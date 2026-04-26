@@ -25,6 +25,9 @@ class TestScene : public Scene {
     using Scene::add_mesh;
     using Scene::add_mesh_instance;
     using Scene::add_node;
+    using Scene::remove_mesh;
+    using Scene::remove_mesh_instance;
+    using Scene::remove_node;
 };
 
 class SceneTest : public ::testing::Test {
@@ -69,7 +72,7 @@ class SceneTest : public ::testing::Test {
 
     // Helper: create a triangle mesh
     static MeshHandle make_triangle(MaterialID mat_id,
-                                    MeshFlags flags = MeshFlags::ForceOpaque) {
+                                    MeshFlags flags = MeshFlags::IsOpaque) {
         std::unique_ptr<SimpleMesh> m = std::make_unique<SimpleMesh>();
         m->material_id = mat_id;
         m->flags = flags;
@@ -101,7 +104,7 @@ TEST_F(SceneTest, Construction) {
                                              material_system);
     EXPECT_NE(scene->get_composition(), nullptr);
     EXPECT_EQ(scene->get_material_system(), material_system);
-    EXPECT_EQ(scene->get_active_camera(), nullptr);
+    EXPECT_FALSE(scene->has_geometry());
 }
 
 // ---------------------------------------------------------------------------
@@ -126,11 +129,11 @@ TEST_F(SceneTest, SceneGraphTransforms) {
     EXPECT_EQ(child_id, 1u);
 
     const auto& graph = scene->get_scene_graph();
-    EXPECT_FLOAT_EQ(graph[root_id].global_transform.value()[0][3], 2.0f);
-    EXPECT_FLOAT_EQ(graph[root_id].global_transform.value()[1][3], 0.0f);
+    EXPECT_FLOAT_EQ(graph[root_id]->global_transform.value()[0][3], 2.0f);
+    EXPECT_FLOAT_EQ(graph[root_id]->global_transform.value()[1][3], 0.0f);
     // Child: global = mul(root, child) => translate (2, 3, 0)
-    EXPECT_FLOAT_EQ(graph[child_id].global_transform.value()[0][3], 2.0f);
-    EXPECT_FLOAT_EQ(graph[child_id].global_transform.value()[1][3], 3.0f);
+    EXPECT_FLOAT_EQ(graph[child_id]->global_transform.value()[0][3], 2.0f);
+    EXPECT_FLOAT_EQ(graph[child_id]->global_transform.value()[1][3], 3.0f);
 }
 
 // ---------------------------------------------------------------------------
@@ -140,6 +143,7 @@ TEST_F(SceneTest, SceneGraphTransforms) {
 TEST_F(SceneTest, MeshGroupingStatic) {
     auto scene = std::make_shared<TestScene>(compile_context, context, allocator, obj_allocator,
                                              material_system);
+    scene->add_camera(std::make_shared<Camera>());
 
     SceneNode node;
     node.name = "node0";
@@ -165,6 +169,7 @@ TEST_F(SceneTest, MeshGroupingStatic) {
 TEST_F(SceneTest, MeshGroupingInstanced) {
     auto scene = std::make_shared<TestScene>(compile_context, context, allocator, obj_allocator,
                                              material_system);
+    scene->add_camera(std::make_shared<Camera>());
 
     SceneNode n0, n1;
     n0.name = "inst0";
@@ -188,6 +193,7 @@ TEST_F(SceneTest, MeshGroupingInstanced) {
 TEST_F(SceneTest, MeshGroupingDynamic) {
     auto scene = std::make_shared<TestScene>(compile_context, context, allocator, obj_allocator,
                                              material_system);
+    scene->add_camera(std::make_shared<Camera>());
 
     SceneNode n0, n1;
     n0.name = "dyn0";
@@ -197,9 +203,9 @@ TEST_F(SceneTest, MeshGroupingDynamic) {
 
     // Two dynamic meshes on different nodes
     MeshID m0 =
-        scene->add_mesh(make_triangle(0, MeshFlags::ForceOpaque | MeshFlags::IsDynamic));
+        scene->add_mesh(make_triangle(0, MeshFlags::IsOpaque | MeshFlags::IsDynamic));
     MeshID m1 =
-        scene->add_mesh(make_triangle(0, MeshFlags::ForceOpaque | MeshFlags::IsDynamic));
+        scene->add_mesh(make_triangle(0, MeshFlags::IsOpaque | MeshFlags::IsDynamic));
     scene->add_mesh_instance(m0, nid0);
     scene->add_mesh_instance(m1, nid1);
 
@@ -218,8 +224,6 @@ TEST_F(SceneTest, CameraManagement) {
     auto scene = std::make_shared<TestScene>(compile_context, context, allocator, obj_allocator,
                                              material_system);
 
-    EXPECT_EQ(scene->get_active_camera(), nullptr);
-
     auto cam = std::make_shared<Camera>();
     scene->add_camera(cam);
     EXPECT_EQ(scene->get_active_camera(), cam);
@@ -228,4 +232,81 @@ TEST_F(SceneTest, CameraManagement) {
     scene->add_camera(cam2);
     scene->set_active_camera(1);
     EXPECT_EQ(scene->get_active_camera(), cam2);
+}
+
+// ---------------------------------------------------------------------------
+// Removal
+// ---------------------------------------------------------------------------
+
+TEST_F(SceneTest, RemoveMeshInstanceLeavesMeshAndOtherInstances) {
+    auto scene = std::make_shared<TestScene>(compile_context, context, allocator, obj_allocator,
+                                             material_system);
+    scene->add_camera(std::make_shared<Camera>());
+
+    NodeID n0 = scene->add_node({});
+    NodeID n1 = scene->add_node({});
+    MeshID m = scene->add_mesh(make_triangle(0));
+    scene->add_mesh_instance(m, n0);
+    scene->add_mesh_instance(m, n1);
+    EXPECT_EQ(scene->get_mesh(m).instances.size(), 2u);
+
+    scene->remove_mesh_instance(m, n0);
+    EXPECT_EQ(scene->get_mesh(m).instances.size(), 1u);
+    EXPECT_EQ(scene->get_mesh(m).instances.count(n1), 1u);
+
+    queue->submit_wait([&](const CommandBufferHandle& cmd) { scene->update(cmd, 0.0f, 0.0f, 0); });
+}
+
+TEST_F(SceneTest, RemoveMeshClearsSlotAndAllowsReuse) {
+    auto scene = std::make_shared<TestScene>(compile_context, context, allocator, obj_allocator,
+                                             material_system);
+    scene->add_camera(std::make_shared<Camera>());
+
+    NodeID n = scene->add_node({});
+    MeshID m0 = scene->add_mesh(make_triangle(0));
+    MeshID m1 = scene->add_mesh(make_triangle(0));
+    scene->add_mesh_instance(m0, n);
+    scene->add_mesh_instance(m1, n);
+    queue->submit_wait([&](const CommandBufferHandle& cmd) { scene->update(cmd, 0.0f, 0.0f, 0); });
+
+    // Remove the top mesh — slot should compact away and be reused on next add.
+    scene->remove_mesh(m1);
+    EXPECT_EQ(scene->get_meshes().size(), m1);
+
+    MeshID m_new = scene->add_mesh(make_triangle(0));
+    EXPECT_EQ(m_new, m1);
+    scene->add_mesh_instance(m_new, n);
+
+    queue->submit_wait([&](const CommandBufferHandle& cmd) { scene->update(cmd, 0.0f, 0.0f, 0); });
+}
+
+TEST_F(SceneTest, RemoveNodeCascadesAndDetachesInstances) {
+    auto scene = std::make_shared<TestScene>(compile_context, context, allocator, obj_allocator,
+                                             material_system);
+    scene->add_camera(std::make_shared<Camera>());
+
+    SceneNode root_node;
+    root_node.name = "root";
+    NodeID root = scene->add_node(root_node);
+
+    SceneNode child_node;
+    child_node.name = "child";
+    child_node.parent = root;
+    NodeID child = scene->add_node(child_node);
+
+    SceneNode leaf_node;
+    leaf_node.name = "leaf";
+    leaf_node.parent = child;
+    NodeID leaf = scene->add_node(leaf_node);
+
+    MeshID m = scene->add_mesh(make_triangle(0));
+    scene->add_mesh_instance(m, leaf);
+    EXPECT_EQ(scene->get_mesh(m).instances.size(), 1u);
+
+    scene->remove_node(root);
+    EXPECT_EQ(scene->get_mesh(m).instances.size(), 0u);
+    // Slots compact: removing the top NodeID drops graph size to root index.
+    EXPECT_EQ(scene->get_scene_graph().size(), root);
+    (void)child;
+    (void)leaf;
 }

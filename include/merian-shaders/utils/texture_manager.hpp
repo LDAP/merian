@@ -4,6 +4,7 @@
 #include "merian/shader/shader_object.hpp"
 #include "merian/shader/slang_composition.hpp"
 #include "merian/shader/slang_program.hpp"
+#include "merian/utils/free_list.hpp"
 #include "merian/utils/versionable.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 
@@ -83,7 +84,7 @@ class TextureManager : public Versionable, public std::enable_shared_from_this<T
     }
 
     uint32_t get_texture_count() const {
-        return texture_count;
+        return ids.count();
     }
 
     uint32_t get_capacity() const {
@@ -124,8 +125,7 @@ class TextureManager : public Versionable, public std::enable_shared_from_this<T
     ResourceAllocatorHandle allocator;
     ShaderObjectAllocatorHandle obj_allocator;
     std::vector<TextureHandle> textures;
-    std::vector<TextureID> free_list;
-    uint32_t texture_count = 0;
+    FreeList<TextureID> ids;
     SlangCompositionHandle composition;
     SlangProgramHandle layout_program;
     ShaderObjectHandle shader_object;

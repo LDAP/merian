@@ -88,14 +88,9 @@ void TextureManager::resize(const uint32_t capacity) {
 }
 
 TextureID TextureManager::allocate_id() {
-    if (!free_list.empty()) {
-        const TextureID id = free_list.back();
-        free_list.pop_back();
-        return id;
-    }
-    const TextureID id = static_cast<TextureID>(texture_count);
+    const TextureID id = ids.acquire();
     if (id >= textures.size()) {
-        resize(textures.size() * 2);
+        resize(static_cast<uint32_t>(textures.size()) * 2);
     }
     return id;
 }
@@ -108,8 +103,7 @@ TextureID TextureManager::add_texture(const TextureHandle& texture) {
 
 void TextureManager::set_texture(const TextureID id, const TextureHandle& texture) {
     assert(id < textures.size());
-    if (!textures[id])
-        texture_count++;
+    ids.acquire(id);
     textures[id] = texture;
     shader_object->get_cursor()["textures"][id] =
         texture ? texture : allocator->get_dummy_texture();
@@ -172,8 +166,7 @@ void TextureManager::set_texture_from_rgba8(const TextureID id,
     assert(id < textures.size());
     const TextureHandle texture = stage_rgba8(data, width, height, address_mode, mag_filter,
                                               min_filter, srgb, generate_mipmaps);
-    if (!textures[id])
-        texture_count++;
+    ids.acquire(id);
     textures[id] = texture;
     // Image is in eUndefined now and will reach eShaderReadOnlyOptimal during the next update().
     // Declaring the access layout up front lets us write the descriptor immediately.
@@ -183,11 +176,10 @@ void TextureManager::set_texture_from_rgba8(const TextureID id,
 
 void TextureManager::remove_texture(const TextureID id) {
     assert(id < textures.size());
-    assert(textures[id] && "Removing already-removed texture");
+    [[maybe_unused]] const bool was_used = ids.release(id);
+    assert(was_used && "Removing already-removed texture");
 
     textures[id].reset();
-    free_list.push_back(id);
-    texture_count--;
     shader_object->get_cursor()["textures"][id] = allocator->get_dummy_texture();
 }
 

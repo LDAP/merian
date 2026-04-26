@@ -6,6 +6,7 @@
 #include "merian/shader/slang_composition.hpp"
 #include "merian/shader/slang_program.hpp"
 #include "merian/utils/camera/camera.hpp"
+#include "merian/utils/free_list.hpp"
 #include "merian/utils/versionable.hpp"
 #include "merian/vk/raytrace/as_builder.hpp"
 
@@ -286,7 +287,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         return !meshes.empty();
     }
 
-    const std::vector<SceneNode>& get_scene_graph() const {
+    const std::vector<std::optional<SceneNode>>& get_scene_graph() const {
         return scene_graph;
     }
 
@@ -295,18 +296,19 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     }
 
     const SceneNode& get_node(const NodeID node_id) {
-        assert(node_id < scene_graph.size());
-        return scene_graph[node_id];
+        assert(node_ids.is_used(node_id));
+        return *scene_graph[node_id];
     }
 
     // Guarantees that the global transform is available (unlike get_node).
     const float4x4& get_global_transform(const NodeID node_id) {
-        assert(scene_graph[node_id].global_transform);
-        return scene_graph[node_id].global_transform.value();
+        assert(node_ids.is_used(node_id));
+        assert(scene_graph[node_id]->global_transform);
+        return scene_graph[node_id]->global_transform.value();
     }
 
     const Mesh& get_mesh(const MeshID mesh_id) {
-        assert(mesh_id < meshes.size());
+        assert(mesh_ids.is_used(mesh_id));
         return *meshes[mesh_id];
     }
 
@@ -355,6 +357,17 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     NodeID add_node(SceneNode node);
 
     void add_mesh_instance(MeshID mesh_id, NodeID node_id);
+
+    // Detach a single instance. No-op if the instance was not present.
+    void remove_mesh_instance(MeshID mesh_id, NodeID node_id);
+
+    // Auto-detaches every instance and frees GPU buffers (deferred to next update()).
+    // Note: the freed MeshID may be reused by a later add_mesh — don't cache it across removes.
+    void remove_mesh(MeshID mesh_id);
+
+    // Cascades to all children and detaches every Mesh::instances entry referencing
+    // node_id (or any descendant). Same id-reuse caveat as remove_mesh.
+    void remove_node(NodeID node_id);
 
     CameraID add_camera(CameraHandle camera);
 
@@ -415,12 +428,18 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     // Scene definition
 
     MaterialSystemHandle material_system;
-    std::vector<MeshHandle> meshes;
-    std::vector<SceneNode> scene_graph;
+    FreeList<MeshID> mesh_ids;
+    std::vector<MeshHandle> meshes; // sized to mesh_ids.size(); null at released slots
+    FreeList<NodeID> node_ids;
+    std::vector<std::optional<SceneNode>> scene_graph; // sized to node_ids.size()
     bool pretransform_dynamic = false;
     std::vector<CameraHandle> cameras;
     uint32_t active_camera = 0;
     AABB aabb; // can be invalid if information is not available.
+
+    // Buffers dropped by remove_mesh; drained at the top of update() via
+    // cmd->keep_until_pool_reset so in-flight cmds keep them alive.
+    std::vector<BufferHandle> pending_buffer_releases;
 
     // --------------------------
     // Debug

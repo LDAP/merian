@@ -3,6 +3,7 @@
 #include "merian/shader/slang_program.hpp"
 #include "merian/utils/normal_encoding.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <fmt/format.h>
 #include <map>
@@ -167,8 +168,11 @@ void Scene::rebuild_shader_object() {
 
 MeshID Scene::add_mesh(MeshHandle mesh) {
     assert(mesh);
-    auto id = static_cast<MeshID>(meshes.size());
-    meshes.push_back(std::move(mesh));
+    const MeshID id = mesh_ids.acquire();
+    if (id >= meshes.size()) {
+        meshes.resize(mesh_ids.size());
+    }
+    meshes[id] = std::move(mesh);
 
     // note we ignore the mesh as long there are no instances
     // in add_mesh_instance the mesh is marked dirty and regrouping is enfored.
@@ -177,11 +181,14 @@ MeshID Scene::add_mesh(MeshHandle mesh) {
 }
 
 NodeID Scene::add_node(SceneNode node) {
-    auto id = static_cast<NodeID>(scene_graph.size());
+    const NodeID id = node_ids.acquire();
+    if (id >= scene_graph.size()) {
+        scene_graph.resize(node_ids.size());
+    }
     if (node.parent != NODE_ID_INVALID) {
-        assert(node.parent < scene_graph.size());
+        assert(node_ids.is_used(node.parent));
 
-        SceneNode& parent = scene_graph[node.parent];
+        SceneNode& parent = *scene_graph[node.parent];
         parent.children.push_back(id);
         assert(parent.global_transform);
         node.global_transform = mul(*parent.global_transform, node.local_transform);
@@ -190,13 +197,13 @@ NodeID Scene::add_node(SceneNode node) {
     }
     node.global_inverse_transposed = inverse(transpose(*node.global_transform));
 
-    scene_graph.push_back(std::move(node));
+    scene_graph[id] = std::move(node);
     return id;
 }
 
 void Scene::add_mesh_instance(const MeshID mesh_id, const NodeID node_id) {
-    assert(mesh_id < meshes.size());
-    assert(node_id < scene_graph.size());
+    assert(mesh_ids.is_used(mesh_id));
+    assert(node_ids.is_used(node_id));
 
     if ((!(meshes[mesh_id]->flags & MeshFlags::IsDynamic) || pretransform_dynamic) &&
         meshes[mesh_id]->instances.size() == 1) {
@@ -208,8 +215,71 @@ void Scene::add_mesh_instance(const MeshID mesh_id, const NodeID node_id) {
     needs_regroup = true;
 }
 
+void Scene::remove_mesh_instance(const MeshID mesh_id, const NodeID node_id) {
+    assert(mesh_ids.is_used(mesh_id));
+    assert(node_ids.is_used(node_id));
+
+    if (meshes[mesh_id]->instances.erase(node_id) > 0) {
+        // pretransform may flip when instance count drops to 1 / 0
+        mark_mesh_dirty(mesh_id);
+        needs_regroup = true;
+    }
+}
+
+void Scene::remove_mesh(const MeshID mesh_id) {
+    assert(mesh_ids.is_used(mesh_id));
+
+    meshes[mesh_id]->instances.clear();
+    meshes[mesh_id].reset();
+
+    // No cmd in scope; defer keep-alive to the next update().
+    if (mesh_id < vertex_buffers.size() && vertex_buffers[mesh_id]) {
+        pending_buffer_releases.push_back(std::move(vertex_buffers[mesh_id]));
+    }
+    if (mesh_id < prev_vertex_buffers.size() && prev_vertex_buffers[mesh_id]) {
+        pending_buffer_releases.push_back(std::move(prev_vertex_buffers[mesh_id]));
+    }
+    if (mesh_id < index_buffers.size() && index_buffers[mesh_id]) {
+        pending_buffer_releases.push_back(std::move(index_buffers[mesh_id]));
+    }
+
+    mesh_ids.release(mesh_id);
+    meshes.resize(mesh_ids.size());
+    vertex_buffers.resize(mesh_ids.size());
+    prev_vertex_buffers.resize(mesh_ids.size());
+    index_buffers.resize(mesh_ids.size());
+    needs_regroup = true;
+}
+
+void Scene::remove_node(const NodeID node_id) {
+    assert(node_ids.is_used(node_id));
+    SceneNode& node = *scene_graph[node_id];
+
+    // Detach from parent's children list.
+    if (node.parent != NODE_ID_INVALID && node_ids.is_used(node.parent)) {
+        auto& siblings = scene_graph[node.parent]->children;
+        siblings.erase(std::remove(siblings.begin(), siblings.end(), node_id), siblings.end());
+    }
+
+    // Cascade. Snapshot first — recursive remove mutates the vector.
+    const std::vector<NodeID> children_snapshot = node.children;
+    for (const NodeID child : children_snapshot) {
+        remove_node(child);
+    }
+
+    // Detach from every mesh that instanced this node. O(meshes); fine for a rare op.
+    for (const MeshID mesh_id : mesh_ids) {
+        meshes[mesh_id]->instances.erase(node_id);
+    }
+    needs_regroup = true;
+
+    scene_graph[node_id].reset();
+    node_ids.release(node_id);
+    scene_graph.resize(node_ids.size());
+}
+
 void Scene::mark_mesh_dirty(const MeshID mesh_id) {
-    assert(mesh_id < meshes.size());
+    assert(mesh_ids.is_used(mesh_id));
     // assert((get_mesh(mesh_id).flags & MeshFlags::IsDynamic) == 0);
     meshes[mesh_id]->dirty = true;
 }
@@ -245,7 +315,7 @@ void Scene::set_pretransform_dynamic(bool value) {
     pretransform_dynamic = value;
 
     // assume all dynamic meshes need reupload.
-    for (MeshID mesh_id = 0; mesh_id < meshes.size(); mesh_id++) {
+    for (const MeshID mesh_id : mesh_ids) {
         if (meshes[mesh_id]->flags & MeshFlags::IsDynamic) {
             mark_mesh_dirty(mesh_id);
         }
@@ -256,7 +326,7 @@ void Scene::node_properties(Properties& props, const SceneNode& node) {
     props.output_text("{}", node);
 
     for (uint32_t i = 0; i < node.children.size(); i++) {
-        const SceneNode& child = scene_graph[node.children[i]];
+        const SceneNode& child = *scene_graph[node.children[i]];
         if (props.st_begin_child(fmt::format("child_{:02} ({})", i, child.name),
                                  fmt::format("Child {:02} ({})", i, child.name))) {
             Scene::node_properties(props, child);
@@ -307,7 +377,7 @@ void Scene::properties(Properties& props) {
         }
 
         if (props.st_begin_child("meshes", "Meshes")) {
-            for (uint32_t id = 0; id < meshes.size(); id++) {
+            for (const MeshID id : mesh_ids) {
                 if (props.st_begin_child(fmt::format("mesh_{:02} ", id),
                                          fmt::format("{:02}: {}", id, meshes[id]->name))) {
                     props.output_text("{}", *meshes[id]);
@@ -318,8 +388,8 @@ void Scene::properties(Properties& props) {
         }
 
         if (props.st_begin_child("graph", "Graph")) {
-            for (uint32_t id = 0; id < scene_graph.size(); id++) {
-                const SceneNode& node = scene_graph[id];
+            for (const NodeID id : node_ids) {
+                const SceneNode& node = *scene_graph[id];
                 if (node.parent != NODE_ID_INVALID) {
                     continue;
                 }
@@ -345,14 +415,14 @@ void Scene::properties(Properties& props) {
     if (props.st_begin_child("stats", "Statistics")) {
         std::size_t total_vertices = 0;
         std::size_t total_triangles = 0;
-        for (const auto& m : meshes) {
-            total_vertices += m->get_vertex_count();
-            total_triangles += m->get_primitive_count();
+        for (const MeshID id : mesh_ids) {
+            total_vertices += meshes[id]->get_vertex_count();
+            total_triangles += meshes[id]->get_primitive_count();
         }
 
         props.output_text("nodes: {}\nmeshes: {}\nvertices: {}\ntriangles: {}\nmaterials: "
                           "{}\ntextures: {}",
-                          scene_graph.size(), meshes.size(), total_vertices, total_triangles,
+                          node_ids.count(), mesh_ids.count(), total_vertices, total_triangles,
                           material_system->get_material_count(),
                           get_texture_manager()->get_texture_count());
 
@@ -376,11 +446,11 @@ void Scene::compute_mesh_groups() {
     auto prev_mesh_groups = std::move(mesh_groups);
     auto prev_mesh_to_group = std::move(mesh_to_group);
     mesh_groups.clear();
-    mesh_to_group.assign(meshes.size(), MESH_GROUP_ID_INVALID);
+    mesh_to_group.assign(mesh_ids.size(), MESH_GROUP_ID_INVALID);
 
     // allow to access prev_mesh_to_group with any (new) MeshID.
-    prev_mesh_to_group.resize(meshes.size(), MESH_GROUP_ID_INVALID);
-    mesh_groups.reserve(std::min(meshes.size(), prev_mesh_groups.size()));
+    prev_mesh_to_group.resize(mesh_ids.size(), MESH_GROUP_ID_INVALID);
+    mesh_groups.reserve(std::min<std::size_t>(mesh_ids.count(), prev_mesh_groups.size()));
 
     // 1. Group meshes according to our grouping logic
 
@@ -395,9 +465,9 @@ void Scene::compute_mesh_groups() {
     std::map<std::set<NodeID>, std::unordered_map<MeshFlags, MeshGroupID>> mesh_groups_instanced;
 
     mesh_groups_static_non_instanced.reserve(32 /*all flags set*/);
-    mesh_groups_dynamic_non_instanced.reserve(scene_graph.size() * 2);
+    mesh_groups_dynamic_non_instanced.reserve(node_ids.count() * 2);
 
-    for (MeshID mesh_id = 0; mesh_id < static_cast<MeshID>(meshes.size()); mesh_id++) {
+    for (const MeshID mesh_id : mesh_ids) {
         const Mesh& mesh = *meshes[mesh_id];
         MeshGroupID group_id = MESH_GROUP_ID_INVALID;
 
@@ -505,7 +575,7 @@ void Scene::upload_geometry_data_and_transforms(const CommandBufferHandle& cmd) 
                 prev_instance_transforms.emplace_back(identity_transform);
                 prev_inverse_transposed_instance_transforms.emplace_back(identity_transform);
             } else {
-                SceneNode& node = scene_graph[node_id];
+                SceneNode& node = *scene_graph[node_id];
 
                 instance_transforms.emplace_back(node.global_transform.value());
                 inverse_transposed_instance_transforms.emplace_back(
@@ -577,10 +647,10 @@ void Scene::upload_geometry_data_and_transforms(const CommandBufferHandle& cmd) 
 void Scene::upload_meshes(const CommandBufferHandle& cmd) {
     // For now we have a index and vertex buffer for each mesh,
     // we could combine them per group or into single buffers in the future.
-    if (meshes.size() > vertex_buffers.size()) {
-        index_buffers.resize(meshes.size());
-        vertex_buffers.resize(meshes.size());
-        prev_vertex_buffers.resize(meshes.size());
+    if (mesh_ids.size() > vertex_buffers.size()) {
+        index_buffers.resize(mesh_ids.size());
+        vertex_buffers.resize(mesh_ids.size());
+        prev_vertex_buffers.resize(mesh_ids.size());
     }
 
     const auto staging = allocator->get_staging();
@@ -646,7 +716,7 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
 
                 // Upload vertices
                 const NodeID node_id = *mesh.instances.begin();
-                const SceneNode& node = scene_graph[node_id];
+                const SceneNode& node = *scene_graph[node_id];
                 assert(node.global_transform);
                 // dont pretransform if identity to save some computations
                 const bool pretransform_mesh =
@@ -799,7 +869,7 @@ void Scene::build_tlas(const CommandBufferHandle& cmd) {
                 tlas_instance.transform.matrix[1][1] = 1.f;
                 tlas_instance.transform.matrix[2][2] = 1.f;
             } else {
-                const auto& t = *scene_graph[node_id].global_transform;
+                const auto& t = *scene_graph[node_id]->global_transform;
                 for (int row = 0; row < 3; row++)
                     for (int col = 0; col < 4; col++)
                         tlas_instance.transform.matrix[row][col] = t[row][col];
@@ -868,6 +938,11 @@ void Scene::update(const CommandBufferHandle& cmd,
 
     assert(!cameras.empty() &&
            "the scene implementation must ensure that there is at least one camera");
+
+    for (auto& buffer : pending_buffer_releases) {
+        cmd->keep_until_pool_reset(std::move(buffer));
+    }
+    pending_buffer_releases.clear();
 
     material_system->update(cmd);
 

@@ -147,7 +147,7 @@ TEST_F(GLTFSceneTest, SceneGraphHierarchy) {
     const auto& graph = scene->get_scene_graph();
     bool has_root = false;
     for (const auto& node : graph) {
-        if (node.parent == NODE_ID_INVALID) {
+        if (node && node->parent == NODE_ID_INVALID) {
             has_root = true;
             break;
         }

@@ -2,6 +2,13 @@ gtest_main_dep = dependency('gtest', main : true, fallback: ['gtest', 'gtest_mai
 
 test_shader_dir_arg = '-DTEST_SHADER_DIR="' + meson.current_source_dir() + '"'
 
+test_free_list = executable(
+    'test-free-list',
+    'test_free_list.cpp',
+    dependencies: [merian_dep, gtest_main_dep],
+)
+test('free_list', test_free_list, timeout: 30)
+
 test_slang_binding = executable(
     'test-slang-binding',
     'test_slang_binding.cpp',
