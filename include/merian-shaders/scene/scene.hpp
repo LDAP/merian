@@ -71,77 +71,72 @@ class SceneNode;
 
 class Mesh {
   public:
-    // General purpose host source
-    struct HostMeshSource {
-        virtual ~HostMeshSource() = default;
+    // ----- General CPU vertex data -----
+    template <typename T> struct HostVertexSource {
+        virtual ~HostVertexSource() = default;
 
-        virtual void write_packed_vertex(uint32_t v, PackedVertexData* dst) const = 0;
-        virtual void write_packed_prev_vertex(uint32_t v, PackedPrevVertexData* dst) const = 0;
-
+        virtual void write_packed_vertex(uint32_t v, T* dst) const = 0;
         virtual void
         write_packed_vertex_pretransformed(uint32_t v,
                                            const float4x4& global_transform,
                                            const float4x4& global_inverse_transposed_transform,
-                                           PackedVertexData* dst) const = 0;
-        virtual void write_packed_prev_vertex_pretransformed(uint32_t v,
-                                                             const float4x4& global_transform,
-                                                             PackedPrevVertexData* dst) const = 0;
-
-        virtual void write_index(uint32_t p, uint3* dst) const = 0;
+                                           T* dst) const = 0;
     };
 
-    using Host = HostMeshSource*;
+    using HostVertices = HostVertexSource<PackedVertexData>*;
+    using HostPrevVertices = HostVertexSource<PackedPrevVertexData>*;
 
-    // CPU memory in the canonical packed layout.
-    struct HostPacked {
-        const PackedVertexData* vertices;
-        const PackedPrevVertexData* prev_vertices; // can be null for static meshes
-        const uint3* indices;
+    // ----- Static prepacked CPU Data -----
+    template <typename T> struct HostPacked {
+        const T* data;
     };
 
-    // GPU staging memory in the canonical packed layout.
-    // Scene copies it into its device-local buffer.
+    // ----- GPU Staged Data (Frequently updated CPU data) -----
     struct DeviceStaged {
-        BufferHandle vertex_buffer;
-        BufferHandle prev_vertex_buffer; // can be null for static meshes
-        BufferHandle index_buffer;
-        vk::DeviceSize vertex_offset = 0;
-        vk::DeviceSize prev_vertex_offset = 0;
-        vk::DeviceSize index_offset = 0;
+        BufferHandle data;
+        vk::DeviceSize offset = 0;
     };
 
-    // GPU device local memory in the canonical packed layout.
-    // The scene can use the buffers directly
+    // ----- GPU Local Data (Procedural/Static GPU data) -----
     struct DeviceLocal {
-        BufferHandle vertex_buffer;
-        BufferHandle prev_vertex_buffer; // can be null for static meshes
-        BufferHandle index_buffer;
-        // TODO: Support offsets here too.
-        // vk::DeviceSize vertex_offset = 0;
-        // vk::DeviceSize prev_vertex_offset = 0;
-        // vk::DeviceSize index_offset = 0;
+        BufferHandle data;
     };
 
-    using MeshData = std::variant<Host, HostPacked, DeviceStaged, DeviceLocal>;
+    using MeshVertexData =
+        std::variant<HostVertices, HostPacked<PackedVertexData>, DeviceStaged, DeviceLocal>;
+
+    // can be std::monostate for static meshes.
+    using MeshPrevVertexData = std::variant<std::monostate,
+                                            HostPrevVertices,
+                                            HostPacked<PackedPrevVertexData>,
+                                            DeviceStaged,
+                                            DeviceLocal>;
+
+    // Layout depends on Mesh::index_type
+    using MeshIndexData = std::variant<HostPacked<void>, DeviceStaged, DeviceLocal>;
 
   public:
     std::string name;
     MaterialID material_id{};
     MeshFlags flags = MeshFlags::IsOpaque;
+    vk::IndexType index_type = vk::IndexType::eUint32;
 
-    // different meanings depending on MeshData type:
-    // - Host*: reupload + device copy + TLAS build
-    // - HostPacked: reupload (including pretransform) + device copy + TLAS build
-    // - DeviceStaged: device copy (TODO: including pretransform) + TLAS build
-    // - DeviceLocal: (TODO: pretransform) + TLAS build
-    bool dirty = true;
+    // different meanings depending on data type:
+    // - Host*: reupload (+ pretransform) + device copy + TLAS build
+    // - DeviceStaged: device copy (TODO: including pretransform on GPU) + TLAS build
+    // - DeviceLocal: (TODO: pretransform on GPU) + TLAS build
+
+    bool vertices_dirty = true;
+    bool indices_dirty = true;
 
     virtual ~Mesh() = default;
 
     virtual uint32_t get_vertex_count() const = 0;
     virtual uint32_t get_primitive_count() const = 0;
 
-    virtual MeshData get_data() const = 0;
+    virtual MeshVertexData get_vertices() const = 0;
+    virtual MeshPrevVertexData get_prev_vertices() const = 0;
+    virtual MeshIndexData get_indices() const = 0;
 
     bool is_dynamic() const {
         return (flags & MeshFlags::IsDynamic);
@@ -164,6 +159,10 @@ class Mesh {
     bool is_opaque() const {
         // if yes, allows to set the force opaque flag when raytracing.
         return flags & MeshFlags::IsOpaque;
+    }
+
+    bool is_dirty() const {
+        return vertices_dirty || indices_dirty;
     }
 
     // ------------------
@@ -193,14 +192,20 @@ class SimpleMesh : public Mesh {
         return static_cast<uint32_t>(indices.size());
     }
 
-    MeshData get_data() const override {
-        assert(is_static() || prev_vertices.size() == vertices.size());
-
-        return HostPacked{
-            vertices.data(),
-            is_static() ? nullptr : prev_vertices.data(),
-            indices.data(),
-        };
+    virtual MeshVertexData get_vertices() const override {
+        return HostPacked<PackedVertexData>(vertices.data());
+    }
+    virtual MeshPrevVertexData get_prev_vertices() const override {
+        if (is_static()) {
+            return std::monostate();
+        }
+        assert(prev_vertices.size() == vertices.size());
+        HostPacked<PackedPrevVertexData> data(prev_vertices.data());
+        return data;
+    }
+    virtual MeshIndexData get_indices() const override {
+        assert(index_type == vk::IndexType::eUint32);
+        return HostPacked<void>(indices.data());
     }
 };
 
@@ -424,10 +429,6 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     }
 
     MeshID add_mesh(MeshHandle mesh);
-
-    // signalize that the geometry of this mesh has changed and needs to be updated on the GPU
-    // and BVHs with this mesh need to be rebuilt.
-    void mark_mesh_dirty(MeshID mesh_id);
 
     NodeID add_node(SceneNode node);
 

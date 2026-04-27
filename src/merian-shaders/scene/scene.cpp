@@ -47,6 +47,21 @@ PackedPrevVertexData pretransform_packed_prev_vertex(const PackedPrevVertexData&
     return PackedPrevVertexData{.position = mul(m, float4(src.position, 1.f))};
 }
 
+// in bytes
+vk::DeviceSize size_for_index_type(const vk::IndexType type) {
+    switch (type) {
+
+    case vk::IndexType::eUint16:
+        return 2;
+    case vk::IndexType::eUint32:
+        return 4;
+    case vk::IndexType::eUint8:
+        return 1;
+    case vk::IndexType::eNoneKHR:
+        assert(false && "not yet supported!");
+    }
+}
+
 } // namespace
 
 // ---------------------------------------------------------------------------
@@ -145,9 +160,6 @@ MeshID Scene::add_mesh(MeshHandle mesh) {
     }
     meshes[id] = std::move(mesh);
 
-    // note we ignore the mesh as long there are no instances
-    // in add_mesh_instance the mesh is marked dirty and regrouping is enfored.
-
     return id;
 }
 
@@ -198,13 +210,14 @@ void Scene::add_mesh_instance(const MeshID mesh_id, const NodeID node_id) {
     assert(mesh_ids.is_used(mesh_id));
     assert(node_ids.is_used(node_id));
 
-    if (meshes[mesh_id]->instances.size() == 1 &&
-        (meshes[mesh_id]->is_static() || pretransform_dynamic)) {
+    Mesh& mesh = *meshes[mesh_id];
+
+    if (mesh.instances.size() == 1 && (mesh.is_static() || pretransform_dynamic)) {
         // - instances was 1 and is static: previously we could pretransform, but now this is not
         // possible anymore.
-        mark_mesh_dirty(mesh_id);
+        mesh.vertices_dirty = true;
     }
-    meshes[mesh_id]->instances.insert(node_id);
+    mesh.instances.insert(node_id);
     needs_regroup = true;
 }
 
@@ -212,12 +225,13 @@ void Scene::remove_mesh_instance(const MeshID mesh_id, const NodeID node_id) {
     assert(mesh_ids.is_used(mesh_id));
     assert(node_ids.is_used(node_id));
 
-    if (meshes[mesh_id]->instances.erase(node_id) > 0) {
-        if (meshes[mesh_id]->instances.size() == 1 &&
-            (meshes[mesh_id]->is_static() || pretransform_dynamic)) {
+    Mesh& mesh = *meshes[mesh_id];
+
+    if (mesh.instances.erase(node_id) > 0) {
+        if (mesh.instances.size() == 1 && (mesh.is_static() || pretransform_dynamic)) {
             // instances droped to 1 and is static: previously we could not pretransform, not this
             // is possible
-            mark_mesh_dirty(mesh_id);
+            mesh.vertices_dirty = true;
         }
         needs_regroup = true;
     }
@@ -280,12 +294,6 @@ void Scene::remove_node(const NodeID node_id) {
     scene_graph.resize(node_ids.size());
 }
 
-void Scene::mark_mesh_dirty(const MeshID mesh_id) {
-    assert(mesh_ids.is_used(mesh_id));
-    // assert((get_mesh(mesh_id).flags & MeshFlags::IsDynamic) == 0);
-    meshes[mesh_id]->dirty = true;
-}
-
 CameraID Scene::add_camera(CameraHandle camera) {
     const CameraID id = cameras.size();
     cameras.push_back(std::move(camera));
@@ -319,7 +327,7 @@ void Scene::set_pretransform_dynamic(bool value) {
     // assume all dynamic meshes need reupload.
     for (const MeshID mesh_id : mesh_ids) {
         if (meshes[mesh_id]->flags & MeshFlags::IsDynamic) {
-            mark_mesh_dirty(mesh_id);
+            meshes[mesh_id]->vertices_dirty = true;
         }
     }
 }
@@ -715,10 +723,11 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
 
         for (const MeshID mesh_id : group.meshes) {
             Mesh& mesh = *meshes[mesh_id];
-            group.blas_dirty |= mesh.dirty;
-
-            if (!mesh.dirty)
+            const bool mesh_dirty = mesh.is_dirty();
+            if (!mesh_dirty)
                 continue;
+
+            group.blas_dirty |= mesh_dirty;
 
             assert(!mesh.instances.empty());
             assert(mesh_id < vertex_buffers.size());
@@ -729,7 +738,8 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
             const uint32_t primitive_count = mesh.get_primitive_count();
             const vk::DeviceSize vb_size = vertex_count * sizeof(PackedVertexData);
             const vk::DeviceSize prev_vb_size = vertex_count * sizeof(PackedPrevVertexData);
-            const vk::DeviceSize ib_size = primitive_count * sizeof(uint3);
+            const vk::DeviceSize ib_size =
+                primitive_count * std::size_t(3) * size_for_index_type(mesh.index_type);
 
             const NodeID node_id = *mesh.instances.begin();
             const float4x4& global_transform = get_global_transform(node_id);
@@ -737,6 +747,38 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                 get_global_inverse_transposed_transform(node_id);
 
             const bool pretransform_mesh = pretransform_group && global_transform != identity();
+
+            // TODO fix with something like:
+
+            // template <typename VariantType, typename GeneratorFunc>
+            // BufferHandle upload_buffer(const VariantType& variant, size_t byte_size,
+            //                               MeshUploader& uploader, GeneratorFunc&&
+            //                               generator_logic) {
+            //     return std::visit(
+            //         [&](auto&& source) -> BufferHandle {
+            //             using T = std::decay_t<decltype(source)>;
+
+            //             if constexpr (is_device_local<T>::value) {
+            //                 return uploader.keep_local(source.data);
+            //             } else if constexpr (is_device_staged<T>::value) {
+            //                 // TODO: If your GPU pretransform logic goes here, pass a flag to
+            //                 // uploader
+            //                 return uploader.copy_staged_to_local(source.data, source.offset,
+            //                                                      byte_size);
+            //             } else if constexpr (is_host_packed<T>::value) {
+            //                 return uploader.upload_host_bytes(source.data, byte_size);
+            //             } else {
+            //                 // It's a HostVirtual source (HostVertices or HostPrevVertices)
+            //                 return uploader.generate_and_upload(
+            //                     byte_size, [&](void* mapped_memory) {
+            //                         // Pass the specific host source and the mapped memory to the
+            //                         // caller's lambda
+            //                         generator_logic(source, mapped_memory);
+            //                     });
+            //             }
+            //         },
+            //         variant);
+            // }
 
             const Mesh::MeshData view = mesh.get_data();
             std::visit(
@@ -910,7 +952,7 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
             triangles.vertexData = vertex_buffers[mesh_id]->get_device_address();
             triangles.vertexStride = sizeof(PackedVertexData);
             triangles.maxVertex = mesh.get_vertex_count() - 1;
-            triangles.indexType = vk::IndexType::eUint32;
+            triangles.indexType = mesh.index_type;
             triangles.indexData = index_buffers[mesh_id]->get_device_address();
 
             vk::AccelerationStructureGeometryKHR geom;

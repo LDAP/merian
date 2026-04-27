@@ -66,6 +66,7 @@ class GLTFMesh : public Mesh, public Mesh::HostMeshSource {
 
     // null -> sequential indices
     const uint8_t* idx_base = nullptr;
+    // TODO: set it on the Mesh!
     int idx_component_type =
         0; // TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE / _UNSIGNED_SHORT / _UNSIGNED_INT
     uint32_t primitive_count = 0;
