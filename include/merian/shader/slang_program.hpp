@@ -31,8 +31,7 @@ using SlangProgramHandle = std::shared_ptr<SlangProgram>;
  * Implements Versionable: when the underlying composition changes, the program
  * automatically recompiles (creating a fresh SlangSession) and increments its version.
  */
-class SlangProgram : public Versionable,
-                     public std::enable_shared_from_this<SlangProgram> {
+class SlangProgram : public Versionable, public std::enable_shared_from_this<SlangProgram> {
   protected:
     SlangProgram(const ShaderCompileContextHandle& compile_context,
                  const SlangCompositionHandle& composition);

@@ -54,7 +54,7 @@ ShaderCursor ShaderCursor::field(uint32_t index) {
         return ShaderCursor();
     }
 
-    assert(index < type_layout->getFieldCount());
+    assert(index < get_field_count());
 
     slang::VariableLayoutReflection* field_var = type_layout->getFieldByIndex(index);
     slang::TypeLayoutReflection* field_type_layout = field_var->getTypeLayout();
@@ -75,7 +75,7 @@ ShaderCursor ShaderCursor::element(uint32_t index) {
         return ShaderCursor();
     }
 
-    // Auto-dereference PB/CB to navigate into their element type
+    // Auto-dereference ParameterBlock and ConstantBuffer to navigate into their element type
     if (is_parameter_block() || is_constant_buffer()) {
         return dereference().element(index);
     }
@@ -84,6 +84,7 @@ ShaderCursor ShaderCursor::element(uint32_t index) {
     switch (kind) {
     case slang::TypeReflection::Kind::Array: {
         assert(get_element_type_layout());
+        assert(index < get_element_count());
 
         ShaderCursor result;
         result.base_object = base_object;
@@ -97,6 +98,7 @@ ShaderCursor ShaderCursor::element(uint32_t index) {
     case slang::TypeReflection::Kind::Vector:
     case slang::TypeReflection::Kind::Matrix: {
         assert(get_element_type_layout());
+        assert(index < get_element_count());
 
         ShaderCursor result;
         result.base_object = base_object;

@@ -67,13 +67,15 @@ Scene::Scene(const ShaderCompileContextHandle& compile_context,
                .get_acceleration_structure_features_khr()
                .accelerationStructure == VK_TRUE);
 
-    // Build composition once — subsequent changes modify in-place.
     composition = SlangComposition::create();
     composition->add_composition(material_system->get_composition());
     composition->add_module_from_path("merian-shaders/scene/scene.slang");
     composition->add_module_from_path("merian-shaders/scene/camera.slang");
     composition->add_module_from_path("merian-shaders/scene/environment-map.slang");
     composition->add_module_from_path("merian-shaders/scene/acceleration-structure.slang");
+
+    layout_program = SlangProgram::create(compile_context, composition);
+    layout_program->on_changed(layout_program, [&] { rebuild_shader_object(); });
 
     rebuild_shader_object();
 
@@ -96,19 +98,15 @@ Scene::Scene(const ShaderCompileContextHandle& compile_context,
 }
 
 void Scene::rebuild_shader_object() {
-    if (!layout_program) {
-        layout_program = SlangProgram::create(compile_context, composition);
-    }
+    SPDLOG_DEBUG("recreate shader object");
 
     shader_object = layout_program->create_shader_object(context, "merian::Scene", obj_allocator);
 
     auto c = shader_object->get_cursor();
 
     c["material_system"] = material_system;
-    material_system->on_changed(shader_object, [&] {
-        auto c = shader_object->get_cursor();
-        c["material_system"] = material_system;
-    });
+    material_system->on_changed(
+        shader_object, [&] { shader_object->get_cursor()["material_system"] = material_system; });
 
     c["geometries"] = geometries_buffer ? geometries_buffer : allocator->get_dummy_buffer();
 

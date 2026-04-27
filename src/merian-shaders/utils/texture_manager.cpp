@@ -23,6 +23,8 @@ TextureManager::TextureManager(const ShaderCompileContextHandle& compile_context
     update_composition_constants();
 
     layout_program = SlangProgram::create(compile_context, composition);
+    layout_program->on_changed(layout_program, [&] { rebuild_shader_object(); });
+
     rebuild_shader_object();
 }
 
@@ -34,6 +36,7 @@ void TextureManager::update_composition_constants() {
 }
 
 void TextureManager::rebuild_shader_object() {
+    SPDLOG_DEBUG("recreate shader object");
     shader_object =
         layout_program->create_shader_object(context, "merian::TextureManager", obj_allocator);
 
@@ -43,6 +46,8 @@ void TextureManager::rebuild_shader_object() {
     for (uint32_t i = 0; i < textures.size(); i++) {
         cursor["textures"][i] = textures[i] ? textures[i] : dummy;
     }
+
+    increment_version();
 }
 
 void TextureManager::update(const CommandBufferHandle& cmd) {
@@ -83,8 +88,6 @@ void TextureManager::resize(const uint32_t capacity) {
 
     textures.resize(capacity);
     update_composition_constants();
-    rebuild_shader_object();
-    increment_version();
 }
 
 TextureID TextureManager::allocate_id() {

@@ -32,8 +32,8 @@ MaterialSystem::MaterialSystem(const ShaderCompileContextHandle& compile_context
     composition->add_module_from_path("merian-shaders/shading/materials/material-system.slang");
     update_composition_constants();
 
-    // Create a persistent program that listens to composition changes.
     layout_program = SlangProgram::create(compile_context, composition);
+    layout_program->on_changed(layout_program, [&] { rebuild_shader_object(); });
 
     rebuild_shader_object();
 }
@@ -47,9 +47,17 @@ void MaterialSystem::update_composition_constants() {
 }
 
 void MaterialSystem::rebuild_shader_object() {
+    SPDLOG_DEBUG("recreate shader object");
+
     shader_object =
         layout_program->create_shader_object(context, "merian::MaterialSystem", obj_allocator);
     shader_object->get_cursor()["texture_manager"] = texture_manager->get_shader_object();
+
+    texture_manager->on_changed(shader_object, [&] {
+        shader_object->get_cursor()["texture_manager"] = texture_manager->get_shader_object();
+    });
+
+    increment_version();
 }
 
 MaterialModelID MaterialSystem::register_material_type(const std::string& slang_type_name,
@@ -57,12 +65,9 @@ MaterialModelID MaterialSystem::register_material_type(const std::string& slang_
     auto dispatch_id = static_cast<MaterialModelID>(material_types.size());
     material_types.push_back({slang_type_name, slang_module_path, dispatch_id});
 
-    // Modify composition in-place — triggers program rebuild via Versionable chain
+    // triggers program rebuild via listener
     composition->add_module_from_path(slang_module_path);
     composition->add_type_conformance("merian::MaterialModel", slang_type_name, dispatch_id);
-
-    rebuild_shader_object();
-    increment_version();
     return dispatch_id;
 }
 
@@ -96,8 +101,6 @@ MaterialID MaterialSystem::add_material(const MaterialModelID type_id, const Mat
         max_payload_size = payload_bytes;
         // Update constants in-place — triggers program rebuild via Versionable chain
         update_composition_constants();
-        rebuild_shader_object();
-        increment_version();
 
         // Entry size changed — repack everything
         materials.push_back(std::move(stored));
