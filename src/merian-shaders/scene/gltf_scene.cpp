@@ -1,5 +1,7 @@
 #include "merian-shaders/scene/gltf_scene.hpp"
 
+#include "merian/utils/normal_encoding.hpp"
+
 #include <fmt/format.h>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -45,7 +47,12 @@ template <typename T> T read_strided(const uint8_t* base, int byte_stride, uint3
 }
 
 // Mesh referencing buffer data in a tinygltf::Model (owned by GLTFScene).
-class GLTFMesh : public Mesh {
+//
+// glTF meshes carry strided + arbitrarily-typed source data; they aren't in
+// the canonical PackedVertexData layout. So GLTFMesh implements
+// HostUnpackedSource: Scene calls write_packed_vertex / write_index per
+// element during upload_meshes and packs into device-local buffers.
+class GLTFMesh : public Mesh, public Mesh::HostMeshSource {
   public:
     const uint8_t* pos_base = nullptr;
     int pos_stride = 0;
@@ -70,39 +77,91 @@ class GLTFMesh : public Mesh {
         return primitive_count;
     }
 
-    float3 get_position(uint32_t v) const override {
+    MeshData get_data() const override {
+        return static_cast<Mesh::Host>(const_cast<GLTFMesh*>(this));
+    }
+
+    // ---- HostMeshSource ----
+
+    void write_packed_vertex(uint32_t v, PackedVertexData* dst) const override {
+        const float3 pos = get_position(v);
+        const float3 nrm = get_normal(v);
+        const float2 uv = get_uv(v);
+        const float4 tan = get_tangent(v);
+        dst->position = pos;
+        dst->encoded_normal = encode_normal(nrm);
+        dst->uv = half2(uv.x, uv.y);
+        const uint32_t enc = encode_normal(float3(tan.x, tan.y, tan.z));
+        dst->encoded_tangent = (enc & ~1u) | (tan.w < 0.f ? 1u : 0u);
+    }
+
+    void write_packed_prev_vertex(uint32_t /*v*/, PackedPrevVertexData* /*dst*/) const override {
+        assert(false);
+    }
+
+    void write_packed_vertex_pretransformed(uint32_t v,
+                                            const float4x4& m,
+                                            const float4x4& it,
+                                            PackedVertexData* dst) const override {
+        const float3 pos = get_position(v);
+        const float3 nrm = get_normal(v);
+        const float2 uv = get_uv(v);
+        const float4 tan = get_tangent(v);
+
+        dst->position = mul(m, float4(pos, 1.f));
+        dst->encoded_normal =
+            encode_normal(normalize(float3(mul(it, float4(nrm, 0.f)))));
+        dst->uv = half2(uv.x, uv.y);
+        const float3 tw = normalize(float3(mul(it, float4(tan.x, tan.y, tan.z, 0.f))));
+        const uint32_t enc = encode_normal(tw);
+        dst->encoded_tangent = (enc & ~1u) | (tan.w < 0.f ? 1u : 0u);
+    }
+
+    void write_packed_prev_vertex_pretransformed(uint32_t /*v*/,
+                                                 const float4x4& /*m*/,
+                                                 PackedPrevVertexData* /*dst*/) const override {
+        assert(false);
+    }
+
+    void write_index(uint32_t p, uint3* dst) const override {
+        if (idx_base == nullptr) {
+            *dst = uint3(p * 3, p * 3 + 1, p * 3 + 2);
+            return;
+        }
+        if (idx_component_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
+            const auto* src = reinterpret_cast<const uint16_t*>(idx_base);
+            *dst = uint3(src[p * 3], src[p * 3 + 1], src[p * 3 + 2]);
+            return;
+        }
+        if (idx_component_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT) {
+            const auto* src = reinterpret_cast<const uint32_t*>(idx_base);
+            *dst = uint3(src[p * 3], src[p * 3 + 1], src[p * 3 + 2]);
+            return;
+        }
+        // TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE
+        *dst = uint3(idx_base[p * 3], idx_base[p * 3 + 1], idx_base[p * 3 + 2]);
+    }
+
+  private:
+    // ---- private accessors used by the write_* implementations ----
+
+    float3 get_position(uint32_t v) const {
         return read_strided<float3>(pos_base, pos_stride, v);
     }
-    float3 get_normal(uint32_t v) const override {
+    float3 get_normal(uint32_t v) const {
         if (nrm_base == nullptr)
             return float3(0, 1, 0);
         return read_strided<float3>(nrm_base, nrm_stride, v);
     }
-    float2 get_uv(uint32_t v) const override {
+    float2 get_uv(uint32_t v) const {
         if (uv_base == nullptr)
             return float2(0, 0);
         return read_strided<float2>(uv_base, uv_stride, v);
     }
-    float4 get_tangent(uint32_t v) const override {
+    float4 get_tangent(uint32_t v) const {
         if (tan_base == nullptr)
             return float4(1, 0, 0, 1);
         return read_strided<float4>(tan_base, tan_stride, v);
-    }
-
-    uint3 get_indices(uint32_t p) const override {
-        if (idx_base == nullptr) {
-            return uint3(p * 3, p * 3 + 1, p * 3 + 2);
-        }
-        if (idx_component_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
-            const auto* src = reinterpret_cast<const uint16_t*>(idx_base);
-            return uint3(src[p * 3], src[p * 3 + 1], src[p * 3 + 2]);
-        }
-        if (idx_component_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT) {
-            const auto* src = reinterpret_cast<const uint32_t*>(idx_base);
-            return uint3(src[p * 3], src[p * 3 + 1], src[p * 3 + 2]);
-        }
-        // TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE
-        return uint3(idx_base[p * 3], idx_base[p * 3 + 1], idx_base[p * 3 + 2]);
     }
 };
 

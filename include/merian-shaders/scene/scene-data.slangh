@@ -11,7 +11,12 @@ import merian_shaders.utils.encoding;
 namespace merian {
 
 enum GeometryDataFlags : uint16_t {
+    // Pretransformed means the data in vertex_buffers[mesh_id]
+    // is already in world space and the shader can skip the
+    // instance transform multiply.
     Pretransformed = 0x1,
+    // Needs to read the prev_vertices.
+    IsDynamic = 0x2,
 };
 
 // See scene.hpp for details.

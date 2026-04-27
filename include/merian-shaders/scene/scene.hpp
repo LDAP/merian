@@ -11,11 +11,12 @@
 #include "merian/vk/raytrace/as_builder.hpp"
 
 #include <optional>
+#include <variant>
 #include <vector>
 
 namespace merian {
 
-enum MeshFlags : uint32_t {
+enum class MeshFlags : uint32_t {
     None = 0,
     IsDynamic = 0x1,             // default: static
     IsOpaque = 0x2,              // default: treat all as non-opaque (allow alpha mask)
@@ -54,6 +55,9 @@ class SceneNode {
     std::optional<float4x4> global_transform;
     // Cached inverse-transpose of global_transform; computed alongside global_transform.
     std::optional<float4x4> global_inverse_transposed;
+
+    std::optional<float4x4> prev_global_transform;
+    std::optional<float4x4> prev_global_inverse_transposed;
 };
 
 inline std::string format_as(const SceneNode& node) {
@@ -63,11 +67,73 @@ inline std::string format_as(const SceneNode& node) {
         node.local_transform, node.global_transform.value_or(float4x4(0)));
 }
 
+class SceneNode;
+
 class Mesh {
+  public:
+    // General purpose host source
+    struct HostMeshSource {
+        virtual ~HostMeshSource() = default;
+
+        virtual void write_packed_vertex(uint32_t v, PackedVertexData* dst) const = 0;
+        virtual void write_packed_prev_vertex(uint32_t v, PackedPrevVertexData* dst) const = 0;
+
+        virtual void
+        write_packed_vertex_pretransformed(uint32_t v,
+                                           const float4x4& global_transform,
+                                           const float4x4& global_inverse_transposed_transform,
+                                           PackedVertexData* dst) const = 0;
+        virtual void write_packed_prev_vertex_pretransformed(uint32_t v,
+                                                             const float4x4& global_transform,
+                                                             PackedPrevVertexData* dst) const = 0;
+
+        virtual void write_index(uint32_t p, uint3* dst) const = 0;
+    };
+
+    using Host = HostMeshSource*;
+
+    // CPU memory in the canonical packed layout.
+    struct HostPacked {
+        const PackedVertexData* vertices;
+        const PackedPrevVertexData* prev_vertices; // can be null for static meshes
+        const uint3* indices;
+    };
+
+    // GPU staging memory in the canonical packed layout.
+    // Scene copies it into its device-local buffer.
+    struct DeviceStaged {
+        BufferHandle vertex_buffer;
+        BufferHandle prev_vertex_buffer; // can be null for static meshes
+        BufferHandle index_buffer;
+        vk::DeviceSize vertex_offset = 0;
+        vk::DeviceSize prev_vertex_offset = 0;
+        vk::DeviceSize index_offset = 0;
+    };
+
+    // GPU device local memory in the canonical packed layout.
+    // The scene can use the buffers directly
+    struct DeviceLocal {
+        BufferHandle vertex_buffer;
+        BufferHandle prev_vertex_buffer; // can be null for static meshes
+        BufferHandle index_buffer;
+        // TODO: Support offsets here too.
+        // vk::DeviceSize vertex_offset = 0;
+        // vk::DeviceSize prev_vertex_offset = 0;
+        // vk::DeviceSize index_offset = 0;
+    };
+
+    using MeshData = std::variant<Host, HostPacked, DeviceStaged, DeviceLocal>;
+
   public:
     std::string name;
     MaterialID material_id{};
     MeshFlags flags = MeshFlags::IsOpaque;
+
+    // different meanings depending on MeshData type:
+    // - Host*: reupload + device copy + TLAS build
+    // - HostPacked: reupload (including pretransform) + device copy + TLAS build
+    // - DeviceStaged: device copy (TODO: including pretransform) + TLAS build
+    // - DeviceLocal: (TODO: pretransform) + TLAS build
     bool dirty = true;
 
     virtual ~Mesh() = default;
@@ -75,30 +141,10 @@ class Mesh {
     virtual uint32_t get_vertex_count() const = 0;
     virtual uint32_t get_primitive_count() const = 0;
 
-    virtual float3 get_position(uint32_t vertex_idx) const = 0;
-    virtual float3 get_prev_position(uint32_t vertex_idx) const {
-        return get_position(vertex_idx);
-    }
-    virtual float3 get_normal(uint32_t vertex_idx) const = 0;
-    virtual float2 get_uv(uint32_t vertex_idx) const = 0;
-    // bitangent = cross(normal, tangent.xyz) * tangent.w
-    virtual float4 get_tangent(uint32_t vertex_idx) const = 0;
-
-    virtual uint3 get_indices(uint32_t primitive_idx) const = 0;
-
-    // ------------------------
-    // default implementation calls the above methods
-    // can be overwritten for performance
-
-    virtual PackedVertexData get_packed_vertex(uint32_t vertex_idx) const;
-    virtual PackedVertexData get_packed_vertex_pretransformed(uint32_t vertex_idx,
-                                                              const SceneNode& node) const;
-    virtual PackedPrevVertexData get_packed_prev_vertex(uint32_t vertex_idx) const;
-    virtual PackedPrevVertexData get_packed_prev_vertex_pretransformed(uint32_t vertex_idx,
-                                                                       const SceneNode& node) const;
+    virtual MeshData get_data() const = 0;
 
     bool is_dynamic() const {
-        return flags & MeshFlags::IsDynamic;
+        return (flags & MeshFlags::IsDynamic);
     }
 
     bool is_static() const {
@@ -134,10 +180,10 @@ inline std::string format_as(const Mesh& mesh) {
                        mesh.instances.size());
 }
 
-// Concrete Mesh that owns its vertex/index data.
 class SimpleMesh : public Mesh {
   public:
     std::vector<PackedVertexData> vertices;
+    std::vector<PackedPrevVertexData> prev_vertices;
     std::vector<uint3> indices;
 
     uint32_t get_vertex_count() const override {
@@ -147,17 +193,14 @@ class SimpleMesh : public Mesh {
         return static_cast<uint32_t>(indices.size());
     }
 
-    float3 get_position(uint32_t vertex_idx) const override {
-        return vertices[vertex_idx].position;
-    }
-    float3 get_normal(uint32_t vertex_idx) const override;
-    float2 get_uv(uint32_t vertex_idx) const override {
-        return float2(vertices[vertex_idx].uv);
-    }
-    float4 get_tangent(uint32_t vertex_idx) const override;
+    MeshData get_data() const override {
+        assert(is_static() || prev_vertices.size() == vertices.size());
 
-    uint3 get_indices(uint32_t primitive_idx) const override {
-        return indices[primitive_idx];
+        return HostPacked{
+            vertices.data(),
+            is_static() ? nullptr : prev_vertices.data(),
+            indices.data(),
+        };
     }
 };
 
@@ -295,16 +338,48 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         return meshes;
     }
 
+    // to get transforms use get_*_transform(...)
     const SceneNode& get_node(const NodeID node_id) {
         assert(node_ids.is_used(node_id));
         return *scene_graph[node_id];
     }
 
     // Guarantees that the global transform is available (unlike get_node).
+    const float4x4& get_global_transform(SceneNode& node) {
+        if (!node.global_transform) {
+            if (node.parent != NODE_ID_INVALID) {
+                assert(node_ids.is_used(node.parent));
+                assert(scene_graph[node.parent]);
+                node.global_transform =
+                    mul(get_global_transform(*scene_graph[node.parent]), node.local_transform);
+            } else {
+                node.global_transform = node.local_transform;
+            }
+        }
+
+        return node.global_transform.value();
+    }
+
+    // Guarantees that the global transform is available (unlike get_node).
+    const float4x4& get_global_inverse_transposed_transform(SceneNode& node) {
+        if (!node.global_inverse_transposed) {
+            node.global_inverse_transposed = inverse(transpose(get_global_transform(node)));
+        }
+
+        return node.global_inverse_transposed.value();
+    }
+
+    // Guarantees that the global transform is available (unlike get_node).
     const float4x4& get_global_transform(const NodeID node_id) {
         assert(node_ids.is_used(node_id));
-        assert(scene_graph[node_id]->global_transform);
-        return scene_graph[node_id]->global_transform.value();
+        assert(scene_graph[node_id]);
+        return get_global_transform(*scene_graph[node_id]);
+    }
+
+    const float4x4& get_global_inverse_transposed_transform(const NodeID node_id) {
+        assert(node_ids.is_used(node_id));
+        assert(scene_graph[node_id]);
+        return get_global_inverse_transposed_transform(*scene_graph[node_id]);
     }
 
     const Mesh& get_mesh(const MeshID mesh_id) {
@@ -350,23 +425,22 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
 
     MeshID add_mesh(MeshHandle mesh);
 
-    // signalize that the geometry of this mesh has changed and needs to be reuploaded to the GPU
+    // signalize that the geometry of this mesh has changed and needs to be updated on the GPU
     // and BVHs with this mesh need to be rebuilt.
     void mark_mesh_dirty(MeshID mesh_id);
 
     NodeID add_node(SceneNode node);
 
+    void update_node(NodeID node_id, const float4x4& local_transform);
+
     void add_mesh_instance(MeshID mesh_id, NodeID node_id);
 
-    // Detach a single instance. No-op if the instance was not present.
     void remove_mesh_instance(MeshID mesh_id, NodeID node_id);
 
-    // Auto-detaches every instance and frees GPU buffers (deferred to next update()).
-    // Note: the freed MeshID may be reused by a later add_mesh — don't cache it across removes.
+    // Removes the mesh and its instances.
     void remove_mesh(MeshID mesh_id);
 
-    // Cascades to all children and detaches every Mesh::instances entry referencing
-    // node_id (or any descendant). Same id-reuse caveat as remove_mesh.
+    // Removes the node, its children and attached instances.
     void remove_node(NodeID node_id);
 
     CameraID add_camera(CameraHandle camera);
@@ -387,6 +461,9 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
   private:
     void rebuild_shader_object();
 
+    // invalidates the global transform of this node and its children.
+    void invalidate_node(SceneNode& node);
+
     // Computes mesh groups according to the grouping logic above.
     //
     // instanced meshes must have the same instances and non-instanced dynamic meshes are only
@@ -399,7 +476,11 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
 
     // this only changes if the mesh groups changed or if a transform changes (TODO: selectively
     // upload transforms)
-    void upload_geometry_data_and_transforms(const CommandBufferHandle& cmd);
+    void upload_geometry_data(const CommandBufferHandle& cmd);
+
+    // this only changes if the mesh groups changed or if a transform changes (TODO: selectively
+    // upload transforms)
+    void upload_transforms(const CommandBufferHandle& cmd);
 
     // uploads the meshes, geometry data, and instance transforms
     void upload_meshes(const CommandBufferHandle& cmd);
@@ -449,7 +530,8 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     // --------------------------
     // Cached and Precomputed
 
-    bool needs_regroup = false; // a mesh was instanced
+    bool needs_regroup = false;      // a mesh was instanced
+    bool transforms_changed = false; // a node was updated
 
     inline static const MeshGroupID MESH_GROUP_ID_INVALID = MeshGroupID(-1);
     std::vector<MeshGroup> mesh_groups;
@@ -492,60 +574,6 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     AccelerationStructureHandle tlas;
 
     Camera prev_active_camera;
-
-    // // Per-mesh: list of geometry instance indices for each instance of this mesh.
-    // // mesh_id_to_instance_ids[mesh_id][i] = global geometry instance index.
-    // std::vector<std::vector<uint32_t>> mesh_id_to_instance_ids;
-
-    // // Per-mesh: index of the mesh group containing this mesh. UINT32_MAX if
-    // // the mesh is not assigned to any group (no instances). Set by
-    // // create_mesh_groups; consumed by mark_mesh_data_dirty handling.
-    // std::vector<uint32_t> mesh_id_to_group_id;
-
-    // // Per-mesh dirty bit: when true, the mesh's vertex/index data must be
-    // // re-uploaded and its group's BLAS rebuilt on the next update(). Set
-    // // via mark_mesh_data_dirty; cleared inside update().
-    // std::vector<bool> mesh_data_dirty;
-
-    // // Flat array of GeometryData ordered for InstanceID+GeometryIndex lookup.
-    // std::vector<GeometryData> geometry_instance_data;
-    // std::vector<BufferHandle> vertex_buffers;
-    // std::vector<BufferHandle> index_buffers;
-    // BufferHandle geometry_data_buffer;
-    // BufferHandle instance_transforms_buffer;
-    // BufferHandle inverse_transposed_instance_transforms_buffer;
-    // BufferHandle prev_instance_transforms_buffer;
-    // BufferHandle prev_inverse_transposed_instance_transforms_buffer;
-    // std::vector<float4x4> prev_instance_transforms_data;
-
-    // bool build_as = false;
-    //
-    // std::vector<AccelerationStructureHandle> blas_list;
-    // AccelerationStructureHandle tlas;
-    // BufferHandle tlas_instances_buffer;
-    // // Keepalive ring for tlas_instances_buffer: build_tlas can be called every
-    // // frame for dynamic scenes, and the previous buffer may still be referenced
-    // // by an in-flight command buffer. Sizing is conservative (covers up to 4
-    // // frames in flight, which is more than any current swapchain config uses).
-    // static constexpr uint32_t TLAS_INSTANCES_KEEPALIVE = 4;
-    // std::array<BufferHandle, TLAS_INSTANCES_KEEPALIVE> tlas_instances_keepalive;
-    // uint32_t tlas_instances_keepalive_idx = 0;
-    // BufferHandle scratch_buffer;
-    // bool bvh_dirty = true;
-    //
-    // bool geometry_dirty = true;
-
-    // // Placeholder fallback for the empty-scene case: lets us bind a real
-    // // (but empty) buffer/TLAS to every Scene descriptor slot when no
-    // // geometry has been added yet, so consumers that gate on
-    // // has_geometry() (e.g. gbuffer_rt) can still construct/validate their
-    // // descriptor sets.
-    // //
-    // // TODO: with VK_EXT_robustness2's nullDescriptor enabled the
-    // // bindings can legally stay null and this whole fallback can be
-    // // skipped. Wire a fast path once the device feature is requested.
-    // BufferHandle placeholder_buffer;
-    // AccelerationStructureHandle placeholder_tlas;
 };
 
 using SceneHandle = std::shared_ptr<Scene>;
