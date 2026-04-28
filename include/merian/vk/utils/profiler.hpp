@@ -285,7 +285,6 @@ class ProfileScopeGPU {
 #endif
 };
 
-// Default profiler for MERIAN_PROFILE_* macros
 ProfilerHandle get_default_profiler() noexcept;
 
 class [[nodiscard]] ScopedDefaultProfiler {
@@ -313,7 +312,6 @@ class [[nodiscard]] ScopedDefaultProfiler {
 #define MERIAN_PP_PICK_3(_1, _2, _3, NAME, ...) NAME
 
 #ifdef MERIAN_PROFILER_ENABLE
-    // 1-arg form uses the registered default profiler; 2-arg form is explicit.
     #define MERIAN_PROFILE_SCOPE_1(name) \
         merian::ProfileScope merian_profile_scope(merian::get_default_profiler(), name)
     #define MERIAN_PROFILE_SCOPE_2(profiler, name) \
@@ -321,7 +319,6 @@ class [[nodiscard]] ScopedDefaultProfiler {
     #define MERIAN_PROFILE_SCOPE(...) \
         MERIAN_PP_EXPAND(MERIAN_PP_PICK_2(__VA_ARGS__, MERIAN_PROFILE_SCOPE_2, MERIAN_PROFILE_SCOPE_1)(__VA_ARGS__))
 
-    // 2-arg form (cmd, name) uses the registered default; 3-arg form is explicit.
     #define MERIAN_PROFILE_SCOPE_GPU_2(cmd, name) \
         merian::ProfileScopeGPU merian_profile_scope(merian::get_default_profiler(), cmd, name)
     #define MERIAN_PROFILE_SCOPE_GPU_3(profiler, cmd, name) \
@@ -329,7 +326,6 @@ class [[nodiscard]] ScopedDefaultProfiler {
     #define MERIAN_PROFILE_SCOPE_GPU(...) \
         MERIAN_PP_EXPAND(MERIAN_PP_PICK_3(__VA_ARGS__, MERIAN_PROFILE_SCOPE_GPU_3, MERIAN_PROFILE_SCOPE_GPU_2)(__VA_ARGS__))
 #else
-    // sizeof prevents accidental evaluation of side-effecting macro arguments.
     #define MERIAN_PROFILE_DISCARD_1(a)       ((void)sizeof(a))
     #define MERIAN_PROFILE_DISCARD_2(a, b)    ((void)sizeof(a), (void)sizeof(b))
     #define MERIAN_PROFILE_DISCARD_3(a, b, c) ((void)sizeof(a), (void)sizeof(b), (void)sizeof(c))
