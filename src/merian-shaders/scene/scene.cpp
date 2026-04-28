@@ -207,7 +207,7 @@ void Scene::add_mesh_instance(const MeshID mesh_id, const NodeID node_id) {
 
     Mesh& mesh = *meshes[mesh_id];
 
-    if (mesh.instances.size() == 1 && (!mesh.is_dynamic() || pretransform_dynamic)) {
+    if (mesh.instances.size() == 1 && (!mesh.is_dynamic() || pretransform_animated)) {
         mesh.vertices_dirty = true;
     }
     mesh.instances.insert(node_id);
@@ -227,7 +227,7 @@ void Scene::remove_mesh_instance(const MeshID mesh_id, const NodeID node_id) {
             assert(mesh.animated_instance_count > 0);
             mesh.animated_instance_count--;
         }
-        if (mesh.instances.size() == 1 && (!mesh.is_dynamic() || pretransform_dynamic)) {
+        if (mesh.instances.size() == 1 && (!mesh.is_dynamic() || pretransform_animated)) {
             mesh.vertices_dirty = true;
         }
         needs_regroup = true;
@@ -413,11 +413,11 @@ void Scene::pretransform_prev_vertices_gpu(const CommandBufferHandle& cmd,
     cmd->dispatch((vertex_count + PRETRANSFORM_LOCAL_SIZE_X - 1) / PRETRANSFORM_LOCAL_SIZE_X, 1, 1);
 }
 
-void Scene::set_pretransform_dynamic(bool value) {
-    if (pretransform_dynamic == value)
+void Scene::set_pretransform_animated(bool value) {
+    if (pretransform_animated == value)
         return;
 
-    pretransform_dynamic = value;
+    pretransform_animated = value;
 
     needs_regroup = true;
 }
@@ -505,7 +505,7 @@ void Scene::properties(Properties& props) {
                         group.meshes.empty() ? 0 : group.get_instances(meshes).size();
                     const bool pretransformed =
                         !group.meshes.empty() &&
-                        group.is_pretranformed(meshes, pretransform_dynamic);
+                        group.is_pretranformed(meshes, pretransform_animated);
                     std::size_t group_vertices = 0;
                     std::size_t group_triangles = 0;
                     for (const MeshID mesh_id : group.meshes) {
@@ -551,9 +551,9 @@ void Scene::properties(Properties& props) {
     }
 
     if (props.st_begin_child("settings", "Settings")) {
-        bool pretransform = get_pretransform_dynamic();
-        if (props.config_bool("Pretransform Dyanmic", pretransform)) {
-            set_pretransform_dynamic(pretransform);
+        bool pretransform = get_pretransform_animated();
+        if (props.config_bool("Pretransform Animated", pretransform)) {
+            set_pretransform_animated(pretransform);
         }
         props.st_end_child();
     }
@@ -586,7 +586,7 @@ void Scene::properties(Properties& props) {
             mesh_groups.size(), total_vertices, total_triangles,
             material_system->get_material_count(), get_texture_manager()->get_texture_count(),
             tlas_instances.size(), pending_buffer_releases.size(), needs_regroup,
-            transforms_changed, pretransform_dynamic);
+            transforms_changed, pretransform_animated);
 
         if (aabb.is_valid()) {
             props.output_text("aabb: min={}, max={}, size={}", aabb.get_min(), aabb.get_max(),
@@ -619,7 +619,7 @@ void Scene::compute_mesh_groups() {
 
     // See description in scene.hpp for grouping logic
 
-    // non-animated nodes: pretransformed (or not if IsMorphed && !pretransform_dynamic)
+    // non-animated nodes: pretransformed (or not if IsMorphed && !pretransform_animated)
     std::unordered_map<MeshFlags, MeshGroupID> mesh_groups_static_non_instanced;
     // animated nodes: not pretransformed, keyed by (MeshFlags << 32 | NodeID)
     std::unordered_map<uint64_t, MeshGroupID> mesh_groups_animated_non_instanced;
@@ -649,20 +649,18 @@ void Scene::compute_mesh_groups() {
             const NodeID node_id = *mesh.instances.begin();
             const bool node_animated = scene_graph[node_id]->is_animated;
 
-            // With pretransform_dynamic on, dynamic meshes have their world-space
-            // data baked in (TLAS instance is identity), so they group together
-            // by MeshFlags alongside truly-static meshes.
-            if (node_animated && !pretransform_dynamic) {
-                const uint64_t key = (static_cast<uint64_t>(mesh.flags) << 32) | node_id;
+            if (!node_animated /*static*/ || /*animated &&*/ pretransform_animated) {
                 const auto [it, inserted] =
-                    mesh_groups_animated_non_instanced.try_emplace(key, mesh_groups.size());
+                    mesh_groups_static_non_instanced.try_emplace(mesh.flags, mesh_groups.size());
                 if (inserted) {
                     mesh_groups.emplace_back();
                 }
                 group_id = it->second;
+
             } else {
+                const uint64_t key = (static_cast<uint64_t>(mesh.flags) << 32) | node_id;
                 const auto [it, inserted] =
-                    mesh_groups_static_non_instanced.try_emplace(mesh.flags, mesh_groups.size());
+                    mesh_groups_animated_non_instanced.try_emplace(key, mesh_groups.size());
                 if (inserted) {
                     mesh_groups.emplace_back();
                 }
@@ -713,7 +711,7 @@ void Scene::upload_transforms(const CommandBufferHandle& cmd) {
         MeshGroup& group = mesh_groups[group_id];
         assert(!group.meshes.empty());
 
-        const bool pretransform = group.is_pretranformed(meshes, pretransform_dynamic);
+        const bool pretransform = group.is_pretranformed(meshes, pretransform_animated);
 
         for (const NodeID node_id : group.get_instances(meshes)) {
             SceneNode& node = *scene_graph[node_id];
@@ -799,7 +797,7 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
         MeshGroup& group = mesh_groups[group_id];
         assert(!group.meshes.empty());
 
-        const bool pretransform = group.is_pretranformed(meshes, pretransform_dynamic);
+        const bool pretransform = group.is_pretranformed(meshes, pretransform_animated);
 
         for (const NodeID node_id : group.get_instances(meshes)) {
             SceneNode& node = *scene_graph[node_id];
@@ -856,9 +854,9 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
 
 void Scene::upload_meshes(const CommandBufferHandle& cmd) {
     MERIAN_PROFILE_SCOPE_GPU(cmd, "Scene::upload_meshes");
+
     // For now we have a index and vertex buffer for each mesh,
     // we could combine them per group or into single buffers in the future.
-
     index_buffers.resize(mesh_ids.size());
     vertex_buffers.resize(mesh_ids.size());
     prev_vertex_buffers.resize(mesh_ids.size());
@@ -867,7 +865,7 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
     // every frame because the source transform may have changed; for IsMorphed
     // meshes the dirty flag is already set externally.
     for (MeshGroup& group : mesh_groups) {
-        if (group.has_animated_node && group.is_pretranformed(meshes, pretransform_dynamic)) {
+        if (group.has_animated_node && group.is_pretranformed(meshes, pretransform_animated)) {
             for (const MeshID mesh_id : group.meshes) {
                 meshes[mesh_id]->vertices_dirty = true;
             }
@@ -893,7 +891,7 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
 
     for (MeshGroupID group_id = 0; group_id < mesh_groups.size(); group_id++) {
         MeshGroup& group = mesh_groups[group_id];
-        const bool pretransform_group = group.is_pretranformed(meshes, pretransform_dynamic);
+        const bool pretransform_group = group.is_pretranformed(meshes, pretransform_animated);
 
         for (const MeshID mesh_id : group.meshes) {
             Mesh& mesh = *meshes[mesh_id];
@@ -1152,13 +1150,13 @@ void Scene::build_tlas(const CommandBufferHandle& cmd) {
             tlas_instance.accelerationStructureReference =
                 group.blas->get_acceleration_structure_device_address();
 
-            if (group.is_pretranformed(meshes, pretransform_dynamic)) {
+            if (group.is_pretranformed(meshes, pretransform_animated)) {
                 // Use identity
                 tlas_instance.transform.matrix[0][0] = 1.f;
                 tlas_instance.transform.matrix[1][1] = 1.f;
                 tlas_instance.transform.matrix[2][2] = 1.f;
             } else {
-                const auto& t = *scene_graph[node_id]->global_transform;
+                const auto& t = get_global_transform(node_id);
                 for (int row = 0; row < 3; row++)
                     for (int col = 0; col < 4; col++)
                         tlas_instance.transform.matrix[row][col] = t[row][col];

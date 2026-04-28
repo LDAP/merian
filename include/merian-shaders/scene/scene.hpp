@@ -75,7 +75,7 @@ class SceneNode {
   public:
     std::string name;
 
-    // Transform changes over time; update_node() asserts this. Set before add_node().
+    // Transform can change over time;.
     bool is_animated = false;
 
     NodeID parent = NODE_ID_INVALID;
@@ -292,17 +292,17 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         // means the Scene uploads the meshes in this group pretransformed and the instance
         // transform should be the identity.
         bool is_pretranformed(const std::vector<MeshHandle>& meshes,
-                              bool pretransform_dynamic) const {
+                              bool pretransform_animated) const {
             assert(!meshes.empty());
             const Mesh& mesh = *meshes[*this->meshes.begin()];
             assert(flags == mesh.flags);
             if (mesh.instances.size() > 1)
                 return false;
-            if (has_animated_node && !pretransform_dynamic)
+            if (has_animated_node && !pretransform_animated)
                 return false;
             if (!mesh.is_morphed())
                 return true;
-            return pretransform_dynamic;
+            return pretransform_animated;
         }
     };
 
@@ -450,12 +450,12 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         return *meshes[mesh_id];
     }
 
-    // Bake single-instance dynamic mesh world transforms on CPU at upload time
-    // (small scenes / debugging). Static meshes are always pre-transformed.
-    bool get_pretransform_dynamic() const {
-        return pretransform_dynamic;
+    // Bake single-instance animated (node transforms can change) meshes world transforms on CPU at
+    // upload time. Static (non-animated) meshes are always pre-transformed.
+    bool get_pretransform_animated() const {
+        return pretransform_animated;
     }
-    void set_pretransform_dynamic(bool value);
+    void set_pretransform_animated(bool value);
 
     // A the scenes up direction
     virtual float3 get_up() {
@@ -582,7 +582,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     std::vector<MeshHandle> meshes; // sized to mesh_ids.size(); null at released slots
     FreeList<NodeID> node_ids;
     std::vector<std::optional<SceneNode>> scene_graph; // sized to node_ids.size()
-    bool pretransform_dynamic = false;
+    bool pretransform_animated = false;
     std::vector<CameraHandle> cameras;
     uint32_t active_camera = 0;
     AABB aabb; // can be invalid if information is not available.

@@ -76,10 +76,10 @@ GLTFSceneNode::NodeStatusFlags GLTFSceneNode::properties([[maybe_unused]] Proper
     }
 
     if (scene) {
-        bool pretransform = scene->get_pretransform_dynamic();
+        bool pretransform = scene->get_pretransform_animated();
         if (config.config_bool("pretransform dynamic", pretransform,
                                "Bake dynamic mesh transforms on CPU (debug / small scenes)")) {
-            scene->set_pretransform_dynamic(pretransform);
+            scene->set_pretransform_animated(pretransform);
         }
         scene->properties(config);
     }
