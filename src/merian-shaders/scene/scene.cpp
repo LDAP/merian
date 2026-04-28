@@ -960,6 +960,8 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
         if (static_geometry) {
             did_build_static = true;
             flags |= vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace;
+        } else {
+            flags |= vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastBuild;
         }
 
         const auto size_info =
