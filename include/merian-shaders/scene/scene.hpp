@@ -583,6 +583,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
 
     bool needs_regroup = false;      // a mesh was instanced
     bool transforms_changed = false; // a node was updated
+    bool tlas_dirty = false;
 
     inline static const MeshGroupID MESH_GROUP_ID_INVALID = MeshGroupID(-1);
     std::vector<MeshGroup> mesh_groups;

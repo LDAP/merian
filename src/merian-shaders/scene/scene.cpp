@@ -925,6 +925,7 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
         if (group.blas && !group.blas_dirty) {
             continue;
         }
+        tlas_dirty = true;
 
         auto& blas_geometry = blas_geometries[group_id];
 
@@ -1124,11 +1125,14 @@ void Scene::update(const CommandBufferHandle& cmd,
 
     if (true /*build_as*/) {
         build_blas(cmd);
-        // TODO only build if blases where built or instances where modified.
         // TODO: compact the static BLASes -> reduce memory bandwidth and increase performance.
 
-        // TODO: only call if a BLAS was built / updated or transforms changed.
-        build_tlas(cmd);
+        tlas_dirty |= needs_regroup || transforms_changed;
+
+        if (tlas_dirty || !tlas) {
+            build_tlas(cmd);
+            tlas_dirty = false;
+        }
 
         cmd->barrier(vk::MemoryBarrier2{
             vk::PipelineStageFlagBits2::eTransfer |
