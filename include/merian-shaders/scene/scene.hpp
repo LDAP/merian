@@ -8,6 +8,8 @@
 #include "merian/utils/camera/camera.hpp"
 #include "merian/utils/free_list.hpp"
 #include "merian/utils/versionable.hpp"
+#include "merian/vk/descriptors/descriptor_set_layout.hpp"
+#include "merian/vk/pipeline/pipeline.hpp"
 #include "merian/vk/raytrace/as_builder.hpp"
 
 #include <optional>
@@ -296,7 +298,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
             assert(flags == mesh.flags);
             if (mesh.instances.size() > 1)
                 return false;
-            if (has_animated_node)
+            if (has_animated_node && !pretransform_dynamic)
                 return false;
             if (!mesh.is_morphed())
                 return true;
@@ -525,6 +527,22 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     // All meshes in a group share the same instances (transforms); one group = one BLAS.
     void compute_mesh_groups();
 
+    void ensure_pretransform_pipelines();
+
+    // GPU pretransform: read src in model space, write dst in world space. The
+    // dispatch records a memory barrier on the destination buffer.
+    void pretransform_vertices_gpu(const CommandBufferHandle& cmd,
+                                   const BufferHandle& src,
+                                   const BufferHandle& dst,
+                                   const float4x4& transform,
+                                   const float4x4& inverse_transposed,
+                                   uint32_t vertex_count);
+    void pretransform_prev_vertices_gpu(const CommandBufferHandle& cmd,
+                                        const BufferHandle& src,
+                                        const BufferHandle& dst,
+                                        const float4x4& transform,
+                                        uint32_t vertex_count);
+
     // this only changes if the mesh groups changed or if a transform changes (TODO: selectively
     // upload transforms)
     void upload_geometry_data(const CommandBufferHandle& cmd);
@@ -624,6 +642,11 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     BufferHandle tlas_instances_buffer;
     BufferHandle as_scratch_buffer;
     AccelerationStructureHandle tlas;
+
+    // GPU pretransform pipelines (lazily initialized).
+    DescriptorSetLayoutHandle pretransform_descriptor_layout;
+    PipelineHandle pretransform_vertex_pipeline;
+    PipelineHandle pretransform_prev_vertex_pipeline;
 
     Camera prev_active_camera;
 };

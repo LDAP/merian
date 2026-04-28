@@ -4,6 +4,14 @@ merian_shaders_src = [
     'utils/texture_manager.cpp',
 ]
 
+shaders = [
+    'scene/pretransform_vertex.slang',
+    'scene/pretransform_prev_vertex.slang',
+]
+foreach s : shaders
+    merian_shaders_src += shader_generator.process(s)
+endforeach
+
 
 if tgltf.found()
     merian_shaders_src += 'scene/gltf_scene.cpp'

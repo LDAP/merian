@@ -1,8 +1,16 @@
 #include "merian-shaders/scene/scene.hpp"
 
+#include "merian/shader/entry_point.hpp"
 #include "merian/shader/slang_program.hpp"
 #include "merian/utils/normal_encoding.hpp"
+#include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
+#include "merian/vk/pipeline/pipeline_compute.hpp"
+#include "merian/vk/pipeline/pipeline_layout_builder.hpp"
+#include "merian/vk/pipeline/specialization_info_builder.hpp"
 #include "merian/vk/utils/math.hpp"
+
+#include "pretransform_prev_vertex.slang.spv.h"
+#include "pretransform_vertex.slang.spv.h"
 
 #include <algorithm>
 #include <cassert>
@@ -311,17 +319,107 @@ void Scene::set_active_camera(const uint32_t index) {
     active_camera = index;
 }
 
+// ---------------------------------------------------------------------------
+// GPU pretransform
+// ---------------------------------------------------------------------------
+
+namespace {
+
+struct PretransformVertexPushConstant {
+    float4x4 transform;
+    float4x4 inverse_transposed;
+    uint32_t vertex_count;
+};
+
+struct PretransformPrevVertexPushConstant {
+    float4x4 transform;
+    uint32_t vertex_count;
+};
+
+constexpr uint32_t PRETRANSFORM_LOCAL_SIZE_X = 64;
+
+} // namespace
+
+void Scene::ensure_pretransform_pipelines() {
+    if (pretransform_vertex_pipeline && pretransform_prev_vertex_pipeline) {
+        return;
+    }
+
+    pretransform_descriptor_layout =
+        DescriptorSetLayoutBuilder()
+            .add_binding_storage_buffer(1, vk::ShaderStageFlagBits::eCompute)
+            .add_binding_storage_buffer(1, vk::ShaderStageFlagBits::eCompute)
+            .build_push_descriptor_layout(context);
+
+    auto vertex_module = EntryPoint::create(context, merian_pretransform_vertex_slang_spv(),
+                                            merian_pretransform_vertex_slang_spv_size(), "main",
+                                            vk::ShaderStageFlagBits::eCompute);
+    auto prev_module = EntryPoint::create(context, merian_pretransform_prev_vertex_slang_spv(),
+                                          merian_pretransform_prev_vertex_slang_spv_size(), "main",
+                                          vk::ShaderStageFlagBits::eCompute);
+
+    auto vertex_layout =
+        PipelineLayoutBuilder(context)
+            .add_descriptor_set_layout(pretransform_descriptor_layout)
+            .add_push_constant<PretransformVertexPushConstant>(vk::ShaderStageFlagBits::eCompute)
+            .build_pipeline_layout();
+    auto prev_layout = PipelineLayoutBuilder(context)
+                           .add_descriptor_set_layout(pretransform_descriptor_layout)
+                           .add_push_constant<PretransformPrevVertexPushConstant>(
+                               vk::ShaderStageFlagBits::eCompute)
+                           .build_pipeline_layout();
+
+    auto spec_builder = SpecializationInfoBuilder();
+    spec_builder.add_entry(PRETRANSFORM_LOCAL_SIZE_X);
+    SpecializationInfoHandle spec = spec_builder.build();
+
+    pretransform_vertex_pipeline = ComputePipeline::create(vertex_layout, vertex_module, spec);
+    pretransform_prev_vertex_pipeline = ComputePipeline::create(prev_layout, prev_module, spec);
+}
+
+void Scene::pretransform_vertices_gpu(const CommandBufferHandle& cmd,
+                                      const BufferHandle& src,
+                                      const BufferHandle& dst,
+                                      const float4x4& transform,
+                                      const float4x4& inverse_transposed,
+                                      const uint32_t vertex_count) {
+    ensure_pretransform_pipelines();
+
+    PretransformVertexPushConstant pc{};
+    pc.transform = transform;
+    pc.inverse_transposed = inverse_transposed;
+    pc.vertex_count = vertex_count;
+
+    cmd->bind(pretransform_vertex_pipeline);
+    cmd->push_descriptor_set(pretransform_vertex_pipeline, src, dst);
+    cmd->push_constant(pretransform_vertex_pipeline, pc);
+    cmd->dispatch((vertex_count + PRETRANSFORM_LOCAL_SIZE_X - 1) / PRETRANSFORM_LOCAL_SIZE_X, 1, 1);
+}
+
+void Scene::pretransform_prev_vertices_gpu(const CommandBufferHandle& cmd,
+                                           const BufferHandle& src,
+                                           const BufferHandle& dst,
+                                           const float4x4& transform,
+                                           const uint32_t vertex_count) {
+    ensure_pretransform_pipelines();
+
+    PretransformPrevVertexPushConstant pc{};
+    pc.transform = transform;
+    pc.vertex_count = vertex_count;
+
+    cmd->bind(pretransform_prev_vertex_pipeline);
+    cmd->push_descriptor_set(pretransform_prev_vertex_pipeline, src, dst);
+    cmd->push_constant(pretransform_prev_vertex_pipeline, pc);
+    cmd->dispatch((vertex_count + PRETRANSFORM_LOCAL_SIZE_X - 1) / PRETRANSFORM_LOCAL_SIZE_X, 1, 1);
+}
+
 void Scene::set_pretransform_dynamic(bool value) {
     if (pretransform_dynamic == value)
         return;
+
     pretransform_dynamic = value;
 
-    // assume all dynamic meshes need reupload.
-    for (const MeshID mesh_id : mesh_ids) {
-        if (meshes[mesh_id]->is_morphed()) {
-            meshes[mesh_id]->vertices_dirty = true;
-        }
-    }
+    needs_regroup = true;
 }
 
 void Scene::node_properties(Properties& props, const SceneNode& node) {
@@ -551,7 +649,10 @@ void Scene::compute_mesh_groups() {
             const NodeID node_id = *mesh.instances.begin();
             const bool node_animated = scene_graph[node_id]->is_animated;
 
-            if (node_animated) {
+            // With pretransform_dynamic on, dynamic meshes have their world-space
+            // data baked in (TLAS instance is identity), so they group together
+            // by MeshFlags alongside truly-static meshes.
+            if (node_animated && !pretransform_dynamic) {
                 const uint64_t key = (static_cast<uint64_t>(mesh.flags) << 32) | node_id;
                 const auto [it, inserted] =
                     mesh_groups_animated_non_instanced.try_emplace(key, mesh_groups.size());
@@ -762,6 +863,17 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
     vertex_buffers.resize(mesh_ids.size());
     prev_vertex_buffers.resize(mesh_ids.size());
 
+    // Pretransformed dynamic groups carry world-space vertex data. Re-pretransform
+    // every frame because the source transform may have changed; for IsMorphed
+    // meshes the dirty flag is already set externally.
+    for (MeshGroup& group : mesh_groups) {
+        if (group.has_animated_node && group.is_pretranformed(meshes, pretransform_dynamic)) {
+            for (const MeshID mesh_id : group.meshes) {
+                meshes[mesh_id]->vertices_dirty = true;
+            }
+        }
+    }
+
     const auto staging = allocator->get_staging();
 
     const auto buffer_usage = vk::BufferUsageFlagBits::eStorageBuffer |
@@ -811,9 +923,13 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
             const bool pretransform_mesh = pretransform_group && global_transform != identity();
 
             // Generic dispatcher: handles DeviceLocal/DeviceStaged uniformly,
-            // calls host_fill for HostPacked/HostVertexSource variants.
+            // calls host_fill for HostPacked/HostVertexSource variants. When
+            // pretransform_mesh is set, gpu_pretransform is used to bake the
+            // world-space transform into the destination buffer for the
+            // device-resident sources.
             const auto upload_variant = [&](auto&& variant, BufferHandle& dst, vk::DeviceSize size,
-                                            const std::string& label, auto&& host_fill) {
+                                            const std::string& label, auto&& host_fill,
+                                            auto&& gpu_pretransform) {
                 std::visit(
                     [&](auto&& src) {
                         using T = std::decay_t<decltype(src)>;
@@ -821,12 +937,23 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                             if (dst)
                                 cmd->keep_until_pool_reset(std::move(dst));
                         } else if constexpr (std::is_same_v<T, Mesh::DeviceLocal>) {
-                            if (dst && dst != src.data)
-                                cmd->keep_until_pool_reset(std::move(dst));
-                            dst = src.data;
+                            if (pretransform_mesh) {
+                                if (dst && dst == src.data)
+                                    dst.reset();
+                                ensure_buffer(dst, size, label);
+                                gpu_pretransform(src.data, dst);
+                            } else {
+                                if (dst && dst != src.data)
+                                    cmd->keep_until_pool_reset(std::move(dst));
+                                dst = src.data;
+                            }
                         } else if constexpr (std::is_same_v<T, Mesh::DeviceStaged>) {
                             ensure_buffer(dst, size, label);
-                            cmd->copy(src.data, dst, {vk::BufferCopy{src.offset, 0, size}});
+                            if (pretransform_mesh) {
+                                gpu_pretransform(src.data, dst);
+                            } else {
+                                cmd->copy(src.data, dst, {vk::BufferCopy{src.offset, 0, size}});
+                            }
                         } else {
                             ensure_buffer(dst, size, label);
                             const MemoryAllocationHandle alloc = staging->cmd_to_device(cmd, dst);
@@ -836,6 +963,8 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                     },
                     std::forward<decltype(variant)>(variant));
             };
+
+            const auto noop_gpu = [](const BufferHandle&, const BufferHandle&) {};
 
             auto& vb = vertex_buffers[mesh_id];
             auto& prev_vb = prev_vertex_buffers[mesh_id];
@@ -866,6 +995,11 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                                 src->write(dst);
                             }
                         }
+                    },
+                    [&](const BufferHandle& src_buf, const BufferHandle& dst_buf) {
+                        pretransform_vertices_gpu(cmd, src_buf, dst_buf, global_transform,
+                                                  global_inverse_transposed_transform,
+                                                  vertex_count);
                     });
 
                 upload_variant(
@@ -891,23 +1025,29 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                                 src->write(dst);
                             }
                         }
+                    },
+                    [&](const BufferHandle& src_buf, const BufferHandle& dst_buf) {
+                        pretransform_prev_vertices_gpu(cmd, src_buf, dst_buf, global_transform,
+                                                       vertex_count);
                     });
 
                 mesh.vertices_dirty = false;
             }
 
             if (mesh.indices_dirty) {
-                upload_variant(mesh.get_indices(), ib, ib_size,
-                               fmt::format("Scene::ib[{}]: name={}", mesh_id, mesh.name),
-                               [&](auto&& src, void* mapped) {
-                                   using S = std::decay_t<decltype(src)>;
-                                   if constexpr (std::is_same_v<S, Mesh::HostPacked<void>>) {
-                                       std::memcpy(mapped, src.data, ib_size);
-                                   } else {
-                                       static_assert(std::is_same_v<S, Mesh::HostIndices>);
-                                       src->write(mapped);
-                                   }
-                               });
+                upload_variant(
+                    mesh.get_indices(), ib, ib_size,
+                    fmt::format("Scene::ib[{}]: name={}", mesh_id, mesh.name),
+                    [&](auto&& src, void* mapped) {
+                        using S = std::decay_t<decltype(src)>;
+                        if constexpr (std::is_same_v<S, Mesh::HostPacked<void>>) {
+                            std::memcpy(mapped, src.data, ib_size);
+                        } else {
+                            static_assert(std::is_same_v<S, Mesh::HostIndices>);
+                            src->write(mapped);
+                        }
+                    },
+                    noop_gpu);
 
                 mesh.indices_dirty = false;
             }
@@ -1123,8 +1263,8 @@ void Scene::update(const CommandBufferHandle& cmd,
     upload_geometry_data(cmd);
 
     cmd->barrier(vk::MemoryBarrier2{
-        vk::PipelineStageFlagBits2::eTransfer,
-        vk::AccessFlagBits2::eTransferWrite,
+        vk::PipelineStageFlagBits2::eTransfer | vk::PipelineStageFlagBits2::eComputeShader,
+        vk::AccessFlagBits2::eTransferWrite | vk::AccessFlagBits2::eShaderWrite,
         vk::PipelineStageFlagBits2::eAllCommands,
         vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eAccelerationStructureReadKHR,
     });
