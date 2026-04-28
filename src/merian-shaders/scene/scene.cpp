@@ -723,6 +723,10 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
                 if (group.flags & MeshFlags::IsMorphed) {
                     gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::IsMorphed);
                 }
+                if (group.flags & MeshFlags::FrontCounterClockwise) {
+                    gd.flags =
+                        GeometryDataFlags(gd.flags | GeometryDataFlags::FrontCounterClockwise);
+                }
                 if (scene_graph[node_id]->is_animated) {
                     gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::IsAnimated);
                 }

@@ -17,6 +17,8 @@ enum GeometryDataFlags : uint16_t {
     IsMorphed = 0x2,
     // Instance transform changed since last frame; read prev_instance_transform.
     IsAnimated = 0x4,
+    // Default winding is clockwise, this signals counter clockwise winding.
+    FrontCounterClockwise = 0x8,
 };
 
 // See scene.hpp for details.
