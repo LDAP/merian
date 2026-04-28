@@ -63,7 +63,8 @@ void main(uint3 tid: SV_DispatchThreadID,
     half2 grad_z = half2(grad_z_x, grad_z_y);
 
     // Delta z: difference in depth from previous frame camera
-    float3 prev_pos = pos; // TODO: use prev_vertex_buffers when available
+    float3 prev_object_pos = scene.get_interpolated_prev_object_position(gd, hit.primitive_id, bary);
+    float3 prev_pos = scene.to_prev_world_position(gd, hit.instance_index, prev_object_pos);
     float delta_z = length(prev_pos - scene.prev_camera.position) - linear_z;
 
     // Motion vectors: project previous position onto previous camera

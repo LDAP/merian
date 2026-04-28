@@ -211,7 +211,7 @@ struct Scene {
     // Previous-frame object-space position for a vertex.
     // For non-morphed meshes this equals the current position.
     float3 get_prev_object_position(const GeometryData geometry_data, const uint vertex_index) {
-        if (!(geometry_data.flags & GeometryDataFlags::IsMorphed))
+        if ((geometry_data.flags & GeometryDataFlags::IsMorphed) == 0)
             return geometry_data.vertices[vertex_index].position;
         return geometry_data.prev_vertices[vertex_index].position;
     }
@@ -251,7 +251,7 @@ struct Scene {
                                   const float3 object_pos) {
         if (gd.flags & GeometryDataFlags::Pretransformed)
             return object_pos;
-        if (!(gd.flags & GeometryDataFlags::IsAnimated))
+        if ((gd.flags & GeometryDataFlags::IsAnimated) == 0)
             return mul(get_instance_transform(instance_index), float4(object_pos, 1.0)).xyz;
         return mul(get_prev_instance_transform(instance_index), float4(object_pos, 1.0)).xyz;
     }
@@ -262,7 +262,7 @@ struct Scene {
                                    const float3 object_dir) {
         if (gd.flags & GeometryDataFlags::Pretransformed)
             return object_dir;
-        if (!(gd.flags & GeometryDataFlags::IsAnimated))
+        if ((gd.flags & GeometryDataFlags::IsAnimated) == 0)
             return normalize(mul(get_inverse_transposed_instance_transform(instance_index),
                                  float4(object_dir, 0.0))
                                  .xyz);
