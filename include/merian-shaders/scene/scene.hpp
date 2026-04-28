@@ -163,8 +163,8 @@ class Mesh {
 
     // different meanings depending on data type:
     // - Host*: reupload (+ pretransform) + device copy + TLAS build
-    // - DeviceStaged: device copy (TODO: including pretransform on GPU) + TLAS build
-    // - DeviceLocal: (TODO: pretransform on GPU) + TLAS build
+    // - DeviceStaged: device copy (+ pretransform on GPU) + TLAS build
+    // - DeviceLocal: (pretransform on GPU) + TLAS build
 
     bool vertices_dirty = true;
     bool indices_dirty = true;

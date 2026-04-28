@@ -673,7 +673,7 @@ void Scene::compute_mesh_groups() {
         MeshGroup& group = mesh_groups[group_id];
         assert(group.meshes.empty() || group.flags == mesh.flags);
         group.flags = mesh.flags;
-        group.has_animated_node = mesh.animated_instance_count > 0;
+        group.has_animated_node |= mesh.animated_instance_count > 0;
         group.meshes.insert(mesh_id);
     }
 
@@ -776,14 +776,6 @@ void Scene::upload_transforms(const CommandBufferHandle& cmd) {
         staging->cmd_to_device(cmd, prev_instance_transforms_buffer, prev_instance_transforms);
         staging->cmd_to_device(cmd, prev_inverse_transposed_instance_transforms_buffer,
                                prev_inverse_transposed_instance_transforms);
-    }
-
-    for (const NodeID& node_id : node_ids) {
-        assert(scene_graph[node_id]);
-        SceneNode& node = *scene_graph[node_id];
-
-        node.prev_global_transform = node.global_transform;
-        node.prev_global_inverse_transposed = node.global_inverse_transposed;
     }
 }
 
@@ -920,14 +912,19 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
 
             const bool pretransform_mesh = pretransform_group && global_transform != identity();
 
-            // Generic dispatcher: handles DeviceLocal/DeviceStaged uniformly,
-            // calls host_fill for HostPacked/HostVertexSource variants. When
-            // pretransform_mesh is set, gpu_pretransform is used to bake the
-            // world-space transform into the destination buffer for the
-            // device-resident sources.
-            const auto upload_variant = [&](auto&& variant, BufferHandle& dst, vk::DeviceSize size,
-                                            const std::string& label, auto&& host_fill,
-                                            auto&& gpu_pretransform) {
+            // Dispatches upload for a mesh data variant.
+            // cpu_write:        (src, void*) -> writes raw host data
+            // cpu_pretransform: (src, void*) -> writes pretransformed host data (nullptr to skip)
+            // gpu_pretransform: (BufferHandle src, BufferHandle dst) -> compute pretransform
+            // (nullptr to skip)
+            const auto upload = [&](auto&& variant, BufferHandle& dst, vk::DeviceSize size,
+                                    const std::string& label, auto&& cpu_write,
+                                    auto&& cpu_pretransform, auto&& gpu_pretransform) {
+                constexpr bool has_cpu_pt =
+                    !std::is_null_pointer_v<std::decay_t<decltype(cpu_pretransform)>>;
+                constexpr bool has_gpu_pt =
+                    !std::is_null_pointer_v<std::decay_t<decltype(gpu_pretransform)>>;
+
                 std::visit(
                     [&](auto&& src) {
                         using T = std::decay_t<decltype(src)>;
@@ -935,63 +932,75 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                             if (dst)
                                 cmd->keep_until_pool_reset(std::move(dst));
                         } else if constexpr (std::is_same_v<T, Mesh::DeviceLocal>) {
-                            if (pretransform_mesh) {
-                                if (dst && dst == src.data)
-                                    dst.reset();
-                                ensure_buffer(dst, size, label);
-                                gpu_pretransform(src.data, dst);
-                            } else {
-                                if (dst && dst != src.data)
-                                    cmd->keep_until_pool_reset(std::move(dst));
-                                dst = src.data;
+                            if constexpr (has_gpu_pt) {
+                                if (pretransform_mesh) {
+                                    if (dst && dst == src.data)
+                                        dst.reset();
+                                    ensure_buffer(dst, size, label);
+                                    gpu_pretransform(src.data, dst);
+                                    return;
+                                }
                             }
+                            if (dst && dst != src.data)
+                                cmd->keep_until_pool_reset(std::move(dst));
+                            dst = src.data;
                         } else if constexpr (std::is_same_v<T, Mesh::DeviceStaged>) {
                             ensure_buffer(dst, size, label);
-                            if (pretransform_mesh) {
-                                gpu_pretransform(src.data, dst);
-                            } else {
-                                cmd->copy(src.data, dst, {vk::BufferCopy{src.offset, 0, size}});
+                            if constexpr (has_gpu_pt) {
+                                if (pretransform_mesh) {
+                                    gpu_pretransform(src.data, dst);
+                                    return;
+                                }
                             }
+                            cmd->copy(src.data, dst, {vk::BufferCopy{src.offset, 0, size}});
                         } else {
                             ensure_buffer(dst, size, label);
                             const MemoryAllocationHandle alloc = staging->cmd_to_device(cmd, dst);
-                            host_fill(src, alloc->map());
+                            void* mapped = alloc->map();
+                            if constexpr (has_cpu_pt) {
+                                if (pretransform_mesh)
+                                    cpu_pretransform(src, mapped);
+                                else
+                                    cpu_write(src, mapped);
+                            } else {
+                                cpu_write(src, mapped);
+                            }
                             alloc->unmap();
                         }
                     },
                     std::forward<decltype(variant)>(variant));
             };
 
-            const auto noop_gpu = [](const BufferHandle&, const BufferHandle&) {};
-
             auto& vb = vertex_buffers[mesh_id];
             auto& prev_vb = prev_vertex_buffers[mesh_id];
             auto& ib = index_buffers[mesh_id];
 
             if (mesh.vertices_dirty) {
-                upload_variant(
+                upload(
                     mesh.get_vertices(), vb, vb_size,
                     fmt::format("Scene::vb[{}]: name={}", mesh_id, mesh.name),
                     [&](auto&& src, void* mapped) {
                         auto* dst = static_cast<PackedVertexData*>(mapped);
                         using S = std::decay_t<decltype(src)>;
+                        if constexpr (std::is_same_v<S, Mesh::HostPacked<PackedVertexData>>)
+                            std::memcpy(dst, src.data, vb_size);
+                        else {
+                            static_assert(std::is_same_v<S, Mesh::HostVertices>);
+                            src->write(dst);
+                        }
+                    },
+                    [&](auto&& src, void* mapped) {
+                        auto* dst = static_cast<PackedVertexData*>(mapped);
+                        using S = std::decay_t<decltype(src)>;
                         if constexpr (std::is_same_v<S, Mesh::HostPacked<PackedVertexData>>) {
-                            if (pretransform_mesh) {
-                                for (uint32_t v = 0; v < vertex_count; v++)
-                                    dst[v] = pretransform_packed_vertex(
-                                        src.data[v], global_transform,
-                                        global_inverse_transposed_transform);
-                            } else {
-                                std::memcpy(dst, src.data, vb_size);
-                            }
+                            for (uint32_t v = 0; v < vertex_count; v++)
+                                dst[v] =
+                                    pretransform_packed_vertex(src.data[v], global_transform,
+                                                               global_inverse_transposed_transform);
                         } else {
                             static_assert(std::is_same_v<S, Mesh::HostVertices>);
-                            if (pretransform_mesh) {
-                                src->write_pretransformed(global_transform,
-                                                          global_inverse_transposed_transform, dst);
-                            } else {
-                                src->write(dst);
-                            }
+                            src->write_pretransformed(global_transform,
+                                                      global_inverse_transposed_transform, dst);
                         }
                     },
                     [&](const BufferHandle& src_buf, const BufferHandle& dst_buf) {
@@ -1000,32 +1009,39 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                                                   vertex_count);
                     });
 
-                upload_variant(
+                const float4x4 prev_transform =
+                    scene_graph[node_id]->prev_global_transform.value_or(global_transform);
+                const float4x4 prev_inverse_transposed =
+                    scene_graph[node_id]->prev_global_inverse_transposed.value_or(
+                        global_inverse_transposed_transform);
+
+                upload(
                     mesh.get_prev_vertices(), prev_vb, prev_vb_size,
                     fmt::format("Scene::prev_vb[{}]: name={}", mesh_id, mesh.name),
                     [&](auto&& src, void* mapped) {
                         auto* dst = static_cast<PackedPrevVertexData*>(mapped);
                         using S = std::decay_t<decltype(src)>;
+                        if constexpr (std::is_same_v<S, Mesh::HostPacked<PackedPrevVertexData>>)
+                            std::memcpy(dst, src.data, prev_vb_size);
+                        else {
+                            static_assert(std::is_same_v<S, Mesh::HostPrevVertices>);
+                            src->write(dst);
+                        }
+                    },
+                    [&](auto&& src, void* mapped) {
+                        auto* dst = static_cast<PackedPrevVertexData*>(mapped);
+                        using S = std::decay_t<decltype(src)>;
                         if constexpr (std::is_same_v<S, Mesh::HostPacked<PackedPrevVertexData>>) {
-                            if (pretransform_mesh) {
-                                for (uint32_t v = 0; v < vertex_count; v++)
-                                    dst[v] = pretransform_packed_prev_vertex(src.data[v],
-                                                                             global_transform);
-                            } else {
-                                std::memcpy(dst, src.data, prev_vb_size);
-                            }
+                            for (uint32_t v = 0; v < vertex_count; v++)
+                                dst[v] =
+                                    pretransform_packed_prev_vertex(src.data[v], prev_transform);
                         } else {
                             static_assert(std::is_same_v<S, Mesh::HostPrevVertices>);
-                            if (pretransform_mesh) {
-                                src->write_pretransformed(global_transform,
-                                                          global_inverse_transposed_transform, dst);
-                            } else {
-                                src->write(dst);
-                            }
+                            src->write_pretransformed(prev_transform, prev_inverse_transposed, dst);
                         }
                     },
                     [&](const BufferHandle& src_buf, const BufferHandle& dst_buf) {
-                        pretransform_prev_vertices_gpu(cmd, src_buf, dst_buf, global_transform,
+                        pretransform_prev_vertices_gpu(cmd, src_buf, dst_buf, prev_transform,
                                                        vertex_count);
                     });
 
@@ -1033,19 +1049,19 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
             }
 
             if (mesh.indices_dirty) {
-                upload_variant(
+                upload(
                     mesh.get_indices(), ib, ib_size,
                     fmt::format("Scene::ib[{}]: name={}", mesh_id, mesh.name),
                     [&](auto&& src, void* mapped) {
                         using S = std::decay_t<decltype(src)>;
-                        if constexpr (std::is_same_v<S, Mesh::HostPacked<void>>) {
+                        if constexpr (std::is_same_v<S, Mesh::HostPacked<void>>)
                             std::memcpy(mapped, src.data, ib_size);
-                        } else {
+                        else {
                             static_assert(std::is_same_v<S, Mesh::HostIndices>);
                             src->write(mapped);
                         }
                     },
-                    noop_gpu);
+                    nullptr, nullptr);
 
                 mesh.indices_dirty = false;
             }
@@ -1256,6 +1272,14 @@ void Scene::update(const CommandBufferHandle& cmd,
     // Allocate/upload vertex/index buffers first so their device addresses are available
     // when GeometryData is written below.
     upload_meshes(cmd);
+
+    // Advance prev transforms after upload_meshes (prev vertex pretransform reads them).
+    for (const NodeID& nid : node_ids) {
+        assert(scene_graph[nid]);
+        SceneNode& n = *scene_graph[nid];
+        n.prev_global_transform = n.global_transform;
+        n.prev_global_inverse_transposed = n.global_inverse_transposed;
+    }
 
     // changes at regroup, or updated mesh (buffer address) -> run every frame.
     upload_geometry_data(cmd);
