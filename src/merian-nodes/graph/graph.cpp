@@ -33,8 +33,8 @@ Graph::Graph(const GraphCreateInfo& create_info)
                       in_flight_data.command_buffer_cache =
                           std::make_shared<CachingCommandPool>(in_flight_data.command_pool);
                       in_flight_data.profiler_query_pool =
-                          std::make_shared<merian::QueryPool<vk::QueryType::eTimestamp>>(context,
-                                                                                         512, true);
+                          std::make_shared<merian::QueryPool<vk::QueryType::eTimestamp>>(
+                              context, 1024, true);
                       return in_flight_data;
                   }),
       run_profiler(std::make_shared<merian::Profiler>(context)),
