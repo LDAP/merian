@@ -399,10 +399,10 @@ void Scene::properties(Properties& props) {
         if (props.st_begin_child("mesh_groups", "Mesh Groups")) {
             for (MeshGroupID group_id = 0; group_id < mesh_groups.size(); group_id++) {
                 const MeshGroup& group = mesh_groups[group_id];
-                if (props.st_begin_child(
-                        fmt::format("group_{:04}", group_id),
-                        fmt::format("{:04}: {} ({} mesh{})", group_id, group.flags,
-                                    group.meshes.size(), group.meshes.size() == 1 ? "" : "es"))) {
+                if (props.st_begin_child(fmt::format("group_{:04}", group_id),
+                                         fmt::format("{:04}: {} ({} mesh{})", group_id, group.flags,
+                                                     group.meshes.size(),
+                                                     group.meshes.size() == 1 ? "" : "es"))) {
                     const std::size_t instances =
                         group.meshes.empty() ? 0 : group.get_instances(meshes).size();
                     const bool pretransformed =
@@ -419,7 +419,8 @@ void Scene::properties(Properties& props) {
                         "{}\nvertices: {}\ntriangles: {}\nblas: {}\nblas dirty: {}",
                         group.flags, group.has_animated_node, pretransformed, instances,
                         group_vertices, group_triangles,
-                        group.blas ? fmt::format("{} bytes", group.blas->get_size()) : "<none>",
+                        group.blas ? fmt::format("{} bytes", format_size(group.blas->get_size()))
+                                   : "<none>",
                         group.blas_dirty);
 
                     if (props.st_begin_child("members", "Members")) {
