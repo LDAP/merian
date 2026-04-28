@@ -11,12 +11,12 @@ import merian_shaders.utils.encoding;
 namespace merian {
 
 enum GeometryDataFlags : uint16_t {
-    // Pretransformed means the data in vertex_buffers[mesh_id]
-    // is already in world space and the shader can skip the
-    // instance transform multiply.
+    // Data already in world space; skip the instance transform multiply.
     Pretransformed = 0x1,
-    // Needs to read the prev_vertices.
-    IsDynamic = 0x2,
+    // Vertices change over time; prev_vertices buffer is valid.
+    IsMorphed = 0x2,
+    // Instance transform changed since last frame; read prev_instance_transform.
+    IsAnimated = 0x4,
 };
 
 // See scene.hpp for details.
@@ -33,12 +33,12 @@ struct VertexData {
 
 #ifndef __cplusplus
 
-VertexData operator +(const VertexData a, const VertexData b) {
+VertexData operator+(const VertexData a, const VertexData b) {
     return VertexData(a.position + b.position, a.normal + b.normal, a.uv + b.uv,
                       a.tangent + b.tangent);
 }
 
-void operator +=(inout VertexData a, const VertexData b) {
+void operator+=(inout VertexData a, const VertexData b) {
     a.position += b.position;
     a.normal += b.normal;
     a.uv += b.uv;
@@ -110,4 +110,4 @@ static_assert(sizeof(GeometryData) == 32, "GeometryData layout mismatch");
 static_assert(alignof(GeometryData) == 8, "GeometryData must be 8-byte aligned");
 #endif
 
-}
+} // namespace merian

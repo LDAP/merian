@@ -1,6 +1,7 @@
 #include "merian-shaders/scene/gltf_scene.hpp"
 
 #include "merian/utils/normal_encoding.hpp"
+#include "merian/vk/utils/math.hpp"
 
 #include <fmt/format.h>
 #include <glm/gtc/quaternion.hpp>
@@ -49,10 +50,11 @@ template <typename T> T read_strided(const uint8_t* base, int byte_stride, uint3
 // Mesh referencing buffer data in a tinygltf::Model (owned by GLTFScene).
 //
 // glTF meshes carry strided + arbitrarily-typed source data; they aren't in
-// the canonical PackedVertexData layout. So GLTFMesh implements
-// HostUnpackedSource: Scene calls write_packed_vertex / write_index per
-// element during upload_meshes and packs into device-local buffers.
-class GLTFMesh : public Mesh, public Mesh::HostMeshSource {
+// the canonical PackedVertexData layout. GLTFMesh implements
+// HostVertexSource and HostIndexSource for bulk write into device-local buffers.
+class GLTFMesh : public Mesh,
+                 public Mesh::HostVertexSource<PackedVertexData>,
+                 public Mesh::HostIndexSource {
   public:
     const uint8_t* pos_base = nullptr;
     int pos_stride = 0;
@@ -64,12 +66,22 @@ class GLTFMesh : public Mesh, public Mesh::HostMeshSource {
     int tan_stride = 0;
     uint32_t vertex_count = 0;
 
-    // null -> sequential indices
-    const uint8_t* idx_base = nullptr;
-    // TODO: set it on the Mesh!
-    int idx_component_type =
-        0; // TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE / _UNSIGNED_SHORT / _UNSIGNED_INT
+    const uint8_t* idx_base = nullptr; // null -> sequential indices
     uint32_t primitive_count = 0;
+
+    void set_indices(const uint8_t* base, int gltf_component_type, uint32_t prim_count) {
+        idx_base = base;
+        primitive_count = prim_count;
+        if (base == nullptr) {
+            index_type = vk::IndexType::eUint32;
+        } else if (gltf_component_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
+            index_type = vk::IndexType::eUint16;
+        } else if (gltf_component_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT) {
+            index_type = vk::IndexType::eUint32;
+        } else {
+            index_type = vk::IndexType::eUint8;
+        }
+    }
 
     uint32_t get_vertex_count() const override {
         return vertex_count;
@@ -78,74 +90,66 @@ class GLTFMesh : public Mesh, public Mesh::HostMeshSource {
         return primitive_count;
     }
 
-    MeshData get_data() const override {
-        return static_cast<Mesh::Host>(const_cast<GLTFMesh*>(this));
+    MeshVertexData get_vertices() const override {
+        return static_cast<HostVertices>(const_cast<GLTFMesh*>(this));
+    }
+    MeshPrevVertexData get_prev_vertices() const override {
+        return std::monostate{};
+    }
+    MeshIndexData get_indices() const override {
+        return static_cast<HostIndices>(const_cast<GLTFMesh*>(this));
     }
 
-    // ---- HostMeshSource ----
+    // ---- HostVertexSource<PackedVertexData> ----
 
-    void write_packed_vertex(uint32_t v, PackedVertexData* dst) const override {
-        const float3 pos = get_position(v);
-        const float3 nrm = get_normal(v);
-        const float2 uv = get_uv(v);
-        const float4 tan = get_tangent(v);
-        dst->position = pos;
-        dst->encoded_normal = encode_normal(nrm);
-        dst->uv = half2(uv.x, uv.y);
-        const uint32_t enc = encode_normal(float3(tan.x, tan.y, tan.z));
-        dst->encoded_tangent = (enc & ~1u) | (tan.w < 0.f ? 1u : 0u);
+    void write(PackedVertexData* dst) const override {
+        for (uint32_t v = 0; v < vertex_count; v++) {
+            const float3 pos = get_position(v);
+            const float3 nrm = get_normal(v);
+            const float2 uv = get_uv(v);
+            const float4 tan = get_tangent(v);
+            dst[v].position = pos;
+            dst[v].encoded_normal = encode_normal(nrm);
+            dst[v].uv = half2(uv.x, uv.y);
+            const uint32_t enc = encode_normal(float3(tan.x, tan.y, tan.z));
+            dst[v].encoded_tangent = (enc & ~1u) | (tan.w < 0.f ? 1u : 0u);
+        }
     }
 
-    void write_packed_prev_vertex(uint32_t /*v*/, PackedPrevVertexData* /*dst*/) const override {
-        assert(false);
+    void write_pretransformed(const float4x4& m,
+                              const float4x4& it,
+                              PackedVertexData* dst) const override {
+        for (uint32_t v = 0; v < vertex_count; v++) {
+            const float3 pos = get_position(v);
+            const float3 nrm = get_normal(v);
+            const float2 uv = get_uv(v);
+            const float4 tan = get_tangent(v);
+
+            dst[v].position = mul(m, float4(pos, 1.f));
+            dst[v].encoded_normal = encode_normal(normalize(float3(mul(it, float4(nrm, 0.f)))));
+            dst[v].uv = half2(uv.x, uv.y);
+            const float3 tw = normalize(float3(mul(it, float4(tan.x, tan.y, tan.z, 0.f))));
+            const uint32_t enc = encode_normal(tw);
+            dst[v].encoded_tangent = (enc & ~1u) | (tan.w < 0.f ? 1u : 0u);
+        }
     }
 
-    void write_packed_vertex_pretransformed(uint32_t v,
-                                            const float4x4& m,
-                                            const float4x4& it,
-                                            PackedVertexData* dst) const override {
-        const float3 pos = get_position(v);
-        const float3 nrm = get_normal(v);
-        const float2 uv = get_uv(v);
-        const float4 tan = get_tangent(v);
+    // ---- HostIndexSource ----
 
-        dst->position = mul(m, float4(pos, 1.f));
-        dst->encoded_normal =
-            encode_normal(normalize(float3(mul(it, float4(nrm, 0.f)))));
-        dst->uv = half2(uv.x, uv.y);
-        const float3 tw = normalize(float3(mul(it, float4(tan.x, tan.y, tan.z, 0.f))));
-        const uint32_t enc = encode_normal(tw);
-        dst->encoded_tangent = (enc & ~1u) | (tan.w < 0.f ? 1u : 0u);
-    }
-
-    void write_packed_prev_vertex_pretransformed(uint32_t /*v*/,
-                                                 const float4x4& /*m*/,
-                                                 PackedPrevVertexData* /*dst*/) const override {
-        assert(false);
-    }
-
-    void write_index(uint32_t p, uint3* dst) const override {
+    void write(void* dst) const override {
         if (idx_base == nullptr) {
-            *dst = uint3(p * 3, p * 3 + 1, p * 3 + 2);
-            return;
+            auto* out = static_cast<uint32_t*>(dst);
+            for (uint32_t p = 0; p < primitive_count; p++) {
+                out[p * 3 + 0] = p * 3;
+                out[p * 3 + 1] = p * 3 + 1;
+                out[p * 3 + 2] = p * 3 + 2;
+            }
+        } else {
+            std::memcpy(dst, idx_base, primitive_count * 3 * size_for_index_type(index_type));
         }
-        if (idx_component_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
-            const auto* src = reinterpret_cast<const uint16_t*>(idx_base);
-            *dst = uint3(src[p * 3], src[p * 3 + 1], src[p * 3 + 2]);
-            return;
-        }
-        if (idx_component_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT) {
-            const auto* src = reinterpret_cast<const uint32_t*>(idx_base);
-            *dst = uint3(src[p * 3], src[p * 3 + 1], src[p * 3 + 2]);
-            return;
-        }
-        // TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE
-        *dst = uint3(idx_base[p * 3], idx_base[p * 3 + 1], idx_base[p * 3 + 2]);
     }
 
   private:
-    // ---- private accessors used by the write_* implementations ----
-
     float3 get_position(uint32_t v) const {
         return read_strided<float3>(pos_base, pos_stride, v);
     }
@@ -474,11 +478,11 @@ void GLTFScene::load_meshes() {
 
             if (prim.indices >= 0) {
                 const auto& idx_acc = model->accessors[prim.indices];
-                mesh->idx_base = get_accessor_base(*model, prim.indices);
-                mesh->idx_component_type = idx_acc.componentType;
-                mesh->primitive_count = static_cast<uint32_t>(idx_acc.count / 3);
+                mesh->set_indices(get_accessor_base(*model, prim.indices),
+                                  idx_acc.componentType,
+                                  static_cast<uint32_t>(idx_acc.count / 3));
             } else {
-                mesh->primitive_count = mesh->vertex_count / 3;
+                mesh->set_indices(nullptr, 0, mesh->vertex_count / 3);
             }
 
             // Determine material

@@ -2,6 +2,7 @@
 
 #include "merian/shader/slang_program.hpp"
 #include "merian/utils/normal_encoding.hpp"
+#include "merian/vk/utils/math.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -45,21 +46,6 @@ pretransform_packed_vertex(const PackedVertexData& src, const float4x4& m, const
 PackedPrevVertexData pretransform_packed_prev_vertex(const PackedPrevVertexData& src,
                                                      const float4x4& m) {
     return PackedPrevVertexData{.position = mul(m, float4(src.position, 1.f))};
-}
-
-// in bytes
-vk::DeviceSize size_for_index_type(const vk::IndexType type) {
-    switch (type) {
-
-    case vk::IndexType::eUint16:
-        return 2;
-    case vk::IndexType::eUint32:
-        return 4;
-    case vk::IndexType::eUint8:
-        return 1;
-    case vk::IndexType::eNoneKHR:
-        assert(false && "not yet supported!");
-    }
 }
 
 } // namespace
@@ -199,6 +185,7 @@ void Scene::update_node(NodeID node_id, const float4x4& local_transform) {
     assert(scene_graph[node_id]);
 
     SceneNode& node = *scene_graph[node_id];
+    assert(node.is_animated);
     node.local_transform = local_transform;
 
     invalidate_node(node);
@@ -212,12 +199,12 @@ void Scene::add_mesh_instance(const MeshID mesh_id, const NodeID node_id) {
 
     Mesh& mesh = *meshes[mesh_id];
 
-    if (mesh.instances.size() == 1 && (mesh.is_static() || pretransform_dynamic)) {
-        // - instances was 1 and is static: previously we could pretransform, but now this is not
-        // possible anymore.
+    if (mesh.instances.size() == 1 && (!mesh.is_dynamic() || pretransform_dynamic)) {
         mesh.vertices_dirty = true;
     }
     mesh.instances.insert(node_id);
+    if (scene_graph[node_id]->is_animated)
+        mesh.animated_instance_count++;
     needs_regroup = true;
 }
 
@@ -228,9 +215,11 @@ void Scene::remove_mesh_instance(const MeshID mesh_id, const NodeID node_id) {
     Mesh& mesh = *meshes[mesh_id];
 
     if (mesh.instances.erase(node_id) > 0) {
-        if (mesh.instances.size() == 1 && (mesh.is_static() || pretransform_dynamic)) {
-            // instances droped to 1 and is static: previously we could not pretransform, not this
-            // is possible
+        if (scene_graph[node_id]->is_animated) {
+            assert(mesh.animated_instance_count > 0);
+            mesh.animated_instance_count--;
+        }
+        if (mesh.instances.size() == 1 && (!mesh.is_dynamic() || pretransform_dynamic)) {
             mesh.vertices_dirty = true;
         }
         needs_regroup = true;
@@ -284,7 +273,10 @@ void Scene::remove_node(const NodeID node_id) {
     // Remove all instances on this node.
     for (const MeshID mesh_id : mesh_ids) {
         assert(meshes[mesh_id]);
-        meshes[mesh_id]->instances.erase(node_id);
+        if (meshes[mesh_id]->instances.erase(node_id) > 0 && node.is_animated) {
+            assert(meshes[mesh_id]->animated_instance_count > 0);
+            meshes[mesh_id]->animated_instance_count--;
+        }
     }
 
     needs_regroup = true;
@@ -326,7 +318,7 @@ void Scene::set_pretransform_dynamic(bool value) {
 
     // assume all dynamic meshes need reupload.
     for (const MeshID mesh_id : mesh_ids) {
-        if (meshes[mesh_id]->flags & MeshFlags::IsDynamic) {
+        if (meshes[mesh_id]->is_morphed()) {
             meshes[mesh_id]->vertices_dirty = true;
         }
     }
@@ -466,28 +458,25 @@ void Scene::compute_mesh_groups() {
 
     // See description in scene.hpp for grouping logic
 
-    // have their global transforms precomputed
+    // non-animated nodes: pretransformed (or not if IsMorphed && !pretransform_dynamic)
     std::unordered_map<MeshFlags, MeshGroupID> mesh_groups_static_non_instanced;
-    // have their global transforms precomputed only if enabled
-    // packed (GeometryFlags << 32 | NodeID) -> MeshGroupID
-    std::unordered_map<uint64_t, MeshGroupID> mesh_groups_dynamic_non_instanced;
+    // animated nodes: not pretransformed, keyed by (MeshFlags << 32 | NodeID)
+    std::unordered_map<uint64_t, MeshGroupID> mesh_groups_animated_non_instanced;
     // CANNOT have their global transforms precomputed
     std::map<std::set<NodeID>, std::unordered_map<MeshFlags, MeshGroupID>> mesh_groups_instanced;
 
     mesh_groups_static_non_instanced.reserve(32 /*all flags set*/);
-    mesh_groups_dynamic_non_instanced.reserve(node_ids.count() * 2);
+    mesh_groups_animated_non_instanced.reserve(node_ids.count() * 2);
 
     for (const MeshID mesh_id : mesh_ids) {
         const Mesh& mesh = *meshes[mesh_id];
         MeshGroupID group_id = MESH_GROUP_ID_INVALID;
 
         if (mesh.instances.empty()) {
-            // dont build BLASes for meshes that are not used.
             continue;
         }
 
         if (mesh.instances.size() > 1) {
-            // is instanced
             auto& by_instances = mesh_groups_instanced[mesh.instances];
             const auto [it, inserted] = by_instances.try_emplace(mesh.flags, mesh_groups.size());
             if (inserted) {
@@ -495,20 +484,19 @@ void Scene::compute_mesh_groups() {
             }
             group_id = it->second;
         } else {
-            if (mesh.flags & MeshFlags::IsDynamic) {
-                // dynamic, non-instanced
-                assert(mesh.instances.size() == 1);
-                const uint64_t key =
-                    (static_cast<uint64_t>(mesh.flags) << 32) | (*mesh.instances.begin());
+            assert(mesh.instances.size() == 1);
+            const NodeID node_id = *mesh.instances.begin();
+            const bool node_animated = scene_graph[node_id]->is_animated;
+
+            if (node_animated) {
+                const uint64_t key = (static_cast<uint64_t>(mesh.flags) << 32) | node_id;
                 const auto [it, inserted] =
-                    mesh_groups_dynamic_non_instanced.try_emplace(key, mesh_groups.size());
+                    mesh_groups_animated_non_instanced.try_emplace(key, mesh_groups.size());
                 if (inserted) {
                     mesh_groups.emplace_back();
                 }
                 group_id = it->second;
             } else {
-                // static, non-instanced
-                assert(mesh.instances.size() == 1);
                 const auto [it, inserted] =
                     mesh_groups_static_non_instanced.try_emplace(mesh.flags, mesh_groups.size());
                 if (inserted) {
@@ -523,6 +511,7 @@ void Scene::compute_mesh_groups() {
         MeshGroup& group = mesh_groups[group_id];
         assert(group.meshes.empty() || group.flags == mesh.flags);
         group.flags = mesh.flags;
+        group.has_animated_node = mesh.animated_instance_count > 0;
         group.meshes.insert(mesh_id);
     }
 
@@ -658,7 +647,7 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
                 gd.material_id = mesh.material_id;
                 gd.vertices = vertex_buffers[mesh_id]->get_device_address();
                 gd.indices = index_buffers[mesh_id]->get_device_address();
-                assert(!(group.flags & MeshFlags::IsDynamic) || prev_vertex_buffers[mesh_id]);
+                assert(!(group.flags & MeshFlags::IsMorphed) || prev_vertex_buffers[mesh_id]);
                 gd.prev_vertices = prev_vertex_buffers[mesh_id]
                                        ? prev_vertex_buffers[mesh_id]->get_device_address()
                                        : vk::DeviceAddress{0};
@@ -666,8 +655,11 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
                 if (pretransform || transform_is_identity) {
                     gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::Pretransformed);
                 }
-                if (group.flags & MeshFlags::IsDynamic) {
-                    gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::IsDynamic);
+                if (group.flags & MeshFlags::IsMorphed) {
+                    gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::IsMorphed);
+                }
+                if (scene_graph[node_id]->is_animated) {
+                    gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::IsAnimated);
                 }
 
                 geometries.emplace_back(gd);
@@ -748,182 +740,107 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
 
             const bool pretransform_mesh = pretransform_group && global_transform != identity();
 
-            // TODO fix with something like:
-
-            // template <typename VariantType, typename GeneratorFunc>
-            // BufferHandle upload_buffer(const VariantType& variant, size_t byte_size,
-            //                               MeshUploader& uploader, GeneratorFunc&&
-            //                               generator_logic) {
-            //     return std::visit(
-            //         [&](auto&& source) -> BufferHandle {
-            //             using T = std::decay_t<decltype(source)>;
-
-            //             if constexpr (is_device_local<T>::value) {
-            //                 return uploader.keep_local(source.data);
-            //             } else if constexpr (is_device_staged<T>::value) {
-            //                 // TODO: If your GPU pretransform logic goes here, pass a flag to
-            //                 // uploader
-            //                 return uploader.copy_staged_to_local(source.data, source.offset,
-            //                                                      byte_size);
-            //             } else if constexpr (is_host_packed<T>::value) {
-            //                 return uploader.upload_host_bytes(source.data, byte_size);
-            //             } else {
-            //                 // It's a HostVirtual source (HostVertices or HostPrevVertices)
-            //                 return uploader.generate_and_upload(
-            //                     byte_size, [&](void* mapped_memory) {
-            //                         // Pass the specific host source and the mapped memory to the
-            //                         // caller's lambda
-            //                         generator_logic(source, mapped_memory);
-            //                     });
-            //             }
-            //         },
-            //         variant);
-            // }
-
-            const Mesh::MeshData view = mesh.get_data();
-            std::visit(
-                [&](auto&& m) {
-                    using T = std::decay_t<decltype(m)>;
-
-                    auto& vb = vertex_buffers[mesh_id];
-                    auto& prev_vb = prev_vertex_buffers[mesh_id];
-                    auto& ib = index_buffers[mesh_id];
-
-                    if constexpr (std::is_same_v<T, Mesh::HostPacked>) {
-                        ensure_buffer(vb, vb_size,
-                                      fmt::format("Scene::vb[{}]: name={}", mesh_id, mesh.name));
-                        ensure_buffer(ib, ib_size,
-                                      fmt::format("Scene::ib[{}]: name={}", mesh_id, mesh.name));
-
-                        const MemoryAllocationHandle vb_st = staging->cmd_to_device(cmd, vb);
-                        auto* vb_mapped = vb_st->map_as<PackedVertexData>();
-                        if (pretransform_mesh) {
-                            assert(mesh.instances.size() == 1);
-                            for (uint32_t v = 0; v < vertex_count; v++)
-                                vb_mapped[v] =
-                                    pretransform_packed_vertex(m.vertices[v], global_transform,
-                                                               global_inverse_transposed_transform);
+            // Generic dispatcher: handles DeviceLocal/DeviceStaged uniformly,
+            // calls host_fill for HostPacked/HostVertexSource variants.
+            const auto upload_variant = [&](auto&& variant, BufferHandle& dst, vk::DeviceSize size,
+                                            const std::string& label, auto&& host_fill) {
+                std::visit(
+                    [&](auto&& src) {
+                        using T = std::decay_t<decltype(src)>;
+                        if constexpr (std::is_same_v<T, std::monostate>) {
+                            if (dst)
+                                cmd->keep_until_pool_reset(std::move(dst));
+                        } else if constexpr (std::is_same_v<T, Mesh::DeviceLocal>) {
+                            if (dst && dst != src.data)
+                                cmd->keep_until_pool_reset(std::move(dst));
+                            dst = src.data;
+                        } else if constexpr (std::is_same_v<T, Mesh::DeviceStaged>) {
+                            ensure_buffer(dst, size, label);
+                            cmd->copy(src.data, dst, {vk::BufferCopy{src.offset, 0, size}});
                         } else {
-                            std::memcpy(vb_mapped, m.vertices, vb_size);
+                            ensure_buffer(dst, size, label);
+                            const MemoryAllocationHandle alloc = staging->cmd_to_device(cmd, dst);
+                            host_fill(src, alloc->map());
+                            alloc->unmap();
                         }
-                        vb_st->unmap();
+                    },
+                    std::forward<decltype(variant)>(variant));
+            };
 
-                        if (m.prev_vertices != nullptr) {
-                            ensure_buffer(
-                                prev_vb, prev_vb_size,
-                                fmt::format("Scene::prev_vb[{}]: name={}", mesh_id, mesh.name));
-                            const MemoryAllocationHandle prev_st =
-                                staging->cmd_to_device(cmd, prev_vb);
-                            auto* prev_mapped = prev_st->map_as<PackedPrevVertexData>();
+            auto& vb = vertex_buffers[mesh_id];
+            auto& prev_vb = prev_vertex_buffers[mesh_id];
+            auto& ib = index_buffers[mesh_id];
+
+            if (mesh.vertices_dirty) {
+                upload_variant(
+                    mesh.get_vertices(), vb, vb_size,
+                    fmt::format("Scene::vb[{}]: name={}", mesh_id, mesh.name),
+                    [&](auto&& src, void* mapped) {
+                        auto* dst = static_cast<PackedVertexData*>(mapped);
+                        using S = std::decay_t<decltype(src)>;
+                        if constexpr (std::is_same_v<S, Mesh::HostPacked<PackedVertexData>>) {
                             if (pretransform_mesh) {
                                 for (uint32_t v = 0; v < vertex_count; v++)
-                                    prev_mapped[v] = pretransform_packed_prev_vertex(
-                                        m.prev_vertices[v], global_transform);
+                                    dst[v] = pretransform_packed_vertex(
+                                        src.data[v], global_transform,
+                                        global_inverse_transposed_transform);
                             } else {
-                                std::memcpy(prev_mapped, m.prev_vertices, prev_vb_size);
+                                std::memcpy(dst, src.data, vb_size);
                             }
-                            prev_st->unmap();
-                        } else if (prev_vb) {
-                            cmd->keep_until_pool_reset(std::move(prev_vb));
-                        }
-
-                        const MemoryAllocationHandle ib_st = staging->cmd_to_device(cmd, ib);
-                        std::memcpy(ib_st->map_as<uint3>(), m.indices, ib_size);
-                        ib_st->unmap();
-                    } else if constexpr (std::is_same_v<T, Mesh::Host>) {
-                        ensure_buffer(vb, vb_size,
-                                      fmt::format("Scene::vb[{}]: name={}", mesh_id, mesh.name));
-                        ensure_buffer(ib, ib_size,
-                                      fmt::format("Scene::ib[{}]: name={}", mesh_id, mesh.name));
-
-                        const MemoryAllocationHandle vb_st = staging->cmd_to_device(cmd, vb);
-                        auto* vb_mapped = vb_st->map_as<PackedVertexData>();
-                        if (pretransform_mesh) {
-                            assert(mesh.instances.size() == 1);
-                            for (uint32_t v = 0; v < vertex_count; v++)
-                                m->write_packed_vertex_pretransformed(
-                                    v, global_transform, global_inverse_transposed_transform,
-                                    &vb_mapped[v]);
                         } else {
-                            for (uint32_t v = 0; v < vertex_count; v++)
-                                m->write_packed_vertex(v, &vb_mapped[v]);
+                            static_assert(std::is_same_v<S, Mesh::HostVertices>);
+                            if (pretransform_mesh) {
+                                src->write_pretransformed(global_transform,
+                                                          global_inverse_transposed_transform, dst);
+                            } else {
+                                src->write(dst);
+                            }
                         }
-                        vb_st->unmap();
+                    });
 
-                        if (mesh.is_dynamic()) {
-                            ensure_buffer(
-                                prev_vb, prev_vb_size,
-                                fmt::format("Scene::prev_vb[{}]: name={}", mesh_id, mesh.name));
-                            const MemoryAllocationHandle prev_st =
-                                staging->cmd_to_device(cmd, prev_vb);
-                            auto* prev_mapped = prev_st->map_as<PackedPrevVertexData>();
+                upload_variant(
+                    mesh.get_prev_vertices(), prev_vb, prev_vb_size,
+                    fmt::format("Scene::prev_vb[{}]: name={}", mesh_id, mesh.name),
+                    [&](auto&& src, void* mapped) {
+                        auto* dst = static_cast<PackedPrevVertexData*>(mapped);
+                        using S = std::decay_t<decltype(src)>;
+                        if constexpr (std::is_same_v<S, Mesh::HostPacked<PackedPrevVertexData>>) {
                             if (pretransform_mesh) {
                                 for (uint32_t v = 0; v < vertex_count; v++)
-                                    m->write_packed_prev_vertex_pretransformed(v, global_transform,
-                                                                               &prev_mapped[v]);
+                                    dst[v] = pretransform_packed_prev_vertex(src.data[v],
+                                                                             global_transform);
                             } else {
-                                for (uint32_t v = 0; v < vertex_count; v++)
-                                    m->write_packed_prev_vertex(v, &prev_mapped[v]);
+                                std::memcpy(dst, src.data, prev_vb_size);
                             }
-                            prev_st->unmap();
-                        } else if (prev_vb) {
-                            cmd->keep_until_pool_reset(std::move(prev_vb));
+                        } else {
+                            static_assert(std::is_same_v<S, Mesh::HostPrevVertices>);
+                            if (pretransform_mesh) {
+                                src->write_pretransformed(global_transform,
+                                                          global_inverse_transposed_transform, dst);
+                            } else {
+                                src->write(dst);
+                            }
                         }
+                    });
 
-                        const MemoryAllocationHandle ib_st = staging->cmd_to_device(cmd, ib);
-                        auto* ib_mapped = ib_st->map_as<uint3>();
-                        for (uint32_t p = 0; p < primitive_count; p++)
-                            m->write_index(p, &ib_mapped[p]);
-                        ib_st->unmap();
-                    } else if constexpr (std::is_same_v<T, Mesh::DeviceStaged>) {
-                        assert(!pretransform_mesh);
+                mesh.vertices_dirty = false;
+            }
 
-                        ensure_buffer(vb, vb_size,
-                                      fmt::format("Scene::vb[{}]: name={}", mesh_id, mesh.name));
-                        ensure_buffer(ib, ib_size,
-                                      fmt::format("Scene::ib[{}]: name={}", mesh_id, mesh.name));
+            if (mesh.indices_dirty) {
+                upload_variant(mesh.get_indices(), ib, ib_size,
+                               fmt::format("Scene::ib[{}]: name={}", mesh_id, mesh.name),
+                               [&](auto&& src, void* mapped) {
+                                   using S = std::decay_t<decltype(src)>;
+                                   if constexpr (std::is_same_v<S, Mesh::HostPacked<void>>) {
+                                       std::memcpy(mapped, src.data, ib_size);
+                                   } else {
+                                       static_assert(std::is_same_v<S, Mesh::HostIndices>);
+                                       src->write(mapped);
+                                   }
+                               });
 
-                        cmd->copy(m.vertex_buffer, vb,
-                                  {vk::BufferCopy{m.vertex_offset, 0, vb_size}});
-
-                        if (mesh.is_dynamic()) {
-                            assert(m.prev_vertex_buffer);
-                            ensure_buffer(
-                                prev_vb, prev_vb_size,
-                                fmt::format("Scene::prev_vb[{}]: name={}", mesh_id, mesh.name));
-                            cmd->copy(m.prev_vertex_buffer, prev_vb,
-                                      {vk::BufferCopy{m.prev_vertex_offset, 0, prev_vb_size}});
-                        } else if (prev_vb) {
-                            cmd->keep_until_pool_reset(std::move(prev_vb));
-                        }
-
-                        cmd->copy(m.index_buffer, ib, {vk::BufferCopy{m.index_offset, 0, ib_size}});
-                    } else { // DeviceLocal
-                        static_assert(std::is_same_v<T, Mesh::DeviceLocal>);
-                        assert(!pretransform_mesh);
-
-                        if (vb && vb != m.vertex_buffer) {
-                            cmd->keep_until_pool_reset(std::move(vb));
-                        }
-                        vb = m.vertex_buffer;
-
-                        if (mesh.is_dynamic()) {
-                            assert(m.prev_vertex_buffer);
-                            if (prev_vb && prev_vb != m.prev_vertex_buffer)
-                                cmd->keep_until_pool_reset(std::move(prev_vb));
-                            prev_vb = m.prev_vertex_buffer;
-                        } else if (prev_vb) {
-                            cmd->keep_until_pool_reset(std::move(prev_vb));
-                        }
-
-                        if (ib && ib != m.index_buffer)
-                            cmd->keep_until_pool_reset(std::move(ib));
-                        ib = m.index_buffer;
-                    }
-                },
-                view);
-
-            mesh.dirty = false;
+                mesh.indices_dirty = false;
+            }
         }
     }
 }
@@ -970,9 +887,9 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
             blas_geometry.ranges.push_back(range);
         }
 
-        const bool is_static = !(group.flags & MeshFlags::IsDynamic);
+        const bool static_geometry = !(group.flags & MeshFlags::IsMorphed);
         vk::BuildAccelerationStructureFlagsKHR flags;
-        if (is_static) {
+        if (static_geometry) {
             did_build_static = true;
             flags |= vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace;
         }
@@ -1057,6 +974,7 @@ void Scene::build_tlas(const CommandBufferHandle& cmd) {
     const vk::DeviceSize tlas_instances_size = std::max((std::size_t)1, tlas_instances.size()) *
                                                sizeof(vk::AccelerationStructureInstanceKHR);
     if (!tlas_instances_buffer || tlas_instances_buffer->get_size() < tlas_instances_size) {
+        cmd->keep_until_pool_reset(std::move(tlas_instances_buffer));
         tlas_instances_buffer = allocator->create_buffer(
             tlas_instances_size,
             vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR |

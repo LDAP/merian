@@ -18,10 +18,14 @@ namespace merian {
 
 enum class MeshFlags : uint32_t {
     None = 0,
-    IsDynamic = 0x1,             // default: static
-    IsOpaque = 0x2,              // default: treat all as non-opaque (allow alpha mask)
-    FrontCounterClockwise = 0x4, // default: clockwise
-    TwoSided = 0x8,              // default: cull backfaces
+    // default: not; means: vertices can change over time, get_prev_vertices must be valid.
+    IsMorphed = 0x1,
+    // default: treat all as non-opaque (allow alpha mask)
+    IsOpaque = 0x2,
+    // default: clockwise
+    FrontCounterClockwise = 0x4,
+    // default: cull backfaces
+    TwoSided = 0x8,
 };
 
 constexpr MeshFlags operator|(MeshFlags a, MeshFlags b) {
@@ -42,6 +46,9 @@ static constexpr CameraID CAMERA_ID_INVALID = UINT32_MAX;
 class SceneNode {
   public:
     std::string name;
+
+    // Transform changes over time; update_node() asserts this. Set before add_node().
+    bool is_animated = false;
 
     NodeID parent = NODE_ID_INVALID;
     std::vector<NodeID> children;
@@ -71,20 +78,25 @@ class SceneNode;
 
 class Mesh {
   public:
-    // ----- General CPU vertex data -----
+    // ----- Bulk CPU vertex data -----
     template <typename T> struct HostVertexSource {
         virtual ~HostVertexSource() = default;
-
-        virtual void write_packed_vertex(uint32_t v, T* dst) const = 0;
-        virtual void
-        write_packed_vertex_pretransformed(uint32_t v,
-                                           const float4x4& global_transform,
-                                           const float4x4& global_inverse_transposed_transform,
-                                           T* dst) const = 0;
+        virtual void write(T* dst) const = 0;
+        virtual void write_pretransformed(const float4x4& global_transform,
+                                          const float4x4& global_inverse_transposed,
+                                          T* dst) const = 0;
     };
 
     using HostVertices = HostVertexSource<PackedVertexData>*;
     using HostPrevVertices = HostVertexSource<PackedPrevVertexData>*;
+
+    // ----- Bulk CPU index data -----
+    struct HostIndexSource {
+        virtual ~HostIndexSource() = default;
+        virtual void write(void* dst) const = 0;
+    };
+
+    using HostIndices = HostIndexSource*;
 
     // ----- Static prepacked CPU Data -----
     template <typename T> struct HostPacked {
@@ -113,7 +125,7 @@ class Mesh {
                                             DeviceLocal>;
 
     // Layout depends on Mesh::index_type
-    using MeshIndexData = std::variant<HostPacked<void>, DeviceStaged, DeviceLocal>;
+    using MeshIndexData = std::variant<HostIndices, HostPacked<void>, DeviceStaged, DeviceLocal>;
 
   public:
     std::string name;
@@ -138,12 +150,16 @@ class Mesh {
     virtual MeshPrevVertexData get_prev_vertices() const = 0;
     virtual MeshIndexData get_indices() const = 0;
 
+    bool is_morphed() const {
+        return flags & MeshFlags::IsMorphed;
+    }
+
     bool is_dynamic() const {
-        return (flags & MeshFlags::IsDynamic);
+        return is_morphed() || animated_instance_count > 0;
     }
 
     bool is_static() const {
-        return !(flags & MeshFlags::IsDynamic);
+        return !is_dynamic();
     }
 
     bool is_front_counterclockwise() const {
@@ -169,6 +185,7 @@ class Mesh {
     // Managed by Scene
 
     std::set<NodeID> instances;
+    uint32_t animated_instance_count = 0;
 };
 
 using MeshHandle = std::unique_ptr<Mesh>;
@@ -196,7 +213,7 @@ class SimpleMesh : public Mesh {
         return HostPacked<PackedVertexData>(vertices.data());
     }
     virtual MeshPrevVertexData get_prev_vertices() const override {
-        if (is_static()) {
+        if (!is_morphed()) {
             return std::monostate();
         }
         assert(prev_vertices.size() == vertices.size());
@@ -226,6 +243,8 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
 
         // flags shared by all meshes
         MeshFlags flags;
+        // true if any instance node has is_animated set
+        bool has_animated_node = false;
 
         // ----------------
         AccelerationStructureHandle blas;
@@ -246,7 +265,13 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
             assert(!meshes.empty());
             const Mesh& mesh = *meshes[*this->meshes.begin()];
             assert(flags == mesh.flags);
-            return (mesh.is_static() || pretransform_dynamic) && mesh.instances.size() <= 1;
+            if (mesh.instances.size() > 1)
+                return false;
+            if (has_animated_node)
+                return false;
+            if (!mesh.is_morphed())
+                return true;
+            return pretransform_dynamic;
         }
     };
 
@@ -254,20 +279,22 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     // We use a BLAS / TLAS organization that is inspired by by Falcor.
     // https://github.com/NVIDIAGameWorks/Falcor/blob/master/Source/Falcor/Scene/Scene.h
     //
-    // BLASs (one for each group)
-    // - static, non-instanced -> pretransform and put in a group
-    // - dynamic, non-instanced -> group if same transform (same NodeID) and same flags
-    // - instanced -> group if identical instances and flags (instanced cannot be
-    // pretransformed!)
-    // - procedural -> own group / BLAS
+    // We differentiate between meshes with IsMorphed (vertices that change) and nodes with
+    // IsAnimated (transforms that change). A mesh is "dynamic" if either applies to any of
+    // its instances; otherwise it is "static".
     //
-    // - Groups must be further split if they differ in these GeometryFlags: ForceOpaque,
-    // FrontCounterClockwise and TwoSided as those can only be set on the (BLAS) instance, not the
-    // geometry.
+    // BLASs (one for each group, grouped by MeshFlags)
+    // - non-animated, non-instanced -> pretransform and merge into one BLAS per MeshFlags
+    //   (unless IsMorphed and pretransform_dynamic is off)
+    // - animated, non-instanced     -> group by (MeshFlags, NodeID), not pretransformed
+    // - instanced                   -> group by (instance set, MeshFlags), never pretransformed
+    //
+    // Groups must be split if they differ in IsOpaque, FrontCounterClockwise or TwoSided
+    // since those map to per-TLAS-instance flags.
     //
     // TLAS
-    // - We set InstanceID as the prefix sum of the number of geometries with lower InstanceIndex.
-    // That means InstanceID + GeometryIndex is unique. We call that GeometryID.
+    // - InstanceID = prefix sum of geometry counts with lower InstanceIndex.
+    //   InstanceID + GeometryIndex is unique and called GeometryID.
     //
     // clang-format off
     //                           ----------------------------------------------------------------------------------------------
@@ -465,14 +492,8 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     // invalidates the global transform of this node and its children.
     void invalidate_node(SceneNode& node);
 
-    // Computes mesh groups according to the grouping logic above.
-    //
-    // instanced meshes must have the same instances and non-instanced dynamic meshes are only
-    // grouped if they share the same instance and static meshes are pretransformed and the
-    // single instance does not matter as it it replaced with the identity anyway.
-    // That means all meshes in the group share the same instances (transforms) -> iterating over
-    // groups and instances gives the instances One group builds one BLAS -> the instances can refer
-    // to those.
+    // Groups meshes into BLASes according to the logic above.
+    // All meshes in a group share the same instances (transforms); one group = one BLAS.
     void compute_mesh_groups();
 
     // this only changes if the mesh groups changed or if a transform changes (TODO: selectively

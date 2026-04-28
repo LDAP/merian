@@ -71,8 +71,7 @@ class SceneTest : public ::testing::Test {
     }
 
     // Helper: create a triangle mesh
-    static MeshHandle make_triangle(MaterialID mat_id,
-                                    MeshFlags flags = MeshFlags::IsOpaque) {
+    static MeshHandle make_triangle(MaterialID mat_id, MeshFlags flags = MeshFlags::IsOpaque) {
         std::unique_ptr<SimpleMesh> m = std::make_unique<SimpleMesh>();
         m->material_id = mat_id;
         m->flags = flags;
@@ -83,6 +82,9 @@ class SceneTest : public ::testing::Test {
         v2.position = float3(0, 1, 0);
         m->vertices = {v0, v1, v2};
         m->indices = {uint3(0, 1, 2)};
+        if (flags & MeshFlags::IsMorphed) {
+            m->prev_vertices = {{v0.position}, {v1.position}, {v2.position}};
+        }
         return m;
     }
 };
@@ -128,12 +130,11 @@ TEST_F(SceneTest, SceneGraphTransforms) {
     NodeID child_id = scene->add_node(child);
     EXPECT_EQ(child_id, 1u);
 
-    const auto& graph = scene->get_scene_graph();
-    EXPECT_FLOAT_EQ(graph[root_id]->global_transform.value()[0][3], 2.0f);
-    EXPECT_FLOAT_EQ(graph[root_id]->global_transform.value()[1][3], 0.0f);
+    EXPECT_FLOAT_EQ(scene->get_global_transform(root_id)[0][3], 2.0f);
+    EXPECT_FLOAT_EQ(scene->get_global_transform(root_id)[1][3], 0.0f);
     // Child: global = mul(root, child) => translate (2, 3, 0)
-    EXPECT_FLOAT_EQ(graph[child_id]->global_transform.value()[0][3], 2.0f);
-    EXPECT_FLOAT_EQ(graph[child_id]->global_transform.value()[1][3], 3.0f);
+    EXPECT_FLOAT_EQ(scene->get_global_transform(child_id)[0][3], 2.0f);
+    EXPECT_FLOAT_EQ(scene->get_global_transform(child_id)[1][3], 3.0f);
 }
 
 // ---------------------------------------------------------------------------
@@ -197,21 +198,21 @@ TEST_F(SceneTest, MeshGroupingDynamic) {
 
     SceneNode n0, n1;
     n0.name = "dyn0";
+    n0.is_animated = true;
     n1.name = "dyn1";
+    n1.is_animated = true;
     NodeID nid0 = scene->add_node(n0);
     NodeID nid1 = scene->add_node(n1);
 
-    // Two dynamic meshes on different nodes
-    MeshID m0 =
-        scene->add_mesh(make_triangle(0, MeshFlags::IsOpaque | MeshFlags::IsDynamic));
-    MeshID m1 =
-        scene->add_mesh(make_triangle(0, MeshFlags::IsOpaque | MeshFlags::IsDynamic));
+    // Two morphed meshes on animated nodes → separate groups (different NodeIDs)
+    MeshID m0 = scene->add_mesh(make_triangle(0, MeshFlags::IsOpaque | MeshFlags::IsMorphed));
+    MeshID m1 = scene->add_mesh(make_triangle(0, MeshFlags::IsOpaque | MeshFlags::IsMorphed));
     scene->add_mesh_instance(m0, nid0);
     scene->add_mesh_instance(m1, nid1);
 
     queue->submit_wait([&](const CommandBufferHandle& cmd) { scene->update(cmd, 0.0f, 0.0f, 0); });
 
-    // Each dynamic mesh on a different node → separate groups
+    // Each mesh on a different animated node → separate groups
     EXPECT_EQ(scene->get_mesh(m0).instances.size(), 1u);
     EXPECT_EQ(scene->get_mesh(m1).instances.size(), 1u);
 }

@@ -48,6 +48,22 @@ inline uint32_t workgroup_size_for_shared_memory_with_halo(
                     min_workgroup_size, halo_size, required_shared_memory_bytes_per_invocation)};
 }
 
+inline vk::DeviceSize size_for_index_type(vk::IndexType type) {
+    switch (type) {
+    case vk::IndexType::eUint16:
+        return 2;
+    case vk::IndexType::eUint32:
+        return 4;
+    case vk::IndexType::eUint8:
+        return 1;
+    case vk::IndexType::eNoneKHR:
+        return 0;
+    default:
+        assert(false);
+        return 0;
+    }
+}
+
 inline vk::TransformMatrixKHR transform_identity() noexcept {
     vk::TransformMatrixKHR transform;
     transform.matrix[0][0] = transform.matrix[1][1] = transform.matrix[2][2] = 1.0f;

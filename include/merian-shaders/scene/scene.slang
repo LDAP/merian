@@ -177,9 +177,9 @@ struct Scene {
                                                        const uint primitive_id,
                                                        const float3 barycentrics) {
         const uint3 indices = get_vertex_indices(geometry_data, primitive_id);
-        return { get_packed_vertex_data(geometry_data, indices.x),
-                 get_packed_vertex_data(geometry_data, indices.y),
-                 get_packed_vertex_data(geometry_data, indices.z) };
+        return {get_packed_vertex_data(geometry_data, indices.x),
+                get_packed_vertex_data(geometry_data, indices.y),
+                get_packed_vertex_data(geometry_data, indices.z)};
     }
 
     VertexData get_interpolated_vertex_data(const GeometryData geometry_data,
@@ -209,11 +209,10 @@ struct Scene {
     }
 
     // Previous-frame object-space position for a vertex.
-    // For static meshes (prev_vertices == null) this equals the current position.
+    // For non-morphed meshes this equals the current position.
     float3 get_prev_object_position(const GeometryData geometry_data, const uint vertex_index) {
-        if (uint64_t(geometry_data.prev_vertices) == 0) {
+        if (!(geometry_data.flags & GeometryDataFlags::IsMorphed))
             return geometry_data.vertices[vertex_index].position;
-        }
         return geometry_data.prev_vertices[vertex_index].position;
     }
 
@@ -252,6 +251,8 @@ struct Scene {
                                   const float3 object_pos) {
         if (gd.flags & GeometryDataFlags::Pretransformed)
             return object_pos;
+        if (!(gd.flags & GeometryDataFlags::IsAnimated))
+            return mul(get_instance_transform(instance_index), float4(object_pos, 1.0)).xyz;
         return mul(get_prev_instance_transform(instance_index), float4(object_pos, 1.0)).xyz;
     }
 
@@ -261,6 +262,10 @@ struct Scene {
                                    const float3 object_dir) {
         if (gd.flags & GeometryDataFlags::Pretransformed)
             return object_dir;
+        if (!(gd.flags & GeometryDataFlags::IsAnimated))
+            return normalize(mul(get_inverse_transposed_instance_transform(instance_index),
+                                 float4(object_dir, 0.0))
+                                 .xyz);
         return normalize(mul(get_prev_inverse_transposed_instance_transform(instance_index),
                              float4(object_dir, 0.0))
                              .xyz);
@@ -292,5 +297,4 @@ struct Scene {
     }
 }
 
-}
-
+} // namespace merian
