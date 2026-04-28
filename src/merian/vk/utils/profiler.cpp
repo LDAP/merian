@@ -1,6 +1,9 @@
 #include "merian/vk/utils/profiler.hpp"
 #include "merian/vk/command/command_buffer.hpp"
 
+#include <mutex>
+#include <vector>
+
 #ifndef MERIAN_PROFILER_ENABLE
 #include "spdlog/spdlog.h"
 #endif
@@ -268,6 +271,37 @@ Profiler::Report Profiler::get_report() {
         make_report<chrono_clock::time_point>(cpu_sections[current_cpu_section], cpu_sections);
     report.gpu_report = make_report<uint64_t>(gpu_sections[current_gpu_section], gpu_sections);
     return report;
+}
+
+namespace detail {
+std::mutex g_default_profiler_mutex;
+std::vector<Profiler*> g_default_profiler_stack;
+} // namespace detail
+
+ProfilerHandle get_default_profiler() noexcept {
+    const std::lock_guard lock{detail::g_default_profiler_mutex};
+    if (detail::g_default_profiler_stack.empty()) {
+        return nullptr;
+    }
+    Profiler* const top = detail::g_default_profiler_stack.back();
+    return top != nullptr ? top->shared_from_this() : nullptr;
+}
+
+ScopedDefaultProfiler::ScopedDefaultProfiler(ProfilerHandle profiler) : profiler(std::move(profiler)) {
+    const std::lock_guard lock{detail::g_default_profiler_mutex};
+    detail::g_default_profiler_stack.push_back(this->profiler.get());
+}
+
+ScopedDefaultProfiler::~ScopedDefaultProfiler() {
+    const std::lock_guard lock{detail::g_default_profiler_mutex};
+    assert(!detail::g_default_profiler_stack.empty());
+    assert(detail::g_default_profiler_stack.back() == profiler.get() &&
+           "ScopedDefaultProfiler destroyed out of LIFO order");
+    detail::g_default_profiler_stack.pop_back();
+}
+
+ScopedDefaultProfiler set_default_profiler(ProfilerHandle profiler) {
+    return ScopedDefaultProfiler{std::move(profiler)};
 }
 
 } // namespace merian

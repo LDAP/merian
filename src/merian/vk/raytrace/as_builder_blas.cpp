@@ -127,9 +127,7 @@ void ASBuilder::queue_update(const vk::AccelerationStructureGeometryKHR* geometr
     pending_blas_builds.emplace_back(as, build_info, range_info);
 }
 
-void ASBuilder::get_cmds_blas(const CommandBufferHandle& cmd,
-                              BufferHandle& scratch_buffer,
-                              const ProfilerHandle& profiler) {
+void ASBuilder::get_cmds_blas(const CommandBufferHandle& cmd, BufferHandle& scratch_buffer) {
     if (pending_blas_builds.empty())
         return;
 
@@ -145,7 +143,7 @@ void ASBuilder::get_cmds_blas(const CommandBufferHandle& cmd,
                                            vk::AccessFlagBits::eAccelerationStructureWriteKHR);
     cmd->keep_until_pool_reset(scratch_buffer);
     for (uint32_t idx = 0; idx < pending_blas_builds.size(); idx++) {
-        MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, fmt::format("BLAS build {:02}", idx));
+        MERIAN_PROFILE_SCOPE_GPU(cmd, fmt::format("BLAS build {:02}", idx));
 
         pending_blas_builds[idx].build_info.scratchData.deviceAddress =
             scratch_buffer->get_device_address();

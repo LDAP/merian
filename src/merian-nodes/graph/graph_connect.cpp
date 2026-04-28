@@ -6,6 +6,7 @@ namespace merian {
 
 void Graph::connect() {
     ProfilerHandle profiler = std::make_shared<Profiler>(context);
+    const ScopedDefaultProfiler scoped_default_profiler{profiler};
     {
         MERIAN_PROFILE_SCOPE(profiler, "connect");
 

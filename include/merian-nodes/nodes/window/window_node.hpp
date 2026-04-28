@@ -118,7 +118,7 @@ class WindowNode : public Node {
 
             {
                 MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "on_blit_completed callback");
-                on_blit_completed(cmd, *acquire, run.get_profiler());
+                on_blit_completed(cmd, *acquire);
             }
 
             {
@@ -271,9 +271,8 @@ class WindowNode : public Node {
         on_window_created = cb;
     }
 
-    void set_on_blit_completed(const std::function<void(const CommandBufferHandle&,
-                                                        const SwapchainAcquireResult&,
-                                                        const ProfilerHandle&)>& cb) {
+    void set_on_blit_completed(
+        const std::function<void(const CommandBufferHandle&, const SwapchainAcquireResult&)>& cb) {
         on_blit_completed = cb;
     }
 
@@ -298,11 +297,9 @@ class WindowNode : public Node {
 
     std::function<void(const WindowHandle&)> on_window_created;
 
-    std::function<void(
-        const CommandBufferHandle&, const SwapchainAcquireResult&, const ProfilerHandle&)>
+    std::function<void(const CommandBufferHandle&, const SwapchainAcquireResult&)>
         on_blit_completed = []([[maybe_unused]] const CommandBufferHandle&,
-                               [[maybe_unused]] const SwapchainAcquireResult&,
-                               [[maybe_unused]] const ProfilerHandle&) {};
+                               [[maybe_unused]] const SwapchainAcquireResult&) {};
 
     VkImageInHandle image_in = VkImageIn::transfer_src(0, true);
 

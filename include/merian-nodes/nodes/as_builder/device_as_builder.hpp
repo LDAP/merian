@@ -352,7 +352,7 @@ class DeviceASBuilder : public Node {
         run.get_cmd()->barrier(pre_build_barriers);
 
         // 4. Run builds (reusing the same scratch buffer)
-        as_builder->get_cmds(run.get_cmd(), scratch_buffer, run.get_profiler());
+        as_builder->get_cmds(run.get_cmd(), scratch_buffer);
 
         // 5. Prevent object destruction
         in_flight_data.build_buffers.emplace_back(scratch_buffer);

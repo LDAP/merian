@@ -35,6 +35,32 @@ constexpr bool operator&(MeshFlags a, MeshFlags b) {
     return (static_cast<uint32_t>(a) & static_cast<uint32_t>(b)) != 0;
 }
 
+inline std::string format_as(const MeshFlags flags) {
+    if (flags == MeshFlags::None) {
+        return "None";
+    }
+    std::string out;
+    const auto append = [&](const char* name) {
+        if (!out.empty()) {
+            out += " | ";
+        }
+        out += name;
+    };
+    if (flags & MeshFlags::IsMorphed) {
+        append("IsMorphed");
+    }
+    if (flags & MeshFlags::IsOpaque) {
+        append("IsOpaque");
+    }
+    if (flags & MeshFlags::FrontCounterClockwise) {
+        append("FrontCounterClockwise");
+    }
+    if (flags & MeshFlags::TwoSided) {
+        append("TwoSided");
+    }
+    return out;
+}
+
 using NodeID = uint32_t;
 using MeshID = uint32_t;
 using CameraID = uint32_t;
@@ -191,9 +217,12 @@ class Mesh {
 using MeshHandle = std::unique_ptr<Mesh>;
 
 inline std::string format_as(const Mesh& mesh) {
-    return fmt::format("vertices: {}\ntriangles: {}\nmaterial id: {}\nnum instances: {}",
-                       mesh.get_vertex_count(), mesh.get_primitive_count(), mesh.material_id,
-                       mesh.instances.size());
+    return fmt::format(
+        "vertices: {}\ntriangles: {}\nmaterial id: {}\nnum instances: {}\nanimated instances: "
+        "{}\nflags: {}\nindex type: {}\nvertices dirty: {}\nindices dirty: {}",
+        mesh.get_vertex_count(), mesh.get_primitive_count(), mesh.material_id,
+        mesh.instances.size(), mesh.animated_instance_count, mesh.flags,
+        vk::to_string(mesh.index_type), mesh.vertices_dirty, mesh.indices_dirty);
 }
 
 class SimpleMesh : public Mesh {

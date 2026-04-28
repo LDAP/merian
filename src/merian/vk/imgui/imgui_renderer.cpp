@@ -1,5 +1,6 @@
 #include "merian/vk/imgui/imgui_renderer.hpp"
 #include "merian/vk/imgui/extension_imgui.hpp"
+#include "merian/vk/utils/profiler.hpp"
 
 #include "imgui.frag.spv.h"
 #include "imgui.vert.spv.h"
@@ -158,10 +159,8 @@ void ImGuiRenderer::ensure_buffers(const ImDrawData* draw_data) {
                               "imgui_indices");
 }
 
-void ImGuiRenderer::render(const CommandBufferHandle& cmd,
-                           const ImageViewHandle& image_view,
-                           const ProfilerHandle& profiler) {
-    MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "ImGui::render");
+void ImGuiRenderer::render(const CommandBufferHandle& cmd, const ImageViewHandle& image_view) {
+    MERIAN_PROFILE_SCOPE_GPU(cmd, "ImGui::render");
 
     ImDrawData* draw_data = nullptr;
     imgui_ctx->with_context([&] {
@@ -181,7 +180,7 @@ void ImGuiRenderer::render(const CommandBufferHandle& cmd,
     }
 
     {
-        MERIAN_PROFILE_SCOPE(profiler, "ImGui::upload_textures");
+        MERIAN_PROFILE_SCOPE("ImGui::upload_textures");
         upload_pending_textures(cmd, draw_data->Textures);
     }
 
@@ -189,7 +188,7 @@ void ImGuiRenderer::render(const CommandBufferHandle& cmd,
 
     // Upload vertex and index data via staging (staging manager rotates internally)
     {
-        MERIAN_PROFILE_SCOPE(profiler, "ImGui::upload_buffers");
+        MERIAN_PROFILE_SCOPE("ImGui::upload_buffers");
         vk::DeviceSize vtx_offset = 0;
         vk::DeviceSize idx_offset = 0;
         for (int n = 0; n < draw_data->CmdListsCount; ++n) {

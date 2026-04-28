@@ -6,7 +6,6 @@
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline_graphics.hpp"
 #include "merian/vk/pipeline/pipeline_layout.hpp"
-#include "merian/vk/utils/profiler.hpp"
 
 #include "imgui.h"
 
@@ -44,9 +43,7 @@ class ImGuiRenderer {
     void unregister_texture(ImTextureID id);
 
     // Calls ImGui::Render() then draws ImGui draw data into the given image view.
-    void render(const CommandBufferHandle& cmd,
-                const ImageViewHandle& image_view,
-                const ProfilerHandle& profiler = nullptr);
+    void render(const CommandBufferHandle& cmd, const ImageViewHandle& image_view);
 
   private:
     void init_pipeline(vk::Format color_format);

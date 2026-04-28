@@ -279,9 +279,7 @@ class ASBuilder {
     // the pool.
     //
     // This command inserts a barrier for the BLAS that are built.
-    void get_cmds_blas(const CommandBufferHandle& cmd,
-                       BufferHandle& scratch_buffer,
-                       const ProfilerHandle& profiler = nullptr);
+    void get_cmds_blas(const CommandBufferHandle& cmd, BufferHandle& scratch_buffer);
 
     // Note: This method does not insert a synchronization barrier. You must enure proper
     // synchronization before using the TLAS (you can use the helper cmd_barrier()).
@@ -289,23 +287,19 @@ class ASBuilder {
     // Provide a BufferHandle to a (optinally null) scratch_buffer. The scratch buffer is reused if
     // it is large enough else it is replaced with a larger one. The scratch buffer is kept alive on
     // the pool.
-    void get_cmds_tlas(const CommandBufferHandle& cmd,
-                       BufferHandle& scratch_buffer,
-                       const ProfilerHandle& profiler = nullptr);
+    void get_cmds_tlas(const CommandBufferHandle& cmd, BufferHandle& scratch_buffer);
 
     // Provide a BufferHandle to a (optinally null) scratch_buffer. The scratch buffer is reused if
     // it is large enough else it is replaced with a larger one. The scratch buffer is kept alive on
     // the pool.
-    void get_cmds(const CommandBufferHandle& cmd,
-                  BufferHandle& scratch_buffer,
-                  const ProfilerHandle& profiler = nullptr) {
+    void get_cmds(const CommandBufferHandle& cmd, BufferHandle& scratch_buffer) {
         {
-            MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "BLAS build");
-            get_cmds_blas(cmd, scratch_buffer, profiler);
+            MERIAN_PROFILE_SCOPE_GPU(cmd, "BLAS build");
+            get_cmds_blas(cmd, scratch_buffer);
         }
         {
-            MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "TLAS build");
-            get_cmds_tlas(cmd, scratch_buffer, profiler);
+            MERIAN_PROFILE_SCOPE_GPU(cmd, "TLAS build");
+            get_cmds_tlas(cmd, scratch_buffer);
         }
     }
 

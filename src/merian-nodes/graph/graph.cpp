@@ -125,6 +125,7 @@ void Graph::run() {
     time_delta = duration_elapsed - last_elapsed_ns;
 
     const ProfilerHandle& profiler = prepare_profiler_for_run(in_flight_data);
+    const ScopedDefaultProfiler scoped_default_profiler{profiler};
     const auto run_start = std::chrono::high_resolution_clock::now();
 
     // CONNECT and PREPROCESS

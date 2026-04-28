@@ -380,9 +380,54 @@ void Scene::properties(Properties& props) {
 
         if (props.st_begin_child("meshes", "Meshes")) {
             for (const MeshID id : mesh_ids) {
-                if (props.st_begin_child(fmt::format("mesh_{:02} ", id),
-                                         fmt::format("{:02}: {}", id, meshes[id]->name))) {
-                    props.output_text("{}", *meshes[id]);
+                const Mesh& mesh = *meshes[id];
+                const MeshGroupID group_id =
+                    id < mesh_to_group.size() ? mesh_to_group[id] : MESH_GROUP_ID_INVALID;
+                const std::string group_label = group_id == MESH_GROUP_ID_INVALID
+                                                    ? "no group"
+                                                    : fmt::format("group {}", group_id);
+                if (props.st_begin_child(
+                        fmt::format("mesh_{:04} ", id),
+                        fmt::format("{:04}: {} [{}]", id, mesh.name, group_label))) {
+                    props.output_text("{}", mesh);
+                    props.st_end_child();
+                }
+            }
+            props.st_end_child();
+        }
+
+        if (props.st_begin_child("mesh_groups", "Mesh Groups")) {
+            for (MeshGroupID group_id = 0; group_id < mesh_groups.size(); group_id++) {
+                const MeshGroup& group = mesh_groups[group_id];
+                if (props.st_begin_child(
+                        fmt::format("group_{:04}", group_id),
+                        fmt::format("{:04}: {} ({} mesh{})", group_id, group.flags,
+                                    group.meshes.size(), group.meshes.size() == 1 ? "" : "es"))) {
+                    const std::size_t instances =
+                        group.meshes.empty() ? 0 : group.get_instances(meshes).size();
+                    const bool pretransformed =
+                        !group.meshes.empty() &&
+                        group.is_pretranformed(meshes, pretransform_dynamic);
+                    std::size_t group_vertices = 0;
+                    std::size_t group_triangles = 0;
+                    for (const MeshID mesh_id : group.meshes) {
+                        group_vertices += meshes[mesh_id]->get_vertex_count();
+                        group_triangles += meshes[mesh_id]->get_primitive_count();
+                    }
+                    props.output_text(
+                        "flags: {}\nhas animated node: {}\npretransformed: {}\ninstances: "
+                        "{}\nvertices: {}\ntriangles: {}\nblas: {}\nblas dirty: {}",
+                        group.flags, group.has_animated_node, pretransformed, instances,
+                        group_vertices, group_triangles,
+                        group.blas ? fmt::format("{} bytes", group.blas->get_size()) : "<none>",
+                        group.blas_dirty);
+
+                    if (props.st_begin_child("members", "Members")) {
+                        for (const MeshID mesh_id : group.meshes) {
+                            props.output_text("{:04}: {}", mesh_id, meshes[mesh_id]->name);
+                        }
+                        props.st_end_child();
+                    }
                     props.st_end_child();
                 }
             }
@@ -417,16 +462,32 @@ void Scene::properties(Properties& props) {
     if (props.st_begin_child("stats", "Statistics")) {
         std::size_t total_vertices = 0;
         std::size_t total_triangles = 0;
+        std::size_t total_instances = 0;
+        std::size_t morphed_meshes = 0;
+        std::size_t dynamic_meshes = 0;
         for (const MeshID id : mesh_ids) {
-            total_vertices += meshes[id]->get_vertex_count();
-            total_triangles += meshes[id]->get_primitive_count();
+            const Mesh& mesh = *meshes[id];
+            total_vertices += mesh.get_vertex_count();
+            total_triangles += mesh.get_primitive_count();
+            total_instances += mesh.instances.size();
+            if (mesh.is_morphed()) {
+                morphed_meshes++;
+            }
+            if (mesh.is_dynamic()) {
+                dynamic_meshes++;
+            }
         }
 
-        props.output_text("nodes: {}\nmeshes: {}\nvertices: {}\ntriangles: {}\nmaterials: "
-                          "{}\ntextures: {}",
-                          node_ids.count(), mesh_ids.count(), total_vertices, total_triangles,
-                          material_system->get_material_count(),
-                          get_texture_manager()->get_texture_count());
+        props.output_text(
+            "nodes: {}\nmeshes: {} ({} dynamic, {} morphed)\ninstances: {}\nmesh groups: "
+            "{}\nvertices: {}\ntriangles: {}\nmaterials: {}\ntextures: {}\ntlas instances: "
+            "{}\npending buffer releases: {}\nneeds regroup: {}\ntransforms changed: "
+            "{}\npretransform dynamic: {}",
+            node_ids.count(), mesh_ids.count(), dynamic_meshes, morphed_meshes, total_instances,
+            mesh_groups.size(), total_vertices, total_triangles,
+            material_system->get_material_count(), get_texture_manager()->get_texture_count(),
+            tlas_instances.size(), pending_buffer_releases.size(), needs_regroup,
+            transforms_changed, pretransform_dynamic);
 
         if (aabb.is_valid()) {
             props.output_text("aabb: min={}, max={}, size={}", aabb.get_min(), aabb.get_max(),
@@ -444,6 +505,7 @@ void Scene::properties(Properties& props) {
 // ---------------------------------------------------------------------------
 
 void Scene::compute_mesh_groups() {
+    MERIAN_PROFILE_SCOPE("Scene::compute_mesh_groups");
 
     auto prev_mesh_groups = std::move(mesh_groups);
     auto prev_mesh_to_group = std::move(mesh_to_group);
@@ -537,6 +599,7 @@ void Scene::compute_mesh_groups() {
 }
 
 void Scene::upload_transforms(const CommandBufferHandle& cmd) {
+    MERIAN_PROFILE_SCOPE_GPU(cmd, "Scene::upload_transforms");
     instance_transforms.clear();
     inverse_transposed_instance_transforms.clear();
     prev_instance_transforms.clear();
@@ -625,6 +688,7 @@ void Scene::upload_transforms(const CommandBufferHandle& cmd) {
 }
 
 void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
+    MERIAN_PROFILE_SCOPE_GPU(cmd, "Scene::upload_geometry_data");
     geometries.clear();
 
     const float4x4 identity_transform = identity();
@@ -685,6 +749,7 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
 }
 
 void Scene::upload_meshes(const CommandBufferHandle& cmd) {
+    MERIAN_PROFILE_SCOPE_GPU(cmd, "Scene::upload_meshes");
     // For now we have a index and vertex buffer for each mesh,
     // we could combine them per group or into single buffers in the future.
 
@@ -846,6 +911,7 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
 }
 
 void Scene::build_blas(const CommandBufferHandle& cmd) {
+    MERIAN_PROFILE_SCOPE_GPU(cmd, "Scene::build_blas");
     //     if (mesh_groups.empty())
     //         return;
 
@@ -918,6 +984,7 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
 }
 
 void Scene::build_tlas(const CommandBufferHandle& cmd) {
+    MERIAN_PROFILE_SCOPE_GPU(cmd, "Scene::build_tlas");
 
     tlas_instances.clear();
     // we set this such that GeometryData index is InstanceID + GeometryIndex.
@@ -1009,7 +1076,12 @@ void Scene::update(const CommandBufferHandle& cmd,
                    const float time,
                    const float time_diff,
                    const uint32_t frame) {
-    on_update(cmd, time, time_diff, frame);
+    MERIAN_PROFILE_SCOPE_GPU(cmd, "Scene::update");
+
+    {
+        MERIAN_PROFILE_SCOPE_GPU(cmd, "on_update");
+        on_update(cmd, time, time_diff, frame);
+    }
 
     assert(!cameras.empty() &&
            "the scene implementation must ensure that there is at least one camera");
@@ -1019,7 +1091,10 @@ void Scene::update(const CommandBufferHandle& cmd,
     }
     pending_buffer_releases.clear();
 
-    material_system->update(cmd);
+    {
+        MERIAN_PROFILE_SCOPE_GPU(cmd, "material_system::update");
+        material_system->update(cmd);
+    }
 
     // do that before to upload geometry buffers, because that clears the dirty flags!
     if (needs_regroup) {

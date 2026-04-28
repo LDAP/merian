@@ -96,9 +96,7 @@ void ASBuilder::queue_build(const uint32_t instance_count,
     pending_tlas_builds.emplace_back(build_info, instance_count, top_as_geometry, src_as);
 }
 
-void ASBuilder::get_cmds_tlas(const CommandBufferHandle& cmd,
-                              BufferHandle& scratch_buffer,
-                              const ProfilerHandle& profiler) {
+void ASBuilder::get_cmds_tlas(const CommandBufferHandle& cmd, BufferHandle& scratch_buffer) {
     if (pending_tlas_builds.empty()) {
         return;
     }
@@ -116,7 +114,7 @@ void ASBuilder::get_cmds_tlas(const CommandBufferHandle& cmd,
                                            vk::AccessFlagBits::eAccelerationStructureWriteKHR);
     cmd->keep_until_pool_reset(scratch_buffer);
     for (uint32_t pending_idx = 0; pending_idx < pending_tlas_builds.size(); pending_idx++) {
-        MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, fmt::format("TLAS build {:02}", pending_idx));
+        MERIAN_PROFILE_SCOPE_GPU(cmd, fmt::format("TLAS build {:02}", pending_idx));
 
         pending_tlas_builds[pending_idx].build_info.scratchData.deviceAddress =
             scratch_buffer->get_device_address();
