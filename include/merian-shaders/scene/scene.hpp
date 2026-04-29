@@ -285,6 +285,8 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         bool has_animated_node = false;
         // true if any mesh in the group is morphed
         bool has_morphed_mesh = false;
+        // true if all meshes in the group are opaque
+        bool all_opaque = true;
 
         // ----------------
         AccelerationStructureHandle blas;
@@ -310,7 +312,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
             if (mesh.instances.size() > 1)
                 return false;
             if ((has_animated_node || has_morphed_mesh) && !pretransform_animated)
-                return !has_animated_node;
+                return false;
             return true;
         }
     };

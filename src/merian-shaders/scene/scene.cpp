@@ -519,11 +519,12 @@ void Scene::properties(Properties& props) {
                     }
                     props.output_text(
                         "split flags: {}\nhas animated node: {}\nhas morphed mesh: "
-                        "{}\npretransformed: {}\ninstances: "
+                        "{}\nall opaque: {}\npretransformed: {}\ninstances: "
                         "{}\nvertices: {}\ntriangles: {}\nblas: {}\nblas dirty: {}\nblas last "
                         "built frame: {}",
                         group.flags, group.has_animated_node, group.has_morphed_mesh,
-                        pretransformed, instances, group_vertices, group_triangles,
+                        group.all_opaque, pretransformed, instances, group_vertices,
+                        group_triangles,
                         group.blas ? fmt::format("{} bytes", format_size(group.blas->get_size()))
                                    : "<none>",
                         group.blas_dirty, group.blas_last_built_frame);
@@ -687,6 +688,7 @@ void Scene::compute_mesh_groups() {
         group.flags = static_cast<MeshFlags>(key);
         group.has_animated_node |= mesh.animated_instance_count > 0;
         group.has_morphed_mesh |= mesh.is_morphed();
+        group.all_opaque &= mesh.is_opaque();
         group.meshes.insert(mesh_id);
     }
 
@@ -1205,6 +1207,9 @@ void Scene::build_tlas(const CommandBufferHandle& cmd) {
             if (group.flags & MeshFlags::TwoSided) {
                 geometry_instance_flags |=
                     vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable;
+            }
+            if (group.all_opaque) {
+                geometry_instance_flags |= vk::GeometryInstanceFlagBitsKHR::eForceOpaque;
             }
             tlas_instance.setFlags(geometry_instance_flags);
 
