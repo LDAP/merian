@@ -271,13 +271,20 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
 
     using MeshGroupID = uint32_t;
 
+    // Flags that force group splits (mapped to TLAS instance flags).
+    // IsOpaque is per-geometry, IsMorphed is per-mesh — neither splits groups.
+    static constexpr MeshFlags GROUP_SPLIT_MASK =
+        MeshFlags::FrontCounterClockwise | MeshFlags::TwoSided;
+
     struct MeshGroup {
         std::unordered_set<MeshID> meshes;
 
-        // flags shared by all meshes
+        // only the TLAS-instance-level flags shared by all meshes (GROUP_SPLIT_MASK)
         MeshFlags flags;
         // true if any instance node has is_animated set
         bool has_animated_node = false;
+        // true if any mesh in the group is morphed
+        bool has_morphed_mesh = false;
 
         // ----------------
         AccelerationStructureHandle blas;
@@ -300,14 +307,11 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
                               bool pretransform_animated) const {
             assert(!meshes.empty());
             const Mesh& mesh = *meshes[*this->meshes.begin()];
-            assert(flags == mesh.flags);
             if (mesh.instances.size() > 1)
                 return false;
-            if (has_animated_node && !pretransform_animated)
-                return false;
-            if (!mesh.is_morphed())
-                return true;
-            return pretransform_animated;
+            if ((has_animated_node || has_morphed_mesh) && !pretransform_animated)
+                return !has_animated_node;
+            return true;
         }
     };
 
@@ -319,14 +323,18 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     // IsAnimated (transforms that change). A mesh is "dynamic" if either applies to any of
     // its instances; otherwise it is "static".
     //
-    // BLASs (one for each group, grouped by MeshFlags)
-    // - non-animated, non-instanced  -> pretransform, group by MeshFlags (BLAS built once)
-    // - animated + pretransform_anim -> pretransform, group by MeshFlags (separate from static)
-    // - animated, no pretransform    -> group by (MeshFlags, NodeID), not pretransformed
-    // - instanced                    -> group by (instance set, MeshFlags), never pretransformed
+    // BLASs (one per group, split by GROUP_SPLIT_MASK = FrontCCW | TwoSided)
+    // IsOpaque is per-geometry; IsMorphed is per-mesh — neither splits groups.
     //
-    // Groups must be split if they differ in IsOpaque, FrontCounterClockwise or TwoSided
-    // since those map to per-TLAS-instance flags.
+    // pretransform_animated ON:
+    //   static (non-morphed, non-animated)  -> pretransformed, group by split flags, built once
+    //   dynamic (morphed OR animated)       -> pretransformed, group by split flags, rebuilt
+    //   instanced                           -> group by (instance set, split flags)
+    // pretransform_animated OFF:
+    //   static non-morphed non-animated     -> pretransformed, group by split flags, built once
+    //   morphed non-animated                -> not pretransformed, group by split flags
+    //   animated non-instanced              -> not pretransformed, group by (split flags, NodeID)
+    //   instanced                           -> group by (instance set, split flags)
     //
     // TLAS
     // - InstanceID = prefix sum of geometry counts with lower InstanceIndex.

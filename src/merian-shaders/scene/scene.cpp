@@ -518,11 +518,12 @@ void Scene::properties(Properties& props) {
                         group_triangles += meshes[mesh_id]->get_primitive_count();
                     }
                     props.output_text(
-                        "flags: {}\nhas animated node: {}\npretransformed: {}\ninstances: "
+                        "split flags: {}\nhas animated node: {}\nhas morphed mesh: "
+                        "{}\npretransformed: {}\ninstances: "
                         "{}\nvertices: {}\ntriangles: {}\nblas: {}\nblas dirty: {}\nblas last "
                         "built frame: {}",
-                        group.flags, group.has_animated_node, pretransformed, instances,
-                        group_vertices, group_triangles,
+                        group.flags, group.has_animated_node, group.has_morphed_mesh,
+                        pretransformed, instances, group_vertices, group_triangles,
                         group.blas ? fmt::format("{} bytes", format_size(group.blas->get_size()))
                                    : "<none>",
                         group.blas_dirty, group.blas_last_built_frame);
@@ -621,75 +622,71 @@ void Scene::compute_mesh_groups() {
     prev_mesh_to_group.resize(mesh_ids.size(), MESH_GROUP_ID_INVALID);
     mesh_groups.reserve(std::min<std::size_t>(mesh_ids.count(), prev_mesh_groups.size()));
 
-    // 1. Group meshes according to our grouping logic
+    // 1. Group meshes according to our grouping logic (see scene.hpp)
+    // Only FrontCounterClockwise and TwoSided split groups (TLAS instance flags).
+    // IsOpaque is per-geometry, IsMorphed is per-mesh.
 
-    // See description in scene.hpp for grouping logic
+    const auto split_key = [](MeshFlags f) -> uint32_t {
+        return static_cast<uint32_t>(f) & static_cast<uint32_t>(GROUP_SPLIT_MASK);
+    };
 
-    // non-animated nodes: pretransformed, keyed by MeshFlags
-    std::unordered_map<MeshFlags, MeshGroupID> mesh_groups_static_non_instanced;
-    // animated nodes with pretransform_animated: pretransformed, keyed by MeshFlags (separate
-    // from static so their BLAS rebuilds don't drag static geometry along)
-    std::unordered_map<MeshFlags, MeshGroupID> mesh_groups_animated_pretransformed;
-    // animated nodes without pretransform_animated: not pretransformed, keyed by (MeshFlags << 32 |
-    // NodeID)
-    std::unordered_map<uint64_t, MeshGroupID> mesh_groups_animated_non_instanced;
-    // instanced: keyed by instance set + MeshFlags
-    std::map<std::set<NodeID>, std::unordered_map<MeshFlags, MeshGroupID>> mesh_groups_instanced;
+    // static (non-morphed, non-animated): pretransformed, BLAS built once
+    std::unordered_map<uint32_t, MeshGroupID> groups_static;
+    // dynamic with pretransform_animated: pretransformed, BLAS rebuilt as needed
+    std::unordered_map<uint32_t, MeshGroupID> groups_dynamic_pretransformed;
+    // morphed on non-animated node, pretransform OFF: not pretransformed
+    std::unordered_map<uint32_t, MeshGroupID> groups_morphed_static;
+    // animated node, pretransform OFF: not pretransformed, per-node
+    std::unordered_map<uint64_t, MeshGroupID> groups_animated_per_node;
+    // instanced
+    std::map<std::set<NodeID>, std::unordered_map<uint32_t, MeshGroupID>> groups_instanced;
 
-    mesh_groups_static_non_instanced.reserve(32);
-    mesh_groups_animated_non_instanced.reserve(node_ids.count() * 2);
+    groups_static.reserve(32);
+    groups_animated_per_node.reserve(node_ids.count() * 2);
+
+    const auto get_or_create = [&](auto& map, auto key) -> MeshGroupID {
+        const auto [it, inserted] = map.try_emplace(key, mesh_groups.size());
+        if (inserted) {
+            mesh_groups.emplace_back();
+        }
+        return it->second;
+    };
 
     for (const MeshID mesh_id : mesh_ids) {
         const Mesh& mesh = *meshes[mesh_id];
-        MeshGroupID group_id = MESH_GROUP_ID_INVALID;
 
         if (mesh.instances.empty()) {
             continue;
         }
 
+        const uint32_t key = split_key(mesh.flags);
+        MeshGroupID group_id;
+
         if (mesh.instances.size() > 1) {
-            auto& by_instances = mesh_groups_instanced[mesh.instances];
-            const auto [it, inserted] = by_instances.try_emplace(mesh.flags, mesh_groups.size());
-            if (inserted) {
-                mesh_groups.emplace_back();
-            }
-            group_id = it->second;
+            group_id = get_or_create(groups_instanced[mesh.instances], key);
         } else {
             assert(mesh.instances.size() == 1);
             const NodeID node_id = *mesh.instances.begin();
             const bool node_animated = scene_graph[node_id]->is_animated;
+            const bool is_dynamic = node_animated || mesh.is_morphed();
 
-            if (!node_animated) {
-                const auto [it, inserted] =
-                    mesh_groups_static_non_instanced.try_emplace(mesh.flags, mesh_groups.size());
-                if (inserted) {
-                    mesh_groups.emplace_back();
-                }
-                group_id = it->second;
+            if (!is_dynamic) {
+                group_id = get_or_create(groups_static, key);
             } else if (pretransform_animated) {
-                const auto [it, inserted] =
-                    mesh_groups_animated_pretransformed.try_emplace(mesh.flags, mesh_groups.size());
-                if (inserted) {
-                    mesh_groups.emplace_back();
-                }
-                group_id = it->second;
+                group_id = get_or_create(groups_dynamic_pretransformed, key);
+            } else if (!node_animated) {
+                group_id = get_or_create(groups_morphed_static, key);
             } else {
-                const uint64_t key = (static_cast<uint64_t>(mesh.flags) << 32) | node_id;
-                const auto [it, inserted] =
-                    mesh_groups_animated_non_instanced.try_emplace(key, mesh_groups.size());
-                if (inserted) {
-                    mesh_groups.emplace_back();
-                }
-                group_id = it->second;
+                const uint64_t node_key = (static_cast<uint64_t>(key) << 32) | node_id;
+                group_id = get_or_create(groups_animated_per_node, node_key);
             }
         }
 
-        assert(group_id != MESH_GROUP_ID_INVALID);
         mesh_to_group[mesh_id] = group_id;
         MeshGroup& group = mesh_groups[group_id];
-        assert(group.meshes.empty() || group.flags == mesh.flags);
-        group.flags = mesh.flags;
+        group.flags = static_cast<MeshFlags>(key);
         group.has_animated_node |= mesh.animated_instance_count > 0;
+        group.has_morphed_mesh |= mesh.is_morphed();
         group.meshes.insert(mesh_id);
     }
 
@@ -819,7 +816,7 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
                 gd.material_id = mesh.material_id;
                 gd.vertices = vertex_buffers[mesh_id]->get_device_address();
                 gd.indices = index_buffers[mesh_id]->get_device_address();
-                assert(!(group.flags & MeshFlags::IsMorphed) || prev_vertex_buffers[mesh_id]);
+                assert(!mesh.is_morphed() || prev_vertex_buffers[mesh_id]);
                 gd.prev_vertices = prev_vertex_buffers[mesh_id]
                                        ? prev_vertex_buffers[mesh_id]->get_device_address()
                                        : vk::DeviceAddress{0};
@@ -827,10 +824,10 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
                 if (pretransform || transform_is_identity) {
                     gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::Pretransformed);
                 }
-                if (group.flags & MeshFlags::IsMorphed) {
+                if (mesh.is_morphed()) {
                     gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::IsMorphed);
                 }
-                if (group.flags & MeshFlags::FrontCounterClockwise) {
+                if (mesh.is_front_counterclockwise()) {
                     gd.flags =
                         GeometryDataFlags(gd.flags | GeometryDataFlags::FrontCounterClockwise);
                 }
@@ -1134,7 +1131,7 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
             blas_geometry.ranges.push_back(range);
         }
 
-        const bool static_geometry = !(group.flags & MeshFlags::IsMorphed);
+        const bool static_geometry = !group.has_morphed_mesh && !group.has_animated_node;
         vk::BuildAccelerationStructureFlagsKHR flags;
         if (static_geometry) {
             did_build_static = true;
@@ -1201,11 +1198,6 @@ void Scene::build_tlas(const CommandBufferHandle& cmd) {
             }
 
             vk::GeometryInstanceFlagsKHR geometry_instance_flags{};
-            if (group.flags & MeshFlags::IsOpaque) {
-                // we group by flags, and thus can force the whole group to opaque.
-                // TODO: Maybe reduce groups by only setting this in geometry level?
-                geometry_instance_flags |= vk::GeometryInstanceFlagBitsKHR::eForceOpaque;
-            }
             if (group.flags & MeshFlags::FrontCounterClockwise) {
                 geometry_instance_flags |=
                     vk::GeometryInstanceFlagBitsKHR::eTriangleFrontCounterclockwise;
