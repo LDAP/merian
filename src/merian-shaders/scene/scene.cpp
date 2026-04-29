@@ -177,6 +177,7 @@ NodeID Scene::add_node(SceneNode node) {
 void Scene::invalidate_node(SceneNode& node) {
     node.global_transform.reset();
     node.global_inverse_transposed.reset();
+    node.transform_dirty = true;
 
     for (const auto child_node_id : node.children) {
         assert(node_ids.is_used(child_node_id));
@@ -857,13 +858,16 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
     vertex_buffers.resize(mesh_ids.size());
     prev_vertex_buffers.resize(mesh_ids.size());
 
-    // Pretransformed dynamic groups carry world-space vertex data. Re-pretransform
-    // every frame because the source transform may have changed; for IsMorphed
-    // meshes the dirty flag is already set externally.
+    // Pretransformed groups bake the node transform into vertex data. Only re-pretransform
+    // when the node's transform actually changed; for IsMorphed meshes the dirty flag is
+    // already set externally by the application.
     for (MeshGroup& group : mesh_groups) {
         if (group.has_animated_node && group.is_pretranformed(meshes, pretransform_animated)) {
             for (const MeshID mesh_id : group.meshes) {
-                meshes[mesh_id]->vertices_dirty = true;
+                const NodeID node_id = *meshes[mesh_id]->instances.begin();
+                if (scene_graph[node_id]->transform_dirty) {
+                    meshes[mesh_id]->vertices_dirty = true;
+                }
             }
         }
     }
@@ -1010,8 +1014,8 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                     [&](const BufferHandle& src_buf, const BufferHandle& dst_buf,
                         vk::DeviceSize src_offset) {
                         pretransform_vertices_gpu(cmd, src_buf, dst_buf, global_transform,
-                                                  global_inverse_transposed_transform,
-                                                  vertex_count, src_offset);
+                                                  global_inverse_transposed_transform, vertex_count,
+                                                  src_offset);
                     });
 
                 const float4x4 prev_transform =
@@ -1318,6 +1322,9 @@ void Scene::update(const CommandBufferHandle& cmd,
         });
     }
 
+    for (const NodeID& nid : node_ids) {
+        scene_graph[nid]->transform_dirty = false;
+    }
     needs_regroup = false;
     transforms_changed = false;
 

@@ -93,6 +93,8 @@ class SceneNode {
 
     std::optional<float4x4> prev_global_transform;
     std::optional<float4x4> prev_global_inverse_transposed;
+
+    bool transform_dirty = true;
 };
 
 inline std::string format_as(const SceneNode& node) {
