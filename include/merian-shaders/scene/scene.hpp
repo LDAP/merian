@@ -291,6 +291,8 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
 
         // means the Scene uploads the meshes in this group pretransformed and the instance
         // transform should be the identity.
+        // TODO: pretransforming non-morphed animated meshes effectively makes them morphed
+        // (vertices change each frame) — they need a prev vertex buffer for motion vectors.
         bool is_pretranformed(const std::vector<MeshHandle>& meshes,
                               bool pretransform_animated) const {
             assert(!meshes.empty());
@@ -536,12 +538,14 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
                                    const BufferHandle& dst,
                                    const float4x4& transform,
                                    const float4x4& inverse_transposed,
-                                   uint32_t vertex_count);
+                                   uint32_t vertex_count,
+                                   vk::DeviceSize src_offset = 0);
     void pretransform_prev_vertices_gpu(const CommandBufferHandle& cmd,
                                         const BufferHandle& src,
                                         const BufferHandle& dst,
                                         const float4x4& transform,
-                                        uint32_t vertex_count);
+                                        uint32_t vertex_count,
+                                        vk::DeviceSize src_offset = 0);
 
     // this only changes if the mesh groups changed or if a transform changes (TODO: selectively
     // upload transforms)

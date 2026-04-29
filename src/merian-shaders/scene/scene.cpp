@@ -382,7 +382,8 @@ void Scene::pretransform_vertices_gpu(const CommandBufferHandle& cmd,
                                       const BufferHandle& dst,
                                       const float4x4& transform,
                                       const float4x4& inverse_transposed,
-                                      const uint32_t vertex_count) {
+                                      const uint32_t vertex_count,
+                                      const vk::DeviceSize src_offset) {
     ensure_pretransform_pipelines();
 
     PretransformVertexPushConstant pc{};
@@ -391,7 +392,8 @@ void Scene::pretransform_vertices_gpu(const CommandBufferHandle& cmd,
     pc.vertex_count = vertex_count;
 
     cmd->bind(pretransform_vertex_pipeline);
-    cmd->push_descriptor_set(pretransform_vertex_pipeline, src, dst);
+    cmd->push_descriptor_set(pretransform_vertex_pipeline, src->get_descriptor_info(src_offset),
+                             dst->get_descriptor_info());
     cmd->push_constant(pretransform_vertex_pipeline, pc);
     cmd->dispatch((vertex_count + PRETRANSFORM_LOCAL_SIZE_X - 1) / PRETRANSFORM_LOCAL_SIZE_X, 1, 1);
 }
@@ -400,7 +402,8 @@ void Scene::pretransform_prev_vertices_gpu(const CommandBufferHandle& cmd,
                                            const BufferHandle& src,
                                            const BufferHandle& dst,
                                            const float4x4& transform,
-                                           const uint32_t vertex_count) {
+                                           const uint32_t vertex_count,
+                                           const vk::DeviceSize src_offset) {
     ensure_pretransform_pipelines();
 
     PretransformPrevVertexPushConstant pc{};
@@ -408,7 +411,8 @@ void Scene::pretransform_prev_vertices_gpu(const CommandBufferHandle& cmd,
     pc.vertex_count = vertex_count;
 
     cmd->bind(pretransform_prev_vertex_pipeline);
-    cmd->push_descriptor_set(pretransform_prev_vertex_pipeline, src, dst);
+    cmd->push_descriptor_set(pretransform_prev_vertex_pipeline,
+                             src->get_descriptor_info(src_offset), dst->get_descriptor_info());
     cmd->push_constant(pretransform_prev_vertex_pipeline, pc);
     cmd->dispatch((vertex_count + PRETRANSFORM_LOCAL_SIZE_X - 1) / PRETRANSFORM_LOCAL_SIZE_X, 1, 1);
 }
@@ -915,8 +919,8 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
             // Dispatches upload for a mesh data variant.
             // cpu_write:        (src, void*) -> writes raw host data
             // cpu_pretransform: (src, void*) -> writes pretransformed host data (nullptr to skip)
-            // gpu_pretransform: (BufferHandle src, BufferHandle dst) -> compute pretransform
-            // (nullptr to skip)
+            // gpu_pretransform: (BufferHandle src, BufferHandle dst, DeviceSize src_offset) ->
+            // compute pretransform (nullptr to skip)
             const auto upload = [&](auto&& variant, BufferHandle& dst, vk::DeviceSize size,
                                     const std::string& label, auto&& cpu_write,
                                     auto&& cpu_pretransform, auto&& gpu_pretransform) {
@@ -937,7 +941,7 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                                     if (dst && dst == src.data)
                                         dst.reset();
                                     ensure_buffer(dst, size, label);
-                                    gpu_pretransform(src.data, dst);
+                                    gpu_pretransform(src.data, dst, 0);
                                     return;
                                 }
                             }
@@ -948,7 +952,7 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                             ensure_buffer(dst, size, label);
                             if constexpr (has_gpu_pt) {
                                 if (pretransform_mesh) {
-                                    gpu_pretransform(src.data, dst);
+                                    gpu_pretransform(src.data, dst, src.offset);
                                     return;
                                 }
                             }
@@ -1003,10 +1007,11 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                                                       global_inverse_transposed_transform, dst);
                         }
                     },
-                    [&](const BufferHandle& src_buf, const BufferHandle& dst_buf) {
+                    [&](const BufferHandle& src_buf, const BufferHandle& dst_buf,
+                        vk::DeviceSize src_offset) {
                         pretransform_vertices_gpu(cmd, src_buf, dst_buf, global_transform,
                                                   global_inverse_transposed_transform,
-                                                  vertex_count);
+                                                  vertex_count, src_offset);
                     });
 
                 const float4x4 prev_transform =
@@ -1040,9 +1045,10 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                             src->write_pretransformed(prev_transform, prev_inverse_transposed, dst);
                         }
                     },
-                    [&](const BufferHandle& src_buf, const BufferHandle& dst_buf) {
+                    [&](const BufferHandle& src_buf, const BufferHandle& dst_buf,
+                        vk::DeviceSize src_offset) {
                         pretransform_prev_vertices_gpu(cmd, src_buf, dst_buf, prev_transform,
-                                                       vertex_count);
+                                                       vertex_count, src_offset);
                     });
 
                 mesh.vertices_dirty = false;

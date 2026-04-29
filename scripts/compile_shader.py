@@ -66,6 +66,7 @@ def compile_slang_shader(args, user_compiler_args) -> bytes:
         glslc_command = (
             [args.slangc_path]
             + compiler_args
+            + ["-matrix-layout-row-major"]
             + [args.shader_path, "-target", "spirv", "-o", shader]
         )
         subprocess.check_call(glslc_command)
