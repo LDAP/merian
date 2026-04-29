@@ -519,12 +519,13 @@ void Scene::properties(Properties& props) {
                     }
                     props.output_text(
                         "flags: {}\nhas animated node: {}\npretransformed: {}\ninstances: "
-                        "{}\nvertices: {}\ntriangles: {}\nblas: {}\nblas dirty: {}",
+                        "{}\nvertices: {}\ntriangles: {}\nblas: {}\nblas dirty: {}\nblas last "
+                        "built frame: {}",
                         group.flags, group.has_animated_node, pretransformed, instances,
                         group_vertices, group_triangles,
                         group.blas ? fmt::format("{} bytes", format_size(group.blas->get_size()))
                                    : "<none>",
-                        group.blas_dirty);
+                        group.blas_dirty, group.blas_last_built_frame);
 
                     if (props.st_begin_child("members", "Members")) {
                         for (const MeshID mesh_id : group.meshes) {
@@ -624,14 +625,18 @@ void Scene::compute_mesh_groups() {
 
     // See description in scene.hpp for grouping logic
 
-    // non-animated nodes: pretransformed (or not if IsMorphed && !pretransform_animated)
+    // non-animated nodes: pretransformed, keyed by MeshFlags
     std::unordered_map<MeshFlags, MeshGroupID> mesh_groups_static_non_instanced;
-    // animated nodes: not pretransformed, keyed by (MeshFlags << 32 | NodeID)
+    // animated nodes with pretransform_animated: pretransformed, keyed by MeshFlags (separate
+    // from static so their BLAS rebuilds don't drag static geometry along)
+    std::unordered_map<MeshFlags, MeshGroupID> mesh_groups_animated_pretransformed;
+    // animated nodes without pretransform_animated: not pretransformed, keyed by (MeshFlags << 32 |
+    // NodeID)
     std::unordered_map<uint64_t, MeshGroupID> mesh_groups_animated_non_instanced;
-    // CANNOT have their global transforms precomputed
+    // instanced: keyed by instance set + MeshFlags
     std::map<std::set<NodeID>, std::unordered_map<MeshFlags, MeshGroupID>> mesh_groups_instanced;
 
-    mesh_groups_static_non_instanced.reserve(32 /*all flags set*/);
+    mesh_groups_static_non_instanced.reserve(32);
     mesh_groups_animated_non_instanced.reserve(node_ids.count() * 2);
 
     for (const MeshID mesh_id : mesh_ids) {
@@ -654,14 +659,20 @@ void Scene::compute_mesh_groups() {
             const NodeID node_id = *mesh.instances.begin();
             const bool node_animated = scene_graph[node_id]->is_animated;
 
-            if (!node_animated /*static*/ || /*animated &&*/ pretransform_animated) {
+            if (!node_animated) {
                 const auto [it, inserted] =
                     mesh_groups_static_non_instanced.try_emplace(mesh.flags, mesh_groups.size());
                 if (inserted) {
                     mesh_groups.emplace_back();
                 }
                 group_id = it->second;
-
+            } else if (pretransform_animated) {
+                const auto [it, inserted] =
+                    mesh_groups_animated_pretransformed.try_emplace(mesh.flags, mesh_groups.size());
+                if (inserted) {
+                    mesh_groups.emplace_back();
+                }
+                group_id = it->second;
             } else {
                 const uint64_t key = (static_cast<uint64_t>(mesh.flags) << 32) | node_id;
                 const auto [it, inserted] =
@@ -1145,6 +1156,7 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
         as_builder.queue_build(blas_geometry.geometries, blas_geometry.ranges, group.blas,
                                size_info, flags);
         group.blas_dirty = false;
+        group.blas_last_built_frame = current_frame;
     }
 
     as_builder.get_cmds_blas(cmd, as_scratch_buffer);
@@ -1249,6 +1261,7 @@ void Scene::update(const CommandBufferHandle& cmd,
                    const float time_diff,
                    const uint32_t frame) {
     MERIAN_PROFILE_SCOPE_GPU(cmd, "Scene::update");
+    current_frame = frame;
 
     {
         MERIAN_PROFILE_SCOPE_GPU(cmd, "on_update");

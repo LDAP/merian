@@ -283,6 +283,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         AccelerationStructureHandle blas;
         // a mesh changed (new mesh in group -> not the same group, never true)
         bool blas_dirty = false;
+        uint32_t blas_last_built_frame = 0;
 
         // ----------------
 
@@ -319,10 +320,10 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     // its instances; otherwise it is "static".
     //
     // BLASs (one for each group, grouped by MeshFlags)
-    // - non-animated, non-instanced -> pretransform and merge into one BLAS per MeshFlags
-    //   (unless IsMorphed and pretransform_dynamic is off)
-    // - animated, non-instanced     -> group by (MeshFlags, NodeID), not pretransformed
-    // - instanced                   -> group by (instance set, MeshFlags), never pretransformed
+    // - non-animated, non-instanced  -> pretransform, group by MeshFlags (BLAS built once)
+    // - animated + pretransform_anim -> pretransform, group by MeshFlags (separate from static)
+    // - animated, no pretransform    -> group by (MeshFlags, NodeID), not pretransformed
+    // - instanced                    -> group by (instance set, MeshFlags), never pretransformed
     //
     // Groups must be split if they differ in IsOpaque, FrontCounterClockwise or TwoSided
     // since those map to per-TLAS-instance flags.
@@ -589,6 +590,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     FreeList<NodeID> node_ids;
     std::vector<std::optional<SceneNode>> scene_graph; // sized to node_ids.size()
     bool pretransform_animated = false;
+    uint32_t current_frame = 0;
     std::vector<CameraHandle> cameras;
     uint32_t active_camera = 0;
     AABB aabb; // can be invalid if information is not available.
