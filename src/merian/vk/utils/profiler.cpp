@@ -1,12 +1,10 @@
 #include "merian/vk/utils/profiler.hpp"
 #include "merian/vk/command/command_buffer.hpp"
 
+#include "spdlog/spdlog.h"
+
 #include <mutex>
 #include <vector>
-
-#ifndef MERIAN_PROFILER_ENABLE
-#include "spdlog/spdlog.h"
-#endif
 
 #define SW_QUERY_COUNT 2
 
@@ -44,11 +42,9 @@ void Profiler::clear() {
 void Profiler::cmd_start(const CommandBufferHandle& cmd,
                          const std::string& name,
                          const vk::PipelineStageFlagBits pipeline_stage) {
-    assert(query_pool);
-    PerQueryPoolInfo& qp_info = query_pool_infos[query_pool];
-    assert(qp_info.pending_gpu_sections.size() * SW_QUERY_COUNT + SW_QUERY_COUNT <
-           query_pool->get_query_count());
     assert(query_pool && "num_gpu_timers is 0?");
+    PerQueryPoolInfo& qp_info = query_pool_infos[query_pool];
+
     GPUSection& parent_section = gpu_sections[current_gpu_section];
     if (parent_section.children.contains(name)) {
         current_gpu_section = parent_section.children[name];
@@ -61,6 +57,14 @@ void Profiler::cmd_start(const CommandBufferHandle& cmd,
     GPUSection& current_section = gpu_sections[current_gpu_section];
     assert(current_section.timestamp_idx == (uint32_t)-1 &&
            "two sections with the same name or missing collect()?");
+
+    if ((qp_info.pending_gpu_sections.size() * SW_QUERY_COUNT) + SW_QUERY_COUNT >=
+        query_pool->get_query_count()) {
+        SPDLOG_WARN("profiler query pool exhausted ({} queries); skipping section '{}'",
+                    query_pool->get_query_count(), name);
+        return;
+    }
+
     current_section.timestamp_idx = qp_info.pending_gpu_sections.size() * SW_QUERY_COUNT;
 
     cmd->write_timestamp(query_pool, current_section.timestamp_idx, pipeline_stage);
@@ -71,12 +75,12 @@ void Profiler::cmd_end(const CommandBufferHandle& cmd,
                        const vk::PipelineStageFlagBits pipeline_stage) {
     assert(query_pool && "num_gpu_timers is 0?");
     assert(current_gpu_section != 0 && "missing cmd_start?");
-    assert(query_pool);
     GPUSection& section = gpu_sections[current_gpu_section];
 
-    assert(section.timestamp_idx != (uint32_t)-1);
-    cmd->write_timestamp(query_pool, section.timestamp_idx + 1, pipeline_stage);
-    section.timestamp_idx = (uint32_t)-1;
+    if (section.timestamp_idx != (uint32_t)-1) {
+        cmd->write_timestamp(query_pool, section.timestamp_idx + 1, pipeline_stage);
+        section.timestamp_idx = (uint32_t)-1;
+    }
 
     current_gpu_section = section.parent_index;
 }
@@ -287,7 +291,8 @@ ProfilerHandle get_default_profiler() noexcept {
     return top != nullptr ? top->shared_from_this() : nullptr;
 }
 
-ScopedDefaultProfiler::ScopedDefaultProfiler(ProfilerHandle profiler) : profiler(std::move(profiler)) {
+ScopedDefaultProfiler::ScopedDefaultProfiler(ProfilerHandle profiler)
+    : profiler(std::move(profiler)) {
     const std::lock_guard lock{detail::g_default_profiler_mutex};
     detail::g_default_profiler_stack.push_back(this->profiler.get());
 }
