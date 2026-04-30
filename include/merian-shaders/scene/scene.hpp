@@ -536,7 +536,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
   private:
     void rebuild_shader_object();
 
-    // invalidates the global transform of this node and its children.
+    // invalidates the global transform of this node and its children and marks the node as dirty.
     void invalidate_node(SceneNode& node);
 
     // Groups meshes into BLASes according to the logic above.

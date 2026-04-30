@@ -195,11 +195,14 @@ void Scene::update_node(NodeID node_id, const float4x4& local_transform) {
 
     SceneNode& node = *scene_graph[node_id];
     assert(node.is_animated);
-    node.local_transform = local_transform;
 
-    invalidate_node(node);
+    if (node.local_transform != local_transform) {
+        node.local_transform = local_transform;
 
-    transforms_changed = true;
+        invalidate_node(node);
+
+        transforms_changed = true;
+    }
 }
 
 void Scene::add_mesh_instance(const MeshID mesh_id, const NodeID node_id) {
@@ -894,8 +897,8 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
         for (const MeshID mesh_id : group.meshes) {
             Mesh& mesh = *meshes[mesh_id];
 
-            mesh.vertices_dirty |= check_node_transform &&
-                                   scene_graph[*mesh.instances.begin()]->transform_dirty;
+            mesh.vertices_dirty |=
+                check_node_transform && scene_graph[*mesh.instances.begin()]->transform_dirty;
 
             if (!mesh.is_dirty())
                 continue;
@@ -1149,7 +1152,8 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
             flags |= vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastBuild;
         }
 
-        // TODO: This call is expensive, maybe reuse / cache. May need to split IsMorphed into IsMorphed and IsVariableTopology.
+        // TODO: This call is expensive, maybe reuse / cache. May need to split IsMorphed into
+        // IsMorphed and IsVariableTopology.
         const auto size_info =
             as_builder.get_size_info(blas_geometry.geometries, blas_geometry.ranges, flags);
 
