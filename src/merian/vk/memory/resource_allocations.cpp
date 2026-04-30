@@ -71,11 +71,16 @@ vk::BufferDeviceAddressInfo Buffer::get_buffer_device_address_info() const {
 
 vk::DeviceAddress Buffer::get_device_address() const {
     assert(create_info.usage | vk::BufferUsageFlagBits::eShaderDeviceAddress);
-    return context->get_device()->get_device().getBufferAddress(get_buffer_device_address_info());
+    if (!cached_device_address_) {
+        cached_device_address_ =
+            context->get_device()->get_device().getBufferAddress(get_buffer_device_address_info());
+    }
+    return *cached_device_address_;
 }
 
 void Buffer::_set_memory_allocation(const MemoryAllocationHandle& allocation) {
     this->memory = allocation;
+    cached_device_address_.reset();
 }
 
 vk::BufferMemoryBarrier Buffer::buffer_barrier(const vk::AccessFlags src_access_flags,

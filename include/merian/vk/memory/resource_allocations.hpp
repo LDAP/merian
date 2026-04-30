@@ -155,6 +155,7 @@ class Buffer : public std::enable_shared_from_this<Buffer>, public Resource {
     const vk::Buffer buffer;
     MemoryAllocationHandle memory;
     const vk::BufferCreateInfo create_info;
+    mutable std::optional<vk::DeviceAddress> cached_device_address_;
 
   public:
     static inline const BufferHandle EMPTY = nullptr;

@@ -6,6 +6,7 @@
 #include "merian/shader/slang_composition.hpp"
 #include "merian/shader/slang_program.hpp"
 #include "merian/utils/camera/camera.hpp"
+#include "merian/utils/concurrent/thread_pool.hpp"
 #include "merian/utils/free_list.hpp"
 #include "merian/utils/versionable.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout.hpp"
@@ -660,6 +661,8 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     BufferHandle tlas_instances_buffer;
     BufferHandle as_scratch_buffer;
     AccelerationStructureHandle tlas;
+
+    ThreadPoolHandle thread_pool;
 
     // GPU pretransform pipelines (lazily initialized).
     DescriptorSetLayoutHandle pretransform_descriptor_layout;

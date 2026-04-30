@@ -69,7 +69,7 @@ Scene::Scene(const ShaderCompileContextHandle& compile_context,
              const MaterialSystemHandle& material_system)
     : compile_context(compile_context), context(context), allocator(allocator),
       obj_allocator(obj_allocator), as_builder(context, allocator),
-      material_system(material_system) {
+      material_system(material_system), thread_pool(std::make_shared<ThreadPool>()) {
 
     assert(context->get_device()
                ->get_enabled_features()
@@ -974,16 +974,22 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                         } else {
                             ensure_buffer(dst, size, label);
                             const MemoryAllocationHandle alloc = staging->cmd_to_device(cmd, dst);
-                            void* mapped = alloc->map();
+                            std::function<void(void*)> fill;
                             if constexpr (has_cpu_pt) {
                                 if (pretransform_mesh)
-                                    cpu_pretransform(src, mapped);
+                                    fill = [src, cpu_pretransform](void* m) {
+                                        cpu_pretransform(src, m);
+                                    };
                                 else
-                                    cpu_write(src, mapped);
+                                    fill = [src, cpu_write](void* m) { cpu_write(src, m); };
                             } else {
-                                cpu_write(src, mapped);
+                                fill = [src, cpu_write](void* m) { cpu_write(src, m); };
                             }
-                            alloc->unmap();
+                            thread_pool->submit<void>([alloc, fill = std::move(fill)]() {
+                                void* mapped = alloc->map();
+                                fill(mapped);
+                                alloc->unmap();
+                            });
                         }
                     },
                     std::forward<decltype(variant)>(variant));
@@ -997,7 +1003,7 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                 upload(
                     mesh.get_vertices(), vb, vb_size,
                     fmt::format("Scene::vb[{}]: name={}", mesh_id, mesh.name),
-                    [&](auto&& src, void* mapped) {
+                    [vb_size](auto&& src, void* mapped) {
                         auto* dst = static_cast<PackedVertexData*>(mapped);
                         using S = std::decay_t<decltype(src)>;
                         if constexpr (std::is_same_v<S, Mesh::HostPacked<PackedVertexData>>)
@@ -1007,7 +1013,8 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                             src->write(dst);
                         }
                     },
-                    [&](auto&& src, void* mapped) {
+                    [vertex_count, global_transform,
+                     global_inverse_transposed_transform](auto&& src, void* mapped) {
                         auto* dst = static_cast<PackedVertexData*>(mapped);
                         using S = std::decay_t<decltype(src)>;
                         if constexpr (std::is_same_v<S, Mesh::HostPacked<PackedVertexData>>) {
@@ -1037,7 +1044,7 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                 upload(
                     mesh.get_prev_vertices(), prev_vb, prev_vb_size,
                     fmt::format("Scene::prev_vb[{}]: name={}", mesh_id, mesh.name),
-                    [&](auto&& src, void* mapped) {
+                    [prev_vb_size](auto&& src, void* mapped) {
                         auto* dst = static_cast<PackedPrevVertexData*>(mapped);
                         using S = std::decay_t<decltype(src)>;
                         if constexpr (std::is_same_v<S, Mesh::HostPacked<PackedPrevVertexData>>)
@@ -1047,7 +1054,8 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                             src->write(dst);
                         }
                     },
-                    [&](auto&& src, void* mapped) {
+                    [vertex_count, prev_transform, prev_inverse_transposed](auto&& src,
+                                                                            void* mapped) {
                         auto* dst = static_cast<PackedPrevVertexData*>(mapped);
                         using S = std::decay_t<decltype(src)>;
                         if constexpr (std::is_same_v<S, Mesh::HostPacked<PackedPrevVertexData>>) {
@@ -1072,7 +1080,7 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                 upload(
                     mesh.get_indices(), ib, ib_size,
                     fmt::format("Scene::ib[{}]: name={}", mesh_id, mesh.name),
-                    [&](auto&& src, void* mapped) {
+                    [ib_size](auto&& src, void* mapped) {
                         using S = std::decay_t<decltype(src)>;
                         if constexpr (std::is_same_v<S, Mesh::HostPacked<void>>)
                             std::memcpy(mapped, src.data, ib_size);
@@ -1087,6 +1095,8 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
             }
         }
     }
+
+    thread_pool->wait_idle();
 }
 
 void Scene::build_blas(const CommandBufferHandle& cmd) {
