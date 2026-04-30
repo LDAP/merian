@@ -1152,6 +1152,7 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
             flags |= vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastBuild;
         }
 
+        // TODO: This call is expensive, maybe reuse / cache. May need to split IsMorphed into IsMorphed and IsVariableTopology.
         const auto size_info =
             as_builder.get_size_info(blas_geometry.geometries, blas_geometry.ranges, flags);
 
