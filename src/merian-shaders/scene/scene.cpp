@@ -868,20 +868,6 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
     vertex_buffers.resize(mesh_ids.size());
     prev_vertex_buffers.resize(mesh_ids.size());
 
-    // Pretransformed groups bake the node transform into vertex data. Only re-pretransform
-    // when the node's transform actually changed; for IsMorphed meshes the dirty flag is
-    // already set externally by the application.
-    for (MeshGroup& group : mesh_groups) {
-        if (group.has_animated_node && group.is_pretranformed(meshes, pretransform_animated)) {
-            for (const MeshID mesh_id : group.meshes) {
-                const NodeID node_id = *meshes[mesh_id]->instances.begin();
-                if (scene_graph[node_id]->transform_dirty) {
-                    meshes[mesh_id]->vertices_dirty = true;
-                }
-            }
-        }
-    }
-
     const auto staging = allocator->get_staging();
 
     const auto buffer_usage = vk::BufferUsageFlagBits::eStorageBuffer |
@@ -902,14 +888,22 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
     for (MeshGroupID group_id = 0; group_id < mesh_groups.size(); group_id++) {
         MeshGroup& group = mesh_groups[group_id];
         const bool pretransform_group = group.is_pretranformed(meshes, pretransform_animated);
+        // Pretransformed animated meshes must be re-pretransformed when the node moved.
+        const bool check_node_transform = pretransform_group && group.has_animated_node;
 
         for (const MeshID mesh_id : group.meshes) {
             Mesh& mesh = *meshes[mesh_id];
-            const bool mesh_dirty = mesh.is_dirty();
-            if (!mesh_dirty)
+
+            mesh.vertices_dirty |= check_node_transform &&
+                                   scene_graph[*mesh.instances.begin()]->transform_dirty;
+
+            if (!mesh.is_dirty())
                 continue;
 
-            group.blas_dirty |= mesh_dirty;
+            MERIAN_PROFILE_SCOPE_GPU_DETAILED(
+                cmd, fmt::format("Scene::upload_meshes::mesh[{}]", mesh_id));
+
+            group.blas_dirty = true;
 
             assert(!mesh.instances.empty());
             assert(mesh_id < vertex_buffers.size());
@@ -1096,7 +1090,10 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
         }
     }
 
-    thread_pool->wait_idle();
+    {
+        MERIAN_PROFILE_SCOPE("Scene::upload_meshes::wait_idle");
+        thread_pool->wait_idle();
+    }
 }
 
 void Scene::build_blas(const CommandBufferHandle& cmd) {

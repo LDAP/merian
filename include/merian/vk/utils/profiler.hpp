@@ -334,6 +334,23 @@ class [[nodiscard]] ScopedDefaultProfiler {
     #define MERIAN_PROFILE_SCOPE_GPU(...) \
         MERIAN_PP_EXPAND(MERIAN_PP_PICK_3(__VA_ARGS__, MERIAN_PROFILE_DISCARD_3, MERIAN_PROFILE_DISCARD_2)(__VA_ARGS__))
 #endif
+
+// Detailed scopes are intended for fine-grained, potentially per-item profiling
+// (e.g. one section per mesh / per BLAS build). They are off by default to keep
+// the GPU query pool from being exhausted; enable by defining MERIAN_PROFILER_DETAILED
+// (which also requires MERIAN_PROFILER_ENABLE).
+#if defined(MERIAN_PROFILER_ENABLE) && defined(MERIAN_PROFILER_DETAILED)
+    #define MERIAN_PROFILE_SCOPE_DETAILED(...)     MERIAN_PROFILE_SCOPE(__VA_ARGS__)
+    #define MERIAN_PROFILE_SCOPE_GPU_DETAILED(...) MERIAN_PROFILE_SCOPE_GPU(__VA_ARGS__)
+#else
+    #define MERIAN_PROFILE_DETAILED_DISCARD_1(a)       ((void)sizeof(a))
+    #define MERIAN_PROFILE_DETAILED_DISCARD_2(a, b)    ((void)sizeof(a), (void)sizeof(b))
+    #define MERIAN_PROFILE_DETAILED_DISCARD_3(a, b, c) ((void)sizeof(a), (void)sizeof(b), (void)sizeof(c))
+    #define MERIAN_PROFILE_SCOPE_DETAILED(...) \
+        MERIAN_PP_EXPAND(MERIAN_PP_PICK_2(__VA_ARGS__, MERIAN_PROFILE_DETAILED_DISCARD_2, MERIAN_PROFILE_DETAILED_DISCARD_1)(__VA_ARGS__))
+    #define MERIAN_PROFILE_SCOPE_GPU_DETAILED(...) \
+        MERIAN_PP_EXPAND(MERIAN_PP_PICK_3(__VA_ARGS__, MERIAN_PROFILE_DETAILED_DISCARD_3, MERIAN_PROFILE_DETAILED_DISCARD_2)(__VA_ARGS__))
+#endif
 // clang-format on
 
 } // namespace merian

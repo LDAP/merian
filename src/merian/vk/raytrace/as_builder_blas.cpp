@@ -143,7 +143,7 @@ void ASBuilder::get_cmds_blas(const CommandBufferHandle& cmd, BufferHandle& scra
                                            vk::AccessFlagBits::eAccelerationStructureWriteKHR);
     cmd->keep_until_pool_reset(scratch_buffer);
     for (uint32_t idx = 0; idx < pending_blas_builds.size(); idx++) {
-        MERIAN_PROFILE_SCOPE_GPU(cmd, fmt::format("BLAS build {:02}", idx));
+        MERIAN_PROFILE_SCOPE_GPU_DETAILED(cmd, fmt::format("BLAS build {:02}", idx));
 
         pending_blas_builds[idx].build_info.scratchData.deviceAddress =
             scratch_buffer->get_device_address();
