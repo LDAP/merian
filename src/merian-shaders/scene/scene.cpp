@@ -522,7 +522,8 @@ void Scene::properties(Properties& props) {
                     }
                     props.output_text(
                         "split flags: {}\nhas animated node: {}\nhas morphed mesh: "
-                        "{}\nall opaque: {}\npretransformed: {}\ninstances: "
+                        "{}\nall opaque: {}\npretransformed: "
+                        "{}\ninstances: "
                         "{}\nvertices: {}\ntriangles: {}\nblas: {}\nblas dirty: {}\nblas last "
                         "built frame: {}",
                         group.flags, group.has_animated_node, group.has_morphed_mesh,
@@ -709,8 +710,8 @@ void Scene::compute_mesh_groups() {
             if (prev_group.meshes == group.meshes) {
                 group.blas = prev_group.blas;
                 // blas_dirty is computed later when we upload the meshes, because this method is
-                // not run every frame.We later also check if the blas can be actually reused or if
-                // a new one is necessary.
+                // not run every frame. We later also check if the blas can be actually reused or
+                // if a new one is necessary.
             }
         }
     }
@@ -830,7 +831,7 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
                     gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::Pretransformed);
                 }
                 if (mesh.is_morphed()) {
-                    gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::IsMorphed);
+                    gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::HasPrevVertices);
                 }
                 if (mesh.is_front_counterclockwise()) {
                     gd.flags =
@@ -1152,8 +1153,6 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
             flags |= vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastBuild;
         }
 
-        // TODO: This call is expensive, maybe reuse / cache. May need to split IsMorphed into
-        // IsMorphed and IsVariableTopology.
         const auto size_info =
             as_builder.get_size_info(blas_geometry.geometries, blas_geometry.ranges, flags);
 

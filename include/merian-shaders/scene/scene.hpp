@@ -294,7 +294,6 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         // a mesh changed (new mesh in group -> not the same group, never true)
         bool blas_dirty = false;
         uint32_t blas_last_built_frame = 0;
-
         // ----------------
 
         const std::set<NodeID>& get_instances(const std::vector<MeshHandle>& meshes) const {

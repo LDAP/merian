@@ -211,7 +211,7 @@ struct Scene {
     // Previous-frame object-space position for a vertex.
     // For non-morphed meshes this equals the current position.
     float3 get_prev_object_position(const GeometryData geometry_data, const uint vertex_index) {
-        if ((geometry_data.flags & GeometryDataFlags::IsMorphed) == 0)
+        if ((geometry_data.flags & GeometryDataFlags::HasPrevVertices) == 0)
             return geometry_data.vertices[vertex_index].position;
         return geometry_data.prev_vertices[vertex_index].position;
     }

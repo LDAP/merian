@@ -13,8 +13,8 @@ namespace merian {
 enum GeometryDataFlags : uint16_t {
     // Data already in world space; skip the instance transform multiply.
     Pretransformed = 0x1,
-    // Vertices change over time; prev_vertices buffer is valid.
-    IsMorphed = 0x2,
+    // prev_vertices buffer is valid.
+    HasPrevVertices = 0x2,
     // Instance transform changed since last frame; read prev_instance_transform.
     IsAnimated = 0x4,
     // Default winding is clockwise, this signals counter clockwise winding.
