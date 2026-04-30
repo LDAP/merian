@@ -42,11 +42,14 @@ ASBuilder::queue_build(const uint32_t instance_count,
     AccelerationStructureHandle tlas = allocator->create_acceleration_structure(
         vk::AccelerationStructureTypeKHR::eTopLevel, size_info);
 
-    pending_min_scratch_buffer = std::max(pending_min_scratch_buffer, size_info.buildScratchSize);
-
     build_info.dstAccelerationStructure = *tlas;
 
-    pending_tlas_builds.emplace_back(build_info, instance_count, top_as_geometry, tlas);
+    pending_tlas_total_scratch +=
+        align_ceil(size_info.buildScratchSize, scratch_buffer_min_alignment);
+    pending_tlas_build_infos.push_back(build_info);
+    pending_tlas_geometries.push_back(top_as_geometry);
+    pending_tlas_range_infos.push_back({instance_count, 0, 0, 0});
+    pending_tlas.emplace_back(tlas, size_info.buildScratchSize);
 
     return tlas;
 }
@@ -69,9 +72,12 @@ void ASBuilder::queue_update(
         *src_as,
         top_as_geometry};
 
-    pending_min_scratch_buffer = std::max(pending_min_scratch_buffer, size_info.updateScratchSize);
-
-    pending_tlas_builds.emplace_back(build_info, instance_count, top_as_geometry, src_as);
+    pending_tlas_total_scratch +=
+        align_ceil(size_info.updateScratchSize, scratch_buffer_min_alignment);
+    pending_tlas_build_infos.push_back(build_info);
+    pending_tlas_geometries.push_back(top_as_geometry);
+    pending_tlas_range_infos.push_back({instance_count, 0, 0, 0});
+    pending_tlas.emplace_back(src_as, size_info.updateScratchSize);
 }
 
 void ASBuilder::queue_build(const uint32_t instance_count,
@@ -91,47 +97,45 @@ void ASBuilder::queue_build(const uint32_t instance_count,
         *src_as,
         top_as_geometry};
 
-    pending_min_scratch_buffer = std::max(pending_min_scratch_buffer, size_info.buildScratchSize);
-
-    pending_tlas_builds.emplace_back(build_info, instance_count, top_as_geometry, src_as);
+    pending_tlas_total_scratch +=
+        align_ceil(size_info.buildScratchSize, scratch_buffer_min_alignment);
+    pending_tlas_build_infos.push_back(build_info);
+    pending_tlas_geometries.push_back(top_as_geometry);
+    pending_tlas_range_infos.push_back({instance_count, 0, 0, 0});
+    pending_tlas.emplace_back(src_as, size_info.buildScratchSize);
 }
 
 void ASBuilder::get_cmds_tlas(const CommandBufferHandle& cmd, BufferHandle& scratch_buffer) {
-    if (pending_tlas_builds.empty()) {
+    if (pending_tlas.empty()) {
         return;
     }
 
-    ensure_scratch_buffer(pending_min_scratch_buffer, scratch_buffer);
-
-    vk::AccelerationStructureBuildRangeInfoKHR build_offset_info{0, 0, 0, 0};
-
-    // Since the scratch buffer is reused across builds, we need a barrier to ensure one
-    // build is finished before starting the next one.
-    const vk::BufferMemoryBarrier scratch_barrier =
-        scratch_buffer->buffer_barrier(vk::AccessFlagBits::eAccelerationStructureReadKHR |
-                                           vk::AccessFlagBits::eAccelerationStructureWriteKHR,
-                                       vk::AccessFlagBits::eAccelerationStructureReadKHR |
-                                           vk::AccessFlagBits::eAccelerationStructureWriteKHR);
+    ensure_scratch_buffer(pending_tlas_total_scratch, scratch_buffer);
     cmd->keep_until_pool_reset(scratch_buffer);
-    for (uint32_t pending_idx = 0; pending_idx < pending_tlas_builds.size(); pending_idx++) {
-        MERIAN_PROFILE_SCOPE_GPU(cmd, fmt::format("TLAS build {:02}", pending_idx));
 
-        pending_tlas_builds[pending_idx].build_info.scratchData.deviceAddress =
-            scratch_buffer->get_device_address();
-        // Reset the pointer here, since it may have been invalidated
-        pending_tlas_builds[pending_idx].build_info.pGeometries =
-            &pending_tlas_builds[pending_idx].geometry;
-        build_offset_info.primitiveCount = pending_tlas_builds[pending_idx].instance_count;
+    const vk::DeviceAddress scratch_base = scratch_buffer->get_device_address();
+    vk::DeviceSize scratch_offset = 0;
 
-        cmd->get_command_buffer().buildAccelerationStructuresKHR(
-            pending_tlas_builds[pending_idx].build_info, &build_offset_info);
-        cmd->keep_until_pool_reset(pending_tlas_builds[pending_idx].tlas);
-        cmd->barrier(vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
-                     vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR, scratch_barrier);
+    std::vector<const vk::AccelerationStructureBuildRangeInfoKHR*> range_info_ptrs(
+        pending_tlas.size());
+
+    for (uint32_t idx = 0; idx < pending_tlas.size(); idx++) {
+        pending_tlas_build_infos[idx].scratchData.deviceAddress = scratch_base + scratch_offset;
+        scratch_offset += align_ceil(pending_tlas[idx].scratch_size, scratch_buffer_min_alignment);
+        // Fixup geometry pointer (invalidated by vector growth during queue calls)
+        pending_tlas_build_infos[idx].pGeometries = &pending_tlas_geometries[idx];
+        range_info_ptrs[idx] = &pending_tlas_range_infos[idx];
+        cmd->keep_until_pool_reset(pending_tlas[idx].as);
     }
 
-    pending_tlas_builds.clear();
-    pending_min_scratch_buffer = 0;
+    cmd->get_command_buffer().buildAccelerationStructuresKHR(pending_tlas_build_infos,
+                                                             range_info_ptrs);
+
+    pending_tlas.clear();
+    pending_tlas_build_infos.clear();
+    pending_tlas_geometries.clear();
+    pending_tlas_range_infos.clear();
+    pending_tlas_total_scratch = 0;
 }
 
 } // namespace merian

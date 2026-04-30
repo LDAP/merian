@@ -1,5 +1,6 @@
 #pragma once
 
+#include "merian/utils/alignment.hpp"
 #include "merian/vk/memory/resource_allocations.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/utils/profiler.hpp"
@@ -36,18 +37,9 @@ namespace merian {
 class ASBuilder {
 
   private:
-    struct PendingBLAS {
-        // src/dstAccelerationStructures and scratchData.deviceAddress are left empty until build
-        AccelerationStructureHandle blas;
-        vk::AccelerationStructureBuildGeometryInfoKHR build_info;
-        const vk::AccelerationStructureBuildRangeInfoKHR* range_info;
-    };
-
-    struct PendingTLAS {
-        vk::AccelerationStructureBuildGeometryInfoKHR build_info;
-        uint32_t instance_count;
-        vk::AccelerationStructureGeometryKHR geometry;
-        AccelerationStructureHandle tlas;
+    struct PendingAS {
+        AccelerationStructureHandle as;
+        vk::DeviceSize scratch_size;
     };
 
   public:
@@ -319,11 +311,16 @@ class ASBuilder {
     const ResourceAllocatorHandle allocator;
     vk::DeviceSize scratch_buffer_min_alignment;
 
-    // The BLASs/TLASs that are build when calling get_cmds()
-    std::vector<PendingBLAS> pending_blas_builds;
-    std::vector<PendingTLAS> pending_tlas_builds;
-    // The minimum scratch buffer size that is required to build all pending BLASs.
-    vk::DeviceSize pending_min_scratch_buffer = 0;
+    std::vector<PendingAS> pending_blas;
+    std::vector<vk::AccelerationStructureBuildGeometryInfoKHR> pending_blas_build_infos;
+    std::vector<const vk::AccelerationStructureBuildRangeInfoKHR*> pending_blas_range_infos;
+    vk::DeviceSize pending_blas_total_scratch = 0;
+
+    std::vector<PendingAS> pending_tlas;
+    std::vector<vk::AccelerationStructureBuildGeometryInfoKHR> pending_tlas_build_infos;
+    std::vector<vk::AccelerationStructureGeometryKHR> pending_tlas_geometries;
+    std::vector<vk::AccelerationStructureBuildRangeInfoKHR> pending_tlas_range_infos;
+    vk::DeviceSize pending_tlas_total_scratch = 0;
 };
 
 } // namespace merian
