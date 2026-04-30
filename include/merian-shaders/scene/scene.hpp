@@ -21,14 +21,16 @@ namespace merian {
 
 enum class MeshFlags : uint32_t {
     None = 0,
-    // default: not; means: vertices can change over time, get_prev_vertices must be valid.
+    // default: not; means: vertices can move over time, get_prev_vertices must be valid.
     IsMorphed = 0x1,
+    // Topology (vertex count, primitive count) can change between frames.
+    HasVariableTopology = 0x2,
     // default: treat all as non-opaque (allow alpha mask)
-    IsOpaque = 0x2,
+    IsOpaque = 0x4,
     // default: clockwise
-    FrontCounterClockwise = 0x4,
+    FrontCounterClockwise = 0x8,
     // default: cull backfaces
-    TwoSided = 0x8,
+    TwoSided = 0x10,
 };
 
 constexpr MeshFlags operator|(MeshFlags a, MeshFlags b) {
@@ -60,6 +62,9 @@ inline std::string format_as(const MeshFlags flags) {
     }
     if (flags & MeshFlags::TwoSided) {
         append("TwoSided");
+    }
+    if (flags & MeshFlags::HasVariableTopology) {
+        append("HasVariableTopology");
     }
     return out;
 }
@@ -185,6 +190,10 @@ class Mesh {
         return flags & MeshFlags::IsMorphed;
     }
 
+    bool has_variable_topology() const {
+        return flags & MeshFlags::HasVariableTopology;
+    }
+
     bool is_dynamic() const {
         return is_morphed() || animated_instance_count > 0;
     }
@@ -286,6 +295,8 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         bool has_animated_node = false;
         // true if any mesh in the group is morphed
         bool has_morphed_mesh = false;
+        // true if any mesh in the group has HasVariableTopology
+        bool has_variable_topology_mesh = false;
         // true if all meshes in the group are opaque
         bool all_opaque = true;
 
@@ -294,6 +305,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         // a mesh changed (new mesh in group -> not the same group, never true)
         bool blas_dirty = false;
         uint32_t blas_last_built_frame = 0;
+        std::optional<vk::AccelerationStructureBuildSizesInfoKHR> cached_blas_size_info;
         // ----------------
 
         const std::set<NodeID>& get_instances(const std::vector<MeshHandle>& meshes) const {

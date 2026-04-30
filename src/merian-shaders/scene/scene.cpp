@@ -522,13 +522,13 @@ void Scene::properties(Properties& props) {
                     }
                     props.output_text(
                         "split flags: {}\nhas animated node: {}\nhas morphed mesh: "
-                        "{}\nall opaque: {}\npretransformed: "
+                        "{}\nhas variable topology: {}\nall opaque: {}\npretransformed: "
                         "{}\ninstances: "
                         "{}\nvertices: {}\ntriangles: {}\nblas: {}\nblas dirty: {}\nblas last "
                         "built frame: {}",
                         group.flags, group.has_animated_node, group.has_morphed_mesh,
-                        group.all_opaque, pretransformed, instances, group_vertices,
-                        group_triangles,
+                        group.has_variable_topology_mesh, group.all_opaque, pretransformed,
+                        instances, group_vertices, group_triangles,
                         group.blas ? fmt::format("{} bytes", format_size(group.blas->get_size()))
                                    : "<none>",
                         group.blas_dirty, group.blas_last_built_frame);
@@ -692,6 +692,7 @@ void Scene::compute_mesh_groups() {
         group.flags = static_cast<MeshFlags>(key);
         group.has_animated_node |= mesh.animated_instance_count > 0;
         group.has_morphed_mesh |= mesh.is_morphed();
+        group.has_variable_topology_mesh |= mesh.has_variable_topology();
         group.all_opaque &= mesh.is_opaque();
         group.meshes.insert(mesh_id);
     }
@@ -709,6 +710,7 @@ void Scene::compute_mesh_groups() {
             MeshGroup& prev_group = prev_mesh_groups[maybe_prev_group];
             if (prev_group.meshes == group.meshes) {
                 group.blas = prev_group.blas;
+                group.cached_blas_size_info = prev_group.cached_blas_size_info;
                 // blas_dirty is computed later when we upload the meshes, because this method is
                 // not run every frame. We later also check if the blas can be actually reused or
                 // if a new one is necessary.
@@ -908,6 +910,9 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                 cmd, fmt::format("Scene::upload_meshes::mesh[{}]", mesh_id));
 
             group.blas_dirty = true;
+            if (mesh.has_variable_topology()) {
+                group.cached_blas_size_info.reset();
+            }
 
             assert(!mesh.instances.empty());
             assert(mesh_id < vertex_buffers.size());
@@ -1153,8 +1158,11 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
             flags |= vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastBuild;
         }
 
-        const auto size_info =
-            as_builder.get_size_info(blas_geometry.geometries, blas_geometry.ranges, flags);
+        if (!group.cached_blas_size_info) {
+            group.cached_blas_size_info =
+                as_builder.get_size_info(blas_geometry.geometries, blas_geometry.ranges, flags);
+        }
+        const auto& size_info = *group.cached_blas_size_info;
 
         if (!group.blas || group.blas->get_size() < size_info.accelerationStructureSize) {
             // cannot reuse and needs to be allcated
