@@ -613,6 +613,43 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     std::vector<std::optional<SceneNode>> scene_graph; // sized to node_ids.size()
     bool pretransform_animated = false;
     uint32_t current_frame = 0;
+
+    struct FrameStats {
+        uint32_t meshes_uploaded_device_local = 0;
+        uint32_t meshes_uploaded_device_staged = 0;
+        uint32_t meshes_uploaded_host_packed = 0;
+        uint32_t meshes_uploaded_host_unpacked = 0;
+        uint32_t vertices_uploaded = 0;
+        uint32_t indices_uploaded = 0;
+        vk::DeviceSize upload_bytes = 0;
+
+        uint32_t cpu_pretransforms = 0;
+        uint32_t gpu_pretransforms = 0;
+        uint32_t cpu_pretransform_vertices = 0;
+        uint32_t gpu_pretransform_vertices = 0;
+
+        uint32_t blas_builds = 0;
+        uint32_t blas_builds_static = 0;
+        uint32_t blas_builds_dynamic = 0;
+
+        bool tlas_rebuilt = false;
+        uint32_t tlas_instance_count = 0;
+
+        uint32_t buffers_allocated = 0;
+        uint32_t buffers_released = 0;
+
+        vk::DeviceSize geometry_data_bytes = 0;
+        vk::DeviceSize transform_data_bytes = 0;
+        vk::DeviceSize tlas_instance_data_bytes = 0;
+
+        uint32_t meshes_uploaded() const {
+            return meshes_uploaded_device_local + meshes_uploaded_device_staged +
+                   meshes_uploaded_host_packed + meshes_uploaded_host_unpacked;
+        }
+    };
+
+    FrameStats frame_stats{};
+
     std::vector<CameraHandle> cameras;
     uint32_t active_camera = 0;
     AABB aabb; // can be invalid if information is not available.

@@ -607,6 +607,30 @@ void Scene::properties(Properties& props) {
             props.output_text("aabb: <not available>");
         }
 
+        props.st_separate("Per Frame");
+        props.output_text(
+            "meshes uploaded: {} (device_local: {}, staged: {}, host_packed: {}, "
+            "host_unpacked: {})\n"
+            "vertices uploaded: {}, primitives uploaded: {}\n"
+            "upload size: {}\n"
+            "pretransforms cpu: {} ({} verts), gpu: {} ({} verts)\n"
+            "blas builds: {} (static: {}, dynamic: {})\n"
+            "tlas rebuilt: {} ({} instances)\n"
+            "buffers allocated: {}, released: {}\n"
+            "geometry data: {}, transforms: {}, tlas instances: {}",
+            frame_stats.meshes_uploaded(), frame_stats.meshes_uploaded_device_local,
+            frame_stats.meshes_uploaded_device_staged, frame_stats.meshes_uploaded_host_packed,
+            frame_stats.meshes_uploaded_host_unpacked, frame_stats.vertices_uploaded,
+            frame_stats.indices_uploaded, format_size(frame_stats.upload_bytes),
+            frame_stats.cpu_pretransforms, frame_stats.cpu_pretransform_vertices,
+            frame_stats.gpu_pretransforms, frame_stats.gpu_pretransform_vertices,
+            frame_stats.blas_builds, frame_stats.blas_builds_static,
+            frame_stats.blas_builds_dynamic, frame_stats.tlas_rebuilt,
+            frame_stats.tlas_instance_count, frame_stats.buffers_allocated,
+            frame_stats.buffers_released, format_size(frame_stats.geometry_data_bytes),
+            format_size(frame_stats.transform_data_bytes),
+            format_size(frame_stats.tlas_instance_data_bytes));
+
         props.st_end_child();
     }
 }
@@ -888,6 +912,7 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                 cmd->keep_until_pool_reset(std::move(slot));
             }
             slot = allocator->create_buffer(size, buffer_usage, MemoryMappingType::NONE, name);
+            frame_stats.buffers_allocated++;
         }
     };
 
@@ -926,12 +951,50 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
             const vk::DeviceSize ib_size =
                 primitive_count * std::size_t(3) * size_for_index_type(mesh.index_type);
 
+            frame_stats.vertices_uploaded += vertex_count;
+            frame_stats.indices_uploaded += primitive_count;
+            frame_stats.upload_bytes += vb_size + ib_size;
+            if (mesh.is_morphed())
+                frame_stats.upload_bytes += prev_vb_size;
+
             const NodeID node_id = *mesh.instances.begin();
             const float4x4& global_transform = get_global_transform(node_id);
             const float4x4& global_inverse_transposed_transform =
                 get_global_inverse_transposed_transform(node_id);
 
             const bool pretransform_mesh = pretransform_group && global_transform != identity();
+
+            std::visit(
+                [&](auto&& src) {
+                    using T = std::decay_t<decltype(src)>;
+                    if constexpr (std::is_same_v<T, Mesh::DeviceLocal>) {
+                        frame_stats.meshes_uploaded_device_local++;
+                        if (pretransform_mesh) {
+                            frame_stats.gpu_pretransforms++;
+                            frame_stats.gpu_pretransform_vertices += vertex_count;
+                        }
+                    } else if constexpr (std::is_same_v<T, Mesh::DeviceStaged>) {
+                        frame_stats.meshes_uploaded_device_staged++;
+                        if (pretransform_mesh) {
+                            frame_stats.gpu_pretransforms++;
+                            frame_stats.gpu_pretransform_vertices += vertex_count;
+                        }
+                    } else if constexpr (std::is_same_v<T, Mesh::HostPacked<PackedVertexData>>) {
+                        frame_stats.meshes_uploaded_host_packed++;
+                        if (pretransform_mesh) {
+                            frame_stats.cpu_pretransforms++;
+                            frame_stats.cpu_pretransform_vertices += vertex_count;
+                        }
+                    } else {
+                        static_assert(std::is_same_v<T, Mesh::HostVertices>);
+                        frame_stats.meshes_uploaded_host_unpacked++;
+                        if (pretransform_mesh) {
+                            frame_stats.cpu_pretransforms++;
+                            frame_stats.cpu_pretransform_vertices += vertex_count;
+                        }
+                    }
+                },
+                mesh.get_vertices());
 
             // Dispatches upload for a mesh data variant.
             // cpu_write:        (src, void*) -> writes raw host data
@@ -1175,6 +1238,11 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
                                size_info, flags);
         group.blas_dirty = false;
         group.blas_last_built_frame = current_frame;
+        frame_stats.blas_builds++;
+        if (static_geometry)
+            frame_stats.blas_builds_static++;
+        else
+            frame_stats.blas_builds_dynamic++;
     }
 
     as_builder.get_cmds_blas(cmd, as_scratch_buffer);
@@ -1278,6 +1346,7 @@ void Scene::update(const CommandBufferHandle& cmd,
                    const uint32_t frame) {
     MERIAN_PROFILE_SCOPE_GPU(cmd, "Scene::update");
     current_frame = frame;
+    frame_stats = {};
 
     {
         MERIAN_PROFILE_SCOPE_GPU(cmd, "on_update");
@@ -1287,6 +1356,7 @@ void Scene::update(const CommandBufferHandle& cmd,
     assert(!cameras.empty() &&
            "the scene implementation must ensure that there is at least one camera");
 
+    frame_stats.buffers_released = static_cast<uint32_t>(pending_buffer_releases.size());
     for (auto& buffer : pending_buffer_releases) {
         cmd->keep_until_pool_reset(std::move(buffer));
     }
@@ -1323,6 +1393,9 @@ void Scene::update(const CommandBufferHandle& cmd,
     // changes at regroup, or updated mesh (buffer address) -> run every frame.
     upload_geometry_data(cmd);
 
+    frame_stats.geometry_data_bytes = geometries.size() * sizeof(GeometryData);
+    frame_stats.transform_data_bytes = instance_transforms.size() * sizeof(float4x4) * 4;
+
     cmd->barrier(vk::MemoryBarrier2{
         vk::PipelineStageFlagBits2::eTransfer | vk::PipelineStageFlagBits2::eComputeShader,
         vk::AccessFlagBits2::eTransferWrite | vk::AccessFlagBits2::eShaderWrite,
@@ -1339,6 +1412,10 @@ void Scene::update(const CommandBufferHandle& cmd,
         if (tlas_dirty || !tlas) {
             build_tlas(cmd);
             tlas_dirty = false;
+            frame_stats.tlas_rebuilt = true;
+            frame_stats.tlas_instance_count = static_cast<uint32_t>(tlas_instances.size());
+            frame_stats.tlas_instance_data_bytes =
+                tlas_instances.size() * sizeof(vk::AccelerationStructureInstanceKHR);
         }
 
         cmd->barrier(vk::MemoryBarrier2{
