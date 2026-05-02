@@ -24,8 +24,11 @@ class VMAMemoryAllocation : public MemoryAllocation {
      */
     VMAMemoryAllocation(const ContextHandle& context,
                         const std::shared_ptr<VMAMemoryAllocator>& allocator,
-                        VmaAllocation allocation)
-        : MemoryAllocation(context), allocator(allocator), m_allocation(allocation) {
+                        VmaAllocation allocation,
+                        void* persistent_mapped = nullptr)
+        : MemoryAllocation(context), allocator(allocator), m_allocation(allocation),
+          mapped_memory(persistent_mapped),
+          map_count(persistent_mapped != nullptr ? PERSISTENT_MAP_COUNT : 0) {
         SPDLOG_TRACE("create VMA allocation ({})", fmt::ptr(this));
     }
 
@@ -78,9 +81,11 @@ class VMAMemoryAllocation : public MemoryAllocation {
     const std::shared_ptr<VMAMemoryAllocator> allocator;
     VmaAllocation m_allocation;
 
+    static constexpr int32_t PERSISTENT_MAP_COUNT = -1;
+
     mutable std::mutex allocation_mutex;
-    void* mapped_memory = nullptr;
-    uint32_t map_count = 0;
+    void* mapped_memory;
+    int32_t map_count;
 };
 
 /**

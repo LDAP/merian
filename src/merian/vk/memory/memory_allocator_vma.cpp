@@ -47,6 +47,7 @@ VmaAllocationCreateInfo make_create_info(const VmaMemoryUsage usage,
     vma_alloc_info.flags |= dedicated ? VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT : 0;
     vma_alloc_info.flags |= mapping_type == merian::MemoryMappingType::HOST_ACCESS_RANDOM ? VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT : 0;
     vma_alloc_info.flags |= mapping_type == merian::MemoryMappingType::HOST_ACCESS_SEQUENTIAL_WRITE ? VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT : 0;
+    vma_alloc_info.flags |= mapping_type != merian::MemoryMappingType::NONE ? VMA_ALLOCATION_CREATE_MAPPED_BIT : 0;
     // clang-format on
     return vma_alloc_info;
 }
@@ -60,11 +61,11 @@ namespace merian {
 VMAMemoryAllocation::~VMAMemoryAllocation() {
     SPDLOG_TRACE("destroy VMA allocation ({})", fmt::ptr(this));
 
-    if (map_count != 0) {
+    if (map_count > 0) {
         SPDLOG_WARN(" VMA allocation ({}): unmap() must be called the same number as map()!",
                     fmt::ptr(this));
 
-        for (uint32_t i = 0; i < map_count; i++) {
+        for (int32_t i = 0; i < map_count; i++) {
             unmap();
         }
     }
@@ -88,6 +89,10 @@ void VMAMemoryAllocation::flush(const VkDeviceSize offset, const VkDeviceSize si
 };
 
 void* VMAMemoryAllocation::map() {
+    if (map_count == PERSISTENT_MAP_COUNT) {
+        return mapped_memory;
+    }
+
     std::lock_guard<std::mutex> lock(allocation_mutex);
 
     map_count++;
@@ -104,6 +109,10 @@ void* VMAMemoryAllocation::map() {
 };
 
 void VMAMemoryAllocation::unmap() {
+    if (map_count == PERSISTENT_MAP_COUNT) {
+        return;
+    }
+
     std::lock_guard<std::mutex> lock(allocation_mutex);
     assert(map_count > 0 && "forget to call map()?");
 
@@ -179,6 +188,7 @@ void VMAMemoryAllocation::properties(Properties& props) {
     MemoryAllocation::properties(props);
 
     props.output_text(fmt::format("Mapped: {}", mapped_memory != nullptr));
+    props.output_text(fmt::format("Persistent: {}", map_count == PERSISTENT_MAP_COUNT));
     if (mapped_memory != nullptr) {
         props.output_text(fmt::format("Mapped at: {}", fmt::ptr(mapped_memory)));
     }
@@ -247,7 +257,8 @@ VMAMemoryAllocator::allocate_memory(const vk::MemoryPropertyFlags required_flags
         set_name(vma_allocator, allocation, debug_name);
     const std::shared_ptr<VMAMemoryAllocator> allocator =
         static_pointer_cast<VMAMemoryAllocator>(shared_from_this());
-    auto memory = std::make_shared<VMAMemoryAllocation>(get_context(), allocator, allocation);
+    auto memory = std::make_shared<VMAMemoryAllocation>(get_context(), allocator, allocation,
+                                                        allocation_info.pMappedData);
     log_allocation(allocation_info, memory, debug_name);
     return memory;
 }
@@ -281,7 +292,8 @@ BufferHandle VMAMemoryAllocator::create_buffer(const vk::BufferCreateInfo buffer
 
     const std::shared_ptr<VMAMemoryAllocator> allocator =
         static_pointer_cast<VMAMemoryAllocator>(shared_from_this());
-    auto memory = std::make_shared<VMAMemoryAllocation>(get_context(), allocator, allocation);
+    auto memory = std::make_shared<VMAMemoryAllocation>(get_context(), allocator, allocation,
+                                                        allocation_info.pMappedData);
     auto buffer_handle = Buffer::create(buffer, memory, buffer_create_info);
     log_allocation(allocation_info, memory, debug_name);
 
@@ -306,7 +318,8 @@ ImageHandle VMAMemoryAllocator::create_image(const vk::ImageCreateInfo image_cre
         set_name(vma_allocator, allocation, debug_name);
     const std::shared_ptr<VMAMemoryAllocator> allocator =
         static_pointer_cast<VMAMemoryAllocator>(shared_from_this());
-    auto memory = std::make_shared<VMAMemoryAllocation>(get_context(), allocator, allocation);
+    auto memory = std::make_shared<VMAMemoryAllocation>(get_context(), allocator, allocation,
+                                                        allocation_info.pMappedData);
     auto image_handle = Image::create(image, memory, image_create_info);
     log_allocation(allocation_info, memory, debug_name);
 

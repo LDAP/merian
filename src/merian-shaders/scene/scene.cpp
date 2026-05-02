@@ -241,6 +241,12 @@ void Scene::remove_mesh_instance(const MeshID mesh_id, const NodeID node_id) {
 void Scene::remove_mesh(const MeshID mesh_id) {
     assert(mesh_ids.is_used(mesh_id));
 
+    if (mesh_id < mesh_to_group.size() && mesh_to_group[mesh_id] != MESH_GROUP_ID_INVALID) {
+        MeshGroup& group = mesh_groups[mesh_to_group[mesh_id]];
+        group.cached_blas_size_info.reset();
+        group.blas.reset();
+    }
+
     meshes[mesh_id]->instances.clear();
     meshes[mesh_id].reset();
 
