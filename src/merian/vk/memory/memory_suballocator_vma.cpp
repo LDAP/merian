@@ -29,16 +29,19 @@ VMAMemorySubAllocation::VMAMemorySubAllocation(
     const std::shared_ptr<VMAMemorySubAllocator>& allocator,
     VmaVirtualAllocation allocation,
     const vk::DeviceSize offset,
-    const vk::DeviceSize size)
+    const vk::DeviceSize size,
+    const bool no_free)
     : MemoryAllocation(context), allocator(allocator), allocation(allocation), offset(offset),
-      size(size) {
+      size(size), no_free(no_free) {
     SPDLOG_TRACE("create VMA suballocation ({})", fmt::ptr(this));
 }
 
-// frees the memory when called
 VMAMemorySubAllocation::~VMAMemorySubAllocation() {
     SPDLOG_TRACE("free VMA suballocation ({})", fmt::ptr(this));
-    vmaVirtualFree(allocator->get_vma_block(), allocation);
+    if (!no_free) {
+        const std::lock_guard lock(allocator->block_mutex);
+        vmaVirtualFree(allocator->get_vma_block(), allocation);
+    }
 }
 
 // ------------------------------------------------------------------------------------
@@ -148,17 +151,55 @@ VMAMemorySubAllocator::VMAMemorySubAllocator(const BufferHandle& buffer)
     VulkanException::throw_if_no_success(vmaCreateVirtualBlock(&block_create_info, &block));
 
     buffer_flags = buffer->get_context()
-                       ->physical_device.physical_device_memory_properties.memoryProperties
-                       .memoryTypes[buffer_info.memory_type_index]
+                       ->get_physical_device()
+                       ->get_memory_properties()
+                       .memoryProperties.memoryTypes[buffer_info.memory_type_index]
                        .propertyFlags;
-    buffer_alignment = 1ul << std::countr_zero(buffer_info.offset);
+    buffer_alignment =
+        vk::DeviceSize(1)
+        << std::min(std::countr_zero(buffer_info.offset),
+                    std::numeric_limits<vk::DeviceSize>::digits - 1);
 }
 
 VMAMemorySubAllocator::~VMAMemorySubAllocator() {
+    vmaClearVirtualBlock(block);
     vmaDestroyVirtualBlock(block);
 }
 
 // ------------------------------------------------------------------------------------
+
+VMAMemorySubAllocator::VirtualAllocation
+VMAMemorySubAllocator::allocate(const vk::MemoryRequirements& requirements) {
+    assert(requirements.alignment == 0ul || std::popcount(requirements.alignment) == 1);
+
+    VmaVirtualAllocationCreateInfo alloc_create_info = {};
+    if (requirements.alignment <= buffer_alignment) {
+        alloc_create_info.size = requirements.size;
+        alloc_create_info.alignment = requirements.alignment;
+    } else {
+        alloc_create_info.size = requirements.size + requirements.alignment;
+        alloc_create_info.alignment = 0;
+    }
+
+    VmaVirtualAllocation virtual_allocation;
+    vk::DeviceSize offset;
+    {
+        const std::lock_guard lock(block_mutex);
+        AllocationFailed::throw_if_no_success(
+            vmaVirtualAllocate(block, &alloc_create_info, &virtual_allocation, &offset));
+    }
+
+    if (requirements.alignment > buffer_alignment) {
+        offset = ((buffer_info.offset + offset - 1ul + requirements.alignment) &
+                  -requirements.alignment) -
+                 buffer_info.offset;
+    }
+
+    assert(offset >= buffer_info.offset &&
+           offset + requirements.size <= buffer_info.offset + buffer_info.size);
+
+    return {virtual_allocation, offset};
+}
 
 MemoryAllocationHandle
 VMAMemorySubAllocator::allocate_memory(const vk::MemoryPropertyFlags required_flags,
@@ -192,36 +233,13 @@ VMAMemorySubAllocator::allocate_memory(const vk::MemoryPropertyFlags required_fl
                         buffer_info.memory_type_index));
     }
 
-    assert(requirements.alignment == 0ul || std::popcount(requirements.alignment) == 0);
+    const auto [virtual_allocation, offset] = allocate(requirements);
 
-    VmaVirtualAllocationCreateInfo alloc_create_info = {};
-    if (requirements.alignment <= buffer_alignment) {
-        alloc_create_info.size = requirements.size;
-        alloc_create_info.alignment = requirements.alignment;
-    } else {
-        alloc_create_info.size = requirements.size + requirements.alignment;
-        alloc_create_info.alignment = 0;
-    }
-
-    VmaVirtualAllocation virtual_allocation;
-    vk::DeviceSize offset;
-    AllocationFailed::throw_if_no_success(
-        vmaVirtualAllocate(block, &alloc_create_info, &virtual_allocation, &offset));
-
-    if (requirements.alignment > buffer_alignment) {
-        offset = ((buffer_info.offset + offset - 1ul + requirements.alignment) &
-                  -requirements.alignment) -
-                 buffer_info.offset;
-    }
-
-    assert(offset >= buffer_info.offset &&
-           offset + requirements.size < buffer_info.offset + buffer_info.size);
-
-    const std::shared_ptr<VMAMemorySubAllocator> allocator =
+    const std::shared_ptr<VMAMemorySubAllocator> self =
         static_pointer_cast<VMAMemorySubAllocator>(shared_from_this());
 
     const auto allocation = std::make_shared<VMAMemorySubAllocation>(
-        get_context(), allocator, virtual_allocation, offset, requirements.size);
+        get_context(), self, virtual_allocation, offset, requirements.size);
 
 #ifndef NDEBUG
     allocation->name = debug_name;
@@ -238,6 +256,13 @@ const BufferHandle& VMAMemorySubAllocator::get_base_buffer() const {
 
 const VmaVirtualBlock& VMAMemorySubAllocator::get_vma_block() const {
     return block;
+}
+
+vk::DeviceSize VMAMemorySubAllocator::get_free_size() const {
+    const std::lock_guard lock(block_mutex);
+    VmaStatistics stats;
+    vmaGetVirtualBlockStatistics(block, &stats);
+    return stats.blockBytes - stats.allocationBytes;
 }
 
 std::shared_ptr<VMAMemorySubAllocator> VMAMemorySubAllocator::create(const BufferHandle& buffer) {

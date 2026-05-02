@@ -47,8 +47,11 @@ class StagingMemoryManager : public std::enable_shared_from_this<StagingMemoryMa
     StagingMemoryManager(StagingMemoryManager const&) = delete;
     StagingMemoryManager& operator=(StagingMemoryManager const&) = delete;
     StagingMemoryManager() = delete;
-    StagingMemoryManager(const MemoryAllocatorHandle& memory_allocator,
-                         const vk::DeviceSize block_size = (vk::DeviceSize(128) * 1024 * 1024));
+    StagingMemoryManager(
+        const MemoryAllocatorHandle& memory_allocator,
+        const vk::DeviceSize block_size = vk::DeviceSize(128) * 1024 * 1024,
+        const vk::BufferUsageFlags upload_usage = vk::BufferUsageFlagBits::eTransferSrc,
+        const vk::BufferUsageFlags download_usage = vk::BufferUsageFlagBits::eTransferDst);
 
     ~StagingMemoryManager();
 
@@ -57,9 +60,10 @@ class StagingMemoryManager : public std::enable_shared_from_this<StagingMemoryMa
   public:
     // Request a staging area of size 'size' for uploads. The buffer and offset are returned to
     // queue the device copy on the command buffer.
-    MemoryAllocationHandle get_upload_staging_space(const vk::DeviceSize size,
-                                                    BufferHandle& upload_buffer,
-                                                    vk::DeviceSize& buffer_offset);
+    MemoryAllocationHandle
+    get_upload_staging_space(const vk::DeviceSize size,
+                             BufferHandle& upload_buffer,
+                             vk::DeviceSize& buffer_offset);
 
     // Request a staging area of size 'size' for downloads. The buffer and offset are returned to
     // queue the device copy on the command buffer.
@@ -178,6 +182,21 @@ class StagingMemoryManager : public std::enable_shared_from_this<StagingMemoryMa
     const ContextHandle context;
     const MemoryAllocatorHandle allocator;
     const vk::DeviceSize block_size;
+    const vk::BufferUsageFlags upload_usage;
+    const vk::BufferUsageFlags download_usage;
+
+    static constexpr vk::DeviceSize STAGING_ALIGNMENT = 16;
+
+    VMAMemorySubAllocatorHandle upload_block;
+    VMAMemorySubAllocatorHandle download_block;
+
+    void create_upload_block();
+    void create_download_block();
+
+    MemoryAllocationHandle suballocate(VMAMemorySubAllocatorHandle& block,
+                                       vk::DeviceSize size,
+                                       BufferHandle& buffer,
+                                       vk::DeviceSize& buffer_offset);
 };
 
 using StagingMemoryManagerHandle = std::shared_ptr<StagingMemoryManager>;

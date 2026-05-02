@@ -39,6 +39,7 @@ merian_src = files(
     'vk/utils/vulkan_spirv.cpp',
     'vk/memory/memory_allocator.cpp',
     'vk/memory/memory_allocator_vma.cpp',
+    'vk/memory/memory_suballocator_vma.cpp',
     'vk/memory/resource_allocations.cpp',
     'vk/memory/resource_allocator.cpp',
     'vk/memory/staging_memory_manager.cpp',

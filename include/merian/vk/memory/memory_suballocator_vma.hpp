@@ -3,6 +3,7 @@
 #include "merian/vk/memory/memory_allocator.hpp"
 
 #include <cstdio>
+#include <mutex>
 #include <spdlog/spdlog.h>
 #include <vk_mem_alloc.h>
 
@@ -28,7 +29,8 @@ class VMAMemorySubAllocation : public MemoryAllocation {
                            const std::shared_ptr<VMAMemorySubAllocator>& allocator,
                            VmaVirtualAllocation allocation,
                            const vk::DeviceSize offset,
-                           const vk::DeviceSize size);
+                           const vk::DeviceSize size,
+                           const bool no_free = false);
 
     ~VMAMemorySubAllocation();
 
@@ -83,6 +85,7 @@ class VMAMemorySubAllocation : public MemoryAllocation {
 
     const vk::DeviceSize offset;
     const vk::DeviceSize size;
+    const bool no_free;
 
     std::string name;
 };
@@ -114,12 +117,22 @@ class VMAMemorySubAllocator : public MemoryAllocator {
 
     // ------------------------------------------------------------------------------------
 
+    struct VirtualAllocation {
+        VmaVirtualAllocation allocation;
+        vk::DeviceSize offset;
+    };
+
+    // Low-level: performs a VMA virtual allocation and returns the raw handle + offset.
+    VirtualAllocation allocate(const vk::MemoryRequirements& requirements);
+
     // Returns the buffer from which this allocator allocates from.
     const BufferHandle& get_base_buffer() const;
 
     // Returns the VMA block for the virtual allocator.
     // You should never use this directly.
     const VmaVirtualBlock& get_vma_block() const;
+
+    vk::DeviceSize get_free_size() const;
 
   private:
     const BufferHandle buffer;
@@ -128,6 +141,7 @@ class VMAMemorySubAllocator : public MemoryAllocator {
     vk::DeviceSize buffer_alignment;
 
     VmaVirtualBlock block;
+    mutable std::mutex block_mutex;
 
   public:
     static std::shared_ptr<VMAMemorySubAllocator> create(const BufferHandle& buffer);
