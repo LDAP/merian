@@ -17,7 +17,7 @@ StagingMemoryManager::~StagingMemoryManager() = default;
 // -------------------------------------------------------------------------
 
 void StagingMemoryManager::create_upload_block() {
-    SPDLOG_WARN("creating new upload staging block ({})", format_size(block_size));
+    SPDLOG_DEBUG("creating new upload staging block ({})", format_size(block_size));
     const BufferHandle buffer = allocator->create_buffer(
         vk::BufferCreateInfo{{}, block_size, upload_usage},
         MemoryMappingType::HOST_ACCESS_SEQUENTIAL_WRITE, "staging upload block");
@@ -25,18 +25,17 @@ void StagingMemoryManager::create_upload_block() {
 }
 
 void StagingMemoryManager::create_download_block() {
-    SPDLOG_WARN("creating new download staging block ({})", format_size(block_size));
-    const BufferHandle buffer = allocator->create_buffer(
-        vk::BufferCreateInfo{{}, block_size, download_usage},
-        MemoryMappingType::HOST_ACCESS_RANDOM, "staging download block");
+    SPDLOG_DEBUG("creating new download staging block ({})", format_size(block_size));
+    const BufferHandle buffer =
+        allocator->create_buffer(vk::BufferCreateInfo{{}, block_size, download_usage},
+                                 MemoryMappingType::HOST_ACCESS_RANDOM, "staging download block");
     download_block = VMAMemorySubAllocator::create(buffer);
 }
 
-MemoryAllocationHandle
-StagingMemoryManager::suballocate(VMAMemorySubAllocatorHandle& block,
-                                  const vk::DeviceSize size,
-                                  BufferHandle& buffer,
-                                  vk::DeviceSize& buffer_offset) {
+MemoryAllocationHandle StagingMemoryManager::suballocate(VMAMemorySubAllocatorHandle& block,
+                                                         const vk::DeviceSize size,
+                                                         BufferHandle& buffer,
+                                                         vk::DeviceSize& buffer_offset) {
     const vk::MemoryRequirements reqs{size, STAGING_ALIGNMENT, ~0u};
     const auto [virtual_alloc, offset] = block->allocate(reqs);
     buffer = block->get_base_buffer();
