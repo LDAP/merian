@@ -544,6 +544,11 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         return aabb;
     }
 
+    void defer_buffer_release(BufferHandle buffer) {
+        if (buffer)
+            pending_buffer_releases.push_back(std::move(buffer));
+    }
+
   private:
     void rebuild_shader_object();
 
