@@ -29,19 +29,16 @@ VMAMemorySubAllocation::VMAMemorySubAllocation(
     const std::shared_ptr<VMAMemorySubAllocator>& allocator,
     VmaVirtualAllocation allocation,
     const vk::DeviceSize offset,
-    const vk::DeviceSize size,
-    const bool no_free)
+    const vk::DeviceSize size)
     : MemoryAllocation(context), allocator(allocator), allocation(allocation), offset(offset),
-      size(size), no_free(no_free) {
+      size(size) {
     SPDLOG_TRACE("create VMA suballocation ({})", fmt::ptr(this));
 }
 
 VMAMemorySubAllocation::~VMAMemorySubAllocation() {
     SPDLOG_TRACE("free VMA suballocation ({})", fmt::ptr(this));
-    if (!no_free) {
-        const std::lock_guard lock(allocator->block_mutex);
-        vmaVirtualFree(allocator->get_vma_block(), allocation);
-    }
+    const std::lock_guard lock(allocator->block_mutex);
+    vmaVirtualFree(allocator->get_vma_block(), allocation);
 }
 
 // ------------------------------------------------------------------------------------

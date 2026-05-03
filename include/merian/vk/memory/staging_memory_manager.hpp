@@ -3,7 +3,7 @@
 #include "merian/vk/context.hpp"
 
 #include "merian/vk/command/command_buffer.hpp"
-#include "merian/vk/memory/memory_suballocator_vma.hpp"
+#include "merian/vk/memory/bump_memory_allocator.hpp"
 #include "merian/vk/utils/math.hpp"
 
 namespace merian {
@@ -187,13 +187,13 @@ class StagingMemoryManager : public std::enable_shared_from_this<StagingMemoryMa
 
     static constexpr vk::DeviceSize STAGING_ALIGNMENT = 16;
 
-    VMAMemorySubAllocatorHandle upload_block;
-    VMAMemorySubAllocatorHandle download_block;
+    BumpMemoryAllocatorHandle upload_block;
+    BumpMemoryAllocatorHandle download_block;
 
     void create_upload_block();
     void create_download_block();
 
-    MemoryAllocationHandle suballocate(VMAMemorySubAllocatorHandle& block,
+    MemoryAllocationHandle suballocate(BumpMemoryAllocatorHandle& block,
                                        vk::DeviceSize size,
                                        BufferHandle& buffer,
                                        vk::DeviceSize& buffer_offset);

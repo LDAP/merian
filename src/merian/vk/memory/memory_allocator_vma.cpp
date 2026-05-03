@@ -61,19 +61,11 @@ namespace merian {
 VMAMemoryAllocation::~VMAMemoryAllocation() {
     SPDLOG_TRACE("destroy VMA allocation ({})", fmt::ptr(this));
 
-    if (map_count > 0) {
-        SPDLOG_WARN(" VMA allocation ({}): unmap() must be called the same number as map()!",
-                    fmt::ptr(this));
-
-        for (int32_t i = 0; i < map_count; i++) {
-            unmap();
-        }
-    }
-
     std::lock_guard<std::mutex> lock(allocation_mutex);
     assert(m_allocation);
 
     SPDLOG_TRACE("freeing memory ({})", fmt::ptr(this));
+    // vmaFreeMemory unmaps any persistent mapping (whether set up via MAPPED_BIT or vmaMapMemory).
     vmaFreeMemory(allocator->vma_allocator, m_allocation);
     m_allocation = nullptr;
 };
@@ -89,43 +81,13 @@ void VMAMemoryAllocation::flush(const VkDeviceSize offset, const VkDeviceSize si
 };
 
 void* VMAMemoryAllocation::map() {
-    if (map_count == PERSISTENT_MAP_COUNT) {
-        return mapped_memory;
+    if (mapped_memory == nullptr) {
+        throw std::runtime_error{"mapping is unsupported for this memory type (not host-visible)"};
     }
-
-    std::lock_guard<std::mutex> lock(allocation_mutex);
-
-    map_count++;
-
-    if (mapped_memory != nullptr) {
-        assert(map_count > 1);
-        return mapped_memory;
-    }
-
-    VulkanException::throw_if_no_success(
-        vmaMapMemory(allocator->vma_allocator, m_allocation, &mapped_memory),
-        "mapping memory failed");
     return mapped_memory;
 };
 
-void VMAMemoryAllocation::unmap() {
-    if (map_count == PERSISTENT_MAP_COUNT) {
-        return;
-    }
-
-    std::lock_guard<std::mutex> lock(allocation_mutex);
-    assert(map_count > 0 && "forget to call map()?");
-
-    map_count--;
-    if (map_count > 0) {
-        return;
-    }
-
-    assert(mapped_memory != nullptr);
-
-    vmaUnmapMemory(allocator->vma_allocator, m_allocation);
-    mapped_memory = nullptr;
-};
+void VMAMemoryAllocation::unmap() {};
 
 // ------------------------------------------------------------------------------------
 
@@ -187,10 +149,10 @@ MemoryAllocatorHandle VMAMemoryAllocation::get_allocator() const {
 void VMAMemoryAllocation::properties(Properties& props) {
     MemoryAllocation::properties(props);
 
-    props.output_text(fmt::format("Mapped: {}", mapped_memory != nullptr));
-    props.output_text(fmt::format("Persistent: {}", map_count == PERSISTENT_MAP_COUNT));
     if (mapped_memory != nullptr) {
         props.output_text(fmt::format("Mapped at: {}", fmt::ptr(mapped_memory)));
+    } else {
+        props.output_text("Mapped: false");
     }
 }
 

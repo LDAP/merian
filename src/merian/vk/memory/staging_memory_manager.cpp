@@ -21,7 +21,7 @@ void StagingMemoryManager::create_upload_block() {
     const BufferHandle buffer = allocator->create_buffer(
         vk::BufferCreateInfo{{}, block_size, upload_usage},
         MemoryMappingType::HOST_ACCESS_SEQUENTIAL_WRITE, "staging upload block");
-    upload_block = VMAMemorySubAllocator::create(buffer);
+    upload_block = BumpMemoryAllocator::create(buffer);
 }
 
 void StagingMemoryManager::create_download_block() {
@@ -29,19 +29,18 @@ void StagingMemoryManager::create_download_block() {
     const BufferHandle buffer =
         allocator->create_buffer(vk::BufferCreateInfo{{}, block_size, download_usage},
                                  MemoryMappingType::HOST_ACCESS_RANDOM, "staging download block");
-    download_block = VMAMemorySubAllocator::create(buffer);
+    download_block = BumpMemoryAllocator::create(buffer);
 }
 
-MemoryAllocationHandle StagingMemoryManager::suballocate(VMAMemorySubAllocatorHandle& block,
+MemoryAllocationHandle StagingMemoryManager::suballocate(BumpMemoryAllocatorHandle& block,
                                                          const vk::DeviceSize size,
                                                          BufferHandle& buffer,
                                                          vk::DeviceSize& buffer_offset) {
     const vk::MemoryRequirements reqs{size, STAGING_ALIGNMENT, ~0u};
-    const auto [virtual_alloc, offset] = block->allocate(reqs);
+    const vk::DeviceSize offset = block->allocate(reqs);
     buffer = block->get_base_buffer();
     buffer_offset = offset;
-    return std::make_shared<VMAMemorySubAllocation>(context, block, virtual_alloc, offset, size,
-                                                    true);
+    return std::make_shared<BumpMemoryAllocation>(context, block, offset, size);
 }
 
 // -------------------------------------------------------------------------

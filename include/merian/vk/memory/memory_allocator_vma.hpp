@@ -27,8 +27,7 @@ class VMAMemoryAllocation : public MemoryAllocation {
                         VmaAllocation allocation,
                         void* persistent_mapped = nullptr)
         : MemoryAllocation(context), allocator(allocator), m_allocation(allocation),
-          mapped_memory(persistent_mapped),
-          map_count(persistent_mapped != nullptr ? PERSISTENT_MAP_COUNT : 0) {
+          mapped_memory(persistent_mapped) {
         SPDLOG_TRACE("create VMA allocation ({})", fmt::ptr(this));
     }
 
@@ -42,9 +41,10 @@ class VMAMemoryAllocation : public MemoryAllocation {
 
     void flush(const VkDeviceSize offset = 0, const VkDeviceSize size = VK_WHOLE_SIZE) override;
 
-    // You must call unmap the same number of time you call map!
+    // Returns the persistent mapping; throws if the allocation is not host-visible.
     void* map() override;
 
+    // No-op. Mappings are persistent for the lifetime of the allocation.
     void unmap() override;
 
     // ------------------------------------------------------------------------------------
@@ -81,11 +81,8 @@ class VMAMemoryAllocation : public MemoryAllocation {
     const std::shared_ptr<VMAMemoryAllocator> allocator;
     VmaAllocation m_allocation;
 
-    static constexpr int32_t PERSISTENT_MAP_COUNT = -1;
-
     mutable std::mutex allocation_mutex;
-    void* mapped_memory;
-    int32_t map_count;
+    void* const mapped_memory;
 };
 
 /**

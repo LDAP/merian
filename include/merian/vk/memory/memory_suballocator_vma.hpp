@@ -29,8 +29,7 @@ class VMAMemorySubAllocation : public MemoryAllocation {
                            const std::shared_ptr<VMAMemorySubAllocator>& allocator,
                            VmaVirtualAllocation allocation,
                            const vk::DeviceSize offset,
-                           const vk::DeviceSize size,
-                           const bool no_free = false);
+                           const vk::DeviceSize size);
 
     ~VMAMemorySubAllocation();
 
@@ -85,7 +84,6 @@ class VMAMemorySubAllocation : public MemoryAllocation {
 
     const vk::DeviceSize offset;
     const vk::DeviceSize size;
-    const bool no_free;
 
     std::string name;
 };
@@ -96,7 +94,6 @@ class VMAMemorySubAllocation : public MemoryAllocation {
 class VMAMemorySubAllocator : public MemoryAllocator {
   private:
     friend class VMAMemorySubAllocation;
-    friend class StagingMemoryManager;
 
     VMAMemorySubAllocator() = delete;
     explicit VMAMemorySubAllocator(const BufferHandle& buffer);
