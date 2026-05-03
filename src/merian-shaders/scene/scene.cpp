@@ -31,7 +31,7 @@ Scene::Scene(const ShaderCompileContextHandle& compile_context,
              const MaterialSystemHandle& material_system)
     : compile_context(compile_context), context(context), allocator(allocator),
       obj_allocator(obj_allocator), as_builder(context, allocator),
-      material_system(material_system), thread_pool(std::make_shared<ThreadPool>()),
+      material_system(material_system), thread_pool(std::make_shared<ThreadPool>(4)),
       mesh_staging(std::make_shared<StagingMemoryManager>(
           allocator->get_memory_allocator(),
           vk::DeviceSize(8) * 1024 * 1024,
@@ -211,7 +211,8 @@ void Scene::remove_mesh(const MeshID mesh_id) {
     if (mesh_id < mesh_to_group.size() && mesh_to_group[mesh_id] != MESH_GROUP_ID_INVALID) {
         MeshGroup& group = mesh_groups[mesh_to_group[mesh_id]];
         group.cached_blas_size_info.reset();
-        group.blas.reset();
+        if (group.blas)
+            pending_blas_releases.push_back(std::move(group.blas));
     }
 
     meshes[mesh_id]->instances.clear();
@@ -357,7 +358,8 @@ void Scene::stage_transform_jobs(const CommandBufferHandle& cmd) {
     if (!prev_vertex_jobs.empty()) {
         const vk::DeviceSize size = prev_vertex_jobs.size() * sizeof(TransformPrevVertexJob);
         ensure_job_buf(transform_prev_vertex_job_buf, size, "Scene::transform_prev_vertex_jobs");
-        staging->cmd_to_device(cmd, transform_prev_vertex_job_buf, prev_vertex_jobs.data(), 0, size);
+        staging->cmd_to_device(cmd, transform_prev_vertex_job_buf, prev_vertex_jobs.data(), 0,
+                               size);
         frame_stats.gpu_transform_buffer_bytes += size;
     }
 }
@@ -721,6 +723,11 @@ void Scene::compute_mesh_groups() {
             }
         }
     }
+
+    for (auto& prev_group : prev_mesh_groups) {
+        if (prev_group.blas)
+            pending_blas_releases.push_back(std::move(prev_group.blas));
+    }
 }
 
 void Scene::upload_transforms(const CommandBufferHandle& cmd) {
@@ -824,9 +831,8 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
                 Mesh& mesh = *meshes[mesh_id];
                 assert(vertex_buffers[mesh_id] && index_buffers[mesh_id]);
 
-                const bool needs_prev =
-                    mesh.is_morphed() || mesh.has_variable_topology() ||
-                    (pretransform && scene_graph[node_id]->is_animated);
+                const bool needs_prev = mesh.is_morphed() || mesh.has_variable_topology() ||
+                                        (pretransform && scene_graph[node_id]->is_animated);
 
                 GeometryData gd;
                 gd.material_id = mesh.material_id;
@@ -1370,6 +1376,11 @@ void Scene::update(const CommandBufferHandle& cmd,
         cmd->keep_until_pool_reset(std::move(buffer));
     }
     pending_buffer_releases.clear();
+
+    for (auto& blas : pending_blas_releases) {
+        cmd->keep_until_pool_reset(std::move(blas));
+    }
+    pending_blas_releases.clear();
 
     {
         MERIAN_PROFILE_SCOPE_GPU(cmd, "material_system::update");

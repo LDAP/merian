@@ -652,6 +652,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     // Buffers dropped by remove_mesh; drained at the top of update() via
     // cmd->keep_until_pool_reset so in-flight cmds keep them alive.
     std::vector<BufferHandle> pending_buffer_releases;
+    std::vector<AccelerationStructureHandle> pending_blas_releases;
 
     // --------------------------
     // Debug
