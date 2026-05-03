@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <fmt/format.h>
 #include <map>
 #include <unordered_map>
@@ -530,14 +531,16 @@ void Scene::properties(Properties& props) {
                         "split flags: {}\nhas animated node: {}\nhas morphed mesh: "
                         "{}\nhas variable topology: {}\nall opaque: {}\npretransformed: "
                         "{}\ninstances: "
-                        "{}\nvertices: {}\ntriangles: {}\nblas: {}\nblas dirty: {}\nblas last "
-                        "built frame: {}",
+                        "{}\nvertices: {}\ntriangles: {}\nblas: {}\nblas build flags: "
+                        "{}\nblas dirty: {}\nblas last built frame: {}\nblas last updated "
+                        "frame: {}",
                         group.flags, group.has_animated_node, group.has_morphed_mesh,
                         group.has_variable_topology_mesh, group.all_opaque, pretransformed,
                         instances, group_vertices, group_triangles,
                         group.blas ? fmt::format("{} bytes", format_size(group.blas->get_size()))
                                    : "<none>",
-                        group.blas_dirty, group.blas_last_built_frame);
+                        vk::to_string(group.blas_build_flags), group.blas_dirty,
+                        group.blas_last_built_frame, group.blas_last_updated_frame);
 
                     if (props.st_begin_child("members", "Members")) {
                         for (const MeshID mesh_id : group.meshes) {
@@ -573,6 +576,7 @@ void Scene::properties(Properties& props) {
         if (props.config_bool("Pretransform Animated", pretransform)) {
             set_pretransform_animated(pretransform);
         }
+        props.config_percent("BLAS Rebuild Fraction", blas_rebuild_fraction);
         props.st_end_child();
     }
 
@@ -620,7 +624,7 @@ void Scene::properties(Properties& props) {
             "vertices uploaded: {}, primitives uploaded: {}\n"
             "upload size: {}\n"
             "pretransforms cpu: {} ({} verts), gpu: {} ({} verts)\n"
-            "blas builds: {} (static: {}, dynamic: {})\n"
+            "blas builds: {} (static: {}, dynamic: {}), updates: {}\n"
             "tlas rebuilt: {} ({} instances)\n"
             "buffers allocated: {}, released: {}\n"
             "geometry data: {}, transforms: {}, tlas instances: {}",
@@ -631,7 +635,7 @@ void Scene::properties(Properties& props) {
             frame_stats.cpu_pretransforms, frame_stats.cpu_pretransform_vertices,
             frame_stats.gpu_pretransforms, frame_stats.gpu_pretransform_vertices,
             frame_stats.blas_builds, frame_stats.blas_builds_static,
-            frame_stats.blas_builds_dynamic, frame_stats.tlas_rebuilt,
+            frame_stats.blas_builds_dynamic, frame_stats.blas_updates, frame_stats.tlas_rebuilt,
             frame_stats.tlas_instance_count, frame_stats.buffers_allocated,
             frame_stats.buffers_released, format_size(frame_stats.geometry_data_bytes),
             format_size(frame_stats.transform_data_bytes),
@@ -727,11 +731,20 @@ void Scene::compute_mesh_groups() {
         group.meshes.insert(mesh_id);
     }
 
-    // 2. Now go over the groups and try to find previous BLASs for the groups to prevent
-    // (re)builds.
+    // 2. Compute build flags and try to find previous BLASs to prevent (re)builds.
     for (MeshGroupID group_id = 0; group_id < mesh_groups.size(); group_id++) {
         MeshGroup& group = mesh_groups[group_id];
         assert(!group.meshes.empty());
+
+        const bool static_geometry = !group.has_morphed_mesh && !group.has_animated_node;
+        if (static_geometry) {
+            group.blas_build_flags = vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace;
+        } else if (!group.has_variable_topology_mesh) {
+            group.blas_build_flags = vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace |
+                                     vk::BuildAccelerationStructureFlagBitsKHR::eAllowUpdate;
+        } else {
+            group.blas_build_flags = vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastBuild;
+        }
 
         // We can check the first mesh only, since if thats not in the old group we cant reuse the
         // group / BLAS anyway.
@@ -1176,12 +1189,11 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
 
 void Scene::build_blas(const CommandBufferHandle& cmd) {
     MERIAN_PROFILE_SCOPE_GPU(cmd, "Scene::build_blas");
-    //     if (mesh_groups.empty())
-    //         return;
 
     blas_geometries.assign(mesh_groups.size(), {});
 
     bool did_build_static = false;
+    std::vector<MeshGroupID> update_eligible;
 
     for (MeshGroupID group_id = 0; group_id < mesh_groups.size(); group_id++) {
         MeshGroup& group = mesh_groups[group_id];
@@ -1218,32 +1230,36 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
             blas_geometry.ranges.push_back(range);
         }
 
-        const bool static_geometry = !group.has_morphed_mesh && !group.has_animated_node;
-        vk::BuildAccelerationStructureFlagsKHR flags;
-        if (static_geometry) {
-            did_build_static = true;
-            flags |= vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace;
-        } else {
-            flags |= vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastBuild;
+        const bool can_update =
+            group.blas &&
+            (group.blas_build_flags & vk::BuildAccelerationStructureFlagBitsKHR::eAllowUpdate);
+
+        if (can_update) {
+            update_eligible.push_back(group_id);
+            continue;
         }
 
+        const bool static_geometry = !group.has_morphed_mesh && !group.has_animated_node;
+        if (static_geometry)
+            did_build_static = true;
+
         if (!group.cached_blas_size_info) {
-            group.cached_blas_size_info =
-                as_builder.get_size_info(blas_geometry.geometries, blas_geometry.ranges, flags);
+            group.cached_blas_size_info = as_builder.get_size_info(
+                blas_geometry.geometries, blas_geometry.ranges, group.blas_build_flags);
         }
         const auto& size_info = *group.cached_blas_size_info;
 
         if (!group.blas || group.blas->get_size() < size_info.accelerationStructureSize) {
-            // cannot reuse and needs to be allcated
             group.blas = allocator->create_acceleration_structure(
                 vk::AccelerationStructureTypeKHR::eBottomLevel, size_info,
                 fmt::format("Scene::blas[{}]", group_id));
         }
 
         as_builder.queue_build(blas_geometry.geometries, blas_geometry.ranges, group.blas,
-                               size_info, flags);
+                               size_info, group.blas_build_flags);
         group.blas_dirty = false;
         group.blas_last_built_frame = current_frame;
+        group.blas_last_updated_frame = current_frame;
         frame_stats.blas_builds++;
         if (static_geometry)
             frame_stats.blas_builds_static++;
@@ -1251,10 +1267,55 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
             frame_stats.blas_builds_dynamic++;
     }
 
+    // Partial rebuild for update-eligible groups (morphed, fixed topology, existing BLAS)
+    if (!update_eligible.empty()) {
+        const uint32_t eligible_count = static_cast<uint32_t>(update_eligible.size());
+        const uint32_t rebuild_count =
+            static_cast<uint32_t>(std::ceil(eligible_count * blas_rebuild_fraction));
+
+        if (rebuild_count < eligible_count) {
+            std::sort(update_eligible.begin(), update_eligible.end(),
+                      [&](MeshGroupID a, MeshGroupID b) {
+                          return mesh_groups[a].blas_last_built_frame <
+                                 mesh_groups[b].blas_last_built_frame;
+                      });
+        }
+
+        for (uint32_t i = 0; i < eligible_count; i++) {
+            const MeshGroupID group_id = update_eligible[i];
+            MeshGroup& group = mesh_groups[group_id];
+            auto& blas_geometry = blas_geometries[group_id];
+
+            if (!group.cached_blas_size_info) {
+                group.cached_blas_size_info = as_builder.get_size_info(
+                    blas_geometry.geometries, blas_geometry.ranges, group.blas_build_flags);
+            }
+            const auto& size_info = *group.cached_blas_size_info;
+
+            if (i < rebuild_count) {
+                if (group.blas->get_size() < size_info.accelerationStructureSize) {
+                    group.blas = allocator->create_acceleration_structure(
+                        vk::AccelerationStructureTypeKHR::eBottomLevel, size_info,
+                        fmt::format("Scene::blas[{}]", group_id));
+                }
+                as_builder.queue_build(blas_geometry.geometries, blas_geometry.ranges, group.blas,
+                                       size_info, group.blas_build_flags);
+                group.blas_last_built_frame = current_frame;
+                frame_stats.blas_builds++;
+                frame_stats.blas_builds_dynamic++;
+            } else {
+                as_builder.queue_update(blas_geometry.geometries, blas_geometry.ranges, group.blas,
+                                        size_info, group.blas_build_flags);
+                frame_stats.blas_updates++;
+            }
+            group.blas_dirty = false;
+            group.blas_last_updated_frame = current_frame;
+        }
+    }
+
     as_builder.get_cmds_blas(cmd, as_scratch_buffer);
 
     if (did_build_static) {
-        // release a probably large scratch buffer
         as_scratch_buffer.reset();
     }
 }

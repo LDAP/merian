@@ -302,9 +302,11 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
 
         // ----------------
         AccelerationStructureHandle blas;
+        vk::BuildAccelerationStructureFlagsKHR blas_build_flags{};
         // a mesh changed (new mesh in group -> not the same group, never true)
         bool blas_dirty = false;
         uint32_t blas_last_built_frame = 0;
+        uint32_t blas_last_updated_frame = 0;
         std::optional<vk::AccelerationStructureBuildSizesInfoKHR> cached_blas_size_info;
         // ----------------
 
@@ -612,6 +614,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     FreeList<NodeID> node_ids;
     std::vector<std::optional<SceneNode>> scene_graph; // sized to node_ids.size()
     bool pretransform_animated = false;
+    float blas_rebuild_fraction = 0.33f;
     uint32_t current_frame = 0;
 
     struct FrameStats {
@@ -631,6 +634,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         uint32_t blas_builds = 0;
         uint32_t blas_builds_static = 0;
         uint32_t blas_builds_dynamic = 0;
+        uint32_t blas_updates = 0;
 
         bool tlas_rebuilt = false;
         uint32_t tlas_instance_count = 0;
