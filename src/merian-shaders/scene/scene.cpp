@@ -2,15 +2,14 @@
 
 #include "merian/shader/entry_point.hpp"
 #include "merian/shader/slang_program.hpp"
-#include "merian/utils/normal_encoding.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 #include "merian/vk/utils/math.hpp"
 
-#include "pretransform_prev_vertex.slang.spv.h"
-#include "pretransform_vertex.slang.spv.h"
+#include "transform_prev_vertex.slang.spv.h"
+#include "transform_vertex.slang.spv.h"
 
 #include <algorithm>
 #include <cassert>
@@ -20,44 +19,6 @@
 #include <unordered_map>
 
 namespace merian {
-
-namespace {
-
-uint32_t pack_tangent(const float3 tangent_dir, const float sign) {
-    const uint32_t enc = encode_normal(tangent_dir);
-    return (enc & ~1u) | (sign < 0.f ? 1u : 0u);
-}
-
-} // namespace
-
-// ---------------------------------------------------------------------------
-// Mesh
-// ---------------------------------------------------------------------------
-
-namespace {
-
-// HostPacked pretransform: unpack, transform, repack a single vertex.
-PackedVertexData
-pretransform_packed_vertex(const PackedVertexData& src, const float4x4& m, const float4x4& m_it) {
-    const float3 normal = decode_normal(src.encoded_normal);
-    const float3 t_dir = decode_normal(src.encoded_tangent & ~1u);
-    const float t_sign = (src.encoded_tangent & 1u) ? -1.f : 1.f;
-
-    PackedVertexData v;
-    v.position = mul(m, float4(src.position, 1.f));
-    v.encoded_normal = encode_normal(normalize(float3(mul(m_it, float4(normal, 0.f)))));
-    v.uv = src.uv;
-    const float3 tw = normalize(float3(mul(m_it, float4(t_dir, 0.f))));
-    v.encoded_tangent = pack_tangent(tw, t_sign);
-    return v;
-}
-
-PackedPrevVertexData pretransform_packed_prev_vertex(const PackedPrevVertexData& src,
-                                                     const float4x4& m) {
-    return PackedPrevVertexData{.position = mul(m, float4(src.position, 1.f))};
-}
-
-} // namespace
 
 // ---------------------------------------------------------------------------
 // Constructor
@@ -70,7 +31,12 @@ Scene::Scene(const ShaderCompileContextHandle& compile_context,
              const MaterialSystemHandle& material_system)
     : compile_context(compile_context), context(context), allocator(allocator),
       obj_allocator(obj_allocator), as_builder(context, allocator),
-      material_system(material_system), thread_pool(std::make_shared<ThreadPool>()) {
+      material_system(material_system), thread_pool(std::make_shared<ThreadPool>()),
+      mesh_staging(std::make_shared<StagingMemoryManager>(
+          allocator->get_memory_allocator(),
+          vk::DeviceSize(8) * 1024 * 1024,
+          vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eStorageBuffer |
+              vk::BufferUsageFlagBits::eShaderDeviceAddress)) {
 
     assert(context->get_device()
                ->get_enabled_features()
@@ -331,101 +297,95 @@ void Scene::set_active_camera(const uint32_t index) {
 }
 
 // ---------------------------------------------------------------------------
-// GPU pretransform
+// Batched GPU transform
 // ---------------------------------------------------------------------------
 
 namespace {
 
-struct PretransformVertexPushConstant {
-    float4x4 transform;
-    float4x4 inverse_transposed;
-    uint32_t vertex_count;
-};
-
-struct PretransformPrevVertexPushConstant {
-    float4x4 transform;
-    uint32_t vertex_count;
-};
-
-constexpr uint32_t PRETRANSFORM_LOCAL_SIZE_X = 64;
+constexpr uint32_t TRANSFORM_LOCAL_SIZE_X = 256;
 
 } // namespace
 
-void Scene::ensure_pretransform_pipelines() {
-    if (pretransform_vertex_pipeline && pretransform_prev_vertex_pipeline) {
+void Scene::ensure_transform_pipelines() {
+    if (transform_vertex_pipeline && transform_prev_vertex_pipeline)
         return;
-    }
 
-    pretransform_descriptor_layout =
+    transform_descriptor_layout =
         DescriptorSetLayoutBuilder()
-            .add_binding_storage_buffer(1, vk::ShaderStageFlagBits::eCompute)
             .add_binding_storage_buffer(1, vk::ShaderStageFlagBits::eCompute)
             .build_push_descriptor_layout(context);
 
-    auto vertex_module = EntryPoint::create(context, merian_pretransform_vertex_slang_spv(),
-                                            merian_pretransform_vertex_slang_spv_size(), "main",
+    auto vertex_module = EntryPoint::create(context, merian_transform_vertex_slang_spv(),
+                                            merian_transform_vertex_slang_spv_size(), "main",
                                             vk::ShaderStageFlagBits::eCompute);
-    auto prev_module = EntryPoint::create(context, merian_pretransform_prev_vertex_slang_spv(),
-                                          merian_pretransform_prev_vertex_slang_spv_size(), "main",
+    auto prev_module = EntryPoint::create(context, merian_transform_prev_vertex_slang_spv(),
+                                          merian_transform_prev_vertex_slang_spv_size(), "main",
                                           vk::ShaderStageFlagBits::eCompute);
 
-    auto vertex_layout =
-        PipelineLayoutBuilder(context)
-            .add_descriptor_set_layout(pretransform_descriptor_layout)
-            .add_push_constant<PretransformVertexPushConstant>(vk::ShaderStageFlagBits::eCompute)
-            .build_pipeline_layout();
-    auto prev_layout = PipelineLayoutBuilder(context)
-                           .add_descriptor_set_layout(pretransform_descriptor_layout)
-                           .add_push_constant<PretransformPrevVertexPushConstant>(
-                               vk::ShaderStageFlagBits::eCompute)
-                           .build_pipeline_layout();
+    const auto layout = PipelineLayoutBuilder(context)
+                            .add_descriptor_set_layout(transform_descriptor_layout)
+                            .build_pipeline_layout();
 
     auto spec_builder = SpecializationInfoBuilder();
-    spec_builder.add_entry(PRETRANSFORM_LOCAL_SIZE_X);
-    SpecializationInfoHandle spec = spec_builder.build();
+    spec_builder.add_entry(TRANSFORM_LOCAL_SIZE_X);
+    const SpecializationInfoHandle spec = spec_builder.build();
 
-    pretransform_vertex_pipeline = ComputePipeline::create(vertex_layout, vertex_module, spec);
-    pretransform_prev_vertex_pipeline = ComputePipeline::create(prev_layout, prev_module, spec);
+    transform_vertex_pipeline = ComputePipeline::create(layout, vertex_module, spec);
+    transform_prev_vertex_pipeline = ComputePipeline::create(layout, prev_module, spec);
 }
 
-void Scene::pretransform_vertices_gpu(const CommandBufferHandle& cmd,
-                                      const BufferHandle& src,
-                                      const BufferHandle& dst,
-                                      const float4x4& transform,
-                                      const float4x4& inverse_transposed,
-                                      const uint32_t vertex_count,
-                                      const vk::DeviceSize src_offset) {
-    ensure_pretransform_pipelines();
+void Scene::stage_transform_jobs(const CommandBufferHandle& cmd) {
+    const auto staging = allocator->get_staging();
+    const auto job_buf_usage =
+        vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst;
 
-    PretransformVertexPushConstant pc{};
-    pc.transform = transform;
-    pc.inverse_transposed = inverse_transposed;
-    pc.vertex_count = vertex_count;
+    const auto ensure_job_buf = [&](BufferHandle& buf, vk::DeviceSize size, const char* name) {
+        if (!buf || buf->get_size() < size) {
+            if (buf)
+                cmd->keep_until_pool_reset(std::move(buf));
+            buf = allocator->create_buffer(size, job_buf_usage, MemoryMappingType::NONE, name);
+            frame_stats.buffers_allocated++;
+        }
+    };
 
-    cmd->bind(pretransform_vertex_pipeline);
-    cmd->push_descriptor_set(pretransform_vertex_pipeline, src->get_descriptor_info(src_offset),
-                             dst->get_descriptor_info());
-    cmd->push_constant(pretransform_vertex_pipeline, pc);
-    cmd->dispatch((vertex_count + PRETRANSFORM_LOCAL_SIZE_X - 1) / PRETRANSFORM_LOCAL_SIZE_X, 1, 1);
+    if (!vertex_jobs.empty()) {
+        const vk::DeviceSize size = vertex_jobs.size() * sizeof(TransformVertexJob);
+        ensure_job_buf(transform_vertex_job_buf, size, "Scene::transform_vertex_jobs");
+        staging->cmd_to_device(cmd, transform_vertex_job_buf, vertex_jobs.data(), 0, size);
+        frame_stats.gpu_transform_buffer_bytes += size;
+    }
+    if (!prev_vertex_jobs.empty()) {
+        const vk::DeviceSize size = prev_vertex_jobs.size() * sizeof(TransformPrevVertexJob);
+        ensure_job_buf(transform_prev_vertex_job_buf, size, "Scene::transform_prev_vertex_jobs");
+        staging->cmd_to_device(cmd, transform_prev_vertex_job_buf, prev_vertex_jobs.data(), 0, size);
+        frame_stats.gpu_transform_buffer_bytes += size;
+    }
 }
 
-void Scene::pretransform_prev_vertices_gpu(const CommandBufferHandle& cmd,
-                                           const BufferHandle& src,
-                                           const BufferHandle& dst,
-                                           const float4x4& transform,
-                                           const uint32_t vertex_count,
-                                           const vk::DeviceSize src_offset) {
-    ensure_pretransform_pipelines();
+void Scene::dispatch_batched_transforms(const CommandBufferHandle& cmd) {
+    ensure_transform_pipelines();
 
-    PretransformPrevVertexPushConstant pc{};
-    pc.transform = transform;
-    pc.vertex_count = vertex_count;
+    if (!vertex_jobs.empty()) {
+        MERIAN_PROFILE_SCOPE_GPU(cmd, "Scene::transform_vertices");
 
-    cmd->bind(pretransform_prev_vertex_pipeline);
-    cmd->push_descriptor_set(pretransform_prev_vertex_pipeline,
-                             src->get_descriptor_info(src_offset), dst->get_descriptor_info());
-    cmd->push_constant(pretransform_prev_vertex_pipeline, pc);
-    cmd->dispatch((vertex_count + PRETRANSFORM_LOCAL_SIZE_X - 1) / PRETRANSFORM_LOCAL_SIZE_X, 1, 1);
+        const uint32_t wgx =
+            (max_vertex_count_in_jobs + TRANSFORM_LOCAL_SIZE_X - 1) / TRANSFORM_LOCAL_SIZE_X;
+        cmd->bind(transform_vertex_pipeline);
+        cmd->push_descriptor_set(transform_vertex_pipeline,
+                                 transform_vertex_job_buf->get_descriptor_info());
+        cmd->dispatch(wgx, static_cast<uint32_t>(vertex_jobs.size()), 1);
+    }
+
+    if (!prev_vertex_jobs.empty()) {
+        MERIAN_PROFILE_SCOPE_GPU(cmd, "Scene::transform_prev_vertices");
+
+        const uint32_t wgx =
+            (max_prev_vertex_count_in_jobs + TRANSFORM_LOCAL_SIZE_X - 1) / TRANSFORM_LOCAL_SIZE_X;
+        cmd->bind(transform_prev_vertex_pipeline);
+        cmd->push_descriptor_set(transform_prev_vertex_pipeline,
+                                 transform_prev_vertex_job_buf->get_descriptor_info());
+        cmd->dispatch(wgx, static_cast<uint32_t>(prev_vertex_jobs.size()), 1);
+    }
 }
 
 void Scene::set_pretransform_animated(bool value) {
@@ -623,7 +583,7 @@ void Scene::properties(Properties& props) {
             "host_unpacked: {})\n"
             "vertices uploaded: {}, primitives uploaded: {}\n"
             "upload size: {}\n"
-            "pretransforms cpu: {} ({} verts), gpu: {} ({} verts)\n"
+            "gpu vertex transforms: {} ({} verts), prev: {} ({} verts), job buffers: {}\n"
             "blas builds: {} (static: {}, dynamic: {}), updates: {}\n"
             "tlas rebuilt: {} ({} instances)\n"
             "buffers allocated: {}, released: {}\n"
@@ -632,12 +592,13 @@ void Scene::properties(Properties& props) {
             frame_stats.meshes_uploaded_device_staged, frame_stats.meshes_uploaded_host_packed,
             frame_stats.meshes_uploaded_host_unpacked, frame_stats.vertices_uploaded,
             frame_stats.indices_uploaded, format_size(frame_stats.upload_bytes),
-            frame_stats.cpu_pretransforms, frame_stats.cpu_pretransform_vertices,
-            frame_stats.gpu_pretransforms, frame_stats.gpu_pretransform_vertices,
-            frame_stats.blas_builds, frame_stats.blas_builds_static,
-            frame_stats.blas_builds_dynamic, frame_stats.blas_updates, frame_stats.tlas_rebuilt,
-            frame_stats.tlas_instance_count, frame_stats.buffers_allocated,
-            frame_stats.buffers_released, format_size(frame_stats.geometry_data_bytes),
+            frame_stats.gpu_vertex_transforms, frame_stats.gpu_vertex_transform_vertices,
+            frame_stats.gpu_prev_vertex_transforms, frame_stats.gpu_prev_vertex_transform_vertices,
+            format_size(frame_stats.gpu_transform_buffer_bytes), frame_stats.blas_builds,
+            frame_stats.blas_builds_static, frame_stats.blas_builds_dynamic,
+            frame_stats.blas_updates, frame_stats.tlas_rebuilt, frame_stats.tlas_instance_count,
+            frame_stats.buffers_allocated, frame_stats.buffers_released,
+            format_size(frame_stats.geometry_data_bytes),
             format_size(frame_stats.transform_data_bytes),
             format_size(frame_stats.tlas_instance_data_bytes));
 
@@ -863,11 +824,15 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
                 Mesh& mesh = *meshes[mesh_id];
                 assert(vertex_buffers[mesh_id] && index_buffers[mesh_id]);
 
+                const bool needs_prev =
+                    mesh.is_morphed() || mesh.has_variable_topology() ||
+                    (pretransform && scene_graph[node_id]->is_animated);
+
                 GeometryData gd;
                 gd.material_id = mesh.material_id;
                 gd.vertices = vertex_buffers[mesh_id]->get_device_address();
                 gd.indices = index_buffers[mesh_id]->get_device_address();
-                assert(!mesh.is_morphed() || prev_vertex_buffers[mesh_id]);
+                assert(!needs_prev || prev_vertex_buffers[mesh_id]);
                 gd.prev_vertices = prev_vertex_buffers[mesh_id]
                                        ? prev_vertex_buffers[mesh_id]->get_device_address()
                                        : vk::DeviceAddress{0};
@@ -875,7 +840,7 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
                 if (pretransform || transform_is_identity) {
                     gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::Pretransformed);
                 }
-                if (mesh.is_morphed()) {
+                if (needs_prev) {
                     gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::HasPrevVertices);
                 }
                 if (mesh.is_front_counterclockwise()) {
@@ -911,11 +876,14 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
 void Scene::upload_meshes(const CommandBufferHandle& cmd) {
     MERIAN_PROFILE_SCOPE_GPU(cmd, "Scene::upload_meshes");
 
-    // For now we have a index and vertex buffer for each mesh,
-    // we could combine them per group or into single buffers in the future.
     index_buffers.resize(mesh_ids.size());
     vertex_buffers.resize(mesh_ids.size());
     prev_vertex_buffers.resize(mesh_ids.size());
+
+    vertex_jobs.clear();
+    prev_vertex_jobs.clear();
+    max_vertex_count_in_jobs = 0;
+    max_prev_vertex_count_in_jobs = 0;
 
     const auto staging = allocator->get_staging();
 
@@ -923,16 +891,43 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                               vk::BufferUsageFlagBits::eTransferDst |
                               vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR |
                               vk::BufferUsageFlagBits::eShaderDeviceAddress;
-    const auto ensure_buffer = [&](BufferHandle& slot, vk::DeviceSize size,
-                                   const std::string& name) {
+    const auto ensure_buffer = [&](BufferHandle& slot, vk::DeviceSize size, auto&& fmt_str,
+                                   auto&&... args) {
         if (!slot || slot->get_size() < size) {
-            if (slot) {
-                // make sure we keep the buffer until it is not inflight.
+            if (slot)
                 cmd->keep_until_pool_reset(std::move(slot));
-            }
-            slot = allocator->create_buffer(size, buffer_usage, MemoryMappingType::NONE, name);
+            slot = allocator->create_buffer(
+                size, buffer_usage, MemoryMappingType::NONE,
+                fmt::format(fmt::runtime(fmt_str), std::forward<decltype(args)>(args)...));
             frame_stats.buffers_allocated++;
         }
+    };
+
+    // Stage Host* data into mesh_staging via thread pool. Returns the device address
+    // and keeps the block buffer alive for this submit. The transform shader reads
+    // directly from this staging block via PSB pointer — no vkCmdCopyBuffer.
+    const auto stage_host_data = [&](auto&& src, vk::DeviceSize size) -> vk::DeviceAddress {
+        BufferHandle staging_buf;
+        vk::DeviceSize offset;
+        const auto alloc = mesh_staging->get_upload_staging_space(size, staging_buf, offset);
+        const vk::DeviceAddress addr = staging_buf->get_device_address() + offset;
+        using S = std::decay_t<decltype(src)>;
+        thread_pool->submit<void>([alloc, src, size]() {
+            void* m = alloc->map();
+            if constexpr (std::is_same_v<S, Mesh::HostPacked<PackedVertexData>> ||
+                          std::is_same_v<S, Mesh::HostPacked<PackedPrevVertexData>> ||
+                          std::is_same_v<S, Mesh::HostPacked<void>>)
+                std::memcpy(m, src.data, size);
+            else if constexpr (std::is_same_v<S, Mesh::HostVertices>)
+                src->write(static_cast<PackedVertexData*>(m));
+            else if constexpr (std::is_same_v<S, Mesh::HostPrevVertices>)
+                src->write(static_cast<PackedPrevVertexData*>(m));
+            else
+                static_assert(std::is_same_v<S, Mesh::HostIndices>);
+            alloc->unmap();
+        });
+        cmd->keep_until_pool_reset(std::move(staging_buf));
+        return addr;
     };
 
     for (MeshGroupID group_id = 0; group_id < mesh_groups.size(); group_id++) {
@@ -954,9 +949,8 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                 cmd, fmt::format("Scene::upload_meshes::mesh[{}]", mesh_id));
 
             group.blas_dirty = true;
-            if (mesh.has_variable_topology()) {
+            if (mesh.has_variable_topology())
                 group.cached_blas_size_info.reset();
-            }
 
             assert(!mesh.instances.empty());
             assert(mesh_id < vertex_buffers.size());
@@ -973,217 +967,165 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
             frame_stats.vertices_uploaded += vertex_count;
             frame_stats.indices_uploaded += primitive_count;
             frame_stats.upload_bytes += vb_size + ib_size;
-            if (mesh.is_morphed())
-                frame_stats.upload_bytes += prev_vb_size;
 
             const NodeID node_id = *mesh.instances.begin();
-            const float4x4& global_transform = get_global_transform(node_id);
-            const float4x4& global_inverse_transposed_transform =
-                get_global_inverse_transposed_transform(node_id);
-
-            const bool pretransform_mesh = pretransform_group && global_transform != identity();
-
-            std::visit(
-                [&](auto&& src) {
-                    using T = std::decay_t<decltype(src)>;
-                    if constexpr (std::is_same_v<T, Mesh::DeviceLocal>) {
-                        frame_stats.meshes_uploaded_device_local++;
-                        if (pretransform_mesh) {
-                            frame_stats.gpu_pretransforms++;
-                            frame_stats.gpu_pretransform_vertices += vertex_count;
-                        }
-                    } else if constexpr (std::is_same_v<T, Mesh::DeviceStaged>) {
-                        frame_stats.meshes_uploaded_device_staged++;
-                        if (pretransform_mesh) {
-                            frame_stats.gpu_pretransforms++;
-                            frame_stats.gpu_pretransform_vertices += vertex_count;
-                        }
-                    } else if constexpr (std::is_same_v<T, Mesh::HostPacked<PackedVertexData>>) {
-                        frame_stats.meshes_uploaded_host_packed++;
-                        if (pretransform_mesh) {
-                            frame_stats.cpu_pretransforms++;
-                            frame_stats.cpu_pretransform_vertices += vertex_count;
-                        }
-                    } else {
-                        static_assert(std::is_same_v<T, Mesh::HostVertices>);
-                        frame_stats.meshes_uploaded_host_unpacked++;
-                        if (pretransform_mesh) {
-                            frame_stats.cpu_pretransforms++;
-                            frame_stats.cpu_pretransform_vertices += vertex_count;
-                        }
-                    }
-                },
-                mesh.get_vertices());
-
-            // Dispatches upload for a mesh data variant.
-            // cpu_write:        (src, void*) -> writes raw host data
-            // cpu_pretransform: (src, void*) -> writes pretransformed host data (nullptr to skip)
-            // gpu_pretransform: (BufferHandle src, BufferHandle dst, DeviceSize src_offset) ->
-            // compute pretransform (nullptr to skip)
-            const auto upload = [&](auto&& variant, BufferHandle& dst, vk::DeviceSize size,
-                                    const std::string& label, auto&& cpu_write,
-                                    auto&& cpu_pretransform, auto&& gpu_pretransform) {
-                constexpr bool has_cpu_pt =
-                    !std::is_null_pointer_v<std::decay_t<decltype(cpu_pretransform)>>;
-                constexpr bool has_gpu_pt =
-                    !std::is_null_pointer_v<std::decay_t<decltype(gpu_pretransform)>>;
-
-                std::visit(
-                    [&](auto&& src) {
-                        using T = std::decay_t<decltype(src)>;
-                        if constexpr (std::is_same_v<T, std::monostate>) {
-                            if (dst)
-                                cmd->keep_until_pool_reset(std::move(dst));
-                        } else if constexpr (std::is_same_v<T, Mesh::DeviceLocal>) {
-                            if constexpr (has_gpu_pt) {
-                                if (pretransform_mesh) {
-                                    if (dst && dst == src.data)
-                                        dst.reset();
-                                    ensure_buffer(dst, size, label);
-                                    gpu_pretransform(src.data, dst, 0);
-                                    return;
-                                }
-                            }
-                            if (dst && dst != src.data)
-                                cmd->keep_until_pool_reset(std::move(dst));
-                            dst = src.data;
-                        } else if constexpr (std::is_same_v<T, Mesh::DeviceStaged>) {
-                            ensure_buffer(dst, size, label);
-                            if constexpr (has_gpu_pt) {
-                                if (pretransform_mesh) {
-                                    gpu_pretransform(src.data, dst, src.offset);
-                                    return;
-                                }
-                            }
-                            cmd->copy(src.data, dst, {vk::BufferCopy{src.offset, 0, size}});
-                        } else {
-                            ensure_buffer(dst, size, label);
-                            const MemoryAllocationHandle alloc = staging->cmd_to_device(cmd, dst);
-                            std::function<void(void*)> fill;
-                            if constexpr (has_cpu_pt) {
-                                if (pretransform_mesh)
-                                    fill = [src, cpu_pretransform](void* m) {
-                                        cpu_pretransform(src, m);
-                                    };
-                                else
-                                    fill = [src, cpu_write](void* m) { cpu_write(src, m); };
-                            } else {
-                                fill = [src, cpu_write](void* m) { cpu_write(src, m); };
-                            }
-                            thread_pool->submit<void>([alloc, fill = std::move(fill)]() {
-                                void* mapped = alloc->map();
-                                fill(mapped);
-                                alloc->unmap();
-                            });
-                        }
-                    },
-                    std::forward<decltype(variant)>(variant));
-            };
+            const float4x4& M = get_global_transform(node_id);
+            const float4x4& M_it = get_global_inverse_transposed_transform(node_id);
+            const bool pretransform_mesh = pretransform_group && M != identity();
+            const bool synth_prev = pretransform_mesh && !mesh.is_morphed() &&
+                                    !mesh.has_variable_topology() &&
+                                    scene_graph[node_id]->is_animated;
 
             auto& vb = vertex_buffers[mesh_id];
             auto& prev_vb = prev_vertex_buffers[mesh_id];
             auto& ib = index_buffers[mesh_id];
 
             if (mesh.vertices_dirty) {
-                upload(
-                    mesh.get_vertices(), vb, vb_size,
-                    fmt::format("Scene::vb[{}]: name={}", mesh_id, mesh.name),
-                    [vb_size](auto&& src, void* mapped) {
-                        auto* dst = static_cast<PackedVertexData*>(mapped);
-                        using S = std::decay_t<decltype(src)>;
-                        if constexpr (std::is_same_v<S, Mesh::HostPacked<PackedVertexData>>)
-                            std::memcpy(dst, src.data, vb_size);
-                        else {
-                            static_assert(std::is_same_v<S, Mesh::HostVertices>);
-                            src->write(dst);
-                        }
-                    },
-                    [vertex_count, global_transform,
-                     global_inverse_transposed_transform](auto&& src, void* mapped) {
-                        auto* dst = static_cast<PackedVertexData*>(mapped);
-                        using S = std::decay_t<decltype(src)>;
-                        if constexpr (std::is_same_v<S, Mesh::HostPacked<PackedVertexData>>) {
-                            for (uint32_t v = 0; v < vertex_count; v++)
-                                dst[v] =
-                                    pretransform_packed_vertex(src.data[v], global_transform,
-                                                               global_inverse_transposed_transform);
-                        } else {
-                            static_assert(std::is_same_v<S, Mesh::HostVertices>);
-                            src->write_pretransformed(global_transform,
-                                                      global_inverse_transposed_transform, dst);
-                        }
-                    },
-                    [&](const BufferHandle& src_buf, const BufferHandle& dst_buf,
-                        vk::DeviceSize src_offset) {
-                        pretransform_vertices_gpu(cmd, src_buf, dst_buf, global_transform,
-                                                  global_inverse_transposed_transform, vertex_count,
-                                                  src_offset);
-                    });
+                // ---- Vertices: source PSB + decide alias-or-own vb. ----
+                vk::DeviceAddress vertex_src_addr = 0;
+                bool needs_vertex_job = true;
 
-                const float4x4 prev_transform =
-                    scene_graph[node_id]->prev_global_transform.value_or(global_transform);
-                const float4x4 prev_inverse_transposed =
-                    scene_graph[node_id]->prev_global_inverse_transposed.value_or(
-                        global_inverse_transposed_transform);
-
-                upload(
-                    mesh.get_prev_vertices(), prev_vb, prev_vb_size,
-                    fmt::format("Scene::prev_vb[{}]: name={}", mesh_id, mesh.name),
-                    [prev_vb_size](auto&& src, void* mapped) {
-                        auto* dst = static_cast<PackedPrevVertexData*>(mapped);
-                        using S = std::decay_t<decltype(src)>;
-                        if constexpr (std::is_same_v<S, Mesh::HostPacked<PackedPrevVertexData>>)
-                            std::memcpy(dst, src.data, prev_vb_size);
-                        else {
-                            static_assert(std::is_same_v<S, Mesh::HostPrevVertices>);
-                            src->write(dst);
-                        }
-                    },
-                    [vertex_count, prev_transform, prev_inverse_transposed](auto&& src,
-                                                                            void* mapped) {
-                        auto* dst = static_cast<PackedPrevVertexData*>(mapped);
-                        using S = std::decay_t<decltype(src)>;
-                        if constexpr (std::is_same_v<S, Mesh::HostPacked<PackedPrevVertexData>>) {
-                            for (uint32_t v = 0; v < vertex_count; v++)
-                                dst[v] =
-                                    pretransform_packed_prev_vertex(src.data[v], prev_transform);
+                std::visit(
+                    [&](auto&& src) {
+                        using T = std::decay_t<decltype(src)>;
+                        if constexpr (std::is_same_v<T, Mesh::DeviceLocal>) {
+                            frame_stats.meshes_uploaded_device_local++;
+                            vertex_src_addr = src.data->get_device_address();
+                            if (pretransform_mesh) {
+                                if (vb && vb == src.data)
+                                    vb.reset();
+                                ensure_buffer(vb, vb_size, "Scene::vb[{}]", mesh_id);
+                            } else {
+                                if (vb && vb != src.data)
+                                    cmd->keep_until_pool_reset(std::move(vb));
+                                vb = src.data;
+                                needs_vertex_job = false;
+                            }
+                        } else if constexpr (std::is_same_v<T, Mesh::DeviceStaged>) {
+                            frame_stats.meshes_uploaded_device_staged++;
+                            vertex_src_addr = src.data->get_device_address() + src.offset;
+                            ensure_buffer(vb, vb_size, "Scene::vb[{}]", mesh_id);
+                        } else if constexpr (std::is_same_v<T,
+                                                            Mesh::HostPacked<PackedVertexData>>) {
+                            frame_stats.meshes_uploaded_host_packed++;
+                            vertex_src_addr = stage_host_data(src, vb_size);
+                            ensure_buffer(vb, vb_size, "Scene::vb[{}]", mesh_id);
                         } else {
-                            static_assert(std::is_same_v<S, Mesh::HostPrevVertices>);
-                            src->write_pretransformed(prev_transform, prev_inverse_transposed, dst);
+                            static_assert(std::is_same_v<T, Mesh::HostVertices>);
+                            frame_stats.meshes_uploaded_host_unpacked++;
+                            vertex_src_addr = stage_host_data(src, vb_size);
+                            ensure_buffer(vb, vb_size, "Scene::vb[{}]", mesh_id);
                         }
                     },
-                    [&](const BufferHandle& src_buf, const BufferHandle& dst_buf,
-                        vk::DeviceSize src_offset) {
-                        pretransform_prev_vertices_gpu(cmd, src_buf, dst_buf, prev_transform,
-                                                       vertex_count, src_offset);
+                    mesh.get_vertices());
+
+                // ---- Prev-vertex policy ----
+                const bool need_prev_buffer =
+                    mesh.is_morphed() || mesh.has_variable_topology() || synth_prev;
+
+                if (!need_prev_buffer) {
+                    if (prev_vb)
+                        cmd->keep_until_pool_reset(std::move(prev_vb));
+                } else if (synth_prev) {
+                    // No upload — the vertex shader writes prev_vb itself.
+                    ensure_buffer(prev_vb, prev_vb_size, "Scene::prev_vb[{}]", mesh_id);
+                    frame_stats.upload_bytes += prev_vb_size;
+                } else {
+                    // morphed / variable-topology: upload model-space prev data + prev transform job
+                    vk::DeviceAddress prev_src_addr = 0;
+                    std::visit(
+                        [&](auto&& src) {
+                            using T = std::decay_t<decltype(src)>;
+                            if constexpr (std::is_same_v<T, std::monostate>) {
+                                // unreachable: is_morphed / has_variable_topology imply prev data
+                                assert(false);
+                            } else if constexpr (std::is_same_v<T, Mesh::DeviceLocal>) {
+                                prev_src_addr = src.data->get_device_address();
+                                ensure_buffer(prev_vb, prev_vb_size, "Scene::prev_vb[{}]", mesh_id);
+                            } else if constexpr (std::is_same_v<T, Mesh::DeviceStaged>) {
+                                prev_src_addr =
+                                    src.data->get_device_address() + src.offset;
+                                ensure_buffer(prev_vb, prev_vb_size, "Scene::prev_vb[{}]", mesh_id);
+                            } else {
+                                prev_src_addr = stage_host_data(src, prev_vb_size);
+                                ensure_buffer(prev_vb, prev_vb_size, "Scene::prev_vb[{}]", mesh_id);
+                            }
+                        },
+                        mesh.get_prev_vertices());
+
+                    const float4x4 prev_M =
+                        pretransform_mesh
+                            ? scene_graph[node_id]->prev_global_transform.value_or(M)
+                            : float4x4(identity());
+                    prev_vertex_jobs.push_back(TransformPrevVertexJob{
+                        .src = prev_src_addr,
+                        .dst = prev_vb->get_device_address(),
+                        .prev_transform = prev_M,
+                        .vertex_count = vertex_count,
+                        ._pad = {},
                     });
+                    max_prev_vertex_count_in_jobs =
+                        std::max(max_prev_vertex_count_in_jobs, vertex_count);
+                    frame_stats.gpu_prev_vertex_transforms++;
+                    frame_stats.gpu_prev_vertex_transform_vertices += vertex_count;
+                    frame_stats.upload_bytes += prev_vb_size;
+                }
+
+                // ---- Vertex transform job (identity transform = "copy only") ----
+                if (needs_vertex_job) {
+                    const float4x4 prev_M =
+                        synth_prev ? scene_graph[node_id]->prev_global_transform.value_or(M)
+                                   : float4x4(identity());
+                    vertex_jobs.push_back(TransformVertexJob{
+                        .src = vertex_src_addr,
+                        .dst = vb->get_device_address(),
+                        .prev_dst = synth_prev ? prev_vb->get_device_address() : 0,
+                        .transform = pretransform_mesh ? M : float4x4(identity()),
+                        .inverse_transposed = pretransform_mesh ? M_it : float4x4(identity()),
+                        .prev_transform = prev_M,
+                        .vertex_count = vertex_count,
+                        ._pad = {},
+                    });
+                    max_vertex_count_in_jobs =
+                        std::max(max_vertex_count_in_jobs, vertex_count);
+                    frame_stats.gpu_vertex_transforms++;
+                    frame_stats.gpu_vertex_transform_vertices += vertex_count;
+                }
 
                 mesh.vertices_dirty = false;
             }
 
+            // ---- Indices (no transform-shader involvement; rare per-frame work) ----
             if (mesh.indices_dirty) {
-                upload(
-                    mesh.get_indices(), ib, ib_size,
-                    fmt::format("Scene::ib[{}]: name={}", mesh_id, mesh.name),
-                    [ib_size](auto&& src, void* mapped) {
-                        using S = std::decay_t<decltype(src)>;
-                        if constexpr (std::is_same_v<S, Mesh::HostPacked<void>>)
-                            std::memcpy(mapped, src.data, ib_size);
-                        else {
-                            static_assert(std::is_same_v<S, Mesh::HostIndices>);
-                            src->write(mapped);
+                std::visit(
+                    [&](auto&& src) {
+                        using T = std::decay_t<decltype(src)>;
+                        if constexpr (std::is_same_v<T, Mesh::DeviceLocal>) {
+                            if (ib && ib != src.data)
+                                cmd->keep_until_pool_reset(std::move(ib));
+                            ib = src.data;
+                        } else if constexpr (std::is_same_v<T, Mesh::DeviceStaged>) {
+                            ensure_buffer(ib, ib_size, "Scene::ib[{}]", mesh_id);
+                            cmd->copy(src.data, ib, {vk::BufferCopy{src.offset, 0, ib_size}});
+                        } else if constexpr (std::is_same_v<T, Mesh::HostPacked<void>>) {
+                            ensure_buffer(ib, ib_size, "Scene::ib[{}]", mesh_id);
+                            staging->cmd_to_device(cmd, ib, src.data, 0, ib_size);
+                        } else {
+                            static_assert(std::is_same_v<T, Mesh::HostIndices>);
+                            ensure_buffer(ib, ib_size, "Scene::ib[{}]", mesh_id);
+                            const MemoryAllocationHandle alloc =
+                                staging->cmd_to_device(cmd, ib);
+                            thread_pool->submit<void>([alloc, src]() {
+                                void* m = alloc->map();
+                                src->write(m);
+                                alloc->unmap();
+                            });
                         }
                     },
-                    nullptr, nullptr);
-
+                    mesh.get_indices());
                 mesh.indices_dirty = false;
             }
         }
-    }
-
-    {
-        MERIAN_PROFILE_SCOPE("Scene::upload_meshes::wait_idle");
-        thread_pool->wait_idle();
     }
 }
 
@@ -1449,7 +1391,25 @@ void Scene::update(const CommandBufferHandle& cmd,
     // when GeometryData is written below.
     upload_meshes(cmd);
 
-    // Advance prev transforms after upload_meshes (prev vertex pretransform reads them).
+    {
+        MERIAN_PROFILE_SCOPE("Scene::update::wait_idle");
+        thread_pool->wait_idle();
+    }
+
+    if (!vertex_jobs.empty() || !prev_vertex_jobs.empty()) {
+        stage_transform_jobs(cmd);
+
+        cmd->barrier(vk::MemoryBarrier2{
+            vk::PipelineStageFlagBits2::eTransfer,
+            vk::AccessFlagBits2::eTransferWrite,
+            vk::PipelineStageFlagBits2::eComputeShader,
+            vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
+        });
+
+        dispatch_batched_transforms(cmd);
+    }
+
+    // Advance prev transforms after upload_meshes (prev-vertex jobs read them).
     for (const NodeID& nid : node_ids) {
         assert(scene_graph[nid]);
         SceneNode& n = *scene_graph[nid];

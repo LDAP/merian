@@ -105,6 +105,26 @@ struct GeometryData {
     GeometryDataFlags flags;
 };
 
+// Identity transform → "copy only" (a few wasted FMAs, no branches).
+struct TransformVertexJob {
+    VertexBufferAddress src;          // model-space input
+    VertexBufferAddress dst;          // world-space output (may equal src for in-place)
+    PrevVertexBufferAddress prev_dst; // 0 if no synthesized prev
+    float4x4 transform;
+    float4x4 inverse_transposed;
+    float4x4 prev_transform;          // unused if prev_dst == 0
+    uint32_t vertex_count;
+    uint32_t _pad[3];
+};
+
+struct TransformPrevVertexJob {
+    PrevVertexBufferAddress src;
+    PrevVertexBufferAddress dst;      // may equal src for in-place
+    float4x4 prev_transform;          // identity for "copy only"
+    uint32_t vertex_count;
+    uint32_t _pad[3];
+};
+
 #ifdef __cplusplus
 static_assert(sizeof(PackedVertexData) == 24, "PackedVertexData must match Slang scalar layout");
 static_assert(alignof(PackedVertexData) == 4, "PackedVertexData must be 4-byte aligned");

@@ -10,6 +10,7 @@
 #include "merian/utils/free_list.hpp"
 #include "merian/utils/versionable.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout.hpp"
+#include "merian/vk/memory/staging_memory_manager.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 #include "merian/vk/raytrace/as_builder.hpp"
 
@@ -118,9 +119,6 @@ class Mesh {
     template <typename T> struct HostVertexSource {
         virtual ~HostVertexSource() = default;
         virtual void write(T* dst) const = 0;
-        virtual void write_pretransformed(const float4x4& global_transform,
-                                          const float4x4& global_inverse_transposed,
-                                          T* dst) const = 0;
     };
 
     using HostVertices = HostVertexSource<PackedVertexData>*;
@@ -556,23 +554,15 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     // All meshes in a group share the same instances (transforms); one group = one BLAS.
     void compute_mesh_groups();
 
-    void ensure_pretransform_pipelines();
+    void ensure_transform_pipelines();
 
-    // GPU pretransform: read src in model space, write dst in world space. The
-    // dispatch records a memory barrier on the destination buffer.
-    void pretransform_vertices_gpu(const CommandBufferHandle& cmd,
-                                   const BufferHandle& src,
-                                   const BufferHandle& dst,
-                                   const float4x4& transform,
-                                   const float4x4& inverse_transposed,
-                                   uint32_t vertex_count,
-                                   vk::DeviceSize src_offset = 0);
-    void pretransform_prev_vertices_gpu(const CommandBufferHandle& cmd,
-                                        const BufferHandle& src,
-                                        const BufferHandle& dst,
-                                        const float4x4& transform,
-                                        uint32_t vertex_count,
-                                        vk::DeviceSize src_offset = 0);
+    // Upload accumulated TransformVertexJob / TransformPrevVertexJob arrays to their
+    // device buffers. Called before the transfer→compute barrier.
+    void stage_transform_jobs(const CommandBufferHandle& cmd);
+
+    // Bind + push descriptor + dispatch the two batched transform shaders. No transfers,
+    // no internal barrier; the two dispatches touch disjoint per-mesh buffers.
+    void dispatch_batched_transforms(const CommandBufferHandle& cmd);
 
     // this only changes if the mesh groups changed or if a transform changes (TODO: selectively
     // upload transforms)
@@ -626,10 +616,11 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         uint32_t indices_uploaded = 0;
         vk::DeviceSize upload_bytes = 0;
 
-        uint32_t cpu_pretransforms = 0;
-        uint32_t gpu_pretransforms = 0;
-        uint32_t cpu_pretransform_vertices = 0;
-        uint32_t gpu_pretransform_vertices = 0;
+        uint32_t gpu_vertex_transforms = 0;
+        uint32_t gpu_vertex_transform_vertices = 0;
+        uint32_t gpu_prev_vertex_transforms = 0;
+        uint32_t gpu_prev_vertex_transform_vertices = 0;
+        vk::DeviceSize gpu_transform_buffer_bytes = 0;
 
         uint32_t blas_builds = 0;
         uint32_t blas_builds_static = 0;
@@ -716,10 +707,21 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
 
     ThreadPoolHandle thread_pool;
 
-    // GPU pretransform pipelines (lazily initialized).
-    DescriptorSetLayoutHandle pretransform_descriptor_layout;
-    PipelineHandle pretransform_vertex_pipeline;
-    PipelineHandle pretransform_prev_vertex_pipeline;
+    // Staging dedicated to mesh data (Host* sources are read directly via PSB by the
+    // transform shaders). Block usage includes eShaderDeviceAddress; block size is
+    // intentionally small so accumulation across frames-in-flight is bounded.
+    StagingMemoryManagerHandle mesh_staging;
+
+    // Batched GPU transform pipelines (lazily initialized) and reusable device buffers.
+    DescriptorSetLayoutHandle transform_descriptor_layout;
+    PipelineHandle transform_vertex_pipeline;
+    PipelineHandle transform_prev_vertex_pipeline;
+    BufferHandle transform_vertex_job_buf;
+    BufferHandle transform_prev_vertex_job_buf;
+    std::vector<TransformVertexJob> vertex_jobs;
+    std::vector<TransformPrevVertexJob> prev_vertex_jobs;
+    uint32_t max_vertex_count_in_jobs = 0;
+    uint32_t max_prev_vertex_count_in_jobs = 0;
 
     Camera prev_active_camera;
 };

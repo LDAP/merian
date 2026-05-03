@@ -5,8 +5,8 @@ merian_shaders_src = [
 ]
 
 shaders = [
-    'scene/pretransform_vertex.slang',
-    'scene/pretransform_prev_vertex.slang',
+    'scene/transform_vertex.slang',
+    'scene/transform_prev_vertex.slang',
 ]
 foreach s : shaders
     merian_shaders_src += shader_generator.process(s)

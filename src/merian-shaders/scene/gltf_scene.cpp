@@ -116,24 +116,6 @@ class GLTFMesh : public Mesh,
         }
     }
 
-    void write_pretransformed(const float4x4& m,
-                              const float4x4& it,
-                              PackedVertexData* dst) const override {
-        for (uint32_t v = 0; v < vertex_count; v++) {
-            const float3 pos = get_position(v);
-            const float3 nrm = get_normal(v);
-            const float2 uv = get_uv(v);
-            const float4 tan = get_tangent(v);
-
-            dst[v].position = mul(m, float4(pos, 1.f));
-            dst[v].encoded_normal = encode_normal(normalize(float3(mul(it, float4(nrm, 0.f)))));
-            dst[v].uv = half2(uv.x, uv.y);
-            const float3 tw = normalize(float3(mul(it, float4(tan.x, tan.y, tan.z, 0.f))));
-            const uint32_t enc = encode_normal(tw);
-            dst[v].encoded_tangent = (enc & ~1u) | (tan.w < 0.f ? 1u : 0u);
-        }
-    }
-
     // ---- HostIndexSource ----
 
     void write(void* dst) const override {
