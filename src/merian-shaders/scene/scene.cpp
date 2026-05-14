@@ -380,7 +380,24 @@ void Scene::set_pretransform_animated(bool value) {
 
     pretransform_animated = value;
 
+    // Vertex-buffer contents (pretransformed or not) flip for single-instance dynamic meshes.
+    for (const MeshID mesh_id : mesh_ids) {
+        MeshInfo& info = mesh_infos[mesh_id];
+        if (info.is_dynamic() && info.instances.size() == 1) {
+            info.mesh->vertices_dirty = true;
+        }
+    }
+
     needs_regroup = true;
+}
+
+bool Scene::needs_prev_vertices(const MeshGroup& group, const MeshInfo& info) const {
+    const Mesh& mesh = *info.mesh;
+    if (mesh.is_morphed() || mesh.has_variable_topology())
+        return true;
+    if (!group.is_pretranformed(mesh_infos, pretransform_animated))
+        return false;
+    return scene_graph[*info.instances.begin()]->is_animated;
 }
 
 void Scene::properties_node(Properties& props, const NodeID node_id) {
@@ -855,7 +872,8 @@ void Scene::compute_mesh_groups() {
         MeshGroupID maybe_prev_group = prev_mesh_to_group[*group.meshes.begin()];
         if (maybe_prev_group != MESH_GROUP_ID_INVALID) {
             MeshGroup& prev_group = prev_mesh_groups[maybe_prev_group];
-            if (prev_group.meshes == group.meshes) {
+            if (prev_group.meshes == group.meshes &&
+                prev_group.blas_build_flags == group.blas_build_flags) {
                 group.blas = prev_group.blas;
                 group.cached_blas_size_info = prev_group.cached_blas_size_info;
                 // blas_dirty is computed later when we upload the meshes, because this method is
@@ -973,8 +991,7 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
                 Mesh& mesh = *info.mesh;
                 assert(info.vertex_buffer && (!mesh.has_indices() || info.index_buffer));
 
-                const bool needs_prev = mesh.is_morphed() || mesh.has_variable_topology() ||
-                                        (pretransform && scene_graph[node_id]->is_animated);
+                const bool needs_prev = needs_prev_vertices(group, info);
 
                 GeometryData gd;
                 gd.material_id = mesh.material_id;
@@ -1188,6 +1205,11 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                 MeshInfo& info = mesh_infos[mesh_id];
                 Mesh& mesh = *info.mesh;
 
+                const bool needs_prev = needs_prev_vertices(group, info);
+                const bool has_prev = static_cast<bool>(info.prev_vertex_buffer);
+                if (needs_prev != has_prev)
+                    mesh.vertices_dirty = true;
+
                 mesh.vertices_dirty |=
                     check_node_transform && scene_graph[*info.instances.begin()]->transform_dirty;
                 if (!mesh.is_dirty())
@@ -1215,16 +1237,13 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                 const float4x4& M = get_global_transform(node_id);
                 const float4x4& M_it = get_global_inverse_transposed_transform(node_id);
                 const bool pretransform_mesh = pretransform_group && M != identity();
-                const bool synth_prev = pretransform_mesh && !mesh.is_morphed() &&
-                                        !mesh.has_variable_topology() &&
-                                        scene_graph[node_id]->is_animated;
+                const bool pretransform_prev =
+                    needs_prev && !mesh.is_morphed() && !mesh.has_variable_topology();
 
                 ensure_region(info.vertex_buffer, shared_vb_suballoc, vb_size,
                               alignof(PackedVertexData));
 
-                const bool need_prev_buffer =
-                    mesh.is_morphed() || mesh.has_variable_topology() || synth_prev;
-                if (need_prev_buffer) {
+                if (needs_prev) {
                     ensure_region(info.prev_vertex_buffer, shared_prev_vb_suballoc, prev_vb_size,
                                   alignof(PackedPrevVertexData));
                 } else if (info.prev_vertex_buffer) {
@@ -1260,7 +1279,7 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                         },
                         mesh.get_vertices());
 
-                    if (need_prev_buffer && !synth_prev) {
+                    if (needs_prev && !pretransform_prev) {
                         vk::DeviceAddress prev_src_addr = 0;
                         std::visit(
                             [&](auto&& src) {
@@ -1306,12 +1325,15 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                     }
 
                     const float4x4 prev_M =
-                        synth_prev ? scene_graph[node_id]->prev_global_transform.value_or(M)
-                                   : float4x4(identity());
+                        pretransform_prev
+                            ? scene_graph[node_id]->prev_global_transform.value_or(M)
+                            : float4x4(identity());
                     vertex_jobs.push_back(TransformVertexJob{
                         .src = vertex_src_addr,
                         .dst = info.vertex_buffer.get_device_address(),
-                        .prev_dst = synth_prev ? info.prev_vertex_buffer.get_device_address() : 0,
+                        .prev_dst = pretransform_prev
+                                        ? info.prev_vertex_buffer.get_device_address()
+                                        : 0,
                         .transform = pretransform_mesh ? M : float4x4(identity()),
                         .inverse_transposed = pretransform_mesh ? M_it : float4x4(identity()),
                         .prev_transform = prev_M,

@@ -598,6 +598,9 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     // All meshes in a group share the same instances (transforms); one group = one BLAS.
     void compute_mesh_groups();
 
+    // Whether this mesh in this group needs a prev_vertex_buffer for motion vectors.
+    bool needs_prev_vertices(const MeshGroup& group, const MeshInfo& info) const;
+
     void ensure_transform_pipelines();
 
     // Upload accumulated TransformVertexJob / TransformPrevVertexJob arrays to their
