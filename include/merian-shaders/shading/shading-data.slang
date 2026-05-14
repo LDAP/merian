@@ -8,7 +8,7 @@ namespace merian {
  */
 struct ShadingData {
     float3 pos;
-    half2 uv;
+    float2 uv;
 }
 
 }
