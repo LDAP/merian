@@ -835,8 +835,13 @@ void Scene::compute_mesh_groups() {
         MeshGroup& group = mesh_groups[group_id];
         assert(!group.meshes.empty());
 
-        const bool static_geometry = !group.has_morphed_mesh && !group.has_animated_node;
-        if (static_geometry) {
+        // BLAS-space vertices change iff the mesh is morphed, or pretransform_animated
+        // bakes a changing node transform into the vertices. An animated node alone
+        // (with pretransform_animated off) only moves the TLAS instance, so the BLAS
+        // is static and needs neither rebuild nor AllowUpdate.
+        const bool blas_vertices_change =
+            group.has_morphed_mesh || (group.has_animated_node && pretransform_animated);
+        if (!blas_vertices_change) {
             group.blas_build_flags = vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace;
         } else if (!group.has_variable_topology_mesh) {
             group.blas_build_flags = vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace |

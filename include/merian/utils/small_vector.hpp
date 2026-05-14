@@ -105,23 +105,27 @@ template <typename T, std::size_t N> class SmallVector {
     }
 
   private:
+    // Storage stays on the heap once we've spilled, even after erase brings count back
+    // below N — otherwise data() starts pointing at stale inline_storage while live
+    // elements still live in heap_storage.
     bool is_inline() const noexcept {
-        return count <= N;
+        return heap_storage.empty();
     }
 
     template <typename U> iterator insert_impl(const_iterator pos, U&& v) {
         const auto idx = static_cast<size_type>(pos - data());
-        if (count < N) {
+        if (!is_inline()) {
+            heap_storage.insert(heap_storage.begin() + static_cast<std::ptrdiff_t>(idx),
+                                std::forward<U>(v));
+        } else if (count < N) {
             std::move_backward(inline_storage.begin() + idx, inline_storage.begin() + count,
                                inline_storage.begin() + count + 1);
             inline_storage[idx] = std::forward<U>(v);
-        } else if (count == N) {
+        } else {
+            // spill at count == N
             heap_storage.reserve(N + 1);
             heap_storage.insert(heap_storage.end(), std::make_move_iterator(inline_storage.begin()),
                                 std::make_move_iterator(inline_storage.end()));
-            heap_storage.insert(heap_storage.begin() + static_cast<std::ptrdiff_t>(idx),
-                                std::forward<U>(v));
-        } else {
             heap_storage.insert(heap_storage.begin() + static_cast<std::ptrdiff_t>(idx),
                                 std::forward<U>(v));
         }
