@@ -632,7 +632,21 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
                                   vk::BufferUsageFlags usage,
                                   const std::string& debug_name);
 
-    void node_properties(Properties& props, const SceneNode& node);
+    // Detail panes that double as drill-down targets from explorer lists.
+    void properties_node(Properties& props, NodeID node_id);
+    void properties_mesh(Properties& props, MeshID mesh_id);
+    void properties_mesh_group(Properties& props, MeshGroupID group_id);
+
+    // Explorer sub-panes.
+    void properties_explorer(Properties& props);
+    void properties_cameras(Properties& props);
+    void properties_meshes(Properties& props);
+    void properties_mesh_groups(Properties& props);
+    void properties_graph(Properties& props);
+
+    // Top-level sections.
+    void properties_settings(Properties& props);
+    void properties_statistics(Properties& props);
 
   private:
     // --------------------------

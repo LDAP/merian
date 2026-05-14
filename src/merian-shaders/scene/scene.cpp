@@ -383,145 +383,246 @@ void Scene::set_pretransform_animated(bool value) {
     needs_regroup = true;
 }
 
-void Scene::node_properties(Properties& props, const SceneNode& node) {
+void Scene::properties_node(Properties& props, const NodeID node_id) {
+    if (!props.is_ui())
+        return;
+    if (!node_ids.is_used(node_id) || node_id >= scene_graph.size() || !scene_graph[node_id]) {
+        props.output_text("<node {} not available>", node_id);
+        return;
+    }
+    const SceneNode& node = *scene_graph[node_id];
     props.output_text("{}", node);
 
     for (uint32_t i = 0; i < node.children.size(); i++) {
-        const SceneNode& child = *scene_graph[node.children[i]];
-        if (props.st_begin_child(fmt::format("child_{:02} ({})", i, child.name),
-                                 fmt::format("Child {:02} ({})", i, child.name))) {
-            Scene::node_properties(props, child);
+        const NodeID child_id = node.children[i];
+        const SceneNode& child = *scene_graph[child_id];
+        if (props.st_begin_child(fmt::format("child_{:02}", child_id),
+                                 fmt::format("Child {:04}: {}", child_id, child.name))) {
+            properties_node(props, child_id);
             props.st_end_child();
         }
     }
 }
 
+void Scene::properties_mesh(Properties& props, const MeshID mesh_id) {
+    if (!props.is_ui())
+        return;
+    if (!mesh_ids.is_used(mesh_id) || !mesh_infos[mesh_id].mesh) {
+        props.output_text("<mesh {} not available>", mesh_id);
+        return;
+    }
+    const MeshInfo& info = mesh_infos[mesh_id];
+    const Mesh& mesh = *info.mesh;
+    const MeshGroupID group_id =
+        mesh_id < mesh_to_group.size() ? mesh_to_group[mesh_id] : MESH_GROUP_ID_INVALID;
+
+    props.output_text("{}", mesh);
+
+    if (group_id != MESH_GROUP_ID_INVALID &&
+        props.st_begin_child("group", fmt::format("group {}", group_id))) {
+        properties_mesh_group(props, group_id);
+        props.st_end_child();
+    }
+
+    if (props.st_begin_child("instances",
+                             fmt::format("instances ({})", info.instances.size()))) {
+        for (const NodeID node_id : info.instances) {
+            const std::string node_name = (node_id < scene_graph.size() && scene_graph[node_id])
+                                              ? scene_graph[node_id]->name
+                                              : std::string{"<dead>"};
+            if (props.st_begin_child(fmt::format("instance_{:04}", node_id),
+                                     fmt::format("{:04}: {}", node_id, node_name))) {
+                properties_node(props, node_id);
+                props.st_end_child();
+            }
+        }
+        props.st_end_child();
+    }
+}
+
+void Scene::properties_mesh_group(Properties& props, const MeshGroupID group_id) {
+    if (!props.is_ui())
+        return;
+    if (group_id >= mesh_groups.size()) {
+        props.output_text("<group {} not available>", group_id);
+        return;
+    }
+    const MeshGroup& group = mesh_groups[group_id];
+    const std::size_t instances =
+        group.meshes.empty() ? 0 : group.get_instances(mesh_infos).size();
+    const bool pretransformed =
+        !group.meshes.empty() && group.is_pretranformed(mesh_infos, pretransform_animated);
+
+    std::size_t group_vertices = 0;
+    std::size_t group_triangles = 0;
+    for (const MeshID mesh_id : group.meshes) {
+        group_vertices += mesh_infos[mesh_id].mesh->get_vertex_count();
+        group_triangles += mesh_infos[mesh_id].mesh->get_primitive_count();
+    }
+    props.output_text(
+        "split flags: {}\nhas animated node: {}\nhas morphed mesh: {}\nhas variable topology: "
+        "{}\nall opaque: {}\npretransformed: {}\ninstances: {}\nvertices: {}\ntriangles: "
+        "{}\nblas: {}\nblas build flags: {}\nblas dirty: {}\nblas last built frame: {}\nblas "
+        "last updated frame: {}",
+        group.flags, group.has_animated_node, group.has_morphed_mesh,
+        group.has_variable_topology_mesh, group.all_opaque, pretransformed, instances,
+        group_vertices, group_triangles,
+        group.blas ? format_size(group.blas->get_size()) : "<none>",
+        vk::to_string(group.blas_build_flags), group.blas_dirty, group.blas_last_built_frame,
+        group.blas_last_updated_frame);
+
+    if (props.st_begin_child("members", fmt::format("members ({})", group.meshes.size()))) {
+        for (const MeshID mesh_id : group.meshes) {
+            const std::string mesh_name = mesh_infos[mesh_id].mesh
+                                              ? mesh_infos[mesh_id].mesh->name
+                                              : std::string{"<dead>"};
+            if (props.st_begin_child(fmt::format("mesh_{:04}", mesh_id),
+                                     fmt::format("{:04}: {}", mesh_id, mesh_name))) {
+                properties_mesh(props, mesh_id);
+                props.st_end_child();
+            }
+        }
+        props.st_end_child();
+    }
+}
+
+void Scene::properties_cameras(Properties& props) {
+    if (!cameras.empty()) {
+        props.config_uint("active", active_camera, "", 0u,
+                          static_cast<uint32_t>(cameras.size()));
+        if (props.is_ui()) {
+            props.st_separate("Active Camera");
+            get_active_camera()->properties(props);
+            if (aabb.is_valid() &&
+                props.config_bool("Fit AABB",
+                                  "Rotates and moves the camera to fit the scene AABB.")) {
+                get_active_camera()->look_at_bounding_box(aabb);
+            }
+        }
+    }
+    props.st_separate("Debug");
+    if (props.config_bool("debug camera", enable_debug_camera) && enable_debug_camera) {
+        if (debug_camera_id == CAMERA_ID_INVALID) {
+            auto db = std::make_shared<Camera>(float3(1, 0, 0), float3(0, 0, 0), get_up(), 90.f,
+                                               1920.f / 1080.f, 0.01f, 1000.f);
+            if (aabb.is_valid()) {
+                db->look_at_bounding_box(aabb);
+            }
+            debug_camera_id = add_camera(db);
+            set_active_camera(debug_camera_id);
+        }
+    }
+    if (enable_debug_camera) {
+        if (props.config_bool("make active")) {
+            set_active_camera(debug_camera_id);
+        }
+        if (!props.is_ui()) {
+            get_camera(debug_camera_id)->properties(props);
+        }
+    }
+}
+
+void Scene::properties_meshes(Properties& props) {
+    if (!props.is_ui())
+        return;
+    for (const MeshID id : mesh_ids) {
+        const MeshInfo& info = mesh_infos[id];
+        const Mesh& mesh = *info.mesh;
+        const MeshGroupID group_id =
+            id < mesh_to_group.size() ? mesh_to_group[id] : MESH_GROUP_ID_INVALID;
+        const std::string group_label = group_id == MESH_GROUP_ID_INVALID
+                                            ? std::string{"no group"}
+                                            : fmt::format("group {}", group_id);
+        if (props.st_begin_child(fmt::format("mesh_{:04}", id),
+                                 fmt::format("{:04}: {} [{}, {} instances]", id, mesh.name,
+                                             group_label, info.instances.size()))) {
+            properties_mesh(props, id);
+            props.st_end_child();
+        }
+    }
+}
+
+void Scene::properties_mesh_groups(Properties& props) {
+    if (!props.is_ui())
+        return;
+    for (MeshGroupID group_id = 0; group_id < mesh_groups.size(); group_id++) {
+        const MeshGroup& group = mesh_groups[group_id];
+        // When the group holds a single mesh, surface that mesh inline so the
+        // explorer is navigable without expanding every row.
+        std::string label;
+        if (group.meshes.size() == 1) {
+            const MeshID only = *group.meshes.begin();
+            const std::string mesh_name = mesh_infos[only].mesh
+                                              ? mesh_infos[only].mesh->name
+                                              : std::string{"<dead>"};
+            label = fmt::format("{:04}: {} (1 mesh, {:04}: {})", group_id, group.flags, only,
+                                mesh_name);
+        } else {
+            label = fmt::format("{:04}: {} ({} meshes)", group_id, group.flags,
+                                group.meshes.size());
+        }
+        if (props.st_begin_child(fmt::format("group_{:04}", group_id), label)) {
+            properties_mesh_group(props, group_id);
+            props.st_end_child();
+        }
+    }
+}
+
+void Scene::properties_graph(Properties& props) {
+    if (!props.is_ui())
+        return;
+    for (const NodeID id : node_ids) {
+        const SceneNode& node = *scene_graph[id];
+        if (node.parent != NODE_ID_INVALID) {
+            continue;
+        }
+        if (props.st_begin_child(fmt::format("node_{:04}", id),
+                                 fmt::format("{:04}: {}", id, node.name))) {
+            properties_node(props, id);
+            props.st_end_child();
+        }
+    }
+}
+
+void Scene::properties_explorer(Properties& props) {
+    if (props.st_begin_child("cameras", "Cameras")) {
+        properties_cameras(props);
+        props.st_end_child();
+    }
+    if (!props.is_ui())
+        return;
+    if (props.st_begin_child("meshes", fmt::format("Meshes ({})", mesh_ids.count()))) {
+        properties_meshes(props);
+        props.st_end_child();
+    }
+    if (props.st_begin_child("mesh_groups",
+                             fmt::format("Mesh Groups ({})", mesh_groups.size()))) {
+        properties_mesh_groups(props);
+        props.st_end_child();
+    }
+    if (props.st_begin_child("graph", fmt::format("Graph ({} nodes)", node_ids.count()))) {
+        properties_graph(props);
+        props.st_end_child();
+    }
+}
+
+void Scene::properties_settings(Properties& props) {
+    bool pretransform = get_pretransform_animated();
+    if (props.config_bool("Pretransform Animated", pretransform)) {
+        set_pretransform_animated(pretransform);
+    }
+    props.config_percent("BLAS Rebuild Fraction", blas_rebuild_fraction);
+}
+
 void Scene::properties(Properties& props) {
 
     if (props.st_begin_child("scene", "Explorer")) {
-        if (props.st_begin_child("cameras", "Cameras")) {
-            if (!cameras.empty()) {
-                props.config_uint("active", active_camera, "", 0u,
-                                  static_cast<uint32_t>(cameras.size()));
-                if (props.is_ui()) {
-                    props.st_separate("Active Camera");
-                    get_active_camera()->properties(props);
-                    if (aabb.is_valid() &&
-                        props.config_bool("Fit AABB",
-                                          "Rotates and moves the camera to fit the scene AABB.")) {
-                        get_active_camera()->look_at_bounding_box(aabb);
-                    }
-                }
-            }
-            props.st_separate("Debug");
-            if (props.config_bool("debug camera", enable_debug_camera) && enable_debug_camera) {
-                if (debug_camera_id == CAMERA_ID_INVALID) {
-                    auto db = std::make_shared<Camera>(float3(1, 0, 0), float3(0, 0, 0), get_up(),
-                                                       90.f, 1920.f / 1080.f, 0.01f, 1000.f);
-                    if (aabb.is_valid()) {
-                        db->look_at_bounding_box(aabb);
-                    }
-                    debug_camera_id = add_camera(db);
-                    set_active_camera(debug_camera_id);
-                }
-            }
-            if (enable_debug_camera) {
-                if (props.config_bool("make active")) {
-                    set_active_camera(debug_camera_id);
-                }
-                if (!props.is_ui()) {
-                    get_camera(debug_camera_id)->properties(props);
-                }
-            }
-
-            props.st_end_child();
-        }
-
-        if (props.st_begin_child("meshes", "Meshes")) {
-            for (const MeshID id : mesh_ids) {
-                const Mesh& mesh = *mesh_infos[id].mesh;
-                const MeshGroupID group_id =
-                    id < mesh_to_group.size() ? mesh_to_group[id] : MESH_GROUP_ID_INVALID;
-                const std::string group_label = group_id == MESH_GROUP_ID_INVALID
-                                                    ? "no group"
-                                                    : fmt::format("group {}", group_id);
-                if (props.st_begin_child(
-                        fmt::format("mesh_{:04} ", id),
-                        fmt::format("{:04}: {} [{}]", id, mesh.name, group_label))) {
-                    props.output_text("{}", mesh);
-                    props.st_end_child();
-                }
-            }
-            props.st_end_child();
-        }
-
-        if (props.st_begin_child("mesh_groups", "Mesh Groups")) {
-            for (MeshGroupID group_id = 0; group_id < mesh_groups.size(); group_id++) {
-                const MeshGroup& group = mesh_groups[group_id];
-                if (props.st_begin_child(fmt::format("group_{:04}", group_id),
-                                         fmt::format("{:04}: {} ({} mesh{})", group_id, group.flags,
-                                                     group.meshes.size(),
-                                                     group.meshes.size() == 1 ? "" : "es"))) {
-                    const std::size_t instances =
-                        group.meshes.empty() ? 0 : group.get_instances(mesh_infos).size();
-                    const bool pretransformed =
-                        !group.meshes.empty() &&
-                        group.is_pretranformed(mesh_infos, pretransform_animated);
-                    std::size_t group_vertices = 0;
-                    std::size_t group_triangles = 0;
-                    for (const MeshID mesh_id : group.meshes) {
-                        group_vertices += mesh_infos[mesh_id].mesh->get_vertex_count();
-                        group_triangles += mesh_infos[mesh_id].mesh->get_primitive_count();
-                    }
-                    props.output_text(
-                        "split flags: {}\nhas animated node: {}\nhas morphed mesh: "
-                        "{}\nhas variable topology: {}\nall opaque: {}\npretransformed: "
-                        "{}\ninstances: "
-                        "{}\nvertices: {}\ntriangles: {}\nblas: {}\nblas build flags: "
-                        "{}\nblas dirty: {}\nblas last built frame: {}\nblas last updated "
-                        "frame: {}",
-                        group.flags, group.has_animated_node, group.has_morphed_mesh,
-                        group.has_variable_topology_mesh, group.all_opaque, pretransformed,
-                        instances, group_vertices, group_triangles,
-                        group.blas ? format_size(group.blas->get_size()) : "<none>",
-                        vk::to_string(group.blas_build_flags), group.blas_dirty,
-                        group.blas_last_built_frame, group.blas_last_updated_frame);
-
-                    if (props.st_begin_child("members", "Members")) {
-                        for (const MeshID mesh_id : group.meshes) {
-                            props.output_text("{:04}: {}", mesh_id, mesh_infos[mesh_id].mesh->name);
-                        }
-                        props.st_end_child();
-                    }
-                    props.st_end_child();
-                }
-            }
-            props.st_end_child();
-        }
-
-        if (props.st_begin_child("graph", "Graph")) {
-            for (const NodeID id : node_ids) {
-                const SceneNode& node = *scene_graph[id];
-                if (node.parent != NODE_ID_INVALID) {
-                    continue;
-                }
-                if (props.st_begin_child(fmt::format("node_{:02} ", id),
-                                         fmt::format("{:02}: {}", id, node.name))) {
-                    node_properties(props, node);
-                    props.st_end_child();
-                }
-            }
-            props.st_end_child();
-        }
+        properties_explorer(props);
         props.st_end_child();
     }
 
     if (props.st_begin_child("settings", "Settings")) {
-        bool pretransform = get_pretransform_animated();
-        if (props.config_bool("Pretransform Animated", pretransform)) {
-            set_pretransform_animated(pretransform);
-        }
-        props.config_percent("BLAS Rebuild Fraction", blas_rebuild_fraction);
+        properties_settings(props);
         props.st_end_child();
     }
 
