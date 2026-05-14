@@ -6,10 +6,12 @@
 #include "merian/shader/slang_composition.hpp"
 #include "merian/shader/slang_program.hpp"
 #include "merian/utils/camera/camera.hpp"
-#include "merian/utils/concurrent/thread_pool.hpp"
 #include "merian/utils/free_list.hpp"
+#include "merian/utils/small_set.hpp"
 #include "merian/utils/versionable.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout.hpp"
+#include "merian/vk/memory/frame_staging_block.hpp"
+#include "merian/vk/memory/memory_suballocator_vma.hpp"
 #include "merian/vk/memory/staging_memory_manager.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 #include "merian/vk/raytrace/as_builder.hpp"
@@ -138,14 +140,16 @@ class Mesh {
     };
 
     // ----- GPU Staged Data (Frequently updated CPU data) -----
+    // Non-owning: references a BufferHandle owned by the Mesh subclass.
     struct DeviceStaged {
-        BufferHandle data;
+        const BufferHandle& data;
         vk::DeviceSize offset = 0;
     };
 
     // ----- GPU Local Data (Procedural/Static GPU data) -----
+    // Non-owning: references a BufferHandle owned by the Mesh subclass.
     struct DeviceLocal {
-        BufferHandle data;
+        const BufferHandle& data;
     };
 
     using MeshVertexData =
@@ -192,14 +196,6 @@ class Mesh {
         return flags & MeshFlags::HasVariableTopology;
     }
 
-    bool is_dynamic() const {
-        return is_morphed() || animated_instance_count > 0;
-    }
-
-    bool is_static() const {
-        return !is_dynamic();
-    }
-
     bool is_front_counterclockwise() const {
         // Vulkan default is clockwise
         return flags & MeshFlags::FrontCounterClockwise;
@@ -218,24 +214,62 @@ class Mesh {
     bool is_dirty() const {
         return vertices_dirty || indices_dirty;
     }
-
-    // ------------------
-    // Managed by Scene
-
-    std::set<NodeID> instances;
-    uint32_t animated_instance_count = 0;
 };
 
 using MeshHandle = std::unique_ptr<Mesh>;
 
 inline std::string format_as(const Mesh& mesh) {
-    return fmt::format(
-        "vertices: {}\ntriangles: {}\nmaterial id: {}\nnum instances: {}\nanimated instances: "
-        "{}\nflags: {}\nindex type: {}\nvertices dirty: {}\nindices dirty: {}",
-        mesh.get_vertex_count(), mesh.get_primitive_count(), mesh.material_id,
-        mesh.instances.size(), mesh.animated_instance_count, mesh.flags,
-        vk::to_string(mesh.index_type), mesh.vertices_dirty, mesh.indices_dirty);
+    return fmt::format("vertices: {}\ntriangles: {}\nmaterial id: {}\nflags: {}\nindex type: {}\n"
+                       "vertices dirty: {}\nindices dirty: {}",
+                       mesh.get_vertex_count(), mesh.get_primitive_count(), mesh.material_id,
+                       mesh.flags, vk::to_string(mesh.index_type), mesh.vertices_dirty,
+                       mesh.indices_dirty);
 }
+
+// A suballocation inside one of Scene's shared vertex / prev-vertex / index buffers.
+struct MeshBufferRegion {
+    MemoryAllocationHandle suballoc;
+    vk::DeviceSize size = 0;
+    vk::DeviceSize alignment = 1;
+
+    vk::DeviceAddress get_device_address() const {
+        if (!suballoc)
+            return 0;
+        const auto* sub = static_cast<const VMAMemorySubAllocation*>(suballoc.get());
+        return sub->get_suballocator()->get_base_buffer()->get_device_address() + sub->get_offset();
+    }
+
+    vk::DeviceSize get_offset() const {
+        if (!suballoc)
+            return 0;
+        return static_cast<const VMAMemorySubAllocation*>(suballoc.get())->get_offset();
+    }
+
+    explicit operator bool() const {
+        return static_cast<bool>(suballoc) && size > 0;
+    }
+};
+
+// Scene-owned per-mesh record: handle + shared-buffer regions + instance set.
+class MeshInfo {
+  public:
+    MeshHandle mesh;
+
+    MeshBufferRegion vertex_buffer;
+    MeshBufferRegion prev_vertex_buffer;
+    MeshBufferRegion index_buffer;
+
+    SmallSet<NodeID, 1> instances;
+    uint32_t animated_instance_count = 0;
+
+    bool is_dynamic() const {
+        return mesh && (mesh->is_morphed() || animated_instance_count > 0);
+    }
+
+    bool is_static() const {
+        return !is_dynamic();
+    }
+};
 
 class SimpleMesh : public Mesh {
   public:
@@ -250,20 +284,18 @@ class SimpleMesh : public Mesh {
         return static_cast<uint32_t>(indices.size());
     }
 
-    virtual MeshVertexData get_vertices() const override {
-        return HostPacked<PackedVertexData>(vertices.data());
+    MeshVertexData get_vertices() const override {
+        return HostPacked<PackedVertexData>{vertices.data()};
     }
-    virtual MeshPrevVertexData get_prev_vertices() const override {
-        if (!is_morphed()) {
-            return std::monostate();
-        }
+    MeshPrevVertexData get_prev_vertices() const override {
+        if (!is_morphed())
+            return std::monostate{};
         assert(prev_vertices.size() == vertices.size());
-        HostPacked<PackedPrevVertexData> data(prev_vertices.data());
-        return data;
+        return HostPacked<PackedPrevVertexData>{prev_vertices.data()};
     }
-    virtual MeshIndexData get_indices() const override {
+    MeshIndexData get_indices() const override {
         assert(index_type == vk::IndexType::eUint32);
-        return HostPacked<void>(indices.data());
+        return HostPacked<void>{indices.data()};
     }
 };
 
@@ -285,7 +317,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         MeshFlags::FrontCounterClockwise | MeshFlags::TwoSided;
 
     struct MeshGroup {
-        std::unordered_set<MeshID> meshes;
+        SmallSet<MeshID, 1> meshes;
 
         // only the TLAS-instance-level flags shared by all meshes (GROUP_SPLIT_MASK)
         MeshFlags flags;
@@ -308,20 +340,20 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         std::optional<vk::AccelerationStructureBuildSizesInfoKHR> cached_blas_size_info;
         // ----------------
 
-        const std::set<NodeID>& get_instances(const std::vector<MeshHandle>& meshes) const {
-            assert(!meshes.empty());
-            return meshes[*this->meshes.begin()]->instances;
+        const SmallSet<NodeID, 1>& get_instances(const std::vector<MeshInfo>& mesh_infos) const {
+            assert(!mesh_infos.empty());
+            return mesh_infos[*this->meshes.begin()].instances;
         }
 
         // means the Scene uploads the meshes in this group pretransformed and the instance
         // transform should be the identity.
         // TODO: pretransforming non-morphed animated meshes effectively makes them morphed
         // (vertices change each frame) — they need a prev vertex buffer for motion vectors.
-        bool is_pretranformed(const std::vector<MeshHandle>& meshes,
+        bool is_pretranformed(const std::vector<MeshInfo>& mesh_infos,
                               bool pretransform_animated) const {
-            assert(!meshes.empty());
-            const Mesh& mesh = *meshes[*this->meshes.begin()];
-            if (mesh.instances.size() > 1)
+            assert(!mesh_infos.empty());
+            const MeshInfo& info = mesh_infos[*this->meshes.begin()];
+            if (info.instances.size() > 1)
                 return false;
             if ((has_animated_node || has_morphed_mesh) && !pretransform_animated)
                 return false;
@@ -417,15 +449,15 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     void set_active_camera(uint32_t index);
 
     bool has_geometry() const {
-        return !meshes.empty();
+        return !mesh_infos.empty();
     }
 
     const std::vector<std::optional<SceneNode>>& get_scene_graph() const {
         return scene_graph;
     }
 
-    const std::vector<MeshHandle>& get_meshes() const {
-        return meshes;
+    const std::vector<MeshInfo>& get_mesh_infos() const {
+        return mesh_infos;
     }
 
     // to get transforms use get_*_transform(...)
@@ -472,9 +504,9 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         return get_global_inverse_transposed_transform(*scene_graph[node_id]);
     }
 
-    const Mesh& get_mesh(const MeshID mesh_id) {
+    const MeshInfo& get_mesh(const MeshID mesh_id) {
         assert(mesh_ids.is_used(mesh_id));
-        return *meshes[mesh_id];
+        return mesh_infos[mesh_id];
     }
 
     // Bake single-instance animated (node transforms can change) meshes world transforms on CPU at
@@ -583,6 +615,16 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     void build_blas(const CommandBufferHandle& cmd);
     void build_tlas(const CommandBufferHandle& cmd);
 
+    // Grows one shared buffer: re-suballocates every live region into a new backing buffer and
+    // copies the existing data over in a single vkCmdCopyBuffer.
+    void reallocate_shared_buffer(const CommandBufferHandle& cmd,
+                                  VMAMemorySubAllocatorHandle& slot,
+                                  vk::DeviceSize& capacity_slot,
+                                  MeshBufferRegion MeshInfo::* region_field,
+                                  vk::DeviceSize new_capacity,
+                                  vk::BufferUsageFlags usage,
+                                  const std::string& debug_name);
+
     void node_properties(Properties& props, const SceneNode& node);
 
   private:
@@ -605,7 +647,8 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
 
     MaterialSystemHandle material_system;
     FreeList<MeshID> mesh_ids;
-    std::vector<MeshHandle> meshes; // sized to mesh_ids.size(); null at released slots
+    // Sized to mesh_ids.size(). Released slots have a null mesh.
+    std::vector<MeshInfo> mesh_infos;
     FreeList<NodeID> node_ids;
     std::vector<std::optional<SceneNode>> scene_graph; // sized to node_ids.size()
     bool pretransform_animated = false;
@@ -680,12 +723,15 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     // --------------------------
     // GPU data
 
-    // Indexed with MeshID -> PrimitiveID
-    std::vector<BufferHandle> index_buffers;
-    // Indexed with MeshID -> indices
-    std::vector<BufferHandle> vertex_buffers;
-    // Indexed with MeshID -> indices. Null for static meshes.
-    std::vector<BufferHandle> prev_vertex_buffers;
+    // Shared scene buffers: one backing buffer per kind, suballocated per-mesh.
+    VMAMemorySubAllocatorHandle shared_vb_suballoc;
+    VMAMemorySubAllocatorHandle shared_prev_vb_suballoc;
+    VMAMemorySubAllocatorHandle shared_ib_suballoc;
+    vk::DeviceSize shared_vb_capacity = 0;
+    vk::DeviceSize shared_prev_vb_capacity = 0;
+    vk::DeviceSize shared_ib_capacity = 0;
+
+    std::optional<FrameStagingBlock> frame_staging;
 
     std::vector<GeometryData> geometries;
     struct BLASGeometry {
@@ -710,13 +756,6 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     BufferHandle tlas_instances_buffer;
     BufferHandle as_scratch_buffer;
     AccelerationStructureHandle tlas;
-
-    ThreadPoolHandle thread_pool;
-
-    // Staging dedicated to mesh data (Host* sources are read directly via PSB by the
-    // transform shaders). Block usage includes eShaderDeviceAddress; block size is
-    // intentionally small so accumulation across frames-in-flight is bounded.
-    StagingMemoryManagerHandle mesh_staging;
 
     // Batched GPU transform pipelines (lazily initialized) and reusable device buffers.
     DescriptorSetLayoutHandle transform_descriptor_layout;

@@ -192,8 +192,9 @@ VMAMemorySubAllocator::allocate(const vk::MemoryRequirements& requirements) {
                  buffer_info.offset;
     }
 
-    assert(offset >= buffer_info.offset &&
-           offset + requirements.size <= buffer_info.offset + buffer_info.size);
+    // `offset` is buffer-relative (in [0, buffer_info.size)) — see VMAMemorySubAllocation::map()
+    // and ::get_memory_info() which both add buffer_info.offset back when going to device memory.
+    assert(offset + requirements.size <= buffer_info.size);
 
     return {virtual_allocation, offset};
 }
@@ -260,6 +261,13 @@ vk::DeviceSize VMAMemorySubAllocator::get_free_size() const {
     VmaStatistics stats;
     vmaGetVirtualBlockStatistics(block, &stats);
     return stats.blockBytes - stats.allocationBytes;
+}
+
+VmaDetailedStatistics VMAMemorySubAllocator::get_detailed_statistics() const {
+    const std::lock_guard lock(block_mutex);
+    VmaDetailedStatistics stats;
+    vmaCalculateVirtualBlockStatistics(block, &stats);
+    return stats;
 }
 
 std::shared_ptr<VMAMemorySubAllocator> VMAMemorySubAllocator::create(const BufferHandle& buffer) {

@@ -272,7 +272,7 @@ TEST_F(SceneTest, RemoveMeshClearsSlotAndAllowsReuse) {
 
     // Remove the top mesh — slot should compact away and be reused on next add.
     scene->remove_mesh(m1);
-    EXPECT_EQ(scene->get_meshes().size(), m1);
+    EXPECT_EQ(scene->get_mesh_infos().size(), m1);
 
     MeshID m_new = scene->add_mesh(make_triangle(0));
     EXPECT_EQ(m_new, m1);

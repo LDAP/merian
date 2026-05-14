@@ -96,6 +96,11 @@ class BumpMemoryAllocator : public MemoryAllocator {
     // when the remaining capacity is insufficient.
     vk::DeviceSize allocate(const vk::MemoryRequirements& requirements);
 
+    // Resets the bump pointer to 0. Caller must ensure no in-flight reads of any prior
+    // suballocation exist (e.g. only call after a fence/queue wait or when a parent
+    // command buffer keeps the underlying buffer alive across the reuse).
+    void reset();
+
     const BufferHandle& get_base_buffer() const;
 
     // Persistent host pointer to the start of the base buffer; nullptr for non-mappable buffers.

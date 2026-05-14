@@ -14,14 +14,18 @@
 namespace merian {
 
 [[nodiscard]] inline std::string format_size(const uint64_t size_bytes) {
-    const std::vector<const char*> units = {"B", "KB", "MB", "GB", "TB"};
-    std::size_t unit_index;
-    if (size_bytes == 0) {
-        unit_index = 0;
-    } else {
-        unit_index = std::min((std::size_t)std::log2(size_bytes) / 10, units.size() - 1);
+    static constexpr const char* units[] = {"B", "KiB", "MiB", "GiB", "TiB"};
+    static constexpr std::size_t unit_count = sizeof(units) / sizeof(units[0]);
+    std::size_t unit_index = 0;
+    if (size_bytes != 0) {
+        unit_index =
+            std::min(static_cast<std::size_t>(std::log2(size_bytes) / 10), unit_count - 1);
     }
-    return fmt::format("{} {}", (double)size_bytes / std::pow(1024, unit_index), units[unit_index]);
+    if (unit_index == 0) {
+        return fmt::format("{} B", size_bytes);
+    }
+    return fmt::format("{:.4g} {}", static_cast<double>(size_bytes) / std::pow(1024, unit_index),
+                       units[unit_index]);
 }
 
 [[nodiscard]] inline std::string format_duration(const uint64_t duration_ns) {

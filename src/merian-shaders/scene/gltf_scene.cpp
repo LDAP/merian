@@ -673,7 +673,7 @@ void GLTFScene::load(const CommandBufferHandle& cmd, const std::filesystem::path
     load_cameras();
 
     SPDLOG_INFO("GLTFScene: loaded '{}' nodes: {}, meshes: {}, materials: {}, textures: {}",
-                path.filename().string(), get_scene_graph().size(), get_meshes().size(),
+                path.filename().string(), get_scene_graph().size(), get_mesh_infos().size(),
                 material_map.size(), model->images.size());
 }
 

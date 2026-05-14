@@ -9,6 +9,20 @@ test_free_list = executable(
 )
 test('free_list', test_free_list, timeout: 30)
 
+test_small_vector = executable(
+    'test-small-vector',
+    'test_small_vector.cpp',
+    dependencies: [merian_dep, gtest_main_dep],
+)
+test('small_vector', test_small_vector, timeout: 30)
+
+test_small_set = executable(
+    'test-small-set',
+    'test_small_set.cpp',
+    dependencies: [merian_dep, gtest_main_dep],
+)
+test('small_set', test_small_set, timeout: 30)
+
 test_slang_binding = executable(
     'test-slang-binding',
     'test_slang_binding.cpp',

@@ -204,6 +204,10 @@ BumpMemoryAllocator::allocate_memory(const vk::MemoryPropertyFlags required_flag
     return allocation;
 }
 
+void BumpMemoryAllocator::reset() {
+    current_offset.store(0, std::memory_order_release);
+}
+
 const BufferHandle& BumpMemoryAllocator::get_base_buffer() const {
     return buffer;
 }

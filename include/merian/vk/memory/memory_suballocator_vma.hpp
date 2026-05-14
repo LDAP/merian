@@ -131,6 +131,10 @@ class VMAMemorySubAllocator : public MemoryAllocator {
 
     vk::DeviceSize get_free_size() const;
 
+    // Detailed VMA virtual-block statistics (allocation count, bytes used / unused, min/max
+    // allocation sizes, unused ranges). Slow — only use for diagnostics.
+    VmaDetailedStatistics get_detailed_statistics() const;
+
   private:
     const BufferHandle buffer;
     const MemoryAllocationInfo buffer_info;
