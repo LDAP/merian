@@ -26,6 +26,9 @@ class ExtensionMerian : public ContextExtension {
                                             "uniformAndStorageBuffer16BitAccess",    // for material system
                                             "shaderInt16",                           // for material system
                                             "shaderFloat16",                         // for shading (half types)
+                                            "storageBuffer8BitAccess",               // for scene uint8 indices
+                                            "uniformAndStorageBuffer8BitAccess",     // for scene uint8 indices
+                                            "shaderInt8",                            // for scene uint8 indices
                                             "accelerationStructure",                 // for scene AS
                                         },
                                         {},

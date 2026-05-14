@@ -162,9 +162,23 @@ struct Scene {
         return get_material_id(hit.get_geometry_id());
     }
 
-    // Loads the vertex indices from memory via buffer device address.
+    // Loads the vertex indices from memory via buffer device address, or
+    // computes them from primitive_id for IndexType::None (no memory access).
     uint3 get_vertex_indices(const GeometryData geometry_data, const uint primitive_id) {
-        return geometry_data.indices[primitive_id];
+        if (geometry_data.flags & GeometryDataFlags::IndexTypeUint32) {
+            uint3* p = (uint3*)geometry_data.indices;
+            return p[primitive_id];
+        }
+        if (geometry_data.flags & GeometryDataFlags::IndexTypeUint16) {
+            vector<uint16_t, 3>* p = (vector<uint16_t, 3>*)geometry_data.indices;
+            return uint3(p[primitive_id]);
+        }
+        if (geometry_data.flags & GeometryDataFlags::IndexTypeUint8) {
+            vector<uint8_t, 3>* p = (vector<uint8_t, 3>*)geometry_data.indices;
+            return uint3(p[primitive_id]);
+        }
+        const uint base = primitive_id * 3;
+        return uint3(base, base + 1, base + 2);
     }
 
     // Loads the vertex data from memory via buffer device address.

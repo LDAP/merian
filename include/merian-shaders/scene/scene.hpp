@@ -162,8 +162,10 @@ class Mesh {
                                             DeviceStaged,
                                             DeviceLocal>;
 
-    // Layout depends on Mesh::index_type
-    using MeshIndexData = std::variant<HostIndices, HostPacked<void>, DeviceStaged, DeviceLocal>;
+    // Layout depends on Mesh::index_type. std::monostate means no index buffer
+    // (only valid when index_type == eNoneKHR).
+    using MeshIndexData =
+        std::variant<std::monostate, HostIndices, HostPacked<void>, DeviceStaged, DeviceLocal>;
 
   public:
     std::string name;
@@ -209,6 +211,11 @@ class Mesh {
     bool is_opaque() const {
         // if yes, allows to set the force opaque flag when raytracing.
         return flags & MeshFlags::IsOpaque;
+    }
+
+    // false means primitive i has vertices (3i, 3i+1, 3i+2); no index buffer is allocated.
+    bool has_indices() const {
+        return index_type != vk::IndexType::eNoneKHR;
     }
 
     bool is_dirty() const {

@@ -865,7 +865,7 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
             for (const MeshID mesh_id : group.meshes) {
                 MeshInfo& info = mesh_infos[mesh_id];
                 Mesh& mesh = *info.mesh;
-                assert(info.vertex_buffer && info.index_buffer);
+                assert(info.vertex_buffer && (!mesh.has_indices() || info.index_buffer));
 
                 const bool needs_prev = mesh.is_morphed() || mesh.has_variable_topology() ||
                                         (pretransform && scene_graph[node_id]->is_animated);
@@ -873,12 +873,13 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
                 GeometryData gd;
                 gd.material_id = mesh.material_id;
                 gd.vertices = info.vertex_buffer.get_device_address();
-                gd.indices = info.index_buffer.get_device_address();
+                gd.indices = info.index_buffer ? info.index_buffer.get_device_address()
+                                               : vk::DeviceAddress{0};
                 assert(!needs_prev || info.prev_vertex_buffer);
                 gd.prev_vertices = info.prev_vertex_buffer
                                        ? info.prev_vertex_buffer.get_device_address()
                                        : vk::DeviceAddress{0};
-                gd.flags = GeometryDataFlags{};
+                gd.flags = index_type_flag(mesh.index_type);
                 if (pretransform || transform_is_identity) {
                     gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::Pretransformed);
                 }
@@ -1218,7 +1219,7 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                     mesh.vertices_dirty = false;
                 }
 
-                if (mesh.indices_dirty) {
+                if (mesh.indices_dirty && mesh.has_indices()) {
                     ensure_region(info.index_buffer, shared_ib_suballoc, ib_size,
                                   size_for_index_type(mesh.index_type));
                     const vk::DeviceSize dst_offset = info.index_buffer.get_offset();
@@ -1226,7 +1227,9 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                     std::visit(
                         [&](auto&& src) {
                             using T = std::decay_t<decltype(src)>;
-                            if constexpr (std::is_same_v<T, Mesh::DeviceLocal>) {
+                            if constexpr (std::is_same_v<T, std::monostate>) {
+                                assert(false && "monostate indices on a mesh with has_indices()");
+                            } else if constexpr (std::is_same_v<T, Mesh::DeviceLocal>) {
                                 auto& entry = index_copies[src.data.get()];
                                 entry.first = src.data;
                                 entry.second.push_back({0, dst_offset, ib_size});
@@ -1253,6 +1256,11 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                         },
                         mesh.get_indices());
 
+                    mesh.indices_dirty = false;
+                } else if (mesh.indices_dirty) {
+                    // No index buffer for IndexType::None; drop any prior allocation.
+                    if (info.index_buffer)
+                        info.index_buffer = MeshBufferRegion{};
                     mesh.indices_dirty = false;
                 }
             }
@@ -1308,7 +1316,8 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
             triangles.vertexStride = sizeof(PackedVertexData);
             triangles.maxVertex = mesh.get_vertex_count() - 1;
             triangles.indexType = mesh.index_type;
-            triangles.indexData = info.index_buffer.get_device_address();
+            triangles.indexData = info.index_buffer ? info.index_buffer.get_device_address()
+                                                    : vk::DeviceAddress{0};
 
             vk::AccelerationStructureGeometryKHR geom;
             geom.geometryType = vk::GeometryTypeKHR::eTriangles;

@@ -19,6 +19,12 @@ enum GeometryDataFlags : uint16_t {
     IsAnimated = 0x4,
     // Default winding is clockwise, this signals counter clockwise winding.
     FrontCounterClockwise = 0x8,
+
+    // Index buffer element type. None (no bit set) means sequential indices:
+    // triangle i has vertices 3i, 3i+1, 3i+2 — no memory read.
+    IndexTypeUint8 = 0x10,
+    IndexTypeUint16 = 0x20,
+    IndexTypeUint32 = 0x40,
 };
 
 // See scene.hpp for details.
@@ -91,7 +97,9 @@ using IndexBufferAddress = vk::DeviceAddress;
 using PrevVertexBufferAddress = vk::DeviceAddress;
 #else
 typealias VertexBufferAddress = PackedVertexData*;
-typealias IndexBufferAddress = uint3*;
+// Raw byte pointer; element type encoded in GeometryDataFlags IndexType bits.
+// 0 (null) when IndexType == None.
+typealias IndexBufferAddress = uint8_t*;
 typealias PrevVertexBufferAddress = PackedPrevVertexData*;
 #endif
 
@@ -130,6 +138,22 @@ static_assert(sizeof(PackedVertexData) == 24, "PackedVertexData must match Slang
 static_assert(alignof(PackedVertexData) == 4, "PackedVertexData must be 4-byte aligned");
 static_assert(sizeof(GeometryData) == 32, "GeometryData layout mismatch");
 static_assert(alignof(GeometryData) == 8, "GeometryData must be 8-byte aligned");
+
+inline GeometryDataFlags index_type_flag(const vk::IndexType type) {
+    switch (type) {
+    case vk::IndexType::eUint8:
+        return GeometryDataFlags::IndexTypeUint8;
+    case vk::IndexType::eUint16:
+        return GeometryDataFlags::IndexTypeUint16;
+    case vk::IndexType::eUint32:
+        return GeometryDataFlags::IndexTypeUint32;
+    case vk::IndexType::eNoneKHR:
+        return GeometryDataFlags{};
+    default:
+        assert(false);
+        return GeometryDataFlags{};
+    }
+}
 #endif
 
 } // namespace merian

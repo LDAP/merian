@@ -73,7 +73,8 @@ class GLTFMesh : public Mesh,
         idx_base = base;
         primitive_count = prim_count;
         if (base == nullptr) {
-            index_type = vk::IndexType::eUint32;
+            // No glTF indices: triangles use sequential vertex layout.
+            index_type = vk::IndexType::eNoneKHR;
         } else if (gltf_component_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
             index_type = vk::IndexType::eUint16;
         } else if (gltf_component_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT) {
@@ -97,6 +98,8 @@ class GLTFMesh : public Mesh,
         return std::monostate{};
     }
     MeshIndexData get_indices() const override {
+        if (idx_base == nullptr)
+            return std::monostate{};
         return static_cast<HostIndices>(const_cast<GLTFMesh*>(this));
     }
 
@@ -119,16 +122,8 @@ class GLTFMesh : public Mesh,
     // ---- HostIndexSource ----
 
     void write(void* dst) const override {
-        if (idx_base == nullptr) {
-            auto* out = static_cast<uint32_t*>(dst);
-            for (uint32_t p = 0; p < primitive_count; p++) {
-                out[p * 3 + 0] = p * 3;
-                out[p * 3 + 1] = p * 3 + 1;
-                out[p * 3 + 2] = p * 3 + 2;
-            }
-        } else {
-            std::memcpy(dst, idx_base, primitive_count * 3 * size_for_index_type(index_type));
-        }
+        assert(idx_base != nullptr);
+        std::memcpy(dst, idx_base, primitive_count * 3 * size_for_index_type(index_type));
     }
 
   private:
