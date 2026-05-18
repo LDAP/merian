@@ -206,7 +206,7 @@ struct Scene {
         v += barycentrics.z * get_packed_vertex_data(geometry_data, indices.z).unpack();
 
         v.normal = normalize(v.normal);
-        v.tangent = normalize(v.tangent);
+        v.tangent.xyz = normalize(v.tangent.xyz);
 
         return v;
     }
@@ -249,14 +249,22 @@ struct Scene {
         return mul(get_instance_transform(instance_index), float4(object_pos, 1.0)).xyz;
     }
 
-    // Transform object-space direction to world space.
+    // Transform an object-space normal to world space (covariant: uses inverse-transpose).
     float3
-    to_world_direction(const GeometryData gd, const uint instance_index, const float3 object_dir) {
+    to_world_normal(const GeometryData gd, const uint instance_index, const float3 object_normal) {
         if (gd.flags & GeometryDataFlags::Pretransformed)
-            return object_dir;
-        return normalize(
-            mul(get_inverse_transposed_instance_transform(instance_index), float4(object_dir, 0.0))
-                .xyz);
+            return object_normal;
+        return normalize(mul(get_inverse_transposed_instance_transform(instance_index),
+                             float4(object_normal, 0.0))
+                             .xyz);
+    }
+
+    // Transform an object-space vector (edge, tangent, ...) to world space (uses regular M).
+    float3
+    to_world_vector(const GeometryData gd, const uint instance_index, const float3 object_vec) {
+        if (gd.flags & GeometryDataFlags::Pretransformed)
+            return object_vec;
+        return mul((float3x3)get_instance_transform(instance_index), object_vec);
     }
 
     // Transform object-space position to previous frame world space.
@@ -270,19 +278,30 @@ struct Scene {
         return mul(get_prev_instance_transform(instance_index), float4(object_pos, 1.0)).xyz;
     }
 
-    // Transform object-space direction to previous frame world space.
-    float3 to_prev_world_direction(const GeometryData gd,
-                                   const uint instance_index,
-                                   const float3 object_dir) {
+    // Transform an object-space normal to previous-frame world space.
+    float3 to_prev_world_normal(const GeometryData gd,
+                                const uint instance_index,
+                                const float3 object_normal) {
         if (gd.flags & GeometryDataFlags::Pretransformed)
-            return object_dir;
+            return object_normal;
         if ((gd.flags & GeometryDataFlags::IsAnimated) == 0)
             return normalize(mul(get_inverse_transposed_instance_transform(instance_index),
-                                 float4(object_dir, 0.0))
+                                 float4(object_normal, 0.0))
                                  .xyz);
         return normalize(mul(get_prev_inverse_transposed_instance_transform(instance_index),
-                             float4(object_dir, 0.0))
+                             float4(object_normal, 0.0))
                              .xyz);
+    }
+
+    // Transform an object-space vector (edge, tangent, ...) to previous-frame world space.
+    float3 to_prev_world_vector(const GeometryData gd,
+                                const uint instance_index,
+                                const float3 object_vec) {
+        if (gd.flags & GeometryDataFlags::Pretransformed)
+            return object_vec;
+        if ((gd.flags & GeometryDataFlags::IsAnimated) == 0)
+            return mul((float3x3)get_instance_transform(instance_index), object_vec);
+        return mul((float3x3)get_prev_instance_transform(instance_index), object_vec);
     }
 
     // -----------------------------------------

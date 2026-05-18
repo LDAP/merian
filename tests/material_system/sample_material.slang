@@ -16,6 +16,8 @@ void main(ParameterBlock<Params> params) {
     merian::ShadingData sd;
     sd.pos = float3(0, 0, 0);
     sd.uv = half2(0.5, 0.5);
+    sd.frame = merian::OrthonormalFrame(float3(0, 0, 1));
+    sd.face_normal = float3(0, 0, 1);
 
     // Get sample using LOD0 (works in compute, no implicit derivatives)
     merian::LOD0Sampler lod;

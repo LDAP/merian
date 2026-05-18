@@ -29,7 +29,7 @@ struct MaterialSystem {
     // return true if transparent / should be discarded
     bool alpha_test(const MaterialID material_id,
                     const float2 uv,
-                    const LODSampler lod_sampler = DefaultLODSampler()) {
+                    const LODSampler2D lod_sampler = DefaultLODSampler()) {
         const MaterialHeader header = materials[material_id].header;
         if (let texture_id = header.get_alpha_texture_id()) {
             const float alpha = lod_sampler.sample(texture_manager.get_sampler2D(texture_id), uv).a;
@@ -48,7 +48,7 @@ struct MaterialSystem {
 
     MaterialSample get_material_sample(const MaterialID material_id,
                                        const ShadingData sd,
-                                       const LODSampler lod_sampler = DefaultLODSampler()) {
+                                       const LODSampler2D lod_sampler = DefaultLODSampler()) {
         const MaterialModel material_model = get_material(material_id);
         return material_model.get_sample(sd, texture_manager, lod_sampler);
     }

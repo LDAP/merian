@@ -100,6 +100,12 @@ class Camera {
     const float3& get_forward() noexcept;
     const float3& get_right() noexcept;
 
+    // Sub-pixel jitter in render-pixel units; matches DLSS / FSR2 input convention
+    // (X right, Y down, typical range [-0.5, 0.5]). Default 0.
+    void set_jitter(const float2& jitter) noexcept;
+
+    const float2& get_jitter() const noexcept;
+
     void write_to(ShaderCursor cursor);
 
     // High level operations
@@ -170,6 +176,8 @@ class Camera {
     float3 forward_cache;
     float3 right_cache;
     uint64_t ray_basis_change_id_cache = 0;
+
+    float2 jitter = {0.0f, 0.0f};
 
     void recompute_ray_basis();
 };

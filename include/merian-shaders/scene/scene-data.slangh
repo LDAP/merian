@@ -25,6 +25,13 @@ enum GeometryDataFlags : uint16_t {
     IndexTypeUint8 = 0x10,
     IndexTypeUint16 = 0x20,
     IndexTypeUint32 = 0x40,
+
+    // Use the geometric face normal as the shading normal (hard edges, low-poly look).
+    FlatShading = 0x80,
+
+    // Per-vertex tangents are meaningful (asset-supplied or MikkT-generated).
+    // When unset, consumers should derive a UV-aligned tangent on the fly.
+    HasTangents = 0x100,
 };
 
 // See scene.hpp for details.
@@ -36,7 +43,7 @@ struct VertexData {
     float3 position;
     float3 normal;
     float2 uv;
-    float3 tangent;
+    float4 tangent; // xyz: direction, w: bitangent handedness sign (+-1)
 };
 
 #ifndef __cplusplus
@@ -63,26 +70,26 @@ struct PackedVertexData {
     float3 position;
     uint encoded_normal; // oct30 encoded
     half2 uv;
-    uint encoded_tangent; // oct30 encoded + sign bit for bitangent handedness
+    uint encoded_tangent; // see encode_tangent / decode_tangent in encoding.slang
 
 #ifndef __cplusplus
-    __init(float3 position, float3 normal, float2 uv, float3 tangent) {
+    __init(float3 position, float3 normal, float2 uv, float4 tangent) {
         this.position = position;
         this.encoded_normal = encode_normal(normal);
         this.uv = half2(uv);
-        this.encoded_tangent = encode_normal(tangent);
+        this.encoded_tangent = encode_tangent(tangent);
     }
 
     __init(VertexData vertex_data) {
         this.position = vertex_data.position;
         this.encoded_normal = encode_normal(vertex_data.normal);
         this.uv = half2(vertex_data.uv);
-        this.encoded_tangent = encode_normal(vertex_data.tangent);
+        this.encoded_tangent = encode_tangent(vertex_data.tangent);
     }
 
     VertexData unpack() {
         return VertexData(position, decode_normal(encoded_normal), uv,
-                          decode_normal(encoded_tangent));
+                          decode_tangent(encoded_tangent));
     }
 #endif
 };
@@ -113,11 +120,10 @@ struct GeometryData {
     GeometryDataFlags flags;
 };
 
-// Identity transform → "copy only" (a few wasted FMAs, no branches).
 struct TransformVertexJob {
-    VertexBufferAddress src;          // model-space input
-    VertexBufferAddress dst;          // world-space output (may equal src for in-place)
-    PrevVertexBufferAddress prev_dst; // 0 if no synthesized prev
+    VertexBufferAddress src;
+    VertexBufferAddress dst;          // may equal src for in-place
+    PrevVertexBufferAddress prev_dst; // 0 if no prev
     float4x4 transform;
     float4x4 inverse_transposed;
     float4x4 prev_transform;          // unused if prev_dst == 0
@@ -128,7 +134,7 @@ struct TransformVertexJob {
 struct TransformPrevVertexJob {
     PrevVertexBufferAddress src;
     PrevVertexBufferAddress dst;      // may equal src for in-place
-    float4x4 prev_transform;          // identity for "copy only"
+    float4x4 prev_transform;
     uint32_t vertex_count;
     uint32_t _pad[3];
 };

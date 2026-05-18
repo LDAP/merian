@@ -95,6 +95,10 @@ void Scene::rebuild_shader_object() {
         prev_inverse_transposed_instance_transforms_buffer
             ? prev_inverse_transposed_instance_transforms_buffer
             : allocator->get_dummy_buffer();
+
+    if (tlas) {
+        c["as"]["as"] = tlas;
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1015,6 +1019,9 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
                 }
                 if (scene_graph[node_id]->is_animated) {
                     gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::IsAnimated);
+                }
+                if (mesh.flags & MeshFlags::HasTangents) {
+                    gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::HasTangents);
                 }
 
                 geometries.emplace_back(gd);

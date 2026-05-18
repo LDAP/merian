@@ -34,6 +34,8 @@ enum class MeshFlags : uint32_t {
     FrontCounterClockwise = 0x8,
     // default: cull backfaces
     TwoSided = 0x10,
+    // Per-vertex tangents are meaningful; otherwise consumers derive from UVs.
+    HasTangents = 0x20,
 };
 
 constexpr MeshFlags operator|(MeshFlags a, MeshFlags b) {
@@ -68,6 +70,9 @@ inline std::string format_as(const MeshFlags flags) {
     }
     if (flags & MeshFlags::HasVariableTopology) {
         append("HasVariableTopology");
+    }
+    if (flags & MeshFlags::HasTangents) {
+        append("HasTangents");
     }
     return out;
 }

@@ -43,4 +43,17 @@ float3 decode_normal(uint32_t enc) noexcept {
     return float3(x / len, y / len, z / len);
 }
 
+uint32_t encode_tangent(float4 t) noexcept {
+    const float l = sqrtf(t.x * t.x + t.y * t.y + t.z * t.z);
+    const float3 n = (l > 0.f) ? float3(t.x / l, t.y / l, t.z / l) : float3(0, 0, 1);
+    const uint32_t dir = encode_normal(n) & ~1u;
+    return dir | (t.w < 0.f ? 1u : 0u);
+}
+
+float4 decode_tangent(uint32_t enc) noexcept {
+    const float w = (enc & 1u) ? -1.f : 1.f;
+    const float3 dir = decode_normal(enc & ~1u);
+    return float4(dir.x, dir.y, dir.z, w);
+}
+
 } // namespace merian

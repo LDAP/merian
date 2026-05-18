@@ -87,6 +87,15 @@ struct OrthonormalFrame : Frame {
         basis = make_frame(n);
     }
 
+    // Build a frame whose T is the supplied tangent re-orthonormalized against N,
+    // and B = cross(N, T) * handedness_sign. handedness_sign should be +-1.
+    __init(const float3 n, const float3 target_tangent, const float handedness_sign = 1.0) {
+        const float3 N = normalize(n);
+        const float3 T = normalize(target_tangent - N * dot(target_tangent, N));
+        const float3 B = cross(N, T) * handedness_sign;
+        basis = float3x3(T, B, N);
+    }
+
     float3 to_local(const float3 v) {
         return world_to_local(basis, v);
     }
@@ -105,6 +114,18 @@ struct OrthonormalFrame : Frame {
 
     float3 get_normal() {
         return basis[2];
+    }
+
+    // Perturb N with a tangent-space normal-map sample. T is Gram-Schmidt'd against
+    // the new world-space N, B is rebuilt from cross(N, T).
+    OrthonormalFrame apply_normal_map(const float3 n_local) {
+        const float3 new_N = to_world(n_local);
+        const float3 old_T = get_tangent();
+        const float3 new_T = normalize(old_T - new_N * dot(old_T, new_N));
+        const float3 new_B = cross(new_N, new_T);
+        OrthonormalFrame f;
+        f.basis = float3x3(new_T, new_B, new_N);
+        return f;
     }
 }
 

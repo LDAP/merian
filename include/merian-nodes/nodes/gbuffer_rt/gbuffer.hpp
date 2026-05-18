@@ -52,6 +52,7 @@ class GBufferRTNode : public Node {
     ManagedVkImageOutHandle con_hit_info;
     ManagedVkImageOutHandle con_mv;
     ManagedVkImageOutHandle con_albedo;
+    ManagedVkImageOutHandle con_emission;
 
     // Resolution
     vk::Extent3D extent = vk::Extent3D{1920, 1080, 1};
@@ -63,6 +64,8 @@ class GBufferRTNode : public Node {
 
     // ShaderObject for GBuffer parameter
     GBufferHandle gbuffer_obj;
+    // ShaderObject for entry-point globals (e.g. emission texture)
+    ShaderObjectHandle globals_obj;
     std::shared_ptr<FrameCachingShaderObjectAllocator> obj_allocator;
 };
 

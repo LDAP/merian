@@ -114,8 +114,7 @@ class GLTFMesh : public Mesh,
             dst[v].position = pos;
             dst[v].encoded_normal = encode_normal(nrm);
             dst[v].uv = half2(uv.x, uv.y);
-            const uint32_t enc = encode_normal(float3(tan.x, tan.y, tan.z));
-            dst[v].encoded_tangent = (enc & ~1u) | (tan.w < 0.f ? 1u : 0u);
+            dst[v].encoded_tangent = tan_base ? encode_tangent(tan) : 0u;
         }
     }
 
@@ -480,6 +479,9 @@ void GLTFScene::load_meshes() {
                 }
             } else {
                 flags = flags | MeshFlags::IsOpaque;
+            }
+            if (mesh->tan_base != nullptr) {
+                flags = flags | MeshFlags::HasTangents;
             }
 
             mesh->name =

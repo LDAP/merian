@@ -19,4 +19,9 @@ uint32_t encode_normal(float3 vec) noexcept;
 // Inverse of encode_normal.
 float3 decode_normal(uint32_t enc) noexcept;
 
+// Tangent codec: LSB carries handedness sign (0:+1, 1:-1), upper 31 bits the
+// oct direction. Matches encode_tangent/decode_tangent in encoding.slang.
+uint32_t encode_tangent(float4 t) noexcept;
+float4 decode_tangent(uint32_t enc) noexcept;
+
 } // namespace

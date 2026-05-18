@@ -22,12 +22,14 @@ struct Camera {
     float aspect_ratio; // width / height
     float aperture_radius; // 0 = pinhole
 
+    // Sub-pixel jitter in render-pixel units, typical range [-0.5, 0.5].
+    // X-axis right, Y-axis down (matches DLSS / FSR2 input convention).
+    float2 jitter;
+
     // ----------------------------------
 
     float2 pixel_to_ndc(const uint2 pixel, const uint2 frame_dimensions) {
-        const float2 p = (pixel + float2(0.5f, 0.5f)) / frame_dimensions;
-        // if (applyJitter)
-        //     p += float2(-data.jitterX, data.jitterY);
+        const float2 p = (pixel + float2(0.5f, 0.5f) + jitter) / frame_dimensions;
         return float2(2, -2) * p + float2(-1, 1);
     }
 

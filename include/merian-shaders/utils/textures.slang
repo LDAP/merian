@@ -367,41 +367,58 @@ struct LOD0Sampler : LODSampler {
     }
 }
 
-// Uses the textures ::SampleGrad(...) method to sample a LOD using explicit gradients.
-struct GradLODSampler : LODSampler {
-    float grad_x;
-    float grad_y;
-
-    __init(float grad_x, float grad_y) {
-        this.grad_x = grad_x;
-        this.grad_y = grad_y;
-    }
+interface LODSampler2D {
+    [ForceInline]
+    T sample<T : ITexelElement, int format>(
+        const Sampler2D<T, format> tex,
+        const float2 uv);
 
     [ForceInline]
-    T sample<T : ITexelElement,
-             Shape : __ITextureShape,
-             int isArray,
-             int isMS,
-             int sampleCount,
-             int isShadow,
-             int format>(
-        const _Texture<T, Shape, isArray, isMS, sampleCount, 0, isShadow, 1, format> tex,
-        const vector<float, Shape.dimensions + isArray> location) {
-        return tex.SampleGrad(location, grad_x, grad_y);
-    }
-
-    [ForceInline]
-    T sample<T : ITexelElement,
-             Shape : __ITextureShape,
-             int isArray,
-             int isMS,
-             int sampleCount,
-             int isShadow,
-             int format>(
-        const _Texture<T, Shape, isArray, isMS, sampleCount, 0, isShadow, 0, format> tex,
+    T sample<T : ITexelElement, int format>(
+        const Texture2D<T, format> tex,
         const SamplerState s,
-        const vector<float, Shape.dimensions + isArray> location) {
-        return tex.SampleGrad(s, location, grad_x, grad_y);
+        const float2 uv);
+}
+
+extension<S : LODSampler> S : LODSampler2D {
+    [ForceInline]
+    T sample<T : ITexelElement, int format>(
+        const Sampler2D<T, format> tex,
+        const float2 uv) {
+        return this.sample<T, __Shape2D>(tex, uv);
+    }
+
+    [ForceInline]
+    T sample<T : ITexelElement, int format>(
+        const Texture2D<T, format> tex,
+        const SamplerState s,
+        const float2 uv) {
+        return this.sample<T, __Shape2D>(tex, s, uv);
+    }
+}
+
+struct GradLODSampler : LODSampler2D {
+    float2 ddx;
+    float2 ddy;
+
+    __init(float2 ddx, float2 ddy) {
+        this.ddx = ddx;
+        this.ddy = ddy;
+    }
+
+    [ForceInline]
+    T sample<T : ITexelElement, int format>(
+        const Sampler2D<T, format> tex,
+        const float2 uv) {
+        return tex.SampleGrad(uv, ddx, ddy);
+    }
+
+    [ForceInline]
+    T sample<T : ITexelElement, int format>(
+        const Texture2D<T, format> tex,
+        const SamplerState s,
+        const float2 uv) {
+        return tex.SampleGrad(s, uv, ddx, ddy);
     }
 }
 

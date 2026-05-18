@@ -28,7 +28,7 @@ interface MaterialModel {
 
     MaterialSampleImpl get_sample(const ShadingData sd,
                                   const TextureManager texture_manager,
-                                  const LODSampler lod_sampler);
+                                  const LODSampler2D lod_sampler);
 }
 
 // This represents the evaluated material at a point on a surface or in a volume — normals,
@@ -37,14 +37,10 @@ interface MaterialSample {
 
     associatedtype BSDFImpl : BSDF;
 
-    float3 get_emission() {
-        return float3(0);
-    }
+    property float3 emission { get; }
 
     // The local shading frame (for surfaces).
-    Frame get_shading_frame() {
-        return IdentityFrame();
-    }
+    property OrthonormalFrame shading_frame { get; }
 
     // The BSDF for this Material. BSDFs assume a local tangent space with n = (0,
     // 0, 1), t = (1, 0, 0), b = (0, 1, 0). The incident and outgoing direction point away from the
@@ -54,10 +50,7 @@ interface MaterialSample {
     // ------------------------------------------
 
     // the (representative) shading normal in world space. I.e. to guide a denoiser.
-    // Convenience for get_shading_frame().get_normal().
-    float3 get_shading_normal() {
-        return get_shading_frame().get_normal();
-    }
+    property float3 shading_normal { get; }
 }
 
 }

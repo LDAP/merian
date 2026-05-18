@@ -42,4 +42,15 @@ float encode_normal_float(float3 n) {
     return asfloat(encode_normal(n));
 }
 
+// LSB = handedness sign, upper 31 bits = oct direction. Worst-case angular error ~7.5e-5 rad.
+uint encode_tangent(float4 t) {
+    const uint dir = encode_normal(normalize(t.xyz)) & ~1u;
+    return dir | (t.w < 0.f ? 1u : 0u);
+}
+
+float4 decode_tangent(uint enc) {
+    const float w = (enc & 1u) ? -1.f : 1.f;
+    return float4(decode_normal(enc & ~1u), w);
+}
+
 }

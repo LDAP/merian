@@ -26,17 +26,15 @@ void main(uint thread_id: SV_GroupThreadID, uint2 wg_id: SV_GroupID) {
     }
 
     const float3 normal = decode_normal(v_in.encoded_normal);
-    const float3 t_dir = decode_normal(v_in.encoded_tangent & ~1u);
-    const uint t_sign = v_in.encoded_tangent & 1u;
+    const float4 tangent = decode_tangent(v_in.encoded_tangent);
 
     PackedVertexData v_out;
     v_out.position = mul(job.transform, float4(v_in.position, 1.0)).xyz;
     v_out.encoded_normal =
         encode_normal(normalize(mul(job.inverse_transposed, float4(normal, 0.0)).xyz));
     v_out.uv = v_in.uv;
-    const float3 t_world =
-        normalize(mul(job.inverse_transposed, float4(t_dir, 0.0)).xyz);
-    v_out.encoded_tangent = (encode_normal(t_world) & ~1u) | t_sign;
+    const float3 t_world = normalize(mul((float3x3)job.transform, tangent.xyz));
+    v_out.encoded_tangent = encode_tangent(float4(t_world, tangent.w));
 
     job.dst[i] = v_out;
 }

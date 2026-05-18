@@ -191,6 +191,14 @@ const float3& Camera::get_right() noexcept {
     return right_cache;
 }
 
+void Camera::set_jitter(const float2& jitter) noexcept {
+    this->jitter = jitter;
+}
+
+const float2& Camera::get_jitter() const noexcept {
+    return jitter;
+}
+
 void Camera::write_to(ShaderCursor cursor) {
     const float half_fov_tan = std::tan(radians(field_of_view * 0.5f));
     const float3& fwd = get_forward();
@@ -206,6 +214,7 @@ void Camera::write_to(ShaderCursor cursor) {
     cursor["far"] = far_plane;
     cursor["aspect_ratio"] = aspect_ratio;
     cursor["aperture_radius"] = 0.0f;
+    cursor["jitter"] = jitter;
 }
 
 // High level operations
