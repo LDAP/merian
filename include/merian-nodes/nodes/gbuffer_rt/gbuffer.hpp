@@ -12,6 +12,8 @@
 #include "merian/shader/slang_program.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 
+#include <array>
+
 namespace merian {
 
 class GBufferRTNode : public Node {
@@ -56,6 +58,8 @@ class GBufferRTNode : public Node {
 
     // Resolution
     vk::Extent3D extent = vk::Extent3D{1920, 1080, 1};
+
+    std::array<bool, 8> mask_enabled{true, true, true, true, true, true, true, true};
 
     // Slang program + pipeline
     SlangProgramHandle program;

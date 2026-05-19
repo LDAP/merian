@@ -433,11 +433,46 @@ void Scene::properties_mesh(Properties& props, const MeshID mesh_id) {
         return;
     }
     const MeshInfo& info = mesh_infos[mesh_id];
-    const Mesh& mesh = *info.mesh;
+    Mesh& mesh = *info.mesh;
     const MeshGroupID group_id =
         mesh_id < mesh_to_group.size() ? mesh_to_group[mesh_id] : MESH_GROUP_ID_INVALID;
 
     props.output_text("{}", mesh);
+
+    // One toggle per named bit in MeshFlags (skip unused bits). Names sourced
+    // from format_as(MeshFlags) so this stays in sync with the enum definition.
+    // Toggling any of these requires a regroup.
+    if (props.st_begin_child("flags", "flags")) {
+        auto flag_bits = static_cast<uint32_t>(mesh.flags);
+        for (uint32_t bit = 0; bit < 8; ++bit) {
+            const std::string name = fmt::to_string(static_cast<MeshFlags>(1u << bit));
+            if (name.empty())
+                continue;
+            bool on = (flag_bits & (1u << bit)) != 0u;
+            if (props.config_bool(name, on)) {
+                flag_bits = (flag_bits & ~(1u << bit)) | (on ? (1u << bit) : 0u);
+                mesh.flags = static_cast<MeshFlags>(flag_bits);
+                needs_regroup = true;
+            }
+        }
+        props.st_end_child();
+    }
+
+    // 4x2 grid of instance_mask bits. The mask is part of the group split key,
+    // so a change also forces a regroup.
+    if (props.st_begin_child("instance_mask", "instance mask")) {
+        for (uint32_t bit = 0; bit < 8; ++bit) {
+            bool on = (mesh.instance_mask & (1u << bit)) != 0u;
+            if (props.config_bool(std::to_string(bit), on)) {
+                mesh.instance_mask = static_cast<uint8_t>((mesh.instance_mask & ~(1u << bit)) |
+                                                          (on ? (1u << bit) : 0u));
+                needs_regroup = true;
+            }
+            if ((bit & 3u) != 3u)
+                props.st_no_space();
+        }
+        props.st_end_child();
+    }
 
     if (group_id != MESH_GROUP_ID_INVALID &&
         props.st_begin_child("group", fmt::format("group {}", group_id))) {
@@ -780,11 +815,14 @@ void Scene::compute_mesh_groups() {
     mesh_groups.reserve(std::min<std::size_t>(mesh_ids.count(), prev_mesh_groups.size()));
 
     // 1. Group meshes according to our grouping logic (see scene.hpp)
-    // Only FrontCounterClockwise and TwoSided split groups (TLAS instance flags).
-    // IsOpaque is per-geometry, IsMorphed is per-mesh.
+    // FrontCounterClockwise / TwoSided are TLAS-instance flags shared across all
+    // meshes in a group. instance_mask is also written per-TLAS-instance, so it
+    // joins the split key — meshes with different masks must land in different
+    // groups even if their MeshFlags match.
 
-    const auto split_key = [](MeshFlags f) -> uint32_t {
-        return static_cast<uint32_t>(f) & static_cast<uint32_t>(GROUP_SPLIT_MASK);
+    const auto split_key = [](MeshFlags f, uint8_t mask) -> uint32_t {
+        return (static_cast<uint32_t>(f) & static_cast<uint32_t>(GROUP_SPLIT_MASK)) |
+               (static_cast<uint32_t>(mask) << 16);
     };
 
     // static (non-morphed, non-animated): pretransformed, BLAS built once
@@ -818,7 +856,7 @@ void Scene::compute_mesh_groups() {
             continue;
         }
 
-        const uint32_t key = split_key(mesh.flags);
+        const uint32_t key = split_key(mesh.flags, mesh.instance_mask);
         MeshGroupID group_id;
 
         if (info.instances.size() > 1) {
@@ -843,7 +881,8 @@ void Scene::compute_mesh_groups() {
 
         mesh_to_group[mesh_id] = group_id;
         MeshGroup& group = mesh_groups[group_id];
-        group.flags = static_cast<MeshFlags>(key);
+        group.flags = static_cast<MeshFlags>(static_cast<uint32_t>(GROUP_SPLIT_MASK) & key);
+        group.instance_mask = mesh.instance_mask;
         group.has_animated_node |= info.animated_instance_count > 0;
         group.has_morphed_mesh |= mesh.is_morphed();
         group.has_variable_topology_mesh |= mesh.has_variable_topology();
@@ -1580,7 +1619,7 @@ void Scene::build_tlas(const CommandBufferHandle& cmd) {
             vk::AccelerationStructureInstanceKHR tlas_instance{};
 
             tlas_instance.instanceCustomIndex = instance_id;
-            tlas_instance.mask = 0xFF;
+            tlas_instance.mask = group.instance_mask;
             tlas_instance.accelerationStructureReference =
                 group.blas->get_acceleration_structure_device_address();
 

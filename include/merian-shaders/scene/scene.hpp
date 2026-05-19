@@ -181,6 +181,7 @@ class Mesh {
     std::string name;
     MaterialID material_id{};
     MeshFlags flags = MeshFlags::IsOpaque;
+    uint8_t instance_mask = 0x01;
     vk::IndexType index_type = vk::IndexType::eUint32;
 
     // different meanings depending on data type:
@@ -236,11 +237,12 @@ class Mesh {
 using MeshHandle = std::unique_ptr<Mesh>;
 
 inline std::string format_as(const Mesh& mesh) {
-    return fmt::format("vertices: {}\ntriangles: {}\nmaterial id: {}\nflags: {}\nindex type: {}\n"
+    return fmt::format("vertices: {}\ntriangles: {}\nmaterial id: {}\nflags: {}\n"
+                       "instance mask: 0x{:02x}\nindex type: {}\n"
                        "vertices dirty: {}\nindices dirty: {}",
                        mesh.get_vertex_count(), mesh.get_primitive_count(), mesh.material_id,
-                       mesh.flags, vk::to_string(mesh.index_type), mesh.vertices_dirty,
-                       mesh.indices_dirty);
+                       mesh.flags, mesh.instance_mask, vk::to_string(mesh.index_type),
+                       mesh.vertices_dirty, mesh.indices_dirty);
 }
 
 // A suballocation inside one of Scene's shared vertex / prev-vertex / index buffers.
@@ -338,6 +340,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
 
         // only the TLAS-instance-level flags shared by all meshes (GROUP_SPLIT_MASK)
         MeshFlags flags;
+        uint8_t instance_mask = 0xFF;
         // true if any instance node has is_animated set
         bool has_animated_node = false;
         // true if any mesh in the group is morphed

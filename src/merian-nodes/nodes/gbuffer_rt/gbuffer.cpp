@@ -103,6 +103,13 @@ void GBufferRTNode::process(GraphRun& run,
 
     globals_obj->get_cursor()["emission"] = io[con_emission].get_texture();
 
+    uint32_t mask = 0u;
+    for (uint32_t bit = 0; bit < 8; ++bit) {
+        if (mask_enabled[bit])
+            mask |= (1u << bit);
+    }
+    globals_obj->get_cursor()["params"]["instance_mask"] = mask;
+
     if (scene->has_geometry()) {
         cmd->bind(pipeline);
         entry_point->bind_entry_point_parameter("scene", scene->get_shader_object(), cmd, pipeline);
@@ -124,6 +131,13 @@ GBufferRTNode::NodeStatusFlags GBufferRTNode::properties(Properties& config) {
     bool needs_reconnect = false;
     needs_reconnect |= config.config_uint("width", &extent.width);
     needs_reconnect |= config.config_uint("height", &extent.height);
+
+    config.st_separate("instance mask");
+    for (uint32_t bit = 0; bit < 8; ++bit) {
+        config.config_bool(std::to_string(bit), mask_enabled[bit]);
+        if ((bit & 3u) != 3u)
+            config.st_no_space();
+    }
 
     if (needs_reconnect) {
         return NEEDS_RECONNECT;

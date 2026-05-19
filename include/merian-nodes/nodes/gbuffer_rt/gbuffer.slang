@@ -7,6 +7,9 @@ import merian_shaders.colors.debug;
 namespace merian {
 
 RWTexture2D<float4> emission;
+// 8-bit TLAS instance cull mask used by the primary ray query. Per-frame from the host.
+struct GBufferParams { uint instance_mask; };
+ConstantBuffer<GBufferParams> params;
 
 [shader("compute")]
 [numthreads(16, 16, 1)]
@@ -19,7 +22,7 @@ void main(uint3 tid: SV_DispatchThreadID,
         return;
 
     RayDesc ray = scene.camera.generate_ray_pinhole(pixel, gbuffer.get_dimensions());
-    Hit hit = scene.trace_ray(ray);
+    Hit hit = scene.trace_ray(ray, RAY_FLAG_NONE, params.instance_mask);
 
     if (!hit.is_valid()) {
         gbuffer.clear(pixel);
