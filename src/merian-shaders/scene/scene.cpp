@@ -1023,6 +1023,9 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
                 if (mesh.flags & MeshFlags::HasTangents) {
                     gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::HasTangents);
                 }
+                if (mesh.flags & MeshFlags::FlatShading) {
+                    gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::FlatShading);
+                }
 
                 geometries.emplace_back(gd);
             }

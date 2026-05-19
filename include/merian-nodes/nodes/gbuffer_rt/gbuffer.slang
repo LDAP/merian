@@ -46,7 +46,7 @@ void main(uint3 tid: SV_DispatchThreadID,
     float3 edge01 = scene.to_world_vector(gd, hit.instance_index, v1.position - v0.position);
     float3 edge02 = scene.to_world_vector(gd, hit.instance_index, v2.position - v0.position);
     float3 face_normal = normalize(cross(edge01, edge02));
-    if ((gd.flags & GeometryDataFlags::FrontCounterClockwise) == 0) face_normal = -face_normal;
+    if (gd.flags & GeometryDataFlags::FrontCounterClockwise) face_normal = -face_normal;
 
     // Input shading frame: flat → face normal, smooth → interpolated vertex normal.
     float3 input_normal;

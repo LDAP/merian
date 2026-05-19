@@ -36,6 +36,8 @@ enum class MeshFlags : uint32_t {
     TwoSided = 0x10,
     // Per-vertex tangents are meaningful; otherwise consumers derive from UVs.
     HasTangents = 0x20,
+    // Use the geometric face normal as the shading normal (hard edges, low-poly look).
+    FlatShading = 0x40,
 };
 
 constexpr MeshFlags operator|(MeshFlags a, MeshFlags b) {
@@ -73,6 +75,9 @@ inline std::string format_as(const MeshFlags flags) {
     }
     if (flags & MeshFlags::HasTangents) {
         append("HasTangents");
+    }
+    if (flags & MeshFlags::FlatShading) {
+        append("FlatShading");
     }
     return out;
 }
