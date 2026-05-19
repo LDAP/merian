@@ -1,5 +1,7 @@
 #pragma once
 
+#include <mutex>
+
 #include <spdlog/sinks/base_sink.h>
 
 namespace merian {
@@ -9,7 +11,7 @@ class ImguiSpdlogSink : public spdlog::sinks::base_sink<std::mutex> {
 
     using sink_t = spdlog::sinks::base_sink<std::mutex>;
 
-public:
+  public:
     ImguiSpdlogSink(const uint32_t buffer_size_lines = 512);
 
   protected:
