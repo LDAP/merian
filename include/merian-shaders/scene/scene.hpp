@@ -22,308 +22,333 @@
 
 namespace merian {
 
-enum class MeshFlags : uint32_t {
-    None = 0,
-    // default: not; means: vertices can move over time, get_prev_vertices must be valid.
-    IsMorphed = 0x1,
-    // Topology (vertex count, primitive count) can change between frames.
-    HasVariableTopology = 0x2,
-    // default: treat all as non-opaque (allow alpha mask)
-    IsOpaque = 0x4,
-    // default: clockwise
-    FrontCounterClockwise = 0x8,
-    // default: cull backfaces
-    TwoSided = 0x10,
-    // Per-vertex tangents are meaningful; otherwise consumers derive from UVs.
-    HasTangents = 0x20,
-    // Use the geometric face normal as the shading normal (hard edges, low-poly look).
-    FlatShading = 0x40,
-};
-
-constexpr MeshFlags operator|(MeshFlags a, MeshFlags b) {
-    return static_cast<MeshFlags>(static_cast<uint32_t>(a) | static_cast<uint32_t>(b));
-}
-constexpr bool operator&(MeshFlags a, MeshFlags b) {
-    return (static_cast<uint32_t>(a) & static_cast<uint32_t>(b)) != 0;
-}
-
-inline std::string format_as(const MeshFlags flags) {
-    if (flags == MeshFlags::None) {
-        return "None";
-    }
-    std::string out;
-    const auto append = [&](const char* name) {
-        if (!out.empty()) {
-            out += " | ";
-        }
-        out += name;
-    };
-    if (flags & MeshFlags::IsMorphed) {
-        append("IsMorphed");
-    }
-    if (flags & MeshFlags::IsOpaque) {
-        append("IsOpaque");
-    }
-    if (flags & MeshFlags::FrontCounterClockwise) {
-        append("FrontCounterClockwise");
-    }
-    if (flags & MeshFlags::TwoSided) {
-        append("TwoSided");
-    }
-    if (flags & MeshFlags::HasVariableTopology) {
-        append("HasVariableTopology");
-    }
-    if (flags & MeshFlags::HasTangents) {
-        append("HasTangents");
-    }
-    if (flags & MeshFlags::FlatShading) {
-        append("FlatShading");
-    }
-    return out;
-}
-
-using NodeID = uint32_t;
-using MeshID = uint32_t;
-using CameraID = uint32_t;
-
-// Means this node is a root node and its local transform is the global transform.
-static constexpr NodeID NODE_ID_INVALID = UINT32_MAX;
-static constexpr CameraID CAMERA_ID_INVALID = UINT32_MAX;
-
-class SceneNode {
-  public:
-    std::string name;
-
-    // Transform can change over time;.
-    bool is_animated = false;
-
-    NodeID parent = NODE_ID_INVALID;
-    std::vector<NodeID> children;
-
-    float4x4 local_transform = identity();
-
-    // ------------------
-    // Managed by Scene
-
-    // Empty if invalidated; all children must be invalidated as well.
-    std::optional<float4x4> global_transform;
-    // Cached inverse-transpose of global_transform; computed alongside global_transform.
-    std::optional<float4x4> global_inverse_transposed;
-
-    std::optional<float4x4> prev_global_transform;
-    std::optional<float4x4> prev_global_inverse_transposed;
-
-    bool transform_dirty = true;
-};
-
-inline std::string format_as(const SceneNode& node) {
-    return fmt::format(
-        "name: {}\nparent: {}\nnum children: {}\nlocal_transform:\n{}\nglobal_transform:\n{}",
-        node.name.empty() ? "<none>" : node.name, node.parent, node.children.size(),
-        node.local_transform, node.global_transform.value_or(float4x4(0)));
-}
-
-class SceneNode;
-
-class Mesh {
-  public:
-    // ----- Bulk CPU vertex data -----
-    template <typename T> struct HostVertexSource {
-        virtual ~HostVertexSource() = default;
-        virtual void write(T* dst) const = 0;
-    };
-
-    using HostVertices = HostVertexSource<PackedVertexData>*;
-    using HostPrevVertices = HostVertexSource<PackedPrevVertexData>*;
-
-    // ----- Bulk CPU index data -----
-    struct HostIndexSource {
-        virtual ~HostIndexSource() = default;
-        virtual void write(void* dst) const = 0;
-    };
-
-    using HostIndices = HostIndexSource*;
-
-    // ----- Static prepacked CPU Data -----
-    template <typename T> struct HostPacked {
-        const T* data;
-    };
-
-    // ----- GPU Staged Data (Frequently updated CPU data) -----
-    // Non-owning: references a BufferHandle owned by the Mesh subclass.
-    struct DeviceStaged {
-        const BufferHandle& data;
-        vk::DeviceSize offset = 0;
-    };
-
-    // ----- GPU Local Data (Procedural/Static GPU data) -----
-    // Non-owning: references a BufferHandle owned by the Mesh subclass.
-    struct DeviceLocal {
-        const BufferHandle& data;
-    };
-
-    using MeshVertexData =
-        std::variant<HostVertices, HostPacked<PackedVertexData>, DeviceStaged, DeviceLocal>;
-
-    // can be std::monostate for static meshes.
-    using MeshPrevVertexData = std::variant<std::monostate,
-                                            HostPrevVertices,
-                                            HostPacked<PackedPrevVertexData>,
-                                            DeviceStaged,
-                                            DeviceLocal>;
-
-    // Layout depends on Mesh::index_type. std::monostate means no index buffer
-    // (only valid when index_type == eNoneKHR).
-    using MeshIndexData =
-        std::variant<std::monostate, HostIndices, HostPacked<void>, DeviceStaged, DeviceLocal>;
-
-  public:
-    std::string name;
-    MaterialID material_id{};
-    MeshFlags flags = MeshFlags::IsOpaque;
-    uint8_t instance_mask = 0x01;
-    vk::IndexType index_type = vk::IndexType::eUint32;
-
-    // different meanings depending on data type:
-    // - Host*: reupload (+ pretransform) + device copy + TLAS build
-    // - DeviceStaged: device copy (+ pretransform on GPU) + TLAS build
-    // - DeviceLocal: (pretransform on GPU) + TLAS build
-
-    bool vertices_dirty = true;
-    bool indices_dirty = true;
-
-    virtual ~Mesh() = default;
-
-    virtual uint32_t get_vertex_count() const = 0;
-    virtual uint32_t get_primitive_count() const = 0;
-
-    virtual MeshVertexData get_vertices() const = 0;
-    virtual MeshPrevVertexData get_prev_vertices() const = 0;
-    virtual MeshIndexData get_indices() const = 0;
-
-    bool is_morphed() const {
-        return flags & MeshFlags::IsMorphed;
-    }
-
-    bool has_variable_topology() const {
-        return flags & MeshFlags::HasVariableTopology;
-    }
-
-    bool is_front_counterclockwise() const {
-        // Vulkan default is clockwise
-        return flags & MeshFlags::FrontCounterClockwise;
-    }
-
-    bool is_two_sided() const {
-        // if yes, needs to disable backface culling
-        return flags & MeshFlags::TwoSided;
-    }
-
-    bool is_opaque() const {
-        // if yes, allows to set the force opaque flag when raytracing.
-        return flags & MeshFlags::IsOpaque;
-    }
-
-    // false means primitive i has vertices (3i, 3i+1, 3i+2); no index buffer is allocated.
-    bool has_indices() const {
-        return index_type != vk::IndexType::eNoneKHR;
-    }
-
-    bool is_dirty() const {
-        return vertices_dirty || indices_dirty;
-    }
-};
-
-using MeshHandle = std::unique_ptr<Mesh>;
-
-inline std::string format_as(const Mesh& mesh) {
-    return fmt::format("vertices: {}\ntriangles: {}\nmaterial id: {}\nflags: {}\n"
-                       "instance mask: 0x{:02x}\nindex type: {}\n"
-                       "vertices dirty: {}\nindices dirty: {}",
-                       mesh.get_vertex_count(), mesh.get_primitive_count(), mesh.material_id,
-                       mesh.flags, mesh.instance_mask, vk::to_string(mesh.index_type),
-                       mesh.vertices_dirty, mesh.indices_dirty);
-}
-
-// A suballocation inside one of Scene's shared vertex / prev-vertex / index buffers.
-struct MeshBufferRegion {
-    MemoryAllocationHandle suballoc;
-    vk::DeviceSize size = 0;
-    vk::DeviceSize alignment = 1;
-
-    vk::DeviceAddress get_device_address() const {
-        if (!suballoc)
-            return 0;
-        const auto* sub = static_cast<const VMAMemorySubAllocation*>(suballoc.get());
-        return sub->get_suballocator()->get_base_buffer()->get_device_address() + sub->get_offset();
-    }
-
-    vk::DeviceSize get_offset() const {
-        if (!suballoc)
-            return 0;
-        return static_cast<const VMAMemorySubAllocation*>(suballoc.get())->get_offset();
-    }
-
-    explicit operator bool() const {
-        return static_cast<bool>(suballoc) && size > 0;
-    }
-};
-
-// Scene-owned per-mesh record: handle + shared-buffer regions + instance set.
-class MeshInfo {
-  public:
-    MeshHandle mesh;
-
-    MeshBufferRegion vertex_buffer;
-    MeshBufferRegion prev_vertex_buffer;
-    MeshBufferRegion index_buffer;
-
-    SmallSet<NodeID, 1> instances;
-    uint32_t animated_instance_count = 0;
-
-    bool is_dynamic() const {
-        return mesh && (mesh->is_morphed() || animated_instance_count > 0);
-    }
-
-    bool is_static() const {
-        return !is_dynamic();
-    }
-};
-
-class SimpleMesh : public Mesh {
-  public:
-    std::vector<PackedVertexData> vertices;
-    std::vector<PackedPrevVertexData> prev_vertices;
-    std::vector<uint3> indices;
-
-    uint32_t get_vertex_count() const override {
-        return static_cast<uint32_t>(vertices.size());
-    }
-    uint32_t get_primitive_count() const override {
-        return static_cast<uint32_t>(indices.size());
-    }
-
-    MeshVertexData get_vertices() const override {
-        return HostPacked<PackedVertexData>{vertices.data()};
-    }
-    MeshPrevVertexData get_prev_vertices() const override {
-        if (!is_morphed())
-            return std::monostate{};
-        assert(prev_vertices.size() == vertices.size());
-        return HostPacked<PackedPrevVertexData>{prev_vertices.data()};
-    }
-    MeshIndexData get_indices() const override {
-        assert(index_type == vk::IndexType::eUint32);
-        return HostPacked<void>{indices.data()};
-    }
-};
-
-class SceneError : std::runtime_error {
-  public:
-    SceneError(const std::string& msg) : std::runtime_error(msg) {}
-};
-
 class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
+  public:
+    // --------------------------
+    // IDs
+
+    using NodeID = uint32_t;
+    using MeshID = uint32_t;
+    using CameraID = uint32_t;
+
+    // Means this node is a root node and its local transform is the global transform.
+    static constexpr NodeID NODE_ID_INVALID = UINT32_MAX;
+    static constexpr CameraID CAMERA_ID_INVALID = UINT32_MAX;
+
+    // --------------------------
+    // Mesh flags
+
+    enum class MeshFlags : uint32_t {
+        None = 0,
+        // default: not; means: vertices can move over time, get_prev_vertices must be valid.
+        IsMorphed = 0x1,
+        // Topology (vertex count, primitive count) can change between frames.
+        HasVariableTopology = 0x2,
+        // default: treat all as non-opaque (allow alpha mask)
+        IsOpaque = 0x4,
+        // default: clockwise
+        FrontCounterClockwise = 0x8,
+        // default: cull backfaces
+        TwoSided = 0x10,
+        // Per-vertex tangents are meaningful; otherwise consumers derive from UVs.
+        HasTangents = 0x20,
+        // Use the geometric face normal as the shading normal (hard edges, low-poly look).
+        FlatShading = 0x40,
+    };
+
+    friend constexpr MeshFlags operator|(MeshFlags a, MeshFlags b) {
+        return static_cast<MeshFlags>(static_cast<uint32_t>(a) | static_cast<uint32_t>(b));
+    }
+    friend constexpr bool operator&(MeshFlags a, MeshFlags b) {
+        return (static_cast<uint32_t>(a) & static_cast<uint32_t>(b)) != 0;
+    }
+
+    friend inline std::string format_as(const MeshFlags flags) {
+        if (flags == MeshFlags::None) {
+            return "None";
+        }
+        std::string out;
+        const auto append = [&](const char* name) {
+            if (!out.empty()) {
+                out += " | ";
+            }
+            out += name;
+        };
+        if (flags & MeshFlags::IsMorphed) {
+            append("IsMorphed");
+        }
+        if (flags & MeshFlags::IsOpaque) {
+            append("IsOpaque");
+        }
+        if (flags & MeshFlags::FrontCounterClockwise) {
+            append("FrontCounterClockwise");
+        }
+        if (flags & MeshFlags::TwoSided) {
+            append("TwoSided");
+        }
+        if (flags & MeshFlags::HasVariableTopology) {
+            append("HasVariableTopology");
+        }
+        if (flags & MeshFlags::HasTangents) {
+            append("HasTangents");
+        }
+        if (flags & MeshFlags::FlatShading) {
+            append("FlatShading");
+        }
+        return out;
+    }
+
+    // --------------------------
+    // Instance
+
+    // An instance of a mesh at a scene node.
+    struct Instance {
+        NodeID node_id;
+        uint8_t mask;
+
+        Instance(NodeID node_id, uint8_t mask = 0x01) : node_id(node_id), mask(mask) {}
+
+        auto operator<=>(const Instance&) const = default;
+    };
+
+    // --------------------------
+    // Node
+
+    class Node {
+      public:
+        std::string name;
+
+        // Transform can change over time;.
+        bool is_animated = false;
+
+        NodeID parent = NODE_ID_INVALID;
+        std::vector<NodeID> children;
+
+        float4x4 local_transform = identity();
+
+        // ------------------
+        // Managed by Scene
+
+        // Empty if invalidated; all children must be invalidated as well.
+        std::optional<float4x4> global_transform;
+        // Cached inverse-transpose of global_transform; computed alongside global_transform.
+        std::optional<float4x4> global_inverse_transposed;
+
+        std::optional<float4x4> prev_global_transform;
+        std::optional<float4x4> prev_global_inverse_transposed;
+
+        bool transform_dirty = true;
+    };
+
+    friend inline std::string format_as(const Node& node) {
+        return fmt::format(
+            "name: {}\nparent: {}\nnum children: {}\nlocal_transform:\n{}\nglobal_transform:\n{}",
+            node.name.empty() ? "<none>" : node.name, node.parent, node.children.size(),
+            node.local_transform, node.global_transform.value_or(float4x4(0)));
+    }
+
+    // --------------------------
+    // Mesh
+
+    class Mesh {
+      public:
+        // ----- Bulk CPU vertex data -----
+        template <typename T> struct HostVertexSource {
+            virtual ~HostVertexSource() = default;
+            virtual void write(T* dst) const = 0;
+        };
+
+        using HostVertices = HostVertexSource<PackedVertexData>*;
+        using HostPrevVertices = HostVertexSource<PackedPrevVertexData>*;
+
+        // ----- Bulk CPU index data -----
+        struct HostIndexSource {
+            virtual ~HostIndexSource() = default;
+            virtual void write(void* dst) const = 0;
+        };
+
+        using HostIndices = HostIndexSource*;
+
+        // ----- Static prepacked CPU Data -----
+        template <typename T> struct HostPacked {
+            const T* data;
+        };
+
+        // ----- GPU Staged Data (Frequently updated CPU data) -----
+        // Non-owning: references a BufferHandle owned by the Mesh subclass.
+        struct DeviceStaged {
+            const BufferHandle& data;
+            vk::DeviceSize offset = 0;
+        };
+
+        // ----- GPU Local Data (Procedural/Static GPU data) -----
+        // Non-owning: references a BufferHandle owned by the Mesh subclass.
+        struct DeviceLocal {
+            const BufferHandle& data;
+        };
+
+        using MeshVertexData =
+            std::variant<HostVertices, HostPacked<PackedVertexData>, DeviceStaged, DeviceLocal>;
+
+        // can be std::monostate for static meshes.
+        using MeshPrevVertexData = std::variant<std::monostate,
+                                                HostPrevVertices,
+                                                HostPacked<PackedPrevVertexData>,
+                                                DeviceStaged,
+                                                DeviceLocal>;
+
+        // Layout depends on Mesh::index_type. std::monostate means no index buffer
+        // (only valid when index_type == eNoneKHR).
+        using MeshIndexData =
+            std::variant<std::monostate, HostIndices, HostPacked<void>, DeviceStaged, DeviceLocal>;
+
+      public:
+        std::string name;
+        MaterialID material_id{};
+        MeshFlags flags = MeshFlags::IsOpaque;
+        uint8_t instance_mask = 0x01;
+        vk::IndexType index_type = vk::IndexType::eUint32;
+
+        // different meanings depending on data type:
+        // - Host*: reupload (+ pretransform) + device copy + TLAS build
+        // - DeviceStaged: device copy (+ pretransform on GPU) + TLAS build
+        // - DeviceLocal: (pretransform on GPU) + TLAS build
+
+        bool vertices_dirty = true;
+        bool indices_dirty = true;
+
+        virtual ~Mesh() = default;
+
+        virtual uint32_t get_vertex_count() const = 0;
+        virtual uint32_t get_primitive_count() const = 0;
+
+        virtual MeshVertexData get_vertices() const = 0;
+        virtual MeshPrevVertexData get_prev_vertices() const = 0;
+        virtual MeshIndexData get_indices() const = 0;
+
+        bool is_morphed() const {
+            return flags & MeshFlags::IsMorphed;
+        }
+
+        bool has_variable_topology() const {
+            return flags & MeshFlags::HasVariableTopology;
+        }
+
+        bool is_front_counterclockwise() const {
+            // Vulkan default is clockwise
+            return flags & MeshFlags::FrontCounterClockwise;
+        }
+
+        bool is_two_sided() const {
+            // if yes, needs to disable backface culling
+            return flags & MeshFlags::TwoSided;
+        }
+
+        bool is_opaque() const {
+            // if yes, allows to set the force opaque flag when raytracing.
+            return flags & MeshFlags::IsOpaque;
+        }
+
+        // false means primitive i has vertices (3i, 3i+1, 3i+2); no index buffer is allocated.
+        bool has_indices() const {
+            return index_type != vk::IndexType::eNoneKHR;
+        }
+
+        bool is_dirty() const {
+            return vertices_dirty || indices_dirty;
+        }
+    };
+
+    using MeshHandle = std::unique_ptr<Mesh>;
+
+    friend inline std::string format_as(const Mesh& mesh) {
+        return fmt::format("vertices: {}\ntriangles: {}\nmaterial id: {}\nflags: {}\n"
+                           "instance mask: 0x{:02x}\nindex type: {}\n"
+                           "vertices dirty: {}\nindices dirty: {}",
+                           mesh.get_vertex_count(), mesh.get_primitive_count(), mesh.material_id,
+                           mesh.flags, mesh.instance_mask, vk::to_string(mesh.index_type),
+                           mesh.vertices_dirty, mesh.indices_dirty);
+    }
+
+    // A suballocation inside one of Scene's shared vertex / prev-vertex / index buffers.
+    struct MeshBufferRegion {
+        MemoryAllocationHandle suballoc;
+        vk::DeviceSize size = 0;
+        vk::DeviceSize alignment = 1;
+
+        vk::DeviceAddress get_device_address() const {
+            if (!suballoc)
+                return 0;
+            const auto* sub = static_cast<const VMAMemorySubAllocation*>(suballoc.get());
+            return sub->get_suballocator()->get_base_buffer()->get_device_address() +
+                   sub->get_offset();
+        }
+
+        vk::DeviceSize get_offset() const {
+            if (!suballoc)
+                return 0;
+            return static_cast<const VMAMemorySubAllocation*>(suballoc.get())->get_offset();
+        }
+
+        explicit operator bool() const {
+            return static_cast<bool>(suballoc) && size > 0;
+        }
+    };
+
+    // Scene-owned per-mesh record: handle + shared-buffer regions + instance set.
+    class MeshInfo {
+      public:
+        MeshHandle mesh;
+
+        MeshBufferRegion vertex_buffer;
+        MeshBufferRegion prev_vertex_buffer;
+        MeshBufferRegion index_buffer;
+
+        SmallSet<NodeID, 1> instances;
+        uint32_t animated_instance_count = 0;
+
+        bool is_dynamic() const {
+            return mesh && (mesh->is_morphed() || animated_instance_count > 0);
+        }
+
+        bool is_static() const {
+            return !is_dynamic();
+        }
+    };
+
+    class SimpleMesh : public Mesh {
+      public:
+        std::vector<PackedVertexData> vertices;
+        std::vector<PackedPrevVertexData> prev_vertices;
+        std::vector<uint3> indices;
+
+        uint32_t get_vertex_count() const override {
+            return static_cast<uint32_t>(vertices.size());
+        }
+        uint32_t get_primitive_count() const override {
+            return static_cast<uint32_t>(indices.size());
+        }
+
+        MeshVertexData get_vertices() const override {
+            return HostPacked<PackedVertexData>{vertices.data()};
+        }
+        MeshPrevVertexData get_prev_vertices() const override {
+            if (!is_morphed())
+                return std::monostate{};
+            assert(prev_vertices.size() == vertices.size());
+            return HostPacked<PackedPrevVertexData>{prev_vertices.data()};
+        }
+        MeshIndexData get_indices() const override {
+            assert(index_type == vk::IndexType::eUint32);
+            return HostPacked<void>{indices.data()};
+        }
+    };
+
+    class Error : public std::runtime_error {
+      public:
+        Error(const std::string& msg) : std::runtime_error(msg) {}
+    };
+
   private:
     // --------------------------
     // Internal types
@@ -333,7 +358,10 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     // Flags that force group splits (mapped to TLAS instance flags).
     // IsOpaque is per-geometry, IsMorphed is per-mesh — neither splits groups.
     static constexpr MeshFlags GROUP_SPLIT_MASK =
-        MeshFlags::FrontCounterClockwise | MeshFlags::TwoSided;
+        static_cast<MeshFlags>(static_cast<uint32_t>(MeshFlags::FrontCounterClockwise) |
+                               static_cast<uint32_t>(MeshFlags::TwoSided));
+    static_assert(static_cast<uint32_t>(GROUP_SPLIT_MASK) < (1u << 16),
+                  "split_key reserves bits 16-23 for instance_mask");
 
     struct MeshGroup {
         SmallSet<MeshID, 1> meshes;
@@ -472,7 +500,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         return !mesh_infos.empty();
     }
 
-    const std::vector<std::optional<SceneNode>>& get_scene_graph() const {
+    const std::vector<std::optional<Node>>& get_scene_graph() const {
         return scene_graph;
     }
 
@@ -481,13 +509,13 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     }
 
     // to get transforms use get_*_transform(...)
-    const SceneNode& get_node(const NodeID node_id) {
+    const Node& get_node(const NodeID node_id) {
         assert(node_ids.is_used(node_id));
         return *scene_graph[node_id];
     }
 
     // Guarantees that the global transform is available (unlike get_node).
-    const float4x4& get_global_transform(SceneNode& node) {
+    const float4x4& get_global_transform(Node& node) {
         if (!node.global_transform) {
             if (node.parent != NODE_ID_INVALID) {
                 assert(node_ids.is_used(node.parent));
@@ -503,7 +531,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     }
 
     // Guarantees that the global transform is available (unlike get_node).
-    const float4x4& get_global_inverse_transposed_transform(SceneNode& node) {
+    const float4x4& get_global_inverse_transposed_transform(Node& node) {
         if (!node.global_inverse_transposed) {
             node.global_inverse_transposed = inverse(transpose(get_global_transform(node)));
         }
@@ -567,7 +595,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
 
     MeshID add_mesh(MeshHandle mesh);
 
-    NodeID add_node(SceneNode node);
+    NodeID add_node(Node node);
 
     void update_node(NodeID node_id, const float4x4& local_transform);
 
@@ -605,7 +633,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     void rebuild_shader_object();
 
     // invalidates the global transform of this node and its children and marks the node as dirty.
-    void invalidate_node(SceneNode& node);
+    void invalidate_node(Node& node);
 
     // Groups meshes into BLASes according to the logic above.
     // All meshes in a group share the same instances (transforms); one group = one BLAS.
@@ -687,7 +715,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     // Sized to mesh_ids.size(). Released slots have a null mesh.
     std::vector<MeshInfo> mesh_infos;
     FreeList<NodeID> node_ids;
-    std::vector<std::optional<SceneNode>> scene_graph; // sized to node_ids.size()
+    std::vector<std::optional<Node>> scene_graph; // sized to node_ids.size()
     bool pretransform_animated = false;
     float blas_rebuild_fraction = 0.33f;
     uint32_t current_frame = 0;

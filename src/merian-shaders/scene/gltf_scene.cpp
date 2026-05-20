@@ -52,9 +52,9 @@ template <typename T> T read_strided(const uint8_t* base, int byte_stride, uint3
 // glTF meshes carry strided + arbitrarily-typed source data; they aren't in
 // the canonical PackedVertexData layout. GLTFMesh implements
 // HostVertexSource and HostIndexSource for bulk write into device-local buffers.
-class GLTFMesh : public Mesh,
-                 public Mesh::HostVertexSource<PackedVertexData>,
-                 public Mesh::HostIndexSource {
+class GLTFMesh : public Scene::Mesh,
+                 public Scene::Mesh::HostVertexSource<PackedVertexData>,
+                 public Scene::Mesh::HostIndexSource {
   public:
     const uint8_t* pos_base = nullptr;
     int pos_stride = 0;
@@ -454,8 +454,7 @@ void GLTFScene::load_meshes() {
 
             if (prim.indices >= 0) {
                 const auto& idx_acc = model->accessors[prim.indices];
-                mesh->set_indices(get_accessor_base(*model, prim.indices),
-                                  idx_acc.componentType,
+                mesh->set_indices(get_accessor_base(*model, prim.indices), idx_acc.componentType,
                                   static_cast<uint32_t>(idx_acc.count / 3));
             } else {
                 mesh->set_indices(nullptr, 0, mesh->vertex_count / 3);
@@ -503,7 +502,7 @@ void GLTFScene::load_meshes() {
 void GLTFScene::load_node(int gltf_node_index, NodeID parent_id) {
     const auto& gnode = model->nodes[gltf_node_index];
 
-    SceneNode sn;
+    Scene::Node sn;
     sn.name = gnode.name.empty() ? fmt::format("GLTF Node {:02}", gltf_node_index) : gnode.name;
     sn.parent = parent_id;
     sn.local_transform = gltf_node_transform(gnode);
@@ -646,7 +645,7 @@ void GLTFScene::load(const CommandBufferHandle& cmd, const std::filesystem::path
         SPDLOG_WARN("GLTFScene: {}", warn);
     }
     if (!ok) {
-        throw merian::SceneError(
+        throw merian::Scene::Error(
             fmt::format("GLTFScene: failed to load '{}': {}", path.string(), err));
     }
 

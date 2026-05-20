@@ -12,6 +12,12 @@
 
 using namespace merian;
 
+using MeshHandle = Scene::MeshHandle;
+using SimpleMesh = Scene::SimpleMesh;
+using MeshFlags = Scene::MeshFlags;
+using MeshID = Scene::MeshID;
+using NodeID = Scene::NodeID;
+
 #ifndef TEST_SHADER_DIR
 #define TEST_SHADER_DIR "."
 #endif
@@ -117,13 +123,13 @@ TEST_F(SceneTest, SceneGraphTransforms) {
     auto scene = std::make_shared<TestScene>(compile_context, context, allocator, obj_allocator,
                                              material_system);
 
-    SceneNode root;
+    Scene::Node root;
     root.name = "root";
     root.local_transform = translation(float3(2, 0, 0));
     NodeID root_id = scene->add_node(root);
     EXPECT_EQ(root_id, 0u);
 
-    SceneNode child;
+    Scene::Node child;
     child.name = "child";
     child.parent = root_id;
     child.local_transform = translation(float3(0, 3, 0));
@@ -146,7 +152,7 @@ TEST_F(SceneTest, MeshGroupingStatic) {
                                              material_system);
     scene->add_camera(std::make_shared<Camera>());
 
-    SceneNode node;
+    Scene::Node node;
     node.name = "node0";
     NodeID nid = scene->add_node(node);
 
@@ -172,7 +178,7 @@ TEST_F(SceneTest, MeshGroupingInstanced) {
                                              material_system);
     scene->add_camera(std::make_shared<Camera>());
 
-    SceneNode n0, n1;
+    Scene::Node n0, n1;
     n0.name = "inst0";
     n1.name = "inst1";
     NodeID nid0 = scene->add_node(n0);
@@ -196,7 +202,7 @@ TEST_F(SceneTest, MeshGroupingDynamic) {
                                              material_system);
     scene->add_camera(std::make_shared<Camera>());
 
-    SceneNode n0, n1;
+    Scene::Node n0, n1;
     n0.name = "dyn0";
     n0.is_animated = true;
     n1.name = "dyn1";
@@ -286,16 +292,16 @@ TEST_F(SceneTest, RemoveNodeCascadesAndDetachesInstances) {
                                              material_system);
     scene->add_camera(std::make_shared<Camera>());
 
-    SceneNode root_node;
+    Scene::Node root_node;
     root_node.name = "root";
     NodeID root = scene->add_node(root_node);
 
-    SceneNode child_node;
+    Scene::Node child_node;
     child_node.name = "child";
     child_node.parent = root;
     NodeID child = scene->add_node(child_node);
 
-    SceneNode leaf_node;
+    Scene::Node leaf_node;
     leaf_node.name = "leaf";
     leaf_node.parent = child;
     NodeID leaf = scene->add_node(leaf_node);

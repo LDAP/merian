@@ -55,7 +55,7 @@ void GLTFSceneNode::process([[maybe_unused]] GraphRun& run,
                                             material_system);
         try {
             scene->load(cmd, file_path);
-        } catch (const merian::SceneError& e) {
+        } catch (const merian::Scene::Error& e) {
         }
         needs_load = false;
     }

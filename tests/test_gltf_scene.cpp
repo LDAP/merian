@@ -44,9 +44,9 @@ class GLTFSceneTest : public ::testing::Test {
         compile_context->add_search_path(TEST_SHADER_DIR);
         obj_allocator = std::make_shared<SimpleShaderObjectAllocator>(allocator);
         texture_manager = std::make_shared<TextureManager>(compile_context, context, allocator,
-                                                            obj_allocator, 16);
+                                                           obj_allocator, 16);
         material_system = std::make_shared<MaterialSystem>(compile_context, context, allocator,
-                                                            obj_allocator, texture_manager);
+                                                           obj_allocator, texture_manager);
     }
 
     static void TearDownTestSuite() {
@@ -75,12 +75,10 @@ MaterialSystemHandle GLTFSceneTest::material_system;
 
 TEST_F(GLTFSceneTest, LoadCubeGLTF) {
     auto scene = std::make_shared<GLTFScene>(compile_context, context, allocator, obj_allocator,
-                                              material_system);
+                                             material_system);
 
-    std::filesystem::path cube_path =
-        std::filesystem::path(TEST_MODEL_DIR) / "Cube" / "Cube.gltf";
-    ASSERT_TRUE(std::filesystem::exists(cube_path))
-        << "Test model not found: " << cube_path;
+    std::filesystem::path cube_path = std::filesystem::path(TEST_MODEL_DIR) / "Cube" / "Cube.gltf";
+    ASSERT_TRUE(std::filesystem::exists(cube_path)) << "Test model not found: " << cube_path;
 
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         scene->load(cmd, cube_path);
@@ -99,18 +97,16 @@ TEST_F(GLTFSceneTest, LoadCubeGLTF) {
 
 TEST_F(GLTFSceneTest, LoadBoxGLB) {
     // Reset material system for a clean state
-    texture_manager = std::make_shared<TextureManager>(compile_context, context, allocator,
-                                                        obj_allocator, 16);
+    texture_manager =
+        std::make_shared<TextureManager>(compile_context, context, allocator, obj_allocator, 16);
     material_system = std::make_shared<MaterialSystem>(compile_context, context, allocator,
-                                                        obj_allocator, texture_manager);
+                                                       obj_allocator, texture_manager);
 
     auto scene = std::make_shared<GLTFScene>(compile_context, context, allocator, obj_allocator,
-                                              material_system);
+                                             material_system);
 
-    std::filesystem::path glb_path =
-        std::filesystem::path(TEST_MODEL_DIR) / "box01.glb";
-    ASSERT_TRUE(std::filesystem::exists(glb_path))
-        << "Test model not found: " << glb_path;
+    std::filesystem::path glb_path = std::filesystem::path(TEST_MODEL_DIR) / "box01.glb";
+    ASSERT_TRUE(std::filesystem::exists(glb_path)) << "Test model not found: " << glb_path;
 
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         scene->load(cmd, glb_path);
@@ -126,16 +122,15 @@ TEST_F(GLTFSceneTest, LoadBoxGLB) {
 // ---------------------------------------------------------------------------
 
 TEST_F(GLTFSceneTest, SceneGraphHierarchy) {
-    texture_manager = std::make_shared<TextureManager>(compile_context, context, allocator,
-                                                        obj_allocator, 16);
+    texture_manager =
+        std::make_shared<TextureManager>(compile_context, context, allocator, obj_allocator, 16);
     material_system = std::make_shared<MaterialSystem>(compile_context, context, allocator,
-                                                        obj_allocator, texture_manager);
+                                                       obj_allocator, texture_manager);
 
     auto scene = std::make_shared<GLTFScene>(compile_context, context, allocator, obj_allocator,
-                                              material_system);
+                                             material_system);
 
-    std::filesystem::path cube_path =
-        std::filesystem::path(TEST_MODEL_DIR) / "Cube" / "Cube.gltf";
+    std::filesystem::path cube_path = std::filesystem::path(TEST_MODEL_DIR) / "Cube" / "Cube.gltf";
     ASSERT_TRUE(std::filesystem::exists(cube_path));
 
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
@@ -147,7 +142,7 @@ TEST_F(GLTFSceneTest, SceneGraphHierarchy) {
     const auto& graph = scene->get_scene_graph();
     bool has_root = false;
     for (const auto& node : graph) {
-        if (node && node->parent == NODE_ID_INVALID) {
+        if (node && node->parent == Scene::NODE_ID_INVALID) {
             has_root = true;
             break;
         }

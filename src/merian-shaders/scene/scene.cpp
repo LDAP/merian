@@ -113,7 +113,7 @@ void Scene::rebuild_shader_object() {
 //     return true;
 // }
 
-MeshID Scene::add_mesh(MeshHandle mesh) {
+Scene::MeshID Scene::add_mesh(MeshHandle mesh) {
     assert(mesh);
     const MeshID id = mesh_ids.acquire();
     if (id >= mesh_infos.size()) {
@@ -124,7 +124,7 @@ MeshID Scene::add_mesh(MeshHandle mesh) {
     return id;
 }
 
-NodeID Scene::add_node(SceneNode node) {
+Scene::NodeID Scene::add_node(Node node) {
     const NodeID id = node_ids.acquire();
 
     if (id >= scene_graph.size()) {
@@ -141,7 +141,7 @@ NodeID Scene::add_node(SceneNode node) {
     return id;
 }
 
-void Scene::invalidate_node(SceneNode& node) {
+void Scene::invalidate_node(Node& node) {
     node.global_transform.reset();
     node.global_inverse_transposed.reset();
     node.transform_dirty = true;
@@ -160,7 +160,7 @@ void Scene::update_node(NodeID node_id, const float4x4& local_transform) {
     assert(node_id < scene_graph.size());
     assert(scene_graph[node_id]);
 
-    SceneNode& node = *scene_graph[node_id];
+    Node& node = *scene_graph[node_id];
     assert(node.is_animated);
 
     if (node.local_transform != local_transform) {
@@ -227,7 +227,7 @@ void Scene::remove_mesh(const MeshID mesh_id) {
 
 void Scene::remove_node(const NodeID node_id) {
     assert(node_ids.is_used(node_id));
-    SceneNode& node = *scene_graph[node_id];
+    Node& node = *scene_graph[node_id];
 
     // Remove from parent's children list.
     if (node.parent != NODE_ID_INVALID) {
@@ -259,7 +259,7 @@ void Scene::remove_node(const NodeID node_id) {
     scene_graph.resize(node_ids.size());
 }
 
-CameraID Scene::add_camera(CameraHandle camera) {
+Scene::CameraID Scene::add_camera(CameraHandle camera) {
     const CameraID id = cameras.size();
     cameras.push_back(std::move(camera));
     return id;
@@ -411,12 +411,12 @@ void Scene::properties_node(Properties& props, const NodeID node_id) {
         props.output_text("<node {} not available>", node_id);
         return;
     }
-    const SceneNode& node = *scene_graph[node_id];
+    const Node& node = *scene_graph[node_id];
     props.output_text("{}", node);
 
     for (uint32_t i = 0; i < node.children.size(); i++) {
         const NodeID child_id = node.children[i];
-        const SceneNode& child = *scene_graph[child_id];
+        const Node& child = *scene_graph[child_id];
         if (props.st_begin_child(fmt::format("child_{:02}", child_id),
                                  fmt::format("Child {:04}: {}", child_id, child.name))) {
             properties_node(props, child_id);
@@ -480,8 +480,7 @@ void Scene::properties_mesh(Properties& props, const MeshID mesh_id) {
         props.st_end_child();
     }
 
-    if (props.st_begin_child("instances",
-                             fmt::format("instances ({})", info.instances.size()))) {
+    if (props.st_begin_child("instances", fmt::format("instances ({})", info.instances.size()))) {
         for (const NodeID node_id : info.instances) {
             const std::string node_name = (node_id < scene_graph.size() && scene_graph[node_id])
                                               ? scene_graph[node_id]->name
@@ -504,8 +503,7 @@ void Scene::properties_mesh_group(Properties& props, const MeshGroupID group_id)
         return;
     }
     const MeshGroup& group = mesh_groups[group_id];
-    const std::size_t instances =
-        group.meshes.empty() ? 0 : group.get_instances(mesh_infos).size();
+    const std::size_t instances = group.meshes.empty() ? 0 : group.get_instances(mesh_infos).size();
     const bool pretransformed =
         !group.meshes.empty() && group.is_pretranformed(mesh_infos, pretransform_animated);
 
@@ -529,9 +527,8 @@ void Scene::properties_mesh_group(Properties& props, const MeshGroupID group_id)
 
     if (props.st_begin_child("members", fmt::format("members ({})", group.meshes.size()))) {
         for (const MeshID mesh_id : group.meshes) {
-            const std::string mesh_name = mesh_infos[mesh_id].mesh
-                                              ? mesh_infos[mesh_id].mesh->name
-                                              : std::string{"<dead>"};
+            const std::string mesh_name =
+                mesh_infos[mesh_id].mesh ? mesh_infos[mesh_id].mesh->name : std::string{"<dead>"};
             if (props.st_begin_child(fmt::format("mesh_{:04}", mesh_id),
                                      fmt::format("{:04}: {}", mesh_id, mesh_name))) {
                 properties_mesh(props, mesh_id);
@@ -544,8 +541,7 @@ void Scene::properties_mesh_group(Properties& props, const MeshGroupID group_id)
 
 void Scene::properties_cameras(Properties& props) {
     if (!cameras.empty()) {
-        props.config_uint("active", active_camera, "", 0u,
-                          static_cast<uint32_t>(cameras.size()));
+        props.config_uint("active", active_camera, "", 0u, static_cast<uint32_t>(cameras.size()));
         if (props.is_ui()) {
             props.st_separate("Active Camera");
             get_active_camera()->properties(props);
@@ -608,14 +604,13 @@ void Scene::properties_mesh_groups(Properties& props) {
         std::string label;
         if (group.meshes.size() == 1) {
             const MeshID only = *group.meshes.begin();
-            const std::string mesh_name = mesh_infos[only].mesh
-                                              ? mesh_infos[only].mesh->name
-                                              : std::string{"<dead>"};
+            const std::string mesh_name =
+                mesh_infos[only].mesh ? mesh_infos[only].mesh->name : std::string{"<dead>"};
             label = fmt::format("{:04}: {} (1 mesh, {:04}: {})", group_id, group.flags, only,
                                 mesh_name);
         } else {
-            label = fmt::format("{:04}: {} ({} meshes)", group_id, group.flags,
-                                group.meshes.size());
+            label =
+                fmt::format("{:04}: {} ({} meshes)", group_id, group.flags, group.meshes.size());
         }
         if (props.st_begin_child(fmt::format("group_{:04}", group_id), label)) {
             properties_mesh_group(props, group_id);
@@ -628,7 +623,7 @@ void Scene::properties_graph(Properties& props) {
     if (!props.is_ui())
         return;
     for (const NodeID id : node_ids) {
-        const SceneNode& node = *scene_graph[id];
+        const Node& node = *scene_graph[id];
         if (node.parent != NODE_ID_INVALID) {
             continue;
         }
@@ -651,8 +646,7 @@ void Scene::properties_explorer(Properties& props) {
         properties_meshes(props);
         props.st_end_child();
     }
-    if (props.st_begin_child("mesh_groups",
-                             fmt::format("Mesh Groups ({})", mesh_groups.size()))) {
+    if (props.st_begin_child("mesh_groups", fmt::format("Mesh Groups ({})", mesh_groups.size()))) {
         properties_mesh_groups(props);
         props.st_end_child();
     }
@@ -948,7 +942,7 @@ void Scene::upload_transforms(const CommandBufferHandle& cmd) {
         const bool pretransform = group.is_pretranformed(mesh_infos, pretransform_animated);
 
         for (const NodeID node_id : group.get_instances(mesh_infos)) {
-            SceneNode& node = *scene_graph[node_id];
+            Node& node = *scene_graph[node_id];
             const float4x4& global_transform = get_global_transform(node);
             const float4x4& global_inverse_transposed_transform =
                 get_global_inverse_transposed_transform(node);
@@ -1026,7 +1020,7 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
         const bool pretransform = group.is_pretranformed(mesh_infos, pretransform_animated);
 
         for (const NodeID node_id : group.get_instances(mesh_infos)) {
-            SceneNode& node = *scene_graph[node_id];
+            Node& node = *scene_graph[node_id];
             const bool transform_is_identity = get_global_transform(node) == identity_transform;
 
             for (const MeshID mesh_id : group.meshes) {
@@ -1374,15 +1368,13 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                     }
 
                     const float4x4 prev_M =
-                        pretransform_prev
-                            ? scene_graph[node_id]->prev_global_transform.value_or(M)
-                            : float4x4(identity());
+                        pretransform_prev ? scene_graph[node_id]->prev_global_transform.value_or(M)
+                                          : float4x4(identity());
                     vertex_jobs.push_back(TransformVertexJob{
                         .src = vertex_src_addr,
                         .dst = info.vertex_buffer.get_device_address(),
-                        .prev_dst = pretransform_prev
-                                        ? info.prev_vertex_buffer.get_device_address()
-                                        : 0,
+                        .prev_dst =
+                            pretransform_prev ? info.prev_vertex_buffer.get_device_address() : 0,
                         .transform = pretransform_mesh ? M : float4x4(identity()),
                         .inverse_transposed = pretransform_mesh ? M_it : float4x4(identity()),
                         .prev_transform = prev_M,
@@ -1493,8 +1485,8 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
             triangles.vertexStride = sizeof(PackedVertexData);
             triangles.maxVertex = mesh.get_vertex_count() - 1;
             triangles.indexType = mesh.index_type;
-            triangles.indexData = info.index_buffer ? info.index_buffer.get_device_address()
-                                                    : vk::DeviceAddress{0};
+            triangles.indexData =
+                info.index_buffer ? info.index_buffer.get_device_address() : vk::DeviceAddress{0};
 
             vk::AccelerationStructureGeometryKHR geom;
             geom.geometryType = vk::GeometryTypeKHR::eTriangles;
@@ -1752,7 +1744,7 @@ void Scene::update(const CommandBufferHandle& cmd,
     // Advance prev transforms after upload_meshes (prev-vertex jobs read them).
     for (const NodeID& nid : node_ids) {
         assert(scene_graph[nid]);
-        SceneNode& n = *scene_graph[nid];
+        Node& n = *scene_graph[nid];
         n.prev_global_transform = n.global_transform;
         n.prev_global_inverse_transposed = n.global_inverse_transposed;
     }
