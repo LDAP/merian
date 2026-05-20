@@ -24,19 +24,17 @@ namespace merian {
 
 class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
   public:
-    // --------------------------
-    // IDs
+    // --- IDs ---
 
     using NodeID = uint32_t;
     using MeshID = uint32_t;
     using CameraID = uint32_t;
 
-    // Means this node is a root node and its local transform is the global transform.
+    // Root nodes use NODE_ID_INVALID as parent; their local_transform is the global transform.
     static constexpr NodeID NODE_ID_INVALID = UINT32_MAX;
     static constexpr CameraID CAMERA_ID_INVALID = UINT32_MAX;
 
-    // --------------------------
-    // Mesh flags
+    // --- Mesh flags ---
 
     enum class MeshFlags : uint32_t {
         None = 0,
@@ -98,10 +96,9 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         return out;
     }
 
-    // --------------------------
-    // Instance
+    // --- Instance ---
 
-    // An instance of a mesh at a scene node.
+    // A mesh placed at a scene node.
     struct Instance {
         NodeID node_id;
         uint8_t mask;
@@ -111,27 +108,23 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         auto operator<=>(const Instance&) const = default;
     };
 
-    // --------------------------
-    // Node
+    // --- Node ---
 
     class Node {
       public:
         std::string name;
 
-        // Transform can change over time;.
-        bool is_animated = false;
+        bool is_animated = false; // transform can change between frames
 
         NodeID parent = NODE_ID_INVALID;
         std::vector<NodeID> children;
 
         float4x4 local_transform = identity();
 
-        // ------------------
-        // Managed by Scene
+        // --- Managed by Scene ---
 
-        // Empty if invalidated; all children must be invalidated as well.
+        // Empty when invalidated; children must be invalidated too.
         std::optional<float4x4> global_transform;
-        // Cached inverse-transpose of global_transform; computed alongside global_transform.
         std::optional<float4x4> global_inverse_transposed;
 
         std::optional<float4x4> prev_global_transform;
@@ -147,8 +140,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
             node.local_transform, node.global_transform.value_or(float4x4(0)));
     }
 
-    // --------------------------
-    // Mesh
+    // --- Mesh ---
 
     class Mesh {
       public:
@@ -197,8 +189,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
                                                 DeviceStaged,
                                                 DeviceLocal>;
 
-        // Layout depends on Mesh::index_type. std::monostate means no index buffer
-        // (only valid when index_type == eNoneKHR).
+        // monostate means no index buffer (only valid when index_type == eNoneKHR).
         using MeshIndexData =
             std::variant<std::monostate, HostIndices, HostPacked<void>, DeviceStaged, DeviceLocal>;
 
@@ -209,11 +200,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         uint8_t instance_mask = 0x01;
         vk::IndexType index_type = vk::IndexType::eUint32;
 
-        // different meanings depending on data type:
-        // - Host*: reupload (+ pretransform) + device copy + TLAS build
-        // - DeviceStaged: device copy (+ pretransform on GPU) + TLAS build
-        // - DeviceLocal: (pretransform on GPU) + TLAS build
-
+        // Dirty triggers reupload/copy + TLAS rebuild; cost depends on the data variant.
         bool vertices_dirty = true;
         bool indices_dirty = true;
 
@@ -249,7 +236,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
             return flags & MeshFlags::IsOpaque;
         }
 
-        // false means primitive i has vertices (3i, 3i+1, 3i+2); no index buffer is allocated.
+        // false: primitive i has vertices (3i, 3i+1, 3i+2); no index buffer is allocated.
         bool has_indices() const {
             return index_type != vk::IndexType::eNoneKHR;
         }
@@ -295,7 +282,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         }
     };
 
-    // Scene-owned per-mesh record: handle + shared-buffer regions + instance set.
+    // Scene-owned per-mesh record.
     class MeshInfo {
       public:
         MeshHandle mesh;
@@ -350,13 +337,11 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     };
 
   private:
-    // --------------------------
-    // Internal types
+    // --- Internal types ---
 
     using MeshGroupID = uint32_t;
 
-    // Flags that force group splits (mapped to TLAS instance flags).
-    // IsOpaque is per-geometry, IsMorphed is per-mesh — neither splits groups.
+    // Flags that map to TLAS instance flags and therefore force group splits.
     static constexpr MeshFlags GROUP_SPLIT_MASK =
         static_cast<MeshFlags>(static_cast<uint32_t>(MeshFlags::FrontCounterClockwise) |
                                static_cast<uint32_t>(MeshFlags::TwoSided));
@@ -393,11 +378,10 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
             return mesh_infos[*this->meshes.begin()].instances;
         }
 
-        // means the Scene uploads the meshes in this group pretransformed and the instance
-        // transform should be the identity.
-        // TODO: pretransforming non-morphed animated meshes effectively makes them morphed
-        // (vertices change each frame) — they need a prev vertex buffer for motion vectors.
-        bool is_pretranformed(const std::vector<MeshInfo>& mesh_infos,
+        // True if vertices are uploaded pretransformed and the TLAS instance transform is identity.
+        // TODO: pretransforming animated non-morphed meshes makes them effectively morphed and
+        //       requires a prev vertex buffer for motion vectors.
+        bool is_pretransformed(const std::vector<MeshInfo>& mesh_infos,
                               bool pretransform_animated) const {
             assert(!mesh_infos.empty());
             const MeshInfo& info = mesh_infos[*this->meshes.begin()];
@@ -464,13 +448,6 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     const SlangCompositionHandle& get_composition() const {
         return composition;
     }
-
-    // Enable once Slang link time types work
-    // bool set_build_acceleration_structure(bool build);
-
-    // bool get_build_acceleration_structure() const {
-    //     return build_as;
-    // }
 
     const MaterialSystemHandle& get_material_system() const {
         return material_system;
@@ -693,8 +670,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     void properties_statistics(Properties& props);
 
   private:
-    // --------------------------
-    // Context etc.
+    // --- Context ---
 
     ShaderCompileContextHandle compile_context;
     ContextHandle context;
@@ -707,8 +683,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
 
     ASBuilder as_builder;
 
-    // --------------------------
-    // Scene definition
+    // --- Scene definition ---
 
     MaterialSystemHandle material_system;
     FreeList<MeshID> mesh_ids;
@@ -767,13 +742,12 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     std::vector<BufferHandle> pending_buffer_releases;
     std::vector<AccelerationStructureHandle> pending_blas_releases;
 
-    // --------------------------
-    // Debug
+    // --- Debug ---
+
     bool enable_debug_camera = false;
     CameraID debug_camera_id = CAMERA_ID_INVALID;
 
-    // --------------------------
-    // Cached and Precomputed
+    // --- Cached and precomputed ---
 
     bool needs_regroup = false;      // a mesh was instanced
     bool transforms_changed = false; // a node was updated
@@ -781,12 +755,10 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
 
     inline static const MeshGroupID MESH_GROUP_ID_INVALID = MeshGroupID(-1);
     std::vector<MeshGroup> mesh_groups;
-    // MeshID -> GroupID (MESH_GROUP_ID_INVALID if not in group, eg. because there was no instance
-    // of the mesh)
+    // MeshID -> GroupID; MESH_GROUP_ID_INVALID for meshes with no instances.
     std::vector<MeshGroupID> mesh_to_group;
 
-    // --------------------------
-    // GPU data
+    // --- GPU data ---
 
     // Shared scene buffers: one backing buffer per kind, suballocated per-mesh.
     VMAMemorySubAllocatorHandle shared_vb_suballoc;

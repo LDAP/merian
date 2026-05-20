@@ -21,9 +21,7 @@
 
 namespace merian {
 
-// ---------------------------------------------------------------------------
-// Constructor
-// ---------------------------------------------------------------------------
+// --- Constructor ---
 
 Scene::Scene(const ShaderCompileContextHandle& compile_context,
              const ContextHandle& context,
@@ -101,17 +99,7 @@ void Scene::rebuild_shader_object() {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Scene building
-// ---------------------------------------------------------------------------
-
-// bool Scene::set_build_acceleration_structure(bool build) {
-//     if (build_as == build)
-//         return false;
-//     build_as = build;
-//     // TODO: rebuild composition once link-time AS type is re-enabled
-//     return true;
-// }
+// --- Scene building ---
 
 Scene::MeshID Scene::add_mesh(MeshHandle mesh) {
     assert(mesh);
@@ -284,9 +272,7 @@ void Scene::set_active_camera(const uint32_t index) {
     active_camera = index;
 }
 
-// ---------------------------------------------------------------------------
-// Batched GPU transform
-// ---------------------------------------------------------------------------
+// --- Batched GPU transform ---
 
 namespace {
 
@@ -399,7 +385,7 @@ bool Scene::needs_prev_vertices(const MeshGroup& group, const MeshInfo& info) co
     const Mesh& mesh = *info.mesh;
     if (mesh.is_morphed() || mesh.has_variable_topology())
         return true;
-    if (!group.is_pretranformed(mesh_infos, pretransform_animated))
+    if (!group.is_pretransformed(mesh_infos, pretransform_animated))
         return false;
     return scene_graph[*info.instances.begin()]->is_animated;
 }
@@ -439,9 +425,7 @@ void Scene::properties_mesh(Properties& props, const MeshID mesh_id) {
 
     props.output_text("{}", mesh);
 
-    // One toggle per named bit in MeshFlags (skip unused bits). Names sourced
-    // from format_as(MeshFlags) so this stays in sync with the enum definition.
-    // Toggling any of these requires a regroup.
+    // Names sourced from format_as(MeshFlags) so this stays in sync with the enum.
     if (props.st_begin_child("flags", "flags")) {
         auto flag_bits = static_cast<uint32_t>(mesh.flags);
         for (uint32_t bit = 0; bit < 8; ++bit) {
@@ -458,8 +442,7 @@ void Scene::properties_mesh(Properties& props, const MeshID mesh_id) {
         props.st_end_child();
     }
 
-    // 4x2 grid of instance_mask bits. The mask is part of the group split key,
-    // so a change also forces a regroup.
+    // instance_mask is part of the group split key, so any change forces a regroup.
     if (props.st_begin_child("instance_mask", "instance mask")) {
         for (uint32_t bit = 0; bit < 8; ++bit) {
             bool on = (mesh.instance_mask & (1u << bit)) != 0u;
@@ -505,7 +488,7 @@ void Scene::properties_mesh_group(Properties& props, const MeshGroupID group_id)
     const MeshGroup& group = mesh_groups[group_id];
     const std::size_t instances = group.meshes.empty() ? 0 : group.get_instances(mesh_infos).size();
     const bool pretransformed =
-        !group.meshes.empty() && group.is_pretranformed(mesh_infos, pretransform_animated);
+        !group.meshes.empty() && group.is_pretransformed(mesh_infos, pretransform_animated);
 
     std::size_t group_vertices = 0;
     std::size_t group_triangles = 0;
@@ -599,8 +582,7 @@ void Scene::properties_mesh_groups(Properties& props) {
         return;
     for (MeshGroupID group_id = 0; group_id < mesh_groups.size(); group_id++) {
         const MeshGroup& group = mesh_groups[group_id];
-        // When the group holds a single mesh, surface that mesh inline so the
-        // explorer is navigable without expanding every row.
+        // single-mesh groups: surface the mesh inline so the explorer stays navigable.
         std::string label;
         if (group.meshes.size() == 1) {
             const MeshID only = *group.meshes.begin();
@@ -664,137 +646,133 @@ void Scene::properties_settings(Properties& props) {
     props.config_percent("BLAS Rebuild Fraction", blas_rebuild_fraction);
 }
 
-void Scene::properties(Properties& props) {
+void Scene::properties_statistics(Properties& props) {
+    std::size_t total_vertices = 0;
+    std::size_t total_triangles = 0;
+    std::size_t total_instances = 0;
+    std::size_t morphed_meshes = 0;
+    std::size_t dynamic_meshes = 0;
+    std::size_t animated_instance_meshes = 0;
+    std::size_t variable_topology_meshes = 0;
+    std::size_t animated_instances = 0;
+    for (const MeshID id : mesh_ids) {
+        const MeshInfo& info = mesh_infos[id];
+        const Mesh& mesh = *info.mesh;
+        total_vertices += mesh.get_vertex_count();
+        total_triangles += mesh.get_primitive_count();
+        total_instances += info.instances.size();
+        animated_instances += info.animated_instance_count;
+        if (mesh.is_morphed())
+            morphed_meshes++;
+        if (info.is_dynamic())
+            dynamic_meshes++;
+        if (info.animated_instance_count > 0)
+            animated_instance_meshes++;
+        if (mesh.has_variable_topology())
+            variable_topology_meshes++;
+    }
 
+    props.output_text(
+        "nodes:       {}\n"
+        "meshes:      {} (dynamic: {}, morphed: {}, animated: {}, var_topo: {})\n"
+        "instances:   {} (animated: {})\n"
+        "mesh groups: {}\n"
+        "vertices:    {}\n"
+        "triangles:   {}\n"
+        "materials:   {}\n"
+        "textures:    {}\n"
+        "tlas:        {} instances\n"
+        "flags:       needs_regroup={}, transforms_changed={}, pretransform_animated={}\n"
+        "pending buffer releases: {}",
+        node_ids.count(), mesh_ids.count(), dynamic_meshes, morphed_meshes,
+        animated_instance_meshes, variable_topology_meshes, total_instances, animated_instances,
+        mesh_groups.size(), total_vertices, total_triangles, material_system->get_material_count(),
+        get_texture_manager()->get_texture_count(), tlas_instances.size(), needs_regroup,
+        transforms_changed, pretransform_animated, pending_buffer_releases.size());
+
+    if (aabb.is_valid()) {
+        props.output_text("aabb: min={}, max={}, size={}", aabb.get_min(), aabb.get_max(),
+                          aabb.get_max() - aabb.get_min());
+    } else {
+        props.output_text("aabb: <not available>");
+    }
+
+    props.st_separate("Per Frame");
+    props.output_text(
+        "meshes uploaded: {} (device_local: {}, device_staged: {}, host_packed: {}, "
+        "host_unpacked: {})\n"
+        "upload:          {} ({} vertices, {} primitives)\n"
+        "vertex xfm:      {} jobs ({} vertices)\n"
+        "prev vertex xfm: {} jobs ({} vertices)\n"
+        "xfm job buffers: {}\n"
+        "blas:            {} ops (builds_static: {}, builds_dynamic: {}, updates: {})\n"
+        "tlas:            {} ({} instances)\n"
+        "buffers:         allocated: {}, released: {}\n"
+        "gpu data:        geometry {}, transforms {}, tlas instances {}",
+        frame_stats.meshes_uploaded(), frame_stats.meshes_uploaded_device_local,
+        frame_stats.meshes_uploaded_device_staged, frame_stats.meshes_uploaded_host_packed,
+        frame_stats.meshes_uploaded_host_unpacked, format_size(frame_stats.upload_bytes),
+        frame_stats.vertices_uploaded, frame_stats.indices_uploaded,
+        frame_stats.gpu_vertex_transforms, frame_stats.gpu_vertex_transform_vertices,
+        frame_stats.gpu_prev_vertex_transforms, frame_stats.gpu_prev_vertex_transform_vertices,
+        format_size(frame_stats.gpu_transform_buffer_bytes),
+        frame_stats.blas_builds + frame_stats.blas_updates, frame_stats.blas_builds_static,
+        frame_stats.blas_builds_dynamic, frame_stats.blas_updates,
+        frame_stats.tlas_rebuilt ? "rebuilt" : "unchanged", frame_stats.tlas_instance_count,
+        frame_stats.buffers_allocated, frame_stats.buffers_released,
+        format_size(frame_stats.geometry_data_bytes), format_size(frame_stats.transform_data_bytes),
+        format_size(frame_stats.tlas_instance_data_bytes));
+
+    props.st_separate("Shared Buffers");
+    const auto block_text = [&](const char* name, const VMAMemorySubAllocatorHandle& slot,
+                                const vk::DeviceSize capacity) {
+        if (!slot) {
+            props.output_text("{:<14} <not allocated>", name);
+            return;
+        }
+        const VmaDetailedStatistics s = slot->get_detailed_statistics();
+        const auto fmt_size = [](const vk::DeviceSize x) {
+            return x == VK_WHOLE_SIZE ? std::string{"-"} : format_size(x);
+        };
+        const double fill = s.statistics.blockBytes == 0
+                                ? 0.0
+                                : 100.0 * static_cast<double>(s.statistics.allocationBytes) /
+                                      static_cast<double>(s.statistics.blockBytes);
+        props.output_text("{:<14} {} / {} ({:.1f}% fill) — allocs: {} ({}..{}), free: {} "
+                          "ranges ({}..{})",
+                          fmt::format("{}:", name), format_size(s.statistics.allocationBytes),
+                          format_size(capacity), fill, s.statistics.allocationCount,
+                          fmt_size(s.allocationSizeMin), fmt_size(s.allocationSizeMax),
+                          s.unusedRangeCount, fmt_size(s.unusedRangeSizeMin),
+                          fmt_size(s.unusedRangeSizeMax));
+    };
+    block_text("shared_vb", shared_vb_suballoc, shared_vb_capacity);
+    block_text("shared_prev_vb", shared_prev_vb_suballoc, shared_prev_vb_capacity);
+    block_text("shared_ib", shared_ib_suballoc, shared_ib_capacity);
+    if (frame_staging) {
+        props.output_text("{:<14} {} (bump-allocated, persistently mapped)",
+                          "frame_staging:", format_size(frame_staging->get_capacity()));
+    } else {
+        props.output_text("{:<14} <not allocated>", "frame_staging:");
+    }
+}
+
+void Scene::properties(Properties& props) {
     if (props.st_begin_child("scene", "Explorer")) {
         properties_explorer(props);
         props.st_end_child();
     }
-
     if (props.st_begin_child("settings", "Settings")) {
         properties_settings(props);
         props.st_end_child();
     }
-
     if (props.st_begin_child("stats", "Statistics")) {
-        std::size_t total_vertices = 0;
-        std::size_t total_triangles = 0;
-        std::size_t total_instances = 0;
-        std::size_t morphed_meshes = 0;
-        std::size_t dynamic_meshes = 0;
-        std::size_t animated_instance_meshes = 0;
-        std::size_t variable_topology_meshes = 0;
-        std::size_t animated_instances = 0;
-        for (const MeshID id : mesh_ids) {
-            const MeshInfo& info = mesh_infos[id];
-            const Mesh& mesh = *info.mesh;
-            total_vertices += mesh.get_vertex_count();
-            total_triangles += mesh.get_primitive_count();
-            total_instances += info.instances.size();
-            animated_instances += info.animated_instance_count;
-            if (mesh.is_morphed())
-                morphed_meshes++;
-            if (info.is_dynamic())
-                dynamic_meshes++;
-            if (info.animated_instance_count > 0)
-                animated_instance_meshes++;
-            if (mesh.has_variable_topology())
-                variable_topology_meshes++;
-        }
-
-        props.output_text(
-            "nodes:       {}\n"
-            "meshes:      {} (dynamic: {}, morphed: {}, animated: {}, var_topo: {})\n"
-            "instances:   {} (animated: {})\n"
-            "mesh groups: {}\n"
-            "vertices:    {}\n"
-            "triangles:   {}\n"
-            "materials:   {}\n"
-            "textures:    {}\n"
-            "tlas:        {} instances\n"
-            "flags:       needs_regroup={}, transforms_changed={}, pretransform_animated={}\n"
-            "pending buffer releases: {}",
-            node_ids.count(), mesh_ids.count(), dynamic_meshes, morphed_meshes,
-            animated_instance_meshes, variable_topology_meshes, total_instances, animated_instances,
-            mesh_groups.size(), total_vertices, total_triangles,
-            material_system->get_material_count(), get_texture_manager()->get_texture_count(),
-            tlas_instances.size(), needs_regroup, transforms_changed, pretransform_animated,
-            pending_buffer_releases.size());
-
-        if (aabb.is_valid()) {
-            props.output_text("aabb: min={}, max={}, size={}", aabb.get_min(), aabb.get_max(),
-                              aabb.get_max() - aabb.get_min());
-        } else {
-            props.output_text("aabb: <not available>");
-        }
-
-        props.st_separate("Per Frame");
-        props.output_text(
-            "meshes uploaded: {} (device_local: {}, device_staged: {}, host_packed: {}, "
-            "host_unpacked: {})\n"
-            "upload:          {} ({} vertices, {} primitives)\n"
-            "vertex xfm:      {} jobs ({} vertices)\n"
-            "prev vertex xfm: {} jobs ({} vertices)\n"
-            "xfm job buffers: {}\n"
-            "blas:            {} ops (builds_static: {}, builds_dynamic: {}, updates: {})\n"
-            "tlas:            {} ({} instances)\n"
-            "buffers:         allocated: {}, released: {}\n"
-            "gpu data:        geometry {}, transforms {}, tlas instances {}",
-            frame_stats.meshes_uploaded(), frame_stats.meshes_uploaded_device_local,
-            frame_stats.meshes_uploaded_device_staged, frame_stats.meshes_uploaded_host_packed,
-            frame_stats.meshes_uploaded_host_unpacked, format_size(frame_stats.upload_bytes),
-            frame_stats.vertices_uploaded, frame_stats.indices_uploaded,
-            frame_stats.gpu_vertex_transforms, frame_stats.gpu_vertex_transform_vertices,
-            frame_stats.gpu_prev_vertex_transforms, frame_stats.gpu_prev_vertex_transform_vertices,
-            format_size(frame_stats.gpu_transform_buffer_bytes),
-            frame_stats.blas_builds + frame_stats.blas_updates, frame_stats.blas_builds_static,
-            frame_stats.blas_builds_dynamic, frame_stats.blas_updates,
-            frame_stats.tlas_rebuilt ? "rebuilt" : "unchanged", frame_stats.tlas_instance_count,
-            frame_stats.buffers_allocated, frame_stats.buffers_released,
-            format_size(frame_stats.geometry_data_bytes),
-            format_size(frame_stats.transform_data_bytes),
-            format_size(frame_stats.tlas_instance_data_bytes));
-
-        props.st_separate("Shared Buffers");
-        const auto block_text = [&](const char* name, const VMAMemorySubAllocatorHandle& slot,
-                                    const vk::DeviceSize capacity) {
-            if (!slot) {
-                props.output_text("{:<14} <not allocated>", name);
-                return;
-            }
-            const VmaDetailedStatistics s = slot->get_detailed_statistics();
-            const auto fmt_size = [](const vk::DeviceSize x) {
-                return x == VK_WHOLE_SIZE ? std::string{"-"} : format_size(x);
-            };
-            const double fill = s.statistics.blockBytes == 0
-                                    ? 0.0
-                                    : 100.0 * static_cast<double>(s.statistics.allocationBytes) /
-                                          static_cast<double>(s.statistics.blockBytes);
-            props.output_text("{:<14} {} / {} ({:.1f}% fill) — allocs: {} ({}..{}), free: {} "
-                              "ranges ({}..{})",
-                              fmt::format("{}:", name), format_size(s.statistics.allocationBytes),
-                              format_size(capacity), fill, s.statistics.allocationCount,
-                              fmt_size(s.allocationSizeMin), fmt_size(s.allocationSizeMax),
-                              s.unusedRangeCount, fmt_size(s.unusedRangeSizeMin),
-                              fmt_size(s.unusedRangeSizeMax));
-        };
-        block_text("shared_vb", shared_vb_suballoc, shared_vb_capacity);
-        block_text("shared_prev_vb", shared_prev_vb_suballoc, shared_prev_vb_capacity);
-        block_text("shared_ib", shared_ib_suballoc, shared_ib_capacity);
-        if (frame_staging) {
-            props.output_text("{:<14} {} (bump-allocated, persistently mapped)",
-                              "frame_staging:", format_size(frame_staging->get_capacity()));
-        } else {
-            props.output_text("{:<14} <not allocated>", "frame_staging:");
-        }
-
+        properties_statistics(props);
         props.st_end_child();
     }
 }
 
-// ---------------------------------------------------------------------------
-// Scene update
-// ---------------------------------------------------------------------------
+// --- Scene update ---
 
 void Scene::compute_mesh_groups() {
     MERIAN_PROFILE_SCOPE("Scene::compute_mesh_groups");
@@ -808,12 +786,8 @@ void Scene::compute_mesh_groups() {
     prev_mesh_to_group.resize(mesh_ids.size(), MESH_GROUP_ID_INVALID);
     mesh_groups.reserve(std::min<std::size_t>(mesh_ids.count(), prev_mesh_groups.size()));
 
-    // 1. Group meshes according to our grouping logic (see scene.hpp)
-    // FrontCounterClockwise / TwoSided are TLAS-instance flags shared across all
-    // meshes in a group. instance_mask is also written per-TLAS-instance, so it
-    // joins the split key — meshes with different masks must land in different
-    // groups even if their MeshFlags match.
-
+    // 1. Group meshes according to the grouping logic in scene.hpp. The split key
+    //    holds the TLAS-instance flags (GROUP_SPLIT_MASK) plus instance_mask.
     const auto split_key = [](MeshFlags f, uint8_t mask) -> uint32_t {
         return (static_cast<uint32_t>(f) & static_cast<uint32_t>(GROUP_SPLIT_MASK)) |
                (static_cast<uint32_t>(mask) << 16);
@@ -889,10 +863,8 @@ void Scene::compute_mesh_groups() {
         MeshGroup& group = mesh_groups[group_id];
         assert(!group.meshes.empty());
 
-        // BLAS-space vertices change iff the mesh is morphed, or pretransform_animated
-        // bakes a changing node transform into the vertices. An animated node alone
-        // (with pretransform_animated off) only moves the TLAS instance, so the BLAS
-        // is static and needs neither rebuild nor AllowUpdate.
+        // BLAS-space vertices change when the mesh is morphed or pretransform bakes
+        // a moving node transform in; an animated node alone only moves the TLAS instance.
         const bool blas_vertices_change =
             group.has_morphed_mesh || (group.has_animated_node && pretransform_animated);
         if (!blas_vertices_change) {
@@ -904,8 +876,8 @@ void Scene::compute_mesh_groups() {
             group.blas_build_flags = vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastBuild;
         }
 
-        // We can check the first mesh only, since if thats not in the old group we cant reuse the
-        // group / BLAS anyway.
+        // Checking the first mesh suffices — if it changed group, the BLAS can't be reused.
+        // blas_dirty is computed later by upload_meshes (this method doesn't run every frame).
         MeshGroupID maybe_prev_group = prev_mesh_to_group[*group.meshes.begin()];
         if (maybe_prev_group != MESH_GROUP_ID_INVALID) {
             MeshGroup& prev_group = prev_mesh_groups[maybe_prev_group];
@@ -913,9 +885,6 @@ void Scene::compute_mesh_groups() {
                 prev_group.blas_build_flags == group.blas_build_flags) {
                 group.blas = prev_group.blas;
                 group.cached_blas_size_info = prev_group.cached_blas_size_info;
-                // blas_dirty is computed later when we upload the meshes, because this method is
-                // not run every frame. We later also check if the blas can be actually reused or
-                // if a new one is necessary.
             }
         }
     }
@@ -939,7 +908,7 @@ void Scene::upload_transforms(const CommandBufferHandle& cmd) {
         MeshGroup& group = mesh_groups[group_id];
         assert(!group.meshes.empty());
 
-        const bool pretransform = group.is_pretranformed(mesh_infos, pretransform_animated);
+        const bool pretransform = group.is_pretransformed(mesh_infos, pretransform_animated);
 
         for (const NodeID node_id : group.get_instances(mesh_infos)) {
             Node& node = *scene_graph[node_id];
@@ -1017,7 +986,7 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
         MeshGroup& group = mesh_groups[group_id];
         assert(!group.meshes.empty());
 
-        const bool pretransform = group.is_pretranformed(mesh_infos, pretransform_animated);
+        const bool pretransform = group.is_pretransformed(mesh_infos, pretransform_animated);
 
         for (const NodeID node_id : group.get_instances(mesh_infos)) {
             Node& node = *scene_graph[node_id];
@@ -1240,7 +1209,7 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
         for (MeshGroupID group_id = 0; group_id < mesh_groups.size(); group_id++) {
             MeshGroup& group = mesh_groups[group_id];
             const bool pretransform_group =
-                group.is_pretranformed(mesh_infos, pretransform_animated);
+                group.is_pretransformed(mesh_infos, pretransform_animated);
             // Pretransformed animated meshes must be re-pretransformed when the node moved.
             const bool check_node_transform = pretransform_group && group.has_animated_node;
 
@@ -1438,8 +1407,7 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
 
     if (!index_copies.empty()) {
         MERIAN_PROFILE_SCOPE_GPU(cmd, "index_copy");
-        // Source buffers (Quake's brush_ib etc., or our own frame_staging) may have been written
-        // earlier in the same cmd via cmd_to_device / updateBuffer. Sync transfer-write -> read.
+        // Source buffers may have been written earlier in the same cmd; sync transfer write→read.
         cmd->barrier(vk::MemoryBarrier2{
             vk::PipelineStageFlagBits2::eTransfer | vk::PipelineStageFlagBits2::eHost,
             vk::AccessFlagBits2::eTransferWrite | vk::AccessFlagBits2::eHostWrite,
@@ -1615,7 +1583,7 @@ void Scene::build_tlas(const CommandBufferHandle& cmd) {
             tlas_instance.accelerationStructureReference =
                 group.blas->get_acceleration_structure_device_address();
 
-            if (group.is_pretranformed(mesh_infos, pretransform_animated)) {
+            if (group.is_pretransformed(mesh_infos, pretransform_animated)) {
                 // Use identity
                 tlas_instance.transform.matrix[0][0] = 1.f;
                 tlas_instance.transform.matrix[1][1] = 1.f;
@@ -1713,19 +1681,15 @@ void Scene::update(const CommandBufferHandle& cmd,
         material_system->update(cmd);
     }
 
-    // do that before to upload geometry buffers, because that clears the dirty flags!
+    // Must run before upload_meshes, which clears the dirty flags.
     if (needs_regroup) {
         compute_mesh_groups();
     }
 
-    // needs to be moved once nodes support animating the transforms
-    if (true /*needs_regroup || transforms_changed*/) {
-        // TODO: only run if transforms changed (or in previous transformations changed)
-        upload_transforms(cmd);
-    }
+    // TODO: skip when neither needs_regroup nor transforms_changed
+    upload_transforms(cmd);
 
-    // Allocate/upload vertex/index buffers first so their device addresses are available
-    // when GeometryData is written below.
+    // Must precede upload_geometry_data so device addresses are available.
     upload_meshes(cmd);
 
     if (!vertex_jobs.empty() || !prev_vertex_jobs.empty()) {
@@ -1763,30 +1727,27 @@ void Scene::update(const CommandBufferHandle& cmd,
         vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eAccelerationStructureReadKHR,
     });
 
-    if (true /*build_as*/) {
-        build_blas(cmd);
-        // TODO: compact the static BLASes -> reduce memory bandwidth and increase performance.
+    // TODO: gate on a build_as toggle once Slang link-time types work (cf. top of file).
+    // TODO: compact static BLASes to reduce memory bandwidth.
+    build_blas(cmd);
 
-        tlas_dirty |= needs_regroup || transforms_changed;
-
-        if (tlas_dirty || !tlas) {
-            build_tlas(cmd);
-            tlas_dirty = false;
-            frame_stats.tlas_rebuilt = true;
-            frame_stats.tlas_instance_count = static_cast<uint32_t>(tlas_instances.size());
-            frame_stats.tlas_instance_data_bytes =
-                tlas_instances.size() * sizeof(vk::AccelerationStructureInstanceKHR);
-        }
-
-        cmd->barrier(vk::MemoryBarrier2{
-            vk::PipelineStageFlagBits2::eTransfer |
-                vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
-            vk::AccessFlagBits2::eTransferWrite |
-                vk::AccessFlagBits2::eAccelerationStructureWriteKHR,
-            vk::PipelineStageFlagBits2::eAllCommands,
-            vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eAccelerationStructureReadKHR,
-        });
+    tlas_dirty |= needs_regroup || transforms_changed;
+    if (tlas_dirty || !tlas) {
+        build_tlas(cmd);
+        tlas_dirty = false;
+        frame_stats.tlas_rebuilt = true;
+        frame_stats.tlas_instance_count = static_cast<uint32_t>(tlas_instances.size());
+        frame_stats.tlas_instance_data_bytes =
+            tlas_instances.size() * sizeof(vk::AccelerationStructureInstanceKHR);
     }
+
+    cmd->barrier(vk::MemoryBarrier2{
+        vk::PipelineStageFlagBits2::eTransfer |
+            vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
+        vk::AccessFlagBits2::eTransferWrite | vk::AccessFlagBits2::eAccelerationStructureWriteKHR,
+        vk::PipelineStageFlagBits2::eAllCommands,
+        vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eAccelerationStructureReadKHR,
+    });
 
     for (const NodeID& nid : node_ids) {
         scene_graph[nid]->transform_dirty = false;
