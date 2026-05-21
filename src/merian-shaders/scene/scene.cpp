@@ -644,6 +644,11 @@ void Scene::properties_settings(Properties& props) {
         set_pretransform_animated(pretransform);
     }
     props.config_percent("BLAS Rebuild Fraction", blas_rebuild_fraction);
+
+    float alpha_threshold = material_system->get_alpha_test_threshold();
+    if (props.config_float("Alpha Test Threshold", alpha_threshold, "", 0.01F)) {
+        material_system->set_alpha_test_threshold(alpha_threshold);
+    }
 }
 
 void Scene::properties_statistics(Properties& props) {
@@ -944,6 +949,11 @@ void Scene::upload_transforms(const CommandBufferHandle& cmd) {
         if (!instance_transforms_buffer ||
             instance_transforms_buffer->get_size() < transforms_size) {
 
+            cmd->keep_until_pool_reset(instance_transforms_buffer);
+            cmd->keep_until_pool_reset(inverse_transposed_instance_transforms_buffer);
+            cmd->keep_until_pool_reset(prev_instance_transforms_buffer);
+            cmd->keep_until_pool_reset(prev_inverse_transposed_instance_transforms_buffer);
+
             const auto transform_usage =
                 vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst;
             instance_transforms_buffer =
@@ -1040,6 +1050,8 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
     if (!geometries.empty()) {
         const vk::DeviceSize geometries_size = geometries.size() * sizeof(GeometryData);
         if (!geometries_buffer || geometries_buffer->get_size() < geometries_size) {
+            cmd->keep_until_pool_reset(geometries_buffer);
+
             geometries_buffer = allocator->create_buffer(
                 geometries.size() * sizeof(GeometryData),
                 vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
@@ -1662,6 +1674,10 @@ void Scene::update(const CommandBufferHandle& cmd,
         on_update(cmd, time, time_diff, frame);
     }
 
+    if (!is_ready()) {
+        return;
+    }
+
     assert(!cameras.empty() &&
            "the scene implementation must ensure that there is at least one camera");
 
@@ -1686,8 +1702,11 @@ void Scene::update(const CommandBufferHandle& cmd,
         compute_mesh_groups();
     }
 
-    // TODO: skip when neither needs_regroup nor transforms_changed
-    upload_transforms(cmd);
+    // transforms_changed_last_frame: account for prev_transforms
+    if (needs_regroup || transforms_changed || transforms_changed_last_frame) {
+        upload_transforms(cmd);
+    }
+    transforms_changed_last_frame = transforms_changed;
 
     // Must precede upload_geometry_data so device addresses are available.
     upload_meshes(cmd);

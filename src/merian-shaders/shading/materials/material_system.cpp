@@ -46,12 +46,29 @@ void MaterialSystem::update_composition_constants() {
                                                  payload_uints));
 }
 
+void MaterialSystem::set_alpha_test_threshold(const float threshold) {
+    if (threshold == alpha_test_threshold) {
+        return;
+    }
+    alpha_test_threshold = threshold;
+    composition->add_module_from_string(
+        "material_system_alpha_threshold",
+        fmt::format("namespace merian {{ export static const float "
+                    "merian_alpha_test_threshold = {:.6f}; }}",
+                    threshold));
+}
+
 void MaterialSystem::rebuild_shader_object() {
     SPDLOG_DEBUG("recreate shader object");
 
     shader_object =
         layout_program->create_shader_object(context, "merian::MaterialSystem", obj_allocator);
-    shader_object->get_cursor()["texture_manager"] = texture_manager->get_shader_object();
+    auto cursor = shader_object->get_cursor();
+    cursor["texture_manager"] = texture_manager->get_shader_object();
+    if (material_buffer) {
+        cursor["material_count"] = static_cast<uint32_t>(materials.size());
+        cursor["materials"] = material_buffer;
+    }
 
     texture_manager->on_changed(shader_object, [&] {
         shader_object->get_cursor()["texture_manager"] = texture_manager->get_shader_object();

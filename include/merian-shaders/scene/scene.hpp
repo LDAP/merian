@@ -382,7 +382,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         // TODO: pretransforming animated non-morphed meshes makes them effectively morphed and
         //       requires a prev vertex buffer for motion vectors.
         bool is_pretransformed(const std::vector<MeshInfo>& mesh_infos,
-                              bool pretransform_animated) const {
+                               bool pretransform_animated) const {
             assert(!mesh_infos.empty());
             const MeshInfo& info = mesh_infos[*this->meshes.begin()];
             if (info.instances.size() > 1)
@@ -457,6 +457,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         return material_system->get_texture_manager();
     }
 
+    // Caller must check is_ready() first — otherwise resources may be stale or unset.
     const ShaderObjectHandle& get_shader_object() const {
         return shader_object;
     }
@@ -470,6 +471,11 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     CameraHandle get_camera(const CameraID camera_id) const;
 
     CameraHandle get_active_camera() const;
+
+    // Must be true before binding the shader object. Subclasses override.
+    virtual bool is_ready() const {
+        return false;
+    }
 
     void set_active_camera(uint32_t index);
 
@@ -605,6 +611,8 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         if (buffer)
             pending_buffer_releases.push_back(std::move(buffer));
     }
+
+
 
   private:
     void rebuild_shader_object();
@@ -751,6 +759,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
 
     bool needs_regroup = false;      // a mesh was instanced
     bool transforms_changed = false; // a node was updated
+    bool transforms_changed_last_frame = false;
     bool tlas_dirty = false;
 
     inline static const MeshGroupID MESH_GROUP_ID_INVALID = MeshGroupID(-1);

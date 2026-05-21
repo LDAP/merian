@@ -110,7 +110,7 @@ void GBufferRTNode::process(GraphRun& run,
     }
     globals_obj->get_cursor()["params"]["instance_mask"] = mask;
 
-    if (scene->has_geometry()) {
+    if (scene->is_ready()) {
         cmd->bind(pipeline);
         entry_point->bind_entry_point_parameter("scene", scene->get_shader_object(), cmd, pipeline);
         entry_point->bind_entry_point_parameter("gbuffer", gbuffer_obj->get_write_shader_object(),

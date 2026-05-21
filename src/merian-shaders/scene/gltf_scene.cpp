@@ -1,5 +1,6 @@
 #include "merian-shaders/scene/gltf_scene.hpp"
 
+#include "merian-shaders/shading/materials/gltf_material.hpp"
 #include "merian/utils/normal_encoding.hpp"
 #include "merian/vk/utils/math.hpp"
 
@@ -18,8 +19,8 @@ GLTFScene::GLTFScene(const ShaderCompileContextHandle& compile_context,
                      const MaterialSystemHandle& material_system)
     : Scene(compile_context, context, allocator, obj_allocator, material_system) {
 
-    diffuse_type_id = material_system->register_material_type(
-        "merian::DiffuseMaterial", "merian-shaders/shading/materials/diffuse-material.slang");
+    gltf_type_id = material_system->register_material_type(GLTF_MATERIAL_SLANG_TYPE_NAME,
+                                                           GLTF_MATERIAL_SLANG_MODULE_PATH);
 }
 
 GLTFScene::~GLTFScene() = default;
@@ -321,24 +322,55 @@ void GLTFScene::load_materials(const CommandBufferHandle& cmd) {
         const auto& gmat = model->materials[i];
         const auto& pbr = gmat.pbrMetallicRoughness;
 
-        DiffuseMaterial mat;
-        mat.base_color_factor = float4(
+        GltfMaterial mat;
+
+        // base color (sRGB texture × linear factor)
+        mat.payload.base_color_factor = float4(
             static_cast<float>(pbr.baseColorFactor[0]), static_cast<float>(pbr.baseColorFactor[1]),
             static_cast<float>(pbr.baseColorFactor[2]), static_cast<float>(pbr.baseColorFactor[3]));
-
-        // baseColor is an sRGB color texture (glTF spec, "PBR Methodology").
         if (pbr.baseColorTexture.index >= 0) {
             mat.header.alpha_texture_id =
                 get_or_load_texture(cmd, pbr.baseColorTexture.index, /*linear=*/false);
         }
 
-        material_map[i] = get_material_system()->add_material(diffuse_type_id, mat);
+        // metallic-roughness (linear; spec: B=metallic, G=roughness)
+        mat.payload.metallic_factor = static_cast<float>(pbr.metallicFactor);
+        mat.payload.roughness_factor = static_cast<float>(pbr.roughnessFactor);
+        if (pbr.metallicRoughnessTexture.index >= 0) {
+            mat.payload.metallic_roughness_texture =
+                get_or_load_texture(cmd, pbr.metallicRoughnessTexture.index, /*linear=*/true);
+        }
+
+        // normal map (linear) + scale
+        if (gmat.normalTexture.index >= 0) {
+            mat.payload.normal_texture =
+                get_or_load_texture(cmd, gmat.normalTexture.index, /*linear=*/true);
+            mat.payload.normal_scale = static_cast<float>(gmat.normalTexture.scale);
+        }
+
+        // emissive (sRGB texture × linear factor)
+        mat.payload.emissive_factor = float3(static_cast<float>(gmat.emissiveFactor[0]),
+                                             static_cast<float>(gmat.emissiveFactor[1]),
+                                             static_cast<float>(gmat.emissiveFactor[2]));
+        if (gmat.emissiveTexture.index >= 0) {
+            mat.payload.emissive_texture =
+                get_or_load_texture(cmd, gmat.emissiveTexture.index, /*linear=*/false);
+        }
+
+        // occlusion (linear) + strength
+        if (gmat.occlusionTexture.index >= 0) {
+            mat.payload.occlusion_texture =
+                get_or_load_texture(cmd, gmat.occlusionTexture.index, /*linear=*/true);
+            mat.payload.occlusion_strength = static_cast<float>(gmat.occlusionTexture.strength);
+        }
+
+        material_map[i] = get_material_system()->add_material(gltf_type_id, mat);
     }
 
     // Default material for primitives without one
     if (material_map.empty()) {
-        DiffuseMaterial default_mat;
-        material_map.push_back(get_material_system()->add_material(diffuse_type_id, default_mat));
+        GltfMaterial default_mat;
+        material_map.push_back(get_material_system()->add_material(gltf_type_id, default_mat));
     }
 }
 

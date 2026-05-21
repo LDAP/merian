@@ -77,6 +77,11 @@ class MaterialSystem : public Versionable,
     // Upload material buffer to GPU and update ShaderObject state.
     void update(const CommandBufferHandle& cmd);
 
+    float get_alpha_test_threshold() const {
+        return alpha_test_threshold;
+    }
+    void set_alpha_test_threshold(float threshold);
+
     const SlangCompositionHandle& get_composition() const {
         return composition;
     }
@@ -126,6 +131,7 @@ class MaterialSystem : public Versionable,
     uint32_t max_payload_size = 0;
     uint32_t dirty_begin = UINT32_MAX;
     uint32_t dirty_end = 0;
+    float alpha_test_threshold = 0.5F;
     SlangCompositionHandle composition;
     SlangProgramHandle layout_program;
     ShaderObjectHandle shader_object;

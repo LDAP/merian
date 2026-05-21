@@ -30,6 +30,10 @@ class GLTFScene : public Scene {
         return float3(0, 1, 0);
     }
 
+    bool is_ready() const override {
+        return model != nullptr;
+    }
+
     // If true, generate mipmaps for baseColor and emissive textures even when the glTF sampler
     // does not request a mipmap minFilter. Has no effect on normal/MR/occlusion textures.
     void set_force_mipmaps_color(bool enable) {
@@ -52,8 +56,7 @@ class GLTFScene : public Scene {
     // spaces (rare — same texture used as both color and data), the data is uploaded twice
     // rather than aliasing the image with VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT, which would
     // hurt sampling performance for every texture.
-    TextureID
-    get_or_load_texture(const CommandBufferHandle& cmd, int gltf_tex_idx, bool linear);
+    TextureID get_or_load_texture(const CommandBufferHandle& cmd, int gltf_tex_idx, bool linear);
 
     // Owned so GLTFMesh can reference buffer data directly.
     std::unique_ptr<tinygltf::Model> model;
@@ -81,7 +84,7 @@ class GLTFScene : public Scene {
     // One entry per glTF texture index; populated lazily by get_or_load_texture.
     std::vector<GltfTextureSlot> texture_slots;
 
-    MaterialModelID diffuse_type_id;
+    MaterialModelID gltf_type_id;
 
     bool force_mipmaps_color = true;
 };
