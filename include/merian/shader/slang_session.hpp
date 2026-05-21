@@ -93,11 +93,15 @@ class SlangSession {
         slang_session_desc.searchPaths = search_paths.data();
         slang_session_desc.searchPathCount = (SlangInt)search_paths.size();
 
-        std::array<slang::CompilerOptionEntry, 3> options = {
+        std::array<slang::CompilerOptionEntry, 4> options = {
             {
                 {
                     slang::CompilerOptionName::EmitSpirvDirectly,
                     {slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr},
+                },
+                {
+                    slang::CompilerOptionName::EmitSpirvViaGLSL,
+                    {slang::CompilerOptionValueKind::Int, 0, 0, nullptr, nullptr},
                 },
                 {
                     slang::CompilerOptionName::Optimization,
@@ -115,6 +119,8 @@ class SlangSession {
         };
         slang_session_desc.compilerOptionEntries = options.data();
         slang_session_desc.compilerOptionEntryCount = options.size();
+        target_desc.compilerOptionEntries = options.data();
+        target_desc.compilerOptionEntryCount = options.size();
 
         global_session->createSession(slang_session_desc, session.writeRef());
     }
