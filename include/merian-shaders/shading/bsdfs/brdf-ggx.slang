@@ -286,13 +286,11 @@ float ggx_VNDF_pdf_wo(float3 wi, float3 wo, float alpha_squared) {
 //     return F * bsdf;
 // }
 
-// A specular microfacet BRDF with GGX normal distribution and (Schlick-)Fresnel.
+// A specular microfacet BRDF with GGX normal distribution.
 struct GGXBRDF : BSDF {
-    float3 F0;
     float alpha;
 
-    __init(float3 F0, float alpha) {
-        this.F0 = F0;
+    __init(float alpha) {
         this.alpha = alpha;
     }
 
@@ -303,14 +301,10 @@ struct GGXBRDF : BSDF {
 
         const float3 h = normalize(wo + wi);
         const float alpha_squared = pow2(alpha);
-        float G2_over_widotn =
-            smith_g2_over_widotn(wo.z /*wodotn*/, wi.z /*widotn*/, alpha_squared);
-        float D = ggx_NDF(pow2(h.z), alpha_squared);
+        const float G2_over_widotn = smith_g2_over_widotn(wo.z, wi.z, alpha_squared);
+        const float D = ggx_NDF(pow2(h.z), alpha_squared);
 
-        const float widoth = dot(wi, h);
-        const float3 F = fresnel_schlick(widoth, F0);
-
-        return (F * D * G2_over_widotn) / 4.0f;
+        return float3((D * G2_over_widotn) / 4.0f);
     }
 
     Optional<float3> sample(const float3 wi, inout RandomGenerator rng) {
@@ -366,8 +360,7 @@ struct GGXBRDF : BSDF {
     }
 
     Albedo get_albedo(const float3 wi) {
-        const float3 F = fresnel_schlick(wi.z, F0);
-        return Albedo(F);
+        return Albedo(float3(1.0f));
     }
 }
 

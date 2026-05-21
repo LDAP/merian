@@ -1,10 +1,19 @@
 // glTF 2.0 metallic-roughness material model. The C++ side mirrors this struct byte-for-byte.
 
 import merian_shaders.shading.materials.material;
-import merian_shaders.shading.bsdfs.brdf_lambert_ggx;
 import merian_shaders.shading.bsdfs.brdf_ggx;
+import merian_shaders.shading.bsdfs.brdf_lambert_diffuse;
+import merian_shaders.shading.bsdfs.bsdf_conductor_fresnel;
+import merian_shaders.shading.bsdfs.bsdf_fresnel_mix;
+import merian_shaders.shading.bsdfs.bsdf_mix;
 
 namespace merian {
+
+// https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#complete-model
+typealias GltfBSDF =
+    MixBSDF<FresnelMixBSDF<GGXBRDF, LambertDiffuseBRDF>, ConductorFresnelBSDF<GGXBRDF>>;
+
+static const float GLTF_DIELECTRIC_IOR_F0 = 0.04f; // equals ior = 1.5
 
 struct GltfMaterial : MaterialModel {
     typealias MaterialSampleImpl = GltfMaterialSample;
@@ -23,13 +32,11 @@ struct GltfMaterial : MaterialModel {
 
     GltfMaterialSample
     get_sample(const ShadingData sd, const TextureManager tm, const LODSampler2D lod) {
-        // base color (sRGB texture × linear factor)
         float4 base = base_color_factor;
         if (let tex = header.get_alpha_texture_id()) {
             base *= lod.sample(tm.get_sampler2D(tex), sd.uv);
         }
 
-        // metallic-roughness (linear; glTF: B=metallic, G=roughness)
         float metallic = metallic_factor;
         float roughness = roughness_factor;
         if (metallic_roughness_texture != TextureID(-1)) {
@@ -47,37 +54,34 @@ struct GltfMaterial : MaterialModel {
             shading_frame = sd.frame.apply_normal_map(float3(nxy, nz));
         }
 
-        // emissive (sRGB texture × linear factor)
         float3 emission = emissive_factor;
         if (emissive_texture != TextureID(-1)) {
             emission *= lod.sample(tm.get_sampler2D(emissive_texture), sd.uv).rgb;
         }
 
-        // occlusion (linear), folded into the diffuse lobe
         float occlusion = 1.0f;
         if (occlusion_texture != TextureID(-1)) {
             const float o = lod.sample(tm.get_sampler2D(occlusion_texture), sd.uv).r;
             occlusion = lerp(1.0f, o, occlusion_strength);
         }
 
-        const float3 F0 = lerp(float3(0.04f), base.rgb, metallic);
-        const float3 diffuse = base.rgb * (1.0f - metallic) * occlusion;
         const float alpha = ggx_roughness_to_alpha(roughness);
 
         GltfMaterialSample s;
-        s.brdf = LambertGGXBRDF(diffuse, F0, alpha);
+        s.brdf = GltfBSDF(
+            FresnelMixBSDF<GGXBRDF, LambertDiffuseBRDF>(
+                GGXBRDF(alpha), LambertDiffuseBRDF(base.rgb * occlusion), GLTF_DIELECTRIC_IOR_F0),
+            ConductorFresnelBSDF<GGXBRDF>(GGXBRDF(alpha), base.rgb), metallic);
         s.shading_frame = shading_frame;
         s.emission = emission;
         return s;
     }
 }
 
-// Field names match the MaterialSample interface property names so Slang
-// satisfies the property requirements from the fields directly.
 struct GltfMaterialSample : MaterialSample {
-    typealias BSDFImpl = LambertGGXBRDF;
+    typealias BSDFImpl = GltfBSDF;
 
-    LambertGGXBRDF brdf;
+    GltfBSDF brdf;
     OrthonormalFrame shading_frame;
     float3 emission;
 
