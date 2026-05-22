@@ -6,6 +6,14 @@ namespace merian {
 
 GBufferDebugNode::GBufferDebugNode() {}
 
+DeviceSupportInfo
+GBufferDebugNode::query_device_support(const DeviceSupportQueryInfo& query_info) {
+    // Scene parameter contains an AccelerationStructure; Slang emits RayTracingKHR for the AS
+    // declaration when no ray-query op is reachable from this entry point. Enable rayTracingPipeline
+    // opportunistically so the resulting SPIR-V loads.
+    return DeviceSupportInfo::check(query_info, {}, {"rayTracingPipeline"});
+}
+
 void GBufferDebugNode::initialize(const ContextHandle& context,
                                   const ResourceAllocatorHandle& allocator) {
     this->context = context;
@@ -14,7 +22,7 @@ void GBufferDebugNode::initialize(const ContextHandle& context,
 }
 
 std::vector<InputConnectorDescriptor> GBufferDebugNode::describe_inputs() {
-    return {{"gbuffer", con_gbuffer}};
+    return {{"scene", con_scene}, {"gbuffer", con_gbuffer}};
 }
 
 std::vector<OutputConnectorDescriptor>
@@ -40,25 +48,38 @@ void GBufferDebugNode::process(GraphRun& run,
                                [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                                const NodeIO& io) {
     const auto& cmd = run.get_cmd();
+    const auto& scene = io[con_scene];
     const auto& gbuf = io[con_gbuffer];
-    if (!gbuf)
+    if (!scene || !gbuf || !scene->is_ready())
         return;
 
-    if (!pipeline) {
+    if (!program) {
         auto composition = SlangComposition::create();
+        composition->add_composition(scene->get_composition());
         composition->add_module_from_path("merian-nodes/nodes/gbuffer_debug/gbuffer_debug.slang",
                                           true);
 
         program = SlangProgram::create(compile_context, composition);
         entry_point = SlangProgramEntryPoint::create(program, "main");
 
-        auto pipe_layout = entry_point->get_pipeline_layout(context);
-        auto vulkan_entry_point = entry_point->specialize();
-        pipeline = ComputePipeline::create(pipe_layout, vulkan_entry_point);
+        // entry_point rebuilds when the scene's composition (material type
+        // conformances) changes — drop cached pipeline + per-EP shader objects.
+        entry_point->on_changed(entry_point, [this] {
+            pipeline = nullptr;
+            params = nullptr;
+        });
 
         obj_allocator = std::make_shared<FrameCachingShaderObjectAllocator>(
             resource_allocator, run.get_iterations_in_flight());
     }
+
+    if (!pipeline) {
+        auto pipe_layout = entry_point->get_pipeline_layout(context);
+        auto vulkan_entry_point = entry_point->specialize();
+        pipeline = ComputePipeline::create(pipe_layout, vulkan_entry_point);
+    }
+
+    obj_allocator->set_iteration(run.get_in_flight_index());
 
     if (!params) {
         params = entry_point->create_shader_object(context, "params", obj_allocator);
@@ -68,8 +89,8 @@ void GBufferDebugNode::process(GraphRun& run,
     cursor["gbuffer"] = gbuf->get_shader_object();
     cursor["output"] = io[con_output].get_texture();
 
-    obj_allocator->set_iteration(run.get_in_flight_index());
     cmd->bind(pipeline);
+    entry_point->bind_entry_point_parameter("scene", scene->get_shader_object(), cmd, pipeline);
     entry_point->bind_entry_point_parameter("params", params, cmd, pipeline);
     cmd->push_constant(pipeline, static_cast<int>(selected_field));
 
@@ -80,9 +101,36 @@ GBufferDebugNode::NodeStatusFlags GBufferDebugNode::properties(Properties& confi
     bool needs_reconnect = false;
 
     const std::vector<std::string> field_names = {
-        "Normal",         "Linear Z",     "Grad Z",         "Delta Z",
-        "Motion Vectors", "Instance ID",  "Geometry Index", "Geometry ID",
-        "Primitive ID",   "Barycentrics", "Albedo",
+        // Shaded preview
+        "Simple Shading",
+        "Simple Shading with Albedo",
+        "Albedo",
+        // Normals & tangent frame
+        "Normal",
+        "Normal Texture",
+        "Face Normal",
+        "Tangent",
+        "Bitangent",
+        "Tangent W",
+        // Material
+        "Alpha",
+        "Emissive",
+        "Metallic",
+        "Roughness",
+        // IDs & barycentrics
+        "Instance ID",
+        "Geometry Index",
+        "Geometry ID",
+        "Primitive ID",
+        "Material ID",
+        "Barycentrics",
+        // Depth & motion
+        "Linear Z",
+        "Grad Z",
+        "Delta Z",
+        "Motion Vectors",
+        // Flags
+        "Flat Shading Flag",
     };
 
     config.config_options("field", selected_field, field_names);

@@ -40,6 +40,17 @@ struct MaterialSystem {
         return false;
     }
 
+    // Sampled alpha (or 1.0 if the material has no alpha texture).
+    float get_alpha(const MaterialID material_id,
+                    const float2 uv,
+                    const LODSampler2D lod_sampler = DefaultLODSampler()) {
+        const MaterialHeader header = materials[material_id].header;
+        if (let texture_id = header.get_alpha_texture_id()) {
+            return lod_sampler.sample(texture_manager.get_sampler2D(texture_id), uv).a;
+        }
+        return 1.f;
+    }
+
     MaterialModel get_material(const MaterialID material_id) {
         const uint material_model_type_id = materials[material_id].header.material_model_type_id;
         // the material_model_type_id must be registerd on CPU side as type conformance. The CPU

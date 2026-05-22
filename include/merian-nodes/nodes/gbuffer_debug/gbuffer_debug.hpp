@@ -4,6 +4,7 @@
 #include "merian-nodes/connectors/ptr_in.hpp"
 #include "merian-nodes/graph/node.hpp"
 #include "merian-shaders/gbuffer.hpp"
+#include "merian-shaders/scene/scene.hpp"
 
 #include "merian/shader/shader_compile_context.hpp"
 #include "merian/shader/shader_object.hpp"
@@ -20,6 +21,8 @@ class GBufferDebugNode : public Node {
     GBufferDebugNode();
 
     ~GBufferDebugNode() override = default;
+
+    DeviceSupportInfo query_device_support(const DeviceSupportQueryInfo& query_info) override;
 
     void initialize(const ContextHandle& context,
                     const ResourceAllocatorHandle& allocator) override;
@@ -42,6 +45,7 @@ class GBufferDebugNode : public Node {
     ShaderCompileContextHandle compile_context;
 
     // Connectors
+    PtrInHandle<Scene> con_scene = PtrIn<Scene>::create();
     PtrInHandle<GBuffer> con_gbuffer = PtrIn<GBuffer>::create();
     ManagedVkImageOutHandle con_output;
 

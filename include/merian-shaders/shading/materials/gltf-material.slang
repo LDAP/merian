@@ -30,6 +30,26 @@ struct GltfMaterial : MaterialModel {
     TextureID occlusion_texture;
     TextureID emissive_texture;
 
+    float get_metallic(const TextureManager tm,
+                       const float2 uv,
+                       const LODSampler2D lod = DefaultLODSampler()) {
+        float metallic = metallic_factor;
+        if (metallic_roughness_texture != TextureID(-1)) {
+            metallic *= lod.sample(tm.get_sampler2D(metallic_roughness_texture), uv).b;
+        }
+        return metallic;
+    }
+
+    float get_roughness(const TextureManager tm,
+                        const float2 uv,
+                        const LODSampler2D lod = DefaultLODSampler()) {
+        float roughness = roughness_factor;
+        if (metallic_roughness_texture != TextureID(-1)) {
+            roughness *= lod.sample(tm.get_sampler2D(metallic_roughness_texture), uv).g;
+        }
+        return roughness;
+    }
+
     GltfMaterialSample
     get_sample(const ShadingData sd, const TextureManager tm, const LODSampler2D lod) {
         float4 base = base_color_factor;
