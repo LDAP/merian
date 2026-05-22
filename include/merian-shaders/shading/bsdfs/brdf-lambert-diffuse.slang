@@ -52,6 +52,10 @@ struct LambertDiffuseBRDF : BSDF {
     Albedo get_albedo(const float3 wi) {
         return Albedo(albedo);
     }
+
+    float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
+        return float3(0.0f);
+    }
 }
 
 }

@@ -36,8 +36,12 @@ struct FresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
     }
 
     Albedo get_albedo(const float3 wi) {
-        const float F = fresnel_schlick(wi.z, ior_f0);
-        return Albedo(lerp(base.get_albedo(wi).reflection, layer.get_albedo(wi).reflection, F));
+        const float3 spec = layer.get_preintegrated_specular(float3(ior_f0), wi);
+        return Albedo(spec + (1.0f - spec) * base.get_albedo(wi).reflection);
+    }
+
+    float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
+        return layer.get_preintegrated_specular(F0, wi);
     }
 }
 

@@ -19,6 +19,9 @@ interface BSDF : ShadingFunction {
     // The incident direction points away from the
     // shading location.
     Albedo get_albedo(const float3 wi);
+
+    // Pre-integrated specular reflectance for the given F0.
+    float3 get_preintegrated_specular(const float3 F0, const float3 wi);
 }
 
 }

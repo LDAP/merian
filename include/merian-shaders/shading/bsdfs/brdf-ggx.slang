@@ -250,6 +250,54 @@ float ggx_VNDF_pdf_wo(float3 wi, float3 wo, float alpha_squared) {
 
 // -----------------------------------------------------------------
 
+// Approximate pre-integrated GGX BRDF (Ray Tracing Gems Ch. 32, Eq. 4). Returns F0 · scale + bias.
+// Adapted from: https://github.com/NVIDIAGameWorks/Falcor/blob/eb540f6748774680ce0039aaf3ac9279266ec521/Source/Falcor/Rendering/Materials/IsotropicGGX.slang#L215
+float3 ggx_integral_approx_(const float3 F0,
+                            const float alpha,
+                            const float cosTheta,
+                            const float2x2 M1,
+                            const float3x3 M2,
+                            const float2x2 M3,
+                            const float3x3 M4) {
+    const float c = abs(cosTheta);
+
+    const float4 X = float4(1.0f, c, c * c, c * c * c);
+    const float4 Y = float4(1.0f, alpha, alpha * alpha, alpha * alpha * alpha);
+
+    float bias = dot(mul(M1, X.xy), Y.xy) / dot(mul(M2, X.xyw), Y.xyw);
+    const float scale = dot(mul(M3, X.xy), Y.xy) / dot(mul(M4, X.xzw), Y.xyw);
+
+    // Hack to suppress bias when F0 is ~0 (no specular reflectance).
+    const float F0_luma = (F0.r + F0.g + F0.b) * (1.0f / 3.0f);
+    bias *= saturate(F0_luma * 50.0f);
+
+    return F0 * max(0.0f, scale) + max(0.0f, bias);
+}
+
+// Height-correlated Smith G2 variant. Use this when paired with smith_g2_over_widotn.
+float3 ggx_integral_approx_correlated(const float3 F0, const float alpha, const float cosTheta) {
+    const float2x2 M1 = float2x2(0.995367f, -1.38839f, -0.24751f, 1.97442f);
+    const float3x3 M2 = float3x3(1.0f, 2.68132f, 52.366f, 16.0932f, -3.98452f, 59.3013f,
+                                 -5.18731f, 255.259f, 2544.07f);
+    const float2x2 M3 = float2x2(-0.0564526f, 3.82901f, 16.91f, -11.0303f);
+    const float3x3 M4 = float3x3(1.0f, 4.11118f, -1.37886f, 19.3254f, -28.9947f, 16.9514f,
+                                 0.545386f, 96.0994f, -79.4492f);
+    return ggx_integral_approx_(F0, alpha, cosTheta, M1, M2, M3, M4);
+}
+
+// Separable Smith G2 = G1(wi)·G1(wo) variant.
+float3 ggx_integral_approx_separable(const float3 F0, const float alpha, const float cosTheta) {
+    const float2x2 M1 = float2x2(0.99044f, -1.28514f, 1.29678f, -0.755907f);
+    const float3x3 M2 = float3x3(1.0f, 2.92338f, 59.4188f, 20.3225f, -27.0302f, 222.592f,
+                                 121.563f, 626.13f, 316.627f);
+    const float2x2 M3 = float2x2(0.0365463f, 3.32707f, 9.0632f, -9.04756f);
+    const float3x3 M4 = float3x3(1.0f, 3.59685f, -1.36772f, 9.04401f, -16.3174f, 9.22949f,
+                                 5.56589f, 19.7886f, -20.2123f);
+    return ggx_integral_approx_(F0, alpha, cosTheta, M1, M2, M3, M4);
+}
+
+// -----------------------------------------------------------------
+
 // float ggx_times_wodotn(float wodotn, float widotn, float ndoth, float alpha) {
 //     float G2 = smith_g2_over_widotn(wodotn, widotn, alpha * alpha);
 //     float D = ggx_NDF(ndoth * ndoth, alpha * alpha);
@@ -361,6 +409,10 @@ struct GGXBRDF : BSDF {
 
     Albedo get_albedo(const float3 wi) {
         return Albedo(float3(1.0f));
+    }
+
+    float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
+        return ggx_integral_approx_correlated(F0, alpha, wi.z);
     }
 }
 

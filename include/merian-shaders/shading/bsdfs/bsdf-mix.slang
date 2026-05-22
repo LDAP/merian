@@ -34,6 +34,11 @@ struct MixBSDF<B0 : BSDF, B1 : BSDF> : BSDF {
         return Albedo(
             lerp(bsdf0.get_albedo(wi).reflection, bsdf1.get_albedo(wi).reflection, weight));
     }
+
+    float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
+        return lerp(bsdf0.get_preintegrated_specular(F0, wi),
+                    bsdf1.get_preintegrated_specular(F0, wi), weight);
+    }
 }
 
 }

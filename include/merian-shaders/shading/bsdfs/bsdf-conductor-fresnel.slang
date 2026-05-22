@@ -29,8 +29,11 @@ struct ConductorFresnelBSDF<Inner : BSDF> : BSDF {
     }
 
     Albedo get_albedo(const float3 wi) {
-        const float3 F = fresnel_schlick(wi.z, f0);
-        return Albedo(F * bsdf.get_albedo(wi).reflection);
+        return Albedo(bsdf.get_preintegrated_specular(f0, wi));
+    }
+
+    float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
+        return bsdf.get_preintegrated_specular(F0, wi);
     }
 }
 
