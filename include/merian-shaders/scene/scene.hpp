@@ -1,5 +1,6 @@
 #pragma once
 
+#include "merian-shaders/scene/env_map.hpp"
 #include "merian-shaders/scene/scene-data.slangh"
 #include "merian-shaders/shading/materials/material_system.hpp"
 #include "merian/shader/shader_object.hpp"
@@ -52,6 +53,8 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         HasTangents = 0x20,
         // Use the geometric face normal as the shading normal (hard edges, low-poly look).
         FlatShading = 0x40,
+        // Replace surface shading with the scene env map sampled along the ray.
+        UseEnvMap = 0x80,
     };
 
     friend constexpr MeshFlags operator|(MeshFlags a, MeshFlags b) {
@@ -92,6 +95,9 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         }
         if (flags & MeshFlags::FlatShading) {
             append("FlatShading");
+        }
+        if (flags & MeshFlags::UseEnvMap) {
+            append("UseEnvMap");
         }
         return out;
     }
@@ -453,6 +459,12 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         return material_system;
     }
 
+    const EnvMapHandle& get_env() const {
+        return env_map;
+    }
+
+    void set_env(EnvMapHandle env);
+
     const TextureManagerHandle& get_texture_manager() const {
         return material_system->get_texture_manager();
     }
@@ -690,10 +702,12 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     ShaderObjectHandle shader_object;
 
     ASBuilder as_builder;
+    bool as_supported = false;
 
     // --- Scene definition ---
 
     MaterialSystemHandle material_system;
+    EnvMapHandle env_map;
     FreeList<MeshID> mesh_ids;
     // Sized to mesh_ids.size(). Released slots have a null mesh.
     std::vector<MeshInfo> mesh_infos;

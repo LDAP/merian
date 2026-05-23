@@ -13,6 +13,8 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <unordered_map>
+#include <vector>
 
 namespace merian {
 
@@ -263,7 +265,9 @@ class SlangComposition : public Versionable,
     static SlangCompositionHandle create();
 
   private:
-    std::map<std::string, SlangModule> modules;
+    // insertion-order, deduped by SlangModule::name via module_index.
+    std::vector<SlangModule> modules;
+    std::unordered_map<std::string, size_t> module_index;
     // interface name -> type name -> dynamic dispach id
     std::map<TypeConformance, int64_t> type_conformances;
     std::set<EntryPoint> entry_points;

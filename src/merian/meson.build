@@ -1,5 +1,6 @@
 merian_src = files(
     'io/file_loader.cpp',
+    'io/image_io.cpp',
     'io/tinyobj.cpp',
     'utils/audio/audio_device.cpp',
     'utils/camera/camera.cpp',
@@ -99,6 +100,7 @@ merian_lib = static_library(
         slang,
         spdlog,
         spirv_reflect,
+        stb,
         subprocess,
         tgltf,
         tol,

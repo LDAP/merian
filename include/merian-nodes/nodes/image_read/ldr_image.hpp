@@ -2,6 +2,7 @@
 
 #include "merian-nodes/connectors/image/vk_image_out_managed.hpp"
 #include "merian-nodes/graph/node.hpp"
+#include "merian/utils/blob.hpp"
 
 #include <filesystem>
 
@@ -12,7 +13,7 @@ class LDRImageRead : public Node {
   public:
     LDRImageRead();
 
-    ~LDRImageRead();
+    ~LDRImageRead() override;
 
     void initialize(const ContextHandle& context,
                     const ResourceAllocatorHandle& allocator) override;
@@ -31,11 +32,13 @@ class LDRImageRead : public Node {
     ManagedVkImageOutHandle con_out;
 
     vk::Format format = vk::Format::eR8G8B8A8Srgb;
-    // can be nullptr when image is unloaded.
-    unsigned char* image{nullptr};
+    // null when image is unloaded.
+    BlobHandle image;
     bool needs_run = true;
 
-    int width, height, channels;
+    int width = 0;
+    int height = 0;
+    int channels = 0;
     std::filesystem::path filename;
     std::string config_filename;
 };

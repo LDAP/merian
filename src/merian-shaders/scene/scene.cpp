@@ -30,41 +30,49 @@ Scene::Scene(const ShaderCompileContextHandle& compile_context,
              const MaterialSystemHandle& material_system)
     : compile_context(compile_context), context(context), allocator(allocator),
       obj_allocator(obj_allocator), as_builder(context, allocator),
+      as_supported(context->get_device()
+                       ->get_enabled_features()
+                       .get_acceleration_structure_features_khr()
+                       .accelerationStructure == VK_TRUE),
       material_system(material_system) {
-
-    assert(context->get_device()
-               ->get_enabled_features()
-               .get_acceleration_structure_features_khr()
-               .accelerationStructure == VK_TRUE);
 
     composition = SlangComposition::create();
     composition->add_composition(material_system->get_composition());
+
+    // Workaround for https://github.com/shader-slang/slang/pull/10769.
+    composition->add_module_from_string(
+        "scene_as_workaround",
+        as_supported
+            ? "module scene_as_workaround;\n"
+              "import merian_shaders.scene.acceleration_structure;\n"
+              "namespace merian { public typealias SceneAccelerationStructure = "
+              "HWAccelerationStructure; }"
+            : "module scene_as_workaround;\n"
+              "import merian_shaders.scene.acceleration_structure;\n"
+              "namespace merian { public typealias SceneAccelerationStructure = "
+              "NullAccelerationStructure; }");
+    set_env(std::make_shared<EmptyEnvMap>());
+
     composition->add_module_from_path("merian-shaders/scene/scene.slang");
-    composition->add_module_from_path("merian-shaders/scene/camera.slang");
-    composition->add_module_from_path("merian-shaders/scene/environment-map.slang");
-    composition->add_module_from_path("merian-shaders/scene/acceleration-structure.slang");
 
     layout_program = SlangProgram::create(compile_context, composition);
     layout_program->on_changed(layout_program, [&] { rebuild_shader_object(); });
 
     rebuild_shader_object();
+}
 
-    // TODO: use link-time type for AS once Slang's lookupExternDeclRefType is fixed
-    // if (build_as) {
-    //     composition->add_module_from_string(
-    //         "scene_as_type",
-    //         "import merian_shaders.scene.acceleration_structure;\n"
-    //         "namespace merian { export struct SceneAccelerationStructure : AccelerationStructure
-    //         "
-    //         "= HWAccelerationStructure; }");
-    // } else {
-    //     composition->add_module_from_string(
-    //         "scene_as_type",
-    //         "import merian_shaders.scene.acceleration_structure;\n"
-    //         "namespace merian { export struct SceneAccelerationStructure : AccelerationStructure
-    //         "
-    //         "= NullAccelerationStructure; }");
-    // }
+void Scene::set_env(EnvMapHandle env) {
+    env_map = std::move(env);
+
+    composition->add_module(env_map->get_slang_module());
+    composition->add_module_from_string(
+        "scene_env_map_workaround",
+        fmt::format("module scene_env_map_workaround;\n"
+                    "import \"{}\";\n"
+                    "namespace merian {{ public typealias SceneEnvMap = {}; }}",
+                    env_map->get_slang_module().get_import_path().value_or(
+                        env_map->get_slang_module().get_name()),
+                    env_map->get_type_name()));
 }
 
 void Scene::rebuild_shader_object() {
@@ -94,7 +102,7 @@ void Scene::rebuild_shader_object() {
             ? prev_inverse_transposed_instance_transforms_buffer
             : allocator->get_dummy_buffer();
 
-    if (tlas) {
+    if (as_supported && tlas) {
         c["as"]["as"] = tlas;
     }
 }
@@ -1038,6 +1046,9 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
                 if (mesh.flags & MeshFlags::FlatShading) {
                     gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::FlatShading);
                 }
+                if (mesh.flags & MeshFlags::UseEnvMap) {
+                    gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::UseEnvMap);
+                }
 
                 geometries.emplace_back(gd);
             }
@@ -1746,18 +1757,19 @@ void Scene::update(const CommandBufferHandle& cmd,
         vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eAccelerationStructureReadKHR,
     });
 
-    // TODO: gate on a build_as toggle once Slang link-time types work (cf. top of file).
     // TODO: compact static BLASes to reduce memory bandwidth.
-    build_blas(cmd);
+    if (as_supported) {
+        build_blas(cmd);
 
-    tlas_dirty |= needs_regroup || transforms_changed;
-    if (tlas_dirty || !tlas) {
-        build_tlas(cmd);
-        tlas_dirty = false;
-        frame_stats.tlas_rebuilt = true;
-        frame_stats.tlas_instance_count = static_cast<uint32_t>(tlas_instances.size());
-        frame_stats.tlas_instance_data_bytes =
-            tlas_instances.size() * sizeof(vk::AccelerationStructureInstanceKHR);
+        tlas_dirty |= needs_regroup || transforms_changed;
+        if (tlas_dirty || !tlas) {
+            build_tlas(cmd);
+            tlas_dirty = false;
+            frame_stats.tlas_rebuilt = true;
+            frame_stats.tlas_instance_count = static_cast<uint32_t>(tlas_instances.size());
+            frame_stats.tlas_instance_data_bytes =
+                tlas_instances.size() * sizeof(vk::AccelerationStructureInstanceKHR);
+        }
     }
 
     cmd->barrier(vk::MemoryBarrier2{
@@ -1786,6 +1798,8 @@ void Scene::update(const CommandBufferHandle& cmd,
     prev_active_camera.write_to(c["prev_camera"]);
     cam->write_to(c["camera"]);
     prev_active_camera = *cam;
+
+    env_map->write_to(c["env_map"]);
 }
 
 } // namespace merian

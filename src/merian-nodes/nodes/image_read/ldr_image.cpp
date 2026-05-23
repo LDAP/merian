@@ -1,7 +1,7 @@
 #include "merian-nodes/nodes/image_read/ldr_image.hpp"
 
 #include "merian-nodes/graph/errors.hpp"
-#include "stb_image.h"
+#include "merian/io/image_io.hpp"
 
 #include <filesystem>
 
@@ -14,11 +14,7 @@ void LDRImageRead::initialize(const ContextHandle& context,
     this->context = context;
 }
 
-LDRImageRead::~LDRImageRead() {
-    if (image != nullptr) {
-        stbi_image_free(image);
-    }
-}
+LDRImageRead::~LDRImageRead() = default;
 
 std::vector<OutputConnectorDescriptor>
 LDRImageRead::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
@@ -28,12 +24,18 @@ LDRImageRead::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     if (!std::filesystem::exists(filename)) {
         throw graph_errors::node_error{fmt::format("file does not exist: {}", filename.string())};
     }
-    if (stbi_info(filename.string().c_str(), &width, &height, &channels) == 0) {
-        throw graph_errors::node_error{"format not supported!"};
+
+    try {
+        ImageInfo info;
+        image = image_load_u8(filename, info, 4);
+        width = info.width;
+        height = info.height;
+        channels = info.channels;
+    } catch (const std::runtime_error& e) {
+        throw graph_errors::node_error{e.what()};
     }
 
     con_out = ManagedVkImageOut::transfer_write(format, width, height, 1, true);
-
     needs_run = true;
     return {{"out", con_out}};
 }
@@ -41,27 +43,22 @@ LDRImageRead::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
 void LDRImageRead::process([[maybe_unused]] GraphRun& run,
                            [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                            const NodeIO& io) {
-    if (needs_run) {
-        if (image == nullptr) {
-            image = stbi_load(filename.string().c_str(), &width, &height, &channels, 4);
-            assert(image);
-            assert(width == (int)io[con_out]->get_extent().width &&
-                   height == (int)io[con_out]->get_extent().height &&
-                   1 == (int)io[con_out]->get_extent().depth);
-
-            SPDLOG_INFO("Loaded image from {} ({}x{}, {} channels)", filename.string(), width,
-                        height, channels);
-        }
-
-        run.get_allocator()->get_staging()->cmd_to_device(run.get_cmd(), io[con_out], image);
-
-        if (!keep_on_host) {
-            stbi_image_free(image);
-            image = nullptr;
-        }
-
-        needs_run = false;
+    if (!needs_run) {
+        return;
     }
+    if (!image) {
+        ImageInfo info;
+        image = image_load_u8(filename, info, 4);
+    }
+    SPDLOG_INFO("Loaded image from {} ({}x{}, {} channels)", filename.string(), width, height,
+                channels);
+
+    run.get_allocator()->get_staging()->cmd_to_device(run.get_cmd(), io[con_out], image->get_data());
+
+    if (!keep_on_host) {
+        image.reset();
+    }
+    needs_run = false;
 }
 
 LDRImageRead::NodeStatusFlags LDRImageRead::properties(Properties& config) {
@@ -70,10 +67,7 @@ LDRImageRead::NodeStatusFlags LDRImageRead::properties(Properties& config) {
     if (config.config_text("path", config_filename, true)) {
         needs_rebuild = true;
         filename = context->get_file_loader()->find_file(config_filename).value_or(config_filename);
-        if (image != nullptr) {
-            stbi_image_free(image);
-            image = nullptr;
-        }
+        image.reset();
     }
 
     const vk::Format old_format = format;
@@ -82,16 +76,13 @@ LDRImageRead::NodeStatusFlags LDRImageRead::properties(Properties& config) {
     format = linear ? vk::Format::eR8G8B8A8Unorm : vk::Format::eR8G8B8A8Srgb;
     needs_rebuild |= format != old_format;
     config.config_bool("keep in host memory", keep_on_host, "");
-    if (!keep_on_host && (image != nullptr)) {
-        stbi_image_free(image);
-        image = nullptr;
+    if (!keep_on_host) {
+        image.reset();
     }
 
-    const std::string text =
-        fmt::format("filename: {}\nextent: {}x{}\nformat: {}\nhost cached: {}\n", filename.string(),
-                    width, height, vk::to_string(format), image != nullptr);
-
-    config.output_text(text);
+    config.output_text(fmt::format("filename: {}\nextent: {}x{}\nformat: {}\nhost cached: {}\n",
+                                   filename.string(), width, height, vk::to_string(format),
+                                   image != nullptr));
 
     if (needs_rebuild) {
         return NEEDS_RECONNECT;

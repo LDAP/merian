@@ -5,17 +5,21 @@ namespace merian {
 SlangComposition::SlangComposition() {}
 
 void SlangComposition::add_module(const SlangModule& module) {
-    auto [it, inserted] = modules.emplace(module.name, module);
-    if (!inserted) {
-        it->second = module;
+    auto [it, inserted] = module_index.try_emplace(module.name, modules.size());
+    if (inserted) {
+        modules.emplace_back(module);
+    } else {
+        modules[it->second] = module;
     }
     increment_version();
 }
 
 void SlangComposition::add_module(SlangModule&& module) {
-    auto [it, inserted] = modules.emplace(module.name, module);
-    if (!inserted) {
-        it->second = module;
+    auto [it, inserted] = module_index.try_emplace(module.name, modules.size());
+    if (inserted) {
+        modules.emplace_back(std::move(module));
+    } else {
+        modules[it->second] = std::move(module);
     }
     increment_version();
 }
@@ -79,7 +83,7 @@ bool SlangComposition::reload(const FileLoader& file_loader) {
     bool changed = false;
 
     // Check path-based modules for file changes
-    for (const auto& [name, module] : modules) {
+    for (const auto& module : modules) {
         const auto& source_path = module.get_source_path();
         if (!source_path.has_value()) {
             continue;

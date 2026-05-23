@@ -327,8 +327,16 @@ class SlangSession {
             std::max(composition->modules.size() + composition->compositions.size(),
                      1 + composition->type_conformances.size() + composition->entry_points.size()));
 
+        for (const auto& composition : composition->compositions) {
+            auto it = composition_cache.find(composition);
+            if (it == composition_cache.end()) {
+                it = composition_cache.emplace(composition, compose(composition)).first;
+            }
+            components.emplace_back(it->second);
+        }
+
         std::set<SlangComposition::EntryPoint> additional_entry_points;
-        for (auto& [_, module] : composition->modules) {
+        for (auto& module : composition->modules) {
             auto it = slang_module_cache.find(module.get_name());
             if (it == slang_module_cache.end()) {
                 it = slang_module_cache
@@ -362,14 +370,6 @@ class SlangSession {
                     }
                 }
             }
-        }
-
-        for (const auto& composition : composition->compositions) {
-            auto it = composition_cache.find(composition);
-            if (it == composition_cache.end()) {
-                it = composition_cache.emplace(composition, compose(composition)).first;
-            }
-            components.emplace_back(it->second);
         }
 
         Slang::ComPtr<slang::IComponentType> composed_modules = compose(components);

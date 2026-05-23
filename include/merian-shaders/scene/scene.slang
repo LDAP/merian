@@ -5,58 +5,21 @@ __exported import merian_shaders.scene.acceleration_structure;
 __exported import merian_shaders.scene.environment_map;
 __exported import merian_shaders.shading.materials.material_system;
 __exported import merian_shaders.scene.scene_data;
+__exported import merian_shaders.scene.hit;
 
 import merian_shaders.utils.encoding;
 
+// Workaround for https://github.com/shader-slang/slang/pull/10769; scene.cpp injects replacements.
+__exported import scene_as_workaround;
+__exported import scene_env_map_workaround;
+
 namespace merian {
 
-struct Hit {
-    uint instance_id;
-    uint instance_index;
-    uint primitive_id;
-    uint geometry_index;
-    float2 barycentrics;
+// Once https://github.com/shader-slang/slang/pull/10769 lands these can replace the workaround imports above.
+// extern struct SceneAccelerationStructure : AccelerationStructure = NullAccelerationStructure;
+// extern struct SceneEnvMap : IEnvMap = EmptyEnv;
 
-    __init(uint instance_id,
-           uint instance_index,
-           uint primitive_id,
-           uint geometry_index,
-           float2 barycentrics) {
-        this.instance_id = instance_id;
-        this.instance_index = instance_index;
-        this.primitive_id = primitive_id;
-        this.geometry_index = geometry_index;
-        this.barycentrics = barycentrics;
-    }
-
-    // invalid hit
-    __init() {
-        this.instance_id = uint(-1);
-        this.instance_index = uint(-1);
-        this.primitive_id = uint(-1);
-        this.geometry_index = uint(-1);
-        this.barycentrics = float2(0);
-    }
-
-    bool is_valid() {
-        return instance_id != uint(-1);
-    }
-
-    // Returns (1 - u - v, u, v) for vertex interpolation
-    float3 get_barycentrics3() {
-        return float3(1.0 - barycentrics.x - barycentrics.y, barycentrics.x, barycentrics.y);
-    }
-
-    GeometryID get_geometry_id() {
-        return instance_id + geometry_index;
-    }
-}
-
-// TODO: use link-time type once Slang's lookupExternDeclRefType is fixed
-// extern struct SceneAccelerationStructure : AccelerationStructure;
-typedef HWAccelerationStructure SceneAccelerationStructure;
-
-// // See scene.hpp for details.
+// See scene.hpp for details.
 struct Scene {
     SceneAccelerationStructure as;
 
@@ -69,7 +32,7 @@ struct Scene {
     StructuredBuffer<float4x4, ScalarDataLayout> prev_inverse_transposed_instance_transforms;
 
     ParameterBlock<MaterialSystem> material_system;
-    EnvMap env_map;
+    SceneEnvMap env_map;
 
     Camera camera;
     Camera prev_camera;
@@ -191,9 +154,9 @@ struct Scene {
                                                        const uint primitive_id,
                                                        const float3 barycentrics) {
         const uint3 indices = get_vertex_indices(geometry_data, primitive_id);
-        return {get_packed_vertex_data(geometry_data, indices.x),
-                get_packed_vertex_data(geometry_data, indices.y),
-                get_packed_vertex_data(geometry_data, indices.z)};
+        return { get_packed_vertex_data(geometry_data, indices.x),
+                 get_packed_vertex_data(geometry_data, indices.y),
+                 get_packed_vertex_data(geometry_data, indices.z) };
     }
 
     VertexData get_interpolated_vertex_data(const GeometryData geometry_data,
@@ -306,9 +269,153 @@ struct Scene {
 
     // -----------------------------------------
 
-    // NOTE: Using concrete RayQuery instead of generic <RQ : IRayQuery> to work around
-    // Slang SPIR-V codegen crash in IRBuilder::getSet() with generics (Slang 2026.5.2).
-    void _proceed_ray<uint FLAGS>(inout RayQuery<FLAGS> rq) {
+    // none on miss
+    Optional<GeometryData> get_geometry_data(const Hit hit) {
+        if (!hit.is_valid()) return none;
+        return get_geometry_data(hit.instance_id, hit.geometry_index);
+    }
+
+    // Hit must be a valid triangle hit.
+    TriangleHit get_triangle_hit(const Hit hit) {
+        return get_triangle_hit(hit, get_geometry_data(hit.instance_id, hit.geometry_index));
+    }
+
+    TriangleHit get_triangle_hit(const Hit hit, const GeometryData gd) {
+        const uint3 indices = get_vertex_indices(gd, hit.primitive_id);
+        TriangleHit tri;
+        tri.gd = gd;
+        tri.v0 = get_packed_vertex_data(gd, indices.x);
+        tri.v1 = get_packed_vertex_data(gd, indices.y);
+        tri.v2 = get_packed_vertex_data(gd, indices.z);
+        return tri;
+    }
+
+    Surface get_surface(const Hit hit, const TriangleHit tri) {
+        const float3 bary = hit.get_barycentrics3();
+
+        const float3 pos = to_world_position(tri.gd, hit.instance_index, tri.get_position(hit));
+        const float3 edge01 = to_world_vector(tri.gd, hit.instance_index, tri.get_triangle_edge01());
+        const float3 edge02 = to_world_vector(tri.gd, hit.instance_index, tri.get_triangle_edge02());
+
+        float3 face_normal = normalize(cross(edge01, edge02));
+        if (tri.gd.flags & GeometryDataFlags::FrontCounterClockwise) face_normal = -face_normal;
+
+        float3 vertex_normal;
+        if (tri.gd.flags & GeometryDataFlags::FlatShading) {
+            vertex_normal = face_normal;
+        } else {
+            const float3 n_obj = normalize(
+                bary.x * decode_normal(tri.v0.encoded_normal) +
+                bary.y * decode_normal(tri.v1.encoded_normal) +
+                bary.z * decode_normal(tri.v2.encoded_normal));
+            vertex_normal = to_world_normal(tri.gd, hit.instance_index, n_obj);
+        }
+
+        // per-vertex tangent or Lengyel UV-derived fallback
+        float3 tangent;
+        float handedness;
+        bool tangent_valid;
+        if (tri.gd.flags & GeometryDataFlags::HasTangents) {
+            const float4 t0 = decode_tangent(tri.v0.encoded_tangent);
+            const float4 t1 = decode_tangent(tri.v1.encoded_tangent);
+            const float4 t2 = decode_tangent(tri.v2.encoded_tangent);
+            const float4 t = bary.x * t0 + bary.y * t1 + bary.z * t2;
+            tangent = to_world_vector(tri.gd, hit.instance_index, normalize(t.xyz));
+            handedness = sign(t.w);
+            tangent_valid = true;
+        } else {
+            const float2 duv1 = float2(tri.v1.uv) - float2(tri.v0.uv);
+            const float2 duv2 = float2(tri.v2.uv) - float2(tri.v0.uv);
+            const float det = duv1.x * duv2.y - duv2.x * duv1.y;
+            if (abs(det) > 1e-8f) {
+                const float winding_sign =
+                    (tri.gd.flags & GeometryDataFlags::FrontCounterClockwise) ? 1.f : -1.f;
+                tangent = (duv2.y * edge01 - duv1.y * edge02) / det;
+                handedness = sign(det) * winding_sign;
+                tangent_valid = true;
+            } else {
+                tangent = float3(1, 0, 0);
+                handedness = 1.f;
+                tangent_valid = false;
+            }
+        }
+
+        Surface s;
+        s.material_id = tri.gd.material_id;
+        s.pos = pos;
+        s.uv = tri.get_uv(hit);
+        s.face_normal = face_normal;
+        s.frame = tangent_valid ? OrthonormalFrame(vertex_normal, tangent, handedness)
+                                : OrthonormalFrame(vertex_normal);
+        return s;
+    }
+
+    float3 get_prev_world_position(const Hit hit, const GeometryData gd) {
+        const float3 prev_obj =
+            get_interpolated_prev_object_position(gd, hit.primitive_id, hit.get_barycentrics3());
+        return to_prev_world_position(gd, hit.instance_index, prev_obj);
+    }
+
+    // Pixel-space delta from prev_camera projection to current pixel, jitter-corrected.
+    float2 compute_motion_vector(const float3 prev_pos, const uint2 pixel, const uint2 dim) {
+        return prev_camera.project_pinhole(prev_pos, dim) - float2(pixel)
+             + prev_camera.jitter - camera.jitter;
+    }
+
+    ShadingPoint get_shading_point(const RayDesc ray,
+                                   const Hit hit,
+                                   const GeometryData gd,
+                                   const uint16_t bounce = 0,
+                                   const LODSampler2D lod = DefaultLODSampler()) {
+        const TriangleHit tri = get_triangle_hit(hit, gd);
+        const Surface surface = get_surface(hit, tri);
+
+        // const float3 prev_pos = get_prev_world_position(hit, gd);
+
+        const ShadingData sd = ShadingData(-ray.Direction,
+                                           surface.pos,
+                                           surface.uv,
+                                           time,
+                                           surface.frame,
+                                           surface.face_normal,
+                                           bounce);
+
+        ShadingPoint sp;
+        sp.pos = surface.pos;
+        sp.enc_face_normal = encode_normal(surface.face_normal);
+        // sp.prev_pos = prev_pos;
+        sp.material = material_system.get_material_sample(surface.material_id, sd, lod);
+        return sp;
+    }
+
+    ShadingPoint trace_and_get_shading_point(const RayDesc ray,
+                                             const uint instance_mask = 0xff,
+                                             const uint16_t bounce = 0,
+                                             const LODSampler2D lod = DefaultLODSampler()) {
+        const Hit hit = trace_ray(ray, RAY_FLAG_NONE, instance_mask);
+        if (let gd = get_geometry_data(hit)) {
+            if ((gd.flags & GeometryDataFlags::UseEnvMap) == 0) {
+                return get_shading_point(ray, hit, gd, bounce, lod);
+            }
+        }
+        return _make_environment_map_shading_point(ray, lod);
+    }
+
+    // -----------------------------------------
+
+    ShadingPoint _make_environment_map_shading_point(const RayDesc ray, const LODSampler2D lod) {
+        const float3 pos = ray.Origin + ray.Direction * ENV_MAP_DISTANCE;
+        const float3 env_emission = env_map.eval(ray.Direction, lod);
+
+        ShadingPoint sp;
+        sp.pos = pos;
+        sp.enc_face_normal = encode_normal(-ray.Direction);
+        // sp.prev_pos = pos;
+        sp.material = EnvMaterialSample(env_emission, ray.Direction);
+        return sp;
+    }
+
+    void _proceed_ray(inout SceneAccelerationStructure::RayQueryImpl rq) {
         while (rq.Proceed()) {
 
             if (rq.CandidateType() == CANDIDATE_NON_OPAQUE_TRIANGLE) {

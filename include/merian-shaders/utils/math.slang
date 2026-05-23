@@ -1,5 +1,7 @@
 #pragma once
 
+#include "math-constants.slangh"
+
 // #define MERIAN_WORKGROUP_INDEX                                                                     \
 //     (gl_WorkGroupID.x + gl_WorkGroupID.y * gl_NumWorkGroups.x + gl_WorkGroupID.z * gl_NumWorkGroups.x * gl_NumWorkGroups.y)
 //
@@ -230,6 +232,27 @@ void pseudoinverse(float3 du, float3 dv, out float3 du_dx, out float3 dv_dx) {
     pseudoinverse(du, dv, cross(du, dv), param, param_1);
     du_dx = param;
     dv_dx = param_1;
+}
+
+/**
+ * 'dir' in worldspace
+ */
+float2 world_to_latlong_map(float3 dir) {
+    float3 p = normalize(dir);
+    float2 uv;
+    uv.x = atan2(p.x, -p.z) * MERIAN_1_2PI + 0.5f;
+    uv.y = acos(p.y) * MERIAN_M_1_PI;
+    return uv;
+}
+
+/**
+ * Returns direction in worldspace
+ */
+float3 latlong_map_to_world(float2 latlong) {
+    float phi = MERIAN_M_PI * (2.f * saturate(latlong.x) - 1.f);
+    float theta = MERIAN_M_PI * saturate(latlong.y);
+    float sinTheta = sin(theta);
+    return float3(sinTheta * sin(phi), cos(theta), -sinTheta * cos(phi));
 }
 
 }

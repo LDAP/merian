@@ -33,12 +33,15 @@ struct Camera {
         return float2(2, -2) * p + float2(-1, 1);
     }
 
+    float3 get_pinhole_direction(const uint2 pixel, const uint2 frame_dimensions) {
+        const float2 ndc = pixel_to_ndc(pixel, frame_dimensions);
+        return normalize(ndc.x * U + ndc.y * V + W);
+    }
+
     RayDesc generate_ray_pinhole(const uint2 pixel, const uint2 frame_dimensions) {
         RayDesc ray;
-        const float2 ndc = pixel_to_ndc(pixel, frame_dimensions);
-
         ray.Origin = position;
-        ray.Direction = normalize(ndc.x * U + ndc.y * V + W);
+        ray.Direction = get_pinhole_direction(pixel, frame_dimensions);
 
         // account for curvature
         const float inv_cos = 1.f / dot(normalize(W), ray.Direction);

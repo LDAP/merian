@@ -12,6 +12,8 @@ using BlobHandle = std::shared_ptr<Blob>;
 
 class Blob {
   public:
+    virtual ~Blob() = default;
+
     virtual void* get_data() = 0;
 
     template <typename T> T* get_data() {

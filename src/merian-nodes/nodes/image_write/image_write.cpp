@@ -1,6 +1,6 @@
 #include "merian-nodes/nodes/image_write/image_write.hpp"
-#include "stb_image_write.h"
 
+#include "merian/io/image_io.hpp"
 #include "merian/utils/defer.hpp"
 #include "merian/vk/utils/blits.hpp"
 
@@ -14,9 +14,20 @@ namespace merian {
 #define FORMAT_PNG 0
 #define FORMAT_JPG 1
 #define FORMAT_HDR 2
+#define FORMAT_PFM 3
 
-static const std::unordered_map<uint32_t, std::string> FILE_EXTENSIONS = {
-    {FORMAT_PNG, ".png"}, {FORMAT_JPG, ".jpg"}, {FORMAT_HDR, ".hdr"}};
+namespace {
+const std::unordered_map<uint32_t, std::string> FILE_EXTENSIONS = {
+    {FORMAT_PNG, ".png"},
+    {FORMAT_JPG, ".jpg"},
+    {FORMAT_HDR, ".hdr"},
+    {FORMAT_PFM, ".pfm"},
+};
+
+bool format_is_float(const uint32_t format) {
+    return format == FORMAT_HDR || format == FORMAT_PFM;
+}
+} // namespace
 
 ImageWrite::ImageWrite() {}
 
@@ -166,8 +177,8 @@ void ImageWrite::process(GraphRun& run,
 
     // RECORD FRAME
 
-    const vk::Format format =
-        this->format == FORMAT_HDR ? vk::Format::eR32G32B32A32Sfloat : vk::Format::eR8G8B8A8Srgb;
+    const vk::Format format = format_is_float(this->format) ? vk::Format::eR32G32B32A32Sfloat
+                                                             : vk::Format::eR8G8B8A8Srgb;
     const vk::FormatProperties format_properties =
         context->get_physical_device()->get_physical_device().getFormatProperties(format);
 
@@ -248,27 +259,15 @@ void ImageWrite::process(GraphRun& run,
         (path.parent_path() / (".interm_" + path.filename().string())).string();
 
     std::function<void()> write_task = ([this, linear_image, path, tmp_filename]() {
-        float* mem = linear_image->get_memory()->map_as<float>();
+        const int w = static_cast<int>(linear_image->get_extent().width);
+        const int h = static_cast<int>(linear_image->get_extent().height);
 
-        switch (this->format) {
-        case FORMAT_PNG: {
-            stbi_write_png(tmp_filename.c_str(), linear_image->get_extent().width,
-                           linear_image->get_extent().height, 4, mem,
-                           linear_image->get_extent().width * 4);
-            break;
-        }
-        case FORMAT_JPG: {
-            stbi_write_jpg(tmp_filename.c_str(), linear_image->get_extent().width,
-                           linear_image->get_extent().height, 4, mem, 100);
-            break;
-        }
-        case FORMAT_HDR: {
-            stbi_write_hdr(tmp_filename.c_str(), linear_image->get_extent().width,
-                           linear_image->get_extent().height, 4, mem);
-            break;
-        }
-        default:
-            throw std::runtime_error{"unsupported format."};
+        if (format_is_float(this->format)) {
+            float* mem = linear_image->get_memory()->map_as<float>();
+            image_save_f32(tmp_filename, mem, w, h, 4);
+        } else {
+            uint8_t* mem = linear_image->get_memory()->map_as<uint8_t>();
+            image_save_u8(tmp_filename, mem, w, h, 4);
         }
 
         try {
@@ -302,7 +301,8 @@ void ImageWrite::process(GraphRun& run,
 
 ImageWrite::NodeStatusFlags ImageWrite::properties([[maybe_unused]] Properties& config) {
     config.st_separate("General");
-    config.config_options("format", format, {"PNG", "JPG", "HDR"}, Properties::OptionsStyle::COMBO);
+    config.config_options("format", format, {"PNG", "JPG", "HDR", "PFM"},
+                          Properties::OptionsStyle::COMBO);
     std::ignore = config.config_text("filename", filename_format, false,
                                      "Provide a format string for the path.");
     std::vector<std::string> variables;

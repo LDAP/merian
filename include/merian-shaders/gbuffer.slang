@@ -2,7 +2,9 @@
 
 import merian_shaders.utils.encoding;
 import merian_shaders.utils.textures;
-import merian_shaders.scene.scene;
+import merian_shaders.scene.scene_data;
+import merian_shaders.scene.hit;
+import merian_shaders.shading.bsdfs.bsdf;
 
 namespace merian {
 

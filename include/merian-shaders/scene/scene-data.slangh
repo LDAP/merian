@@ -32,6 +32,9 @@ enum GeometryDataFlags : uint16_t {
     // Per-vertex tangents are meaningful (asset-supplied or MikkT-generated).
     // When unset, consumers should derive a UV-aligned tangent on the fly.
     HasTangents = 0x100,
+
+    // Replace surface shading with the scene env map sampled along the ray.
+    UseEnvMap = 0x200,
 };
 
 // See scene.hpp for details.
