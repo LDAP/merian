@@ -656,9 +656,11 @@ QueueInfo Context::determine_queues(const PhysicalDeviceHandle& physical_device)
     using Flags = vk::QueueFlagBits;
 
     // We calculate all possible index candidates then sort descending the list to get the best
-    // match. (GCT found, GCT extension_accept, additional T found, additional C found, number
-    // remaining compute queues, GCT family index, T family index, C family index)
-    std::vector<std::tuple<bool, uint32_t, bool, bool, uint32_t, uint32_t, uint32_t, uint32_t>>
+    // match. (GCT found, GCT extension_accept, additional T found, additional C found, T family
+    // distinct from GCT, C family distinct from GCT, T family distinct from C, number remaining
+    // compute queues, GCT family index, T family index, C family index)
+    std::vector<std::tuple<bool, uint32_t, bool, bool, bool, bool, bool, uint32_t, uint32_t,
+                           uint32_t, uint32_t>>
         candidates;
 
 #ifndef NDEBUG
@@ -726,7 +728,15 @@ QueueInfo Context::determine_queues(const PhysicalDeviceHandle& physical_device)
                     num_compute_queues = remaining_queue_count[queue_family_idx_C];
                 }
 
+                const bool T_distinct_from_GCT =
+                    found_T && found_GCT && queue_family_idx_T != queue_family_idx_GCT;
+                const bool C_distinct_from_GCT =
+                    found_C && found_GCT && queue_family_idx_C != queue_family_idx_GCT;
+                const bool T_distinct_from_C =
+                    found_T && found_C && queue_family_idx_T != queue_family_idx_C;
+
                 candidates.emplace_back(found_GCT, GCT_accepts, found_T, found_C,
+                                        T_distinct_from_GCT, C_distinct_from_GCT, T_distinct_from_C,
                                         num_compute_queues, queue_family_idx_GCT,
                                         queue_family_idx_T, queue_family_idx_C);
             }
@@ -746,9 +756,9 @@ QueueInfo Context::determine_queues(const PhysicalDeviceHandle& physical_device)
                     found_T, found_C);
     }
 
-    q_info.queue_family_idx_GCT = found_GCT ? std::get<5>(best) : -1;
-    q_info.queue_family_idx_T = found_T ? std::get<6>(best) : -1;
-    q_info.queue_family_idx_C = found_C ? std::get<7>(best) : -1;
+    q_info.queue_family_idx_GCT = found_GCT ? std::get<8>(best) : -1;
+    q_info.queue_family_idx_T = found_T ? std::get<9>(best) : -1;
+    q_info.queue_family_idx_C = found_C ? std::get<10>(best) : -1;
 
     SPDLOG_DEBUG("determined queue families indices: GCT: {} ({}/{} accept votes), T: {} C: {}",
                  q_info.queue_family_idx_GCT, std::get<1>(best),
