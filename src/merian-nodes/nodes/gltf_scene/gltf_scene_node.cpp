@@ -40,10 +40,7 @@ void GLTFSceneNode::process([[maybe_unused]] GraphRun& run,
     const auto& cmd = run.get_cmd();
 
     if (needs_load && !file_path.empty()) {
-        try {
-            scene->load(cmd, file_path);
-        } catch (const merian::Scene::Error& e) {
-        }
+        scene->load(cmd, file_path);
         needs_load = false;
     }
 

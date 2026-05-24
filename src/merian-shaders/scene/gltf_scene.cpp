@@ -659,26 +659,53 @@ void GLTFScene::compute_aabb() {
 // ---------------------------------------------------------------------------
 
 void GLTFScene::load(const CommandBufferHandle& cmd, const std::filesystem::path& path) {
-    model = std::make_unique<tinygltf::Model>();
-    tinygltf::TinyGLTF loader;
-    std::string err, warn;
+    // Drop everything we put into the scene / material system / texture manager on the previous
+    // load so this can be called repeatedly. Defer texture destruction to pool reset so any
+    // in-flight frame keeps its bindings valid.
+    for (const auto& slot : texture_slots) {
+        if (slot.id_srgb != TextureID(-1)) {
+            cmd->keep_until_pool_reset(get_texture_manager()->get_texture(slot.id_srgb));
+            get_texture_manager()->remove_texture(slot.id_srgb);
+        }
+        if (slot.id_linear != TextureID(-1)) {
+            cmd->keep_until_pool_reset(get_texture_manager()->get_texture(slot.id_linear));
+            get_texture_manager()->remove_texture(slot.id_linear);
+        }
+    }
+    texture_slots.clear();
+    material_map.clear();
+    node_map.clear();
+    mesh_map.clear();
+    gltf_samplers.clear();
+    gltf_sampler_wants_mipmaps.clear();
+    default_gltf_sampler.reset();
+
+    clear_geometry();
+    get_material_system()->clear();
+    model.reset();
 
     SPDLOG_INFO("GLFWScene: loading {}", path.string());
 
+    auto parsed = std::make_unique<tinygltf::Model>();
+    tinygltf::TinyGLTF loader;
+    std::string err, warn;
+
     bool ok;
-    if (path.extension() == ".glb") {
-        ok = loader.LoadBinaryFromFile(model.get(), &err, &warn, path.string());
+    if (path.extension() == ".glb" || path.extension() == ".bin") {
+        ok = loader.LoadBinaryFromFile(parsed.get(), &err, &warn, path.string());
     } else {
-        ok = loader.LoadASCIIFromFile(model.get(), &err, &warn, path.string());
+        ok = loader.LoadASCIIFromFile(parsed.get(), &err, &warn, path.string());
     }
 
     if (!warn.empty()) {
         SPDLOG_WARN("GLTFScene: {}", warn);
     }
     if (!ok) {
-        throw merian::Scene::Error(
-            fmt::format("GLTFScene: failed to load '{}': {}", path.string(), err));
+        // Leave model null so is_ready() reports false and update() bails out cleanly.
+        SPDLOG_ERROR("GLTFScene: failed to load '{}': {}", path.string(), err);
+        return;
     }
+    model = std::move(parsed);
 
     // ----------------
 

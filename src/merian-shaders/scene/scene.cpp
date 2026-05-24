@@ -266,6 +266,37 @@ Scene::CameraID Scene::add_camera(CameraHandle camera) {
     return id;
 }
 
+void Scene::clear_geometry() {
+    // remove_node recurses into children, so a snapshot of root NodeIDs is enough.
+    std::vector<NodeID> roots;
+    for (const NodeID id : node_ids) {
+        assert(scene_graph[id]);
+        if (scene_graph[id]->parent == NODE_ID_INVALID) {
+            roots.push_back(id);
+        }
+    }
+    for (const NodeID id : roots) {
+        if (node_ids.is_used(id)) {
+            remove_node(id);
+        }
+    }
+
+    // remove_mesh mutates mesh_ids; snapshot first.
+    std::vector<MeshID> meshes;
+    meshes.reserve(mesh_ids.count());
+    for (const MeshID id : mesh_ids) {
+        meshes.push_back(id);
+    }
+    for (const MeshID id : meshes) {
+        remove_mesh(id);
+    }
+
+    cameras.clear();
+    active_camera = 0;
+    debug_camera_id = CAMERA_ID_INVALID;
+    aabb.reset();
+}
+
 std::vector<CameraHandle> Scene::get_cameras() const {
     return cameras;
 }
