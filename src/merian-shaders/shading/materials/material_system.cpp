@@ -196,6 +196,7 @@ void MaterialSystem::update(const CommandBufferHandle& cmd) {
     const vk::DeviceSize total_size = host_buffer.size();
 
     if (!material_buffer || material_buffer->get_size() < total_size) {
+        cmd->keep_until_pool_reset(material_buffer);
         material_buffer = allocator->create_buffer(
             total_size,
             vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
