@@ -691,7 +691,7 @@ void GLTFScene::load(const CommandBufferHandle& cmd, const std::filesystem::path
     std::string err, warn;
 
     bool ok;
-    if (path.extension() == ".glb" || path.extension() == ".bin") {
+    if (path.extension() == ".glb") {
         ok = loader.LoadBinaryFromFile(parsed.get(), &err, &warn, path.string());
     } else {
         ok = loader.LoadASCIIFromFile(parsed.get(), &err, &warn, path.string());
