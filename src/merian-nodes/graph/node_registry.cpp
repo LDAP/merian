@@ -69,22 +69,54 @@ NodeRegistry::NodeRegistry() {
 
     register_node<Reduce>(
         "Add", "Add values of multiple input images.",
-        nlohmann::json({{"initial value", ""}, {"initial value", "accumulator + current_value"}}));
+        nlohmann::json({{"initial value", ""}, {"reduction", "accumulator + current_value"}}));
     register_node<Reduce>(
         "Multiply", "Multiply values of multiple input images.",
-        nlohmann::json({{"initial value", ""}, {"initial value", "accumulator * current_value"}}));
+        nlohmann::json({{"initial value", ""}, {"reduction", "accumulator * current_value"}}));
     register_node<Reduce>(
         "Divide", "Divide values of multiple input images.",
-        nlohmann::json({{"initial value", ""}, {"initial value", "accumulator / current_value"}}));
+        nlohmann::json({{"initial value", ""}, {"reduction", "accumulator / current_value"}}));
     register_node<Reduce>(
         "Subtract", "Subtract values of multiple input images.",
-        nlohmann::json({{"initial value", ""}, {"initial value", "accumulator - current_value"}}));
-    register_node<Reduce>("Min", "Compute minimum over all input images.",
-                          nlohmann::json({{"initial value", ""},
-                                          {"initial value", "min(accumulator, current_value)"}}));
-    register_node<Reduce>("Max", "Compute maximum over all input images.",
-                          nlohmann::json({{"initial value", ""},
-                                          {"initial value", "max(accumulator, current_value)"}}));
+        nlohmann::json({{"initial value", ""}, {"reduction", "accumulator - current_value"}}));
+    register_node<Reduce>(
+        "Min", "Compute minimum over all input images.",
+        nlohmann::json({{"initial value", ""}, {"reduction", "min(accumulator, current_value)"}}));
+    register_node<Reduce>(
+        "Max", "Compute maximum over all input images.",
+        nlohmann::json({{"initial value", ""}, {"reduction", "max(accumulator, current_value)"}}));
+
+    register_node<Reduce>(
+        "Alpha Blend (Premultiplied, Front-to-Back)",
+        "Porter-Duff over compositing of multiple images, input 0 on top. Inputs must be "
+        "premultiplied.",
+        nlohmann::json({{"initial value", "vec4(0)"},
+                        {"reduction", "accumulator + current_value * (1.0 - accumulator.a)"}}));
+    register_node<Reduce>(
+        "Alpha Blend (Premultiplied, Back-to-Front)",
+        "Porter-Duff over compositing of multiple images, last input on top. Inputs must be "
+        "premultiplied.",
+        nlohmann::json({{"initial value", "vec4(0)"},
+                        {"reduction", "current_value + accumulator * (1.0 - current_value.a)"}}));
+    register_node<Reduce>(
+        "Alpha Blend (Front-to-Back)",
+        "Porter-Duff over compositing of multiple images with straight alpha, input 0 on top.",
+        nlohmann::json(
+            {{"initial value", "vec4(0)"},
+             {"reduction",
+              "vec4((accumulator.rgb * accumulator.a + current_value.rgb * current_value.a * "
+              "(1.0 - accumulator.a)) / max(accumulator.a + current_value.a * (1.0 - "
+              "accumulator.a), 1e-8), accumulator.a + current_value.a * (1.0 - accumulator.a))"}}));
+    register_node<Reduce>(
+        "Alpha Blend (Back-to-Front)",
+        "Porter-Duff over compositing of multiple images with straight alpha, last input on top.",
+        nlohmann::json(
+            {{"initial value", "vec4(0)"},
+             {"reduction",
+              "vec4((current_value.rgb * current_value.a + accumulator.rgb * accumulator.a * "
+              "(1.0 - current_value.a)) / max(current_value.a + accumulator.a * (1.0 - "
+              "current_value.a), 1e-8), current_value.a + accumulator.a * (1.0 - "
+              "current_value.a))"}}));
 }
 
 } // namespace merian
