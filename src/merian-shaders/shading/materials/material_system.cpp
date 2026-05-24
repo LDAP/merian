@@ -79,8 +79,13 @@ void MaterialSystem::rebuild_shader_object() {
 
 MaterialModelID MaterialSystem::register_material_type(const std::string& slang_type_name,
                                                        const std::string& slang_module_path) {
-    auto dispatch_id = static_cast<MaterialModelID>(material_types.size());
-    material_types.push_back({slang_type_name, slang_module_path, dispatch_id});
+    if (auto it = material_types.find(slang_type_name); it != material_types.end()) {
+        assert(it->second.slang_module_path == slang_module_path);
+        return it->second.dispatch_id;
+    }
+
+    const auto dispatch_id = static_cast<MaterialModelID>(material_types.size());
+    material_types.emplace(slang_type_name, MaterialTypeInfo{slang_module_path, dispatch_id});
 
     // triggers program rebuild via listener
     composition->add_module_from_path(slang_module_path);

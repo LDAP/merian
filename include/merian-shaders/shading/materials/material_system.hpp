@@ -7,6 +7,8 @@
 #include "merian/shader/slang_program.hpp"
 #include "merian/utils/versionable.hpp"
 
+#include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace merian {
@@ -100,7 +102,6 @@ class MaterialSystem : public Versionable,
 
   public:
     struct MaterialTypeInfo {
-        std::string slang_type_name;
         std::string slang_module_path;
         MaterialModelID dispatch_id;
     };
@@ -117,7 +118,7 @@ class MaterialSystem : public Versionable,
     ShaderObjectAllocatorHandle obj_allocator;
     TextureManagerHandle texture_manager;
 
-    std::vector<MaterialTypeInfo> material_types;
+    std::unordered_map<std::string, MaterialTypeInfo> material_types;
 
     struct StoredMaterial {
         MaterialHeader header;
