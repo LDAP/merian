@@ -10,7 +10,7 @@ class GBuffer {
   public:
     GBuffer(const ShaderCompileContextHandle& compile_context,
             const ContextHandle& context,
-            const ShaderObjectAllocatorHandle& obj_allocator,
+            const ResourceAllocatorHandle& allocator,
             const vk::Extent3D extent)
         : extent(extent) {
         SlangCompositionHandle composition = SlangComposition::create();
@@ -18,9 +18,9 @@ class GBuffer {
         layout_program = SlangProgram::create(compile_context, composition);
 
         r_shader_object =
-            layout_program->create_shader_object(context, "merian::GBuffer", obj_allocator);
+            layout_program->create_shader_object(context, "merian::GBuffer", allocator);
         w_shader_object =
-            layout_program->create_shader_object(context, "merian::WGBuffer", obj_allocator);
+            layout_program->create_shader_object(context, "merian::WGBuffer", allocator);
     }
 
     const ShaderObjectHandle& get_shader_object() const {

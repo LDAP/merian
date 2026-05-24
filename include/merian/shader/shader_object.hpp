@@ -6,6 +6,7 @@
 #include "merian/shader/slang_utils.hpp"
 #include "merian/vk/descriptors/descriptor_container.hpp"
 #include "merian/vk/memory/resource_allocations.hpp"
+#include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 #include "slang.h"
 
@@ -20,79 +21,25 @@ namespace merian {
 class ShaderObject;
 using ShaderObjectHandle = std::shared_ptr<ShaderObject>;
 
-/**
- * @brief Represents a structured collection of shader parameters backed by Slang reflection.
- *
- * A ShaderObject maps to a Slang struct/type. It manages:
- * - Descriptor state (cached for incremental updates across frames)
- * - Ordinary data (uniform data uploaded via staging memory manager)
- * - Sub-objects (ConstantBuffer and ParameterBlock children, indexed by sub-object range)
- *
- * Sub-objects are stored in a flat array indexed by Slang's sub-object range index
- * (one slot per ConstantBuffer or ParameterBlock field in the type). This matches
- * the slang-rhi data model and avoids ambiguity with value-embedded structs.
- *
- * Example:
- *   auto obj = std::make_shared<ShaderObject>(object_layout, allocator);
- *   obj->get_cursor()["my_texture"] = texture;
- *   obj->get_cursor()["my_value"] = 3.14f;
- *   obj->bind_as_parameter_block(cmd, pipeline, 0);
- */
 class ShaderObject : public std::enable_shared_from_this<ShaderObject> {
   public:
     ShaderObject(const ShaderObjectLayoutHandle& object_layout,
-                 const ShaderObjectAllocatorHandle& allocator);
+                 const ResourceAllocatorHandle& allocator);
 
-    ~ShaderObject();
+    ~ShaderObject() = default;
 
-    // ---------------------------------------------------------------
-    // Binding
-
-    /**
-     * @brief Bind this object as a parameter block (its descriptor set) to the command buffer.
-     *
-     * - Gets a descriptor set from allocator
-     * - If new: registers it and replays cached descriptor state
-     * - Uploads ordinary data and ConstantBuffer sub-objects' data
-     * - Flushes queued writes and binds
-     *
-     * This only binds this object, however ParameterBlock sub-objects are NOT bound here. Use
-     * entry_point->bind_entry_point_parameter() to handle those (with reflection-derived set
-     * indices). Also, the caller must ensure a memory barrier for uniform buffers (use one barrier
-     * for all).
-     */
+    // The obj_allocator supplies the descriptor container; not stored. ParameterBlock sub-objects
+    // are NOT bound here — see SlangProgramEntryPoint::bind_entry_point_parameter for those.
+    // The caller must barrier uniform buffers (one barrier for the whole bind walk).
     void bind_as_parameter_block(const CommandBufferHandle& cmd,
                                  const PipelineHandle& pipeline,
-                                 uint32_t set_index);
+                                 uint32_t set_index,
+                                 const ShaderObjectAllocatorHandle& obj_allocator);
 
-    // ---------------------------------------------------------------
-    // Cursor access
-
-    /**
-     * @brief Get a cursor pointing to the root of this object.
-     *
-     * Use this to write parameters: get_cursor()["field"] = value;
-     */
     ShaderCursor get_cursor();
 
-    // ---------------------------------------------------------------
-    // Sub-object creation and access
-
-    /**
-     * @brief Create a new ShaderObject for a named ConstantBuffer or ParameterBlock field.
-     *
-     * Uses the pre-computed element layout from SlangObjectLayout.
-     * The caller is responsible for assigning the result via set_subobject(field_name, object).
-     */
     ShaderObjectHandle create_subobject(const std::string& field_name);
 
-    /**
-     * @brief Assign a ShaderObject as a sub-object for a named ConstantBuffer / ParameterBlock
-     * field.
-     *
-     * Replaces any existing sub-object at that field. For ConstantBuffer fields,
-     * also writes the object's buffer to this object's descriptor set.
-     */
     void set_subobject(const std::string& field_name, const ShaderObjectHandle& object);
 
     const ShaderObjectHandle& get_subobject(uint32_t subobject_range_index) const {
@@ -100,20 +47,13 @@ class ShaderObject : public std::enable_shared_from_this<ShaderObject> {
         return subobjects[subobject_range_index];
     }
 
-    /**
-     * @brief Set a sub-object by sub-object range index.
-     *
-     * For ConstantBuffer sub-objects, writes the CB's UBO descriptor to the owning PB's
-     * descriptor storage (not the immediate parent's). This ensures descriptor writes happen
-     * at update time, not bind time, enabling zero-write frames when nothing changes.
-     */
+    // Writes the CB's UBO into the owning PB's storage at set time (not bind time) so frames with
+    // no state changes issue no descriptor writes.
     void set_subobject(uint32_t subobject_range_index, const ShaderObjectHandle& object);
 
     uint32_t get_subobject_count() const {
         return static_cast<uint32_t>(subobjects.size());
     }
-
-    // ---------------------------------------------------------------
 
     void write(const ShaderOffset& offset,
                const ImageViewHandle& image,
@@ -126,8 +66,6 @@ class ShaderObject : public std::enable_shared_from_this<ShaderObject> {
     void write(const ShaderOffset& offset, const AccelerationStructureHandle& as);
     void write(const ShaderOffset& offset, const void* data, std::size_t size);
 
-    // ---------------------------------------------------------------
-
     slang::TypeLayoutReflection* get_type_layout() const {
         return object_layout->get_type_layout();
     }
@@ -136,47 +74,36 @@ class ShaderObject : public std::enable_shared_from_this<ShaderObject> {
         return object_layout;
     }
 
-    const ShaderObjectAllocatorHandle& get_allocator() const {
+    const ResourceAllocatorHandle& get_allocator() const {
         return allocator;
     }
 
   private:
-    // Recursively upload staging data for nested ConstantBuffer sub-objects.
-    // Descriptor writes are handled at update time by set_subobject.
     void upload_constant_buffer_tree(ShaderObject* cb_obj, const CommandBufferHandle& cmd);
 
-    // Call fn on each live registered set, prune expired entries.
     void for_each_registered_set(const std::function<void(DescriptorContainer&)>& fn);
 
   private:
     ShaderObjectLayoutHandle object_layout;
-    ShaderObjectAllocatorHandle allocator;
+    ResourceAllocatorHandle allocator;
 
-    // Stores the current descriptor sets state for replay to new descriptor sets and to keep bound
-    // resources alive.
     DescriptorStorageHandle descriptors = nullptr;
 
-    // Registered descriptor sets for incremental write propagation.
     std::vector<std::weak_ptr<DescriptorContainer>> registered_sets;
 
-    // Ordinary data (uniform buffer)
     BufferHandle ordinary_data_buffer;
     std::vector<uint8_t> ordinary_data_staging;
     bool ordinary_data_dirty = false;
 
-    // Sub-objects (nested ParameterBlocks, ConstantBuffers) indexed by sub-object range.
     std::vector<ShaderObjectHandle> subobjects;
 
     struct OwnerConstantBufferBindings {
         std::weak_ptr<ShaderObject> pb;
         uint32_t element_binding;
     };
-    // We store a weak ref to other shader objects, that own this object as constant buffer.
-    // As constant buffer for the other object, we still use their descriptor set storage and need
-    // this ref to access it.
-    //
-    // If we are a ParameterBlock subobject this is not necessary, since we store our own descriptor
-    // set. And for values we are no subobject at all (for now).
+    // When this object is a ConstantBuffer field, we write into the owning PB's descriptor storage
+    // (not the immediate parent's). Multiple owners are possible if the same CB is set in several
+    // places.
     std::vector<OwnerConstantBufferBindings> cb_owners;
 
     friend class ShaderCursor;

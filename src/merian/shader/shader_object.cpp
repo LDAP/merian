@@ -6,12 +6,11 @@
 namespace merian {
 
 ShaderObject::ShaderObject(const ShaderObjectLayoutHandle& object_layout,
-                           const ShaderObjectAllocatorHandle& allocator)
+                           const ResourceAllocatorHandle& allocator)
     : object_layout(object_layout), allocator(allocator) {
     assert(object_layout);
     assert(allocator);
 
-    // Create descriptor storage for caching writes (incremental update model)
     descriptors = DescriptorStorage::create(object_layout->get_descriptor_set_layout());
 
     subobjects.resize(object_layout->get_subobject_range_count());
@@ -20,29 +19,22 @@ ShaderObject::ShaderObject(const ShaderObjectLayoutHandle& object_layout,
         const vk::DeviceSize uniform_size = object_layout->get_uniform_size();
 
         ordinary_data_staging.resize(uniform_size, 0);
-        ordinary_data_buffer = allocator->allocate_uniform_buffer(uniform_size);
+        ordinary_data_buffer = allocator->create_buffer(
+            uniform_size,
+            vk::BufferUsageFlagBits::eUniformBuffer | vk::BufferUsageFlagBits::eTransferDst);
 
-        assert(descriptors);
-
-        // Write buffer to descriptor storage so it gets replayed to new sets
+        // Replayed onto every descriptor set the bind-time allocator hands out.
         descriptors->queue_descriptor_write_buffer(ShaderObjectLayout::ORDINARY_DATA_BUFFER_BINDING,
                                                    ordinary_data_buffer, 0, uniform_size);
     }
 }
 
-// ---------------------------------------------------------------
-// Cursor
-
 ShaderCursor ShaderObject::get_cursor() {
     return ShaderCursor(this);
 }
 
-// ---------------------------------------------------------------
-// Binding
-
-// Compute the sub-range offset, container offset (UBO binding), and element offset
-// for a ConstantBuffer sub-object range within a parent type layout.
-// Returns {ubo_binding_delta, element_binding_delta} relative to parent's base binding.
+// Returns {ubo_binding_delta, element_binding_delta} relative to the parent PB's base binding for
+// the CB sub-object at `sor` / `binding_range_index`.
 static std::pair<uint32_t, uint32_t> compute_cb_binding_deltas(
     slang::TypeLayoutReflection* parent_tl, uint32_t sor, uint32_t binding_range_index) {
     uint32_t sub_range_offset = 0;
@@ -79,14 +71,12 @@ void ShaderObject::set_subobject(uint32_t subobject_range_index, const ShaderObj
         return;
     }
 
-    // For CB sub-objects: write the UBO descriptor to the owning PB's storage/sets
-    // and set the CB's PB context for nested CB propagation.
     auto* tl = object_layout->get_type_layout();
     auto [ubo_delta, element_delta] =
         compute_cb_binding_deltas(tl, subobject_range_index, range.binding_range_index);
 
     if (!cb_owners.empty()) {
-        // This object is a CB inside one or more PBs — propagate to all owning PBs.
+        // We are a CB inside one or more PBs; propagate the write up to every owning PB.
         for (auto it = cb_owners.begin(); it != cb_owners.end();) {
             auto pb = it->pb.lock();
             if (!pb) {
@@ -108,9 +98,8 @@ void ShaderObject::set_subobject(uint32_t subobject_range_index, const ShaderObj
             ++it;
         }
     } else {
-        // This object IS the PB. Use binding_info_cache for the Vulkan binding (same path
-        // the old cursor code used via write()), and compute element_binding from reflection
-        // for nested CB propagation.
+        // We are the owning PB. binding_info_cache gives the Vulkan binding; the element delta
+        // computed from reflection is what nested CB propagation needs.
         const auto& info = object_layout->get_binding_range_info(range.binding_range_index);
         descriptors->queue_descriptor_write_buffer(info.binding, object->ordinary_data_buffer, 0,
                                                    VK_WHOLE_SIZE);
@@ -127,7 +116,6 @@ void ShaderObject::set_subobject(uint32_t subobject_range_index, const ShaderObj
 
 void ShaderObject::upload_constant_buffer_tree(ShaderObject* cb_obj,
                                                const CommandBufferHandle& cmd) {
-    // Upload this CB's staging data if dirty
     if (cb_obj->ordinary_data_buffer && cb_obj->ordinary_data_dirty) {
         allocator->get_staging()->cmd_to_device(cmd, cb_obj->ordinary_data_buffer,
                                                 cb_obj->ordinary_data_staging.data(), 0,
@@ -135,7 +123,6 @@ void ShaderObject::upload_constant_buffer_tree(ShaderObject* cb_obj,
         cb_obj->ordinary_data_dirty = false;
     }
 
-    // Recurse into nested CB sub-objects for staging uploads
     for (uint32_t sor = 0; sor < cb_obj->object_layout->get_subobject_range_count(); sor++) {
         const auto& range = cb_obj->object_layout->get_subobject_range_info(sor);
         if (range.binding_type != slang::BindingType::ConstantBuffer)
@@ -162,8 +149,8 @@ void ShaderObject::for_each_registered_set(const std::function<void(DescriptorCo
 
 void ShaderObject::bind_as_parameter_block(const CommandBufferHandle& cmd,
                                            const PipelineHandle& pipeline,
-                                           const uint32_t set_index) {
-    // Upload this PB's own ordinary data
+                                           const uint32_t set_index,
+                                           const ShaderObjectAllocatorHandle& obj_allocator) {
     if (ordinary_data_buffer && ordinary_data_dirty) {
         allocator->get_staging()->cmd_to_device(cmd, ordinary_data_buffer,
                                                 ordinary_data_staging.data(), 0,
@@ -171,8 +158,7 @@ void ShaderObject::bind_as_parameter_block(const CommandBufferHandle& cmd,
         ordinary_data_dirty = false;
     }
 
-    // Upload staging data for ConstantBuffer sub-objects (recursive, dirty-guarded).
-    // Descriptor writes are handled by set_subobject at update time.
+    // CB sub-object descriptor writes happen in set_subobject; here we only stage their data.
     for (uint32_t sor = 0; sor < object_layout->get_subobject_range_count(); sor++) {
         const auto& range = object_layout->get_subobject_range_info(sor);
         if (range.binding_type != slang::BindingType::ConstantBuffer)
@@ -187,10 +173,8 @@ void ShaderObject::bind_as_parameter_block(const CommandBufferHandle& cmd,
 
     assert(descriptors);
 
-    // Ask allocator for a descriptor container (handles frame cycling)
-    auto container = allocator->allocate(this);
+    auto container = obj_allocator->allocate(shared_from_this());
 
-    // If new container, register and replay cached descriptor state
     bool found = false;
     for (auto it = registered_sets.begin(); it != registered_sets.end();) {
         if (it->expired()) {
@@ -206,22 +190,15 @@ void ShaderObject::bind_as_parameter_block(const CommandBufferHandle& cmd,
         descriptors->replay_to(*container);
     }
 
-    // Flush queued descriptor writes and bind
     container->update();
     container->bind(cmd, pipeline, set_index);
-
-    // ParameterBlock sub-objects are bound by SlangProgramEntryPoint::bind_nested_pbs
 }
-
-// ---------------------------------------------------------------
-// Sub-object creation
 
 ShaderObjectHandle ShaderObject::create_subobject(const std::string& field_name) {
     auto* tl = object_layout->get_type_layout();
     SlangInt field_index = tl->findFieldIndexByName(field_name.c_str());
     assert(field_index >= 0 && "Field not found");
 
-    // Find the sub-object range for this field
     uint32_t br = tl->getFieldBindingRangeOffset(static_cast<uint32_t>(field_index));
     int32_t sor = object_layout->find_subobject_range_index(br);
     assert(sor >= 0 && "Field must be a ConstantBuffer or ParameterBlock");
@@ -230,10 +207,6 @@ ShaderObjectHandle ShaderObject::create_subobject(const std::string& field_name)
     assert(range_info.element_layout);
 
     return std::make_shared<ShaderObject>(range_info.element_layout, allocator);
-}
-
-ShaderObject::~ShaderObject() {
-    allocator->free(this);
 }
 
 void ShaderObject::set_subobject(const std::string& field_name, const ShaderObjectHandle& object) {
@@ -245,12 +218,8 @@ void ShaderObject::set_subobject(const std::string& field_name, const ShaderObje
         tl->getFieldBindingRangeOffset(static_cast<uint32_t>(field_index)));
     assert(sor >= 0 && "Field must be a ConstantBuffer or ParameterBlock");
 
-    // Delegate to the sor-based version which handles CB descriptor writes
     set_subobject(static_cast<uint32_t>(sor), object);
 }
-
-// ---------------------------------------------------------------
-// Write operations
 
 void ShaderObject::write(const ShaderOffset& offset,
                          const ImageViewHandle& image,

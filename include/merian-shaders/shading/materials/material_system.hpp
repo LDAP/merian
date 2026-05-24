@@ -51,7 +51,6 @@ class MaterialSystem : public Versionable,
     MaterialSystem(const ShaderCompileContextHandle& compile_context,
                    const ContextHandle& context,
                    const ResourceAllocatorHandle& allocator,
-                   const ShaderObjectAllocatorHandle& obj_allocator,
                    const TextureManagerHandle& texture_manager);
 
     // Register a material model type. Returns the type's dispatch ID.
@@ -115,7 +114,6 @@ class MaterialSystem : public Versionable,
     ShaderCompileContextHandle compile_context;
     ContextHandle context;
     ResourceAllocatorHandle allocator;
-    ShaderObjectAllocatorHandle obj_allocator;
     TextureManagerHandle texture_manager;
 
     std::unordered_map<std::string, MaterialTypeInfo> material_types;

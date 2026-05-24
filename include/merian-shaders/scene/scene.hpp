@@ -440,7 +440,6 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     Scene(const ShaderCompileContextHandle& compile_context,
           const ContextHandle& context,
           const ResourceAllocatorHandle& allocator,
-          const ShaderObjectAllocatorHandle& obj_allocator,
           const MaterialSystemHandle& material_system);
 
     virtual ~Scene() = default;
@@ -558,6 +557,9 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         return pretransform_animated;
     }
     void set_pretransform_animated(bool value);
+
+    // Removes meshes, nodes, cameras and resets the AABB. Not: env map, materials and textures.
+    void clear_geometry();
 
     // A the scenes up direction
     virtual float3 get_up() {
@@ -698,7 +700,6 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     ShaderCompileContextHandle compile_context;
     ContextHandle context;
     ResourceAllocatorHandle allocator;
-    ShaderObjectAllocatorHandle obj_allocator;
 
     SlangCompositionHandle composition;
     SlangProgramHandle layout_program;

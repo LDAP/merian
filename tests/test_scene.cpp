@@ -59,10 +59,10 @@ class SceneTest : public ::testing::Test {
         compile_context = ShaderCompileContext::create(context);
         compile_context->add_search_path(TEST_SHADER_DIR);
         obj_allocator = std::make_shared<SimpleShaderObjectAllocator>(allocator);
-        texture_manager = std::make_shared<TextureManager>(compile_context, context, allocator,
-                                                           obj_allocator, 16);
-        material_system = std::make_shared<MaterialSystem>(compile_context, context, allocator,
-                                                           obj_allocator, texture_manager);
+        texture_manager =
+            std::make_shared<TextureManager>(compile_context, context, allocator, 16);
+        material_system =
+            std::make_shared<MaterialSystem>(compile_context, context, allocator, texture_manager);
     }
 
     static void TearDownTestSuite() {
@@ -108,7 +108,7 @@ MaterialSystemHandle SceneTest::material_system;
 // ---------------------------------------------------------------------------
 
 TEST_F(SceneTest, Construction) {
-    auto scene = std::make_shared<TestScene>(compile_context, context, allocator, obj_allocator,
+    auto scene = std::make_shared<TestScene>(compile_context, context, allocator,
                                              material_system);
     EXPECT_NE(scene->get_composition(), nullptr);
     EXPECT_EQ(scene->get_material_system(), material_system);
@@ -120,7 +120,7 @@ TEST_F(SceneTest, Construction) {
 // ---------------------------------------------------------------------------
 
 TEST_F(SceneTest, SceneGraphTransforms) {
-    auto scene = std::make_shared<TestScene>(compile_context, context, allocator, obj_allocator,
+    auto scene = std::make_shared<TestScene>(compile_context, context, allocator,
                                              material_system);
 
     Scene::Node root;
@@ -148,7 +148,7 @@ TEST_F(SceneTest, SceneGraphTransforms) {
 // ---------------------------------------------------------------------------
 
 TEST_F(SceneTest, MeshGroupingStatic) {
-    auto scene = std::make_shared<TestScene>(compile_context, context, allocator, obj_allocator,
+    auto scene = std::make_shared<TestScene>(compile_context, context, allocator,
                                              material_system);
     scene->add_camera(std::make_shared<Camera>());
 
@@ -174,7 +174,7 @@ TEST_F(SceneTest, MeshGroupingStatic) {
 // ---------------------------------------------------------------------------
 
 TEST_F(SceneTest, MeshGroupingInstanced) {
-    auto scene = std::make_shared<TestScene>(compile_context, context, allocator, obj_allocator,
+    auto scene = std::make_shared<TestScene>(compile_context, context, allocator,
                                              material_system);
     scene->add_camera(std::make_shared<Camera>());
 
@@ -198,7 +198,7 @@ TEST_F(SceneTest, MeshGroupingInstanced) {
 // ---------------------------------------------------------------------------
 
 TEST_F(SceneTest, MeshGroupingDynamic) {
-    auto scene = std::make_shared<TestScene>(compile_context, context, allocator, obj_allocator,
+    auto scene = std::make_shared<TestScene>(compile_context, context, allocator,
                                              material_system);
     scene->add_camera(std::make_shared<Camera>());
 
@@ -228,7 +228,7 @@ TEST_F(SceneTest, MeshGroupingDynamic) {
 // ---------------------------------------------------------------------------
 
 TEST_F(SceneTest, CameraManagement) {
-    auto scene = std::make_shared<TestScene>(compile_context, context, allocator, obj_allocator,
+    auto scene = std::make_shared<TestScene>(compile_context, context, allocator,
                                              material_system);
 
     auto cam = std::make_shared<Camera>();
@@ -246,7 +246,7 @@ TEST_F(SceneTest, CameraManagement) {
 // ---------------------------------------------------------------------------
 
 TEST_F(SceneTest, RemoveMeshInstanceLeavesMeshAndOtherInstances) {
-    auto scene = std::make_shared<TestScene>(compile_context, context, allocator, obj_allocator,
+    auto scene = std::make_shared<TestScene>(compile_context, context, allocator,
                                              material_system);
     scene->add_camera(std::make_shared<Camera>());
 
@@ -265,7 +265,7 @@ TEST_F(SceneTest, RemoveMeshInstanceLeavesMeshAndOtherInstances) {
 }
 
 TEST_F(SceneTest, RemoveMeshClearsSlotAndAllowsReuse) {
-    auto scene = std::make_shared<TestScene>(compile_context, context, allocator, obj_allocator,
+    auto scene = std::make_shared<TestScene>(compile_context, context, allocator,
                                              material_system);
     scene->add_camera(std::make_shared<Camera>());
 
@@ -288,7 +288,7 @@ TEST_F(SceneTest, RemoveMeshClearsSlotAndAllowsReuse) {
 }
 
 TEST_F(SceneTest, RemoveNodeCascadesAndDetachesInstances) {
-    auto scene = std::make_shared<TestScene>(compile_context, context, allocator, obj_allocator,
+    auto scene = std::make_shared<TestScene>(compile_context, context, allocator,
                                              material_system);
     scene->add_camera(std::make_shared<Camera>());
 

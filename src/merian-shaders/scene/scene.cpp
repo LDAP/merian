@@ -27,10 +27,9 @@ namespace merian {
 Scene::Scene(const ShaderCompileContextHandle& compile_context,
              const ContextHandle& context,
              const ResourceAllocatorHandle& allocator,
-             const ShaderObjectAllocatorHandle& obj_allocator,
              const MaterialSystemHandle& material_system)
     : compile_context(compile_context), context(context), allocator(allocator),
-      obj_allocator(obj_allocator), as_builder(context, allocator),
+      as_builder(context, allocator),
       as_supported(context->get_device()
                        ->get_enabled_features()
                        .get_acceleration_structure_features_khr()
@@ -84,7 +83,7 @@ void Scene::set_env(EnvMapHandle env) {
 void Scene::rebuild_shader_object() {
     SPDLOG_DEBUG("recreate shader object");
 
-    shader_object = layout_program->create_shader_object(context, "merian::Scene", obj_allocator);
+    shader_object = layout_program->create_shader_object(context, "merian::Scene", allocator);
 
     auto c = shader_object->get_cursor();
 

@@ -18,7 +18,6 @@ class GLTFScene : public Scene {
     GLTFScene(const ShaderCompileContextHandle& compile_context,
               const ContextHandle& context,
               const ResourceAllocatorHandle& allocator,
-              const ShaderObjectAllocatorHandle& obj_allocator,
               const MaterialSystemHandle& material_system);
 
     ~GLTFScene() override;

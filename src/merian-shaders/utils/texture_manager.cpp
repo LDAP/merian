@@ -11,10 +11,8 @@ namespace merian {
 TextureManager::TextureManager(const ShaderCompileContextHandle& compile_context,
                                const ContextHandle& context,
                                const ResourceAllocatorHandle& allocator,
-                               const ShaderObjectAllocatorHandle& obj_allocator,
                                const uint32_t initial_capacity)
-    : compile_context(compile_context), context(context), allocator(allocator),
-      obj_allocator(obj_allocator) {
+    : compile_context(compile_context), context(context), allocator(allocator) {
     textures.resize(initial_capacity);
 
     // Build composition once — subsequent changes modify in-place.
@@ -38,7 +36,7 @@ void TextureManager::update_composition_constants() {
 void TextureManager::rebuild_shader_object() {
     SPDLOG_DEBUG("recreate shader object");
     shader_object =
-        layout_program->create_shader_object(context, "merian::TextureManager", obj_allocator);
+        layout_program->create_shader_object(context, "merian::TextureManager", allocator);
 
     // Reinitialize all texture slots
     const auto& dummy = allocator->get_dummy_texture();

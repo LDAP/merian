@@ -69,7 +69,7 @@ ShaderCompileContextHandle TextureManagerTest::compile_context;
 ShaderObjectAllocatorHandle TextureManagerTest::obj_allocator;
 
 TEST_F(TextureManagerTest, Construction) {
-    auto tm = std::make_shared<TextureManager>(compile_context, context, allocator, obj_allocator);
+    auto tm = std::make_shared<TextureManager>(compile_context, context, allocator);
     EXPECT_EQ(tm->get_texture_count(), 0u);
     EXPECT_EQ(tm->get_capacity(), 4096u);
     EXPECT_NE(tm->get_composition(), nullptr);
@@ -77,13 +77,13 @@ TEST_F(TextureManagerTest, Construction) {
 
 TEST_F(TextureManagerTest, ConstructionWithCustomCapacity) {
     auto tm =
-        std::make_shared<TextureManager>(compile_context, context, allocator, obj_allocator, 128);
+        std::make_shared<TextureManager>(compile_context, context, allocator, 128);
     EXPECT_EQ(tm->get_capacity(), 128u);
 }
 
 TEST_F(TextureManagerTest, AddAndRemoveTexture) {
     auto tm =
-        std::make_shared<TextureManager>(compile_context, context, allocator, obj_allocator, 16);
+        std::make_shared<TextureManager>(compile_context, context, allocator, 16);
 
     auto tex = allocator->get_dummy_texture();
     TextureID id = tm->add_texture(tex);
@@ -106,7 +106,7 @@ TEST_F(TextureManagerTest, AddAndRemoveTexture) {
 
 TEST_F(TextureManagerTest, SampleTextureOnGPU) {
     auto tm =
-        std::make_shared<TextureManager>(compile_context, context, allocator, obj_allocator, 16);
+        std::make_shared<TextureManager>(compile_context, context, allocator, 16);
 
     // 1x1 red pixel (RGBA8, linear): R=255 G=0 B=0 A=255
     const uint32_t red_pixel = 0xFF0000FF;
@@ -135,7 +135,7 @@ TEST_F(TextureManagerTest, SampleTextureOnGPU) {
         vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
         MemoryMappingType::HOST_ACCESS_RANDOM, "test_output");
 
-    auto params = entry_point->create_shader_object(context, "params", obj_allocator);
+    auto params = entry_point->create_shader_object(context, "params", allocator);
     auto cursor = params->get_cursor();
     cursor["tm"] = tm;
     cursor["output"] = output_buffer;
@@ -143,7 +143,7 @@ TEST_F(TextureManagerTest, SampleTextureOnGPU) {
 
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(pipeline);
-        entry_point->bind_entry_point_parameter("params", params, cmd, pipeline);
+        entry_point->bind_entry_point_parameter("params", params, cmd, pipeline, obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
 
@@ -162,7 +162,7 @@ TEST_F(TextureManagerTest, SampleTextureOnGPU) {
 
 TEST_F(TextureManagerTest, ResizePropagatesVersion) {
     auto tm =
-        std::make_shared<TextureManager>(compile_context, context, allocator, obj_allocator, 4);
+        std::make_shared<TextureManager>(compile_context, context, allocator, 4);
 
     auto v0 = tm->get_version();
     auto comp_v0 = tm->get_composition()->get_version();

@@ -15,9 +15,8 @@ namespace merian {
 GLTFScene::GLTFScene(const ShaderCompileContextHandle& compile_context,
                      const ContextHandle& context,
                      const ResourceAllocatorHandle& allocator,
-                     const ShaderObjectAllocatorHandle& obj_allocator,
                      const MaterialSystemHandle& material_system)
-    : Scene(compile_context, context, allocator, obj_allocator, material_system) {
+    : Scene(compile_context, context, allocator, material_system) {
 
     gltf_type_id = material_system->register_material_type(GLTF_MATERIAL_SLANG_TYPE_NAME,
                                                            GLTF_MATERIAL_SLANG_MODULE_PATH);

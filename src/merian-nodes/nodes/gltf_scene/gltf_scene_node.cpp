@@ -21,6 +21,10 @@ void GLTFSceneNode::initialize([[maybe_unused]] const ContextHandle& context,
     this->context = context;
     this->allocator = allocator;
     compile_context = ShaderCompileContext::create(context);
+    texture_manager = std::make_shared<TextureManager>(compile_context, context, allocator, 4096);
+    material_system =
+        std::make_shared<MaterialSystem>(compile_context, context, allocator, texture_manager);
+    scene = std::make_shared<GLTFScene>(compile_context, context, allocator, material_system);
 #endif
 }
 
@@ -35,24 +39,7 @@ void GLTFSceneNode::process([[maybe_unused]] GraphRun& run,
 #ifdef MERIAN_TINYGLTF_ENABLED
     const auto& cmd = run.get_cmd();
 
-    // Lazy init: deferred to first process() so iterations_in_flight is available for the
-    // FrameCachingShaderObjectAllocator, which prevents per-frame descriptor set churn.
-    if (!obj_allocator) {
-        obj_allocator = std::make_shared<FrameCachingShaderObjectAllocator>(
-            allocator, run.get_iterations_in_flight());
-        texture_manager = std::make_shared<TextureManager>(compile_context, context, allocator,
-                                                           obj_allocator, 4096);
-        material_system = std::make_shared<MaterialSystem>(compile_context, context, allocator,
-                                                           obj_allocator, texture_manager);
-        scene = std::make_shared<GLTFScene>(compile_context, context, allocator, obj_allocator,
-                                            material_system);
-    }
-
-    obj_allocator->set_iteration(run.get_in_flight_index());
-
     if (needs_load && !file_path.empty()) {
-        scene = std::make_shared<GLTFScene>(compile_context, context, allocator, obj_allocator,
-                                            material_system);
         try {
             scene->load(cmd, file_path);
         } catch (const merian::Scene::Error& e) {

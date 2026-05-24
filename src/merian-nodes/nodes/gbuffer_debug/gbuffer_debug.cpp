@@ -82,7 +82,7 @@ void GBufferDebugNode::process(GraphRun& run,
     obj_allocator->set_iteration(run.get_in_flight_index());
 
     if (!params) {
-        params = entry_point->create_shader_object(context, "params", obj_allocator);
+        params = entry_point->create_shader_object(context, "params", resource_allocator);
     }
 
     auto cursor = params->get_cursor();
@@ -90,8 +90,9 @@ void GBufferDebugNode::process(GraphRun& run,
     cursor["output"] = io[con_output].get_texture();
 
     cmd->bind(pipeline);
-    entry_point->bind_entry_point_parameter("scene", scene->get_shader_object(), cmd, pipeline);
-    entry_point->bind_entry_point_parameter("params", params, cmd, pipeline);
+    entry_point->bind_entry_point_parameter("scene", scene->get_shader_object(), cmd, pipeline,
+                                            obj_allocator);
+    entry_point->bind_entry_point_parameter("params", params, cmd, pipeline, obj_allocator);
     cmd->push_constant(pipeline, static_cast<int>(selected_field));
 
     cmd->dispatch(extent, 16, 16);

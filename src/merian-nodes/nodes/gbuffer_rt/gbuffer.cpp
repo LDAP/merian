@@ -87,13 +87,13 @@ void GBufferRTNode::process(GraphRun& run,
 
     obj_allocator->set_iteration(run.get_in_flight_index());
 
-    // Create shader object for GBufferImages
     if (!gbuffer_obj) {
-        gbuffer_obj = std::make_shared<GBuffer>(compile_context, context, obj_allocator, extent);
+        gbuffer_obj = std::make_shared<GBuffer>(compile_context, context, resource_allocator,
+                                                extent);
     }
 
     if (!globals_obj) {
-        globals_obj = entry_point->create_global_shader_object(context, obj_allocator);
+        globals_obj = entry_point->create_global_shader_object(context, resource_allocator);
     }
 
     // Bind graph-managed textures to the shader object
@@ -112,10 +112,11 @@ void GBufferRTNode::process(GraphRun& run,
 
     if (scene->is_ready()) {
         cmd->bind(pipeline);
-        entry_point->bind_entry_point_parameter("scene", scene->get_shader_object(), cmd, pipeline);
+        entry_point->bind_entry_point_parameter("scene", scene->get_shader_object(), cmd, pipeline,
+                                                obj_allocator);
         entry_point->bind_entry_point_parameter("gbuffer", gbuffer_obj->get_write_shader_object(),
-                                                cmd, pipeline);
-        entry_point->bind_global_parameter(globals_obj, cmd, pipeline);
+                                                cmd, pipeline, obj_allocator);
+        entry_point->bind_global_parameter(globals_obj, cmd, pipeline, obj_allocator);
         cmd->dispatch(extent, 16, 16);
     }
 

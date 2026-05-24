@@ -89,13 +89,12 @@ slang::TypeLayoutReflection* SlangProgram::get_type_layout(const std::string& ty
     return layout;
 }
 
-ShaderObjectHandle
-SlangProgram::create_shader_object(const ContextHandle& context,
-                                   const std::string& type_name,
-                                   const ShaderObjectAllocatorHandle& obj_allocator) {
+ShaderObjectHandle SlangProgram::create_shader_object(const ContextHandle& context,
+                                                      const std::string& type_name,
+                                                      const ResourceAllocatorHandle& allocator) {
     auto* type_layout = get_type_layout(type_name);
     auto layout = std::make_shared<ShaderObjectLayout>(context, type_layout, shared_from_this());
-    return std::make_shared<ShaderObject>(layout, obj_allocator);
+    return std::make_shared<ShaderObject>(layout, allocator);
 }
 
 // ---------------------------------------------------------------

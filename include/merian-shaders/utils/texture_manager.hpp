@@ -17,7 +17,6 @@ class TextureManager : public Versionable, public std::enable_shared_from_this<T
     TextureManager(const ShaderCompileContextHandle& compile_context,
                    const ContextHandle& context,
                    const ResourceAllocatorHandle& allocator,
-                   const ShaderObjectAllocatorHandle& obj_allocator,
                    uint32_t initial_capacity = 4096);
 
     // Records pending uploads queued by the cmd-less add_/set_ overloads.
@@ -123,7 +122,6 @@ class TextureManager : public Versionable, public std::enable_shared_from_this<T
     ShaderCompileContextHandle compile_context;
     ContextHandle context;
     ResourceAllocatorHandle allocator;
-    ShaderObjectAllocatorHandle obj_allocator;
     std::vector<TextureHandle> textures;
     FreeList<TextureID> ids;
     SlangCompositionHandle composition;

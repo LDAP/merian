@@ -66,14 +66,15 @@ class SlangProgramEntryPoint : public Versionable, public EntryPoint {
 
     ShaderObjectHandle create_shader_object(const ContextHandle& context,
                                             const std::string& param_name,
-                                            const ShaderObjectAllocatorHandle& allocator);
+                                            const ResourceAllocatorHandle& allocator);
 
     PipelineLayoutHandle get_pipeline_layout(const ContextHandle& context);
 
     void bind_entry_point_parameter(const std::string& param_name,
                                     const ShaderObjectHandle& object,
                                     const CommandBufferHandle& cmd,
-                                    const PipelineHandle& pipeline);
+                                    const PipelineHandle& pipeline,
+                                    const ShaderObjectAllocatorHandle& obj_allocator);
 
     // ---------------------------------------------------------------
     // Global parameter support
@@ -81,11 +82,12 @@ class SlangProgramEntryPoint : public Versionable, public EntryPoint {
     bool has_globals(const ContextHandle& context);
 
     ShaderObjectHandle create_global_shader_object(const ContextHandle& context,
-                                                   const ShaderObjectAllocatorHandle& allocator);
+                                                   const ResourceAllocatorHandle& allocator);
 
     void bind_global_parameter(const ShaderObjectHandle& globals,
                                const CommandBufferHandle& cmd,
-                               const PipelineHandle& pipeline);
+                               const PipelineHandle& pipeline,
+                               const ShaderObjectAllocatorHandle& obj_allocator);
 
     DescriptorSetLayoutHandle get_global_set_layout(uint32_t set_index) const;
 
@@ -140,7 +142,8 @@ class SlangProgramEntryPoint : public Versionable, public EntryPoint {
     void bind_nested_pbs(const ShaderObjectHandle& object,
                          const std::vector<NestedPBInfo>& nested_infos,
                          const CommandBufferHandle& cmd,
-                         const PipelineHandle& pipeline);
+                         const PipelineHandle& pipeline,
+                         const ShaderObjectAllocatorHandle& obj_allocator);
 
     const SlangProgramHandle program;
     const uint64_t entry_point_index;

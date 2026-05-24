@@ -7,7 +7,6 @@
 #ifdef MERIAN_TINYGLTF_ENABLED
 #include "merian-shaders/scene/gltf_scene.hpp"
 #include "merian/shader/shader_compile_context.hpp"
-#include "merian/shader/shader_object_allocator.hpp"
 #include <filesystem>
 #endif
 
@@ -37,7 +36,6 @@ class GLTFSceneNode : public Node {
     ContextHandle context;
     ResourceAllocatorHandle allocator;
     ShaderCompileContextHandle compile_context;
-    std::shared_ptr<FrameCachingShaderObjectAllocator> obj_allocator;
     TextureManagerHandle texture_manager;
     MaterialSystemHandle material_system;
 

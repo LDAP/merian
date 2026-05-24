@@ -15,10 +15,9 @@ static uint32_t payload_size_in_uints(uint32_t byte_size) {
 MaterialSystem::MaterialSystem(const ShaderCompileContextHandle& compile_context,
                                const ContextHandle& context,
                                const ResourceAllocatorHandle& allocator,
-                               const ShaderObjectAllocatorHandle& obj_allocator,
                                const TextureManagerHandle& texture_manager)
     : compile_context(compile_context), context(context), allocator(allocator),
-      obj_allocator(obj_allocator), texture_manager(texture_manager) {
+      texture_manager(texture_manager) {
 
     assert(context->get_device()
                    ->get_enabled_features()
@@ -62,7 +61,7 @@ void MaterialSystem::rebuild_shader_object() {
     SPDLOG_DEBUG("recreate shader object");
 
     shader_object =
-        layout_program->create_shader_object(context, "merian::MaterialSystem", obj_allocator);
+        layout_program->create_shader_object(context, "merian::MaterialSystem", allocator);
     auto cursor = shader_object->get_cursor();
     cursor["texture_manager"] = texture_manager->get_shader_object();
     if (material_buffer) {

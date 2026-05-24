@@ -43,10 +43,10 @@ class GLTFSceneTest : public ::testing::Test {
         compile_context = ShaderCompileContext::create(context);
         compile_context->add_search_path(TEST_SHADER_DIR);
         obj_allocator = std::make_shared<SimpleShaderObjectAllocator>(allocator);
-        texture_manager = std::make_shared<TextureManager>(compile_context, context, allocator,
-                                                           obj_allocator, 16);
-        material_system = std::make_shared<MaterialSystem>(compile_context, context, allocator,
-                                                           obj_allocator, texture_manager);
+        texture_manager =
+            std::make_shared<TextureManager>(compile_context, context, allocator, 16);
+        material_system =
+            std::make_shared<MaterialSystem>(compile_context, context, allocator, texture_manager);
     }
 
     static void TearDownTestSuite() {
@@ -74,7 +74,7 @@ MaterialSystemHandle GLTFSceneTest::material_system;
 // ---------------------------------------------------------------------------
 
 TEST_F(GLTFSceneTest, LoadCubeGLTF) {
-    auto scene = std::make_shared<GLTFScene>(compile_context, context, allocator, obj_allocator,
+    auto scene = std::make_shared<GLTFScene>(compile_context, context, allocator,
                                              material_system);
 
     std::filesystem::path cube_path = std::filesystem::path(TEST_MODEL_DIR) / "Cube" / "Cube.gltf";
@@ -98,11 +98,11 @@ TEST_F(GLTFSceneTest, LoadCubeGLTF) {
 TEST_F(GLTFSceneTest, LoadBoxGLB) {
     // Reset material system for a clean state
     texture_manager =
-        std::make_shared<TextureManager>(compile_context, context, allocator, obj_allocator, 16);
-    material_system = std::make_shared<MaterialSystem>(compile_context, context, allocator,
-                                                       obj_allocator, texture_manager);
+        std::make_shared<TextureManager>(compile_context, context, allocator, 16);
+    material_system =
+        std::make_shared<MaterialSystem>(compile_context, context, allocator, texture_manager);
 
-    auto scene = std::make_shared<GLTFScene>(compile_context, context, allocator, obj_allocator,
+    auto scene = std::make_shared<GLTFScene>(compile_context, context, allocator,
                                              material_system);
 
     std::filesystem::path glb_path = std::filesystem::path(TEST_MODEL_DIR) / "box01.glb";
@@ -123,11 +123,11 @@ TEST_F(GLTFSceneTest, LoadBoxGLB) {
 
 TEST_F(GLTFSceneTest, SceneGraphHierarchy) {
     texture_manager =
-        std::make_shared<TextureManager>(compile_context, context, allocator, obj_allocator, 16);
-    material_system = std::make_shared<MaterialSystem>(compile_context, context, allocator,
-                                                       obj_allocator, texture_manager);
+        std::make_shared<TextureManager>(compile_context, context, allocator, 16);
+    material_system =
+        std::make_shared<MaterialSystem>(compile_context, context, allocator, texture_manager);
 
-    auto scene = std::make_shared<GLTFScene>(compile_context, context, allocator, obj_allocator,
+    auto scene = std::make_shared<GLTFScene>(compile_context, context, allocator,
                                              material_system);
 
     std::filesystem::path cube_path = std::filesystem::path(TEST_MODEL_DIR) / "Cube" / "Cube.gltf";

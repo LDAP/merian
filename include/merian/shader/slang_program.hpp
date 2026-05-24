@@ -5,6 +5,7 @@
 #include "merian/shader/slang_composition.hpp"
 #include "merian/shader/slang_session.hpp"
 #include "merian/utils/versionable.hpp"
+#include "merian/vk/memory/resource_allocator.hpp"
 
 #include "slang-com-ptr.h"
 #include "slang.h"
@@ -16,8 +17,6 @@ namespace merian {
 
 class ShaderObject;
 using ShaderObjectHandle = std::shared_ptr<ShaderObject>;
-class ShaderObjectAllocator;
-using ShaderObjectAllocatorHandle = std::shared_ptr<ShaderObjectAllocator>;
 
 class SlangProgram;
 using SlangProgramHandle = std::shared_ptr<SlangProgram>;
@@ -81,7 +80,7 @@ class SlangProgram : public Versionable, public std::enable_shared_from_this<Sla
      */
     ShaderObjectHandle create_shader_object(const ContextHandle& context,
                                             const std::string& type_name,
-                                            const ShaderObjectAllocatorHandle& obj_allocator);
+                                            const ResourceAllocatorHandle& allocator);
 
     // ---------------------------------------------------------------
     // Global parameter discovery

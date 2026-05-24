@@ -70,9 +70,9 @@ ShaderObjectAllocatorHandle SlangHotReloadTest::obj_allocator;
 
 TEST_F(SlangHotReloadTest, MaterialPipelineRebuildsAfterForceReload) {
     auto tm =
-        std::make_shared<TextureManager>(compile_context, context, allocator, obj_allocator, 16);
+        std::make_shared<TextureManager>(compile_context, context, allocator, 16);
     auto ms =
-        std::make_shared<MaterialSystem>(compile_context, context, allocator, obj_allocator, tm);
+        std::make_shared<MaterialSystem>(compile_context, context, allocator, tm);
 
     auto type_id = ms->register_material_type(
         "merian::DiffuseMaterial",
@@ -110,7 +110,7 @@ TEST_F(SlangHotReloadTest, MaterialPipelineRebuildsAfterForceReload) {
             vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
             MemoryMappingType::HOST_ACCESS_RANDOM, "test_output_1");
 
-        auto params = entry_point->create_shader_object(context, "params", obj_allocator);
+        auto params = entry_point->create_shader_object(context, "params", allocator);
         params->get_cursor()["ms"] = ms;
         params->get_cursor()["output"] = output_buffer;
         params->get_cursor()["material_id"] = static_cast<uint32_t>(mat1_id);
@@ -118,7 +118,7 @@ TEST_F(SlangHotReloadTest, MaterialPipelineRebuildsAfterForceReload) {
         queue->submit_wait([&](const CommandBufferHandle& cmd) {
             ms->update(cmd);
             cmd->bind(pipeline);
-            entry_point->bind_entry_point_parameter("params", params, cmd, pipeline);
+            entry_point->bind_entry_point_parameter("params", params, cmd, pipeline, obj_allocator);
             cmd->dispatch(1, 1, 1);
         });
 
@@ -147,7 +147,7 @@ TEST_F(SlangHotReloadTest, MaterialPipelineRebuildsAfterForceReload) {
             vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
             MemoryMappingType::HOST_ACCESS_RANDOM, "test_output_2");
 
-        auto params = entry_point->create_shader_object(context, "params", obj_allocator);
+        auto params = entry_point->create_shader_object(context, "params", allocator);
         params->get_cursor()["ms"] = ms;
         params->get_cursor()["output"] = output_buffer;
         params->get_cursor()["material_id"] = static_cast<uint32_t>(mat2_id);
@@ -155,7 +155,7 @@ TEST_F(SlangHotReloadTest, MaterialPipelineRebuildsAfterForceReload) {
         queue->submit_wait([&](const CommandBufferHandle& cmd) {
             ms->update(cmd);
             cmd->bind(pipeline);
-            entry_point->bind_entry_point_parameter("params", params, cmd, pipeline);
+            entry_point->bind_entry_point_parameter("params", params, cmd, pipeline, obj_allocator);
             cmd->dispatch(1, 1, 1);
         });
 
@@ -177,7 +177,7 @@ TEST_F(SlangHotReloadTest, MaterialPipelineRebuildsAfterForceReload) {
 TEST_F(SlangHotReloadTest, TextureArrayResizeRebuildsFullPipeline) {
     // Start with capacity 4
     auto tm =
-        std::make_shared<TextureManager>(compile_context, context, allocator, obj_allocator, 4);
+        std::make_shared<TextureManager>(compile_context, context, allocator, 4);
 
     // Build pipeline using TM composition
     auto composition = SlangComposition::create();
@@ -225,14 +225,14 @@ TEST_F(SlangHotReloadTest, TextureArrayResizeRebuildsFullPipeline) {
         vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
         MemoryMappingType::HOST_ACCESS_RANDOM, "test_output");
 
-    auto params = entry_point->create_shader_object(context, "params", obj_allocator);
+    auto params = entry_point->create_shader_object(context, "params", allocator);
     params->get_cursor()["tm"] = tm;
     params->get_cursor()["output"] = output_buffer;
     params->get_cursor()["texture_id"] = static_cast<uint32_t>(tex_id);
 
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(pipeline);
-        entry_point->bind_entry_point_parameter("params", params, cmd, pipeline);
+        entry_point->bind_entry_point_parameter("params", params, cmd, pipeline, obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
 
