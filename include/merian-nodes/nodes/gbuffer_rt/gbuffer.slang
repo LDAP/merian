@@ -68,8 +68,16 @@ void main(uint3 tid: SV_DispatchThreadID,
         }
     }
 
-    gbuffer.clear(pixel);
-    emission[pixel] = float4(0);
+    const ShadingPoint sp =
+        scene._make_environment_map_shading_point(ray, uint16_t(0), DefaultLODSampler());
+    const float linear_z = length(sp.pos - ray.Origin);
+    const float2 mv = scene.compute_motion_vector(sp.pos, pixel, dim);
+
+    gbuffer.store_surface(pixel, sp.material.shading_normal, linear_z, half2(0), 0);
+    gbuffer.store_hit(pixel, hit);
+    gbuffer.store_motion_vectors(pixel, mv);
+    gbuffer.store_albedo(pixel, Albedo(sp.material.emission));
+    emission[pixel] = float4(sp.material.emission, 0);
 }
 
 }

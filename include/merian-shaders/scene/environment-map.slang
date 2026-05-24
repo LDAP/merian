@@ -11,11 +11,11 @@ namespace merian {
 static const float ENV_MAP_DISTANCE = 1e7f;
 
 interface IEnvMap {
-    float3 eval(const float3 dir, const LODSampler2D lod);
+    float3 eval(const ShadingData sd, const TextureManager tm, const LODSampler2D lod);
 }
 
 struct EmptyEnv : IEnvMap {
-    float3 eval(const float3 dir, const LODSampler2D lod) {
+    float3 eval(const ShadingData sd, const TextureManager tm, const LODSampler2D lod) {
         return float3(0);
     }
 }
@@ -28,8 +28,8 @@ struct LatLongMap : IEnvMap {
         return lod.sample(env_map, uv).rgb;
     }
 
-    float3 eval(const float3 dir, const LODSampler2D lod) {
-        return eval(world_to_latlong_map(mul(to_local, dir)), lod);
+    float3 eval(const ShadingData sd, const TextureManager tm, const LODSampler2D lod) {
+        return eval(world_to_latlong_map(mul(to_local, -sd.wi)), lod);
     }
 }
 
@@ -42,8 +42,8 @@ struct CubeMap : IEnvMap {
     Sampler2D dn;
     float3x3 to_local;
 
-    float3 eval(const float3 dir, const LODSampler2D lod) {
-        const float3 d = mul(to_local, dir);
+    float3 eval(const ShadingData sd, const TextureManager tm, const LODSampler2D lod) {
+        const float3 d = mul(to_local, -sd.wi);
         Sampler2D tex = rt;
         float2 uv;
 
@@ -107,6 +107,17 @@ struct EnvMaterialSample : MaterialSample {
     __init(const float3 env_emission, const float3 ray_direction) {
         _emission = env_emission;
         _frame = OrthonormalFrame(-ray_direction);
+    }
+}
+
+__generic<E : IEnvMap>
+extension E : merian::MaterialModel {
+    typealias MaterialSampleImpl = EnvMaterialSample;
+
+    EnvMaterialSample get_sample(const ShadingData sd,
+                                 const TextureManager tm,
+                                 const LODSampler2D lod) {
+        return EnvMaterialSample(eval(sd, tm, lod), -sd.wi);
     }
 }
 

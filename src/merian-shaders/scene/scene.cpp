@@ -62,7 +62,12 @@ Scene::Scene(const ShaderCompileContextHandle& compile_context,
 }
 
 void Scene::set_env(EnvMapHandle env) {
+    const bool needs_composition_update =
+        !env_map || env_map->get_type_name() != env->get_type_name();
     env_map = std::move(env);
+    if (!needs_composition_update) {
+        return;
+    }
 
     composition->add_module(env_map->get_slang_module());
     composition->add_module_from_string(

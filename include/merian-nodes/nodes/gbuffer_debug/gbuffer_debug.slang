@@ -47,12 +47,14 @@ void main(uint3 tid: SV_DispatchThreadID,
         break;
     }
     case 1: { // Simple Shading with Albedo
-        const float3 n = params.gbuffer.get_normal(pixel);
+        const RayDesc ray = scene.camera.generate_ray_pinhole(pixel, dim);
+        const ShadingPoint sp = scene.get_shading_point(ray, params.gbuffer.get_hit(pixel));
         const float3 l = normalize(float3(0.4, 0.8, 0.6));
-        const float ndotl = saturate(dot(normalize(n), l));
+        const float ndotl = saturate(dot(normalize(sp.material.shading_normal), l));
         const float ambient = 0.1f;
-        const float3 albedo = params.gbuffer.get_albedo(pixel).reflection;
-        color = float4(albedo * (ambient + (1.f - ambient) * ndotl), 1);
+        const float3 albedo =
+            sp.material.get_bsdf().get_albedo(sp.material.shading_frame.to_local(-ray.Direction)).reflection;
+        color = float4(albedo * (ambient + (1.f - ambient) * ndotl) + sp.material.emission, 1);
         break;
     }
     case 2: { // Albedo

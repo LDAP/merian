@@ -388,30 +388,39 @@ struct Scene {
         return sp;
     }
 
-    ShadingPoint trace_and_get_shading_point(const RayDesc ray,
-                                             const uint instance_mask = 0xff,
-                                             const uint16_t bounce = 0,
-                                             const LODSampler2D lod = DefaultLODSampler()) {
-        const Hit hit = trace_ray(ray, RAY_FLAG_NONE, instance_mask);
+    ShadingPoint get_shading_point(const RayDesc ray,
+                                   const Hit hit,
+                                   const uint16_t bounce = 0,
+                                   const LODSampler2D lod = DefaultLODSampler()) {
         if (let gd = get_geometry_data(hit)) {
             if ((gd.flags & GeometryDataFlags::UseEnvMap) == 0) {
                 return get_shading_point(ray, hit, gd, bounce, lod);
             }
         }
-        return _make_environment_map_shading_point(ray, lod);
+        return _make_environment_map_shading_point(ray, bounce, lod);
+    }
+
+    ShadingPoint trace_and_get_shading_point(const RayDesc ray,
+                                             const uint instance_mask = 0xff,
+                                             const uint16_t bounce = 0,
+                                             const LODSampler2D lod = DefaultLODSampler()) {
+        return get_shading_point(ray, trace_ray(ray, RAY_FLAG_NONE, instance_mask), bounce, lod);
     }
 
     // -----------------------------------------
 
-    ShadingPoint _make_environment_map_shading_point(const RayDesc ray, const LODSampler2D lod) {
+    ShadingPoint _make_environment_map_shading_point(const RayDesc ray,
+                                                     const uint16_t bounce,
+                                                     const LODSampler2D lod) {
         const float3 pos = ray.Origin + ray.Direction * ENV_MAP_DISTANCE;
-        const float3 env_emission = env_map.eval(ray.Direction, lod);
+        const ShadingData sd =
+            ShadingData(-ray.Direction, pos, float2(0), time, OrthonormalFrame(-ray.Direction),
+                        -ray.Direction, bounce);
 
         ShadingPoint sp;
         sp.pos = pos;
         sp.enc_face_normal = encode_normal(-ray.Direction);
-        // sp.prev_pos = pos;
-        sp.material = EnvMaterialSample(env_emission, ray.Direction);
+        sp.material = env_map.get_sample(sd, material_system.texture_manager, lod);
         return sp;
     }
 
