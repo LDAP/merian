@@ -688,6 +688,9 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     // Top-level sections.
     void properties_settings(Properties& props);
     void properties_statistics(Properties& props);
+    void properties_env(Properties& props);
+
+    void process_pending_env_load(const CommandBufferHandle& cmd);
 
   private:
     // --- Context ---
@@ -708,6 +711,20 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
 
     MaterialSystemHandle material_system;
     EnvMapHandle env_map;
+
+    struct EnvUIState {
+        int selection = 0;
+        std::string latlong_path;
+        std::array<std::string, 6> cubemap_paths;
+    };
+    EnvUIState env_ui;
+
+    struct PendingEnvLoad {
+        int kind;
+        std::string latlong_path;
+        std::array<std::string, 6> cubemap_paths;
+    };
+    std::optional<PendingEnvLoad> pending_env_load;
     FreeList<MeshID> mesh_ids;
     // Sized to mesh_ids.size(). Released slots have a null mesh.
     std::vector<MeshInfo> mesh_infos;

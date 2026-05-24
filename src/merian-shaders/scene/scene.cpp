@@ -1,5 +1,6 @@
 #include "merian-shaders/scene/scene.hpp"
 
+#include "merian/io/image_io.hpp"
 #include "merian/shader/entry_point.hpp"
 #include "merian/shader/slang_program.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
@@ -664,6 +665,98 @@ void Scene::properties_settings(Properties& props) {
     }
 }
 
+void Scene::process_pending_env_load(const CommandBufferHandle& cmd) {
+    if (!pending_env_load) {
+        return;
+    }
+
+    const auto load_texture = [&](const std::filesystem::path& path,
+                                  const std::string& name) -> TextureHandle {
+        ImageInfo info;
+        const ImageFormat fmt = image_format_from_extension(path);
+        const bool is_hdr = fmt == ImageFormat::HDR || fmt == ImageFormat::PFM;
+        if (is_hdr) {
+            const BlobHandle blob = image_load_f32(path, info);
+            return allocator->create_texture_from_rgba32f(
+                cmd, blob->get_data<float>(), info.width, info.height,
+                vk::SamplerAddressMode::eRepeat, vk::Filter::eLinear, vk::Filter::eLinear, name);
+        }
+        const BlobHandle blob = image_load_u8(path, info);
+        return allocator->create_texture_from_rgba8(
+            cmd, blob->get_data<uint32_t>(), info.width, info.height,
+            vk::SamplerAddressMode::eRepeat, vk::Filter::eLinear, vk::Filter::eLinear, true, name);
+    };
+
+    try {
+        if (pending_env_load->kind == 1) {
+            const TextureHandle tex = load_texture(pending_env_load->latlong_path, "env_latlong");
+            cmd->barrier(tex->get_image()->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal));
+            if (auto e = std::dynamic_pointer_cast<LatLongEnvMap>(env_map)) {
+                e->set_texture(tex);
+            }
+        } else if (pending_env_load->kind == 2) {
+            std::array<TextureHandle, 6> faces;
+            for (int i = 0; i < 6; ++i) {
+                faces[i] =
+                    load_texture(pending_env_load->cubemap_paths[i], fmt::format("env_cube_{}", i));
+                cmd->barrier(
+                    faces[i]->get_image()->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal));
+            }
+            if (auto e = std::dynamic_pointer_cast<CubeMapEnvMap>(env_map)) {
+                e->set_faces(faces);
+            }
+        }
+    } catch (const std::exception& e) {
+        SPDLOG_ERROR("env map load failed: {}", e.what());
+    }
+    pending_env_load.reset();
+}
+
+void Scene::properties_env(Properties& props) {
+    static const std::vector<std::string> kinds = {"Empty", "LatLong", "CubeMap"};
+    const bool selection_changed = props.config_options("Type", env_ui.selection, kinds);
+
+    bool paths_changed = false;
+    if (env_ui.selection == 1) {
+        paths_changed |= props.config_text("Path", env_ui.latlong_path, props.is_ui());
+    } else if (env_ui.selection == 2) {
+        static constexpr std::array<const char*, 6> face_labels = {
+            "rt (+X)", "bk (+Y)", "lf (-X)", "ft (-Y)", "up (+Z)", "dn (-Z)"};
+        for (int i = 0; i < 6; ++i) {
+            paths_changed |=
+                props.config_text(face_labels[i], env_ui.cubemap_paths[i], props.is_ui());
+        }
+    }
+
+    if (selection_changed) {
+        const float old_yaw = env_map ? env_map->get_yaw_rad() : 0.f;
+        const float old_pitch = env_map ? env_map->get_pitch_rad() : 0.f;
+
+        const TextureHandle dummy = allocator->get_dummy_texture();
+        EnvMapHandle next;
+        if (env_ui.selection == 1) {
+            next = std::make_shared<LatLongEnvMap>(dummy);
+        } else if (env_ui.selection == 2) {
+            next = std::make_shared<CubeMapEnvMap>(
+                std::array<TextureHandle, 6>{dummy, dummy, dummy, dummy, dummy, dummy});
+        } else {
+            next = std::make_shared<EmptyEnvMap>();
+        }
+        next->set_base_transform(rotation_from_to(get_up(), float3(0, 1, 0)));
+        next->set_yaw_pitch(old_yaw, old_pitch);
+        set_env(next);
+    }
+
+    if ((selection_changed || paths_changed) && env_ui.selection != 0) {
+        pending_env_load = PendingEnvLoad{env_ui.selection, env_ui.latlong_path,
+                                          env_ui.cubemap_paths};
+    }
+
+    if (env_map) {
+        env_map->properties(props);
+    }
+}
+
 void Scene::properties_statistics(Properties& props) {
     std::size_t total_vertices = 0;
     std::size_t total_triangles = 0;
@@ -782,6 +875,10 @@ void Scene::properties(Properties& props) {
     }
     if (props.st_begin_child("settings", "Settings")) {
         properties_settings(props);
+        props.st_end_child();
+    }
+    if (props.st_begin_child("env", "Environment Map")) {
+        properties_env(props);
         props.st_end_child();
     }
     if (props.st_begin_child("stats", "Statistics")) {
@@ -1689,6 +1786,8 @@ void Scene::update(const CommandBufferHandle& cmd,
         MERIAN_PROFILE_SCOPE_GPU(cmd, "on_update");
         on_update(cmd, time, time_diff, frame);
     }
+
+    process_pending_env_load(cmd);
 
     if (!is_ready()) {
         return;

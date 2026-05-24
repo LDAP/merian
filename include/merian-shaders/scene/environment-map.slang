@@ -22,14 +22,14 @@ struct EmptyEnv : IEnvMap {
 
 struct LatLongMap : IEnvMap {
     Sampler2D env_map;
-    float3x3 to_local;
+    float4x4 to_local;
 
     float3 eval(const float2 uv, const LODSampler2D lod) {
         return lod.sample(env_map, uv).rgb;
     }
 
     float3 eval(const ShadingData sd, const TextureManager tm, const LODSampler2D lod) {
-        return eval(world_to_latlong_map(mul(to_local, -sd.wi)), lod);
+        return eval(world_to_latlong_map(mul((float3x3)to_local, -sd.wi)), lod);
     }
 }
 
@@ -40,47 +40,25 @@ struct CubeMap : IEnvMap {
     Sampler2D ft;
     Sampler2D up;
     Sampler2D dn;
-    float3x3 to_local;
+    float4x4 to_local;
 
     float3 eval(const ShadingData sd, const TextureManager tm, const LODSampler2D lod) {
-        const float3 d = mul(to_local, -sd.wi);
-        Sampler2D tex = rt;
-        float2 uv;
+        const float3 d = mul((float3x3)to_local, -sd.wi);
 
         switch (cubemap_side(d)) {
-        case 0: {
-            tex = rt;
-            uv = 0.5 + 0.5 * float2(-d.y, -d.z) / abs(d.x);
-            break;
+        case 0:
+            return lod.sample(rt, 0.5 + 0.5 * float2(-d.y, -d.z) / abs(d.x)).rgb;
+        case 1:
+            return lod.sample(lf, 0.5 + 0.5 * float2(d.y, -d.z) / abs(d.x)).rgb;
+        case 2:
+            return lod.sample(bk, 0.5 + 0.5 * float2(d.x, -d.z) / abs(d.y)).rgb;
+        case 3:
+            return lod.sample(ft, 0.5 + 0.5 * float2(-d.x, -d.z) / abs(d.y)).rgb;
+        case 4:
+            return lod.sample(up, 0.5 + 0.5 * float2(-d.y, d.x) / abs(d.z)).rgb;
+        default:
+            return lod.sample(dn, 0.5 + 0.5 * float2(-d.y, -d.x) / abs(d.z)).rgb;
         }
-        case 1: {
-            tex = lf;
-            uv = 0.5 + 0.5 * float2(d.y, -d.z) / abs(d.x);
-            break;
-        }
-        case 2: {
-            tex = bk;
-            uv = 0.5 + 0.5 * float2(d.x, -d.z) / abs(d.y);
-            break;
-        }
-        case 3: {
-            tex = ft;
-            uv = 0.5 + 0.5 * float2(-d.x, -d.z) / abs(d.y);
-            break;
-        }
-        case 4: {
-            tex = up;
-            uv = 0.5 + 0.5 * float2(-d.y, d.x) / abs(d.z);
-            break;
-        }
-        case 5: {
-            tex = dn;
-            uv = 0.5 + 0.5 * float2(-d.y, -d.x) / abs(d.z);
-            break;
-        }
-        }
-
-        return lod.sample(tex, uv).rgb;
     }
 }
 

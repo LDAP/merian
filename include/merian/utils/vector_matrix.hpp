@@ -173,6 +173,18 @@ inline float4x4 rotation(const float3& axis, const float angle) {
     return rot;
 }
 
+// Shortest-arc rotation between unit vectors; antiparallel rotates 180° around an arbitrary perpendicular.
+inline float3x3 rotation_from_to(const float3& from, const float3& to) {
+    const float w = 1.f + dot(from, to);
+    if (w <= 0.f) {
+        const float3 perp = abs(from.x) > abs(from.y) ? float3(0, 1, 0) : float3(1, 0, 0);
+        return float3x3(rotation(normalize(cross(from, perp)), glm::pi<float>()));
+    }
+    const float3 v = cross(from, to);
+    const float3x3 K{{0, -v.z, v.y}, {v.z, 0, -v.x}, {-v.y, v.x, 0}};
+    return identity<float3x3>() + K + mul(K, K) / w;
+}
+
 template <int R, int C, typename T> constexpr matRxC<C, R, T> transpose(const matRxC<R, C, T>& m) {
     matRxC<C, R, T> result;
     for (int i = 0; i < C; i++) {

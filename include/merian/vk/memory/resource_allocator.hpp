@@ -136,6 +136,14 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
                                         const uint32_t mip_levels = 1,
                                         const std::string& debug_name = {});
 
+    ImageHandle create_image_from_rgba32f(const CommandBufferHandle& cmd,
+                                          const float* data,
+                                          const uint32_t width,
+                                          const uint32_t height,
+                                          const vk::ImageUsageFlags usage,
+                                          const uint32_t mip_levels = 1,
+                                          const std::string& debug_name = {});
+
     // Returns a dummy 4x4 image with the "missing texture" color (1,0,1,1).
     const ImageViewHandle& get_dummy_storage_image_view() const;
 
@@ -203,6 +211,19 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
         const vk::Filter mag_filter = vk::Filter::eLinear,
         const vk::Filter min_filter = vk::Filter::eLinear,
         const bool isSRGB = true,
+        const std::string& debug_name = {},
+        const bool generate_mipmaps = false,
+        const vk::ImageUsageFlags additional_usage_flags = {});
+
+    // Important: You are responsible to perform the image transition!
+    TextureHandle create_texture_from_rgba32f(
+        const CommandBufferHandle& cmd,
+        const float* data,
+        const uint32_t width,
+        const uint32_t height,
+        const vk::SamplerAddressMode address_mode = vk::SamplerAddressMode::eRepeat,
+        const vk::Filter mag_filter = vk::Filter::eLinear,
+        const vk::Filter min_filter = vk::Filter::eLinear,
         const std::string& debug_name = {},
         const bool generate_mipmaps = false,
         const vk::ImageUsageFlags additional_usage_flags = {});

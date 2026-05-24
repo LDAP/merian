@@ -190,6 +190,32 @@ ImageHandle ResourceAllocator::create_image_from_rgba8(const CommandBufferHandle
     return create_image(cmd, data, tex_image_info, MemoryMappingType::NONE, debug_name);
 }
 
+ImageHandle ResourceAllocator::create_image_from_rgba32f(const CommandBufferHandle& cmd,
+                                                         const float* data,
+                                                         const uint32_t width,
+                                                         const uint32_t height,
+                                                         const vk::ImageUsageFlags usage,
+                                                         const uint32_t mip_levels,
+                                                         const std::string& debug_name) {
+    const vk::ImageCreateInfo tex_image_info{
+        {},
+        vk::ImageType::e2D,
+        vk::Format::eR32G32B32A32Sfloat,
+        {width, height, 1},
+        mip_levels,
+        1,
+        vk::SampleCountFlagBits::e1,
+        vk::ImageTiling::eOptimal,
+        usage | vk::ImageUsageFlagBits::eTransferDst,
+        vk::SharingMode::eExclusive,
+        {},
+        {},
+        vk::ImageLayout::eUndefined,
+    };
+
+    return create_image(cmd, data, tex_image_info, MemoryMappingType::NONE, debug_name);
+}
+
 const ImageViewHandle& ResourceAllocator::get_dummy_storage_image_view() const {
     return dummy_storage_image_view;
 }
@@ -298,6 +324,34 @@ ResourceAllocator::create_texture_from_rgba8(const CommandBufferHandle& cmd,
         get_sampler_pool()->for_filter_and_address_mode(mag_filter, min_filter, address_mode);
     return create_texture_from_rgba8(cmd, data, width, height, sampler, isSRGB, debug_name,
                                      generate_mipmaps, additional_usage_flags);
+}
+
+TextureHandle
+ResourceAllocator::create_texture_from_rgba32f(const CommandBufferHandle& cmd,
+                                               const float* data,
+                                               const uint32_t width,
+                                               const uint32_t height,
+                                               const vk::SamplerAddressMode address_mode,
+                                               const vk::Filter mag_filter,
+                                               const vk::Filter min_filter,
+                                               const std::string& debug_name,
+                                               const bool generate_mipmaps,
+                                               const vk::ImageUsageFlags additional_usage_flags) {
+    uint32_t mip_levels = 1;
+    vk::ImageUsageFlags usage_flags = vk::ImageUsageFlagBits::eSampled | additional_usage_flags;
+    if (generate_mipmaps) {
+        mip_levels = static_cast<uint32_t>(floor(log2(std::max(width, height))) + 1);
+        usage_flags |= vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst;
+    }
+
+    const ImageHandle image =
+        create_image_from_rgba32f(cmd, data, width, height, usage_flags, mip_levels, debug_name);
+
+    cmd_generate_mipmaps(cmd, image);
+
+    const SamplerHandle sampler =
+        get_sampler_pool()->for_filter_and_address_mode(mag_filter, min_filter, address_mode);
+    return create_texture(image, image->make_view_create_info(), sampler, debug_name);
 }
 
 const TextureHandle& ResourceAllocator::get_dummy_texture() const {
