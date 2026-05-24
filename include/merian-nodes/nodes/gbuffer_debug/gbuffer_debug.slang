@@ -152,6 +152,7 @@ void main(uint3 tid: SV_DispatchThreadID,
         break;
     }
     case 11: { // Metallic (GltfMaterial only)
+        // https://github.com/shader-slang/slang/issues/11266
         const Hit hit = params.gbuffer.get_hit(pixel);
         if (let gd = scene.get_geometry_data(hit)) {
             const TriangleHit tri = scene.get_triangle_hit(hit, gd);
@@ -167,6 +168,7 @@ void main(uint3 tid: SV_DispatchThreadID,
         break;
     }
     case 12: { // Roughness (GltfMaterial only)
+        // https://github.com/shader-slang/slang/issues/11266
         const Hit hit = params.gbuffer.get_hit(pixel);
         if (let gd = scene.get_geometry_data(hit)) {
             const TriangleHit tri = scene.get_triangle_hit(hit, gd);
