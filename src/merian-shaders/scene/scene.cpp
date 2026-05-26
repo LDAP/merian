@@ -1165,9 +1165,8 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
                 if (needs_prev) {
                     gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::HasPrevVertices);
                 }
-                if (mesh.is_front_counterclockwise()) {
-                    gd.flags =
-                        GeometryDataFlags(gd.flags | GeometryDataFlags::FrontCounterClockwise);
+                if (mesh.is_flip_facing()) {
+                    gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::FlipFacing);
                 }
                 if (scene_graph[node_id]->is_animated) {
                     gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::IsAnimated);
@@ -1751,9 +1750,8 @@ void Scene::build_tlas(const CommandBufferHandle& cmd) {
             }
 
             vk::GeometryInstanceFlagsKHR geometry_instance_flags{};
-            if (group.flags & MeshFlags::FrontCounterClockwise) {
-                geometry_instance_flags |=
-                    vk::GeometryInstanceFlagBitsKHR::eTriangleFrontCounterclockwise;
+            if (group.flags & MeshFlags::FlipFacing) {
+                geometry_instance_flags |= vk::GeometryInstanceFlagBitsKHR::eTriangleFlipFacing;
             }
             if (group.flags & MeshFlags::TwoSided) {
                 geometry_instance_flags |=

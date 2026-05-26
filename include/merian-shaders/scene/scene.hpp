@@ -45,8 +45,9 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         HasVariableTopology = 0x2,
         // default: treat all as non-opaque (allow alpha mask)
         IsOpaque = 0x4,
-        // default: clockwise
-        FrontCounterClockwise = 0x8,
+        // Set when the mesh's front winding is clockwise (default is counter-clockwise).
+        // Maps to VK_GEOMETRY_INSTANCE_TRIANGLE_FLIP_FACING_BIT_KHR.
+        FlipFacing = 0x8,
         // default: cull backfaces
         TwoSided = 0x10,
         // Per-vertex tangents are meaningful; otherwise consumers derive from UVs.
@@ -81,8 +82,8 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         if (flags & MeshFlags::IsOpaque) {
             append("IsOpaque");
         }
-        if (flags & MeshFlags::FrontCounterClockwise) {
-            append("FrontCounterClockwise");
+        if (flags & MeshFlags::FlipFacing) {
+            append("FlipFacing");
         }
         if (flags & MeshFlags::TwoSided) {
             append("TwoSided");
@@ -227,9 +228,8 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
             return flags & MeshFlags::HasVariableTopology;
         }
 
-        bool is_front_counterclockwise() const {
-            // Vulkan default is clockwise
-            return flags & MeshFlags::FrontCounterClockwise;
+        bool is_flip_facing() const {
+            return flags & MeshFlags::FlipFacing;
         }
 
         bool is_two_sided() const {
@@ -349,7 +349,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
 
     // Flags that map to TLAS instance flags and therefore force group splits.
     static constexpr MeshFlags GROUP_SPLIT_MASK =
-        static_cast<MeshFlags>(static_cast<uint32_t>(MeshFlags::FrontCounterClockwise) |
+        static_cast<MeshFlags>(static_cast<uint32_t>(MeshFlags::FlipFacing) |
                                static_cast<uint32_t>(MeshFlags::TwoSided));
     static_assert(static_cast<uint32_t>(GROUP_SPLIT_MASK) < (1u << 16),
                   "split_key reserves bits 16-23 for instance_mask");

@@ -298,7 +298,7 @@ struct Scene {
         const float3 edge02 = to_world_vector(tri.gd, hit.instance_index, tri.get_triangle_edge02());
 
         float3 face_normal = normalize(cross(edge01, edge02));
-        if (tri.gd.flags & GeometryDataFlags::FrontCounterClockwise) face_normal = -face_normal;
+        if (tri.gd.flags & GeometryDataFlags::FlipFacing) face_normal = -face_normal;
 
         float3 vertex_normal;
         if (tri.gd.flags & GeometryDataFlags::FlatShading) {
@@ -329,7 +329,7 @@ struct Scene {
             const float det = duv1.x * duv2.y - duv2.x * duv1.y;
             if (abs(det) > 1e-8f) {
                 const float winding_sign =
-                    (tri.gd.flags & GeometryDataFlags::FrontCounterClockwise) ? 1.f : -1.f;
+                    (tri.gd.flags & GeometryDataFlags::FlipFacing) ? 1.f : -1.f;
                 tangent = (duv2.y * edge01 - duv1.y * edge02) / det;
                 handedness = sign(det) * winding_sign;
                 tangent_valid = true;
