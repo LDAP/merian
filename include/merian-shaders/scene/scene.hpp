@@ -348,9 +348,8 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     using MeshGroupID = uint32_t;
 
     // Flags that map to TLAS instance flags and therefore force group splits.
-    static constexpr MeshFlags GROUP_SPLIT_MASK =
-        static_cast<MeshFlags>(static_cast<uint32_t>(MeshFlags::FlipFacing) |
-                               static_cast<uint32_t>(MeshFlags::TwoSided));
+    static constexpr MeshFlags GROUP_SPLIT_MASK = static_cast<MeshFlags>(
+        static_cast<uint32_t>(MeshFlags::FlipFacing) | static_cast<uint32_t>(MeshFlags::TwoSided));
     static_assert(static_cast<uint32_t>(GROUP_SPLIT_MASK) < (1u << 16),
                   "split_key reserves bits 16-23 for instance_mask");
 
@@ -625,8 +624,6 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         if (buffer)
             pending_buffer_releases.push_back(std::move(buffer));
     }
-
-
 
   private:
     void rebuild_shader_object();

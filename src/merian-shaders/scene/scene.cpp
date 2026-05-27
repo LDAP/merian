@@ -29,11 +29,10 @@ Scene::Scene(const ShaderCompileContextHandle& compile_context,
              const ResourceAllocatorHandle& allocator,
              const MaterialSystemHandle& material_system)
     : compile_context(compile_context), context(context), allocator(allocator),
-      as_builder(context, allocator),
-      as_supported(context->get_device()
-                       ->get_enabled_features()
-                       .get_acceleration_structure_features_khr()
-                       .accelerationStructure == VK_TRUE),
+      as_builder(context, allocator), as_supported(context->get_device()
+                                                       ->get_enabled_features()
+                                                       .get_acceleration_structure_features_khr()
+                                                       .accelerationStructure == VK_TRUE),
       material_system(material_system) {
 
     composition = SlangComposition::create();
@@ -42,15 +41,14 @@ Scene::Scene(const ShaderCompileContextHandle& compile_context,
     // Workaround for https://github.com/shader-slang/slang/pull/10769.
     composition->add_module_from_string(
         "scene_as_workaround",
-        as_supported
-            ? "module scene_as_workaround;\n"
-              "import merian_shaders.scene.acceleration_structure;\n"
-              "namespace merian { public typealias SceneAccelerationStructure = "
-              "HWAccelerationStructure; }"
-            : "module scene_as_workaround;\n"
-              "import merian_shaders.scene.acceleration_structure;\n"
-              "namespace merian { public typealias SceneAccelerationStructure = "
-              "NullAccelerationStructure; }");
+        as_supported ? "module scene_as_workaround;\n"
+                       "import merian_shaders.scene.acceleration_structure;\n"
+                       "namespace merian { public typealias SceneAccelerationStructure = "
+                       "HWAccelerationStructure; }"
+                     : "module scene_as_workaround;\n"
+                       "import merian_shaders.scene.acceleration_structure;\n"
+                       "namespace merian { public typealias SceneAccelerationStructure = "
+                       "NullAccelerationStructure; }");
     set_env(std::make_shared<EmptyEnvMap>());
 
     composition->add_module_from_path("merian-shaders/scene/scene.slang");
@@ -750,8 +748,8 @@ void Scene::properties_env(Properties& props) {
     if (env_ui.selection == 1) {
         paths_changed |= props.config_text("Path", env_ui.latlong_path, props.is_ui());
     } else if (env_ui.selection == 2) {
-        static constexpr std::array<const char*, 6> face_labels = {
-            "rt (+X)", "bk (+Y)", "lf (-X)", "ft (-Y)", "up (+Z)", "dn (-Z)"};
+        static constexpr std::array<const char*, 6> face_labels = {"rt (+X)", "bk (+Y)", "lf (-X)",
+                                                                   "ft (-Y)", "up (+Z)", "dn (-Z)"};
         for (int i = 0; i < 6; ++i) {
             paths_changed |=
                 props.config_text(face_labels[i], env_ui.cubemap_paths[i], props.is_ui());
@@ -778,8 +776,8 @@ void Scene::properties_env(Properties& props) {
     }
 
     if ((selection_changed || paths_changed) && env_ui.selection != 0) {
-        pending_env_load = PendingEnvLoad{env_ui.selection, env_ui.latlong_path,
-                                          env_ui.cubemap_paths};
+        pending_env_load =
+            PendingEnvLoad{env_ui.selection, env_ui.latlong_path, env_ui.cubemap_paths};
     }
 
     if (env_map) {
