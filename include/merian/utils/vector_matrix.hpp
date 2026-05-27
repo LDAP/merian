@@ -128,6 +128,8 @@ using glm::min;
 
 using glm::radians;
 
+using glm::degrees;
+
 using glm::any;
 
 using glm::lessThan;
@@ -173,7 +175,8 @@ inline float4x4 rotation(const float3& axis, const float angle) {
     return rot;
 }
 
-// Shortest-arc rotation between unit vectors; antiparallel rotates 180° around an arbitrary perpendicular.
+// Shortest-arc rotation between unit vectors; antiparallel rotates 180° around an arbitrary
+// perpendicular.
 inline float3x3 rotation_from_to(const float3& from, const float3& to) {
     const float w = 1.f + dot(from, to);
     if (w <= 0.f) {

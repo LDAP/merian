@@ -28,8 +28,8 @@ void CameraAnimator::update(const chrono_clock::time_point now) {
 
     // Interpolate camera start and end position
     // Use bezier to connect the camera positon (eye) for consistent animation
-    float interpolated_fov =
-        lerp(animation_start.get_field_of_view(), animation_end.get_field_of_view(), smoothed);
+    float interpolated_fov = lerp(animation_start.get_field_of_view_vertical(),
+                                  animation_end.get_field_of_view_vertical(), smoothed);
     float3 interpolated_center =
         lerp(animation_start.get_target(), animation_end.get_target(), smoothed);
     float3 interpolated_up = lerp(animation_start.get_up(), animation_end.get_up(), smoothed);

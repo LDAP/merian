@@ -572,20 +572,19 @@ void GLTFScene::load_cameras() {
         float3 center = eye - forward;
 
         if (gcam.type == "perspective") {
-            float fov = 90.f;
+            float yfov = radians(60.f);
             float aspect = 1.f;
             float znear = 0.01f;
             float zfar = 1000.f;
 
             if (gcam.perspective.aspectRatio > 0)
                 aspect = static_cast<float>(gcam.perspective.aspectRatio);
-            const float yfov = static_cast<float>(gcam.perspective.yfov);
-            fov = static_cast<float>(glm::degrees(2.0 * std::atan(std::tan(0.5 * yfov) * aspect)));
+            yfov = static_cast<float>(gcam.perspective.yfov);
             znear = static_cast<float>(gcam.perspective.znear);
             if (gcam.perspective.zfar > 0)
                 zfar = static_cast<float>(gcam.perspective.zfar);
 
-            add_camera(std::make_shared<Camera>(eye, center, up_vec, fov, aspect, znear, zfar));
+            add_camera(std::make_shared<Camera>(eye, center, up_vec, yfov, aspect, znear, zfar));
             SPDLOG_DEBUG("GLTFScene: loaded {} camera '{}' at ({},{},{})", gcam.type, gcam.name,
                          eye.x, eye.y, eye.z);
         } else {
@@ -598,8 +597,8 @@ void GLTFScene::load_cameras() {
     if (get_cameras().empty()) {
         SPDLOG_INFO("GLTFScene: no cameras in file, adding default camera");
 
-        add_camera(std::make_shared<Camera>(float3(3, 3, 3), float3(0, 0, 0), get_up(), 90.f,
-                                            1920.f / 1080.f, 0.01f, 1000.f));
+        add_camera(std::make_shared<Camera>(float3(3, 3, 3), float3(0, 0, 0), get_up(),
+                                            radians(60.f), 1920.f / 1080.f, 0.01f, 1000.f));
         AABB& aabb = get_aabb();
         if (aabb.is_valid()) {
             get_active_camera()->look_at(float3(1.3) * aabb.get_max().y, aabb.get_center(),

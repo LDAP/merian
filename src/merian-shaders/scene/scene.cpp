@@ -580,8 +580,8 @@ void Scene::properties_cameras(Properties& props) {
     props.st_separate("Debug");
     if (props.config_bool("debug camera", enable_debug_camera) && enable_debug_camera) {
         if (debug_camera_id == CAMERA_ID_INVALID) {
-            auto db = std::make_shared<Camera>(float3(1, 0, 0), float3(0, 0, 0), get_up(), 90.f,
-                                               1920.f / 1080.f, 0.01f, 1000.f);
+            auto db = std::make_shared<Camera>(float3(1, 0, 0), float3(0, 0, 0), get_up(),
+                                               radians(60.f), 1920.f / 1080.f, 0.01f, 1000.f);
             if (aabb.is_valid()) {
                 db->look_at_bounding_box(aabb);
             }

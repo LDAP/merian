@@ -18,8 +18,8 @@ Camera::Camera(const float3& position,
     : position(position), target(target), up(normalize(up)), field_of_view(field_of_view),
       aspect_ratio(aspect_ratio), near_plane(near_plane), far_plane(far_plane) {
 
-    assert(field_of_view < 179.99);
-    assert(field_of_view > 0.01);
+    assert(field_of_view < radians(179.99f));
+    assert(field_of_view > radians(0.01f));
     assert(near_plane > 0 && near_plane < far_plane);
     assert(far_plane > 0 && far_plane > near_plane);
 
@@ -38,9 +38,7 @@ const float4x4& Camera::get_view_matrix() noexcept {
 
 const float4x4& Camera::get_projection_matrix() noexcept {
     if (has_changed(projection_change_id, projection_change_id_cache)) {
-        const float fovy =
-            2.f * std::atan(std::tan(radians(field_of_view * 0.5f)) / aspect_ratio);
-        projection_cache = merian::perspective(fovy, aspect_ratio, near_plane, far_plane);
+        projection_cache = merian::perspective(field_of_view, aspect_ratio, near_plane, far_plane);
     }
     return projection_cache;
 }
@@ -113,8 +111,8 @@ void Camera::set_perspective(const float field_of_view,
                              const float aspect_ratio,
                              const float near_plane,
                              const float far_plane) noexcept {
-    assert(field_of_view < 179.99);
-    assert(field_of_view > 0.01);
+    assert(field_of_view < radians(179.99f));
+    assert(field_of_view > radians(0.01f));
     assert(near_plane > 0 && near_plane < far_plane);
     assert(far_plane > 0 && far_plane > near_plane);
 
@@ -126,11 +124,19 @@ void Camera::set_perspective(const float field_of_view,
     projection_change_id++;
 }
 
-void Camera::set_field_of_view(const float field_of_view) noexcept {
-    assert(field_of_view < 179.99);
-    assert(field_of_view > 0.01);
+void Camera::set_field_of_view_vertical(const float field_of_view) noexcept {
+    assert(field_of_view < radians(179.99f));
+    assert(field_of_view > radians(0.01f));
 
     this->field_of_view = field_of_view;
+    projection_change_id++;
+}
+
+void Camera::set_field_of_view_horizontal(const float field_of_view) noexcept {
+    assert(field_of_view < radians(179.99f));
+    assert(field_of_view > radians(0.01f));
+
+    this->field_of_view = 2.f * std::atan(std::tan(field_of_view * 0.5f) / aspect_ratio);
     projection_change_id++;
 }
 
@@ -156,8 +162,12 @@ void Camera::set_far_plane(const float far_plane) noexcept {
     projection_change_id++;
 }
 
-float Camera::get_field_of_view() const noexcept {
+float Camera::get_field_of_view_vertical() const noexcept {
     return field_of_view;
+}
+
+float Camera::get_field_of_view_horizontal() const noexcept {
+    return 2.f * std::atan(std::tan(field_of_view * 0.5f) * aspect_ratio);
 }
 
 float Camera::get_aspect_ratio() const noexcept {
@@ -200,15 +210,15 @@ const float2& Camera::get_jitter() const noexcept {
 }
 
 void Camera::write_to(ShaderCursor cursor) {
-    const float half_fov_tan = std::tan(radians(field_of_view * 0.5f));
+    const float half_vfov_tan = std::tan(field_of_view * 0.5f);
     const float3& fwd = get_forward();
     const float3& rgt = get_right();
 
     cursor["position"] = position;
     cursor["target"] = target;
     cursor["up"] = up;
-    cursor["U"] = rgt * half_fov_tan;
-    cursor["V"] = cross(rgt, fwd) * (half_fov_tan / aspect_ratio);
+    cursor["U"] = rgt * (half_vfov_tan * aspect_ratio);
+    cursor["V"] = cross(rgt, fwd) * half_vfov_tan;
     cursor["W"] = fwd;
     cursor["near"] = near_plane;
     cursor["far"] = far_plane;
@@ -224,13 +234,10 @@ void Camera::look_at_bounding_box(const AABB& aabb) {
     assert(aabb.is_valid());
 
     // reduce field of view to make the fit not tight => looks better
-    const float field_of_view = this->field_of_view * 0.85f;
+    const float vfov = this->field_of_view * 0.85f;
 
-    // field_of_view is horizontal: derive vertical from aspect.
-    const float half_xfov = merian::radians(field_of_view * 0.5f);
-    const float half_yfov = std::atan(std::tan(half_xfov) / aspect_ratio);
-    const float tan_hx = std::tan(half_xfov);
-    const float tan_hy = std::tan(half_yfov);
+    const float tan_hy = std::tan(vfov * 0.5f);
+    const float tan_hx = tan_hy * aspect_ratio;
 
     // Establish an initial view direction
     look_at(float3(1.3) * (aabb.get_max().y + 1e-3f), aabb.get_center(), get_up());
@@ -338,8 +345,9 @@ void Camera::properties(Properties& props) {
 
     props.st_separate();
 
-    if (props.config_float("fov", field_of_view, "", 0.1f, 0.01f, 179.9f)) {
-        projection_change_id++;
+    float fov_hdeg = degrees(get_field_of_view_horizontal());
+    if (props.config_float("fov", fov_hdeg, "horizontal, in degrees", 0.1f, 0.01f, 179.9f)) {
+        set_field_of_view_horizontal(radians(fov_hdeg));
     }
     if (props.config_float("near", near_plane, "", 0.1f, 0.0f, far_plane - 0.1f)) {
         projection_change_id++;

@@ -1,8 +1,8 @@
 #pragma once
 
 #include "merian/shader/shader_cursor.hpp"
-#include "merian/utils/vector_matrix.hpp"
 #include "merian/utils/aabb.hpp"
+#include "merian/utils/vector_matrix.hpp"
 
 #include <memory>
 
@@ -25,11 +25,11 @@ class Camera {
     }
 
   public:
-    // fov is horizontal
+    // field_of_view is vertical, in radians
     Camera(const float3& position = float3(0),
            const float3& target = float3(1, 0, 0),
            const float3& up = float3(0, 0, 1),
-           const float field_of_view = 90.f,
+           const float field_of_view = radians(60.f),
            const float aspect_ratio = 1.f,
            const float near_plane = 0.1f,
            const float far_plane = 1000.f);
@@ -54,6 +54,7 @@ class Camera {
 
     void look_at(const float3& position, const float3& target, const float3& up) noexcept;
 
+    // field_of_view is vertical, in radians
     void look_at(const float3& position,
                  const float3& target,
                  const float3& up,
@@ -74,13 +75,17 @@ class Camera {
 
     // -----------------------------------------------------------------------------
 
-    // field_of_view is horizontal, in degrees.
-    void set_perspective(const float field_of_view = 90.f,
+    // field_of_view is vertical, in radians
+    void set_perspective(const float field_of_view = radians(60.f),
                          const float aspect_ratio = 1.f,
                          const float near_plane = 0.1f,
                          const float far_plane = 1000.f) noexcept;
 
-    void set_field_of_view(const float field_of_view) noexcept;
+    // in radians
+    void set_field_of_view_vertical(const float field_of_view) noexcept;
+
+    // in radians, converted to vertical using the current aspect ratio
+    void set_field_of_view_horizontal(const float field_of_view) noexcept;
 
     // aspect_ratio = width / height
     void set_aspect_ratio(const float aspect_ratio) noexcept;
@@ -89,7 +94,11 @@ class Camera {
 
     void set_far_plane(const float far_plane) noexcept;
 
-    float get_field_of_view() const noexcept;
+    // in radians
+    float get_field_of_view_vertical() const noexcept;
+
+    // in radians, derived from vertical fov and aspect ratio
+    float get_field_of_view_horizontal() const noexcept;
 
     float get_aspect_ratio() const noexcept;
 
@@ -157,7 +166,7 @@ class Camera {
     // PROJECTION
     //-------------------------------------------------
 
-    float field_of_view; // horizontal FOV, in degrees
+    float field_of_view; // vertical FOV, in radians
     float aspect_ratio;  // aspect_ratio = width / height
     float near_plane;
     float far_plane;
