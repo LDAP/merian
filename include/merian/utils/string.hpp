@@ -18,8 +18,7 @@ namespace merian {
     static constexpr std::size_t unit_count = sizeof(units) / sizeof(units[0]);
     std::size_t unit_index = 0;
     if (size_bytes != 0) {
-        unit_index =
-            std::min(static_cast<std::size_t>(std::log2(size_bytes) / 10), unit_count - 1);
+        unit_index = std::min(static_cast<std::size_t>(std::log2(size_bytes) / 10), unit_count - 1);
     }
     if (unit_index == 0) {
         return fmt::format("{} B", size_bytes);
@@ -36,7 +35,7 @@ namespace merian {
     } else {
         unit_index = std::min((std::size_t)(std::log10(duration_ns) / 3), units.size() - 1);
     }
-    return fmt::format("{} {}", (double)duration_ns / std::pow(1000, unit_index),
+    return fmt::format("{:.3f} {}", (double)duration_ns / std::pow(1000, unit_index),
                        units[unit_index]);
 }
 

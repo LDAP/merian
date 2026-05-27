@@ -82,6 +82,10 @@ void Graph::profiler_properties(Properties& props) {
         props.config_uint("report intervall", profiler_report_intervall_ms,
                           "Set the time period for the profiler to update in ms. Meaning, "
                           "averages and deviations are calculated over this this period.");
+        props.config_uint("evict after ms", profiler_evict_after_ms,
+                          "Drop entries that have not run for this many milliseconds. "
+                          "Prevents the section tree from growing indefinitely while keeping "
+                          "briefly-silent sections visible to avoid layout flicker.");
 
         if (last_run_report &&
             props.st_begin_child("run", "Graph Run", Properties::ChildFlagBits::DEFAULT_OPEN)) {

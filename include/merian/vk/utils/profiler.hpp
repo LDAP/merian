@@ -4,6 +4,7 @@
 #include "merian/utils/stopwatch.hpp"
 #include "merian/vk/utils/query_pool.hpp"
 
+#include <limits>
 #include <optional>
 
 namespace merian {
@@ -48,12 +49,14 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
     friend ProfileScopeGPU;
 
     struct CPUSection {
-        // needed for sorting/printing
         chrono_clock::time_point start;
         chrono_clock::time_point end;
+        chrono_clock::time_point last_seen{};
 
         std::size_t parent_index;
-        std::unordered_map<std::string, uint32_t> children;
+        // Insertion order tracks execution order; child_cursor is the next insert position.
+        std::vector<std::pair<std::string, uint32_t>> children;
+        uint32_t child_cursor{0};
 
         uint32_t num_captures{0};
         uint64_t sum_duration_ns{0};
@@ -64,11 +67,11 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
         // the query index for start. end has index + 1.
         // set to -1 if not in the command buffer
         uint32_t timestamp_idx{(uint32_t)-1};
-        // for sorting
-        uint64_t start;
+        chrono_clock::time_point last_seen{};
 
         std::size_t parent_index;
-        std::unordered_map<std::string, uint32_t> children;
+        std::vector<std::pair<std::string, uint32_t>> children;
+        uint32_t child_cursor{0};
 
         uint32_t num_captures{0};
         uint64_t sum_duration_ns{0};
@@ -82,6 +85,8 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
         double duration;
         // in ms
         double std_deviation;
+        // set if no captures landed in the last report window; value is ms since last_seen.
+        std::optional<double> last_seen_ms_ago;
         std::vector<ReportEntry> children;
     };
 
@@ -133,8 +138,10 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
 
     ~Profiler();
 
-    // Clears the profiler
-    void clear();
+    // Clears the per-window accumulators on every section. Children whose section has not been
+    // seen within evict_after_ms are dropped from their parent's children map; the default
+    // keeps the tree forever.
+    void clear(uint32_t evict_after_ms = std::numeric_limits<uint32_t>::max());
 
     void set_query_pool(const QueryPoolHandle<vk::QueryType::eTimestamp>& query_pool);
 
@@ -171,7 +178,8 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
     // == 0).
     std::optional<Report>
     set_collect_get_every(const QueryPoolHandle<vk::QueryType::eTimestamp>& query_pool,
-                          const uint32_t report_intervall_millis = 0);
+                          const uint32_t report_intervall_millis = 0,
+                          const uint32_t evict_after_ms = std::numeric_limits<uint32_t>::max());
 
     // returns the report as string
     static std::string get_report_str(const Profiler::Report& report);
@@ -184,6 +192,14 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
     static void get_report_as_config(Properties& config, const Profiler::Report& report);
 
   private:
+    // Resolves or inserts `name` as a child of sections[parent_idx]; new children land at
+    // the parent's child_cursor so insertion order tracks execution order.
+    template <typename SectionType>
+    static void enter_child(std::vector<SectionType>& sections,
+                            std::size_t parent_idx,
+                            const std::string& name,
+                            uint32_t& current_idx);
+
     const ContextHandle context;
     const float timestamp_period;
 
@@ -198,14 +214,11 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
     std::vector<CPUSection> cpu_sections;
     std::vector<GPUSection> gpu_sections;
 
-    uint32_t clear_index = 0;
+    // Set in clear(); a section is fresh this period iff last_seen >= last_clear_time.
+    chrono_clock::time_point last_clear_time;
 
-    struct PerQueryPoolInfo {
-        std::vector<uint32_t> pending_gpu_sections;
-        uint32_t clear_index;
-    };
-    std::unordered_map<QueryPoolHandle<vk::QueryType::eTimestamp>, PerQueryPoolInfo>
-        query_pool_infos;
+    std::unordered_map<QueryPoolHandle<vk::QueryType::eTimestamp>, std::vector<uint32_t>>
+        pending_gpu_sections;
 };
 using ProfilerHandle = std::shared_ptr<Profiler>;
 

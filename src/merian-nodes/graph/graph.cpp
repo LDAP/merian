@@ -258,8 +258,8 @@ ProfilerHandle Graph::prepare_profiler_for_run(InFlightData& in_flight_data) {
         return nullptr;
     }
 
-    auto report = run_profiler->set_collect_get_every(in_flight_data.profiler_query_pool,
-                                                      profiler_report_intervall_ms);
+    auto report = run_profiler->set_collect_get_every(
+        in_flight_data.profiler_query_pool, profiler_report_intervall_ms, profiler_evict_after_ms);
 
     if (report) {
         last_run_report = std::move(*report);

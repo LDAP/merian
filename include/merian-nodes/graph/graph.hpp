@@ -352,6 +352,7 @@ class Graph : public std::enable_shared_from_this<Graph> {
     bool needs_reconnect = false;
     bool profiler_enable = true;
     uint32_t profiler_report_intervall_ms = 50;
+    uint32_t profiler_evict_after_ms = 5000;
     bool run_in_progress = false;
     std::vector<std::function<void()>> on_run_finished_tasks;
 
