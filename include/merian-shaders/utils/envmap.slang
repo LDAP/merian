@@ -1,5 +1,3 @@
-#pragma once
-
 namespace merian {
 
 // 0: pos x, 1: neg x, 2: pos y, 3: neg: y, 4: pos z, 5: neg z

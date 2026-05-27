@@ -1,5 +1,3 @@
-#pragma once
-
 import merian_shaders.utils.frame;
 
 namespace merian {

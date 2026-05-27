@@ -1,5 +1,3 @@
-#pragma once
-
 implementing colorspaces;
 
 import "merian-shaders/utils/math.slang";

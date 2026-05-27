@@ -1,5 +1,3 @@
-#pragma once
-
 namespace merian {
 
 // Jarzynski et al. From Hash Functions for GPU Rendering

@@ -1,5 +1,3 @@
-#pragma once
-
 __exported import merian_shaders.shading.materials.material;
 
 namespace merian {

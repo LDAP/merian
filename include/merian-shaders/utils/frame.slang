@@ -1,5 +1,3 @@
-#pragma once
-
 namespace merian {
 
 // Returns a matrix of axis (tangent, bitangent, z) which all being perpendicular to each other

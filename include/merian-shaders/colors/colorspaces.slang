@@ -1,5 +1,3 @@
-#pragma once
-
 module colorspaces;
 
 __include "colorspace_dng.slang";

@@ -1,5 +1,3 @@
-#pragma once
-
 implementing colorspaces;
 
 // Converts the curve from sRGB to linear. Primary chromaticities are not transformed (output is

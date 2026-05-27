@@ -1,5 +1,3 @@
-#pragma once
-
 __exported import merian_shaders.scene.scene_data;
 __exported import merian_shaders.shading.materials.material;
 import merian_shaders.utils.encoding;
@@ -77,8 +75,8 @@ struct Surface {
     // per-pixel screen-space derivative of linear_z along r_x, r_y
     half2 compute_grad_z(const RayDesc ray, const float3 r_x, const float3 r_y, const float linear_z) {
         const float n_dot_oo = dot(face_normal, pos - ray.Origin);
-        return half2(n_dot_oo / dot(face_normal, r_x) - linear_z,
-                     n_dot_oo / dot(face_normal, r_y) - linear_z);
+        return half2(half(n_dot_oo / dot(face_normal, r_x) - linear_z),
+                     half(n_dot_oo / dot(face_normal, r_y) - linear_z));
     }
 }
 

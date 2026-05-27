@@ -1,5 +1,3 @@
-#pragma once
-
 namespace merian {
 
 // Keller et al. [2017] workaround for artifacts

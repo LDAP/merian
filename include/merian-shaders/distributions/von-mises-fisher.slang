@@ -1,5 +1,3 @@
-#pragma once
-
 #include "merian-shaders/utils/math-constants.slangh"
 
 import "distribution.slang";

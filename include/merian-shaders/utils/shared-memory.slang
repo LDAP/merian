@@ -1,5 +1,3 @@
-#pragma once
-
 namespace merian {
 
 // Computes indices to load the halo into shared memory.

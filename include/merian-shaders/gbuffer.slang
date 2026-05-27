@@ -1,5 +1,3 @@
-#pragma once
-
 import merian_shaders.utils.encoding;
 import merian_shaders.utils.textures;
 import merian_shaders.scene.scene_data;

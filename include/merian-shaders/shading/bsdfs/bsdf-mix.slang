@@ -1,5 +1,3 @@
-#pragma once
-
 import bsdf;
 
 namespace merian {

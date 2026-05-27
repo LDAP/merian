@@ -1,5 +1,3 @@
-#pragma once
-
 __exported import merian_shaders.utils.frame;
 __exported import merian_shaders.utils.textures;
 __exported import merian_shaders.utils.texture_manager;

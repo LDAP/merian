@@ -1,5 +1,3 @@
-#pragma once
-
 import merian_shaders.utils.textures;
 import merian_shaders.utils.envmap;
 import merian_shaders.utils.math;

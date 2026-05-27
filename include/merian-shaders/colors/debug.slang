@@ -1,5 +1,3 @@
-#pragma once
-
 import merian_shaders.utils.random;
 import merian_shaders.colors.colorspaces;
 

@@ -1,5 +1,3 @@
-#pragma once
-
 implementing colorspaces;
 
 #include "merian-shaders/utils/math-constants.slangh"

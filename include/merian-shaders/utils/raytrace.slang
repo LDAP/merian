@@ -1,5 +1,3 @@
-#pragma once
-
 namespace merian {
 
 // Returns t such that ray_origin + t * ray_dir = intersection

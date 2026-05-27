@@ -1,5 +1,3 @@
-#pragma once
-
 import merian_shaders.shading.materials.material;
 import merian_shaders.shading.bsdfs.brdf_lambert_diffuse;
 

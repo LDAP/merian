@@ -1,5 +1,3 @@
-#pragma once
-
 namespace merian {
 
 // 32-bit normal encoding from Journal of Computer Graphics Techniques Vol. 3, No. 2, 2014
@@ -49,7 +47,7 @@ uint encode_tangent(float4 t) {
 }
 
 float4 decode_tangent(uint enc) {
-    const float w = (enc & 1u) ? -1.f : 1.f;
+    const float w = (enc & 1u) != 0u ? -1.f : 1.f;
     return float4(decode_normal(enc & ~1u), w);
 }
 

@@ -1,5 +1,3 @@
-#pragma once
-
 namespace merian {
 
 // like smoothstep but without Hermite smoothing

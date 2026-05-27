@@ -1,5 +1,3 @@
-#pragma once
-
 __exported import "merian-shaders/utils/random.slang";
 
 namespace merian {

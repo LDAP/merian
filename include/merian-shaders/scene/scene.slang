@@ -1,5 +1,3 @@
-#pragma once
-
 __exported import merian_shaders.scene.camera;
 __exported import merian_shaders.scene.acceleration_structure;
 __exported import merian_shaders.scene.environment_map;

@@ -1,5 +1,3 @@
-#pragma once
-
 import "merian-shaders/utils/envmap.slang";
 
 namespace merian {

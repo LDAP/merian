@@ -1,5 +1,3 @@
-#pragma once
-
 namespace merian {
 
 // Improves L2 cache locality by swizzling workgroup IDs so that they wrap after N workgroups in x

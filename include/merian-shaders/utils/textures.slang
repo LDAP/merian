@@ -1,5 +1,3 @@
-#pragma once
-
 namespace merian {
 
 typealias RRWWTexture1D<T : ITexelElement, int access, int sampleCount = 0, int format = 0> =

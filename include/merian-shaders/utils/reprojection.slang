@@ -1,5 +1,3 @@
-#pragma once
-
 namespace merian {
 
 // Computes a weight for the quality of the reprojection.

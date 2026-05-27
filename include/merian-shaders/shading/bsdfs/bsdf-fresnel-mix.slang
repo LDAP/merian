@@ -1,5 +1,3 @@
-#pragma once
-
 import bsdf;
 import merian_shaders.utils.fresnel;
 

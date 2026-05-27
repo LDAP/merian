@@ -1,5 +1,3 @@
-#pragma once
-
 namespace merian {
 
 uint next_power_of_two(uint v) {

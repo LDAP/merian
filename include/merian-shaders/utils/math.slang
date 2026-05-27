@@ -1,5 +1,3 @@
-#pragma once
-
 #include "math-constants.slangh"
 
 // #define MERIAN_WORKGROUP_INDEX                                                                     \

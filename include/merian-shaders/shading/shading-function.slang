@@ -1,5 +1,3 @@
-#pragma once
-
 __exported import merian_shaders.utils.random;
 
 namespace merian {

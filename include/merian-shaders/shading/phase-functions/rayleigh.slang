@@ -1,5 +1,3 @@
-#pragma once
-
 namespace merian {
 
 float phase_rayleigh(float cos_theta) {

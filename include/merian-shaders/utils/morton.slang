@@ -1,5 +1,3 @@
-#pragma once
-
 import "merian-shaders/utils/bit-twiddling.slang";
 
 namespace merian {
