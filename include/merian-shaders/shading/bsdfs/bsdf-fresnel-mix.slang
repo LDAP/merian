@@ -33,6 +33,10 @@ struct FresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
         return lerp(base.pdf(wi, wo), layer.pdf(wi, wo), F);
     }
 
+    Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
+        return sample_eval_impl<This>(this, wi, rng);
+    }
+
     Albedo get_albedo(const float3 wi) {
         const float3 spec = layer.get_preintegrated_specular(float3(ior_f0), wi);
         return Albedo(spec + (1.0f - spec) * base.get_albedo(wi).reflection);

@@ -54,16 +54,18 @@ interface ShadingFunction {
      * shading location.
      *
      */
-    Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
-        Optional<float3> optional_wo = sample(wi, rng);
+    Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng);
+}
 
-        if (let wo = optional_wo) {
-            float p = pdf(wi, wo);
-            return ShadingFunctionSample(wo, p, eval(wi, wo, rng) / p);
-        }
-
-        return none;
+// Utility for default implementations of sample_eval (Slang issue prevents a default implementation)
+Optional<ShadingFunctionSample>
+sample_eval_impl<T : ShadingFunction>(const T sf, const float3 wi, inout RandomGenerator rng) {
+    const Optional<float3> optional_wo = sf.sample(wi, rng);
+    if (let wo = optional_wo) {
+        const float p = sf.pdf(wi, wo);
+        return ShadingFunctionSample(wo, p, sf.eval(wi, wo, rng) / p);
     }
+    return none;
 }
 
 }

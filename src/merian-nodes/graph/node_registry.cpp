@@ -16,6 +16,7 @@
 #include "merian-nodes/nodes/mean/mean.hpp"
 #include "merian-nodes/nodes/median_approx/median.hpp"
 #include "merian-nodes/nodes/reduce/reduce.hpp"
+#include "merian-nodes/nodes/render_rt_reference/render_rt_reference.hpp"
 #include "merian-nodes/nodes/shadertoy/shadertoy.hpp"
 #include "merian-nodes/nodes/svgf/svgf.hpp"
 #include "merian-nodes/nodes/taa/taa.hpp"
@@ -60,6 +61,9 @@ NodeRegistry::NodeRegistry() {
     register_node_type<MedianApproxNode>("Median (Approximation)",
                                          "Computes an approximation of the median of a component.");
     register_node_type<Reduce>("Reduce", "Reduce values of multiple input images.");
+    register_node_type<RenderRTReferenceNode>(
+        "Render (RT Reference)",
+        "Brute-force BSDF-sampling path tracer over the Merian scene; ground-truth reference.");
     register_node_type<Shadertoy>("Shadertoy",
                                   "Execute Shadertoy-like shaders (Limited implementation).");
     register_node_type<SVGF>("Denoiser (SVGF)", "Spatiotemporal Variance-Guided Filtering.");

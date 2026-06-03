@@ -28,6 +28,10 @@ struct MixBSDF<B0 : BSDF, B1 : BSDF> : BSDF {
         return lerp(bsdf0.pdf(wi, wo), bsdf1.pdf(wi, wo), weight);
     }
 
+    Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
+        return sample_eval_impl<This>(this, wi, rng);
+    }
+
     Albedo get_albedo(const float3 wi) {
         return Albedo(
             lerp(bsdf0.get_albedo(wi).reflection, bsdf1.get_albedo(wi).reflection, weight));

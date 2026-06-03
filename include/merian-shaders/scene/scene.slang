@@ -17,6 +17,11 @@ namespace merian {
 // extern struct SceneAccelerationStructure : AccelerationStructure = NullAccelerationStructure;
 // extern struct SceneEnvMap : IEnvMap = EmptyEnv;
 
+// Continuation-ray offset and interval, shared so all renderers spawn secondary rays identically.
+static const float SCENE_RAY_OFFSET = 1e-3f;
+static const float SCENE_RAY_TMIN = 0.f;
+static const float SCENE_RAY_TMAX = 1e7f;
+
 // See scene.hpp for details.
 struct Scene {
     SceneAccelerationStructure as;

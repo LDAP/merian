@@ -26,6 +26,10 @@ struct ConductorFresnelBSDF<Inner : BSDF> : BSDF {
         return bsdf.pdf(wi, wo);
     }
 
+    Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
+        return sample_eval_impl<This>(this, wi, rng);
+    }
+
     Albedo get_albedo(const float3 wi) {
         return Albedo(bsdf.get_preintegrated_specular(f0, wi));
     }

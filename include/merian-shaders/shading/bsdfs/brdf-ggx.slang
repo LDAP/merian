@@ -405,6 +405,10 @@ struct GGXBRDF : BSDF {
         return ggx_VNDF_pdf_wo(wi.z, pow2(max(0.f, h.z)), pow2(alpha));
     }
 
+    Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
+        return sample_eval_impl<This>(this, wi, rng);
+    }
+
     Albedo get_albedo(const float3 wi) {
         return Albedo(float3(1.0f));
     }
