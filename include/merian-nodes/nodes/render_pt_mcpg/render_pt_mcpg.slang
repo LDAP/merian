@@ -7,6 +7,10 @@ import merian_shaders.colors.colorspaces;
 
 using merian;
 
+namespace merian {
+extern static const bool merian_render_emission_on_primary = false;
+}
+
 struct RenderBinding {
     ParameterBlock<GBuffer> gbuffer;
     RWTexture2D<float4> irradiance;
@@ -15,6 +19,7 @@ struct RenderBinding {
 struct PushConstant {
     int spp;
     int max_path_length;
+    uint instance_mask;
 };
 
 [vk::push_constant]
@@ -24,7 +29,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
                   RayDesc ray,
                   ShadingPoint sp,
                   inout RandomGenerator rng) {
-    float3 radiance = sp.material.emission;
+    float3 radiance = merian_render_emission_on_primary ? sp.material.emission : float3(0);
     float3 throughput = float3(1);
 
     for (int bounce = 1; bounce < pc.max_path_length; bounce++) {
@@ -47,7 +52,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         ray.TMin = SCENE_RAY_TMIN;
         ray.TMax = SCENE_RAY_TMAX;
 
-        const Hit hit = scene.trace_ray(ray);
+        const Hit hit = scene.trace_ray(ray, RAY_FLAG_NONE, pc.instance_mask);
         sp = scene.get_shading_point(ray, hit, uint16_t(bounce));
         radiance += throughput * sp.material.emission;
     }
@@ -68,29 +73,27 @@ void main(uint3 tid: SV_DispatchThreadID,
     const uint2 dim = params.gbuffer.get_dimensions();
     const Hit primary_hit = params.gbuffer.get_hit(pixel);
 
+    // primary ray and shading point are identical for every sample
+    const RayDesc primary_ray = scene.camera.generate_ray_pinhole(pixel, dim);
+    const ShadingPoint primary_sp = scene.get_shading_point(primary_ray, primary_hit);
+
     float3 irradiance = float3(0);
     float second_moment = 0.f;
 
-    if (primary_hit.is_valid()) {
-        // primary ray and surface are identical for every sample
-        const RayDesc primary_ray = scene.camera.generate_ray_pinhole(pixel, dim);
-        const ShadingPoint primary_sp = scene.get_shading_point(primary_ray, primary_hit);
+    for (int s = 0; s < pc.spp; s++) {
+        RandomGenerator rng = XorShift32(pcg4d16(uint4(pixel, scene.frame, s)));
 
-        for (int s = 0; s < pc.spp; s++) {
-            RandomGenerator rng = XorShift32(pcg4d16(uint4(pixel, scene.frame, s)));
-
-            const float3 contrib = trace_path(scene, primary_ray, primary_sp, rng);
-            if (!any(isnan(contrib)) && !any(isinf(contrib))) {
-                irradiance += contrib;
-                const float l = yuv_luminance(contrib);
-                second_moment += l * l;
-            }
+        const float3 contrib = trace_path(scene, primary_ray, primary_sp, rng);
+        if (!any(isnan(contrib)) && !any(isinf(contrib))) {
+            irradiance += contrib;
+            const float l = yuv_luminance(contrib);
+            second_moment += l * l;
         }
+    }
 
-        if (pc.spp > 0) {
-            irradiance /= float(pc.spp);
-            second_moment /= float(pc.spp);
-        }
+    if (pc.spp > 0) {
+        irradiance /= float(pc.spp);
+        second_moment /= float(pc.spp);
     }
 
     params.irradiance[pixel] = float4(irradiance, second_moment);

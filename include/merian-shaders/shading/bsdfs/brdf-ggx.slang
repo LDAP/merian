@@ -369,33 +369,6 @@ struct GGXBRDF : BSDF {
         return wo;
     }
 
-    // TODO: Is this correct? (weight computation...)
-    // override Optional<BSDFSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
-    //     if (wi.z < BSDF_MIN_COS_THETA) {
-    //         return none;
-    //     }
-
-    //     BSDFSample s;
-
-    //     float3 h = ggx_VNDF_sample_H(wi, alpha, rng.next_float2());
-    //     float widoth = dot(wi, h);
-    //     s.wo = reflect2(wi, h, widoth);
-
-    //     if (s.wo.z < BSDF_MIN_COS_THETA) {
-    //         return none;
-    //     }
-
-    //     s.pdf = ggx_VNDF_pdf_wo(wi.z, pow2(max(0.f, h.z)), pow2(alpha));
-
-    //     float G = smith_g2(s.wo.z, wi.z, pow2(alpha));
-    //     float G_over_G1wo = G * (1.f + smith_Lambda(pow2(alpha), wi.z));
-    //     const float3 F = fresnel_schlick(widoth, albedo);
-
-    //     s.weight = F * G_over_G1wo;
-
-    //     return s;
-    // }
-
     float pdf(const float3 wi, const float3 wo) {
         if (min(wi.z, wo.z) < BSDF_MIN_COS_THETA) {
             return 0.0f;
@@ -405,8 +378,25 @@ struct GGXBRDF : BSDF {
         return ggx_VNDF_pdf_wo(wi.z, pow2(max(0.f, h.z)), pow2(alpha));
     }
 
-    Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
-        return sample_eval_impl<This>(this, wi, rng);
+    override Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
+        if (wi.z < BSDF_MIN_COS_THETA) {
+            return none;
+        }
+
+        const float alpha_squared = pow2(alpha);
+        const float3 h = ggx_VNDF_sample_H(wi, alpha, rng.next_float2());
+        const float3 wo = reflect2(wi, h, dot(wi, h));
+        if (wo.z < BSDF_MIN_COS_THETA) {
+            return none;
+        }
+
+        // Reuse the sampled half-vector h for the pdf instead of reconstructing it via
+        // normalize(wi + wo), and compute the VNDF weight f(wi,wo) * wo.z / pdf = G2(wi,wo) /
+        // G1(wi) directly: the NDF and cosines cancel, so it stays finite even at alpha -> 0.
+        const float pdf = ggx_VNDF_pdf_wo(wi.z, pow2(h.z), alpha_squared);
+        const float weight = smith_g2_over_widotn(wo.z, wi.z, alpha_squared) /
+                             smith_g1_over_widotn(wi.z, alpha_squared);
+        return ShadingFunctionSample(wo, pdf, float3(weight));
     }
 
     Albedo get_albedo(const float3 wi) {

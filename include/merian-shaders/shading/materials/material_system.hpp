@@ -13,6 +13,8 @@
 
 namespace merian {
 
+class Properties;
+
 // CPU-side base for all material definitions.
 // Mirrors the Slang MaterialModel layout: MaterialHeader first, then material-specific payload.
 struct Material {
@@ -45,8 +47,7 @@ struct DiffuseMaterial : Material {
     }
 };
 
-class MaterialSystem : public Versionable,
-                       public std::enable_shared_from_this<MaterialSystem> {
+class MaterialSystem : public Versionable, public std::enable_shared_from_this<MaterialSystem> {
   public:
     MaterialSystem(const ShaderCompileContextHandle& compile_context,
                    const ContextHandle& context,
@@ -82,6 +83,18 @@ class MaterialSystem : public Versionable,
         return alpha_test_threshold;
     }
     void set_alpha_test_threshold(float threshold);
+
+    bool get_clamp_normals() const {
+        return clamp_normals;
+    }
+    void set_clamp_normals(bool clamp);
+
+    float get_min_roughness() const {
+        return min_roughness;
+    }
+    void set_min_roughness(float min_roughness);
+
+    void properties(Properties& props);
 
     const SlangCompositionHandle& get_composition() const {
         return composition;
@@ -131,6 +144,8 @@ class MaterialSystem : public Versionable,
     uint32_t dirty_begin = UINT32_MAX;
     uint32_t dirty_end = 0;
     float alpha_test_threshold = 0.5F;
+    bool clamp_normals = true;
+    float min_roughness = 0.0316F;
     SlangCompositionHandle composition;
     SlangProgramHandle layout_program;
     ShaderObjectHandle shader_object;

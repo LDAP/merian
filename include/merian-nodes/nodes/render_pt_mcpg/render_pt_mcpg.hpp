@@ -9,19 +9,23 @@
 #include "merian/shader/shader_compile_context.hpp"
 #include "merian/shader/shader_object.hpp"
 #include "merian/shader/shader_object_allocator.hpp"
+#include "merian/shader/slang_composition.hpp"
 #include "merian/shader/slang_entry_point.hpp"
 #include "merian/shader/slang_program.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 
+#include <array>
+
 namespace merian {
 
-// Brute-force BSDF-sampled reference path tracer starting from the GBuffer hit.
-class RenderRTReferenceNode : public Node {
+// Markov-chain path-guiding renderer. Currently a plain BSDF-sampled path tracer; the guiding is
+// WIP.
+class RenderMCPG : public Node {
 
   public:
-    RenderRTReferenceNode();
+    RenderMCPG();
 
-    ~RenderRTReferenceNode() override = default;
+    ~RenderMCPG() override = default;
 
     DeviceSupportInfo query_device_support(const DeviceSupportQueryInfo& query_info) override;
 
@@ -41,6 +45,8 @@ class RenderRTReferenceNode : public Node {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
+    void update_render_constants();
+
     ContextHandle context;
     ResourceAllocatorHandle resource_allocator;
     ShaderCompileContextHandle compile_context;
@@ -53,8 +59,11 @@ class RenderRTReferenceNode : public Node {
     vk::Extent3D extent = vk::Extent3D{1920, 1080, 1};
     int32_t spp = 1;
     int32_t max_path_length = 8;
+    bool emission_on_primary = false;
+    std::array<bool, 8> mask_enabled{true, true, true, true, true, true, true, true};
 
     // Slang program + pipeline
+    SlangCompositionHandle composition;
     SlangProgramHandle program;
     SlangProgramEntryPointHandle entry_point;
     PipelineHandle pipeline;

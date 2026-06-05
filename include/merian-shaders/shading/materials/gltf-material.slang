@@ -6,6 +6,7 @@ import merian_shaders.shading.bsdfs.brdf_lambert_diffuse;
 import merian_shaders.shading.bsdfs.bsdf_conductor_fresnel;
 import merian_shaders.shading.bsdfs.bsdf_fresnel_mix;
 import merian_shaders.shading.bsdfs.bsdf_mix;
+import merian_shaders.utils.normal_map;
 
 namespace merian {
 
@@ -71,7 +72,14 @@ struct GltfMaterial : MaterialModel {
             const float3 raw = lod.sample(tm.get_sampler2D(normal_texture), sd.uv).rgb;
             const float2 nxy = (raw.xy * 2.0f - 1.0f) * normal_scale;
             const float nz = sqrt(max(0.0f, 1.0f - dot(nxy, nxy)));
-            shading_frame = sd.frame.apply_normal_map(float3(nxy, nz));
+            const OrthonormalFrame mapped = sd.frame.apply_normal_map(float3(nxy, nz));
+            if (merian_hint_clamp_normals) {
+                const float3 clamped_n =
+                    keller_clamp_normal(mapped.get_normal(), sd.face_normal, sd.wi);
+                shading_frame = OrthonormalFrame(clamped_n, mapped.get_tangent());
+            } else {
+                shading_frame = mapped;
+            }
         }
 
         float3 emission = emissive_factor;
@@ -85,7 +93,7 @@ struct GltfMaterial : MaterialModel {
             occlusion = lerp(1.0f, o, occlusion_strength);
         }
 
-        const float alpha = ggx_roughness_to_alpha(roughness);
+        const float alpha = ggx_roughness_to_alpha(max(roughness, merian_hint_min_roughness));
 
         GltfMaterialSample s;
         s.brdf = GltfBSDF(

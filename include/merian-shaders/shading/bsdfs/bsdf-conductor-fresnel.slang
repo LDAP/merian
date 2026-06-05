@@ -26,8 +26,14 @@ struct ConductorFresnelBSDF<Inner : BSDF> : BSDF {
         return bsdf.pdf(wi, wo);
     }
 
-    Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
-        return sample_eval_impl<This>(this, wi, rng);
+    override Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
+        if (let s = bsdf.sample_eval(wi, rng)) {
+            ShadingFunctionSample r = s;
+            const float3 h = normalize(wi + r.wo);
+            r.weight *= fresnel_schlick(dot(wi, h), f0);
+            return r;
+        }
+        return none;
     }
 
     Albedo get_albedo(const float3 wi) {

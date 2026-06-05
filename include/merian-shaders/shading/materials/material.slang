@@ -13,6 +13,14 @@ enum MaterialFlags : uint8_t {
     NO_NORMAL_MAPPING,
 }
 
+// Hint for material models to clamp their shading normal against the geometric normal,
+// avoiding normal-map reflection artifacts (Keller et al. [2017]). Override via the
+// composition (MaterialSystem::set_clamp_normals()).
+extern static const bool merian_hint_clamp_normals = true;
+
+// Lower bound on perceptual roughness, avoiding the degenerate zero-roughness GGX lobe.
+extern static const float merian_hint_min_roughness = 0.0316f;
+
 // This represents the definition of the material (before being evaluated at a shading point), e.g.
 // Disney, glTF.
 //

@@ -63,6 +63,14 @@ test_slang_hot_reload = executable(
 )
 test('slang_hot_reload', test_slang_hot_reload, timeout: 120)
 
+test_bsdf = executable(
+    'test-bsdf',
+    'test_bsdf.cpp',
+    dependencies: [merian_dep, gtest_main_dep],
+    cpp_args: [test_shader_dir_arg],
+)
+test('bsdf', test_bsdf, timeout: 120)
+
 if tgltf.found()
     test_model_dir_arg = '-DTEST_MODEL_DIR="' + meson.current_source_dir() + '/../subprojects/tinygltf/models"'
 

@@ -109,9 +109,25 @@ class Camera {
     const float3& get_forward() noexcept;
     const float3& get_right() noexcept;
 
+    // Sub-pixel jitter sequence applied to the camera (for TAA / temporal accumulation).
+    enum class JitterSequence : uint32_t {
+        None = 0,
+        Halton,         // Halton (2, 3) low-discrepancy sequence (the TAA default)
+        R2,             // Martin Roberts' R2 low-discrepancy sequence
+        BlackmanHarris, // radially symmetric Blackman-Harris distributed offset
+    };
+
     // Sub-pixel jitter in render-pixel units; matches DLSS / FSR2 input convention
     // (X right, Y down, typical range [-0.5, 0.5]). Default 0.
     void set_jitter(const float2& jitter) noexcept;
+
+    // Selects the sub-pixel jitter sequence; None resets the current jitter to 0.
+    void set_jitter_sequence(JitterSequence sequence) noexcept;
+
+    // Advances the jitter to the given frame within the selected sequence (no-op for None).
+    void advance_jitter(uint32_t frame_index) noexcept;
+
+    JitterSequence get_jitter_sequence() const noexcept;
 
     const float2& get_jitter() const noexcept;
 
@@ -187,6 +203,7 @@ class Camera {
     uint64_t ray_basis_change_id_cache = 0;
 
     float2 jitter = {0.0f, 0.0f};
+    JitterSequence jitter_sequence = JitterSequence::None;
 
     void recompute_ray_basis();
 };

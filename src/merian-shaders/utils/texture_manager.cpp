@@ -1,5 +1,6 @@
 #include "merian-shaders/utils/texture_manager.hpp"
 
+#include "merian/utils/properties.hpp"
 #include "merian/vk/utils/blits.hpp"
 
 #include <cassert>
@@ -220,6 +221,10 @@ TextureHandle TextureManager::stage_rgba8(const uint32_t* data,
     const SamplerHandle sampler = allocator->get_sampler_pool()->for_filter_and_address_mode(
         mag_filter, min_filter, address_mode);
     return allocator->create_texture(image, image->make_view_create_info(), sampler);
+}
+
+void TextureManager::properties(Properties& props) {
+    props.output_text("textures: {} / {} capacity", ids.count(), textures.size());
 }
 
 } // namespace merian

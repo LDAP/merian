@@ -12,6 +12,8 @@
 
 namespace merian {
 
+class Properties;
+
 class TextureManager : public Versionable, public std::enable_shared_from_this<TextureManager> {
   public:
     TextureManager(const ShaderCompileContextHandle& compile_context,
@@ -101,6 +103,8 @@ class TextureManager : public Versionable, public std::enable_shared_from_this<T
     operator const ShaderObjectHandle&() const {
         return shader_object;
     }
+
+    void properties(Properties& props);
 
   private:
     void update_composition_constants();

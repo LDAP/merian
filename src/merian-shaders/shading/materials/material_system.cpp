@@ -1,5 +1,7 @@
 #include "merian-shaders/shading/materials/material_system.hpp"
 
+#include "merian/utils/properties.hpp"
+
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
@@ -50,11 +52,54 @@ void MaterialSystem::set_alpha_test_threshold(const float threshold) {
         return;
     }
     alpha_test_threshold = threshold;
-    composition->add_module_from_string(
-        "material_system_alpha_threshold",
-        fmt::format("namespace merian {{ export static const float "
-                    "merian_alpha_test_threshold = {:.6f}; }}",
-                    threshold));
+    composition->add_module_from_string("material_system_alpha_threshold",
+                                        fmt::format("namespace merian {{ export static const float "
+                                                    "merian_alpha_test_threshold = {:.6f}; }}",
+                                                    threshold));
+}
+
+void MaterialSystem::set_clamp_normals(const bool clamp) {
+    if (clamp == clamp_normals) {
+        return;
+    }
+    clamp_normals = clamp;
+    composition->add_module_from_string("material_system_clamp_normals",
+                                        fmt::format("namespace merian {{ export static const bool "
+                                                    "merian_hint_clamp_normals = {}; }}",
+                                                    clamp ? "true" : "false"));
+}
+
+void MaterialSystem::set_min_roughness(const float min_roughness) {
+    if (min_roughness == this->min_roughness) {
+        return;
+    }
+    this->min_roughness = min_roughness;
+    composition->add_module_from_string("material_system_min_roughness",
+                                        fmt::format("namespace merian {{ export static const float "
+                                                    "merian_hint_min_roughness = {:.9f}; }}",
+                                                    min_roughness));
+}
+
+void MaterialSystem::properties(Properties& props) {
+    float alpha = alpha_test_threshold;
+    if (props.config_float("Alpha Test Threshold", alpha, "", 0.01F)) {
+        set_alpha_test_threshold(alpha);
+    }
+
+    bool clamp = clamp_normals;
+    if (props.config_bool("Clamp Normals", clamp,
+                          "Hint the materials to clamp their normals to prevent artifacts when "
+                          "using normal maps")) {
+        set_clamp_normals(clamp);
+    }
+
+    float roughness = min_roughness;
+    if (props.config_float(
+            "Min Roughness", roughness,
+            "Lower bound on roughness, preventing the degenerate zero-roughness lobe", 1e-3F, 0.0F,
+            1.0F)) {
+        set_min_roughness(roughness);
+    }
 }
 
 void MaterialSystem::rebuild_shader_object() {

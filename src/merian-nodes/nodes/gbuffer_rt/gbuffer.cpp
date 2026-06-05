@@ -3,6 +3,8 @@
 #include "merian/shader/shader_compile_context.hpp"
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 
+#include <fmt/format.h>
+
 namespace merian {
 
 GBufferRTNode::GBufferRTNode() {}
@@ -34,7 +36,7 @@ GBufferRTNode::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) 
 
     return {
         {"gbuffer", con_gbuffer}, {"denoiser", con_denoiser}, {"hit_info", con_hit_info},
-        {"mv", con_mv},           {"albedo", con_albedo},    {"emission", con_emission},
+        {"mv", con_mv},           {"albedo", con_albedo},     {"emission", con_emission},
     };
 }
 
@@ -43,6 +45,7 @@ GBufferRTNode::NodeStatusFlags GBufferRTNode::on_connected(
     [[maybe_unused]] const DescriptorSetLayoutHandle& descriptor_set_layout) {
 
     pipeline = nullptr;
+    composition = nullptr;
     program = nullptr;
     entry_point = nullptr;
     gbuffer_obj = nullptr;
@@ -58,11 +61,14 @@ void GBufferRTNode::process(GraphRun& run,
     const auto& cmd = run.get_cmd();
     const auto& scene = io[con_scene];
 
+    emission_connected = io.is_connected(con_emission);
+
     // Lazily build program/pipeline from scene's composition
     if (!program) {
-        auto composition = SlangComposition::create();
+        composition = SlangComposition::create();
         composition->add_composition(scene->get_composition());
         composition->add_module_from_path("merian-nodes/nodes/gbuffer_rt/gbuffer.slang", true);
+        update_gbuffer_constants();
 
         program = SlangProgram::create(compile_context, composition);
         entry_point = SlangProgramEntryPoint::create(program, "main");
@@ -88,8 +94,8 @@ void GBufferRTNode::process(GraphRun& run,
     obj_allocator->set_iteration(run.get_in_flight_index());
 
     if (!gbuffer_obj) {
-        gbuffer_obj = std::make_shared<GBuffer>(compile_context, context, resource_allocator,
-                                                extent);
+        gbuffer_obj =
+            std::make_shared<GBuffer>(compile_context, context, resource_allocator, extent);
     }
 
     if (!globals_obj) {
@@ -101,7 +107,8 @@ void GBufferRTNode::process(GraphRun& run,
         io[con_denoiser].get_texture()->get_view(), io[con_hit_info].get_texture()->get_view(),
         io[con_mv].get_texture()->get_view(), io[con_albedo].get_texture()->get_view());
 
-    globals_obj->get_cursor()["emission"] = io[con_emission].get_texture();
+    if (emission_connected)
+        globals_obj->get_cursor()["emission"] = io[con_emission].get_texture();
 
     uint32_t mask = 0u;
     for (uint32_t bit = 0; bit < 8; ++bit) {
@@ -126,6 +133,13 @@ void GBufferRTNode::process(GraphRun& run,
     //               io[con_albedo]->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal)});
 
     io[con_gbuffer] = gbuffer_obj;
+}
+
+void GBufferRTNode::update_gbuffer_constants() {
+    composition->add_module_from_string(
+        "gbuffer_constants", fmt::format("namespace merian {{ export static const bool "
+                                         "merian_gbuffer_write_emission = {}; }}",
+                                         emission_connected ? "true" : "false"));
 }
 
 GBufferRTNode::NodeStatusFlags GBufferRTNode::properties(Properties& config) {

@@ -1,8 +1,11 @@
 #include "merian/utils/camera/camera.hpp"
 
 #include "merian/shader/shader_cursor.hpp"
+#include "merian/utils/hash.hpp"
+#include "merian/utils/xorshift.hpp"
 #include "merian/vk/utils/math.hpp"
 
+#include <array>
 #include <cassert>
 #include <cmath>
 
@@ -205,6 +208,65 @@ void Camera::set_jitter(const float2& jitter) noexcept {
     this->jitter = jitter;
 }
 
+namespace {
+
+const std::array<float2, 8> HALTON_SEQUENCE = {
+    float2(1.0f / 2.0f, 1.0f / 3.0f), float2(1.0f / 4.0f, 2.0f / 3.0f),
+    float2(3.0f / 4.0f, 1.0f / 9.0f), float2(1.0f / 8.0f, 4.0f / 9.0f),
+    float2(5.0f / 8.0f, 7.0f / 9.0f), float2(3.0f / 8.0f, 2.0f / 9.0f),
+    float2(7.0f / 8.0f, 5.0f / 9.0f), float2(1.0f / 16.0f, 8.0f / 9.0f),
+};
+
+// length 16 is a Padovan number -> maximally isotropic plastic-constant (R2) lattice
+constexpr uint32_t R2_SEQUENCE_LENGTH = 16;
+constexpr float R2_ALPHA_X = 0.7548776662466927f; // 1 / g
+constexpr float R2_ALPHA_Y = 0.5698402909980532f; // 1 / g^2
+
+// importance sample the Blackman-Harris pixel filter with 1.5px radius support.
+float2 pixel_offset_blackman_harris(const float2& rand) {
+    constexpr float two_pi = 6.28318530717958647692f;
+    const float2 dir = float2(std::cos(rand.y * two_pi), std::sin(rand.y * two_pi));
+    // surprisingly good fit to the inverse cdf.
+    const float r = 0.943404f * std::asin(0.636617f * std::asin(std::sqrt(rand.x)));
+    return dir * r;
+}
+
+} // namespace
+
+void Camera::set_jitter_sequence(const JitterSequence sequence) noexcept {
+    jitter_sequence = sequence;
+    if (sequence == JitterSequence::None) {
+        jitter = float2(0.0f);
+    }
+}
+
+void Camera::advance_jitter(const uint32_t frame_index) noexcept {
+    switch (jitter_sequence) {
+    case JitterSequence::None:
+        return;
+    case JitterSequence::Halton:
+        jitter = HALTON_SEQUENCE[frame_index % HALTON_SEQUENCE.size()] - 0.5f;
+        break;
+    case JitterSequence::R2: {
+        const auto n = static_cast<float>(frame_index % R2_SEQUENCE_LENGTH);
+        jitter = float2(std::fmod(0.5f + (R2_ALPHA_X * n), 1.0f),
+                        std::fmod(0.5f + (R2_ALPHA_Y * n), 1.0f)) -
+                 0.5f;
+        break;
+    }
+    case JitterSequence::BlackmanHarris: {
+        // random per frame: independent samples of the filter, robust to clearing at any time.
+        XORShift32 rng(static_cast<uint32_t>(hash_val(frame_index)));
+        jitter = pixel_offset_blackman_harris(float2(rng.next_float(), rng.next_float()));
+        break;
+    }
+    }
+}
+
+Camera::JitterSequence Camera::get_jitter_sequence() const noexcept {
+    return jitter_sequence;
+}
+
 const float2& Camera::get_jitter() const noexcept {
     return jitter;
 }
@@ -376,6 +438,15 @@ void Camera::properties(Properties& props) {
     float2 d_orbit(0);
     if (props.config_vec("orbit", d_orbit)) {
         orbit(d_orbit.x, d_orbit.y);
+    }
+
+    props.st_separate();
+
+    static const std::vector<std::string> jitter_sequences = {"None", "Halton", "R2",
+                                                              "Blackman-Harris"};
+    int selected = static_cast<int>(jitter_sequence);
+    if (props.config_options("jitter", selected, jitter_sequences, Properties::OptionsStyle::COMBO)) {
+        set_jitter_sequence(static_cast<JitterSequence>(selected));
     }
 }
 

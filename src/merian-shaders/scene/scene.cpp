@@ -678,6 +678,14 @@ void Scene::properties_explorer(Properties& props) {
         properties_graph(props);
         props.st_end_child();
     }
+    if (props.st_begin_child("material_system", "Material System")) {
+        material_system->properties(props);
+        props.st_end_child();
+    }
+    if (props.st_begin_child("texture_manager", "Texture Manager")) {
+        get_texture_manager()->properties(props);
+        props.st_end_child();
+    }
 }
 
 void Scene::properties_settings(Properties& props) {
@@ -687,9 +695,16 @@ void Scene::properties_settings(Properties& props) {
     }
     props.config_percent("BLAS Rebuild Fraction", blas_rebuild_fraction);
 
+    props.st_separate("Material System");
     float alpha_threshold = material_system->get_alpha_test_threshold();
     if (props.config_float("Alpha Test Threshold", alpha_threshold, "", 0.01F)) {
         material_system->set_alpha_test_threshold(alpha_threshold);
+    }
+    bool clamp_normals = material_system->get_clamp_normals();
+    if (props.config_bool("Clamp Normals", clamp_normals,
+                          "Hint the materials to clamp their normals to prevent artifacts when "
+                          "using normal maps")) {
+        material_system->set_clamp_normals(clamp_normals);
     }
 }
 
@@ -1924,6 +1939,8 @@ void Scene::update(const CommandBufferHandle& cmd,
 
     const auto cam = get_active_camera();
     assert(cam);
+
+    cam->advance_jitter(frame);
 
     prev_active_camera.write_to(c["prev_camera"]);
     cam->write_to(c["camera"]);

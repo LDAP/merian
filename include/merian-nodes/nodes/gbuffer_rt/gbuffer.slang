@@ -11,6 +11,8 @@ RWTexture2D<float4> emission;
 struct GBufferParams { uint instance_mask; };
 ConstantBuffer<GBufferParams> params;
 
+extern static const bool merian_gbuffer_write_emission = true;
+
 [shader("compute")]
 [numthreads(16, 16, 1)]
 void main(uint3 tid: SV_DispatchThreadID,
@@ -63,7 +65,8 @@ void main(uint3 tid: SV_DispatchThreadID,
             gbuffer.store_motion_vectors(pixel, mv);
             gbuffer.store_albedo(pixel,
                                  mat.get_bsdf().get_albedo(mat.shading_frame.to_local(-ray.Direction)));
-            emission[pixel] = float4(mat.emission, 0);
+            if (merian_gbuffer_write_emission)
+                emission[pixel] = float4(mat.emission, 0);
             return;
         }
     }
@@ -77,7 +80,8 @@ void main(uint3 tid: SV_DispatchThreadID,
     gbuffer.store_hit(pixel, hit);
     gbuffer.store_motion_vectors(pixel, mv);
     gbuffer.store_albedo(pixel, Albedo(sp.material.emission));
-    emission[pixel] = float4(sp.material.emission, 0);
+    if (merian_gbuffer_write_emission)
+        emission[pixel] = float4(sp.material.emission, 0);
 }
 
 }

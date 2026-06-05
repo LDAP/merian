@@ -8,6 +8,7 @@
 #include "merian-shaders/scene/scene.hpp"
 
 #include "merian/shader/shader_object_allocator.hpp"
+#include "merian/shader/slang_composition.hpp"
 #include "merian/shader/slang_entry_point.hpp"
 #include "merian/shader/slang_program.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
@@ -41,6 +42,8 @@ class GBufferRTNode : public Node {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
+    void update_gbuffer_constants();
+
     ContextHandle context;
     ResourceAllocatorHandle resource_allocator;
     ShaderCompileContextHandle compile_context;
@@ -61,7 +64,10 @@ class GBufferRTNode : public Node {
 
     std::array<bool, 8> mask_enabled{true, true, true, true, true, true, true, true};
 
+    bool emission_connected = true;
+
     // Slang program + pipeline
+    SlangCompositionHandle composition;
     SlangProgramHandle program;
     SlangProgramEntryPointHandle entry_point;
     PipelineHandle pipeline;

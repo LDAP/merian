@@ -359,10 +359,11 @@ struct Scene {
         return to_prev_world_position(gd, hit.instance_index, prev_obj);
     }
 
-    // Pixel-space delta from prev_camera projection to current pixel, jitter-corrected.
+    // Pixel-space delta from prev_camera projection to current pixel. project_pinhole is
+    // jitter-free, so only the current sample's jitter is removed; adding prev_camera.jitter would
+    // (wrongly) shift the reprojection by up to a pixel for wide-support jitter (e.g. Blackman-Harris).
     float2 compute_motion_vector(const float3 prev_pos, const uint2 pixel, const uint2 dim) {
-        return prev_camera.project_pinhole(prev_pos, dim) - float2(pixel)
-             + prev_camera.jitter - camera.jitter;
+        return prev_camera.project_pinhole(prev_pos, dim) - float2(pixel) - camera.jitter;
     }
 
     ShadingPoint get_shading_point(const RayDesc ray,
