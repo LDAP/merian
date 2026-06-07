@@ -20,7 +20,10 @@ enum class ImageFormat : uint8_t {
 struct ImageInfo {
     int width = 0;
     int height = 0;
+    // Channel count of the returned data (after any desired_channels conversion).
     int channels = 0;
+    // Channel count in the source file (e.g. 3 = no alpha, 4 = has alpha), before conversion.
+    int source_channels = 0;
 };
 
 // Load as 8-bit per channel. Any file format; HDR/PFM source values are tonemapped by the

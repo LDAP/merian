@@ -1,0 +1,11 @@
+[wrap-git]
+directory = ufbx
+
+url = https://github.com/ufbx/ufbx
+revision = v0.9.0
+depth = 1
+
+patch_directory = ufbx
+
+[provide]
+ufbx = ufbx_dep

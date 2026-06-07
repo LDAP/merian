@@ -17,6 +17,10 @@ if tgltf.found()
     merian_shaders_src += 'scene/gltf_scene.cpp'
 endif
 
+if ufbx.found()
+    merian_shaders_src += 'scene/fbx_scene.cpp'
+endif
+
 merian_shaders_lib = static_library(
     'merian-shaders',
     merian_shaders_src,
@@ -28,6 +32,7 @@ merian_shaders_lib = static_library(
         spdlog,
         stb,
         tgltf,
+        ufbx,
         vma,
         vulkan,
     ],

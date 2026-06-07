@@ -47,6 +47,12 @@ option(
     description: 'Build with tinygltf support.'
 )
 option(
+    'ufbx',
+    type: 'feature',
+    value: 'auto',
+    description: 'Build with ufbx (FBX) support.'
+)
+option(
     'tinybvh',
     type: 'feature',
     value: 'auto',

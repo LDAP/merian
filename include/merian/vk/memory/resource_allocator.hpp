@@ -6,6 +6,7 @@
 #include "merian/vk/memory/staging_memory_manager.hpp"
 #include "merian/vk/sampler/sampler_pool.hpp"
 
+#include <filesystem>
 #include <memory>
 #include <optional>
 #include <vulkan/vulkan.hpp>
@@ -227,6 +228,31 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
         const std::string& debug_name = {},
         const bool generate_mipmaps = false,
         const vk::ImageUsageFlags additional_usage_flags = {});
+
+    // Create a texture from pre-compressed (e.g. BCn) block data, all mip levels concatenated, mip
+    // 0 first. Left in ShaderReadOnlyOptimal.
+    TextureHandle create_texture_from_compressed(const CommandBufferHandle& cmd,
+                                                 const vk::Format format,
+                                                 const uint32_t width,
+                                                 const uint32_t height,
+                                                 const uint32_t mip_levels,
+                                                 const void* data,
+                                                 const vk::DeviceSize data_size,
+                                                 const SamplerHandle& sampler,
+                                                 const std::string& debug_name = {});
+
+    // Load a texture from any supported image file (including BCn DDS). Optionally reports whether
+    // the source has an alpha channel. Left in ShaderReadOnlyOptimal.
+    TextureHandle create_texture_from_file(
+        const CommandBufferHandle& cmd,
+        const std::filesystem::path& path,
+        const bool srgb,
+        const vk::SamplerAddressMode address_mode = vk::SamplerAddressMode::eRepeat,
+        const vk::Filter mag_filter = vk::Filter::eLinear,
+        const vk::Filter min_filter = vk::Filter::eLinear,
+        const std::string& debug_name = {},
+        const bool generate_mipmaps = false,
+        bool* out_has_alpha = nullptr);
 
     // Returns a dummy 4x4 texture with the "missing texture" color (1,0,1,1).
     const TextureHandle& get_dummy_texture() const;

@@ -6,6 +6,7 @@
 #include "merian-nodes/nodes/bloom/bloom.hpp"
 #include "merian-nodes/nodes/color_image/color_output.hpp"
 #include "merian-nodes/nodes/exposure/exposure.hpp"
+#include "merian-nodes/nodes/fbx_scene/fbx_scene_node.hpp"
 #include "merian-nodes/nodes/fxaa/fxaa.hpp"
 #include "merian-nodes/nodes/gbuffer_debug/gbuffer_debug.hpp"
 #include "merian-nodes/nodes/gbuffer_rt/gbuffer.hpp"
@@ -53,6 +54,7 @@ NodeRegistry::NodeRegistry() {
     register_node_type<GBufferRTNode>(
         "GBuffer (Raytraced)", "Creates a GBuffer for the Merian scene format using Raytracing.");
     register_node_type<GLTFSceneNode>("GLTF Scene", "Loads a glTF/GLB scene file.");
+    register_node_type<FBXSceneNode>("FBX Scene", "Loads an FBX scene file.");
     register_node_type<WindowNode>("Window", "Outputs to a window.");
     register_node_type<HDRImageRead>("HDR Image", "Loads an HDR image.");
     register_node_type<LDRImageRead>("LDR Image", "Loads a LDR image.");

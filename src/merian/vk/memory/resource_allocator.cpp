@@ -1,4 +1,6 @@
 #include "merian/vk/memory/resource_allocator.hpp"
+#include "merian/io/dds.hpp"
+#include "merian/io/image_io.hpp"
 #include "merian/utils/colors.hpp"
 #include "merian/vk/command/command_buffer.hpp"
 #include "merian/vk/extension/extension_vk_debug_utils.hpp"
@@ -352,6 +354,116 @@ ResourceAllocator::create_texture_from_rgba32f(const CommandBufferHandle& cmd,
     const SamplerHandle sampler =
         get_sampler_pool()->for_filter_and_address_mode(mag_filter, min_filter, address_mode);
     return create_texture(image, image->make_view_create_info(), sampler, debug_name);
+}
+
+static uint32_t compressed_block_size(const vk::Format format) {
+    switch (format) {
+    case vk::Format::eBc1RgbUnormBlock:
+    case vk::Format::eBc1RgbSrgbBlock:
+    case vk::Format::eBc1RgbaUnormBlock:
+    case vk::Format::eBc1RgbaSrgbBlock:
+    case vk::Format::eBc4UnormBlock:
+    case vk::Format::eBc4SnormBlock:
+        return 8;
+    default:
+        return 16; // BC2/BC3/BC5/BC6H/BC7
+    }
+}
+
+TextureHandle ResourceAllocator::create_texture_from_compressed(const CommandBufferHandle& cmd,
+                                                                const vk::Format format,
+                                                                const uint32_t width,
+                                                                const uint32_t height,
+                                                                const uint32_t mip_levels,
+                                                                const void* data,
+                                                                const vk::DeviceSize data_size,
+                                                                const SamplerHandle& sampler,
+                                                                const std::string& debug_name) {
+    const vk::ImageCreateInfo image_info{
+        {},
+        vk::ImageType::e2D,
+        format,
+        {width, height, 1},
+        mip_levels,
+        1,
+        vk::SampleCountFlagBits::e1,
+        vk::ImageTiling::eOptimal,
+        vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+        vk::SharingMode::eExclusive,
+        {},
+        {},
+        vk::ImageLayout::eUndefined,
+    };
+    const ImageHandle image = create_image(image_info, MemoryMappingType::NONE, debug_name);
+
+    const BufferHandle staging =
+        create_buffer(data_size, vk::BufferUsageFlagBits::eTransferSrc,
+                      MemoryMappingType::HOST_ACCESS_SEQUENTIAL_WRITE, "compressed staging");
+    std::memcpy(staging->get_memory()->map(), data, data_size);
+    staging->get_memory()->unmap();
+
+    const uint32_t block_bytes = compressed_block_size(format);
+    std::vector<vk::BufferImageCopy> regions;
+    regions.reserve(mip_levels);
+    vk::DeviceSize offset = 0;
+    uint32_t mw = width;
+    uint32_t mh = height;
+    for (uint32_t mip = 0; mip < mip_levels; mip++) {
+        const vk::DeviceSize size = static_cast<vk::DeviceSize>(std::max(1u, (mw + 3) / 4)) *
+                                    std::max(1u, (mh + 3) / 4) * block_bytes;
+        if (offset + size > data_size) {
+            break; // truncated data; stop at the last fully-present mip
+        }
+        regions.push_back(vk::BufferImageCopy{
+            offset, 0, 0, {vk::ImageAspectFlagBits::eColor, mip, 0, 1}, {0, 0, 0}, {mw, mh, 1}});
+        offset += size;
+        mw = std::max(1u, mw / 2);
+        mh = std::max(1u, mh / 2);
+    }
+
+    cmd->barrier(image->barrier2(vk::ImageLayout::eTransferDstOptimal));
+    cmd->get_command_buffer().copyBufferToImage(staging->get_buffer(), **image,
+                                                vk::ImageLayout::eTransferDstOptimal, regions);
+    cmd->barrier(image->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal));
+    cmd->keep_until_pool_reset(staging);
+
+    return create_texture(image, image->make_view_create_info(), sampler, debug_name);
+}
+
+TextureHandle ResourceAllocator::create_texture_from_file(const CommandBufferHandle& cmd,
+                                                          const std::filesystem::path& path,
+                                                          const bool srgb,
+                                                          const vk::SamplerAddressMode address_mode,
+                                                          const vk::Filter mag_filter,
+                                                          const vk::Filter min_filter,
+                                                          const std::string& debug_name,
+                                                          const bool generate_mipmaps,
+                                                          bool* out_has_alpha) {
+    // BCn DDS: upload the raw compressed blocks (and its stored mip chain) directly.
+    if (is_dds(path)) {
+        const DdsImage dds = dds_load(path, srgb);
+        if (out_has_alpha != nullptr) {
+            *out_has_alpha = dds.has_alpha;
+        }
+        const SamplerHandle sampler = m_samplerPool->for_filter_and_address_mode(
+            mag_filter, min_filter, address_mode, vk::SamplerMipmapMode::eLinear);
+        return create_texture_from_compressed(cmd, dds.format, dds.width, dds.height,
+                                              dds.mip_levels, dds.data.data(), dds.data.size(),
+                                              sampler, debug_name);
+    }
+
+    // Everything else: decode to RGBA8 via the host-side stb loader.
+    ImageInfo info;
+    const BlobHandle blob = image_load_u8(path, info, 4);
+    if (out_has_alpha != nullptr) {
+        *out_has_alpha = info.source_channels == 4;
+    }
+    const TextureHandle texture = create_texture_from_rgba8(
+        cmd, blob->get_data<uint32_t>(), static_cast<uint32_t>(info.width),
+        static_cast<uint32_t>(info.height), address_mode, mag_filter, min_filter, srgb, debug_name,
+        generate_mipmaps);
+    cmd->barrier(texture->get_image()->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal));
+    return texture;
 }
 
 const TextureHandle& ResourceAllocator::get_dummy_texture() const {

@@ -1,5 +1,7 @@
 #include "merian/io/image_io.hpp"
 
+#include "merian/io/dds.hpp"
+
 #include <stb_image.h>
 #include <stb_image_write.h>
 
@@ -177,6 +179,12 @@ ImageFormat image_format_from_extension(const std::filesystem::path& path) noexc
 BlobHandle image_load_u8(const std::filesystem::path& path,
                          ImageInfo& info,
                          const int desired_channels) {
+    // BCn-compressed DDS files are not handled by stb; decode them to RGBA8 here so every consumer
+    // (e.g. the Image Read node) can load them. srgb-ness is irrelevant for the raw decoded bytes.
+    if (is_dds(path)) {
+        return dds_decode_rgba8(dds_load(path, false), info);
+    }
+
     int w = 0;
     int h = 0;
     int native = 0;
@@ -186,7 +194,7 @@ BlobHandle image_load_u8(const std::filesystem::path& path,
                                  stbi_failure_reason()};
     }
     const int out_channels = desired_channels == 0 ? native : desired_channels;
-    info = {.width = w, .height = h, .channels = out_channels};
+    info = {.width = w, .height = h, .channels = out_channels, .source_channels = native};
     return std::make_shared<StbiBlob>(pixels,
                                       static_cast<std::size_t>(w) * h * out_channels);
 }

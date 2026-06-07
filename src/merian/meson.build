@@ -1,4 +1,5 @@
 merian_src = files(
+    'io/dds.cpp',
     'io/file_loader.cpp',
     'io/image_io.cpp',
     'io/tinyobj.cpp',
