@@ -22,9 +22,8 @@ TextureManager::TextureManager(const ShaderCompileContextHandle& compile_context
     update_composition_constants();
 
     layout_program = SlangProgram::create(compile_context, composition);
-    layout_program->on_changed(layout_program, [&] { rebuild_shader_object(); });
-
-    rebuild_shader_object();
+    shader_object = Versioned<ShaderObject>([this] { return build_shader_object(); });
+    shader_object.depends_on(layout_program);
 }
 
 void TextureManager::update_composition_constants() {
@@ -34,19 +33,20 @@ void TextureManager::update_composition_constants() {
                                                     static_cast<uint32_t>(textures.size())));
 }
 
-void TextureManager::rebuild_shader_object() {
+ShaderObjectHandle TextureManager::build_shader_object() const {
     SPDLOG_DEBUG("recreate shader object");
-    shader_object =
-        layout_program->create_shader_object(context, "merian::TextureManager", allocator);
+    object_composition_version = composition->version();
+    const ShaderObjectHandle object =
+        layout_program.get()->create_shader_object(context, "merian::TextureManager", allocator);
 
-    // Reinitialize all texture slots
+    // declare eShaderReadOnlyOptimal up front: staged uploads are eUndefined until update()
     const auto& dummy = allocator->get_dummy_texture();
-    auto cursor = shader_object->get_cursor();
+    auto cursor = object->get_cursor();
     for (uint32_t i = 0; i < textures.size(); i++) {
-        cursor["textures"][i] = textures[i] ? textures[i] : dummy;
+        cursor["textures"][i].write(textures[i] ? textures[i] : dummy,
+                                    vk::ImageLayout::eShaderReadOnlyOptimal);
     }
-
-    increment_version();
+    return object;
 }
 
 void TextureManager::update(const CommandBufferHandle& cmd) {
@@ -107,8 +107,11 @@ void TextureManager::set_texture(const TextureID id, const TextureHandle& textur
     assert(id < textures.size());
     ids.acquire(id);
     textures[id] = texture;
-    shader_object->get_cursor()["textures"][id] =
-        texture ? texture : allocator->get_dummy_texture();
+    // poke the live slot only when current; otherwise the next reproject covers it
+    if (object_is_current()) {
+        shader_object.peek()->get_cursor()["textures"][id] =
+            texture ? texture : allocator->get_dummy_texture();
+    }
 }
 
 TextureID TextureManager::add_texture_from_rgba8(const CommandBufferHandle& cmd,
@@ -170,10 +173,12 @@ void TextureManager::set_texture_from_rgba8(const TextureID id,
                                               min_filter, srgb, generate_mipmaps);
     ids.acquire(id);
     textures[id] = texture;
-    // Image is in eUndefined now and will reach eShaderReadOnlyOptimal during the next update().
-    // Declaring the access layout up front lets us write the descriptor immediately.
-    shader_object->get_cursor()["textures"][id].write(texture,
-                                                      vk::ImageLayout::eShaderReadOnlyOptimal);
+    // image reaches eShaderReadOnlyOptimal at the next update(); declare it now to write
+    // immediately
+    if (object_is_current()) {
+        shader_object.peek()->get_cursor()["textures"][id].write(
+            texture, vk::ImageLayout::eShaderReadOnlyOptimal);
+    }
 }
 
 void TextureManager::remove_texture(const TextureID id) {
@@ -182,7 +187,9 @@ void TextureManager::remove_texture(const TextureID id) {
     assert(was_used && "Removing already-removed texture");
 
     textures[id].reset();
-    shader_object->get_cursor()["textures"][id] = allocator->get_dummy_texture();
+    if (object_is_current()) {
+        shader_object.peek()->get_cursor()["textures"][id] = allocator->get_dummy_texture();
+    }
 }
 
 TextureHandle TextureManager::stage_rgba8(const uint32_t* data,

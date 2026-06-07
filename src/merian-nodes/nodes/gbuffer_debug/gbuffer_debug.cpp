@@ -6,11 +6,10 @@ namespace merian {
 
 GBufferDebugNode::GBufferDebugNode() {}
 
-DeviceSupportInfo
-GBufferDebugNode::query_device_support(const DeviceSupportQueryInfo& query_info) {
+DeviceSupportInfo GBufferDebugNode::query_device_support(const DeviceSupportQueryInfo& query_info) {
     // Scene parameter contains an AccelerationStructure; Slang emits RayTracingKHR for the AS
-    // declaration when no ray-query op is reachable from this entry point. Enable rayTracingPipeline
-    // opportunistically so the resulting SPIR-V loads.
+    // declaration when no ray-query op is reachable from this entry point. Enable
+    // rayTracingPipeline opportunistically so the resulting SPIR-V loads.
     return DeviceSupportInfo::check(query_info, {}, {"rayTracingPipeline"});
 }
 
@@ -18,7 +17,7 @@ void GBufferDebugNode::initialize(const ContextHandle& context,
                                   const ResourceAllocatorHandle& allocator) {
     this->context = context;
     this->resource_allocator = allocator;
-    this->compile_context = ShaderCompileContext::create(context);
+    this->compile_context = context->get_shader_compile_context();
 }
 
 std::vector<InputConnectorDescriptor> GBufferDebugNode::describe_inputs() {
@@ -35,10 +34,8 @@ GBufferDebugNode::NodeStatusFlags GBufferDebugNode::on_connected(
     [[maybe_unused]] const NodeIOLayout& io_layout,
     [[maybe_unused]] const DescriptorSetLayoutHandle& descriptor_set_layout) {
 
-    pipeline = nullptr;
-    program = nullptr;
-    entry_point = nullptr;
-    params = nullptr;
+    // force the program graph to be rewired next process()
+    composition = nullptr;
     obj_allocator = nullptr;
 
     return {};
@@ -53,8 +50,8 @@ void GBufferDebugNode::process(GraphRun& run,
     if (!scene || !gbuf || !scene->is_ready())
         return;
 
-    if (!program) {
-        auto composition = SlangComposition::create();
+    if (!composition) {
+        composition = SlangComposition::create();
         composition->add_composition(scene->get_composition());
         composition->add_module_from_path("merian-nodes/nodes/gbuffer_debug/gbuffer_debug.slang",
                                           true);
@@ -62,38 +59,35 @@ void GBufferDebugNode::process(GraphRun& run,
         program = SlangProgram::create(compile_context, composition);
         entry_point = SlangProgramEntryPoint::create(program, "main");
 
-        // entry_point rebuilds when the scene's composition (material type
-        // conformances) changes — drop cached pipeline + per-EP shader objects.
-        entry_point->on_changed(entry_point, [this] {
-            pipeline = nullptr;
-            params = nullptr;
+        pipeline = Versioned<Pipeline>([this] {
+            const auto ep = entry_point.get();
+            return ComputePipeline::create(ep->get_pipeline_layout(context), ep->specialize());
         });
+        pipeline.depends_on(entry_point);
+
+        params = Versioned<ShaderObject>([this] {
+            return entry_point.get()->create_shader_object(context, "params", resource_allocator);
+        });
+        params.depends_on(entry_point);
 
         obj_allocator = std::make_shared<FrameCachingShaderObjectAllocator>(
             resource_allocator, run.get_iterations_in_flight());
     }
 
-    if (!pipeline) {
-        auto pipe_layout = entry_point->get_pipeline_layout(context);
-        auto vulkan_entry_point = entry_point->specialize();
-        pipeline = ComputePipeline::create(pipe_layout, vulkan_entry_point);
-    }
-
     obj_allocator->set_iteration(run.get_in_flight_index());
 
-    if (!params) {
-        params = entry_point->create_shader_object(context, "params", resource_allocator);
-    }
+    const auto ep = entry_point.get();
+    const auto pipe = pipeline.get();
+    const auto params_obj = params.get();
 
-    auto cursor = params->get_cursor();
+    auto cursor = params_obj->get_cursor();
     cursor["gbuffer"] = gbuf->get_shader_object();
     cursor["output"] = io[con_output].get_texture();
 
-    cmd->bind(pipeline);
-    entry_point->bind_entry_point_parameter("scene", scene->get_shader_object(), cmd, pipeline,
-                                            obj_allocator);
-    entry_point->bind_entry_point_parameter("params", params, cmd, pipeline, obj_allocator);
-    cmd->push_constant(pipeline, static_cast<int>(selected_field));
+    cmd->bind(pipe);
+    ep->bind_entry_point_parameter("scene", scene->get_shader_object(), cmd, pipe, obj_allocator);
+    ep->bind_entry_point_parameter("params", params_obj, cmd, pipe, obj_allocator);
+    cmd->push_constant(pipe, static_cast<int>(selected_field));
 
     cmd->dispatch(extent, 16, 16);
 }

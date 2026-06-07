@@ -23,6 +23,13 @@ test_small_set = executable(
 )
 test('small_set', test_small_set, timeout: 30)
 
+test_versioned = executable(
+    'test-versioned',
+    'test_versioned.cpp',
+    dependencies: [merian_dep, gtest_main_dep],
+)
+test('versioned', test_versioned, timeout: 30)
+
 test_slang_binding = executable(
     'test-slang-binding',
     'test_slang_binding.cpp',

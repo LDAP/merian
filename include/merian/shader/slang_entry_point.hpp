@@ -4,7 +4,6 @@
 #include "merian/shader/shader_object_allocator.hpp"
 #include "merian/shader/shader_object_layout.hpp"
 #include "merian/shader/slang_program.hpp"
-#include "merian/utils/versionable.hpp"
 #include "merian/vk/command/command_buffer.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 #include "merian/vk/pipeline/pipeline_layout.hpp"
@@ -22,14 +21,9 @@ using ShaderObjectHandle = std::shared_ptr<ShaderObject>;
 class SlangProgramEntryPoint;
 using SlangProgramEntryPointHandle = std::shared_ptr<SlangProgramEntryPoint>;
 
-/**
- * @brief Wraps a SlangProgram entry point with reflection-based binding helpers.
- *
- * Implements Versionable: when the underlying program rebuilds, this entry point
- * invalidates all cached layouts and pipeline state, then increments its version.
- * Consumers (e.g. pipeline owners) should listen and recreate their pipelines.
- */
-class SlangProgramEntryPoint : public Versionable, public EntryPoint {
+// An immutable view of one program entry point with binding helpers. Use create() for one that
+// tracks a changing program.
+class SlangProgramEntryPoint : public EntryPoint {
 
   protected:
     SlangProgramEntryPoint(const SlangProgramHandle& program, const uint64_t entry_point_index);
@@ -44,17 +38,6 @@ class SlangProgramEntryPoint : public Versionable, public EntryPoint {
     slang::EntryPointReflection* get_entry_point_reflection() const;
 
     const SlangProgramHandle& get_program() const;
-
-    // ---------------------------------------------------------------
-    // Rebuild
-
-    /**
-     * @brief Invalidate all cached state and increment version.
-     *
-     * Called automatically when the underlying program rebuilds.
-     * Clears param_cache, pipeline layout, global layouts, etc.
-     */
-    void rebuild();
 
     // ---------------------------------------------------------------
     // ShaderObject helpers
@@ -110,15 +93,17 @@ class SlangProgramEntryPoint : public Versionable, public EntryPoint {
     std::vector<std::string> get_all_parameter_names() const;
 
   public:
-    static SlangProgramEntryPointHandle create(const SlangProgramHandle& program,
-                                               const uint64_t entry_point_index = 0);
+    // An entry point that is rebuilt whenever its program changes.
+    static Versioned<SlangProgramEntryPoint> create(const Versioned<SlangProgram>& program,
+                                                    const uint64_t entry_point_index = 0);
 
-    static SlangProgramEntryPointHandle create(const SlangProgramHandle& program,
-                                               const std::string& entry_point_name = "main");
+    static Versioned<SlangProgramEntryPoint> create(const Versioned<SlangProgram>& program,
+                                                    const std::string& entry_point_name = "main");
 
-    static SlangProgramEntryPointHandle create(const ShaderCompileContextHandle& compile_context,
-                                               const std::filesystem::path& module_path,
-                                               const std::string& entry_point_name = "main");
+    static Versioned<SlangProgramEntryPoint>
+    create(const ShaderCompileContextHandle& compile_context,
+           const std::filesystem::path& module_path,
+           const std::string& entry_point_name = "main");
 
   public:
     // Tree of nested PB info: sub-object range index in parent → Vulkan set index + children

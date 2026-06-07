@@ -8,8 +8,7 @@ namespace merian {
 SlangProgram::SlangProgram(const ShaderCompileContextHandle& compile_context,
                            const SlangCompositionHandle& composition)
     : compile_context(compile_context), composition(composition) {
-
-    session = SlangSession::get_or_create(compile_context);
+    session = compile_context->current_session();
     program = merian::SlangSession::link(session->compose(composition));
 }
 
@@ -51,7 +50,7 @@ uint64_t SlangProgram::get_entry_point_index(const std::string& entry_point_name
         fmt::format("no entry point with name {} in program", entry_point_name)};
 }
 
-const SlangCompositionHandle& SlangProgram::get_composition() {
+const SlangCompositionHandle& SlangProgram::get_composition() const {
     return composition;
 }
 
@@ -174,24 +173,18 @@ std::string SlangProgram::format_reflection() const {
     return out;
 }
 
-void SlangProgram::rebuild() {
-    session = SlangSession::get_or_create(compile_context, true);
-    program = SlangSession::link(session->compose(composition));
-    binary = nullptr;
-    shader_module = nullptr;
-    increment_version();
+Versioned<SlangProgram> SlangProgram::create(const ShaderCompileContextHandle& compile_context,
+                                             const SlangCompositionHandle& composition) {
+    auto program = Versioned<SlangProgram>([compile_context, composition] {
+        return SlangProgramHandle(new SlangProgram(compile_context, composition));
+    });
+    program.depends_on([composition] { return composition->version(); });
+    return program;
 }
 
-SlangProgramHandle SlangProgram::create(const ShaderCompileContextHandle& compile_context,
-                                        const SlangCompositionHandle& composition) {
-    auto p = SlangProgramHandle(new SlangProgram(compile_context, composition));
-    composition->on_changed(p, [raw = p.get()]() { raw->rebuild(); });
-    return p;
-}
-
-SlangProgramHandle SlangProgram::create(const ShaderCompileContextHandle& compile_context,
-                                        const std::filesystem::path& path,
-                                        const bool with_entry_points) {
+Versioned<SlangProgram> SlangProgram::create(const ShaderCompileContextHandle& compile_context,
+                                             const std::filesystem::path& path,
+                                             const bool with_entry_points) {
     auto comp = SlangComposition::create();
     comp->add_module_from_path(path, with_entry_points);
     return create(compile_context, comp);

@@ -611,13 +611,6 @@ class SlangSession {
   public:
     static SlangSessionHandle create(const ShaderCompileContextHandle& shader_compile_context);
 
-    // Returns a cached session for the context or creates one if none is available.
-    // Pass force_new=true to always create a fresh session (e.g. after composition changes
-    // that require reloading modules with the same name but different content).
-    static SlangSessionHandle
-    get_or_create(const ShaderCompileContextHandle& shader_compile_context,
-                  bool force_new = false);
-
   private:
     static std::string diagnostics_as_string(Slang::ComPtr<slang::IBlob>& diagnostics_blob) {
         if (diagnostics_blob == nullptr) {

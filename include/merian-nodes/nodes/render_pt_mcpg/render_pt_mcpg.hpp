@@ -62,13 +62,12 @@ class RenderMCPG : public Node {
     bool emission_on_primary = false;
     std::array<bool, 8> mask_enabled{true, true, true, true, true, true, true, true};
 
-    // Slang program + pipeline
+    // Slang program + pipeline; rebuilt when the scene composition changes.
     SlangCompositionHandle composition;
-    SlangProgramHandle program;
-    SlangProgramEntryPointHandle entry_point;
-    PipelineHandle pipeline;
-
-    ShaderObjectHandle params;
+    Versioned<SlangProgram> program;
+    Versioned<SlangProgramEntryPoint> entry_point;
+    Versioned<Pipeline> pipeline;
+    Versioned<ShaderObject> params;
     std::shared_ptr<FrameCachingShaderObjectAllocator> obj_allocator;
 };
 

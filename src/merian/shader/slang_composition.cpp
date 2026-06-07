@@ -1,4 +1,5 @@
 #include "merian/shader/slang_composition.hpp"
+#include "merian/shader/slang_global_session.hpp"
 
 namespace merian {
 
@@ -7,11 +8,16 @@ SlangComposition::SlangComposition() {}
 void SlangComposition::add_module(const SlangModule& module) {
     auto [it, inserted] = module_index.try_emplace(module.name, modules.size());
     if (inserted) {
+        // New module name: an existing session loads it incrementally, no fresh session needed.
         modules.emplace_back(module);
     } else {
+        // Replacing an existing name only forces a fresh session if the source actually changed.
+        if (module.source_differs_from(modules[it->second])) {
+            bump_slang_source_epoch();
+        }
         modules[it->second] = module;
     }
-    increment_version();
+    edits++;
 }
 
 void SlangComposition::add_module(SlangModule&& module) {
@@ -19,9 +25,12 @@ void SlangComposition::add_module(SlangModule&& module) {
     if (inserted) {
         modules.emplace_back(std::move(module));
     } else {
+        if (module.source_differs_from(modules[it->second])) {
+            bump_slang_source_epoch();
+        }
         modules[it->second] = std::move(module);
     }
-    increment_version();
+    edits++;
 }
 
 // shortcut for SlangModule::from_path
@@ -54,7 +63,7 @@ void SlangComposition::add_type_conformance(const TypeConformance& type_conforma
     if (!inserted) {
         it->second = dynamic_dispatch_id;
     }
-    increment_version();
+    edits++;
 }
 
 void SlangComposition::add_type_conformance(TypeConformance&& type_conformance,
@@ -64,23 +73,22 @@ void SlangComposition::add_type_conformance(TypeConformance&& type_conformance,
     if (!inserted) {
         it->second = dynamic_dispatch_id;
     }
-    increment_version();
+    edits++;
 }
 
 void SlangComposition::add_entry_point(const std::string& defined_entry_point_name,
                                        const std::string& from_module) {
     entry_points.emplace(EntryPoint(defined_entry_point_name, from_module));
-    increment_version();
+    edits++;
 }
 
 void SlangComposition::add_composition(const SlangCompositionHandle& composition) {
     compositions.emplace(composition);
-    composition->on_changed(shared_from_this(), [this]() { increment_version(); });
-    increment_version();
+    edits++;
 }
 
 bool SlangComposition::reload(const FileLoader& file_loader) {
-    bool changed = false;
+    bool source_changed = false;
 
     // Check path-based modules for file changes
     for (const auto& module : modules) {
@@ -105,18 +113,20 @@ bool SlangComposition::reload(const FileLoader& file_loader) {
             module_mtimes[*resolved] = mtime;
         } else if (it->second != mtime) {
             it->second = mtime;
-            changed = true;
+            source_changed = true;
         }
     }
 
-    if (changed) {
-        increment_version();
+    if (source_changed) {
+        bump_slang_source_epoch();
+        edits++;
     }
-    return changed;
+    return source_changed;
 }
 
 void SlangComposition::force_reload() {
-    increment_version();
+    bump_slang_source_epoch();
+    edits++;
 }
 
 SlangCompositionHandle SlangComposition::create() {

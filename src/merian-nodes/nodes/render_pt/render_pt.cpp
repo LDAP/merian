@@ -23,7 +23,7 @@ DeviceSupportInfo RenderPT::query_device_support(const DeviceSupportQueryInfo& q
 void RenderPT::initialize(const ContextHandle& context, const ResourceAllocatorHandle& allocator) {
     this->context = context;
     this->resource_allocator = allocator;
-    this->compile_context = ShaderCompileContext::create(context);
+    this->compile_context = context->get_shader_compile_context();
 }
 
 std::vector<InputConnectorDescriptor> RenderPT::describe_inputs() {
@@ -40,11 +40,8 @@ RenderPT::NodeStatusFlags
 RenderPT::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
                        [[maybe_unused]] const DescriptorSetLayoutHandle& descriptor_set_layout) {
 
-    pipeline = nullptr;
+    // force the program graph to be rewired next process()
     composition = nullptr;
-    program = nullptr;
-    entry_point = nullptr;
-    params = nullptr;
     obj_allocator = nullptr;
 
     return {};
@@ -59,7 +56,7 @@ void RenderPT::process(GraphRun& run,
     if (!scene || !gbuf || !scene->is_ready())
         return;
 
-    if (!program) {
+    if (!composition) {
         composition = SlangComposition::create();
         composition->add_composition(scene->get_composition());
         composition->add_module_from_path("merian-nodes/nodes/render_pt/render_pt.slang", true);
@@ -68,30 +65,28 @@ void RenderPT::process(GraphRun& run,
         program = SlangProgram::create(compile_context, composition);
         entry_point = SlangProgramEntryPoint::create(program, "main");
 
-        // entry_point rebuilds when the scene's composition (material type
-        // conformances) changes — drop cached pipeline + per-EP shader objects.
-        entry_point->on_changed(entry_point, [this] {
-            pipeline = nullptr;
-            params = nullptr;
+        pipeline = Versioned<Pipeline>([this] {
+            const auto ep = entry_point.get();
+            return ComputePipeline::create(ep->get_pipeline_layout(context), ep->specialize());
         });
+        pipeline.depends_on(entry_point);
+
+        params = Versioned<ShaderObject>([this] {
+            return entry_point.get()->create_shader_object(context, "params", resource_allocator);
+        });
+        params.depends_on(entry_point);
 
         obj_allocator = std::make_shared<FrameCachingShaderObjectAllocator>(
             resource_allocator, run.get_iterations_in_flight());
     }
 
-    if (!pipeline) {
-        auto pipe_layout = entry_point->get_pipeline_layout(context);
-        auto vulkan_entry_point = entry_point->specialize();
-        pipeline = ComputePipeline::create(pipe_layout, vulkan_entry_point);
-    }
-
     obj_allocator->set_iteration(run.get_in_flight_index());
 
-    if (!params) {
-        params = entry_point->create_shader_object(context, "params", resource_allocator);
-    }
+    const auto ep = entry_point.get();
+    const auto pipe = pipeline.get();
+    const auto params_obj = params.get();
 
-    auto cursor = params->get_cursor();
+    auto cursor = params_obj->get_cursor();
     cursor["gbuffer"] = gbuf->get_shader_object();
     cursor["irradiance"] = io[con_irradiance].get_texture();
 
@@ -101,11 +96,10 @@ void RenderPT::process(GraphRun& run,
             mask |= (1u << bit);
     }
 
-    cmd->bind(pipeline);
-    entry_point->bind_entry_point_parameter("scene", scene->get_shader_object(), cmd, pipeline,
-                                            obj_allocator);
-    entry_point->bind_entry_point_parameter("params", params, cmd, pipeline, obj_allocator);
-    cmd->push_constant(pipeline, PushConstant{spp, max_path_length, mask});
+    cmd->bind(pipe);
+    ep->bind_entry_point_parameter("scene", scene->get_shader_object(), cmd, pipe, obj_allocator);
+    ep->bind_entry_point_parameter("params", params_obj, cmd, pipe, obj_allocator);
+    cmd->push_constant(pipe, PushConstant{spp, max_path_length, mask});
 
     cmd->dispatch(extent, 16, 16);
 }

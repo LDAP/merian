@@ -34,9 +34,8 @@ MaterialSystem::MaterialSystem(const ShaderCompileContextHandle& compile_context
     update_composition_constants();
 
     layout_program = SlangProgram::create(compile_context, composition);
-    layout_program->on_changed(layout_program, [&] { rebuild_shader_object(); });
-
-    rebuild_shader_object();
+    shader_object = Versioned<ShaderObject>([this] { return build_shader_object(); });
+    shader_object.depends_on(layout_program);
 }
 
 void MaterialSystem::update_composition_constants() {
@@ -102,23 +101,18 @@ void MaterialSystem::properties(Properties& props) {
     }
 }
 
-void MaterialSystem::rebuild_shader_object() {
+ShaderObjectHandle MaterialSystem::build_shader_object() const {
     SPDLOG_DEBUG("recreate shader object");
 
-    shader_object =
-        layout_program->create_shader_object(context, "merian::MaterialSystem", allocator);
-    auto cursor = shader_object->get_cursor();
+    const ShaderObjectHandle object =
+        layout_program.get()->create_shader_object(context, "merian::MaterialSystem", allocator);
+    auto cursor = object->get_cursor();
     cursor["texture_manager"] = texture_manager->get_shader_object();
     if (material_buffer) {
         cursor["material_count"] = static_cast<uint32_t>(materials.size());
         cursor["materials"] = material_buffer;
     }
-
-    texture_manager->on_changed(shader_object, [&] {
-        shader_object->get_cursor()["texture_manager"] = texture_manager->get_shader_object();
-    });
-
-    increment_version();
+    return object;
 }
 
 MaterialModelID MaterialSystem::register_material_type(const std::string& slang_type_name,
@@ -165,7 +159,7 @@ MaterialID MaterialSystem::add_material(const MaterialModelID type_id, const Mat
 
     if (payload_bytes > max_payload_size) {
         max_payload_size = payload_bytes;
-        // Update constants in-place — triggers program rebuild via Versionable chain
+        // Update constants in-place — bumps the composition version, so the program recompiles
         update_composition_constants();
 
         // Entry size changed — repack everything
@@ -234,6 +228,9 @@ void MaterialSystem::clear() {
 void MaterialSystem::update(const CommandBufferHandle& cmd) {
     texture_manager->update(cmd);
 
+    // current even on frames with no material upload (e.g. a texture-manager resize only)
+    shader_object.get();
+
     if (dirty_begin >= dirty_end || materials.empty())
         return;
 
@@ -261,7 +258,7 @@ void MaterialSystem::update(const CommandBufferHandle& cmd) {
         vk::PipelineStageFlagBits2::eTransfer, vk::PipelineStageFlagBits2::eAllCommands,
         vk::AccessFlagBits2::eTransferWrite, vk::AccessFlagBits2::eShaderRead));
 
-    auto cursor = shader_object->get_cursor();
+    auto cursor = shader_object.get()->get_cursor();
     cursor["material_count"] = static_cast<uint32_t>(materials.size());
     cursor["materials"] = material_buffer;
 

@@ -1,8 +1,11 @@
 #include "merian/shader/slang_global_session.hpp"
 
+#include <atomic>
+
 namespace {
 Slang::ComPtr<slang::IGlobalSession> global_session;
-}
+std::atomic<uint64_t> source_epoch = 0;
+} // namespace
 
 namespace merian {
 
@@ -53,6 +56,14 @@ Slang::ComPtr<slang::IGlobalSession> get_global_slang_session() {
         createGlobalSession(global_session.writeRef());
     }
     return global_session;
+}
+
+uint64_t slang_source_epoch() {
+    return source_epoch.load(std::memory_order_relaxed);
+}
+
+void bump_slang_source_epoch() {
+    source_epoch.fetch_add(1, std::memory_order_relaxed);
 }
 
 } // namespace merian

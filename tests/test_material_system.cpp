@@ -71,8 +71,7 @@ ShaderObjectAllocatorHandle MaterialSystemTest::obj_allocator;
 
 TEST_F(MaterialSystemTest, Construction) {
     auto tm = std::make_shared<TextureManager>(compile_context, context, allocator);
-    auto ms =
-        std::make_shared<MaterialSystem>(compile_context, context, allocator, tm);
+    auto ms = std::make_shared<MaterialSystem>(compile_context, context, allocator, tm);
     EXPECT_EQ(ms->get_material_count(), 0u);
     EXPECT_NE(ms->get_composition(), nullptr);
     EXPECT_EQ(ms->get_texture_manager(), tm);
@@ -80,11 +79,10 @@ TEST_F(MaterialSystemTest, Construction) {
 
 TEST_F(MaterialSystemTest, RegisterAndAddMaterials) {
     auto tm = std::make_shared<TextureManager>(compile_context, context, allocator);
-    auto ms =
-        std::make_shared<MaterialSystem>(compile_context, context, allocator, tm);
+    auto ms = std::make_shared<MaterialSystem>(compile_context, context, allocator, tm);
 
-    auto type_id = ms->register_material_type("merian::DiffuseMaterial",
-                                               "merian-shaders/shading/materials/diffuse-material.slang");
+    auto type_id = ms->register_material_type(
+        "merian::DiffuseMaterial", "merian-shaders/shading/materials/diffuse-material.slang");
     EXPECT_EQ(type_id, 0u);
 
     DiffuseMaterial mat1(float4(1, 0, 0, 1), TextureID(-1));
@@ -99,13 +97,11 @@ TEST_F(MaterialSystemTest, RegisterAndAddMaterials) {
 }
 
 TEST_F(MaterialSystemTest, ReadMaterialOnGPU) {
-    auto tm =
-        std::make_shared<TextureManager>(compile_context, context, allocator, 16);
-    auto ms =
-        std::make_shared<MaterialSystem>(compile_context, context, allocator, tm);
+    auto tm = std::make_shared<TextureManager>(compile_context, context, allocator, 16);
+    auto ms = std::make_shared<MaterialSystem>(compile_context, context, allocator, tm);
 
-    auto type_id = ms->register_material_type("merian::DiffuseMaterial",
-                                               "merian-shaders/shading/materials/diffuse-material.slang");
+    auto type_id = ms->register_material_type(
+        "merian::DiffuseMaterial", "merian-shaders/shading/materials/diffuse-material.slang");
 
     DiffuseMaterial mat(float4(0.25f, 0.5f, 0.75f, 1.0f), TextureID(-1));
     MaterialID mat_id = ms->add_material(type_id, mat);
@@ -116,8 +112,8 @@ TEST_F(MaterialSystemTest, ReadMaterialOnGPU) {
 
     auto program = SlangProgram::create(compile_context, composition);
     auto entry_point = SlangProgramEntryPoint::create(program, "main");
-    auto pipe_layout = entry_point->get_pipeline_layout(context);
-    auto vulkan_ep = entry_point->specialize();
+    auto pipe_layout = entry_point.get()->get_pipeline_layout(context);
+    auto vulkan_ep = entry_point.get()->specialize();
     auto pipeline = ComputePipeline::create(pipe_layout, vulkan_ep);
 
     auto output_buffer = allocator->create_buffer(
@@ -125,7 +121,7 @@ TEST_F(MaterialSystemTest, ReadMaterialOnGPU) {
         vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
         MemoryMappingType::HOST_ACCESS_RANDOM, "test_output");
 
-    auto params = entry_point->create_shader_object(context, "params", allocator);
+    auto params = entry_point.get()->create_shader_object(context, "params", allocator);
     auto cursor = params->get_cursor();
     cursor["ms"] = ms;
     cursor["output"] = output_buffer;
@@ -134,7 +130,8 @@ TEST_F(MaterialSystemTest, ReadMaterialOnGPU) {
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         ms->update(cmd);
         cmd->bind(pipeline);
-        entry_point->bind_entry_point_parameter("params", params, cmd, pipeline, obj_allocator);
+        entry_point.get()->bind_entry_point_parameter("params", params, cmd, pipeline,
+                                                      obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
 
@@ -158,13 +155,11 @@ TEST_F(MaterialSystemTest, ReadMaterialOnGPU) {
 }
 
 TEST_F(MaterialSystemTest, SampleMaterialOnGPU) {
-    auto tm =
-        std::make_shared<TextureManager>(compile_context, context, allocator, 16);
-    auto ms =
-        std::make_shared<MaterialSystem>(compile_context, context, allocator, tm);
+    auto tm = std::make_shared<TextureManager>(compile_context, context, allocator, 16);
+    auto ms = std::make_shared<MaterialSystem>(compile_context, context, allocator, tm);
 
-    auto type_id = ms->register_material_type("merian::DiffuseMaterial",
-                                               "merian-shaders/shading/materials/diffuse-material.slang");
+    auto type_id = ms->register_material_type(
+        "merian::DiffuseMaterial", "merian-shaders/shading/materials/diffuse-material.slang");
 
     DiffuseMaterial mat(float4(1.0f, 0.0f, 0.0f, 1.0f), TextureID(-1));
     MaterialID mat_id = ms->add_material(type_id, mat);
@@ -175,8 +170,8 @@ TEST_F(MaterialSystemTest, SampleMaterialOnGPU) {
 
     auto program = SlangProgram::create(compile_context, composition);
     auto entry_point = SlangProgramEntryPoint::create(program, "main");
-    auto pipe_layout = entry_point->get_pipeline_layout(context);
-    auto vulkan_ep = entry_point->specialize();
+    auto pipe_layout = entry_point.get()->get_pipeline_layout(context);
+    auto vulkan_ep = entry_point.get()->specialize();
     auto pipeline = ComputePipeline::create(pipe_layout, vulkan_ep);
 
     auto output_buffer = allocator->create_buffer(
@@ -184,7 +179,7 @@ TEST_F(MaterialSystemTest, SampleMaterialOnGPU) {
         vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
         MemoryMappingType::HOST_ACCESS_RANDOM, "test_output");
 
-    auto params = entry_point->create_shader_object(context, "params", allocator);
+    auto params = entry_point.get()->create_shader_object(context, "params", allocator);
     auto cursor = params->get_cursor();
     cursor["ms"] = ms;
     cursor["output"] = output_buffer;
@@ -193,7 +188,8 @@ TEST_F(MaterialSystemTest, SampleMaterialOnGPU) {
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         ms->update(cmd);
         cmd->bind(pipeline);
-        entry_point->bind_entry_point_parameter("params", params, cmd, pipeline, obj_allocator);
+        entry_point.get()->bind_entry_point_parameter("params", params, cmd, pipeline,
+                                                      obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
 
@@ -211,35 +207,29 @@ TEST_F(MaterialSystemTest, SampleMaterialOnGPU) {
 }
 
 TEST_F(MaterialSystemTest, PayloadResizePropagatesVersion) {
-    auto tm =
-        std::make_shared<TextureManager>(compile_context, context, allocator, 4);
-    auto ms =
-        std::make_shared<MaterialSystem>(compile_context, context, allocator, tm);
+    auto tm = std::make_shared<TextureManager>(compile_context, context, allocator, 4);
+    auto ms = std::make_shared<MaterialSystem>(compile_context, context, allocator, tm);
 
     auto type_id = ms->register_material_type(
-        "merian::DiffuseMaterial",
-        "merian-shaders/shading/materials/diffuse-material.slang");
+        "merian::DiffuseMaterial", "merian-shaders/shading/materials/diffuse-material.slang");
 
-    auto v0 = ms->get_version();
-    auto comp_v0 = ms->get_composition()->get_version();
+    auto v0 = ms->version();
+    auto comp_v0 = ms->get_composition()->version();
 
     // Adding first material triggers payload resize (0 → DiffuseMaterial payload size)
     DiffuseMaterial mat(float4(1, 0, 0, 1), TextureID(-1));
     ms->add_material(type_id, mat);
 
-    EXPECT_GT(ms->get_version(), v0)
-        << "MaterialSystem version should increment on payload resize";
-    EXPECT_GT(ms->get_composition()->get_version(), comp_v0)
+    EXPECT_GT(ms->version(), v0) << "MaterialSystem version should increment on payload resize";
+    EXPECT_GT(ms->get_composition()->version(), comp_v0)
         << "Composition version should increment on payload resize";
 }
 
 TEST_F(MaterialSystemTest, TextureManagerResizePropagatesToMaterialSystem) {
-    auto tm =
-        std::make_shared<TextureManager>(compile_context, context, allocator, 4);
-    auto ms =
-        std::make_shared<MaterialSystem>(compile_context, context, allocator, tm);
+    auto tm = std::make_shared<TextureManager>(compile_context, context, allocator, 4);
+    auto ms = std::make_shared<MaterialSystem>(compile_context, context, allocator, tm);
 
-    auto ms_comp_v0 = ms->get_composition()->get_version();
+    auto ms_comp_v0 = ms->get_composition()->version();
 
     // Fill TM to capacity, then trigger resize
     auto dummy = allocator->get_dummy_texture();
@@ -248,6 +238,6 @@ TEST_F(MaterialSystemTest, TextureManagerResizePropagatesToMaterialSystem) {
     }
     tm->add_texture(dummy); // triggers resize 4 → 8
 
-    EXPECT_GT(ms->get_composition()->get_version(), ms_comp_v0)
+    EXPECT_GT(ms->get_composition()->version(), ms_comp_v0)
         << "MaterialSystem composition should see TM sub-composition change";
 }

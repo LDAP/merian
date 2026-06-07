@@ -69,14 +69,11 @@ ShaderObjectAllocatorHandle SlangHotReloadTest::obj_allocator;
 // ---------------------------------------------------------------------------
 
 TEST_F(SlangHotReloadTest, MaterialPipelineRebuildsAfterForceReload) {
-    auto tm =
-        std::make_shared<TextureManager>(compile_context, context, allocator, 16);
-    auto ms =
-        std::make_shared<MaterialSystem>(compile_context, context, allocator, tm);
+    auto tm = std::make_shared<TextureManager>(compile_context, context, allocator, 16);
+    auto ms = std::make_shared<MaterialSystem>(compile_context, context, allocator, tm);
 
     auto type_id = ms->register_material_type(
-        "merian::DiffuseMaterial",
-        "merian-shaders/shading/materials/diffuse-material.slang");
+        "merian::DiffuseMaterial", "merian-shaders/shading/materials/diffuse-material.slang");
 
     DiffuseMaterial mat1(float4(0.25f, 0.5f, 0.75f, 1.0f), TextureID(-1));
     MaterialID mat1_id = ms->add_material(type_id, mat1);
@@ -89,19 +86,16 @@ TEST_F(SlangHotReloadTest, MaterialPipelineRebuildsAfterForceReload) {
     auto program = SlangProgram::create(compile_context, composition);
     auto entry_point = SlangProgramEntryPoint::create(program, "main");
 
-    // Auto-rebuild pipeline via listener on entry point
-    PipelineLayoutHandle pipe_layout;
-    PipelineHandle pipeline;
+    // The pipeline is a derived node: it rebuilds itself whenever the entry point (composition)
+    // changes, pulled lazily with get().
     uint32_t rebuild_count = 0;
-
-    auto build_pipeline = [&]() {
-        pipe_layout = entry_point->get_pipeline_layout(context);
-        pipeline = ComputePipeline::create(pipe_layout, entry_point->specialize());
+    auto pipeline = Versioned<Pipeline>([&]() -> std::shared_ptr<Pipeline> {
+        const auto ep = entry_point.get();
         rebuild_count++;
-    };
-    build_pipeline(); // initial build
-
-    entry_point->on_changed(entry_point, [&]() { build_pipeline(); });
+        return ComputePipeline::create(ep->get_pipeline_layout(context), ep->specialize());
+    });
+    pipeline.depends_on(entry_point);
+    pipeline.get(); // initial build
 
     // Run first dispatch
     {
@@ -110,15 +104,16 @@ TEST_F(SlangHotReloadTest, MaterialPipelineRebuildsAfterForceReload) {
             vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
             MemoryMappingType::HOST_ACCESS_RANDOM, "test_output_1");
 
-        auto params = entry_point->create_shader_object(context, "params", allocator);
+        auto params = entry_point.get()->create_shader_object(context, "params", allocator);
         params->get_cursor()["ms"] = ms;
         params->get_cursor()["output"] = output_buffer;
         params->get_cursor()["material_id"] = static_cast<uint32_t>(mat1_id);
 
         queue->submit_wait([&](const CommandBufferHandle& cmd) {
             ms->update(cmd);
-            cmd->bind(pipeline);
-            entry_point->bind_entry_point_parameter("params", params, cmd, pipeline, obj_allocator);
+            cmd->bind(pipeline.get());
+            entry_point.get()->bind_entry_point_parameter("params", params, cmd, pipeline.get(),
+                                                          obj_allocator);
             cmd->dispatch(1, 1, 1);
         });
 
@@ -132,10 +127,12 @@ TEST_F(SlangHotReloadTest, MaterialPipelineRebuildsAfterForceReload) {
         output_buffer->get_memory()->unmap();
     }
 
-    // Force reload — listener should automatically rebuild pipeline
+    // Force reload — pulling the pipeline rebuilds it because the entry point changed.
     EXPECT_EQ(rebuild_count, 1u);
     composition->force_reload();
-    EXPECT_EQ(rebuild_count, 2u) << "Listener should have rebuilt the pipeline";
+    EXPECT_EQ(rebuild_count, 1u) << "force_reload only marks dirty, no eager rebuild";
+    pipeline.get();
+    EXPECT_EQ(rebuild_count, 2u) << "pulling the pipeline rebuilt it after the reload";
 
     // Add a second material and dispatch with the auto-rebuilt pipeline
     DiffuseMaterial mat2(float4(0.1f, 0.2f, 0.3f, 0.4f), TextureID(-1));
@@ -147,15 +144,16 @@ TEST_F(SlangHotReloadTest, MaterialPipelineRebuildsAfterForceReload) {
             vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
             MemoryMappingType::HOST_ACCESS_RANDOM, "test_output_2");
 
-        auto params = entry_point->create_shader_object(context, "params", allocator);
+        auto params = entry_point.get()->create_shader_object(context, "params", allocator);
         params->get_cursor()["ms"] = ms;
         params->get_cursor()["output"] = output_buffer;
         params->get_cursor()["material_id"] = static_cast<uint32_t>(mat2_id);
 
         queue->submit_wait([&](const CommandBufferHandle& cmd) {
             ms->update(cmd);
-            cmd->bind(pipeline);
-            entry_point->bind_entry_point_parameter("params", params, cmd, pipeline, obj_allocator);
+            cmd->bind(pipeline.get());
+            entry_point.get()->bind_entry_point_parameter("params", params, cmd, pipeline.get(),
+                                                          obj_allocator);
             cmd->dispatch(1, 1, 1);
         });
 
@@ -176,8 +174,7 @@ TEST_F(SlangHotReloadTest, MaterialPipelineRebuildsAfterForceReload) {
 
 TEST_F(SlangHotReloadTest, TextureArrayResizeRebuildsFullPipeline) {
     // Start with capacity 4
-    auto tm =
-        std::make_shared<TextureManager>(compile_context, context, allocator, 4);
+    auto tm = std::make_shared<TextureManager>(compile_context, context, allocator, 4);
 
     // Build pipeline using TM composition
     auto composition = SlangComposition::create();
@@ -187,37 +184,35 @@ TEST_F(SlangHotReloadTest, TextureArrayResizeRebuildsFullPipeline) {
     auto program = SlangProgram::create(compile_context, composition);
     auto entry_point = SlangProgramEntryPoint::create(program, "main");
 
-    // Auto-rebuild pipeline via listener on entry point
-    PipelineLayoutHandle pipe_layout;
-    PipelineHandle pipeline;
+    // The pipeline rebuilds itself when the entry point (TM composition) changes; pulled with
+    // get().
     uint32_t rebuild_count = 0;
-
-    auto build_pipeline = [&]() {
-        pipe_layout = entry_point->get_pipeline_layout(context);
-        pipeline = ComputePipeline::create(pipe_layout, entry_point->specialize());
+    auto pipeline = Versioned<Pipeline>([&]() -> std::shared_ptr<Pipeline> {
+        const auto ep = entry_point.get();
         rebuild_count++;
-    };
-    build_pipeline(); // initial build
-
-    entry_point->on_changed(entry_point, [&]() { build_pipeline(); });
+        return ComputePipeline::create(ep->get_pipeline_layout(context), ep->specialize());
+    });
+    pipeline.depends_on(entry_point);
+    pipeline.get(); // initial build
 
     // Fill to capacity
     auto dummy = allocator->get_dummy_texture();
     for (uint32_t i = 0; i < 4; i++) {
         tm->add_texture(dummy);
     }
+    pipeline.get();
     EXPECT_EQ(rebuild_count, 1u) << "No resize yet, pipeline unchanged";
 
-    // Add a real texture — triggers resize 4 → 8 → listener rebuilds pipeline
+    // Add a real texture — triggers resize 4 → 8 → pipeline rebuilds on next pull
     const uint32_t red_pixel = 0xFF0000FF;
     TextureID tex_id;
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
-        tex_id = tm->add_texture_from_rgba8(cmd, &red_pixel, 1, 1,
-                                            vk::SamplerAddressMode::eRepeat, vk::Filter::eNearest,
-                                            vk::Filter::eNearest, false);
+        tex_id = tm->add_texture_from_rgba8(cmd, &red_pixel, 1, 1, vk::SamplerAddressMode::eRepeat,
+                                            vk::Filter::eNearest, vk::Filter::eNearest, false);
     });
     EXPECT_EQ(tm->get_capacity(), 8u);
-    EXPECT_EQ(rebuild_count, 2u) << "Listener should have rebuilt pipeline after TM resize";
+    pipeline.get();
+    EXPECT_EQ(rebuild_count, 2u) << "pipeline rebuilt after TM resize";
 
     // Dispatch with the auto-rebuilt pipeline
     auto output_buffer = allocator->create_buffer(
@@ -225,14 +220,15 @@ TEST_F(SlangHotReloadTest, TextureArrayResizeRebuildsFullPipeline) {
         vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
         MemoryMappingType::HOST_ACCESS_RANDOM, "test_output");
 
-    auto params = entry_point->create_shader_object(context, "params", allocator);
+    auto params = entry_point.get()->create_shader_object(context, "params", allocator);
     params->get_cursor()["tm"] = tm;
     params->get_cursor()["output"] = output_buffer;
     params->get_cursor()["texture_id"] = static_cast<uint32_t>(tex_id);
 
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
-        cmd->bind(pipeline);
-        entry_point->bind_entry_point_parameter("params", params, cmd, pipeline, obj_allocator);
+        cmd->bind(pipeline.get());
+        entry_point.get()->bind_entry_point_parameter("params", params, cmd, pipeline.get(),
+                                                      obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
 

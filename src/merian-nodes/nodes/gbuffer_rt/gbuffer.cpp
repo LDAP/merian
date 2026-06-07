@@ -18,7 +18,7 @@ void GBufferRTNode::initialize(const ContextHandle& context,
                                const ResourceAllocatorHandle& allocator) {
     this->context = context;
     this->resource_allocator = allocator;
-    this->compile_context = ShaderCompileContext::create(context);
+    this->compile_context = context->get_shader_compile_context();
 }
 
 std::vector<InputConnectorDescriptor> GBufferRTNode::describe_inputs() {
@@ -44,12 +44,9 @@ GBufferRTNode::NodeStatusFlags GBufferRTNode::on_connected(
     [[maybe_unused]] const NodeIOLayout& io_layout,
     [[maybe_unused]] const DescriptorSetLayoutHandle& descriptor_set_layout) {
 
-    pipeline = nullptr;
+    // force the program graph to be rewired next process()
     composition = nullptr;
-    program = nullptr;
-    entry_point = nullptr;
     gbuffer_obj = nullptr;
-    globals_obj = nullptr;
     obj_allocator = nullptr;
 
     return {};
@@ -63,32 +60,28 @@ void GBufferRTNode::process(GraphRun& run,
 
     emission_connected = io.is_connected(con_emission);
 
-    // Lazily build program/pipeline from scene's composition
-    if (!program) {
+    if (!composition) {
         composition = SlangComposition::create();
         composition->add_composition(scene->get_composition());
-        composition->add_module_from_path("merian-nodes/nodes/gbuffer_rt/gbuffer.slang", true);
+        composition->add_module_from_path("merian-nodes/nodes/gbuffer_rt/gbuffer_rt.slang", true);
         update_gbuffer_constants();
 
         program = SlangProgram::create(compile_context, composition);
         entry_point = SlangProgramEntryPoint::create(program, "main");
 
-        // entry_point rebuilds when the scene's composition (or any of its
-        // sub-compositions) changes. The cached pipeline + globals shader
-        // object embed the old reflection, so drop them on every rebuild.
-        entry_point->on_changed(entry_point, [this] {
-            pipeline = nullptr;
-            globals_obj = nullptr;
+        pipeline = Versioned<Pipeline>([this] {
+            const auto ep = entry_point.get();
+            return ComputePipeline::create(ep->get_pipeline_layout(context), ep->specialize());
         });
+        pipeline.depends_on(entry_point);
+
+        globals_obj = Versioned<ShaderObject>([this] {
+            return entry_point.get()->create_global_shader_object(context, resource_allocator);
+        });
+        globals_obj.depends_on(entry_point);
 
         obj_allocator = std::make_shared<FrameCachingShaderObjectAllocator>(
             resource_allocator, run.get_iterations_in_flight());
-    }
-
-    if (!pipeline) {
-        auto pipe_layout = entry_point->get_pipeline_layout(context);
-        auto vulkan_entry_point = entry_point->specialize();
-        pipeline = ComputePipeline::create(pipe_layout, vulkan_entry_point);
     }
 
     obj_allocator->set_iteration(run.get_in_flight_index());
@@ -98,32 +91,32 @@ void GBufferRTNode::process(GraphRun& run,
             std::make_shared<GBuffer>(compile_context, context, resource_allocator, extent);
     }
 
-    if (!globals_obj) {
-        globals_obj = entry_point->create_global_shader_object(context, resource_allocator);
-    }
-
     // Bind graph-managed textures to the shader object
     gbuffer_obj->set_resources(
         io[con_denoiser].get_texture()->get_view(), io[con_hit_info].get_texture()->get_view(),
         io[con_mv].get_texture()->get_view(), io[con_albedo].get_texture()->get_view());
 
+    const auto ep = entry_point.get();
+    const auto pipe = pipeline.get();
+    const auto globals = globals_obj.get();
+
     if (emission_connected)
-        globals_obj->get_cursor()["emission"] = io[con_emission].get_texture();
+        globals->get_cursor()["emission"] = io[con_emission].get_texture();
 
     uint32_t mask = 0u;
     for (uint32_t bit = 0; bit < 8; ++bit) {
         if (mask_enabled[bit])
             mask |= (1u << bit);
     }
-    globals_obj->get_cursor()["params"]["instance_mask"] = mask;
+    globals->get_cursor()["params"]["instance_mask"] = mask;
 
     if (scene->is_ready()) {
-        cmd->bind(pipeline);
-        entry_point->bind_entry_point_parameter("scene", scene->get_shader_object(), cmd, pipeline,
-                                                obj_allocator);
-        entry_point->bind_entry_point_parameter("gbuffer", gbuffer_obj->get_write_shader_object(),
-                                                cmd, pipeline, obj_allocator);
-        entry_point->bind_global_parameter(globals_obj, cmd, pipeline, obj_allocator);
+        cmd->bind(pipe);
+        ep->bind_entry_point_parameter("scene", scene->get_shader_object(), cmd, pipe,
+                                       obj_allocator);
+        ep->bind_entry_point_parameter("gbuffer", gbuffer_obj->get_write_shader_object(), cmd, pipe,
+                                       obj_allocator);
+        ep->bind_global_parameter(globals, cmd, pipe, obj_allocator);
         cmd->dispatch(extent, 16, 16);
     }
 
@@ -136,10 +129,10 @@ void GBufferRTNode::process(GraphRun& run,
 }
 
 void GBufferRTNode::update_gbuffer_constants() {
-    composition->add_module_from_string(
-        "gbuffer_constants", fmt::format("namespace merian {{ export static const bool "
-                                         "merian_gbuffer_write_emission = {}; }}",
-                                         emission_connected ? "true" : "false"));
+    composition->add_module_from_string("gbuffer_constants",
+                                        fmt::format("namespace merian {{ export static const bool "
+                                                    "merian_gbuffer_write_emission = {}; }}",
+                                                    emission_connected ? "true" : "false"));
 }
 
 GBufferRTNode::NodeStatusFlags GBufferRTNode::properties(Properties& config) {

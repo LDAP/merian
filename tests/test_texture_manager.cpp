@@ -76,14 +76,12 @@ TEST_F(TextureManagerTest, Construction) {
 }
 
 TEST_F(TextureManagerTest, ConstructionWithCustomCapacity) {
-    auto tm =
-        std::make_shared<TextureManager>(compile_context, context, allocator, 128);
+    auto tm = std::make_shared<TextureManager>(compile_context, context, allocator, 128);
     EXPECT_EQ(tm->get_capacity(), 128u);
 }
 
 TEST_F(TextureManagerTest, AddAndRemoveTexture) {
-    auto tm =
-        std::make_shared<TextureManager>(compile_context, context, allocator, 16);
+    auto tm = std::make_shared<TextureManager>(compile_context, context, allocator, 16);
 
     auto tex = allocator->get_dummy_texture();
     TextureID id = tm->add_texture(tex);
@@ -105,17 +103,15 @@ TEST_F(TextureManagerTest, AddAndRemoveTexture) {
 }
 
 TEST_F(TextureManagerTest, SampleTextureOnGPU) {
-    auto tm =
-        std::make_shared<TextureManager>(compile_context, context, allocator, 16);
+    auto tm = std::make_shared<TextureManager>(compile_context, context, allocator, 16);
 
     // 1x1 red pixel (RGBA8, linear): R=255 G=0 B=0 A=255
     const uint32_t red_pixel = 0xFF0000FF;
 
     TextureID tex_id;
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
-        tex_id = tm->add_texture_from_rgba8(cmd, &red_pixel, 1, 1,
-                                            vk::SamplerAddressMode::eRepeat, vk::Filter::eNearest,
-                                            vk::Filter::eNearest, false);
+        tex_id = tm->add_texture_from_rgba8(cmd, &red_pixel, 1, 1, vk::SamplerAddressMode::eRepeat,
+                                            vk::Filter::eNearest, vk::Filter::eNearest, false);
     });
     EXPECT_EQ(tex_id, 0u);
 
@@ -126,8 +122,8 @@ TEST_F(TextureManagerTest, SampleTextureOnGPU) {
 
     auto program = SlangProgram::create(compile_context, composition);
     auto entry_point = SlangProgramEntryPoint::create(program, "main");
-    auto pipe_layout = entry_point->get_pipeline_layout(context);
-    auto vulkan_ep = entry_point->specialize();
+    auto pipe_layout = entry_point.get()->get_pipeline_layout(context);
+    auto vulkan_ep = entry_point.get()->specialize();
     auto pipeline = ComputePipeline::create(pipe_layout, vulkan_ep);
 
     auto output_buffer = allocator->create_buffer(
@@ -135,7 +131,7 @@ TEST_F(TextureManagerTest, SampleTextureOnGPU) {
         vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
         MemoryMappingType::HOST_ACCESS_RANDOM, "test_output");
 
-    auto params = entry_point->create_shader_object(context, "params", allocator);
+    auto params = entry_point.get()->create_shader_object(context, "params", allocator);
     auto cursor = params->get_cursor();
     cursor["tm"] = tm;
     cursor["output"] = output_buffer;
@@ -143,7 +139,8 @@ TEST_F(TextureManagerTest, SampleTextureOnGPU) {
 
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(pipeline);
-        entry_point->bind_entry_point_parameter("params", params, cmd, pipeline, obj_allocator);
+        entry_point.get()->bind_entry_point_parameter("params", params, cmd, pipeline,
+                                                      obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
 
@@ -161,25 +158,23 @@ TEST_F(TextureManagerTest, SampleTextureOnGPU) {
 }
 
 TEST_F(TextureManagerTest, ResizePropagatesVersion) {
-    auto tm =
-        std::make_shared<TextureManager>(compile_context, context, allocator, 4);
+    auto tm = std::make_shared<TextureManager>(compile_context, context, allocator, 4);
 
-    auto v0 = tm->get_version();
-    auto comp_v0 = tm->get_composition()->get_version();
+    auto v0 = tm->version();
+    auto comp_v0 = tm->get_composition()->version();
 
     // Fill to capacity
     auto dummy = allocator->get_dummy_texture();
     for (uint32_t i = 0; i < 4; i++) {
         tm->add_texture(dummy);
     }
-    EXPECT_EQ(tm->get_version(), v0) << "No resize yet, version unchanged";
+    EXPECT_EQ(tm->version(), v0) << "No resize yet, version unchanged";
 
     // 5th texture triggers resize 4 → 8
     tm->add_texture(dummy);
 
-    EXPECT_GT(tm->get_version(), v0)
-        << "TextureManager version should increment on array resize";
-    EXPECT_GT(tm->get_composition()->get_version(), comp_v0)
+    EXPECT_GT(tm->version(), v0) << "TextureManager version should increment on array resize";
+    EXPECT_GT(tm->get_composition()->version(), comp_v0)
         << "Composition version should increment on array resize";
     EXPECT_EQ(tm->get_capacity(), 8u);
 }

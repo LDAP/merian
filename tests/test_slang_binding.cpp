@@ -76,8 +76,8 @@ class SlangBindingTest : public ::testing::Test {
         auto program =
             SlangProgram::create(compile_context, "slang_binding/" + shader_name + ".slang");
         auto entry_point = SlangProgramEntryPoint::create(program, "main");
-        auto pipe_layout = entry_point->get_pipeline_layout(context);
-        auto vulkan_ep = entry_point->specialize();
+        auto pipe_layout = entry_point.get()->get_pipeline_layout(context);
+        auto vulkan_ep = entry_point.get()->specialize();
         auto pipeline = ComputePipeline::create(pipe_layout, vulkan_ep);
 
         // Allocator
@@ -91,15 +91,16 @@ class SlangBindingTest : public ::testing::Test {
             MemoryMappingType::HOST_ACCESS_RANDOM, "test_output");
 
         // Create params and set values
-        auto params = entry_point->create_shader_object(context, "params", allocator);
+        auto params = entry_point.get()->create_shader_object(context, "params", allocator);
         SPDLOG_DEBUG("ShaderObject:\n{}", *params);
         auto cursor = params->get_cursor();
-        setup_fn(entry_point, cursor, output_buffer);
+        setup_fn(entry_point.get(), cursor, output_buffer);
 
         // Dispatch
         queue->submit_wait([&](const CommandBufferHandle& cmd) {
             cmd->bind(pipeline);
-            entry_point->bind_entry_point_parameter("params", params, cmd, pipeline, obj_allocator);
+            entry_point.get()->bind_entry_point_parameter("params", params, cmd, pipeline,
+                                                          obj_allocator);
             cmd->dispatch(1, 1, 1);
         });
 
@@ -125,7 +126,8 @@ class SlangBindingTest : public ::testing::Test {
                                                   uint32_t output_slots) {
         auto program =
             SlangProgram::create(compile_context, "slang_binding/" + shader_name + ".slang");
-        auto entry_point = SlangProgramEntryPoint::create(program, "main");
+        const SlangProgramEntryPointHandle entry_point =
+            SlangProgramEntryPoint::create(program, "main").get();
         auto pipe_layout = entry_point->get_pipeline_layout(context);
         auto vulkan_ep = entry_point->specialize();
         auto pipeline = ComputePipeline::create(pipe_layout, vulkan_ep);
@@ -401,8 +403,8 @@ TEST_F(SlangBindingTest, TwoEntryPointPBs) {
 TEST_F(SlangBindingTest, IncrementalValueUpdate) {
     auto program = SlangProgram::create(compile_context, "slang_binding/incremental_value.slang");
     auto entry_point = SlangProgramEntryPoint::create(program, "main");
-    auto pipe_layout = entry_point->get_pipeline_layout(context);
-    auto vulkan_ep = entry_point->specialize();
+    auto pipe_layout = entry_point.get()->get_pipeline_layout(context);
+    auto vulkan_ep = entry_point.get()->specialize();
     auto pipeline = ComputePipeline::create(pipe_layout, vulkan_ep);
     auto obj_allocator = std::make_shared<SimpleShaderObjectAllocator>(allocator);
 
@@ -410,7 +412,7 @@ TEST_F(SlangBindingTest, IncrementalValueUpdate) {
         allocator->create_buffer(sizeof(uint32_t), vk::BufferUsageFlagBits::eStorageBuffer,
                                  MemoryMappingType::HOST_ACCESS_RANDOM, "test_output");
 
-    auto params = entry_point->create_shader_object(context, "params", allocator);
+    auto params = entry_point.get()->create_shader_object(context, "params", allocator);
     auto cursor = params->get_cursor();
     cursor["output"] = output_buffer;
 
@@ -418,7 +420,8 @@ TEST_F(SlangBindingTest, IncrementalValueUpdate) {
     cursor["val"] = 1.0f;
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(pipeline);
-        entry_point->bind_entry_point_parameter("params", params, cmd, pipeline, obj_allocator);
+        entry_point.get()->bind_entry_point_parameter("params", params, cmd, pipeline,
+                                                      obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
 
@@ -432,7 +435,8 @@ TEST_F(SlangBindingTest, IncrementalValueUpdate) {
     cursor["val"] = 2.0f;
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(pipeline);
-        entry_point->bind_entry_point_parameter("params", params, cmd, pipeline, obj_allocator);
+        entry_point.get()->bind_entry_point_parameter("params", params, cmd, pipeline,
+                                                      obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
 
@@ -539,7 +543,8 @@ TEST_F(SlangBindingTest, SingleNestedPB) {
 
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(ctx.pipeline);
-        ctx.entry_point->bind_entry_point_parameter("params", params, cmd, ctx.pipeline, ctx.obj_allocator);
+        ctx.entry_point->bind_entry_point_parameter("params", params, cmd, ctx.pipeline,
+                                                    ctx.obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
 
@@ -565,7 +570,8 @@ TEST_F(SlangBindingTest, PBWithCB) {
 
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(ctx.pipeline);
-        ctx.entry_point->bind_entry_point_parameter("params", params, cmd, ctx.pipeline, ctx.obj_allocator);
+        ctx.entry_point->bind_entry_point_parameter("params", params, cmd, ctx.pipeline,
+                                                    ctx.obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
 
@@ -582,8 +588,8 @@ TEST_F(SlangBindingTest, PBWithCB) {
 TEST_F(SlangBindingTest, IncrementalCBUpdate) {
     auto program = SlangProgram::create(compile_context, "slang_binding/incremental_cb.slang");
     auto entry_point = SlangProgramEntryPoint::create(program, "main");
-    auto pipe_layout = entry_point->get_pipeline_layout(context);
-    auto vulkan_ep = entry_point->specialize();
+    auto pipe_layout = entry_point.get()->get_pipeline_layout(context);
+    auto vulkan_ep = entry_point.get()->specialize();
     auto pipeline = ComputePipeline::create(pipe_layout, vulkan_ep);
     auto obj_allocator = std::make_shared<SimpleShaderObjectAllocator>(allocator);
 
@@ -591,7 +597,7 @@ TEST_F(SlangBindingTest, IncrementalCBUpdate) {
         allocator->create_buffer(sizeof(uint32_t), vk::BufferUsageFlagBits::eStorageBuffer,
                                  MemoryMappingType::HOST_ACCESS_RANDOM, "test_output");
 
-    auto params = entry_point->create_shader_object(context, "params", allocator);
+    auto params = entry_point.get()->create_shader_object(context, "params", allocator);
     auto cursor = params->get_cursor();
     cursor["output"] = output_buffer;
 
@@ -599,7 +605,8 @@ TEST_F(SlangBindingTest, IncrementalCBUpdate) {
     cursor["cb"]["val"] = 1.0f;
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(pipeline);
-        entry_point->bind_entry_point_parameter("params", params, cmd, pipeline, obj_allocator);
+        entry_point.get()->bind_entry_point_parameter("params", params, cmd, pipeline,
+                                                      obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
     {
@@ -612,7 +619,8 @@ TEST_F(SlangBindingTest, IncrementalCBUpdate) {
     cursor["cb"]["val"] = 2.0f;
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(pipeline);
-        entry_point->bind_entry_point_parameter("params", params, cmd, pipeline, obj_allocator);
+        entry_point.get()->bind_entry_point_parameter("params", params, cmd, pipeline,
+                                                      obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
     {
@@ -626,8 +634,8 @@ TEST_F(SlangBindingTest, IncrementalResourceUpdate) {
     auto program =
         SlangProgram::create(compile_context, "slang_binding/incremental_resource.slang");
     auto entry_point = SlangProgramEntryPoint::create(program, "main");
-    auto pipe_layout = entry_point->get_pipeline_layout(context);
-    auto vulkan_ep = entry_point->specialize();
+    auto pipe_layout = entry_point.get()->get_pipeline_layout(context);
+    auto vulkan_ep = entry_point.get()->specialize();
     auto pipeline = ComputePipeline::create(pipe_layout, vulkan_ep);
     auto obj_allocator = std::make_shared<SimpleShaderObjectAllocator>(allocator);
 
@@ -653,7 +661,7 @@ TEST_F(SlangBindingTest, IncrementalResourceUpdate) {
         input_b->get_memory()->unmap();
     }
 
-    auto params = entry_point->create_shader_object(context, "params", allocator);
+    auto params = entry_point.get()->create_shader_object(context, "params", allocator);
     auto cursor = params->get_cursor();
     cursor["output"] = output_buffer;
 
@@ -661,7 +669,8 @@ TEST_F(SlangBindingTest, IncrementalResourceUpdate) {
     cursor["input"] = input_a;
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(pipeline);
-        entry_point->bind_entry_point_parameter("params", params, cmd, pipeline, obj_allocator);
+        entry_point.get()->bind_entry_point_parameter("params", params, cmd, pipeline,
+                                                      obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
     {
@@ -674,7 +683,8 @@ TEST_F(SlangBindingTest, IncrementalResourceUpdate) {
     cursor["input"] = input_b;
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(pipeline);
-        entry_point->bind_entry_point_parameter("params", params, cmd, pipeline, obj_allocator);
+        entry_point.get()->bind_entry_point_parameter("params", params, cmd, pipeline,
+                                                      obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
     {
@@ -725,8 +735,8 @@ TEST_F(SlangBindingTest, FullMix) {
 TEST_F(SlangBindingTest, GlobalResource) {
     auto program = SlangProgram::create(compile_context, "slang_binding/global_resource.slang");
     auto entry_point = SlangProgramEntryPoint::create(program, "main");
-    auto pipe_layout = entry_point->get_pipeline_layout(context);
-    auto vulkan_ep = entry_point->specialize();
+    auto pipe_layout = entry_point.get()->get_pipeline_layout(context);
+    auto vulkan_ep = entry_point.get()->specialize();
     auto pipeline = ComputePipeline::create(pipe_layout, vulkan_ep);
     auto obj_allocator = std::make_shared<SimpleShaderObjectAllocator>(allocator);
 
@@ -735,10 +745,10 @@ TEST_F(SlangBindingTest, GlobalResource) {
         vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
         MemoryMappingType::HOST_ACCESS_RANDOM, "test_output");
 
-    ASSERT_TRUE(entry_point->has_globals(context));
-    ASSERT_EQ(entry_point->get_global_set_count(), 1u);
+    ASSERT_TRUE(entry_point.get()->has_globals(context));
+    ASSERT_EQ(entry_point.get()->get_global_set_count(), 1u);
 
-    auto globals = entry_point->create_global_shader_object(context, allocator);
+    auto globals = entry_point.get()->create_global_shader_object(context, allocator);
     auto cursor = globals->get_cursor();
     cursor["cb"]["x"] = 3.14f;
     cursor["cb"]["y"] = -42;
@@ -746,7 +756,7 @@ TEST_F(SlangBindingTest, GlobalResource) {
 
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(pipeline);
-        entry_point->bind_global_parameter(globals, cmd, pipeline, obj_allocator);
+        entry_point.get()->bind_global_parameter(globals, cmd, pipeline, obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
 
@@ -758,8 +768,8 @@ TEST_F(SlangBindingTest, GlobalResource) {
 TEST_F(SlangBindingTest, GlobalPB) {
     auto program = SlangProgram::create(compile_context, "slang_binding/global_pb.slang");
     auto entry_point = SlangProgramEntryPoint::create(program, "main");
-    auto pipe_layout = entry_point->get_pipeline_layout(context);
-    auto vulkan_ep = entry_point->specialize();
+    auto pipe_layout = entry_point.get()->get_pipeline_layout(context);
+    auto vulkan_ep = entry_point.get()->specialize();
     auto pipeline = ComputePipeline::create(pipe_layout, vulkan_ep);
     auto obj_allocator = std::make_shared<SimpleShaderObjectAllocator>(allocator);
 
@@ -768,7 +778,7 @@ TEST_F(SlangBindingTest, GlobalPB) {
         vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
         MemoryMappingType::HOST_ACCESS_RANDOM, "test_output");
 
-    auto globals = entry_point->create_global_shader_object(context, allocator);
+    auto globals = entry_point.get()->create_global_shader_object(context, allocator);
     auto cursor = globals->get_cursor();
     cursor["params"]["x"] = 1.5f;
     cursor["params"]["y"] = -7;
@@ -776,7 +786,7 @@ TEST_F(SlangBindingTest, GlobalPB) {
 
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(pipeline);
-        entry_point->bind_global_parameter(globals, cmd, pipeline, obj_allocator);
+        entry_point.get()->bind_global_parameter(globals, cmd, pipeline, obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
 
@@ -788,8 +798,8 @@ TEST_F(SlangBindingTest, GlobalPB) {
 TEST_F(SlangBindingTest, GlobalWithPB) {
     auto program = SlangProgram::create(compile_context, "slang_binding/global_with_pb.slang");
     auto entry_point = SlangProgramEntryPoint::create(program, "main");
-    auto pipe_layout = entry_point->get_pipeline_layout(context);
-    auto vulkan_ep = entry_point->specialize();
+    auto pipe_layout = entry_point.get()->get_pipeline_layout(context);
+    auto vulkan_ep = entry_point.get()->specialize();
     auto pipeline = ComputePipeline::create(pipe_layout, vulkan_ep);
     auto obj_allocator = std::make_shared<SimpleShaderObjectAllocator>(allocator);
 
@@ -798,22 +808,23 @@ TEST_F(SlangBindingTest, GlobalWithPB) {
         vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
         MemoryMappingType::HOST_ACCESS_RANDOM, "test_output");
 
-    ASSERT_TRUE(entry_point->has_globals(context));
+    ASSERT_TRUE(entry_point.get()->has_globals(context));
 
     // Set global resources
-    auto globals = entry_point->create_global_shader_object(context, allocator);
+    auto globals = entry_point.get()->create_global_shader_object(context, allocator);
     globals->get_cursor()["g_output"] = output_buffer;
 
     // Set PB params
-    auto params = entry_point->create_shader_object(context, "params", allocator);
+    auto params = entry_point.get()->create_shader_object(context, "params", allocator);
     auto cursor = params->get_cursor();
     cursor["x"] = 1.5f;
     cursor["y"] = -7;
 
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(pipeline);
-        entry_point->bind_global_parameter(globals, cmd, pipeline, obj_allocator);
-        entry_point->bind_entry_point_parameter("params", params, cmd, pipeline, obj_allocator);
+        entry_point.get()->bind_global_parameter(globals, cmd, pipeline, obj_allocator);
+        entry_point.get()->bind_entry_point_parameter("params", params, cmd, pipeline,
+                                                      obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
 
@@ -860,8 +871,10 @@ TEST_F(SlangBindingTest, SharedCBacrossPBs) {
     // Dispatch
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(ctx.pipeline);
-        ctx.entry_point->bind_entry_point_parameter("a", a_obj, cmd, ctx.pipeline, ctx.obj_allocator);
-        ctx.entry_point->bind_entry_point_parameter("b", b_obj, cmd, ctx.pipeline, ctx.obj_allocator);
+        ctx.entry_point->bind_entry_point_parameter("a", a_obj, cmd, ctx.pipeline,
+                                                    ctx.obj_allocator);
+        ctx.entry_point->bind_entry_point_parameter("b", b_obj, cmd, ctx.pipeline,
+                                                    ctx.obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
 
@@ -875,9 +888,7 @@ TEST_F(SlangBindingTest, SharedCBacrossPBs) {
     EXPECT_EQ(result_b.data[1], int_bits(-42));
 }
 
-// ---------------------------------------------------------------------------
-// Versionable chain tests
-// ---------------------------------------------------------------------------
+// version propagation through the composition → program → entry point chain
 
 TEST_F(SlangBindingTest, CompositionChangePropagatesToProgram) {
     auto composition = SlangComposition::create();
@@ -885,14 +896,15 @@ TEST_F(SlangBindingTest, CompositionChangePropagatesToProgram) {
                                         "namespace test { export static const int N = 1; }");
 
     auto program = SlangProgram::create(compile_context, composition);
-    auto v0 = program->get_version();
+    program.get();
+    auto v0 = program.version();
 
     // Modify the composition in-place (same module name, different content)
     composition->add_module_from_string("constants",
                                         "namespace test { export static const int N = 2; }");
 
-    EXPECT_GT(program->get_version(), v0)
-        << "Program version should increment when composition changes";
+    program.get(); // pull rebuilds the dirtied program
+    EXPECT_GT(program.version(), v0) << "Program version should increment when composition changes";
 }
 
 TEST_F(SlangBindingTest, CompositionChangePropagatesToEntryPoint) {
@@ -900,52 +912,52 @@ TEST_F(SlangBindingTest, CompositionChangePropagatesToEntryPoint) {
     composition->add_module_from_string("constants",
                                         "namespace test { export static const int N = 1; }");
     composition->add_module_from_string(
-        "shader",
-        "[shader(\"compute\")][numthreads(1,1,1)] void main() {}", true);
+        "shader", "[shader(\"compute\")][numthreads(1,1,1)] void main() {}", true);
 
     auto program = SlangProgram::create(compile_context, composition);
     auto entry_point = SlangProgramEntryPoint::create(program, "main");
-    auto v0 = entry_point->get_version();
+    entry_point.get();
+    auto v0 = entry_point.version();
 
     composition->add_module_from_string("constants",
                                         "namespace test { export static const int N = 2; }");
 
-    EXPECT_GT(entry_point->get_version(), v0)
+    entry_point.get(); // pull rebuilds the dirtied entry point
+    EXPECT_GT(entry_point.version(), v0)
         << "EntryPoint version should increment when composition changes";
 }
 
 TEST_F(SlangBindingTest, SubCompositionChangePropagatesToParent) {
     auto sub = SlangComposition::create();
-    sub->add_module_from_string("sub_const",
-                                "namespace sub { export static const int X = 1; }");
+    sub->add_module_from_string("sub_const", "namespace sub { export static const int X = 1; }");
 
     auto parent = SlangComposition::create();
     parent->add_composition(sub);
-    auto v0 = parent->get_version();
+    auto v0 = parent->version();
 
-    sub->add_module_from_string("sub_const",
-                                "namespace sub { export static const int X = 2; }");
+    sub->add_module_from_string("sub_const", "namespace sub { export static const int X = 2; }");
 
-    EXPECT_GT(parent->get_version(), v0)
+    EXPECT_GT(parent->version(), v0)
         << "Parent composition version should increment when sub-composition changes";
 }
 
 TEST_F(SlangBindingTest, ForceReloadTriggersFullChain) {
     auto composition = SlangComposition::create();
     composition->add_module_from_string(
-        "shader",
-        "[shader(\"compute\")][numthreads(1,1,1)] void main() {}", true);
+        "shader", "[shader(\"compute\")][numthreads(1,1,1)] void main() {}", true);
 
     auto program = SlangProgram::create(compile_context, composition);
     auto entry_point = SlangProgramEntryPoint::create(program, "main");
+    entry_point.get(); // build the chain
 
-    auto comp_v0 = composition->get_version();
-    auto prog_v0 = program->get_version();
-    auto ep_v0 = entry_point->get_version();
+    auto comp_v0 = composition->version();
+    auto prog_v0 = program.version();
+    auto ep_v0 = entry_point.version();
 
     composition->force_reload();
+    entry_point.get(); // pull rebuilds program + entry point
 
-    EXPECT_GT(composition->get_version(), comp_v0);
-    EXPECT_GT(program->get_version(), prog_v0);
-    EXPECT_GT(entry_point->get_version(), ep_v0);
+    EXPECT_GT(composition->version(), comp_v0);
+    EXPECT_GT(program.version(), prog_v0);
+    EXPECT_GT(entry_point.version(), ep_v0);
 }

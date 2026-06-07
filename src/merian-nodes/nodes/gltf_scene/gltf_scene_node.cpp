@@ -20,7 +20,7 @@ void GLTFSceneNode::initialize([[maybe_unused]] const ContextHandle& context,
 #ifdef MERIAN_TINYGLTF_ENABLED
     this->context = context;
     this->allocator = allocator;
-    compile_context = ShaderCompileContext::create(context);
+    compile_context = context->get_shader_compile_context();
     texture_manager = std::make_shared<TextureManager>(compile_context, context, allocator, 4096);
     material_system =
         std::make_shared<MaterialSystem>(compile_context, context, allocator, texture_manager);

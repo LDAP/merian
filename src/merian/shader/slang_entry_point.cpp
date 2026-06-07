@@ -152,8 +152,8 @@ PipelineLayoutHandle SlangProgramEntryPoint::get_pipeline_layout(const ContextHa
         // Direct global descriptor sets (resources, CBs at global scope)
         const uint32_t global_ds_count = global_tl->getDescriptorSetCount();
         for (uint32_t ds = 0; ds < global_ds_count; ds++) {
-            auto layout =
-                create_descriptor_set_layout_from_slang_type_layout(context, global_tl, program_layout, ds);
+            auto layout = create_descriptor_set_layout_from_slang_type_layout(context, global_tl,
+                                                                              program_layout, ds);
             if (!layout->get_bindings().empty()) {
                 if (!global_object_layout) {
                     global_object_layout =
@@ -190,8 +190,7 @@ PipelineLayoutHandle SlangProgramEntryPoint::get_pipeline_layout(const ContextHa
     if (push_constant_size == 0) {
         auto* entry_tl = entry_reflection->getTypeLayout();
         if (entry_tl) {
-            push_constant_size =
-                entry_tl->getSize(SLANG_PARAMETER_CATEGORY_PUSH_CONSTANT_BUFFER);
+            push_constant_size = entry_tl->getSize(SLANG_PARAMETER_CATEGORY_PUSH_CONSTANT_BUFFER);
             if (push_constant_size > 0) {
                 builder.add_push_constant(static_cast<uint32_t>(push_constant_size));
             }
@@ -448,38 +447,37 @@ std::string SlangProgramEntryPoint::format_reflection(const ContextHandle& conte
 // ---------------------------------------------------------------
 // Rebuild
 
-void SlangProgramEntryPoint::rebuild() {
-    param_cache.clear();
-    cached_pipeline_layout = nullptr;
-    global_object_layout = nullptr;
-    global_set_index = UINT32_MAX;
-    global_set_layouts.clear();
-    global_nested_pb_infos.clear();
-    push_constant_size = 0;
-    increment_version();
-}
-
 // ---------------------------------------------------------------
 // Factory methods
 
-SlangProgramEntryPointHandle SlangProgramEntryPoint::create(const SlangProgramHandle& program,
-                                                            const uint64_t entry_point_index) {
-    auto ep = SlangProgramEntryPointHandle(new SlangProgramEntryPoint(program, entry_point_index));
-    program->on_changed(ep, [raw = ep.get()]() { raw->rebuild(); });
+Versioned<SlangProgramEntryPoint>
+SlangProgramEntryPoint::create(const Versioned<SlangProgram>& program,
+                               const uint64_t entry_point_index) {
+    auto ep = Versioned<SlangProgramEntryPoint>([program, entry_point_index] {
+        return SlangProgramEntryPointHandle(
+            new SlangProgramEntryPoint(program.get(), entry_point_index));
+    });
+    ep.depends_on(program);
     return ep;
 }
 
-SlangProgramEntryPointHandle SlangProgramEntryPoint::create(const SlangProgramHandle& program,
-                                                            const std::string& entry_point_name) {
-    return create(program, program->get_entry_point_index(entry_point_name));
+Versioned<SlangProgramEntryPoint>
+SlangProgramEntryPoint::create(const Versioned<SlangProgram>& program,
+                               const std::string& entry_point_name) {
+    auto ep = Versioned<SlangProgramEntryPoint>([program, entry_point_name] {
+        const SlangProgramHandle p = program.get();
+        return SlangProgramEntryPointHandle(
+            new SlangProgramEntryPoint(p, p->get_entry_point_index(entry_point_name)));
+    });
+    ep.depends_on(program);
+    return ep;
 }
 
-SlangProgramEntryPointHandle
+Versioned<SlangProgramEntryPoint>
 SlangProgramEntryPoint::create(const ShaderCompileContextHandle& compile_context,
                                const std::filesystem::path& module_path,
                                const std::string& entry_point_name) {
-    SlangProgramHandle program = SlangProgram::create(compile_context, module_path, true);
-    return create(program, entry_point_name);
+    return create(SlangProgram::create(compile_context, module_path, true), entry_point_name);
 }
 
 } // namespace merian

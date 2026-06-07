@@ -54,9 +54,8 @@ Scene::Scene(const ShaderCompileContextHandle& compile_context,
     composition->add_module_from_path("merian-shaders/scene/scene.slang");
 
     layout_program = SlangProgram::create(compile_context, composition);
-    layout_program->on_changed(layout_program, [&] { rebuild_shader_object(); });
-
-    rebuild_shader_object();
+    shader_object = Versioned<ShaderObject>([this] { return build_shader_object(); });
+    shader_object.depends_on(layout_program);
 }
 
 void Scene::set_env(EnvMapHandle env) {
@@ -78,16 +77,15 @@ void Scene::set_env(EnvMapHandle env) {
                     env_map->get_type_name()));
 }
 
-void Scene::rebuild_shader_object() {
+ShaderObjectHandle Scene::build_shader_object() const {
     SPDLOG_DEBUG("recreate shader object");
 
-    shader_object = layout_program->create_shader_object(context, "merian::Scene", allocator);
+    const ShaderObjectHandle object =
+        layout_program.get()->create_shader_object(context, "merian::Scene", allocator);
 
-    auto c = shader_object->get_cursor();
+    auto c = object->get_cursor();
 
     c["material_system"] = material_system;
-    material_system->on_changed(
-        shader_object, [&] { shader_object->get_cursor()["material_system"] = material_system; });
 
     c["geometries"] = geometries_buffer ? geometries_buffer : allocator->get_dummy_buffer();
 
@@ -108,6 +106,7 @@ void Scene::rebuild_shader_object() {
     if (as_supported && tlas) {
         c["as"]["as"] = tlas;
     }
+    return object;
 }
 
 // --- Scene building ---
@@ -1094,7 +1093,7 @@ void Scene::upload_transforms(const CommandBufferHandle& cmd) {
     }
 
     const auto staging = allocator->get_staging();
-    auto c = shader_object->get_cursor();
+    auto c = shader_object.get()->get_cursor();
 
     if (!instance_transforms.empty()) {
         const vk::DeviceSize transforms_size = instance_transforms.size() * sizeof(float4x4);
@@ -1200,7 +1199,7 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
     }
 
     const auto staging = allocator->get_staging();
-    auto c = shader_object->get_cursor();
+    auto c = shader_object.get()->get_cursor();
 
     if (!geometries.empty()) {
         const vk::DeviceSize geometries_size = geometries.size() * sizeof(GeometryData);
@@ -1808,7 +1807,7 @@ void Scene::build_tlas(const CommandBufferHandle& cmd) {
         // cannot reuse and needs to be allcated
         tlas = allocator->create_acceleration_structure(vk::AccelerationStructureTypeKHR::eTopLevel,
                                                         size_info);
-        shader_object->get_cursor()["as"]["as"] = tlas;
+        shader_object.get()->get_cursor()["as"]["as"] = tlas;
     }
 
     as_builder.queue_build(tlas_instances.size(), tlas_instances_buffer, tlas, size_info);
@@ -1833,6 +1832,9 @@ void Scene::update(const CommandBufferHandle& cmd,
     if (!is_ready()) {
         return;
     }
+
+    // rebuild once here so the per-frame uploads below write into the current object
+    shader_object.get();
 
     assert(!cameras.empty() &&
            "the scene implementation must ensure that there is at least one camera");
@@ -1931,7 +1933,7 @@ void Scene::update(const CommandBufferHandle& cmd,
     needs_regroup = false;
     transforms_changed = false;
 
-    auto c = shader_object->get_cursor();
+    auto c = shader_object.get()->get_cursor();
 
     c["frame"] = frame;
     c["time"] = get_time(time);

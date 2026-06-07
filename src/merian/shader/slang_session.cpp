@@ -3,48 +3,25 @@
 
 namespace merian {
 
-static std::map<ShaderCompileContextHandle, std::weak_ptr<SlangSession>> cached_session_for_context;
-static std::map<SlangSession*, ShaderCompileContextHandle> cached_context_for_session;
-
 SlangSessionHandle SlangSession::create(const ShaderCompileContextHandle& shader_compile_context) {
-    SlangSession* session = new SlangSession(shader_compile_context);
-    cached_context_for_session[session] = shader_compile_context;
-    SlangSessionHandle shared_session = SlangSessionHandle(session, [](SlangSession* p) {
-        auto ctx_it = cached_context_for_session.find(p);
-        if (ctx_it != cached_context_for_session.end()) {
-            // Only erase the cache entry if it still points to this session
-            auto cache_it = cached_session_for_context.find(ctx_it->second);
-            if (cache_it != cached_session_for_context.end() && cache_it->second.expired()) {
-                cached_session_for_context.erase(cache_it);
-            }
-            cached_context_for_session.erase(ctx_it);
-        }
-        SPDLOG_DEBUG("erase slang session from cache");
-        delete p;
-    });
-    cached_session_for_context[shader_compile_context] = shared_session;
-    return shared_session;
+    SPDLOG_DEBUG("create slang session");
+    return SlangSessionHandle(new SlangSession(shader_compile_context));
 }
 
-// returns a cached session for the context or creates one if none is avaiable.
-SlangSessionHandle
-SlangSession::get_or_create(const ShaderCompileContextHandle& shader_compile_context,
-                            const bool force_new) {
-    if (!force_new) {
-        auto it = cached_session_for_context.find(shader_compile_context);
-        if (it != cached_session_for_context.end() && !it->second.expired()) {
-            SPDLOG_DEBUG("reuse slang session from cache");
-            return it->second.lock();
-        }
+SlangSessionHandle ShaderCompileContext::current_session() {
+    const uint64_t epoch = slang_source_epoch();
+    if (!hot_session || hot_session_epoch != epoch) {
+        hot_session = SlangSession::create(shared_from_this());
+        hot_session_epoch = epoch;
     }
-    return create(shader_compile_context);
+    return hot_session;
 }
-static slang::TypeLayoutReflection*
-find_type_layout(slang::ProgramLayout* layout, const std::string& type_name) {
+
+static slang::TypeLayoutReflection* find_type_layout(slang::ProgramLayout* layout,
+                                                     const std::string& type_name) {
     slang::TypeReflection* type = layout->findTypeByName(type_name.c_str());
     if (type == nullptr) {
-        throw ShaderCompiler::compilation_failed(
-            fmt::format("type '{}' not found", type_name));
+        throw ShaderCompiler::compilation_failed(fmt::format("type '{}' not found", type_name));
     }
 
     slang::TypeLayoutReflection* type_layout =
@@ -61,7 +38,7 @@ SlangSession::TypeLayoutResult
 SlangSession::get_type_layout(const ShaderCompileContextHandle& compile_context,
                               const SlangCompositionHandle& composition,
                               const std::string& type_name) {
-    auto program = SlangProgram::create(compile_context, composition);
+    const SlangProgramHandle program = SlangProgram::create(compile_context, composition).get();
     auto* type_layout = find_type_layout(program->get_program_reflection(), type_name);
     return {type_layout, program};
 }
@@ -70,7 +47,8 @@ SlangSession::TypeLayoutResult
 SlangSession::get_type_layout(const ShaderCompileContextHandle& compile_context,
                               const std::filesystem::path& module_path,
                               const std::string& type_name) {
-    auto program = SlangProgram::create(compile_context, module_path, false);
+    const SlangProgramHandle program =
+        SlangProgram::create(compile_context, module_path, false).get();
     auto* type_layout = find_type_layout(program->get_program_reflection(), type_name);
     return {type_layout, program};
 }

@@ -27,9 +27,9 @@ DeviceSupportInfo SVGF::query_device_support(const DeviceSupportQueryInfo& query
     auto taa_program = SlangProgramEntryPoint::create(compilation_ctx, "svgf_taa.slang");
 
     // Get SPIR-V binaries and reflect to determine requirements
-    auto filter_binary = filter_program->get_program()->get_binary();
-    auto variance_binary = variance_program->get_program()->get_binary();
-    auto taa_binary = taa_program->get_program()->get_binary();
+    auto filter_binary = filter_program.get()->get_program()->get_binary();
+    auto variance_binary = variance_program.get()->get_program()->get_binary();
+    auto taa_binary = taa_program.get()->get_program()->get_binary();
 
     SpirvReflect filter_reflect(static_cast<const uint32_t*>(filter_binary->getBufferPointer()),
                                 filter_binary->getBufferSize());
@@ -160,10 +160,12 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
         compilation_session_desc->add_search_path("merian-nodes/nodes/svgf");
 
         filter_module =
-            SlangProgramEntryPoint::create(compilation_session_desc, "svgf_filter.slang");
-        variance_estimate_module = SlangProgramEntryPoint::create(compilation_session_desc,
-                                                                  "svgf_variance_estimate.slang");
-        taa_module = SlangProgramEntryPoint::create(compilation_session_desc, "svgf_taa.slang");
+            SlangProgramEntryPoint::create(compilation_session_desc, "svgf_filter.slang").get();
+        variance_estimate_module =
+            SlangProgramEntryPoint::create(compilation_session_desc, "svgf_variance_estimate.slang")
+                .get();
+        taa_module =
+            SlangProgramEntryPoint::create(compilation_session_desc, "svgf_taa.slang").get();
 
         auto variance_estimate_pipe_layout = PipelineLayoutBuilder(context)
                                                  .add_descriptor_set_layout(graph_layout)

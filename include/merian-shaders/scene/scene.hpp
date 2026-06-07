@@ -9,7 +9,6 @@
 #include "merian/utils/camera/camera.hpp"
 #include "merian/utils/free_list.hpp"
 #include "merian/utils/small_set.hpp"
-#include "merian/utils/versionable.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout.hpp"
 #include "merian/vk/memory/frame_staging_block.hpp"
 #include "merian/vk/memory/memory_suballocator_vma.hpp"
@@ -23,7 +22,7 @@
 
 namespace merian {
 
-class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
+class Scene : public std::enable_shared_from_this<Scene> {
   public:
     // --- IDs ---
 
@@ -469,11 +468,11 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
 
     // Caller must check is_ready() first — otherwise resources may be stale or unset.
     const ShaderObjectHandle& get_shader_object() const {
-        return shader_object;
+        return shader_object.get();
     }
 
     operator const ShaderObjectHandle&() const {
-        return shader_object;
+        return shader_object.get();
     }
 
     std::vector<CameraHandle> get_cameras() const;
@@ -626,7 +625,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     }
 
   private:
-    void rebuild_shader_object();
+    ShaderObjectHandle build_shader_object() const;
 
     // invalidates the global transform of this node and its children and marks the node as dirty.
     void invalidate_node(Node& node);
@@ -699,8 +698,8 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     ResourceAllocatorHandle allocator;
 
     SlangCompositionHandle composition;
-    SlangProgramHandle layout_program;
-    ShaderObjectHandle shader_object;
+    Versioned<SlangProgram> layout_program;
+    Versioned<ShaderObject> shader_object;
 
     ASBuilder as_builder;
     bool as_supported = false;

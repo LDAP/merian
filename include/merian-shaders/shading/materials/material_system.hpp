@@ -5,7 +5,6 @@
 #include "merian/shader/shader_object.hpp"
 #include "merian/shader/slang_composition.hpp"
 #include "merian/shader/slang_program.hpp"
-#include "merian/utils/versionable.hpp"
 
 #include <string>
 #include <unordered_map>
@@ -47,7 +46,7 @@ struct DiffuseMaterial : Material {
     }
 };
 
-class MaterialSystem : public Versionable, public std::enable_shared_from_this<MaterialSystem> {
+class MaterialSystem : public std::enable_shared_from_this<MaterialSystem> {
   public:
     MaterialSystem(const ShaderCompileContextHandle& compile_context,
                    const ContextHandle& context,
@@ -100,16 +99,21 @@ class MaterialSystem : public Versionable, public std::enable_shared_from_this<M
         return composition;
     }
 
+    // Bumps whenever the composition changes.
+    uint64_t version() const {
+        return composition->version();
+    }
+
     const TextureManagerHandle& get_texture_manager() const {
         return texture_manager;
     }
 
     const ShaderObjectHandle& get_shader_object() const {
-        return shader_object;
+        return shader_object.get();
     }
 
     operator const ShaderObjectHandle&() const {
-        return shader_object;
+        return shader_object.get();
     }
 
   public:
@@ -120,7 +124,7 @@ class MaterialSystem : public Versionable, public std::enable_shared_from_this<M
 
   private:
     void update_composition_constants();
-    void rebuild_shader_object();
+    ShaderObjectHandle build_shader_object() const;
     void repack_host_buffer();
     uint32_t get_entry_size() const;
 
@@ -147,8 +151,8 @@ class MaterialSystem : public Versionable, public std::enable_shared_from_this<M
     bool clamp_normals = true;
     float min_roughness = 0.0316F;
     SlangCompositionHandle composition;
-    SlangProgramHandle layout_program;
-    ShaderObjectHandle shader_object;
+    Versioned<SlangProgram> layout_program;
+    Versioned<ShaderObject> shader_object;
 };
 
 using MaterialSystemHandle = std::shared_ptr<MaterialSystem>;

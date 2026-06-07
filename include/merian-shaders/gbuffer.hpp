@@ -2,6 +2,7 @@
 
 #include "merian/shader/shader_object.hpp"
 #include "merian/shader/slang_composition.hpp"
+#include "merian/shader/slang_program.hpp"
 #include "merian/vk/memory/resource_allocations.hpp"
 
 namespace merian {
@@ -15,12 +16,10 @@ class GBuffer {
         : extent(extent) {
         SlangCompositionHandle composition = SlangComposition::create();
         composition->add_module_from_path("merian-shaders/gbuffer.slang");
-        layout_program = SlangProgram::create(compile_context, composition);
+        const SlangProgramHandle program = SlangProgram::create(compile_context, composition).get();
 
-        r_shader_object =
-            layout_program->create_shader_object(context, "merian::GBuffer", allocator);
-        w_shader_object =
-            layout_program->create_shader_object(context, "merian::WGBuffer", allocator);
+        r_shader_object = program->create_shader_object(context, "merian::GBuffer", allocator);
+        w_shader_object = program->create_shader_object(context, "merian::WGBuffer", allocator);
     }
 
     const ShaderObjectHandle& get_shader_object() const {
@@ -57,8 +56,6 @@ class GBuffer {
 
   private:
     const vk::Extent3D extent;
-
-    SlangProgramHandle layout_program;
 
     ShaderObjectHandle r_shader_object;
     ShaderObjectHandle w_shader_object;

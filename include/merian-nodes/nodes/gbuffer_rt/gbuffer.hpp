@@ -66,16 +66,15 @@ class GBufferRTNode : public Node {
 
     bool emission_connected = true;
 
-    // Slang program + pipeline
+    // Slang program + pipeline; rebuilt when the scene composition changes.
     SlangCompositionHandle composition;
-    SlangProgramHandle program;
-    SlangProgramEntryPointHandle entry_point;
-    PipelineHandle pipeline;
+    Versioned<SlangProgram> program;
+    Versioned<SlangProgramEntryPoint> entry_point;
+    Versioned<Pipeline> pipeline;
+    Versioned<ShaderObject> globals_obj;
 
     // ShaderObject for GBuffer parameter
     GBufferHandle gbuffer_obj;
-    // ShaderObject for entry-point globals (e.g. emission texture)
-    ShaderObjectHandle globals_obj;
     std::shared_ptr<FrameCachingShaderObjectAllocator> obj_allocator;
 };
 

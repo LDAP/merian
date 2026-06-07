@@ -52,12 +52,12 @@ class GBufferDebugNode : public Node {
     vk::Extent3D extent = vk::Extent3D{1920, 1080, 1};
     int32_t selected_field = 0;
 
-    // Slang program + pipeline
-    SlangProgramHandle program;
-    SlangProgramEntryPointHandle entry_point;
-    PipelineHandle pipeline;
-
-    ShaderObjectHandle params;
+    // Slang program + pipeline; rebuilt when the scene composition changes.
+    SlangCompositionHandle composition;
+    Versioned<SlangProgram> program;
+    Versioned<SlangProgramEntryPoint> entry_point;
+    Versioned<Pipeline> pipeline;
+    Versioned<ShaderObject> params;
     std::shared_ptr<FrameCachingShaderObjectAllocator> obj_allocator;
 };
 

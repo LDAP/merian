@@ -1,5 +1,6 @@
 #pragma once
 
+#include "merian/fwd.hpp"
 #include "merian/shader/spirv_utils.hpp"
 #include "merian/vk/context.hpp"
 
@@ -11,7 +12,7 @@ namespace merian {
 class ShaderCompileContext;
 using ShaderCompileContextHandle = std::shared_ptr<ShaderCompileContext>;
 
-class ShaderCompileContext {
+class ShaderCompileContext : public std::enable_shared_from_this<ShaderCompileContext> {
   protected:
     ShaderCompileContext(const vk::ArrayProxy<std::filesystem::path>& search_paths = {},
                          const std::map<std::string, std::string>& preprocessor_macros = {},
@@ -115,6 +116,12 @@ class ShaderCompileContext {
 
     // -------------------------------------------------
 
+    // A slang session shared by everything compiled through this context, so common modules are
+    // parsed once. A module-source change retires it (see slang_source_epoch).
+    SlangSessionHandle current_session();
+
+    // -------------------------------------------------
+
     static ShaderCompileContextHandle create(const ContextHandle& context) {
         return ShaderCompileContextHandle(new ShaderCompileContext(context));
     }
@@ -148,6 +155,9 @@ class ShaderCompileContext {
     uint32_t optimization_level;
     SpirvVersion target;
     uint32_t target_vk_api_version;
+
+    SlangSessionHandle hot_session;
+    uint64_t hot_session_epoch = UINT64_MAX;
 };
 
 } // namespace merian

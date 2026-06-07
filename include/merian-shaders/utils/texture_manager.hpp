@@ -5,7 +5,6 @@
 #include "merian/shader/slang_composition.hpp"
 #include "merian/shader/slang_program.hpp"
 #include "merian/utils/free_list.hpp"
-#include "merian/utils/versionable.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 
 #include <vector>
@@ -14,7 +13,7 @@ namespace merian {
 
 class Properties;
 
-class TextureManager : public Versionable, public std::enable_shared_from_this<TextureManager> {
+class TextureManager : public std::enable_shared_from_this<TextureManager> {
   public:
     TextureManager(const ShaderCompileContextHandle& compile_context,
                    const ContextHandle& context,
@@ -96,19 +95,27 @@ class TextureManager : public Versionable, public std::enable_shared_from_this<T
         return composition;
     }
 
+    // Bumps whenever the composition changes.
+    uint64_t version() const {
+        return composition->version();
+    }
+
     const ShaderObjectHandle& get_shader_object() const {
-        return shader_object;
+        return shader_object.get();
     }
 
     operator const ShaderObjectHandle&() const {
-        return shader_object;
+        return shader_object.get();
     }
 
     void properties(Properties& props);
 
   private:
     void update_composition_constants();
-    void rebuild_shader_object();
+    ShaderObjectHandle build_shader_object() const;
+    bool object_is_current() const {
+        return shader_object.peek() && object_composition_version == composition->version();
+    }
 
     // Pulls the next slot from free_list or grows the table.
     TextureID allocate_id();
@@ -129,8 +136,9 @@ class TextureManager : public Versionable, public std::enable_shared_from_this<T
     std::vector<TextureHandle> textures;
     FreeList<TextureID> ids;
     SlangCompositionHandle composition;
-    SlangProgramHandle layout_program;
-    ShaderObjectHandle shader_object;
+    Versioned<SlangProgram> layout_program;
+    Versioned<ShaderObject> shader_object;
+    mutable uint64_t object_composition_version = 0;
 
     std::vector<StagingMemoryManager::DeviceImageCopy> pending_uploads;
 };

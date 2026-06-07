@@ -3,7 +3,7 @@
 #include "merian/io/file_loader.hpp"
 #include "merian/shader/shader_compiler.hpp"
 #include "merian/utils/hash.hpp"
-#include "merian/utils/versionable.hpp"
+#include "merian/utils/versioned.hpp"
 
 #include "slang-com-ptr.h"
 #include "slang.h"
@@ -21,12 +21,9 @@ namespace merian {
 class SlangComposition;
 using SlangCompositionHandle = std::shared_ptr<SlangComposition>;
 
-// Describes a composition of modules, type conformances, and entrypoints under a compile context.
-// Which can be (lazyly) compiled to a SlangProgram and entry points.
-//
-// A slang composition used a single slang session for compilation.
-class SlangComposition : public Versionable,
-                         public std::enable_shared_from_this<SlangComposition> {
+// A mutable accumulator of modules, type conformances, and entrypoints, compilable to a
+// SlangProgram. version() lets a derived program detect when to recompile.
+class SlangComposition : public std::enable_shared_from_this<SlangComposition> {
     friend class SlangSession;
 
   private:
@@ -78,6 +75,18 @@ class SlangComposition : public Versionable,
         // can be empty if is from source string.
         const std::optional<std::filesystem::path>& get_source_path() const {
             return source_path;
+        }
+
+        // Whether replacing prev changes the compiled source (so its session can't be reused). Same
+        // path = same source; on-disk edits go through reload().
+        bool source_differs_from(const SlangModule& prev) const {
+            if (source_path != prev.source_path) {
+                return true;
+            }
+            if (source_path.has_value()) {
+                return false;
+            }
+            return source != prev.source;
         }
 
         // can be relative to search paths of the composits compile context.
@@ -240,6 +249,15 @@ class SlangComposition : public Versionable,
 
     void add_composition(const SlangCompositionHandle& composition);
 
+    // Increments on every edit, here or in a nested composition.
+    uint64_t version() const {
+        uint64_t v = edits;
+        for (const auto& composition : compositions) {
+            v += composition->version();
+        }
+        return v;
+    }
+
     // ---------------------------------------------------------------
     // Reload
 
@@ -275,6 +293,8 @@ class SlangComposition : public Versionable,
 
     // Last known modification times for path-based modules (for reload detection)
     std::map<std::filesystem::path, std::filesystem::file_time_type> module_mtimes;
+
+    uint64_t edits = 0;
 };
 
 } // namespace merian
