@@ -9,7 +9,7 @@ struct TextureManager {
 
     // -----------------------------------------
 
-    Sampler2D get_sampler2D(const TextureID texture_id) {
+    Sampler2D<float4> get_sampler2D(const TextureID texture_id) {
         return textures[NonUniformResourceIndex(texture_id)];
     }
 }
