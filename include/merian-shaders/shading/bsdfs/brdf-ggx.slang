@@ -390,9 +390,7 @@ struct GGXBRDF : BSDF {
             return none;
         }
 
-        // Reuse the sampled half-vector h for the pdf instead of reconstructing it via
-        // normalize(wi + wo), and compute the VNDF weight f(wi,wo) * wo.z / pdf = G2(wi,wo) /
-        // G1(wi) directly: the NDF and cosines cancel, so it stays finite even at alpha -> 0.
+        // the NDF and cosines cancel, so it stays finite even at alpha -> 0.
         const float pdf = ggx_VNDF_pdf_wo(wi.z, pow2(h.z), alpha_squared);
         const float weight = smith_g2_over_widotn(wo.z, wi.z, alpha_squared) /
                              smith_g1_over_widotn(wi.z, alpha_squared);
@@ -408,8 +406,7 @@ struct GGXBRDF : BSDF {
     }
 }
 
-// A specular microfacet BTDF with GGX normal distribution: the transmission twin of GGXBRDF.
-// eta is the relative index of refraction (incident / transmitted), baked in by the material.
+// A specular microfacet BTDF with GGX normal distribution.
 // https://www.cs.cornell.edu/~srm/publications/EGSR07-btdf.pdf
 struct GGXBTDF : BSDF {
     float alpha;
@@ -436,7 +433,8 @@ struct GGXBTDF : BSDF {
         const float D = ggx_NDF(pow2(h.z), alpha_squared);
 
         const float denom = wodoth + (eta * widoth);
-        return tint * (D * G2_over_widotn * abs(pow2(eta) * widoth * wodoth / pow2(denom)));
+        const float jacobian = pow2(eta) * widoth * wodoth / pow2(denom);
+        return tint * (D * G2_over_widotn * abs(jacobian));
     }
 
     Optional<float3> sample(const float3 wi, inout RandomGenerator rng) {
