@@ -1,0 +1,11 @@
+merian_graph_src += files(
+    'node.cpp',
+    'node_registry.cpp',
+    'graph.cpp',
+    'graph_edit.cpp',
+    'graph_connect.cpp',
+    'graph_properties.cpp',
+    'graph_events.cpp',
+    'graph_description.cpp',
+    'graph_load_store.cpp',
+)

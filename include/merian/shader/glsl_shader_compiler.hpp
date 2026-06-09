@@ -14,7 +14,7 @@ namespace merian {
 
 // A compiler for shaders.
 //
-// Include paths for the merian-nodes library and context extensions must be automatically added.
+// Include paths for the merian-graph library and context extensions must be automatically added.
 class GLSLShaderCompiler;
 using GLSLShaderCompilerHandle = std::shared_ptr<GLSLShaderCompiler>;
 using WeakGLSLShaderCompilerHandle = std::weak_ptr<GLSLShaderCompiler>;
