@@ -19,7 +19,7 @@ struct EmptyEnv : IEnvMap {
 }
 
 struct LatLongMap : IEnvMap {
-    Sampler2D env_map;
+    Sampler2D<float4> env_map;
     float4x4 to_local;
 
     float3 eval(const float2 uv, const LODSampler2D lod) {
@@ -32,12 +32,12 @@ struct LatLongMap : IEnvMap {
 }
 
 struct CubeMap : IEnvMap {
-    Sampler2D rt;
-    Sampler2D bk;
-    Sampler2D lf;
-    Sampler2D ft;
-    Sampler2D up;
-    Sampler2D dn;
+    Sampler2D<float4> rt;
+    Sampler2D<float4> bk;
+    Sampler2D<float4> lf;
+    Sampler2D<float4> ft;
+    Sampler2D<float4> up;
+    Sampler2D<float4> dn;
     float4x4 to_local;
 
     float3 eval(const ShadingData sd, const TextureManager tm, const LODSampler2D lod) {
