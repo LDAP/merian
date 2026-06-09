@@ -12,7 +12,8 @@
 #include "merian/shader/slang_composition.hpp"
 #include "merian/shader/slang_entry_point.hpp"
 #include "merian/shader/slang_program.hpp"
-#include "merian/vk/pipeline/pipeline.hpp"
+#include "merian/vk/pipeline/pipeline_ray_tracing.hpp"
+#include "merian/vk/raytrace/shader_binding_table.hpp"
 
 #include <array>
 
@@ -65,7 +66,8 @@ class RenderPT : public Node {
     SlangCompositionHandle composition;
     Versioned<SlangProgram> program;
     Versioned<SlangProgramEntryPoint> entry_point;
-    Versioned<Pipeline> pipeline;
+    Versioned<RayTracingPipeline> pipeline;
+    Versioned<ShaderBindingTable> sbt;
     Versioned<ShaderObject> params;
     std::shared_ptr<FrameCachingShaderObjectAllocator> obj_allocator;
 };

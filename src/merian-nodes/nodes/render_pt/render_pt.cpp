@@ -1,6 +1,6 @@
 #include "merian-nodes/nodes/render_pt/render_pt.hpp"
 
-#include "merian/vk/pipeline/pipeline_compute.hpp"
+#include "merian/vk/pipeline/pipeline_ray_tracing_builder.hpp"
 
 #include <fmt/format.h>
 
@@ -17,7 +17,7 @@ struct PushConstant {
 RenderPT::RenderPT() = default;
 
 DeviceSupportInfo RenderPT::query_device_support(const DeviceSupportQueryInfo& query_info) {
-    return DeviceSupportInfo::check(query_info, {}, {"rayQuery"});
+    return DeviceSupportInfo::check(query_info, {"rayTracingPipeline"}, {"rayQuery"});
 }
 
 void RenderPT::initialize(const ContextHandle& context, const ResourceAllocatorHandle& allocator) {
@@ -65,11 +65,17 @@ void RenderPT::process(GraphRun& run,
         program = SlangProgram::create(compile_context, composition);
         entry_point = SlangProgramEntryPoint::create(program, "main");
 
-        pipeline = Versioned<Pipeline>([this] {
+        pipeline = Versioned<RayTracingPipeline>([this] {
             const auto ep = entry_point.get();
-            return ComputePipeline::create(ep->get_pipeline_layout(context), ep->specialize());
+            return RayTracingPipelineBuilder()
+                .add_raygen_group(ep->specialize())
+                .build(ep->get_pipeline_layout(context));
         });
         pipeline.depends_on(entry_point);
+
+        sbt = Versioned<ShaderBindingTable>(
+            [this] { return ShaderBindingTable::create(pipeline.get(), resource_allocator); });
+        sbt.depends_on(pipeline);
 
         params = Versioned<ShaderObject>([this] {
             return entry_point.get()->create_shader_object(context, "params", resource_allocator);
@@ -101,7 +107,7 @@ void RenderPT::process(GraphRun& run,
     ep->bind_entry_point_parameter("params", params_obj, cmd, pipe, obj_allocator);
     cmd->push_constant(pipe, PushConstant{spp, max_path_length, mask});
 
-    cmd->dispatch(extent, 16, 16);
+    cmd->trace_rays(sbt.get(), extent);
 }
 
 void RenderPT::update_render_constants() {
