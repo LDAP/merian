@@ -4,9 +4,12 @@
 #include "merian/utils/normal_encoding.hpp"
 #include "merian/vk/utils/math.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <fmt/format.h>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <limits>
 #include <spdlog/spdlog.h>
 #include <tiny_gltf.h>
 
@@ -317,6 +320,9 @@ void GLTFScene::load_materials(const CommandBufferHandle& cmd) {
 
     // Build materials. get_or_load_texture pulls in only the textures actually referenced.
     material_map.resize(model->materials.size());
+    bool any_transmissive = false;
+    bool any_volume = false;
+    bool any_clearcoat = false;
     for (size_t i = 0; i < model->materials.size(); i++) {
         const auto& gmat = model->materials[i];
         const auto& pbr = gmat.pbrMetallicRoughness;
@@ -363,7 +369,85 @@ void GLTFScene::load_materials(const CommandBufferHandle& cmd) {
             mat.payload.occlusion_strength = static_cast<float>(gmat.occlusionTexture.strength);
         }
 
+        // KHR_materials_transmission / _ior / _volume — refractive glass.
+        if (const auto it = gmat.extensions.find("KHR_materials_transmission");
+            it != gmat.extensions.end() && it->second.Has("transmissionFactor")) {
+            mat.payload.transmission_weight =
+                static_cast<float>(it->second.Get("transmissionFactor").GetNumberAsDouble());
+            any_transmissive |= mat.payload.transmission_weight > 0.0f;
+        }
+        if (const auto it = gmat.extensions.find("KHR_materials_ior");
+            it != gmat.extensions.end() && it->second.Has("ior")) {
+            mat.payload.ior = static_cast<float>(it->second.Get("ior").GetNumberAsDouble());
+        }
+        // KHR_materials_volume → Beer-Lambert absorption: sigma_a = -ln(attenuationColor) /
+        // distance.
+        if (const auto it = gmat.extensions.find("KHR_materials_volume");
+            it != gmat.extensions.end()) {
+            const tinygltf::Value& ext = it->second;
+            float3 att_color(1.0f, 1.0f, 1.0f);
+            if (ext.Has("attenuationColor")) {
+                const tinygltf::Value& c = ext.Get("attenuationColor");
+                if (c.ArrayLen() >= 3) {
+                    att_color = float3(static_cast<float>(c.Get(0).GetNumberAsDouble()),
+                                       static_cast<float>(c.Get(1).GetNumberAsDouble()),
+                                       static_cast<float>(c.Get(2).GetNumberAsDouble()));
+                }
+            }
+            const double att_dist = ext.Has("attenuationDistance")
+                                        ? ext.Get("attenuationDistance").GetNumberAsDouble()
+                                        : std::numeric_limits<double>::infinity();
+            if (std::isfinite(att_dist) && att_dist > 0.0) {
+                const auto sigma = [att_dist](float c) {
+                    return static_cast<float>(-std::log(std::clamp(c, 1e-4f, 1.0f)) / att_dist);
+                };
+                mat.payload.absorption =
+                    float3(sigma(att_color.x), sigma(att_color.y), sigma(att_color.z));
+                any_volume = true;
+            }
+        }
+
+        // KHR_materials_clearcoat — thin glossy dielectric coat (textures store R = factor, G =
+        // roughness).
+        if (const auto it = gmat.extensions.find("KHR_materials_clearcoat");
+            it != gmat.extensions.end()) {
+            const tinygltf::Value& ext = it->second;
+            if (ext.Has("clearcoatFactor")) {
+                mat.payload.clearcoat_weight =
+                    static_cast<float>(ext.Get("clearcoatFactor").GetNumberAsDouble());
+            }
+            if (ext.Has("clearcoatRoughnessFactor")) {
+                mat.payload.clearcoat_roughness =
+                    static_cast<float>(ext.Get("clearcoatRoughnessFactor").GetNumberAsDouble());
+            }
+            const auto ext_texture = [&](const char* key) -> int {
+                if (ext.Has(key) && ext.Get(key).Has("index")) {
+                    return static_cast<int>(ext.Get(key).Get("index").GetNumberAsDouble());
+                }
+                return -1;
+            };
+            if (const int idx = ext_texture("clearcoatTexture"); idx >= 0) {
+                mat.payload.clearcoat_texture = get_or_load_texture(cmd, idx, /*linear=*/true);
+            }
+            if (const int idx = ext_texture("clearcoatRoughnessTexture"); idx >= 0) {
+                mat.payload.clearcoat_roughness_texture =
+                    get_or_load_texture(cmd, idx, /*linear=*/true);
+            }
+            any_clearcoat |= mat.payload.clearcoat_weight > 0.0f;
+        }
+
         material_map[i] = get_material_system()->add_material(gltf_type_id, mat);
+    }
+
+    // Enable each lobe only when an asset actually uses it.
+    if (any_transmissive) {
+        get_material_system()->set_enable_transmission(true);
+    }
+    if (any_volume) {
+        get_material_system()->set_enable_volume(true);
+    }
+    if (any_clearcoat) {
+        get_material_system()->set_enable_clearcoat(true);
     }
 
     // Default material for primitives without one
@@ -504,7 +588,9 @@ void GLTFScene::load_meshes() {
                 if (gmat.alphaMode == "OPAQUE") {
                     flags = flags | MeshFlags::IsOpaque;
                 }
-                if (gmat.doubleSided) {
+                // Two-sided, or transmissive: refraction must hit the back/exit interface.
+                if (gmat.doubleSided ||
+                    gmat.extensions.find("KHR_materials_transmission") != gmat.extensions.end()) {
                     flags = flags | MeshFlags::TwoSided;
                 }
             } else {

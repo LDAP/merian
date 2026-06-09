@@ -114,6 +114,13 @@ struct OrthonormalFrame : Frame {
         return basis[2];
     }
 
+    // Flip the normal in place; the basis turns left-handed but that is fine for isotropic shading
+    // and saves rebuilding the frame.
+    [mutating]
+    void flip_normal() {
+        basis[2] = -basis[2];
+    }
+
     // Perturb N with a tangent-space normal-map sample. T is Gram-Schmidt'd against
     // the new world-space N, B is rebuilt from cross(N, T).
     OrthonormalFrame apply_normal_map(const float3 n_local) {

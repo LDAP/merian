@@ -55,8 +55,8 @@ class FBXScene : public Scene {
 
     // ufbx material typed_id -> MaterialID
     std::vector<MaterialID> material_map;
-    // ufbx material typed_id -> whether it is fully opaque (no base-color alpha cutout).
-    std::vector<uint8_t> material_opaque;
+    // ufbx material typed_id -> material-derived mesh flags (IsOpaque, TwoSided).
+    std::vector<MeshFlags> material_flags;
     // Used for mesh parts without an assigned material.
     MaterialID default_material_id{};
 

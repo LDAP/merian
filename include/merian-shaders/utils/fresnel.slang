@@ -21,4 +21,20 @@ T fresnel_schlick<T : IFloat>(const float cos_theta, const T F0) {
     return fresnel_schlick(cos_theta, F0, T(1.));
 }
 
+/**
+ * Unpolarized Fresnel reflectance at a dielectric interface. eta is the relative index of refraction
+ * (incident / transmitted), cos_i is the cosine of the incidence angle (>= 0). Returns 1.0 on total
+ * internal reflection.
+ */
+float fresnel_dielectric(const float cos_i, const float eta) {
+    const float sin2_t = eta * eta * (1.0f - cos_i * cos_i);
+    if (sin2_t >= 1.0f) {
+        return 1.0f;
+    }
+    const float cos_t = sqrt(1.0f - sin2_t);
+    const float r_parl = (eta * cos_i - cos_t) / (eta * cos_i + cos_t);
+    const float r_perp = (cos_i - eta * cos_t) / (cos_i + eta * cos_t);
+    return 0.5f * (r_parl * r_parl + r_perp * r_perp);
+}
+
 }

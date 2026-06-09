@@ -35,6 +35,9 @@ enum GeometryDataFlags : uint16_t {
 
     // Replace surface shading with the scene env map sampled along the ray.
     UseEnvMap = 0x200,
+
+    // Shade back faces too (orient the frame to the viewer). For foliage, glass, etc.
+    TwoSided = 0x400,
 };
 
 // See scene.hpp for details.

@@ -79,6 +79,39 @@ void MaterialSystem::set_min_roughness(const float min_roughness) {
                                                     min_roughness));
 }
 
+void MaterialSystem::set_enable_transmission(const bool enable) {
+    if (enable == enable_transmission) {
+        return;
+    }
+    enable_transmission = enable;
+    composition->add_module_from_string("material_system_enable_transmission",
+                                        fmt::format("namespace merian {{ export static const bool "
+                                                    "merian_hint_enable_transmission = {}; }}",
+                                                    enable ? "true" : "false"));
+}
+
+void MaterialSystem::set_enable_volume(const bool enable) {
+    if (enable == enable_volume) {
+        return;
+    }
+    enable_volume = enable;
+    composition->add_module_from_string("material_system_enable_volume",
+                                        fmt::format("namespace merian {{ export static const bool "
+                                                    "merian_hint_enable_volume = {}; }}",
+                                                    enable ? "true" : "false"));
+}
+
+void MaterialSystem::set_enable_clearcoat(const bool enable) {
+    if (enable == enable_clearcoat) {
+        return;
+    }
+    enable_clearcoat = enable;
+    composition->add_module_from_string("material_system_enable_clearcoat",
+                                        fmt::format("namespace merian {{ export static const bool "
+                                                    "merian_hint_enable_clearcoat = {}; }}",
+                                                    enable ? "true" : "false"));
+}
+
 void MaterialSystem::properties(Properties& props) {
     float alpha = alpha_test_threshold;
     if (props.config_float("Alpha Test Threshold", alpha, "", 0.01F)) {
@@ -98,6 +131,27 @@ void MaterialSystem::properties(Properties& props) {
             "Lower bound on roughness, preventing the degenerate zero-roughness lobe", 1e-3F, 0.0F,
             1.0F)) {
         set_min_roughness(roughness);
+    }
+
+    bool transmission = enable_transmission;
+    if (props.config_bool("Enable Transmission", transmission,
+                          "Render refraction through glass and other dielectrics; transmissive "
+                          "materials shade as opaque when off")) {
+        set_enable_transmission(transmission);
+    }
+
+    bool volume = enable_volume;
+    if (props.config_bool("Enable Volume Absorption", volume,
+                          "Tint light by the distance it travels through transmissive media, for "
+                          "coloured glass and liquids")) {
+        set_enable_volume(volume);
+    }
+
+    bool clearcoat = enable_clearcoat;
+    if (props.config_bool("Enable Clearcoat", clearcoat,
+                          "Add a thin glossy dielectric coat over the surface, for car paint, "
+                          "lacquer and similar")) {
+        set_enable_clearcoat(clearcoat);
     }
 }
 
@@ -221,6 +275,10 @@ void MaterialSystem::clear() {
     host_buffer.clear();
     dirty_begin = UINT32_MAX;
     dirty_end = 0;
+    // Reset the feature toggles so a previous scene's lobes don't stay compiled in.
+    set_enable_transmission(false);
+    set_enable_volume(false);
+    set_enable_clearcoat(false);
     // Keep material_buffer handle and max_payload_size; the next add_material
     // call will repopulate from index 0.
 }

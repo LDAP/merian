@@ -1192,6 +1192,9 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
                 if (mesh.flags & MeshFlags::UseEnvMap) {
                     gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::UseEnvMap);
                 }
+                if (mesh.flags & MeshFlags::TwoSided) {
+                    gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::TwoSided);
+                }
 
                 geometries.emplace_back(gd);
             }

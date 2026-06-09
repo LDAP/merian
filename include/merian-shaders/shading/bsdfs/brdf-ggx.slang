@@ -408,6 +408,98 @@ struct GGXBRDF : BSDF {
     }
 }
 
+// A specular microfacet BTDF with GGX normal distribution: the transmission twin of GGXBRDF.
+// eta is the relative index of refraction (incident / transmitted), baked in by the material.
+// https://www.cs.cornell.edu/~srm/publications/EGSR07-btdf.pdf
+struct GGXBTDF : BSDF {
+    float alpha;
+    float eta;
+    float3 tint;
+
+    __init(float alpha, float eta, float3 tint) {
+        this.alpha = alpha;
+        this.eta = eta;
+        this.tint = tint;
+    }
+
+    float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) {
+        if (wi.z < BSDF_MIN_COS_THETA || wo.z > -BSDF_MIN_COS_THETA) {
+            return float3(0.0f);
+        }
+
+        float3 h = normalize(wo + (wi * eta));
+        h *= sign(h.z);
+        const float widoth = dot(wi, h);
+        const float wodoth = dot(wo, h);
+        const float alpha_squared = pow2(alpha);
+        const float G2_over_widotn = smith_g2_over_widotn(abs(wo.z), wi.z, alpha_squared);
+        const float D = ggx_NDF(pow2(h.z), alpha_squared);
+
+        const float denom = wodoth + (eta * widoth);
+        return tint * (D * G2_over_widotn * abs(pow2(eta) * widoth * wodoth / pow2(denom)));
+    }
+
+    Optional<float3> sample(const float3 wi, inout RandomGenerator rng) {
+        if (wi.z < BSDF_MIN_COS_THETA) {
+            return none;
+        }
+
+        const float3 h = ggx_VNDF_sample_H(wi, alpha, rng.next_float2());
+        const float3 wo = refract(-wi, h, eta);
+        if (all(wo == float3(0.0f)) || wo.z > -BSDF_MIN_COS_THETA) {
+            return none; // total internal reflection
+        }
+
+        return wo;
+    }
+
+    float pdf(const float3 wi, const float3 wo) {
+        if (wi.z < BSDF_MIN_COS_THETA || wo.z > -BSDF_MIN_COS_THETA) {
+            return 0.0f;
+        }
+
+        float3 h = normalize(wo + (wi * eta));
+        h *= sign(h.z);
+        const float wodoth = dot(wo, h);
+        const float denom = wodoth + (eta * dot(wi, h));
+        /* * abs(wodoth) / pow2(denom) is the Jacobian of the refraction */
+        return ggx_VNDF_H_pdf(wi, h, pow2(alpha)) * abs(wodoth) / pow2(denom);
+    }
+
+    override Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
+        if (wi.z < BSDF_MIN_COS_THETA) {
+            return none;
+        }
+
+        const float alpha_squared = pow2(alpha);
+        const float3 h = ggx_VNDF_sample_H(wi, alpha, rng.next_float2());
+        const float3 wo = refract(-wi, h, eta);
+        if (all(wo == float3(0.0f)) || wo.z > -BSDF_MIN_COS_THETA) {
+            return none;
+        }
+
+        const float wodoth = dot(wo, h);
+        const float denom = wodoth + (eta * dot(wi, h));
+        const float pdf = ggx_VNDF_H_pdf(wi, h, alpha_squared) * abs(wodoth) / pow2(denom);
+        // Like GGXBRDF, the VNDF weight f(wi,wo) * |wo.z| / pdf reduces to G2(wi,wo) / G1(wi); the
+        // refraction adds an eta^2 radiance factor. It stays finite even at alpha -> 0.
+        const float weight = pow2(eta) * smith_g2_over_widotn(abs(wo.z), wi.z, alpha_squared) /
+                             smith_g1_over_widotn(wi.z, alpha_squared);
+        return ShadingFunctionSample(wo, pdf, tint * weight);
+    }
+
+    Albedo get_albedo(const float3 wi) {
+        return Albedo(tint);
+    }
+
+    float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
+        return float3(0.0f);
+    }
+}
+
+typealias SpecularBRDF = GGXBRDF;
+typealias SpecularBTDF = GGXBTDF;
+
 // float ggx_diffuse_mix_times_wodotn(float3 wi, float3 wo, float3 n, float alpha, float F0) {
 //     float3 h = normalize(wo + wi);
 //     float wodotn = clamp(dot(n, wo), 0.0f, 1.0f);

@@ -31,6 +31,9 @@ float3 trace_path(const ParameterBlock<Scene> scene,
                   inout RandomGenerator rng) {
     float3 radiance = merian_render_emission_on_primary ? sp.material.emission : float3(0);
     float3 throughput = float3(1);
+    // Medium the ray is travelling through; updated on transmission events.
+    float current_ior = 1.0f;
+    float3 current_absorption = float3(0.0f);
 
     for (int bounce = 1; bounce < pc.max_path_length; bounce++) {
         const OrthonormalFrame frame = sp.material.shading_frame;
@@ -45,14 +48,31 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         const float3 wo = frame.to_world(bs.wo);
         throughput *= bs.weight;
 
-        // avoid self-intersection by nudging off the surface on wo's side
         const float3 ng = sp.get_face_normal();
+        if (merian_hint_enable_transmission) {
+            // A transmission event crosses the geometric surface; update the medium we are now in.
+            if ((dot(wo, ng) < 0.f) != (dot(-ray.Direction, ng) < 0.f)) {
+                current_ior /= sp.material.get_eta();
+                if (merian_hint_enable_volume) {
+                    current_absorption = sp.material.get_absorption();
+                }
+            }
+        }
+
+        // avoid self-intersection by nudging off the surface on wo's side
         ray.Origin = sp.pos + (dot(wo, ng) < 0.f ? -ng : ng) * SCENE_RAY_OFFSET;
         ray.Direction = wo;
         ray.TMin = SCENE_RAY_TMIN;
         ray.TMax = SCENE_RAY_TMAX;
 
-        sp = scene.trace_and_get_shading_point(ray, pc.instance_mask, uint16_t(bounce));
+        sp = scene.trace_and_get_shading_point(ray, pc.instance_mask,
+                                               RenderContext(uint16_t(bounce), current_ior));
+
+        if (merian_hint_enable_volume) {
+            // Beer-Lambert absorption over the segment just travelled inside the medium.
+            throughput *= exp(-current_absorption * distance(ray.Origin, sp.pos));
+        }
+
         radiance += throughput * sp.material.emission;
     }
 

@@ -103,9 +103,19 @@ void FBXScene::load_materials(const CommandBufferHandle& cmd) {
 
     // ufbx normalizes every source shader into the same `pbr` map set.
     material_map.resize(scene->materials.count);
-    material_opaque.assign(scene->materials.count, 1);
+    material_flags.assign(scene->materials.count, MeshFlags::IsOpaque);
+    bool any_transmissive = false;
     for (size_t i = 0; i < scene->materials.count; i++) {
-        const ufbx_material_pbr_maps& pbr = scene->materials.data[i]->pbr;
+        const ufbx_material* fmat = scene->materials.data[i];
+        const ufbx_material_pbr_maps& pbr = fmat->pbr;
+
+        // Legacy FBX Phong/Lambert materials have no real transmission channel; ufbx's Phong->PBR
+        // conversion fills transmission anyway (1.0 for opaque assets), so only trust it for PBR
+        // shaders.
+        const bool pbr_shader = fmat->shader_type != UFBX_SHADER_FBX_PHONG &&
+                                fmat->shader_type != UFBX_SHADER_FBX_LAMBERT;
+        const float transmission = pbr_shader ? map_real(pbr.transmission_factor, 0.f) : 0.f;
+        any_transmissive |= transmission > 0.f;
 
         PBRTMaterial mat;
         PBRTMaterialPayload& p = mat.payload;
@@ -124,7 +134,13 @@ void FBXScene::load_materials(const CommandBufferHandle& cmd) {
         const bool base_has_alpha = base_tex != nullptr &&
                                     base_tex->typed_id < texture_slots.size() &&
                                     texture_slots[base_tex->typed_id].has_alpha;
-        material_opaque[i] = static_cast<uint8_t>(!base_has_alpha && p.opacity >= 0.999f);
+        const bool opaque = !base_has_alpha && transmission == 0.f && p.opacity >= 0.999f;
+        // Back faces are shaded for alpha-cutout (foliage), explicitly double-sided materials, and
+        // glass (so the ray hits the exit interface).
+        const bool two_sided = base_has_alpha || transmission > 0.f ||
+                               fmat->features.features[UFBX_MATERIAL_FEATURE_DOUBLE_SIDED].enabled;
+        material_flags[i] = (opaque ? MeshFlags::IsOpaque : MeshFlags::None) |
+                            (two_sided ? MeshFlags::TwoSided : MeshFlags::None);
 
         // metalness / roughness (linear scalar maps; the texture replaces the constant)
         p.metalness_texture = load(pbr.metalness, true);
@@ -153,7 +169,15 @@ void FBXScene::load_materials(const CommandBufferHandle& cmd) {
         p.sheen_color = map_vec3(pbr.sheen_color, float3(1));
         p.sheen_roughness = map_real(pbr.sheen_roughness, 0.3f);
 
+        // transmission (glass)
+        p.transmission_weight = transmission;
+        p.transmission_color = map_vec3(pbr.transmission_color, float3(1));
+
         material_map[i] = get_material_system()->add_material(pbrt_type_id, mat);
+    }
+
+    if (any_transmissive) {
+        get_material_system()->set_enable_transmission(true);
     }
 
     // Default material for mesh parts without an assigned material.
@@ -303,25 +327,34 @@ void FBXScene::load_meshes() {
                 }
             }
 
-            // Material for this part (default material is opaque).
+            // Material for this part (default material is opaque, single-sided).
             MaterialID mat_id = default_material_id;
-            bool opaque = true;
+            MeshFlags flags = MeshFlags::IsOpaque;
             if (part.index < mesh->materials.count) {
                 const ufbx_material* m = mesh->materials.data[part.index];
                 if (m != nullptr && m->typed_id < material_map.size()) {
                     mat_id = material_map[m->typed_id];
-                    opaque = material_opaque[m->typed_id] != 0;
+                    flags = material_flags[m->typed_id];
                 }
             }
 
-            MeshFlags flags = opaque ? MeshFlags::IsOpaque : MeshFlags::None;
             if (mesh->vertex_tangent.exists) {
                 flags = flags | MeshFlags::HasTangents;
             }
 
+            // FBX stores names on nodes, not geometry, so fall back to the instancing node's name.
+            std::string base_name;
+            if (mesh->name.length > 0) {
+                base_name = std::string(mesh->name.data, mesh->name.length);
+            } else if (mesh->instances.count > 0 && mesh->instances.data[0]->name.length > 0) {
+                const ufbx_string& n = mesh->instances.data[0]->name;
+                base_name = std::string(n.data, n.length);
+            } else {
+                base_name = fmt::format("FBX Mesh {}", mesh_index);
+            }
             sm->name = mesh->material_parts.count > 1
-                           ? fmt::format("{} ({:02})", mesh->name.data, part_index)
-                           : std::string(mesh->name.data);
+                           ? fmt::format("{} ({:02})", base_name, part_index)
+                           : base_name;
             sm->material_id = mat_id;
             sm->flags = flags;
 

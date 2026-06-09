@@ -93,6 +93,21 @@ class MaterialSystem : public std::enable_shared_from_this<MaterialSystem> {
     }
     void set_min_roughness(float min_roughness);
 
+    bool get_enable_transmission() const {
+        return enable_transmission;
+    }
+    void set_enable_transmission(bool enable);
+
+    bool get_enable_volume() const {
+        return enable_volume;
+    }
+    void set_enable_volume(bool enable);
+
+    bool get_enable_clearcoat() const {
+        return enable_clearcoat;
+    }
+    void set_enable_clearcoat(bool enable);
+
     void properties(Properties& props);
 
     const SlangCompositionHandle& get_composition() const {
@@ -150,6 +165,9 @@ class MaterialSystem : public std::enable_shared_from_this<MaterialSystem> {
     float alpha_test_threshold = 0.5F;
     bool clamp_normals = true;
     float min_roughness = 0.0316F;
+    bool enable_transmission = false;
+    bool enable_volume = false;
+    bool enable_clearcoat = false;
     SlangCompositionHandle composition;
     Versioned<SlangProgram> layout_program;
     Versioned<ShaderObject> shader_object;

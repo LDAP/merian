@@ -72,7 +72,7 @@ void main(uint3 tid: SV_DispatchThreadID,
     }
 
     const ShadingPoint sp =
-        scene._make_environment_map_shading_point(ray, uint16_t(0), DefaultLODSampler());
+        scene._make_environment_map_shading_point(ray, RenderContext(), DefaultLODSampler());
     const float linear_z = length(sp.pos - ray.Origin);
     const float2 mv = scene.compute_motion_vector(sp.pos, pixel, dim);
 

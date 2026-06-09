@@ -21,6 +21,16 @@ extern static const bool merian_hint_clamp_normals = true;
 // Lower bound on perceptual roughness, avoiding the degenerate zero-roughness GGX lobe.
 extern static const float merian_hint_min_roughness = 0.0316f;
 
+// Enables the dielectric transmission lobe; transmissive materials shade as opaque when false.
+// Set via MaterialSystem.
+extern static const bool merian_hint_enable_transmission = false;
+
+// Enables volume absorption inside transmissive media (coloured glass). Set via MaterialSystem.
+extern static const bool merian_hint_enable_volume = false;
+
+// Enables the clearcoat layer (a thin glossy dielectric coat over the surface). Set via MaterialSystem.
+extern static const bool merian_hint_enable_clearcoat = false;
+
 // This represents the definition of the material (before being evaluated at a shading point), e.g.
 // Disney, glTF.
 //
@@ -57,6 +67,18 @@ interface MaterialSample {
 
     // the (representative) shading normal in world space. I.e. to guide a denoiser.
     property float3 shading_normal { get; }
+
+    // Relative IOR (incident / transmitted) at this surface; 1.0 for opaque materials. The integrator
+    // multiplies the medium IOR by 1/eta after a transmission event.
+    float get_eta() {
+        return 1.0f;
+    }
+
+    // Volume absorption coefficient (per channel) of the medium entered on a transmission event;
+    // 0 outside / for opaque materials. The integrator applies Beer-Lambert exp(-sigma * distance).
+    float3 get_absorption() {
+        return float3(0.0f);
+    }
 }
 
 }

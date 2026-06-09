@@ -11,12 +11,13 @@ import merian_shaders.utils.normal_map;
 
 namespace merian {
 
-typealias PBRTDielectric = FresnelMixBSDF<GGXBRDF, LambertDiffuseBRDF>; // specular over diffuse
-typealias PBRTMetal = ConductorFresnelBSDF<GGXBRDF>;
+typealias PBRTDiffuseOrTransmission = MixBSDF<LambertDiffuseBRDF, SpecularBTDF>; // by transmission
+typealias PBRTDielectric = FresnelMixBSDF<SpecularBRDF, PBRTDiffuseOrTransmission>; // specular over base
+typealias PBRTMetal = ConductorFresnelBSDF<SpecularBRDF>;
 typealias PBRTSubstrate = MixBSDF<PBRTDielectric, PBRTMetal>; // by metalness
-typealias PBRTCoated = FresnelMixBSDF<GGXBRDF, PBRTSubstrate>;
-typealias PBRTWithCoat = MixBSDF<PBRTSubstrate, PBRTCoated>; // by coat weight
-typealias PBRTBSDF = MixBSDF<PBRTWithCoat, SheenBRDF>;       // by sheen weight
+typealias PBRTCoated = FresnelMixBSDF<SpecularBRDF, PBRTSubstrate>;
+typealias PBRTWithCoat = MixBSDF<PBRTSubstrate, PBRTCoated>;   // by coat weight
+typealias PBRTBSDF = MixBSDF<PBRTWithCoat, SheenBRDF>;         // by sheen weight
 
 struct PBRTMaterial : MaterialModel {
     typealias MaterialSampleImpl = PBRTMaterialSample;
@@ -36,6 +37,8 @@ struct PBRTMaterial : MaterialModel {
     float sheen_weight;
     float3 sheen_color;
     float sheen_roughness;
+    float transmission_weight;
+    float3 transmission_color;
     TextureID metalness_texture;
     TextureID roughness_texture;
     TextureID emission_texture;
@@ -83,21 +86,33 @@ struct PBRTMaterial : MaterialModel {
         const float ior_t = (specular_ior - 1.0f) / (specular_ior + 1.0f);
         const float dielectric_f0 = clamp(specular_weight * ior_t * ior_t, 0.0f, 1.0f);
 
-        const PBRTSubstrate substrate =
-            PBRTSubstrate(PBRTDielectric(GGXBRDF(alpha), LambertDiffuseBRDF(base), dielectric_f0),
-                          PBRTMetal(GGXBRDF(alpha), base), metal);
+        // When transmission is disabled eta/weight stay neutral and the surface shades as opaque.
+        float eta = 1.0f;
+        float tw = 0.0f;
+        if (merian_hint_enable_transmission) {
+            eta = sd.ior / (sd.front_facing ? specular_ior : 1.0f);
+            tw = transmission_weight;
+        }
+
+        const PBRTSubstrate substrate = PBRTSubstrate(
+            PBRTDielectric(SpecularBRDF(alpha),
+                           PBRTDiffuseOrTransmission(LambertDiffuseBRDF(base),
+                                                     SpecularBTDF(alpha, eta, transmission_color), tw),
+                           dielectric_f0),
+            PBRTMetal(SpecularBRDF(alpha), base), metal);
 
         // Dielectric clearcoat over the substrate.
         const float coat_alpha =
             ggx_roughness_to_alpha(max(coat_roughness, merian_hint_min_roughness));
         const float coat_t = (coat_ior - 1.0f) / (coat_ior + 1.0f);
         const PBRTWithCoat with_coat = PBRTWithCoat(
-            substrate, PBRTCoated(GGXBRDF(coat_alpha), substrate, coat_t * coat_t), coat_weight);
+            substrate, PBRTCoated(SpecularBRDF(coat_alpha), substrate, coat_t * coat_t), coat_weight);
 
         PBRTMaterialSample s;
         s.brdf = PBRTBSDF(with_coat, SheenBRDF(sheen_color, sheen_roughness), sheen_weight);
         s.shading_frame = shading_frame;
         s.emission = emission_out;
+        s.eta = eta;
         return s;
     }
 }
@@ -108,6 +123,7 @@ struct PBRTMaterialSample : MaterialSample {
     PBRTBSDF brdf;
     OrthonormalFrame shading_frame;
     float3 emission;
+    float eta;
 
     BSDFImpl get_bsdf() {
         return brdf;
@@ -115,6 +131,10 @@ struct PBRTMaterialSample : MaterialSample {
 
     property float3 shading_normal {
         get { return shading_frame.get_normal(); }
+    }
+
+    override float get_eta() {
+        return eta;
     }
 }
 

@@ -369,20 +369,29 @@ struct Scene {
     ShadingPoint get_shading_point(const RayDesc ray,
                                    const Hit hit,
                                    const GeometryData gd,
-                                   const uint16_t bounce = 0,
+                                   const RenderContext ctx = RenderContext(),
                                    const LODSampler2D lod = DefaultLODSampler()) {
         const TriangleHit tri = get_triangle_hit(hit, gd);
         const Surface surface = get_surface(hit, tri);
 
         // const float3 prev_pos = get_prev_world_position(hit, gd);
 
-        const ShadingData sd = ShadingData(-ray.Direction,
-                                           surface.pos,
-                                           surface.uv,
-                                           time,
-                                           surface.frame,
-                                           surface.face_normal,
-                                           bounce);
+        // Two-sided geometry (foliage, transmissive glass) can be hit from behind; orient the frame
+        // and face normal to the viewer so the upper-hemisphere BSDF sees a positive cosine.
+        // Single-sided geometry is back-face culled, so it is always hit front-on.
+        OrthonormalFrame frame = surface.frame;
+        float3 face_normal = surface.face_normal;
+        bool front_facing = true;
+        if (gd.flags & GeometryDataFlags::TwoSided) {
+            front_facing = dot(-ray.Direction, surface.face_normal) >= 0.f;
+            if (!front_facing) {
+                frame.flip_normal();
+                face_normal = -face_normal;
+            }
+        }
+
+        const ShadingData sd = ShadingData(-ray.Direction, surface.pos, surface.uv, time, frame,
+                                           face_normal, ctx.bounce, ctx.ior, front_facing);
 
         ShadingPoint sp;
         sp.pos = surface.pos;
@@ -394,32 +403,32 @@ struct Scene {
 
     ShadingPoint get_shading_point(const RayDesc ray,
                                    const Hit hit,
-                                   const uint16_t bounce = 0,
+                                   const RenderContext ctx = RenderContext(),
                                    const LODSampler2D lod = DefaultLODSampler()) {
         if (let gd = get_geometry_data(hit)) {
             if ((gd.flags & GeometryDataFlags::UseEnvMap) == 0) {
-                return get_shading_point(ray, hit, gd, bounce, lod);
+                return get_shading_point(ray, hit, gd, ctx, lod);
             }
         }
-        return _make_environment_map_shading_point(ray, bounce, lod);
+        return _make_environment_map_shading_point(ray, ctx, lod);
     }
 
     ShadingPoint trace_and_get_shading_point(const RayDesc ray,
                                              const uint instance_mask = 0xff,
-                                             const uint16_t bounce = 0,
+                                             const RenderContext ctx = RenderContext(),
                                              const LODSampler2D lod = DefaultLODSampler()) {
-        return get_shading_point(ray, trace_ray(ray, RAY_FLAG_NONE, instance_mask), bounce, lod);
+        return get_shading_point(ray, trace_ray(ray, RAY_FLAG_NONE, instance_mask), ctx, lod);
     }
 
     // -----------------------------------------
 
     ShadingPoint _make_environment_map_shading_point(const RayDesc ray,
-                                                     const uint16_t bounce,
+                                                     const RenderContext ctx,
                                                      const LODSampler2D lod) {
         const float3 pos = ray.Origin + ray.Direction * ENV_MAP_DISTANCE;
         const ShadingData sd =
             ShadingData(-ray.Direction, pos, float2(0), time, OrthonormalFrame(-ray.Direction),
-                        -ray.Direction, bounce);
+                        -ray.Direction, ctx.bounce, ctx.ior, true);
 
         ShadingPoint sp;
         sp.pos = pos;

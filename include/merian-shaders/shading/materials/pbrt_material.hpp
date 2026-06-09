@@ -23,12 +23,14 @@ struct PBRTMaterialPayload {
     float sheen_weight{0.0f};
     float3 sheen_color{0, 0, 0};
     float sheen_roughness{0.3f};
+    float transmission_weight{0.0f};
+    float3 transmission_color{1, 1, 1};
     TextureID metalness_texture{TextureID(-1)};
     TextureID roughness_texture{TextureID(-1)};
     TextureID emission_texture{TextureID(-1)};
     TextureID normal_texture{TextureID(-1)};
 };
-static_assert(sizeof(PBRTMaterialPayload) == 88,
+static_assert(sizeof(PBRTMaterialPayload) == 104,
               "PBRTMaterialPayload layout must match Slang PBRTMaterial");
 
 struct PBRTMaterial : Material {
