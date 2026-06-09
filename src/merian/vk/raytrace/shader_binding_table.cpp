@@ -74,8 +74,9 @@ ShaderBindingTableHandle ShaderBindingTable::create(const RayTracingPipelineHand
 
     const auto usage = vk::BufferUsageFlagBits::eShaderBindingTableKHR |
                        vk::BufferUsageFlagBits::eShaderDeviceAddress;
-    sbt->sbt_buffer = allocator->create_buffer(
-        buffer_size, usage, MemoryMappingType::HOST_ACCESS_SEQUENTIAL_WRITE, "ShaderBindingTable");
+    sbt->sbt_buffer = allocator->create_buffer(buffer_size, usage,
+                                               MemoryMappingType::HOST_ACCESS_SEQUENTIAL_WRITE,
+                                               "ShaderBindingTable", base_alignment);
 
     auto* data = sbt->sbt_buffer->get_memory()->map_as<uint8_t>();
     std::memset(data, 0, static_cast<size_t>(buffer_size));
@@ -249,8 +250,9 @@ ShaderBindingTableHandle ShaderBindingTableBuilder::build() {
 
     const auto usage = vk::BufferUsageFlagBits::eShaderBindingTableKHR |
                        vk::BufferUsageFlagBits::eShaderDeviceAddress;
-    sbt->sbt_buffer = allocator->create_buffer(
-        buffer_size, usage, MemoryMappingType::HOST_ACCESS_SEQUENTIAL_WRITE, "ShaderBindingTable");
+    sbt->sbt_buffer = allocator->create_buffer(buffer_size, usage,
+                                               MemoryMappingType::HOST_ACCESS_SEQUENTIAL_WRITE,
+                                               "ShaderBindingTable", base_alignment);
 
     auto* data = sbt->sbt_buffer->get_memory()->map_as<uint8_t>();
     std::memset(data, 0, static_cast<size_t>(buffer_size));
