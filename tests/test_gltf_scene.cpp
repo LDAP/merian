@@ -33,6 +33,7 @@ class GLTFSceneTest : public ::testing::Test {
     static void SetUpTestSuite() {
         spdlog::set_level(spdlog::level::debug);
         ContextCreateInfo info{
+            .features = VulkanFeatures({"scalarBlockLayout", "shaderInt64"}),
             .context_extensions = {ExtensionVkValidationLayers::name, ExtensionResources::name},
             .application_name = "test-gltf-scene",
         };

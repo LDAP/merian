@@ -105,6 +105,8 @@ void FBXScene::load_materials(const CommandBufferHandle& cmd) {
     material_map.resize(scene->materials.count);
     material_flags.assign(scene->materials.count, MeshFlags::IsOpaque);
     bool any_transmissive = false;
+    bool any_clearcoat = false;
+    bool any_sheen = false;
     for (size_t i = 0; i < scene->materials.count; i++) {
         const ufbx_material* fmat = scene->materials.data[i];
         const ufbx_material_pbr_maps& pbr = fmat->pbr;
@@ -163,11 +165,13 @@ void FBXScene::load_materials(const CommandBufferHandle& cmd) {
         p.coat_weight = map_real(pbr.coat_factor, 0.f);
         p.coat_roughness = map_real(pbr.coat_roughness, 0.f);
         p.coat_ior = map_real(pbr.coat_ior, 1.6f);
+        any_clearcoat |= p.coat_weight > 0.f;
 
         // sheen
         p.sheen_weight = map_real(pbr.sheen_factor, 0.f);
         p.sheen_color = map_vec3(pbr.sheen_color, float3(1));
         p.sheen_roughness = map_real(pbr.sheen_roughness, 0.3f);
+        any_sheen |= p.sheen_weight > 0.f;
 
         // transmission (glass)
         p.transmission_weight = transmission;
@@ -176,9 +180,11 @@ void FBXScene::load_materials(const CommandBufferHandle& cmd) {
         material_map[i] = get_material_system()->add_material(pbrt_type_id, mat);
     }
 
-    if (any_transmissive) {
-        get_material_system()->set_enable_transmission(true);
-    }
+    // Enable exactly the lobes this asset uses so the Slang compiler folds out the rest.
+    // set_enable_* is a no-op when the flag is unchanged.
+    get_material_system()->set_enable_transmission(any_transmissive);
+    get_material_system()->set_enable_clearcoat(any_clearcoat);
+    get_material_system()->set_enable_sheen(any_sheen);
 
     // Default material for mesh parts without an assigned material.
     PBRTMaterial default_mat;
@@ -424,6 +430,9 @@ void FBXScene::load_cameras() {
             get_active_camera()->look_at_bounding_box(aabb);
         }
     }
+
+    for (const CameraHandle& cam : get_cameras())
+        cam->set_jitter_sequence(Camera::JitterSequence::R2);
 }
 
 void FBXScene::compute_aabb() {

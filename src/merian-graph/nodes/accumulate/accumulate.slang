@@ -1,6 +1,11 @@
 #define FILTER_MODE_NEAREST 0
 #define FILTER_MODE_STOCHASTIC_BILINEAR 1
 
+// When the reprojected GBuffer (normal/depth) is consulted to validate reuse.
+#define GBUFFER_CHECK_ALWAYS 0    // always validate (default)
+#define GBUFFER_CHECK_IF_MOVING 1 // skip the check (accept) where the motion vector is zero
+#define GBUFFER_CHECK_NEVER 2     // never validate, trust the motion vectors
+
 [vk::constant_id(0)]
 const int workgroup_size_x = 1;
 [vk::constant_id(1)]
@@ -18,6 +23,8 @@ const bool EXTENDED_SEARCH = true;
 const bool REUSE_BORDER = false;
 [vk::constant_id(7)]
 const bool USE_MOTION_VECTORS = true;
+[vk::constant_id(8)]
+const int GBUFFER_CHECK_MODE = GBUFFER_CHECK_ALWAYS;
 
 #include "graph_layout.slangh"
 
@@ -96,9 +103,11 @@ void main(uint3 ipos: SV_DispatchThreadID) {
     // REPROJECT
     int2 prev_ipos;
     float max_history = pc.accum_max_hist;
+    bool is_static; // the surface did not move on screen (motion vector ~0)
     RandomGenerator rng = XorShift32(pcg3d16(uint3(ipos.xy, pc.iteration)));
     if (USE_MOTION_VECTORS) {
         const float2 mv = gbuffer.get_motion_vectors(ipos.xy);
+        is_static = dot(mv, mv) < 1e-3 * 1e-3;
         float2 prev_pos = ipos.xy + mv;
 
         if (REUSE_BORDER) {
@@ -119,6 +128,7 @@ void main(uint3 ipos: SV_DispatchThreadID) {
         }
     } else {
         prev_ipos = ipos.xy;
+        is_static = true;
         max_history = pc.accum_max_hist;
     }
 
@@ -129,12 +139,19 @@ void main(uint3 ipos: SV_DispatchThreadID) {
     float prev_history = 0.0;
     float4 prev_out = float4(0);
 
+    const bool skip_gbuffer_check = GBUFFER_CHECK_MODE == GBUFFER_CHECK_NEVER ||
+                                    (GBUFFER_CHECK_MODE == GBUFFER_CHECK_IF_MOVING && is_static);
+
     bool found = false;
     if (is_on_texture(prev_ipos, img_src)) {
-        const SurfaceData prev_gbuf = prev_gbuffer.get_surface(prev_ipos);
-        found = reprojection_valid(gbuf.normal, prev_gbuf.normal,
-                                   pc.normal_reject_cos, gbuf.linear_z, gbuf.delta_z,
-                                   prev_gbuf.linear_z, pc.z_reject_percent);
+        if (skip_gbuffer_check) {
+            found = true;
+        } else {
+            const SurfaceData prev_gbuf = prev_gbuffer.get_surface(prev_ipos);
+            found = reprojection_valid(gbuf.normal, prev_gbuf.normal,
+                                       pc.normal_reject_cos, gbuf.linear_z, gbuf.delta_z,
+                                       prev_gbuf.linear_z, pc.z_reject_percent);
+        }
 
         if (found) {
             prev_history = img_prev_history[prev_ipos].r;
@@ -142,7 +159,7 @@ void main(uint3 ipos: SV_DispatchThreadID) {
         }
     }
 
-    if (EXTENDED_SEARCH) {
+    if (EXTENDED_SEARCH && !skip_gbuffer_check) {
         if (!found) {
             float sum_w = 0.0;
 

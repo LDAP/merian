@@ -31,6 +31,12 @@ extern static const bool merian_hint_enable_volume = false;
 // Enables the clearcoat layer (a thin glossy dielectric coat over the surface). Set via MaterialSystem.
 extern static const bool merian_hint_enable_clearcoat = false;
 
+// Enables the sheen layer (a retroreflective microfibre coat, for cloth and fabric). Set via MaterialSystem.
+extern static const bool merian_hint_enable_sheen = false;
+
+// Enables thin-film iridescence on the specular Fresnel (soap bubbles, oil films). Set via MaterialSystem.
+extern static const bool merian_hint_enable_iridescence = false;
+
 // This represents the definition of the material (before being evaluated at a shading point), e.g.
 // Disney, glTF.
 //

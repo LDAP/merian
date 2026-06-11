@@ -1,0 +1,257 @@
+{
+    "graph_properties": {
+        "flush thread pool": true,
+        "fps limiter": false,
+        "imgui event": "ui",
+        "iterations in flight": 2,
+        "low latency": false,
+        "time overwrite": "None"
+    },
+    "nodes": [
+        {
+            "enabled": true,
+            "id": "accumulate",
+            "outputs": [
+                "history->accumulate.prev_history",
+                "out->accumulate.prev_out",
+                "out->exposure.src"
+            ],
+            "properties": {
+                "IPR factor": 50.0,
+                "adaptivity": 0.0,
+                "adaptivity IPR factor": 1.5,
+                "adaptivity percentile lower": 0.05000000074505806,
+                "adaptivity percentile upper": 0.949999988079071,
+                "alpha": 1.0,
+                "clear event pattern": "/user/clear,//geometry_changed,//transform_changed,//camera_changed",
+                "depth threshold": 0.03761100023984909,
+                "extended search": true,
+                "filter mode": "nearest",
+                "firefly filter bias": 0.20000000298023224,
+                "firefly filter enable": false,
+                "firefly percentile lower": 0.25,
+                "firefly percentile upper": 0.8999999761581421,
+                "gbuffer check": "only if moving",
+                "hard clamp": "inf",
+                "max history": "inf",
+                "normal threshold": 0.8377581238746643,
+                "reuse border": false,
+                "use motion vectors": true
+            },
+            "type": "Accumulate"
+        },
+        {
+            "enabled": true,
+            "id": "blit",
+            "outputs": [
+                "acquire->imgui.acquire"
+            ],
+            "properties": {
+                "blit mode": "FIT",
+                "source array element": 0
+            },
+            "type": "Swapchain Blit"
+        },
+        {
+            "enabled": true,
+            "id": "exposure",
+            "outputs": [
+                "out->tonemap.src"
+            ],
+            "properties": {
+                "ISO": 856.0,
+                "K": 8.0,
+                "aperature": 1.1200000047683716,
+                "autoexposure": true,
+                "max exposure": 10000.0,
+                "max log luminance": 12.0,
+                "metering": "center-weighted",
+                "min exposure": 1.0,
+                "min log luminance": -15.0,
+                "q": 0.6499999761581421,
+                "shutter time (ms)": 768.0,
+                "speed down": 5.099999904632568,
+                "speed up": 3.0999999046325684
+            },
+            "type": "Exposure"
+        },
+        {
+            "enabled": true,
+            "id": "gbuffer",
+            "outputs": [
+                "denoiser->accumulate.gbuffer.tex0",
+                "denoiser->accumulate.prev_gbuffer.tex0",
+                "gbuffer->render.gbuffer",
+                "hit_info->accumulate.gbuffer.tex1",
+                "hit_info->accumulate.prev_gbuffer.tex1",
+                "mv->accumulate.gbuffer.tex2",
+                "mv->accumulate.prev_gbuffer.tex2"
+            ],
+            "properties": {
+                "0": true,
+                "1": true,
+                "2": true,
+                "3": true,
+                "4": true,
+                "5": true,
+                "6": false,
+                "7": true,
+                "height": 1080,
+                "width": 1920
+            },
+            "type": "GBuffer (Raytraced)"
+        },
+        {
+            "enabled": true,
+            "id": "imgui",
+            "properties": {
+                "imgui event": "ui"
+            },
+            "type": "ImGui"
+        },
+        {
+            "enabled": true,
+            "id": "output",
+            "outputs": [
+                "acquire->blit.acquire",
+                "controller->scene.controller",
+                "window->imgui.window"
+            ],
+            "properties": {
+                "acquire timeout": 100000000,
+                "backend": "SDL3 (Video Subsystem)",
+                "blit mode": "FIT",
+                "mode": "windowed",
+                "on_should_close_actions": {
+                    "remove node": false,
+                    "send sigint": false,
+                    "send sigterm": true
+                },
+                "present mode": "Mailbox",
+                "rebuild on recreate": false,
+                "surface format": "R8G8B8A8Srgb, SrgbNonlinear"
+            },
+            "type": "Window"
+        },
+        {
+            "enabled": true,
+            "id": "render",
+            "outputs": [
+                "irradiance->accumulate.src"
+            ],
+            "properties": {
+                "0": true,
+                "1": true,
+                "2": true,
+                "3": true,
+                "4": true,
+                "5": true,
+                "6": true,
+                "7": true,
+                "emission on primary": true,
+                "height": 1080,
+                "max path length": 12,
+                "samples per pixel": 2,
+                "width": 1920
+            },
+            "type": "Render (Path-traced)"
+        },
+        {
+            "enabled": true,
+            "id": "scene",
+            "outputs": [
+                "scene->gbuffer.scene",
+                "scene->render.scene"
+            ],
+            "properties": {
+                "camera_controller": {
+                    "look sensitivity": 0.001500000013038516,
+                    "move speed": 3.0,
+                    "orbit sensitivity": 0.009999999776482582,
+                    "pan sensitivity": 0.0020000000949949026
+                },
+                "env": {
+                    "Path": "/home/lucas/repos/glTF-Sample-Environments/artist_workshop_8k.hdr",
+                    "Pitch": 0.0,
+                    "Type": "LatLong",
+                    "Yaw": 0.0
+                },
+                "file": "/home/lucas/repos/glTF-Sample-Assets/Models/ABeautifulGame/glTF/ABeautifulGame.gltf",
+                "scene": {
+                    "cameras": {
+                        "active": 0,
+                        "aspect": 1.7777777910232544,
+                        "far": 1000.0,
+                        "fly": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "fov": 91.49284362792969,
+                        "jitter": "R2",
+                        "move": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "near": 0.009999999776482582,
+                        "orbit": [
+                            0.0,
+                            0.0
+                        ],
+                        "position": [
+                            0.21925067901611328,
+                            0.045605480670928955,
+                            0.22148285806179047
+                        ],
+                        "rotate": [
+                            0.0,
+                            0.0
+                        ],
+                        "target": [
+                            0.09012854099273682,
+                            0.036754950881004333,
+                            -0.025203702971339226
+                        ],
+                        "up": [
+                            0.0,
+                            1.0,
+                            0.0
+                        ]
+                    }
+                },
+                "settings": {
+                    "Alpha Test Threshold": 0.5,
+                    "BLAS Rebuild Fraction": 0.33000001311302185,
+                    "Clamp Normals": true,
+                    "Pretransform Animated": false
+                }
+            },
+            "type": "GLTF Scene"
+        },
+        {
+            "enabled": true,
+            "id": "tonemap",
+            "outputs": [
+                "out->blit.src"
+            ],
+            "properties": {
+                "alpha mode": "Perceptual luminance",
+                "clamp output": true,
+                "look": "Default",
+                "offset": 0.0,
+                "perceptual exponent": 2.200000047683716,
+                "power": 1.0,
+                "saturation": 1.0,
+                "slope": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "tonemap": "AgX"
+            },
+            "type": "Tonemap"
+        }
+    ],
+    "version": 3
+}

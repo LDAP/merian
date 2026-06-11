@@ -197,6 +197,10 @@ class Graph : public std::enable_shared_from_this<Graph> {
     void store_to_file(const std::filesystem::path& path);
     nlohmann::json store_to_json();
 
+    // Sets the default path for the load/store controls in the graph properties. load_from_file
+    // sets this automatically; a host that loads via load_from_json should set it explicitly.
+    void set_store_path(const std::filesystem::path& path);
+
     // Build graph from description
     void from_description(const GraphDescription& description);
 
@@ -390,6 +394,12 @@ class Graph : public std::enable_shared_from_this<Graph> {
     uint32_t time_history_current = 0;
     merian::ProfilerHandle run_profiler;
 
+    // Load/Store UI state: editable path for the controls, and a reload requested from the UI that
+    // is applied at the start of the next run() (so it never runs mid-iteration).
+    std::string store_path;
+    std::optional<std::filesystem::path> pending_load;
+    std::string imgui_event = "ui";
+
     // Nodes
     std::map<std::string, NodeHandle> node_for_identifier;
     std::unordered_map<NodeHandle, NodeData> node_data;
@@ -408,6 +418,14 @@ class Graph : public std::enable_shared_from_this<Graph> {
     // cached here when the user calls register_event_listener and added to the data structure
     // above when the graph is built.
     std::vector<std::pair<std::string, GraphEvent::Listener>> user_event_pattern_listener;
+
+    // Most recently sent events for the properties readout, deduped by name. Updated in
+    // send_event(), so it is mutable to keep that method const.
+    struct RecentEvent {
+        uint64_t iteration;
+        std::chrono::steady_clock::time_point time;
+    };
+    mutable std::map<std::string, RecentEvent> recent_events;
 
     // Properties helper
     std::string props_send_event;

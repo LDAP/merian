@@ -36,6 +36,10 @@ class NodeRegistry {
     NodeRegistry& operator=(const NodeRegistry&) = delete;
     NodeRegistry(const NodeRegistry&) = delete;
 
+    // Discovers merian plugins and lets them register node types via their merian_register_nodes
+    // hook. Runs the discovery once; later calls are no-ops.
+    void load_from_plugins();
+
     // Adds a new node type to this registy.
     //
     // If add_default_config is true a node with empty config is added.

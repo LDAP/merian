@@ -122,6 +122,7 @@ class Accumulate : public Node {
     VkBool32 extended_search = VK_TRUE;
     VkBool32 reuse_border = VK_FALSE;
     bool enable_mv = VK_TRUE;
+    int gbuffer_check_mode = 0;
 
     std::string clear_event_listener_pattern = "/user/clear";
 };

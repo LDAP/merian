@@ -1,0 +1,257 @@
+#include "merian-graph/nodes/window/window_node.hpp"
+
+#include "merian-graph/graph/errors.hpp"
+#include "merian/vk/extension/extension_registry.hpp"
+#include "merian/vk/utils/profiler.hpp"
+
+#include <csignal>
+
+namespace merian {
+
+void WindowNode::initialize(const ContextHandle& context,
+                            const ResourceAllocatorHandle& /*allocator*/) {
+    this->context = context;
+    providers = context->find_providers<WindowProvider>();
+    if (providers.empty()) {
+        throw graph_errors::node_error{"WindowNode requires at least one WindowProvider"};
+    }
+}
+
+WindowNode::NodeStatusFlags WindowNode::on_connected(const NodeIOLayout& /*io_layout*/,
+                                                     const DescriptorSetLayoutHandle& /*dsl*/) {
+    const auto& selected = get_selected_provider();
+    if (!window || selected != active_provider) {
+        window = selected->create_window(context->get_device(), create_info);
+        active_provider = selected;
+
+        const SwapchainHandle swapchain =
+            std::make_shared<merian::Swapchain>(context, window->get_surface());
+        swapchain_manager.emplace(swapchain);
+    }
+    return {};
+}
+
+std::vector<InputConnectorDescriptor> WindowNode::describe_inputs() {
+    if (providers.empty()) {
+        throw graph_errors::node_error{"WindowNode requires at least one WindowProvider"};
+    }
+    return {{"src", image_in}};
+}
+
+std::vector<OutputConnectorDescriptor> WindowNode::describe_outputs(const NodeIOLayout& /*io*/) {
+    return {{"acquire", con_acquire}, {"controller", con_controller}, {"window", con_window}};
+}
+
+WindowNode::NodeStatusFlags WindowNode::pre_process([[maybe_unused]] const GraphRun& run,
+                                                    [[maybe_unused]] const NodeIO& io) {
+    if (window) {
+        window->poll_events();
+        if (on_should_close_remove_node && window->should_close()) {
+            return NodeStatusFlagBits::REMOVE_NODE;
+        }
+    }
+    return {};
+}
+
+void WindowNode::process(GraphRun& run,
+                         [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
+                         const NodeIO& io) {
+    assert(swapchain_manager);
+
+    const int64_t signed_max_img_count = get_swapchain()->get_max_image_count();
+    const int64_t signed_iteration = static_cast<int64_t>(run.get_iteration());
+    throttle = !run.get_iteration_semaphore()->wait(
+        std::max(static_cast<int64_t>(0), signed_iteration - signed_max_img_count + 1), 0);
+    run.get_iteration_semaphore()->wait(
+        std::max(static_cast<int64_t>(0), signed_iteration - signed_max_img_count + 1));
+
+    get_swapchain()->set_min_images(run.get_iterations_in_flight());
+    std::optional<SwapchainAcquireResult> acquire;
+    {
+        MERIAN_PROFILE_SCOPE(run.get_profiler(), "acquire");
+        acquire = swapchain_manager->acquire(window, acquire_timeout_ns);
+    }
+
+    if (acquire) {
+        const CommandBufferHandle& cmd = run.get_cmd();
+        const ImageHandle image = acquire->image_view->get_image();
+
+        io[con_acquire] = std::make_shared<SwapchainAcquireResult>(*acquire);
+        io[con_controller] = window->get_input_controller();
+        io[con_window] = window;
+
+        // Provide the swapchain image as a canvas: blit the optional "src" input, or clear.
+        // Downstream nodes consuming "acquire" composite on top (load-preserving the result).
+        cmd->barrier(image->barrier2(vk::ImageLayout::eTransferDstOptimal, true));
+
+        ImageHandle src_image;
+        if (io.is_connected(image_in)) {
+            current_src_array_size = io[image_in].get_array_size();
+            src_array_element = std::min(src_array_element, current_src_array_size - 1);
+            src_image = io[image_in].get_image(src_array_element);
+        } else {
+            current_src_array_size = 0;
+        }
+
+        {
+            MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "blit/clear");
+            if (src_image) {
+                const vk::Filter filter =
+                    src_image->format_features() &
+                            vk::FormatFeatureFlagBits::eSampledImageFilterLinear
+                        ? vk::Filter::eLinear
+                        : vk::Filter::eNearest;
+                cmd_blit(mode, cmd, src_image, vk::ImageLayout::eTransferSrcOptimal,
+                         src_image->get_extent(), image, vk::ImageLayout::eTransferDstOptimal,
+                         image->get_extent(), vk::ClearColorValue{}, filter);
+            } else {
+                cmd->clear(image);
+            }
+        }
+
+        // Transition to present once the canvas and any downstream "acquire" consumer have
+        // rendered.
+        run.add_pre_submit_callback([image](GraphRun& pre_submit_run) {
+            pre_submit_run.get_cmd()->barrier(image->barrier2(vk::ImageLayout::ePresentSrcKHR));
+        });
+
+        run.add_wait_semaphore(acquire->wait_semaphore, vk::PipelineStageFlagBits::eTransfer);
+        run.add_signal_semaphore(acquire->signal_semaphore);
+
+        uint32_t index = acquire->index;
+        SwapchainHandle swapchain = get_swapchain();
+        run.add_submit_callback([index, swapchain](const QueueHandle& queue, GraphRun& run) {
+            try {
+                MERIAN_PROFILE_SCOPE(run.get_profiler(), "present");
+                Stopwatch present_duration;
+                swapchain->present(queue, index);
+                run.hint_external_wait_time(present_duration.duration());
+            } catch (const Swapchain::needs_recreate&) {
+                return;
+            }
+        });
+
+        if (request_rebuild_on_recreate && acquire->did_recreate)
+            run.request_reconnect();
+    }
+
+    if (window && window->should_close()) {
+        if (on_should_close_sigint)
+            raise(SIGINT);
+        if (on_should_close_sigterm)
+            raise(SIGTERM);
+    }
+}
+
+const SwapchainHandle& WindowNode::get_swapchain() {
+    assert(swapchain_manager);
+    return swapchain_manager->get_swapchain();
+}
+
+WindowNode::NodeStatusFlags WindowNode::properties(Properties& config) {
+    if (throttle) {
+        config.output_text("WARN: throttling CPU, too many frames in flight for swapchain!");
+    }
+
+    NodeStatusFlags flags{};
+
+    if (current_src_array_size > 0) {
+        config.config_uint("source array element", src_array_element, "", 0u,
+                           current_src_array_size - 1);
+    }
+
+    if (window) {
+        int fullscreen = static_cast<int>(window->is_fullscreen());
+        const int old_fullscreen = fullscreen;
+        config.config_options("mode", fullscreen, {"windowed", "fullscreen"});
+        if (fullscreen != old_fullscreen) {
+            window->set_fullscreen(fullscreen != 0);
+        }
+    }
+
+    int int_mode = mode;
+    config.config_options("blit mode", int_mode, {"FIT", "FILL", "STRETCH"},
+                          Properties::OptionsStyle::LIST_BOX);
+    mode = static_cast<BlitMode>(int_mode);
+
+    if (swapchain_manager) {
+        const SwapchainHandle swapchain = get_swapchain();
+
+        int selected = 0;
+        std::vector<std::string> str_surface_formats;
+        const auto& surface_formats = swapchain->get_supported_surface_formats();
+        for (uint32_t i = 0; i < surface_formats.size(); i++) {
+            const vk::SurfaceFormatKHR& format = surface_formats[i];
+            str_surface_formats.emplace_back(fmt::format("{}, {}", vk::to_string(format.format),
+                                                         vk::to_string(format.colorSpace)));
+            if (format == swapchain->get_new_surface_format()) {
+                selected = static_cast<int>(i);
+            }
+        }
+        if (config.config_options("surface format", selected, str_surface_formats)) {
+            swapchain->set_new_surface_format(surface_formats[selected]);
+        }
+
+        std::vector<std::string> str_present_modes;
+        const auto& present_modes = swapchain->get_supported_present_modes();
+        for (uint32_t i = 0; i < present_modes.size(); i++) {
+            const vk::PresentModeKHR& mode = present_modes[i];
+            str_present_modes.emplace_back(fmt::format("{}", vk::to_string(mode)));
+            if (mode == swapchain->get_new_present_mode()) {
+                selected = static_cast<int>(i);
+            }
+        }
+        if (config.config_options("present mode", selected, str_present_modes)) {
+            swapchain->set_new_present_mode(present_modes[selected]);
+        }
+    }
+
+    config.config_bool("rebuild on recreate", request_rebuild_on_recreate,
+                       "requests a graph rebuild if the swapchain was recreated.");
+
+    config.config_uint64("acquire timeout", acquire_timeout_ns, "in nanoseconds");
+
+    if (config.st_begin_child("on_should_close_actions", "On should_close()")) {
+        config.config_bool("send sigint", on_should_close_sigint);
+        config.config_bool("send sigterm", on_should_close_sigterm);
+        config.config_bool("remove node", on_should_close_remove_node);
+        config.st_end_child();
+    }
+
+    if (swapchain_manager) {
+        const std::optional<Swapchain::SwapchainInfo>& swapchain_info =
+            get_swapchain()->get_swapchain_info();
+        if (swapchain_info) {
+            config.output_text(fmt::format(
+                "surface format: {}\ncolor space: {}\nimage count: "
+                "{}\nextent: {}x{}\npresent mode: {}",
+                vk::to_string(swapchain_info->surface_format.format),
+                vk::to_string(swapchain_info->surface_format.colorSpace),
+                swapchain_info->images.size(), swapchain_info->extent.width,
+                swapchain_info->extent.height, vk::to_string(swapchain_info->present_mode)));
+        }
+    }
+
+    const auto& registry = ExtensionRegistry::get_instance();
+    if (providers.size() > 1) {
+        std::vector<std::string> provider_names;
+        provider_names.reserve(providers.size());
+        for (const auto& p : providers) {
+            provider_names.push_back(registry.get_name(p));
+        }
+        if (config.config_options("backend", selected_provider, provider_names,
+                                  Properties::OptionsStyle::LIST_BOX)) {
+            flags |= NodeStatusFlagBits::NEEDS_RECONNECT;
+        }
+    } else if (active_provider) {
+        config.output_text("active backend: {}", registry.get_name(active_provider));
+    }
+
+    return flags;
+}
+
+const std::shared_ptr<WindowProvider>& WindowNode::get_selected_provider() const {
+    return providers[std::min(selected_provider, static_cast<int>(providers.size()) - 1)];
+}
+
+} // namespace merian

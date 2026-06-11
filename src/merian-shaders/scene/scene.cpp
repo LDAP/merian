@@ -290,7 +290,6 @@ void Scene::clear_geometry() {
 
     cameras.clear();
     active_camera = 0;
-    debug_camera_id = CAMERA_ID_INVALID;
     aabb.reset();
 }
 
@@ -566,34 +565,12 @@ void Scene::properties_mesh_group(Properties& props, const MeshGroupID group_id)
 void Scene::properties_cameras(Properties& props) {
     if (!cameras.empty()) {
         props.config_uint("active", active_camera, "", 0u, static_cast<uint32_t>(cameras.size()));
-        if (props.is_ui()) {
-            props.st_separate("Active Camera");
-            get_active_camera()->properties(props);
-            if (aabb.is_valid() &&
-                props.config_bool("Fit AABB",
-                                  "Rotates and moves the camera to fit the scene AABB.")) {
-                get_active_camera()->look_at_bounding_box(aabb);
-            }
-        }
-    }
-    props.st_separate("Debug");
-    if (props.config_bool("debug camera", enable_debug_camera) && enable_debug_camera) {
-        if (debug_camera_id == CAMERA_ID_INVALID) {
-            auto db = std::make_shared<Camera>(float3(1, 0, 0), float3(0, 0, 0), get_up(),
-                                               radians(60.f), 1920.f / 1080.f, 0.01f, 1000.f);
-            if (aabb.is_valid()) {
-                db->look_at_bounding_box(aabb);
-            }
-            debug_camera_id = add_camera(db);
-            set_active_camera(debug_camera_id);
-        }
-    }
-    if (enable_debug_camera) {
-        if (props.config_bool("make active")) {
-            set_active_camera(debug_camera_id);
-        }
-        if (!props.is_ui()) {
-            get_camera(debug_camera_id)->properties(props);
+        props.st_separate("Active Camera");
+        // Persisted (not is_ui gated) so the navigated camera is part of a stored graph.
+        get_active_camera()->properties(props);
+        if (props.is_ui() && aabb.is_valid() &&
+            props.config_bool("Fit AABB", "Rotates and moves the camera to fit the scene AABB.")) {
+            get_active_camera()->look_at_bounding_box(aabb);
         }
     }
 }
@@ -1933,6 +1910,8 @@ void Scene::update(const CommandBufferHandle& cmd,
     for (const NodeID& nid : node_ids) {
         scene_graph[nid]->transform_dirty = false;
     }
+    last_update_changes.geometry_changed = needs_regroup;
+    last_update_changes.transform_changed = transforms_changed;
     needs_regroup = false;
     transforms_changed = false;
 
@@ -1944,6 +1923,9 @@ void Scene::update(const CommandBufferHandle& cmd,
 
     const auto cam = get_active_camera();
     assert(cam);
+
+    // prev_active_camera still holds last frame's pose here (updated below).
+    last_update_changes.camera_changed = !(*cam == prev_active_camera);
 
     cam->advance_jitter(frame);
 

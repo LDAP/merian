@@ -19,6 +19,9 @@ class MerianGraphExtension : public ContextExtension {
     MerianGraphExtension() : ContextExtension() {}
 
     std::vector<std::string> request_extensions() override {
+        // Make plugin-provided node types visible before the registry is enumerated.
+        NodeRegistry::get_instance().load_from_plugins();
+
         std::vector<std::string> aggregated;
 
         // Request compiler extensions for nodes that need shader compilation

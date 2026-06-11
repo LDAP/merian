@@ -446,6 +446,18 @@ class Scene : public std::enable_shared_from_this<Scene> {
 
     void update(const CommandBufferHandle& cmd, float time, float time_diff, uint32_t frame);
 
+    // What changed during the most recent update(). Lets consumers (e.g. temporal
+    // accumulation) react to scene edits without diffing the scene themselves.
+    struct UpdateChanges {
+        bool geometry_changed = false;  // a mesh or instance was added or removed
+        bool transform_changed = false; // a node transform changed
+        bool camera_changed = false; // the active camera moved or a different one became active
+    };
+
+    const UpdateChanges& get_last_update_changes() const {
+        return last_update_changes;
+    }
+
     // ------------------------------
 
     const SlangCompositionHandle& get_composition() const {
@@ -731,6 +743,8 @@ class Scene : public std::enable_shared_from_this<Scene> {
     float blas_rebuild_fraction = 0.33f;
     uint32_t current_frame = 0;
 
+    UpdateChanges last_update_changes;
+
     struct FrameStats {
         uint32_t meshes_uploaded_device_local = 0;
         uint32_t meshes_uploaded_device_staged = 0;
@@ -777,11 +791,6 @@ class Scene : public std::enable_shared_from_this<Scene> {
     // cmd->keep_until_pool_reset so in-flight cmds keep them alive.
     std::vector<BufferHandle> pending_buffer_releases;
     std::vector<AccelerationStructureHandle> pending_blas_releases;
-
-    // --- Debug ---
-
-    bool enable_debug_camera = false;
-    CameraID debug_camera_id = CAMERA_ID_INVALID;
 
     // --- Cached and precomputed ---
 

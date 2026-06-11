@@ -56,6 +56,11 @@ void RenderPT::process(GraphRun& run,
     if (!scene || !gbuf || !scene->is_ready())
         return;
 
+    if (max_path_length != emitted_max_path_length) {
+        emitted_max_path_length = max_path_length;
+        io.send_event("bounces_changed");
+    }
+
     if (!composition) {
         composition = SlangComposition::create();
         composition->add_composition(scene->get_composition());

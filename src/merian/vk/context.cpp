@@ -1,4 +1,5 @@
 #include "merian/vk/context.hpp"
+#include "merian/plugin/plugins.hpp"
 #include "merian/utils/pointer.hpp"
 #include "merian/utils/stopwatch.hpp"
 #include "merian/utils/vector.hpp"
@@ -29,6 +30,9 @@ struct Context::FeatureExtensionCheckResult {
 };
 
 ContextHandle Context::create(const ContextCreateInfo& create_info) {
+    // Let plugins register their context extensions before any extension is loaded.
+    ExtensionRegistry::get_instance().load_from_plugins();
+
     const ContextHandle context = std::shared_ptr<Context>(new Context(create_info));
 
     for (const auto& ext : context->get_extensions()) {
@@ -973,6 +977,10 @@ void Context::prepare_file_loader(const ContextCreateInfo& create_info) {
     file_loader->add_search_path(FileLoader::install_includedir_name());
 
     file_loader->add_search_path(create_info.additional_search_paths);
+
+    // Make discovered plugins' resources (shaders, data) reachable, so plugin nodes can load e.g.
+    // "shader/foo.slang" without hardcoding paths. Inherited by the shader compile context.
+    file_loader->add_search_path(Plugins::resource_search_paths());
 }
 
 ///////////////

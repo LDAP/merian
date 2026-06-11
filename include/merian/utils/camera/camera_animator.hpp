@@ -2,52 +2,25 @@
 
 #include "merian/utils/camera/camera.hpp"
 
-#include <chrono>
-#include <optional>
-
 namespace merian {
 
-/**
- * @brief      An animator for the camera.
- *
- * Provides smooth camera motion and animation.
- *
- * The animator does not update internally (no thread is started) instead the user must
- * call one of the update() methods periodically.
- */
+// Eases a camera toward a moving target with frame-rate-independent exponential damping, to smooth
+// interactive (e.g. orbit) navigation.
 class CameraAnimator {
-  private:
-    using chrono_clock = std::chrono::high_resolution_clock;
-
   public:
-    CameraAnimator(double animation_duration_ms = 0.5);
+    // tau_s is the damping time constant; keep it small (a few frames) to stay responsive.
+    void follow(const Camera& target, double dt_seconds, double tau_s = 0.03);
 
-    void update(const chrono_clock::time_point now);
+    void snap(const Camera& camera) {
+        camera_current = camera;
+    }
 
-    void set_camera_target(const Camera& camera, bool animate = true);
-
-    // The animated camera
-    const Camera& get_current_camera();
-
-    // The camera that is pursued by the animator
-    const Camera& get_camera_target();
-
-    bool is_animating();
-
-  private:
-    // calculates the bezier points for a smooth animation between start end end.
-    void calculate_eye_animation_bezier_points();
+    const Camera& get_current_camera() const {
+        return camera_current;
+    }
 
   private:
     Camera camera_current;
-
-    Camera animation_start;
-    Camera animation_end;
-    // Animate eye using bezier for consistent animation
-    float3x3 eye_animation_bezier_points;
-    std::optional<chrono_clock::time_point> animation_start_time;
-
-    double animation_duration_ms;
 };
 
 } // namespace merian

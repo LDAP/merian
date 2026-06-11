@@ -1,0 +1,38 @@
+{
+    "graph_properties": {
+        "flush thread pool": true,
+        "fps limiter": false,
+        "iterations in flight": 2,
+        "low latency": false,
+        "time overwrite": "None"
+    },
+    "nodes": [
+        {
+            "enabled": true,
+            "id": "imgui",
+            "type": "ImGui"
+        },
+        {
+            "enabled": true,
+            "id": "window",
+            "outputs": [
+                "acquire->imgui.acquire",
+                "window->imgui.window"
+            ],
+            "properties": {
+                "acquire timeout": 100000000,
+                "backend": "SDL3 (Video Subsystem)",
+                "blit mode": "FIT",
+                "on_should_close_actions": {
+                    "remove node": false,
+                    "send sigint": true,
+                    "send sigterm": false
+                },
+                "rebuild on recreate": false,
+                "source array element": 0
+            },
+            "type": "Window"
+        }
+    ],
+    "version": 3
+}

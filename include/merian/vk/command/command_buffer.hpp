@@ -779,7 +779,7 @@ class CommandBuffer : public std::enable_shared_from_this<CommandBuffer> {
     vk::CommandBuffer cmd;
 
 #ifndef NDEBUG
-    bool did_bind_descriptor_buffers;
+    bool did_bind_descriptor_buffers = false;
 #endif
 
     PipelineHandle current_pipeline;

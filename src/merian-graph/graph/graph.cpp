@@ -1,8 +1,11 @@
 #include "merian-graph/graph/graph.hpp"
 #include "merian-graph/merian_graph_extension.hpp"
 #include "merian/shader/glsl_compiler_provider.hpp"
+#include "merian/utils/properties.hpp"
+#include "merian/utils/string.hpp"
 #include "merian/vk/extension/extension_registry.hpp"
 
+#include <any>
 #include <spdlog/spdlog.h>
 
 namespace merian {
@@ -48,6 +51,20 @@ Graph::Graph(const GraphCreateInfo& create_info)
     time_connect_reference = time_reference = std::chrono::high_resolution_clock::now();
     duration_elapsed = 0ns;
     context_extension = context->get_context_extension<MerianGraphExtension>();
+
+    // An ImGui node sends imgui_event each frame with a Properties to render into.
+    register_event_listener(
+        "//", [this](const GraphEvent::Info& info, const GraphEvent::Data& data) {
+            bool matches = false;
+            split(imgui_event, ",",
+                  [&](const std::string& event) { matches = matches || event == info.event_name; });
+            if (matches) {
+                if (Properties* const* props = std::any_cast<Properties*>(&data)) {
+                    properties(**props);
+                }
+            }
+            return false;
+        });
 }
 
 Graph::~Graph() {
@@ -55,6 +72,14 @@ Graph::~Graph() {
 }
 
 void Graph::run() {
+    // Apply a reload requested from the UI here, before any processing of this iteration.
+    if (pending_load) {
+        const std::filesystem::path path = *pending_load;
+        pending_load.reset();
+        wait();
+        load_from_file(path);
+    }
+
     // PREPARE RUN: wait for fence, release resources, reset cmd pool
     run_in_progress = true;
 

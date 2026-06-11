@@ -19,7 +19,7 @@ class PtrIn : public InputConnector,
               public AccessibleConnector<const std::shared_ptr<T>&> {
 
   public:
-    PtrIn(const uint32_t delay) : InputConnector(delay) {}
+    PtrIn(const uint32_t delay, const bool optional = false) : InputConnector(delay, optional) {}
 
     void on_connect_output(const OutputConnectorHandle& output) override {
         auto casted_output = std::dynamic_pointer_cast<PtrOut<T>>(output);
@@ -49,8 +49,8 @@ class PtrIn : public InputConnector,
     }
 
   public:
-    static PtrInHandle<T> create(const uint32_t delay = 0) {
-        return std::make_shared<PtrIn<T>>(delay);
+    static PtrInHandle<T> create(const uint32_t delay = 0, const bool optional = false) {
+        return std::make_shared<PtrIn<T>>(delay, optional);
     }
 };
 

@@ -1,3 +1,0 @@
-## Acceleration Structure Builder
-
-

@@ -3,9 +3,12 @@ merian_src = files(
     'io/file_loader.cpp',
     'io/image_io.cpp',
     'io/tinyobj.cpp',
+    'plugin/plugins.cpp',
     'utils/audio/audio_device.cpp',
+    'utils/dynamic_library.cpp',
     'utils/camera/camera.cpp',
     'utils/camera/camera_animator.cpp',
+    'utils/camera/camera_controller.cpp',
     'utils/concurrent/thread_pool.cpp',
     'utils/imgui_spdlog_sink.cpp',
     'utils/input_controller.cpp',
@@ -86,10 +89,15 @@ endif
 subdir('shader')
 subdir('vk/imgui')
 
-merian_lib = static_library(
+# dlopen/dlsym live in libdl on older glibc; folded into libc on glibc >= 2.34 and absent on
+# Windows. Optional so it is simply skipped where not present.
+dl_dep = ccx.find_library('dl', required: false)
+
+merian_lib = shared_library(
     'merian',
     [merian_src],
     dependencies: [
+        dl_dep,
         fmt,
         glfw,
         glm,

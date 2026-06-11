@@ -21,7 +21,7 @@ if ufbx.found()
     merian_shaders_src += 'scene/fbx_scene.cpp'
 endif
 
-merian_shaders_lib = static_library(
+merian_shaders_lib = shared_library(
     'merian-shaders',
     merian_shaders_src,
     dependencies: [

@@ -3,21 +3,33 @@
 import merian_shaders.shading.materials.material;
 import merian_shaders.shading.bsdfs.brdf_ggx;
 import merian_shaders.shading.bsdfs.brdf_lambert_diffuse;
+import merian_shaders.shading.bsdfs.brdf_sheen;
 import merian_shaders.shading.bsdfs.bsdf_conductor_fresnel;
 import merian_shaders.shading.bsdfs.bsdf_fresnel_mix;
+import merian_shaders.shading.bsdfs.bsdf_iridescence;
 import merian_shaders.shading.bsdfs.bsdf_mix;
+import merian_shaders.shading.bsdfs.bsdf_rough_dielectric;
+import merian_shaders.shading.bsdfs.bsdf_sheen_layer;
 import merian_shaders.utils.normal_map;
 
 namespace merian {
 
 // https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#complete-model
 // KHR_materials_transmission: the transmission BTDF takes the diffuse slot, mixed by the transmission.
-typealias GltfDiffuseOrTransmission = MixBSDF<LambertDiffuseBRDF, SpecularBTDF>;
-typealias GltfDielectric = FresnelMixBSDF<SpecularBRDF, GltfDiffuseOrTransmission>;
-typealias GltfReflective = MixBSDF<GltfDielectric, ConductorFresnelBSDF<SpecularBRDF>>;
-// KHR_materials_clearcoat: a GGX coat over the surface, mixed by the clearcoat weight.
-typealias GltfCoated = FresnelMixBSDF<SpecularBRDF, GltfReflective>;
-typealias GltfBSDF = MixBSDF<GltfReflective, GltfCoated>;
+// Opaque dielectric: a specular lobe over the diffuse base. KHR_materials_iridescence modulates
+// its Fresnel; the dielectric reflectance uses the full (TIR-aware) Fresnel at the macro normal.
+typealias GltfOpaqueDielectric = IridescentFresnelMixBSDF<SpecularBRDF, LambertDiffuseBRDF>;
+// KHR_materials_transmission: a rough dielectric (coupled microfacet reflection + refraction,
+// PBRT-style), mixed in by the transmission weight. For glass (weight 1) this fully replaces the
+// opaque dielectric; microfacet total internal reflection reflects rather than terminating.
+typealias GltfDielectric = MixBSDF<GltfOpaqueDielectric, RoughDielectricBSDF>;
+typealias GltfConductor = IridescentConductorBSDF<SpecularBRDF>;
+typealias GltfReflective = MixBSDF<GltfDielectric, GltfConductor>;
+// KHR_materials_sheen: a microfibre sheen lobe layered over the reflective base.
+typealias GltfSheened = SheenLayerBSDF<GltfReflective>;
+// KHR_materials_clearcoat: a GGX coat over the (sheened) surface, mixed by the clearcoat weight.
+typealias GltfCoated = FresnelMixBSDF<SpecularBRDF, GltfSheened>;
+typealias GltfBSDF = MixBSDF<GltfSheened, GltfCoated>;
 
 static const float GLTF_DIELECTRIC_IOR_F0 = 0.04f; // equals ior = 1.5
 
@@ -36,12 +48,22 @@ struct GltfMaterial : MaterialModel {
     float clearcoat_weight;
     float clearcoat_roughness;
     float3 absorption; // volume absorption coefficient (sigma_a), precomputed by the loader
+    float3 sheen_color;
+    float sheen_roughness;
+    float iridescence_factor;
+    float iridescence_ior;
+    float iridescence_thickness_min;
+    float iridescence_thickness_max;
     TextureID metallic_roughness_texture;
     TextureID normal_texture;
     TextureID occlusion_texture;
     TextureID emissive_texture;
     TextureID clearcoat_texture;
     TextureID clearcoat_roughness_texture;
+    TextureID sheen_color_texture;
+    TextureID sheen_roughness_texture;
+    TextureID iridescence_texture;
+    TextureID iridescence_thickness_texture;
 
     float get_metallic(const TextureManager tm,
                        const float2 uv,
@@ -99,28 +121,53 @@ struct GltfMaterial : MaterialModel {
             emission *= lod.sample(tm.get_sampler2D(emissive_texture), sd.uv).rgb;
         }
 
-        float occlusion = 1.0f;
-        if (occlusion_texture != TextureID(-1)) {
-            const float o = lod.sample(tm.get_sampler2D(occlusion_texture), sd.uv).r;
-            occlusion = lerp(1.0f, o, occlusion_strength);
-        }
+        // The occlusion texture only attenuates indirect/ambient light; a path tracer computes real
+        // occlusion, so it is intentionally not applied to the BRDF here.
 
         const float alpha = ggx_roughness_to_alpha(max(roughness, merian_hint_min_roughness));
 
-        // Transmission weight and eta, gated by the toggle (off -> weight 0 -> the BTDF drops out).
-        float eta = 1.0f;
+        // Dielectric specular F0 from the index of refraction (KHR_materials_ior; default 1.5 -> 0.04).
+        const float ior_r = (ior - 1.0f) / (ior + 1.0f);
+        const float dielectric_f0 = ior_r * ior_r;
+
+        // Relative IOR at this interface (incident / transmitted). Drives both the dielectric
+        // Fresnel split (including total internal reflection) and the transmission refraction.
+        const float eta = sd.ior / (sd.front_facing ? ior : 1.0f);
+        // Transmission weight, gated by the toggle (off -> weight 0 -> the BTDF drops out).
         float tw = 0.0f;
         if (merian_hint_enable_transmission) {
-            eta = sd.ior / (sd.front_facing ? ior : 1.0f);
             tw = transmission_weight;
         }
-        const GltfDielectric dielectric = GltfDielectric(
-            SpecularBRDF(alpha),
-            GltfDiffuseOrTransmission(LambertDiffuseBRDF(base.rgb * occlusion),
-                                      SpecularBTDF(alpha, eta, base.rgb), tw),
-            GLTF_DIELECTRIC_IOR_F0);
+
+        // Iridescence strength, film index and thickness, gated by the toggle (strength 0 -> the
+        // thin-film branch folds out, leaving the plain Fresnel terms).
+        float iridescence = 0.0f;
+        float iri_ior = 1.0f;
+        float iri_thickness = 0.0f;
+        if (merian_hint_enable_iridescence) {
+            iridescence = iridescence_factor;
+            if (iridescence_texture != TextureID(-1)) {
+                iridescence *= lod.sample(tm.get_sampler2D(iridescence_texture), sd.uv).r;
+            }
+            iri_ior = iridescence_ior;
+            // Thickness texture green channel selects between min and max; absent -> max.
+            float t = 1.0f;
+            if (iridescence_thickness_texture != TextureID(-1)) {
+                t = lod.sample(tm.get_sampler2D(iridescence_thickness_texture), sd.uv).g;
+            }
+            iri_thickness = lerp(iridescence_thickness_min, iridescence_thickness_max, t);
+        }
+
+        const GltfOpaqueDielectric opaque_dielectric =
+            GltfOpaqueDielectric(SpecularBRDF(alpha), LambertDiffuseBRDF(base.rgb), dielectric_f0,
+                                 eta, iri_ior, iri_thickness, iridescence);
+        // Transmission mixes the opaque dielectric towards the rough dielectric (glass). The
+        // specular reflection is present in both, so the mix is a correct weighted blend.
+        const GltfDielectric dielectric =
+            GltfDielectric(opaque_dielectric, RoughDielectricBSDF(alpha, eta, base.rgb), tw);
         const GltfReflective reflective = GltfReflective(
-            dielectric, ConductorFresnelBSDF<SpecularBRDF>(SpecularBRDF(alpha), base.rgb), metallic);
+            dielectric, GltfConductor(SpecularBRDF(alpha), base.rgb, iri_ior, iri_thickness, iridescence),
+            metallic);
 
         // Clearcoat weight and roughness, gated by the toggle.
         float coat_weight = 0.0f;
@@ -144,9 +191,26 @@ struct GltfMaterial : MaterialModel {
             absorb = absorption;
         }
 
+        // Sheen colour and roughness, gated by the toggle (colour 0 -> the sheen lobe drops out).
+        float3 sheen_col = float3(0.0f);
+        float sheen_rough = 0.0f;
+        if (merian_hint_enable_sheen) {
+            sheen_col = sheen_color;
+            if (sheen_color_texture != TextureID(-1)) {
+                sheen_col *= lod.sample(tm.get_sampler2D(sheen_color_texture), sd.uv).rgb;
+            }
+            sheen_rough = sheen_roughness;
+            if (sheen_roughness_texture != TextureID(-1)) {
+                sheen_rough *= lod.sample(tm.get_sampler2D(sheen_roughness_texture), sd.uv).a;
+            }
+        }
+        const float max_sheen = max(sheen_col.r, max(sheen_col.g, sheen_col.b));
+        const GltfSheened sheened =
+            GltfSheened(SheenBRDF(sheen_col, sheen_rough), reflective, sheen_rough, max_sheen);
+
         GltfMaterialSample s;
         s.brdf = GltfBSDF(
-            reflective, GltfCoated(SpecularBRDF(coat_alpha), reflective, GLTF_DIELECTRIC_IOR_F0),
+            sheened, GltfCoated(SpecularBRDF(coat_alpha), sheened, GLTF_DIELECTRIC_IOR_F0),
             coat_weight);
         s.shading_frame = shading_frame;
         s.emission = emission;

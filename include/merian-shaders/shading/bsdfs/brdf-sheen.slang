@@ -5,27 +5,28 @@ import merian_shaders.utils.sampling;
 
 namespace merian {
 
-// Microfacet sheen BRDF (Estevez & Kulla 2017).
-// TODO: replace cosine sampling with LTC sheen (Zeltner et al. 2022) for lower variance and
-// energy-correct layering.
+// "Charlie" microfacet sheen BRDF with Conty & Kulla (2017) visibility.
+//
+// TODO: replace cosine sampling with LTC sheen (Zeltner et al. 2022) for lower variance
 struct SheenBRDF : BSDF {
     float3 color;
-    float roughness;
+    float alpha; // squared roughness, clamped away from zero
 
     __init(float3 color, float roughness) {
         this.color = color;
-        this.roughness = max(roughness, 0.07f);
+        this.alpha = max(roughness * roughness, 1e-6f);
     }
 
     float sheen_D(const float ndoth) {
-        const float inv_alpha = 1.f / roughness;
+        const float inv_alpha = 1.f / alpha;
         const float cos2h = ndoth * ndoth;
         const float sin2h = max(1.f - cos2h, 0.0078125f);
         return (2.f + inv_alpha) * pow(sin2h, inv_alpha * 0.5f) * (0.5f * MERIAN_INV_PI);
     }
 
+    // Rational fit for the visibility lambda term, parameterised by (1 - alpha)^2.
     float sheen_L(const float x) {
-        const float r = (1.f - roughness) * (1.f - roughness);
+        const float r = (1.f - alpha) * (1.f - alpha);
         const float inv_r = 1.f - r;
         const float a = 25.3245f * r + 21.5473f * inv_r;
         const float b = 3.32435f * r + 3.82987f * inv_r;
@@ -43,8 +44,7 @@ struct SheenBRDF : BSDF {
     }
 
     float sheen_G(const float ndoto, const float ndoti) {
-        return 1.f / (1.f + pow(sheen_lambda(ndoto), 1.f + 2.f * pow(1.f - ndoto, 8.f)) +
-                      sheen_lambda(ndoti));
+        return 1.f / (1.f + sheen_lambda(ndoto) + sheen_lambda(ndoti));
     }
 
     float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) {
@@ -52,6 +52,7 @@ struct SheenBRDF : BSDF {
             return float3(0.f);
         }
         const float3 h = normalize(wi + wo);
+        // eval returns f * wo.z, so one foreshortening cosine cancels.
         return sheen_D(h.z) * sheen_G(wo.z, wi.z) * color / (4.f * wi.z);
     }
 
@@ -75,12 +76,24 @@ struct SheenBRDF : BSDF {
     }
 
     Albedo get_albedo(const float3 wi) {
-        return Albedo(color);
+        return Albedo(color * sheen_directional_albedo(wi.z, sqrt(alpha)));
     }
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
         return float3(0.f);
     }
+}
+
+// Analytic fit of the Charlie-sheen directional albedo (hemispherical reflectance).
+float sheen_directional_albedo(const float ndotv, const float roughness) {
+    const float cosv = clamp(ndotv, 0.f, 1.f);
+    const float r2 = roughness * roughness;
+    const float a = roughness < 0.25f ? -339.2f * r2 + 161.4f * roughness - 25.9f
+                                      : -8.48f * r2 + 14.3f * roughness - 9.95f;
+    const float b = roughness < 0.25f ? 44.0f * r2 - 23.7f * roughness + 3.26f
+                                      : 1.97f * r2 - 3.27f * roughness + 0.72f;
+    const float dg = exp(a * cosv + b) + (roughness < 0.25f ? 0.0f : 0.1f * (roughness - 0.25f));
+    return clamp(dg * MERIAN_INV_PI, 0.f, 1.f);
 }
 
 }

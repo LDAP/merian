@@ -59,6 +59,11 @@ bool Camera::has_changed_update(uint64_t& check_id) const noexcept {
 uint64_t Camera::get_change_id() const noexcept {
     return (uint64_t)view_change_id << 32 | (uint64_t)projection_change_id;
 }
+bool Camera::operator==(const Camera& other) const noexcept {
+    return position == other.position && target == other.target && up == other.up &&
+           field_of_view == other.field_of_view && aspect_ratio == other.aspect_ratio &&
+           near_plane == other.near_plane && far_plane == other.far_plane;
+}
 
 // -----------------------------------------------------------------------------
 
@@ -394,6 +399,17 @@ void Camera::orbit(const float d_phi, const float d_theta) {
     view_change_id++;
 }
 
+void Camera::dolly(const float distance) {
+    float3 z = position - target;
+    const float len = merian::length(z);
+    if (len < 1e-5f)
+        return;
+    z = z / len;
+    // Clamp toward the target so the eye never reaches or crosses it.
+    position += z * std::max(distance, -len + 1e-3f);
+    view_change_id++;
+}
+
 void Camera::properties(Properties& props) {
     if (props.config_vec("position", position)) {
         view_change_id++;
@@ -445,7 +461,8 @@ void Camera::properties(Properties& props) {
     static const std::vector<std::string> jitter_sequences = {"None", "Halton", "R2",
                                                               "Blackman-Harris"};
     int selected = static_cast<int>(jitter_sequence);
-    if (props.config_options("jitter", selected, jitter_sequences, Properties::OptionsStyle::COMBO)) {
+    if (props.config_options("jitter", selected, jitter_sequences,
+                             Properties::OptionsStyle::COMBO)) {
         set_jitter_sequence(static_cast<JitterSequence>(selected));
     }
 }

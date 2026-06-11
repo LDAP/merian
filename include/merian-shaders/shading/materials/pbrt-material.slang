@@ -101,15 +101,31 @@ struct PBRTMaterial : MaterialModel {
                            dielectric_f0),
             PBRTMetal(SpecularBRDF(alpha), base), metal);
 
-        // Dielectric clearcoat over the substrate.
-        const float coat_alpha =
-            ggx_roughness_to_alpha(max(coat_roughness, merian_hint_min_roughness));
-        const float coat_t = (coat_ior - 1.0f) / (coat_ior + 1.0f);
+        // Dielectric clearcoat over the substrate, gated by the toggle (weight 0 -> coat drops out).
+        float cw = 0.0f;
+        float coat_alpha = ggx_roughness_to_alpha(merian_hint_min_roughness);
+        float coat_f0 = 0.0f;
+        if (merian_hint_enable_clearcoat) {
+            cw = coat_weight;
+            coat_alpha = ggx_roughness_to_alpha(max(coat_roughness, merian_hint_min_roughness));
+            const float coat_t = (coat_ior - 1.0f) / (coat_ior + 1.0f);
+            coat_f0 = coat_t * coat_t;
+        }
         const PBRTWithCoat with_coat = PBRTWithCoat(
-            substrate, PBRTCoated(SpecularBRDF(coat_alpha), substrate, coat_t * coat_t), coat_weight);
+            substrate, PBRTCoated(SpecularBRDF(coat_alpha), substrate, coat_f0), cw);
+
+        // Sheen lobe, gated by the toggle (weight 0 -> sheen drops out).
+        float sw = 0.0f;
+        float3 sheen_col = float3(0.0f);
+        float sheen_rough = 0.0f;
+        if (merian_hint_enable_sheen) {
+            sw = sheen_weight;
+            sheen_col = sheen_color;
+            sheen_rough = sheen_roughness;
+        }
 
         PBRTMaterialSample s;
-        s.brdf = PBRTBSDF(with_coat, SheenBRDF(sheen_color, sheen_roughness), sheen_weight);
+        s.brdf = PBRTBSDF(with_coat, SheenBRDF(sheen_col, sheen_rough), sw);
         s.shading_frame = shading_frame;
         s.emission = emission_out;
         s.eta = eta;

@@ -1,6 +1,9 @@
 #include "merian/vk/extension/extension_registry.hpp"
 
+#include "merian/plugin/extension_plugin.hpp"
+#include "merian/plugin/plugins.hpp"
 #include "merian/shader/glsl_compiler_provider.hpp"
+
 #include "merian/vk/extension/extension_compatibility.hpp"
 #include "merian/vk/extension/extension_glslang_compiler.hpp"
 #include "merian/vk/extension/extension_glslangvalidator_compiler.hpp"
@@ -15,6 +18,7 @@
 #include "merian/vk/extension/extension_vma.hpp"
 #include "merian/vk/imgui/extension_imgui.hpp"
 #include "merian/vk/memory/memory_allocator_provider.hpp"
+#include <spdlog/spdlog.h>
 
 #ifdef MERIAN_GLFW_ENABLED
 #include "merian/vk/extension/glfw/extension_glfw.hpp"
@@ -64,6 +68,19 @@ ExtensionRegistry::ExtensionRegistry() {
     register_extension<ExtensionVkLayerSettings>(ExtensionVkLayerSettings::name, true);
     register_extension<ExtensionVkValidationLayers>(ExtensionVkValidationLayers::name, false);
     register_extension<ExtensionImGui>(ExtensionImGui::name, true);
+}
+
+void ExtensionRegistry::load_from_plugins() {
+    static bool loaded = false;
+    if (loaded) {
+        return;
+    }
+    loaded = true;
+
+    load_plugins("merian_register_extensions", "merian_extension_plugin_abi_version",
+                 MERIAN_EXTENSION_PLUGIN_ABI_VERSION, "extension", [this](void* register_sym) {
+                     reinterpret_cast<merian_register_extensions_fn>(register_sym)(*this);
+                 });
 }
 
 std::shared_ptr<ContextExtension> ExtensionRegistry::create(const std::string& name) const {

@@ -20,14 +20,24 @@ struct GltfMaterialPayload {
     float clearcoat_weight{0.0f};    // KHR_materials_clearcoat
     float clearcoat_roughness{0.0f};
     float3 absorption{0, 0, 0};      // KHR_materials_volume: precomputed sigma_a (Beer-Lambert)
+    float3 sheen_color{0, 0, 0};     // KHR_materials_sheen
+    float sheen_roughness{0.0f};
+    float iridescence_factor{0.0f};  // KHR_materials_iridescence
+    float iridescence_ior{1.3f};
+    float iridescence_thickness_min{100.0f}; // nm
+    float iridescence_thickness_max{400.0f}; // nm
     TextureID metallic_roughness_texture{TextureID(-1)};
     TextureID normal_texture{TextureID(-1)};
     TextureID occlusion_texture{TextureID(-1)};
     TextureID emissive_texture{TextureID(-1)};
     TextureID clearcoat_texture{TextureID(-1)};
     TextureID clearcoat_roughness_texture{TextureID(-1)};
+    TextureID sheen_color_texture{TextureID(-1)};
+    TextureID sheen_roughness_texture{TextureID(-1)};
+    TextureID iridescence_texture{TextureID(-1)};
+    TextureID iridescence_thickness_texture{TextureID(-1)};
 };
-static_assert(sizeof(GltfMaterialPayload) == 84,
+static_assert(sizeof(GltfMaterialPayload) == 124,
               "GltfMaterialPayload layout must match Slang GltfMaterial");
 
 struct GltfMaterial : Material {

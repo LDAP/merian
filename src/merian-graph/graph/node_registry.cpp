@@ -1,8 +1,12 @@
 #include "merian-graph/graph/node_registry.hpp"
 
+#include "merian-graph/plugin/node_plugin.hpp"
+#include "merian/plugin/plugins.hpp"
+
+#include <spdlog/spdlog.h>
+
 #include "merian-graph/nodes/ab_compare/ab_compare.hpp"
 #include "merian-graph/nodes/accumulate/accumulate.hpp"
-#include "merian-graph/nodes/as_builder/device_as_builder.hpp"
 #include "merian-graph/nodes/bloom/bloom.hpp"
 #include "merian-graph/nodes/color_image/color_output.hpp"
 #include "merian-graph/nodes/exposure/exposure.hpp"
@@ -14,6 +18,7 @@
 #include "merian-graph/nodes/image_read/hdr_image.hpp"
 #include "merian-graph/nodes/image_read/ldr_image.hpp"
 #include "merian-graph/nodes/image_write/image_write.hpp"
+#include "merian-graph/nodes/imgui/imgui_node.hpp"
 #include "merian-graph/nodes/mean/mean.hpp"
 #include "merian-graph/nodes/median_approx/median.hpp"
 #include "merian-graph/nodes/reduce/reduce.hpp"
@@ -21,6 +26,7 @@
 #include "merian-graph/nodes/render_pt_mcpg/render_pt_mcpg.hpp"
 #include "merian-graph/nodes/shadertoy/shadertoy.hpp"
 #include "merian-graph/nodes/svgf/svgf.hpp"
+#include "merian-graph/nodes/swapchain_blit/swapchain_blit.hpp"
 #include "merian-graph/nodes/taa/taa.hpp"
 #include "merian-graph/nodes/tonemap/tonemap.hpp"
 #include "merian-graph/nodes/vkdt_filmcurv/vkdt_filmcurv.hpp"
@@ -33,14 +39,24 @@ NodeRegistry& NodeRegistry::get_instance() {
     return instance;
 }
 
+void NodeRegistry::load_from_plugins() {
+    static bool loaded = false;
+    if (loaded) {
+        return;
+    }
+    loaded = true;
+
+    load_plugins("merian_register_nodes", "merian_node_plugin_abi_version",
+                 MERIAN_NODE_PLUGIN_ABI_VERSION, "node", [this](void* register_sym) {
+                     reinterpret_cast<merian_register_nodes_fn>(register_sym)(*this);
+                 });
+}
+
 NodeRegistry::NodeRegistry() {
     register_node_type<ABSplit>("AB Split", "Compare two inputs in a split-view.");
     register_node_type<ABSideBySide>("AB Side By Side",
                                      "Compare two inputs in a side by side view.");
     register_node_type<Accumulate>("Accumulate", "Accumulate values across multiple iterations.");
-    register_node_type<DeviceASBuilder>(
-        "Acceleration Structure Builder",
-        "Build acceleration structures from geometry on the device.");
     register_node_type<Bloom>("Bloom", "Selectively blurs pixels that surpass a threshold.");
     register_node_type<ColorImage>("Color",
                                    "Outputs a image filled cleared with the selected color.");
@@ -59,6 +75,8 @@ NodeRegistry::NodeRegistry() {
     register_node_type<HDRImageRead>("HDR Image", "Loads an HDR image.");
     register_node_type<LDRImageRead>("LDR Image", "Loads a LDR image.");
     register_node_type<ImageWrite>("Image Write", "Stores a graph output as image file.");
+    register_node_type<ImGuiNode>("ImGui",
+                                  "Renders ImGui draw callbacks onto a window's acquired image.");
     register_node_type<MeanToBuffer>(
         "Mean", "Computes the mean of an image and outputs it as a single buffer element.");
     register_node_type<MedianApproxNode>("Median (Approximation)",
@@ -66,11 +84,13 @@ NodeRegistry::NodeRegistry() {
     register_node_type<Reduce>("Reduce", "Reduce values of multiple input images.");
     register_node_type<RenderMCPG>("Render (Path-traced, MCPG)",
                                    "Path-traced renderer using Markov chain path-guiding.");
-    register_node_type<RenderPT>(
-        "Render (Path-traced)", "Path-traced renderer using BSDF-sampling path tracer.");
+    register_node_type<RenderPT>("Render (Path-traced)",
+                                 "Path-traced renderer using BSDF-sampling path tracer.");
     register_node_type<Shadertoy>("Shadertoy",
                                   "Execute Shadertoy-like shaders (Limited implementation).");
     register_node_type<SVGF>("Denoiser (SVGF)", "Spatiotemporal Variance-Guided Filtering.");
+    register_node_type<SwapchainBlit>(
+        "Swapchain Blit", "Blits a graph image onto a Window node's acquired swapchain image.");
     register_node_type<TAA>("TAA", "Temporal Anti-Aliasing.");
     register_node_type<Tonemap>("Tonemap", "Convert a HDR image to LDR using various tonemaps.");
     register_node_type<VKDTFilmcurv>("Curves", "Adjust brightness and contrast. Ported from VKDT.");

@@ -5,6 +5,12 @@
 #define TONEMAP_ACES                4
 #define TONEMAP_ACES_APPROX         5
 #define TONEMAP_LOTTES              6
+#define TONEMAP_AGX                 7
+
+#define AGX_LOOK_DEFAULT 0
+#define AGX_LOOK_GOLDEN  1
+#define AGX_LOOK_PUNCHY  2
+#define AGX_LOOK_USER    3
 
 #define ALPHA_MODE_PASSTHROUGH 0
 #define ALPHA_MODE_LUMINANCE 1

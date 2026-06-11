@@ -80,6 +80,13 @@ class GraphRun {
         submit_callbacks.push_back(callback);
     }
 
+    // Enqueues a callback executed after all nodes have recorded their commands but before the
+    // command buffer is submitted (i.e. before cmd->end()). Use it to record final barriers, e.g.
+    // transitioning a swapchain image to the present layout once everyone has rendered into it.
+    void add_pre_submit_callback(const std::function<void(GraphRun& run)>& callback) noexcept {
+        pre_submit_callbacks.push_back(callback);
+    }
+
     // ------------------------------------------------------------------------------------
 
     // Number of iterations since connect.
@@ -300,6 +307,10 @@ class GraphRun {
      * @param[in]  fence  The fence to signal when the submitted work completes.
      */
     void end_run(const vk::Fence& fence) {
+        for (const auto& callback : pre_submit_callbacks) {
+            callback(*this);
+        }
+        pre_submit_callbacks.clear();
         cmd->end();
         submit(fence);
         cmd.reset();
@@ -353,6 +364,7 @@ class GraphRun {
     std::vector<vk::Semaphore> signal_semaphores;
     std::vector<uint64_t> signal_values;
     std::vector<std::function<void(const QueueHandle& queue, GraphRun& run)>> submit_callbacks;
+    std::vector<std::function<void(GraphRun& run)>> pre_submit_callbacks;
 
     std::chrono::nanoseconds external_wait_time;
 

@@ -137,7 +137,7 @@ Accumulate::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
     const uint32_t wg_rounded_irr_size_y = percentile_group_count_y * PERCENTILE_LOCAL_SIZE_Y;
     accum_spec_builder.add_entry(FILTER_LOCAL_SIZE_X, FILTER_LOCAL_SIZE_Y, wg_rounded_irr_size_x,
                                  wg_rounded_irr_size_y, filter_mode, extended_search, reuse_border,
-                                 enable_mv);
+                                 enable_mv, gbuffer_check_mode);
     const auto accum_spec = accum_spec_builder.build();
     accumulate = ComputePipeline::create(accum_pipe_layout, accumulate_module, accum_spec);
 
@@ -204,18 +204,28 @@ Accumulate::NodeStatusFlags Accumulate::properties(Properties& config) {
         config.config_bool("inf history") ? INFINITY : accumulate_pc.accum_max_hist;
     clear |= config.config_bool("clear");
     config.st_no_space();
-    needs_rebuild |=
-        config.config_text("clear event pattern", clear_event_listener_pattern, true,
-                           "Set the event pattern which triggers a clear. Press enter to confirm.");
-    needs_rebuild |=
-        config.config_bool("enable motion vectors", enable_mv, "uses motion vectors if connected.");
+    needs_rebuild |= config.config_text(
+        "clear event pattern", clear_event_listener_pattern, true,
+        "Comma separated list of event patterns which trigger a clear. Press enter to confirm.");
+
     config.st_separate("Reproject");
-    float angle = std::acos(accumulate_pc.normal_reject_cos);
-    config.config_angle("normal threshold", angle, "Reject points with normals farther apart", 0,
-                        180);
-    accumulate_pc.normal_reject_cos = std::cos(angle);
-    config.config_percent("depth threshold", accumulate_pc.depth_reject_percent,
-                          "Reject points with depths farther apart (relative to the max)");
+    needs_rebuild |= config.config_bool("use motion vectors", enable_mv,
+                                        "Reproject using motion vectors if connected.");
+    needs_rebuild |= config.config_options(
+        "gbuffer check", gbuffer_check_mode, {"always", "only if moving", "never"},
+        Properties::OptionsStyle::DONT_CARE,
+        "Validate reuse against the reprojected gbuffer (normal/depth).\n"
+        "always: reject reprojections onto a mismatching surface.\n"
+        "only if moving: accept where the motion vector is zero, validate otherwise.\n"
+        "never: trust the motion vectors and skip the check (also disables extended search).");
+    if (gbuffer_check_mode != 2) { // shown unless "never"
+        float angle = std::acos(accumulate_pc.normal_reject_cos);
+        config.config_angle("normal threshold", angle, "Reject points with normals farther apart",
+                            0, 180);
+        accumulate_pc.normal_reject_cos = std::cos(angle);
+        config.config_percent("depth threshold", accumulate_pc.depth_reject_percent,
+                              "Reject points with depths farther apart (relative to the max)");
+    }
     needs_rebuild |=
         config.config_options("filter mode", filter_mode, {"nearest", "stochastic bilinear"});
     needs_rebuild |= config.config_bool(

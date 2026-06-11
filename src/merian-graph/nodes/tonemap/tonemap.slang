@@ -29,6 +29,14 @@ struct PushConstant {
     float param5;
 
     float perceptual_exp;
+
+    // AgX ASC CDL look, slope kept as scalars for a layout-stable push constant
+    float agx_slope_r;
+    float agx_slope_g;
+    float agx_slope_b;
+    float agx_offset;
+    float agx_power;
+    float agx_sat;
 };
 
 [vk::push_constant]
@@ -66,6 +74,11 @@ void main(int2 ipos: SV_DispatchThreadID) {
     case TONEMAP_LOTTES:
         rgb_out = tonemap_lottes(rgb_in.rgb, params.param1, params.param2, params.param3,
                                  params.param4, params.param5);
+        break;
+    case TONEMAP_AGX:
+        rgb_out = tonemap_agx(rgb_in.rgb,
+                              float3(params.agx_slope_r, params.agx_slope_g, params.agx_slope_b),
+                              params.agx_offset, params.agx_power, params.agx_sat);
         break;
     }
 

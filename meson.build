@@ -71,9 +71,23 @@ glfw = dependency('glfw3', version: ['>=3.4.0'], required: get_option('glfw'), f
 if get_option('glfw').enable_auto_if(glfw.found()).enabled()
     global_args += ['-DMERIAN_GLFW_ENABLED']
 endif
-subprocess = dependency('subprocess', version: ['>=0.4.0'], fallback: ['subprocess', 'subprocess_dep'])
+subprocess = dependency('subprocess', version: ['>=0.4.0'], required: false)
+if not subprocess.found()
+    # Built from the CMake wrap; force PIC so it can be linked into the shared merian libraries.
+    subprocess_options = cmake.subproject_options()
+    subprocess_options.add_cmake_defines({'CMAKE_POSITION_INDEPENDENT_CODE': true})
+    subprocess_subp = cmake.subproject('subprocess', options: subprocess_options)
+    subprocess = subprocess_subp.dependency('subprocess')
+endif
 glm = dependency('glm', fallback : ['glm', 'glm_dep'], version: ['>=1.0.3'])
-tol = dependency('tinyobjloader', fallback : ['tinyobjloader', 'tinyobjloader_dep'])
+tol = dependency('tinyobjloader', required: false)
+if not tol.found()
+    # Built from the CMake wrap; force PIC so it can be linked into the shared merian libraries.
+    tol_options = cmake.subproject_options()
+    tol_options.add_cmake_defines({'CMAKE_POSITION_INDEPENDENT_CODE': true})
+    tol_subp = cmake.subproject('tinyobjloader', options: tol_options)
+    tol = tol_subp.dependency('tinyobjloader')
+endif
 tgltf = dependency('tinygltf', required: get_option('tinygltf'), fallback: ['tinygltf', 'tinygltf_dep'])
 if get_option('tinygltf').enable_auto_if(tgltf.found()).enabled()
     global_args += ['-DMERIAN_TINYGLTF_ENABLED']
@@ -218,6 +232,13 @@ merian_dep = declare_dependency(
     compile_args: global_args,
     link_with : [merian_lib, merian_shaders_lib, merian_graph_lib],
     include_directories : inc_dirs,
+    # Mirror the pkg-config variables below so in-tree plugins resolve the shader tooling the same
+    # way as standalone ones (via get_variable(internal: ..., pkgconfig: ...)).
+    variables : {
+        'shader_compile_script': join_paths(meson.current_source_dir(), 'scripts', 'compile_shader.py'),
+        'shader_includedir': join_paths(meson.current_source_dir(), 'include'),
+        'shader_optimization': get_option('optimization'),
+    },
     dependencies : [
         fmt,
         glfw.found() ? glfw : [],
@@ -237,7 +258,72 @@ merian_dep = declare_dependency(
     ]
 )
 
+merian_graph_run = executable(
+    'merian-graph-run',
+    'src/merian-graph-run/main.cpp',
+    dependencies: merian_dep,
+    export_dynamic: true,
+    install: true,
+)
+
+# Let external plugin projects consume merian without vendoring it: dependency('merian') resolves
+# via this pkg-config file (installed, or the uninstalled variant in build/meson-uninstalled for
+# building against the build tree directly). global_args is exported so plugins compile merian's
+# headers with the same defines (Vulkan dynamic dispatch, GLM, feature toggles).
+pkgconfig = import('pkgconfig')
+# Expose the shader-compile tooling so plugins can build their own shaders to SPIR-V with the same
+# script/includes merian uses (reconstruct a generator from these variables; see the quake plugin).
+merian_scripts_install_dir = join_paths(get_option('datadir'), 'merian', 'scripts')
+pkgconfig.generate(
+    libraries: [merian_lib, merian_shaders_lib, merian_graph_lib],
+    name: 'merian',
+    filebase: 'merian',
+    description: 'Merian Vulkan development framework',
+    extra_cflags: global_args,
+    requires: [vulkan, glm, fmt, spdlog, nlohmann_json],
+    variables: [
+        'shader_compile_script=' + join_paths('${prefix}', merian_scripts_install_dir, 'compile_shader.py'),
+        'shader_includedir=${includedir}',
+        'shader_optimization=' + get_option('optimization'),
+    ],
+    unescaped_uninstalled_variables: [
+        'shader_compile_script=' + join_paths(meson.current_source_dir(), 'scripts', 'compile_shader.py'),
+        'shader_includedir=' + join_paths(meson.current_source_dir(), 'include'),
+        'shader_optimization=' + get_option('optimization'),
+    ],
+)
+meson.override_dependency('merian', merian_dep)
+
+# Build any plugin cloned into plugins/. meson only resolves subprojects out of subprojects/, so
+# each plugin is symlinked there; subproject() then builds it and it resolves merian in-tree via the
+# override_dependency above (no PKG_CONFIG_PATH needed).
+plugin_names = run_command(find_program('python3'), '-c', '''
+import os, sys
+root, links = sys.argv[1], sys.argv[2]
+out = []
+if os.path.isdir(root):
+    for name in sorted(os.listdir(root)):
+        if not os.path.isfile(os.path.join(root, name, "meson.build")):
+            continue
+        link, target = os.path.join(links, name), os.path.join("..", "plugins", name)
+        if not (os.path.islink(link) and os.readlink(link) == target):
+            if os.path.lexists(link):
+                os.remove(link)
+            os.symlink(target, link)
+        out.append(name)
+print("\\n".join(out))
+''', meson.project_source_root() / 'plugins', meson.project_source_root() / 'subprojects',
+    check: true).stdout().strip()
+
+foreach name : plugin_names.split('\n')
+    if name != ''
+        subproject(name, required: false)
+    endif
+endforeach
+
 install_subdir('include', install_dir: get_option('includedir'), strip_directory: true)
+install_subdir('examples', install_dir: join_paths(get_option('datadir'), 'merian'))
+install_data('scripts/compile_shader.py', install_dir: merian_scripts_install_dir)
 
 if get_option('tests')
     subdir('tests')

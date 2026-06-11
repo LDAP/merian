@@ -104,6 +104,10 @@ class ExtensionRegistry {
         return auto_load_extension_names;
     }
 
+    // Discovers merian plugins and lets them register context extensions via their
+    // merian_register_extensions hook. Runs the discovery once; later calls are no-ops.
+    void load_from_plugins();
+
     std::shared_ptr<ContextExtension> create(const std::string& name) const;
 
     bool is_registered(const std::string& name) const;
@@ -166,7 +170,10 @@ template <typename EXTENSION_TYPE> class ExtensionRegisterer {
 
 } // namespace merian
 
+#define MERIAN_REGISTER_EXTENSION_CONCAT_(a, b) a##b
+#define MERIAN_REGISTER_EXTENSION_CONCAT(a, b) MERIAN_REGISTER_EXTENSION_CONCAT_(a, b)
 #define REGISTER_CONTEXT_EXTENSION(EXTENSION_TYPE, NAME)                                           \
     namespace {                                                                                    \
-    merian::ExtensionRegisterer<EXTENSION_TYPE> register_ext_##EXTENSION_NAME(NAME);               \
+    const merian::ExtensionRegisterer<EXTENSION_TYPE>                                              \
+        MERIAN_REGISTER_EXTENSION_CONCAT(register_ext_, __LINE__){NAME};                           \
     }

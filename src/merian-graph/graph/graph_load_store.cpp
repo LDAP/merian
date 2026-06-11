@@ -16,6 +16,11 @@ void Graph::load_from_file(const std::filesystem::path& path) {
     SPDLOG_DEBUG("Loading graph from {}", path.string());
     GraphDescription description = GraphDescription::from_file(path);
     from_description(description);
+    set_store_path(path);
+}
+
+void Graph::set_store_path(const std::filesystem::path& path) {
+    store_path = path.string();
 }
 
 void Graph::load_from_json(const nlohmann::json& json) {

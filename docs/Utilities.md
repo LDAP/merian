@@ -6,7 +6,7 @@ Merian provides utilities for common Vulkan programming tasks. See `include/meri
 
 - `Camera`: Computes view and projection matrices from position, target and up vector.
 - `CameraAnimator`: Smoothly interpolates camera motion over time.
-- `CameraController` / `GLFWCameraController`: High-level camera control from keyboard and mouse input.
+- `FlyCameraController`: Backend-agnostic free-fly camera control driven by an `InputController` (WASD + right-mouse look).
 
 ### Configuration (`utils/properties.hpp`)
 

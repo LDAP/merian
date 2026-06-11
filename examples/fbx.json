@@ -1,0 +1,213 @@
+{
+    "graph_properties": {
+        "flush thread pool": true,
+        "fps limiter": false,
+        "iterations in flight": 2,
+        "low latency": false,
+        "time overwrite": "None"
+    },
+    "nodes": [
+        {
+            "enabled": true,
+            "id": "accumulate",
+            "outputs": [
+                "history->accumulate.prev_history",
+                "out->accumulate.prev_out",
+                "out->exposure.src"
+            ],
+            "properties": {
+                "IPR factor": 50.0,
+                "adaptivity": 0.0,
+                "adaptivity IPR factor": 1.5,
+                "adaptivity percentile lower": 0.05000000074505806,
+                "adaptivity percentile upper": 0.949999988079071,
+                "alpha": 1.0,
+                "clear event pattern": "/user/clear,//geometry_changed,//transform_changed,//camera_changed,//bounces_changed",
+                "depth threshold": 1.0,
+                "use motion vectors": true,
+                "extended search": true,
+                "filter mode": "nearest",
+                "firefly filter bias": 0.20000000298023224,
+                "firefly filter enable": false,
+                "firefly percentile lower": 0.25,
+                "firefly percentile upper": 0.8999999761581421,
+                "gbuffer check": "only if moving",
+                "hard clamp": "inf",
+                "max history": "inf",
+                "normal threshold": 3.1415927410125732,
+                "reuse border": false
+            },
+            "type": "Accumulate"
+        },
+        {
+            "enabled": true,
+            "id": "exposure",
+            "outputs": [
+                "out->tonemap.src"
+            ],
+            "properties": {
+                "ISO": 856.0,
+                "K": 8.0,
+                "aperature": 1.1200000047683716,
+                "autoexposure": true,
+                "max exposure": 10000.0,
+                "max log luminance": 12.0,
+                "metering": "center-weighted",
+                "min exposure": 1.0,
+                "min log luminance": -15.0,
+                "q": 0.6499999761581421,
+                "shutter time (ms)": 768.0,
+                "speed down": 5.099999904632568,
+                "speed up": 3.0999999046325684
+            },
+            "type": "Exposure"
+        },
+        {
+            "enabled": true,
+            "id": "gbuffer",
+            "outputs": [
+                "denoiser->accumulate.gbuffer.tex0",
+                "denoiser->accumulate.prev_gbuffer.tex0",
+                "gbuffer->render.gbuffer",
+                "hit_info->accumulate.gbuffer.tex1",
+                "hit_info->accumulate.prev_gbuffer.tex1",
+                "mv->accumulate.gbuffer.tex2",
+                "mv->accumulate.prev_gbuffer.tex2"
+            ],
+            "properties": {
+                "0": true,
+                "1": true,
+                "2": true,
+                "3": true,
+                "4": true,
+                "5": true,
+                "6": false,
+                "7": true,
+                "height": 1080,
+                "width": 1920
+            },
+            "type": "GBuffer (Raytraced)"
+        },
+        {
+            "enabled": true,
+            "id": "output",
+            "properties": {
+                "acquire timeout": 100000000,
+                "backend": "SDL3 (Video Subsystem)",
+                "blit mode": "FIT",
+                "mode": "windowed",
+                "on_should_close_actions": {
+                    "remove node": false,
+                    "send sigint": false,
+                    "send sigterm": true
+                },
+                "present mode": "Mailbox",
+                "rebuild on recreate": false,
+                "source array element": 0,
+                "surface format": "R8G8B8A8Srgb, SrgbNonlinear"
+            },
+            "type": "Window",
+            "outputs": [
+                "controller->scene.controller",
+                "acquire->blit.acquire",
+                "window->imgui.window"
+            ]
+        },
+        {
+            "enabled": true,
+            "id": "render",
+            "outputs": [
+                "irradiance->accumulate.src"
+            ],
+            "properties": {
+                "0": true,
+                "1": true,
+                "2": true,
+                "3": true,
+                "4": true,
+                "5": true,
+                "6": true,
+                "7": true,
+                "emission on primary": true,
+                "height": 1080,
+                "max path length": 3,
+                "samples per pixel": 2,
+                "width": 1920
+            },
+            "type": "Render (Path-traced)"
+        },
+        {
+            "enabled": true,
+            "id": "scene",
+            "outputs": [
+                "scene->gbuffer.scene",
+                "scene->render.scene"
+            ],
+            "properties": {
+                "env": {
+                    "Pitch": 0.0,
+                    "Type": "Empty",
+                    "Yaw": 0.0
+                },
+                "file": "/home/lucas/Downloads/Bistro_v5_2/BistroExterior.fbx",
+                "scene": {
+                    "cameras": {
+                        "active": 0
+                    }
+                },
+                "settings": {
+                    "Alpha Test Threshold": 0.5,
+                    "BLAS Rebuild Fraction": 0.33000001311302185,
+                    "Clamp Normals": true,
+                    "Pretransform Animated": false
+                }
+            },
+            "type": "FBX Scene"
+        },
+        {
+            "enabled": true,
+            "id": "tonemap",
+            "outputs": [
+                "out->blit.src"
+            ],
+            "properties": {
+                "W": 11.199999809265137,
+                "alpha mode": "Perceptual luminance",
+                "clamp output": true,
+                "exposure bias": 2.0,
+                "perceptual exponent": 2.200000047683716,
+                "tonemap": "Uncharted 2"
+            },
+            "type": "Tonemap"
+        },
+        {
+            "enabled": true,
+            "id": "imgui",
+            "type": "ImGui"
+        },
+        {
+            "enabled": true,
+            "id": "blit",
+            "type": "Swapchain Blit",
+            "outputs": [
+                "acquire->imgui.acquire"
+            ]
+        }
+    ],
+    "profiler": {
+        "evict after ms": 5000,
+        "profiling": true,
+        "report intervall": 50,
+        "run": {
+            "cpu auto": true,
+            "cpu max ms": 86.99615478515625,
+            "gpu auto": true,
+            "gpu max ms": 78.98662567138672
+        }
+    },
+    "version": 3,
+    "short_config": {
+        "fbx-scene": "/nodes/11/properties/file",
+        "env-map": "/nodes/11/properties/env/Path"
+    }
+}

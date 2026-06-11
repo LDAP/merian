@@ -37,6 +37,33 @@ void Tonemap::make_spec_info() {
                            "main", vk::ShaderStageFlagBits::eCompute, spec_info);
 }
 
+void Tonemap::apply_agx_look() {
+    switch (agx_look) {
+    case AGX_LOOK_DEFAULT:
+        pc.agx_slope_r = pc.agx_slope_g = pc.agx_slope_b = 1.0;
+        pc.agx_offset = 0.0;
+        pc.agx_power = 1.0;
+        pc.agx_sat = 1.0;
+        break;
+    case AGX_LOOK_GOLDEN:
+        pc.agx_slope_r = 1.0;
+        pc.agx_slope_g = 0.9;
+        pc.agx_slope_b = 0.5;
+        pc.agx_offset = 0.0;
+        pc.agx_power = 0.8;
+        pc.agx_sat = 0.8;
+        break;
+    case AGX_LOOK_PUNCHY:
+        pc.agx_slope_r = pc.agx_slope_g = pc.agx_slope_b = 1.0;
+        pc.agx_offset = 0.0;
+        pc.agx_power = 1.35;
+        pc.agx_sat = 1.4;
+        break;
+    case AGX_LOOK_USER:
+        break;
+    }
+}
+
 std::vector<InputConnectorDescriptor> Tonemap::describe_inputs() {
     return {
         {"src", con_src},
@@ -74,9 +101,9 @@ AbstractCompute::NodeStatusFlags Tonemap::properties(Properties& config) {
     bool needs_rebuild = false;
 
     const int old_tonemap = tonemap;
-    config.config_options(
-        "tonemap", tonemap,
-        {"None", "Clamp", "Uncharted 2", "Reinhard Extended", "Aces", "Aces-Approx", "Lottes"});
+    config.config_options("tonemap", tonemap,
+                          {"None", "Clamp", "Uncharted 2", "Reinhard Extended", "Aces",
+                           "Aces-Approx", "Lottes", "AgX"});
     needs_rebuild |= old_tonemap != tonemap;
 
     if (tonemap == TONEMAP_REINHARD_EXTENDED) {
@@ -123,6 +150,25 @@ AbstractCompute::NodeStatusFlags Tonemap::properties(Properties& config) {
         config.config_float("c", pc.param3, "", 0.01);
         config.config_float("d", pc.param4, "", 0.01);
         config.config_float("e", pc.param5, "", 0.01);
+    }
+
+    if (tonemap == TONEMAP_AGX) {
+        const int old_look = agx_look;
+        config.config_options("look", agx_look, {"Default", "Golden", "Punchy", "User"},
+                              Properties::OptionsStyle::DONT_CARE,
+                              "ASC CDL look from the minimal AgX implementation");
+        if (old_tonemap != TONEMAP_AGX || old_look != agx_look)
+            apply_agx_look();
+
+        // editing any value drops the preset to "User"
+        bool edited = false;
+        edited |=
+            config.config_float("slope", &pc.agx_slope_r, "ASC CDL per-channel gain", 3, 0.01f);
+        edited |= config.config_float("offset", pc.agx_offset, "ASC CDL offset", 0.01f);
+        edited |= config.config_float("power", pc.agx_power, "ASC CDL gamma", 0.01f);
+        edited |= config.config_float("saturation", pc.agx_sat, "", 0.01f);
+        if (edited)
+            agx_look = AGX_LOOK_USER;
     }
 
     config.st_separate();

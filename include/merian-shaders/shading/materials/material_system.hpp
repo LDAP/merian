@@ -108,6 +108,16 @@ class MaterialSystem : public std::enable_shared_from_this<MaterialSystem> {
     }
     void set_enable_clearcoat(bool enable);
 
+    bool get_enable_sheen() const {
+        return enable_sheen;
+    }
+    void set_enable_sheen(bool enable);
+
+    bool get_enable_iridescence() const {
+        return enable_iridescence;
+    }
+    void set_enable_iridescence(bool enable);
+
     void properties(Properties& props);
 
     const SlangCompositionHandle& get_composition() const {
@@ -168,6 +178,8 @@ class MaterialSystem : public std::enable_shared_from_this<MaterialSystem> {
     bool enable_transmission = false;
     bool enable_volume = false;
     bool enable_clearcoat = false;
+    bool enable_sheen = false;
+    bool enable_iridescence = false;
     SlangCompositionHandle composition;
     Versioned<SlangProgram> layout_program;
     Versioned<ShaderObject> shader_object;

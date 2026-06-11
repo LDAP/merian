@@ -66,6 +66,26 @@ void Graph::graph_properties(Properties& props) {
                       "run starts. HIGHLY RECOOMMENDED as it limits memory allocations and "
                       "prevents the queue to fill up indefinitely.");
     props.output_text("tasks in queue: {}", thread_pool->queue_size());
+
+    props.st_separate();
+    static_cast<void>(
+        props.config_text("imgui event", imgui_event, false,
+                          "Comma-separated events from ImGui nodes that draw this graph's UI."));
+
+    if (props.is_ui()) {
+        props.st_separate("Events");
+        const auto now = std::chrono::steady_clock::now();
+        std::erase_if(recent_events, [&](const auto& entry) {
+            return now - entry.second.time > std::chrono::seconds(3);
+        });
+        std::string list;
+        for (const auto& [name, event] : recent_events) {
+            if (!list.empty())
+                list += ", ";
+            list += fmt::format("{} (it {})", name, event.iteration);
+        }
+        props.output_text("Last events: {}", list.empty() ? "<none>" : list);
+    }
 }
 
 void Graph::profiler_properties(Properties& props) {
@@ -131,6 +151,21 @@ void Graph::properties(Properties& props) {
     needs_reconnect |= props.config_bool("Rebuild");
     props.st_no_space();
     props.output_text("Run iteration: {}", run_iteration);
+
+    if (props.is_ui()) {
+        props.st_separate("Load / Store");
+        static_cast<void>(props.config_text("path", store_path, false, "Path for Load and Store."));
+        if (props.config_bool("Store") && !store_path.empty()) {
+            store_to_file(store_path);
+        }
+        props.st_no_space();
+        if (props.config_bool("Load") && !store_path.empty()) {
+            // Deferred to the start of the next run() so we never reload mid-iteration.
+            pending_load = std::filesystem::path(store_path);
+        }
+    }
+
+    props.st_separate("Events");
     if (props.is_ui() && props.config_text("send event", props_send_event, true) &&
         !props_send_event.empty()) {
         send_event(props_send_event);

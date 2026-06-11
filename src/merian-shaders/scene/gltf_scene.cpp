@@ -323,6 +323,8 @@ void GLTFScene::load_materials(const CommandBufferHandle& cmd) {
     bool any_transmissive = false;
     bool any_volume = false;
     bool any_clearcoat = false;
+    bool any_sheen = false;
+    bool any_iridescence = false;
     for (size_t i = 0; i < model->materials.size(); i++) {
         const auto& gmat = model->materials[i];
         const auto& pbr = gmat.pbrMetallicRoughness;
@@ -381,10 +383,17 @@ void GLTFScene::load_materials(const CommandBufferHandle& cmd) {
             mat.payload.ior = static_cast<float>(it->second.Get("ior").GetNumberAsDouble());
         }
         // KHR_materials_volume → Beer-Lambert absorption: sigma_a = -ln(attenuationColor) /
-        // distance.
+        // attenuationDistance. thicknessFactor == 0 means thin-walled (no volume), so it only
+        // gates volume vs. thin-walled here. The integrator applies the absorption over the actual
+        // world-space distance the ray travels inside the medium, and attenuationDistance is
+        // world-space, so the absorption needs no node-scale adjustment (unlike a rasterizer that
+        // uses the mesh-local thicknessFactor as the path length).
         if (const auto it = gmat.extensions.find("KHR_materials_volume");
             it != gmat.extensions.end()) {
             const tinygltf::Value& ext = it->second;
+            const double thickness_factor = ext.Has("thicknessFactor")
+                                                ? ext.Get("thicknessFactor").GetNumberAsDouble()
+                                                : 0.0;
             float3 att_color(1.0f, 1.0f, 1.0f);
             if (ext.Has("attenuationColor")) {
                 const tinygltf::Value& c = ext.Get("attenuationColor");
@@ -397,7 +406,7 @@ void GLTFScene::load_materials(const CommandBufferHandle& cmd) {
             const double att_dist = ext.Has("attenuationDistance")
                                         ? ext.Get("attenuationDistance").GetNumberAsDouble()
                                         : std::numeric_limits<double>::infinity();
-            if (std::isfinite(att_dist) && att_dist > 0.0) {
+            if (thickness_factor > 0.0 && std::isfinite(att_dist) && att_dist > 0.0) {
                 const auto sigma = [att_dist](float c) {
                     return static_cast<float>(-std::log(std::clamp(c, 1e-4f, 1.0f)) / att_dist);
                 };
@@ -436,19 +445,87 @@ void GLTFScene::load_materials(const CommandBufferHandle& cmd) {
             any_clearcoat |= mat.payload.clearcoat_weight > 0.0f;
         }
 
+        // KHR_materials_sheen — retroreflective microfibre layer (colour in sRGB, roughness in the
+        // sheenRoughnessTexture alpha channel).
+        if (const auto it = gmat.extensions.find("KHR_materials_sheen");
+            it != gmat.extensions.end()) {
+            const tinygltf::Value& ext = it->second;
+            if (ext.Has("sheenColorFactor")) {
+                const tinygltf::Value& c = ext.Get("sheenColorFactor");
+                if (c.ArrayLen() >= 3) {
+                    mat.payload.sheen_color =
+                        float3(static_cast<float>(c.Get(0).GetNumberAsDouble()),
+                               static_cast<float>(c.Get(1).GetNumberAsDouble()),
+                               static_cast<float>(c.Get(2).GetNumberAsDouble()));
+                }
+            }
+            if (ext.Has("sheenRoughnessFactor")) {
+                mat.payload.sheen_roughness =
+                    static_cast<float>(ext.Get("sheenRoughnessFactor").GetNumberAsDouble());
+            }
+            const auto ext_texture = [&](const char* key) -> int {
+                if (ext.Has(key) && ext.Get(key).Has("index")) {
+                    return static_cast<int>(ext.Get(key).Get("index").GetNumberAsDouble());
+                }
+                return -1;
+            };
+            if (const int idx = ext_texture("sheenColorTexture"); idx >= 0) {
+                mat.payload.sheen_color_texture = get_or_load_texture(cmd, idx, /*linear=*/false);
+            }
+            if (const int idx = ext_texture("sheenRoughnessTexture"); idx >= 0) {
+                mat.payload.sheen_roughness_texture =
+                    get_or_load_texture(cmd, idx, /*linear=*/true);
+            }
+            any_sheen |= mat.payload.sheen_color.r > 0.0f || mat.payload.sheen_color.g > 0.0f ||
+                         mat.payload.sheen_color.b > 0.0f;
+        }
+
+        // KHR_materials_iridescence — thin-film interference on the specular Fresnel.
+        if (const auto it = gmat.extensions.find("KHR_materials_iridescence");
+            it != gmat.extensions.end()) {
+            const tinygltf::Value& ext = it->second;
+            if (ext.Has("iridescenceFactor")) {
+                mat.payload.iridescence_factor =
+                    static_cast<float>(ext.Get("iridescenceFactor").GetNumberAsDouble());
+            }
+            if (ext.Has("iridescenceIor")) {
+                mat.payload.iridescence_ior =
+                    static_cast<float>(ext.Get("iridescenceIor").GetNumberAsDouble());
+            }
+            if (ext.Has("iridescenceThicknessMinimum")) {
+                mat.payload.iridescence_thickness_min = static_cast<float>(
+                    ext.Get("iridescenceThicknessMinimum").GetNumberAsDouble());
+            }
+            if (ext.Has("iridescenceThicknessMaximum")) {
+                mat.payload.iridescence_thickness_max = static_cast<float>(
+                    ext.Get("iridescenceThicknessMaximum").GetNumberAsDouble());
+            }
+            const auto ext_texture = [&](const char* key) -> int {
+                if (ext.Has(key) && ext.Get(key).Has("index")) {
+                    return static_cast<int>(ext.Get(key).Get("index").GetNumberAsDouble());
+                }
+                return -1;
+            };
+            if (const int idx = ext_texture("iridescenceTexture"); idx >= 0) {
+                mat.payload.iridescence_texture = get_or_load_texture(cmd, idx, /*linear=*/true);
+            }
+            if (const int idx = ext_texture("iridescenceThicknessTexture"); idx >= 0) {
+                mat.payload.iridescence_thickness_texture =
+                    get_or_load_texture(cmd, idx, /*linear=*/true);
+            }
+            any_iridescence |= mat.payload.iridescence_factor > 0.0f;
+        }
+
         material_map[i] = get_material_system()->add_material(gltf_type_id, mat);
     }
 
-    // Enable each lobe only when an asset actually uses it.
-    if (any_transmissive) {
-        get_material_system()->set_enable_transmission(true);
-    }
-    if (any_volume) {
-        get_material_system()->set_enable_volume(true);
-    }
-    if (any_clearcoat) {
-        get_material_system()->set_enable_clearcoat(true);
-    }
+    // Enable exactly the lobes this asset uses: features not needed are disabled so the Slang
+    // compiler folds them out of the BRDF. set_enable_* is a no-op when the flag is unchanged.
+    get_material_system()->set_enable_transmission(any_transmissive);
+    get_material_system()->set_enable_volume(any_volume);
+    get_material_system()->set_enable_clearcoat(any_clearcoat);
+    get_material_system()->set_enable_sheen(any_sheen);
+    get_material_system()->set_enable_iridescence(any_iridescence);
 
     // Default material for primitives without one
     if (material_map.empty()) {
@@ -692,6 +769,9 @@ void GLTFScene::load_cameras() {
             get_active_camera()->look_at_bounding_box(aabb);
         }
     }
+
+    for (const CameraHandle& cam : get_cameras())
+        cam->set_jitter_sequence(Camera::JitterSequence::R2);
 }
 
 void GLTFScene::compute_aabb() {

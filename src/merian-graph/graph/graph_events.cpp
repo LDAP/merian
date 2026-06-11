@@ -74,6 +74,10 @@ void Graph::send_event(const GraphEvent::Info& event_info,
     SPDLOG_TRACE("sending event: {}/{}/{}, notify all={}", event_info.node_name,
                  event_info.identifier, event_info.event_name, notify_all);
 
+    recent_events[fmt::format("{}/{}/{}", event_info.node_name, event_info.identifier,
+                              event_info.event_name)] = {total_iteration,
+                                                         std::chrono::steady_clock::now()};
+
     const auto identifier_it = event_listeners.find(event_info.identifier);
     if (identifier_it == event_listeners.end()) {
         return;

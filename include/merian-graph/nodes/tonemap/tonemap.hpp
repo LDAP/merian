@@ -19,6 +19,14 @@ class Tonemap : public AbstractCompute {
         float param5 = 1.0;
 
         float perceptual_exponent = 2.2;
+
+        // AgX ASC CDL look (defaults to the "Default" preset)
+        float agx_slope_r = 1.0;
+        float agx_slope_g = 1.0;
+        float agx_slope_b = 1.0;
+        float agx_offset = 0.0;
+        float agx_power = 1.0;
+        float agx_sat = 1.0;
     };
 
   public:
@@ -47,6 +55,8 @@ class Tonemap : public AbstractCompute {
   private:
     void make_spec_info();
 
+    void apply_agx_look();
+
     std::optional<vk::Format> output_format = std::nullopt;
 
     VkSampledImageInHandle con_src = VkSampledImageIn::compute_read();
@@ -59,6 +69,7 @@ class Tonemap : public AbstractCompute {
     int32_t tonemap = 0;
     int32_t alpha_mode = 0;
     int32_t clamp_output = 1;
+    int32_t agx_look = 0;
 };
 
 } // namespace merian

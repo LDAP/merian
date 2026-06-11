@@ -8,11 +8,7 @@
 
 namespace merian {
 
-/**
- * @brief      This class describes a camera.
- *
- * The local coordinate system is x: right, y: up, and the camera looks into -z.
- */
+// Local coordinate system is x: right, y: up, looking into -z.
 class Camera {
   private:
     // Checks if current_id != check_id and sets check_id = current_id
@@ -49,6 +45,9 @@ class Camera {
     bool has_changed_update(uint64_t& check_id) const noexcept;
 
     uint64_t get_change_id() const noexcept;
+
+    // Compares the view and projection parameters, excluding jitter.
+    bool operator==(const Camera& other) const noexcept;
 
     // -----------------------------------------------------------------------------
 
@@ -159,6 +158,10 @@ class Camera {
     // Orbit around the "center" horizontally (phi) or vertically (theta).
     //  * pi equals a full turn.
     void orbit(const float d_phi, const float d_theta);
+
+    // Move the camera position toward (negative) or away from (positive) the target along the view
+    // axis, leaving the target fixed (changes the eye-to-target distance).
+    void dolly(const float distance);
 
     void properties(Properties& props);
 

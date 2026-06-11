@@ -60,6 +60,7 @@ class RenderMCPG : public Node {
     vk::Extent3D extent = vk::Extent3D{1920, 1080, 1};
     int32_t spp = 1;
     int32_t max_path_length = 8;
+    int32_t emitted_max_path_length = max_path_length;
     bool emission_on_primary = false;
     std::array<bool, 8> mask_enabled{true, true, true, true, true, true, true, true};
 
