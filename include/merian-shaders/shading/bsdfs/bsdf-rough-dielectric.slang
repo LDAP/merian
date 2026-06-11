@@ -101,7 +101,7 @@ struct RoughDielectricBSDF : BSDF {
         const float denom = wodoth + eta * widoth;
         const float pdf =
             (1.0f - R) * ggx_VNDF_H_pdf(wi, wm, alpha_squared) * abs(wodoth) / pow2(denom);
-        // (1 - R) cancels; the eta^2 radiance factor stays (same as GGXBTDF).
+        // (1 - R) cancels; the eta^2 radiance factor stays.
         const float weight = pow2(eta) * smith_g2_over_widotn(abs(wo.z), wi.z, alpha_squared) /
                              smith_g1_over_widotn(wi.z, alpha_squared);
         return ShadingFunctionSample(wo, pdf, tint * weight);

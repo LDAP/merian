@@ -294,44 +294,6 @@ float3 ggx_integral_approx_separable(const float3 F0, const float alpha, const f
     return ggx_integral_approx_(F0, alpha, cosTheta, M1, M2, M3, M4);
 }
 
-// -----------------------------------------------------------------
-
-// float ggx_times_wodotn(float wodotn, float widotn, float ndoth, float alpha) {
-//     float G2 = smith_g2_over_widotn(wodotn, widotn, alpha * alpha);
-//     float D = ggx_NDF(ndoth * ndoth, alpha * alpha);
-//     return (D * G2) / 4.0f;
-// }
-//
-// float ggx_times_wodotn(float3 wi, float3 wo, float3 n, float alpha) {
-//     float3 h = normalize(wo + wi);
-//     float wodotn = dot(wo, n);
-//     float widotn = dot(wi, n);
-//     float ndoth = dot(n, h);
-//     return ggx_times_wodotn(wodotn, widotn, ndoth, alpha);
-// }
-//
-// float ggx_times_wodotn(float3 wi, float3 wo, float3 n, float alpha, float F0) {
-//     float3 h = normalize(wo + wi);
-//     float wodotn = dot(wo, n);
-//     float widotn = dot(wi, n);
-//     float ndoth = dot(n, h);
-//     float bsdf = ggx_times_wodotn(wodotn, widotn, ndoth, alpha);
-//     float widoth = dot(wi, h);
-//     float F = F0 + ((1.0f - F0) * pow(max(1.0f - widoth, 0.0f), 5.0f));
-//     return F * bsdf;
-// }
-//
-// float3 ggx_times_wodotn(float3 wi, float3 wo, float3 n, float alpha, float3 F0) {
-//     float3 h = normalize(wo + wi);
-//     float wodotn = dot(wo, n);
-//     float widotn = dot(wi, n);
-//     float ndoth = dot(n, h);
-//     float bsdf = ggx_times_wodotn(wodotn, widotn, ndoth, alpha);
-//     float widoth = dot(wi, h);
-//     float3 F = F0 + ((1.0f.xxx - F0) * pow(max(1.0f - widoth, 0.0f), 5.0f));
-//     return F * bsdf;
-// }
-
 // A specular microfacet BRDF with GGX normal distribution.
 struct GGXBRDF : BSDF {
     float alpha;
@@ -497,44 +459,5 @@ struct GGXBTDF : BSDF {
 
 typealias SpecularBRDF = GGXBRDF;
 typealias SpecularBTDF = GGXBTDF;
-
-// float ggx_diffuse_mix_times_wodotn(float3 wi, float3 wo, float3 n, float alpha, float F0) {
-//     float3 h = normalize(wo + wi);
-//     float wodotn = clamp(dot(n, wo), 0.0f, 1.0f);
-//     if (wodotn <= 0.0f) {
-//         return 0.0f;
-//     }
-//     float widotn = dot(wi, n);
-//     float ndoth = dot(n, h);
-//     float widoth = dot(wi, h);
-//     float F = F0 + ((1.0f - F0) * pow(max(1.0f - widoth, 0.0f), 5.0f));
-//     return lerp(0.3183098733425140380859375f * wodotn,
-//                 ggx_times_wodotn(wodotn, widotn, ndoth, alpha), F);
-// }
-
-// float ggx_diffuse_mix_pdf(float3 wi, float3 wo, float3 n, float alpha) {
-//     float wodotn = dot(wo, n);
-//     if (wodotn <= 0.0f) {
-//         return 0.0f;
-//     }
-//     float3 h = normalize(wo + wi);
-//     float widotn = dot(wi, n);
-//     float ndoth = clamp(dot(n, h), 0.0f, 1.0f);
-//     float diffuse_pdf = 0.3183098733425140380859375f * wodotn;
-//     float ggx_vndf_pdf = ggx_VNDF_pdf(widotn, ndoth * ndoth, alpha * alpha);
-//     float fresnel = 0.0199999995529651641845703125f +
-//                     (0.980000019073486328125f * pow(max(1.0f - widotn, 0.0f), 5.0f));
-//     return lerp(diffuse_pdf, ggx_vndf_pdf, fresnel);
-// }
-
-// float3 ggx_diffuse_mix_sample(float3 wi, float3 n, float alpha, float3 random) {
-//     float fresnel = 0.0199999995529651641845703125f +
-//                     (0.980000019073486328125f * pow(max(1.0f - dot(wi, n), 0.0f), 5.0f));
-//     if (fresnel < random.x) {
-//         return mul(sample_cos(random.yz), make_frame(n));
-//     } else {
-//         return ggx_VNDF_sample(wi, n, alpha, random.yz);
-//     }
-// }
 
 }

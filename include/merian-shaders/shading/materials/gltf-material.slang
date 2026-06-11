@@ -15,19 +15,16 @@ import merian_shaders.utils.normal_map;
 namespace merian {
 
 // https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#complete-model
-// KHR_materials_transmission: the transmission BTDF takes the diffuse slot, mixed by the transmission.
-// Opaque dielectric: a specular lobe over the diffuse base. KHR_materials_iridescence modulates
-// its Fresnel; the dielectric reflectance uses the full (TIR-aware) Fresnel at the macro normal.
+
+// Opaque dielectric: specular over diffuse, Fresnel modulated by KHR_materials_iridescence.
 typealias GltfOpaqueDielectric = IridescentFresnelMixBSDF<SpecularBRDF, LambertDiffuseBRDF>;
-// KHR_materials_transmission: a rough dielectric (coupled microfacet reflection + refraction,
-// PBRT-style), mixed in by the transmission weight. For glass (weight 1) this fully replaces the
-// opaque dielectric; microfacet total internal reflection reflects rather than terminating.
+// KHR_materials_transmission: rough dielectric, mixed in by the transmission weight.
 typealias GltfDielectric = MixBSDF<GltfOpaqueDielectric, RoughDielectricBSDF>;
 typealias GltfConductor = IridescentConductorBSDF<SpecularBRDF>;
 typealias GltfReflective = MixBSDF<GltfDielectric, GltfConductor>;
-// KHR_materials_sheen: a microfibre sheen lobe layered over the reflective base.
+// KHR_materials_sheen: sheen lobe over the reflective base.
 typealias GltfSheened = SheenLayerBSDF<GltfReflective>;
-// KHR_materials_clearcoat: a GGX coat over the (sheened) surface, mixed by the clearcoat weight.
+// KHR_materials_clearcoat: a GGX coat over the sheened surface, mixed by the clearcoat weight.
 typealias GltfCoated = FresnelMixBSDF<SpecularBRDF, GltfSheened>;
 typealias GltfBSDF = MixBSDF<GltfSheened, GltfCoated>;
 
@@ -121,26 +118,22 @@ struct GltfMaterial : MaterialModel {
             emission *= lod.sample(tm.get_sampler2D(emissive_texture), sd.uv).rgb;
         }
 
-        // The occlusion texture only attenuates indirect/ambient light; a path tracer computes real
-        // occlusion, so it is intentionally not applied to the BRDF here.
+        // occlusion only attenuates ambient/indirect light; not applied in a path tracer.
 
         const float alpha = ggx_roughness_to_alpha(max(roughness, merian_hint_min_roughness));
 
-        // Dielectric specular F0 from the index of refraction (KHR_materials_ior; default 1.5 -> 0.04).
+        // dielectric specular F0 from the IOR (KHR_materials_ior; default 1.5 -> 0.04).
         const float ior_r = (ior - 1.0f) / (ior + 1.0f);
         const float dielectric_f0 = ior_r * ior_r;
 
-        // Relative IOR at this interface (incident / transmitted). Drives both the dielectric
-        // Fresnel split (including total internal reflection) and the transmission refraction.
+        // relative IOR (incident / transmitted); drives the Fresnel split and the refraction.
         const float eta = sd.ior / (sd.front_facing ? ior : 1.0f);
-        // Transmission weight, gated by the toggle (off -> weight 0 -> the BTDF drops out).
         float tw = 0.0f;
         if (merian_hint_enable_transmission) {
             tw = transmission_weight;
         }
 
-        // Iridescence strength, film index and thickness, gated by the toggle (strength 0 -> the
-        // thin-film branch folds out, leaving the plain Fresnel terms).
+        // iridescence strength / film index / thickness, gated by the toggle.
         float iridescence = 0.0f;
         float iri_ior = 1.0f;
         float iri_thickness = 0.0f;
@@ -161,8 +154,7 @@ struct GltfMaterial : MaterialModel {
         const GltfOpaqueDielectric opaque_dielectric =
             GltfOpaqueDielectric(SpecularBRDF(alpha), LambertDiffuseBRDF(base.rgb), dielectric_f0,
                                  eta, iri_ior, iri_thickness, iridescence);
-        // Transmission mixes the opaque dielectric towards the rough dielectric (glass). The
-        // specular reflection is present in both, so the mix is a correct weighted blend.
+        // transmission blends the opaque dielectric towards the rough dielectric (glass).
         const GltfDielectric dielectric =
             GltfDielectric(opaque_dielectric, RoughDielectricBSDF(alpha, eta, base.rgb), tw);
         const GltfReflective reflective = GltfReflective(
@@ -184,8 +176,7 @@ struct GltfMaterial : MaterialModel {
             coat_alpha = ggx_roughness_to_alpha(max(coat_rough, merian_hint_min_roughness));
         }
 
-        // Volume absorption of the medium entered on a front-face transmission; the integrator applies
-        // it over the segment travelled inside.
+        // volume absorption, entered on a front-face transmission.
         float3 absorb = float3(0.0f);
         if (merian_hint_enable_volume && sd.front_facing) {
             absorb = absorption;

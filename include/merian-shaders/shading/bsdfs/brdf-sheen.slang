@@ -5,9 +5,7 @@ import merian_shaders.utils.sampling;
 
 namespace merian {
 
-// "Charlie" microfacet sheen BRDF with Conty & Kulla (2017) visibility.
-//
-// TODO: replace cosine sampling with LTC sheen (Zeltner et al. 2022) for lower variance
+// Microfacet sheen BRDF (Estevez & Kulla 2017).
 struct SheenBRDF : BSDF {
     float3 color;
     float alpha; // squared roughness, clamped away from zero
@@ -84,7 +82,7 @@ struct SheenBRDF : BSDF {
     }
 }
 
-// Analytic fit of the Charlie-sheen directional albedo (hemispherical reflectance).
+// Analytic fit of the sheen directional albedo (hemispherical reflectance).
 float sheen_directional_albedo(const float ndotv, const float roughness) {
     const float cosv = clamp(ndotv, 0.f, 1.f);
     const float r2 = roughness * roughness;

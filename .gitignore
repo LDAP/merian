@@ -8,3 +8,5 @@
 !/subprojects/slang/meson.build
 
 **/__pycache__/**
+
+imgui.ini

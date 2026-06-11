@@ -3,8 +3,7 @@ import merian_shaders.utils.fresnel;
 
 namespace merian {
 
-// Conductor (metal) specular layer whose Fresnel is blended between plain Schlick and the thin-film
-// reflectance by `iridescence`. With iridescence == 0 it reduces to ConductorFresnelBSDF.
+// Conductor specular layer; its Fresnel blends Schlick with thin-film reflectance by `iridescence`.
 struct IridescentConductorBSDF<Inner : BSDF> : BSDF {
     Inner bsdf;
     float3 f0;
@@ -22,8 +21,7 @@ struct IridescentConductorBSDF<Inner : BSDF> : BSDF {
 
     float3 fresnel(const float cos_theta) {
         const float3 schlick = fresnel_schlick(cos_theta, f0);
-        // No film: plain conductor Fresnel (also lets the thin-film term specialize away when
-        // iridescence is a constant 0).
+        // No film: plain Fresnel; also folds the thin-film term away when iridescence is constant 0.
         if (iridescence <= 0.0f) {
             return schlick;
         }
@@ -63,11 +61,8 @@ struct IridescentConductorBSDF<Inner : BSDF> : BSDF {
     }
 }
 
-// Dielectric specular-over-diffuse/transmission layer. The reflection/transmission split uses the
-// full dielectric Fresnel (eta = incident/transmitted index), which reaches 1 across the whole
-// total-internal-reflection region — so rays inside a refractive medium reflect rather than picking
-// a transmission that cannot refract. `iridescence` blends in the thin-film reflectance; with
-// iridescence == 0 it reduces to a plain dielectric Fresnel mix.
+// Dielectric specular over a diffuse/transmission base. The split uses the full (TIR-aware)
+// dielectric Fresnel; `iridescence` blends in the thin-film reflectance.
 struct IridescentFresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
     Layer layer; // specular (top)
     Base base;   // diffuse / transmission (bottom)
@@ -97,13 +92,11 @@ struct IridescentFresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
         const float3 base_e = base.eval(wi, wo, rng);
         const float3 layer_e = layer.eval(wi, wo, rng);
 
-        // Dielectric reflectance, evaluated at the macro normal so it is consistent with sample()
-        // and pdf() (and total internal reflection -> 1, dropping the transmission term).
+        // Dielectric reflectance at the macro normal (consistent with sample/pdf; TIR -> 1).
         const float f = fresnel_dielectric(wi.z, eta);
         const float3 dielectric = lerp(base_e, layer_e, f);
 
-        // No film: plain dielectric Fresnel mix (also lets the thin-film term specialize away when
-        // iridescence is a constant 0).
+        // No film: plain Fresnel mix; also folds the thin-film term away when iridescence is constant 0.
         if (iridescence <= 0.0f) {
             return dielectric;
         }

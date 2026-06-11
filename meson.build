@@ -232,13 +232,6 @@ merian_dep = declare_dependency(
     compile_args: global_args,
     link_with : [merian_lib, merian_shaders_lib, merian_graph_lib],
     include_directories : inc_dirs,
-    # Mirror the pkg-config variables below so in-tree plugins resolve the shader tooling the same
-    # way as standalone ones (via get_variable(internal: ..., pkgconfig: ...)).
-    variables : {
-        'shader_compile_script': join_paths(meson.current_source_dir(), 'scripts', 'compile_shader.py'),
-        'shader_includedir': join_paths(meson.current_source_dir(), 'include'),
-        'shader_optimization': get_option('optimization'),
-    },
     dependencies : [
         fmt,
         glfw.found() ? glfw : [],
@@ -271,9 +264,6 @@ merian_graph_run = executable(
 # building against the build tree directly). global_args is exported so plugins compile merian's
 # headers with the same defines (Vulkan dynamic dispatch, GLM, feature toggles).
 pkgconfig = import('pkgconfig')
-# Expose the shader-compile tooling so plugins can build their own shaders to SPIR-V with the same
-# script/includes merian uses (reconstruct a generator from these variables; see the quake plugin).
-merian_scripts_install_dir = join_paths(get_option('datadir'), 'merian', 'scripts')
 pkgconfig.generate(
     libraries: [merian_lib, merian_shaders_lib, merian_graph_lib],
     name: 'merian',
@@ -281,16 +271,6 @@ pkgconfig.generate(
     description: 'Merian Vulkan development framework',
     extra_cflags: global_args,
     requires: [vulkan, glm, fmt, spdlog, nlohmann_json],
-    variables: [
-        'shader_compile_script=' + join_paths('${prefix}', merian_scripts_install_dir, 'compile_shader.py'),
-        'shader_includedir=${includedir}',
-        'shader_optimization=' + get_option('optimization'),
-    ],
-    unescaped_uninstalled_variables: [
-        'shader_compile_script=' + join_paths(meson.current_source_dir(), 'scripts', 'compile_shader.py'),
-        'shader_includedir=' + join_paths(meson.current_source_dir(), 'include'),
-        'shader_optimization=' + get_option('optimization'),
-    ],
 )
 meson.override_dependency('merian', merian_dep)
 
@@ -323,7 +303,8 @@ endforeach
 
 install_subdir('include', install_dir: get_option('includedir'), strip_directory: true)
 install_subdir('examples', install_dir: join_paths(get_option('datadir'), 'merian'))
-install_data('scripts/compile_shader.py', install_dir: merian_scripts_install_dir)
+install_data('scripts/compile_shader.py',
+             install_dir: join_paths(get_option('datadir'), 'merian', 'scripts'))
 
 if get_option('tests')
     subdir('tests')
