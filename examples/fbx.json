@@ -4,6 +4,16 @@
         "fps limiter": false,
         "iterations in flight": 2,
         "low latency": false,
+        "short_config": {
+            "env-map": {
+                "pointer": "/nodes/11/properties/env/Path",
+                "required": false
+            },
+            "fbx-scene": {
+                "pointer": "/nodes/11/properties/file",
+                "required": false
+            }
+        },
         "time overwrite": "None"
     },
     "nodes": [
@@ -205,9 +215,5 @@
             "gpu max ms": 78.98662567138672
         }
     },
-    "version": 3,
-    "short_config": {
-        "fbx-scene": "/nodes/11/properties/file",
-        "env-map": "/nodes/11/properties/env/Path"
-    }
+    "version": 3
 }

@@ -72,6 +72,11 @@ void Graph::graph_properties(Properties& props) {
         props.config_text("imgui event", imgui_event, false,
                           "Comma-separated events from ImGui nodes that draw this graph's UI."));
 
+    if (props.st_begin_child("short_config", "Short Configs")) {
+        short_config_properties(props);
+        props.st_end_child();
+    }
+
     if (props.is_ui()) {
         props.st_separate("Events");
         const auto now = std::chrono::steady_clock::now();
@@ -85,6 +90,35 @@ void Graph::graph_properties(Properties& props) {
             list += fmt::format("{} (it {})", name, event.iteration);
         }
         props.output_text("Last events: {}", list.empty() ? "<none>" : list);
+    }
+}
+
+void Graph::short_config_properties(Properties& props) {
+    // Aliases come from the loaded JSON, so discover them before reading their values.
+    for (const std::string& alias : props.st_list_children()) {
+        short_configs.try_emplace(alias);
+    }
+    for (auto it = short_configs.begin(); it != short_configs.end();) {
+        bool remove = false;
+        if (props.st_begin_child(it->first, it->first)) {
+            static_cast<void>(props.config_text(
+                "pointer", it->second.pointer, false,
+                "JSON pointer into this config, resolved by graph-run for --<alias>."));
+            props.config_bool("required", it->second.required,
+                              "graph-run refuses to start without this alias.");
+            remove = props.is_ui() && props.config_bool("Remove");
+            props.st_end_child();
+        }
+        it = remove ? short_configs.erase(it) : std::next(it);
+    }
+    if (props.is_ui()) {
+        props.st_separate();
+        if ((props.config_text("new alias", new_short_config_alias, true) ||
+             props.config_bool("Add")) &&
+            !new_short_config_alias.empty()) {
+            short_configs.try_emplace(new_short_config_alias);
+            new_short_config_alias.clear();
+        }
     }
 }
 

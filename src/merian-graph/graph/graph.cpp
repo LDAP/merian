@@ -256,6 +256,7 @@ void Graph::reset() {
 
     node_data.clear();
     node_for_identifier.clear();
+    short_configs.clear();
     for (uint32_t i = 0; i < ring_fences.size(); i++) {
         InFlightData& in_flight_data = ring_fences.get(i).user_data;
         in_flight_data.in_flight_data.clear();

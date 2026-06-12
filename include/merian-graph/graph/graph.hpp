@@ -226,6 +226,7 @@ class Graph : public std::enable_shared_from_this<Graph> {
 
     /*--- Properties ---*/
     void graph_properties(Properties& props);
+    void short_config_properties(Properties& props);
     void profiler_properties(Properties& props);
     void io_props_for_node(Properties& config, NodeHandle& node, NodeData& data);
 
@@ -400,6 +401,13 @@ class Graph : public std::enable_shared_from_this<Graph> {
     std::optional<std::filesystem::path> pending_load;
     std::string imgui_event = "ui";
 
+    // CLI aliases for graph-run: alias -> JSON pointer into the stored config.
+    struct ShortConfig {
+        std::string pointer;
+        bool required = false;
+    };
+    std::map<std::string, ShortConfig> short_configs;
+
     // Nodes
     std::map<std::string, NodeHandle> node_for_identifier;
     std::unordered_map<NodeHandle, NodeData> node_data;
@@ -429,6 +437,7 @@ class Graph : public std::enable_shared_from_this<Graph> {
 
     // Properties helper
     std::string props_send_event;
+    std::string new_short_config_alias;
     int new_node_selected = 0;
     std::string new_node_identifier;
     int remove_node_selected = 0;

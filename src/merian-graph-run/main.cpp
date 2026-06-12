@@ -105,21 +105,19 @@ struct ShortConfig {
     bool required = false;
 };
 
-// A "short_config" entry is either "alias": "<pointer>" or
-// "alias": {"pointer": "<pointer>", "required": <bool>}.
+// Short configs are owned by the graph and live at graph_properties/short_config as
+// "alias": {"pointer": "<JSON pointer>", "required": <bool>}.
 std::vector<ShortConfig> parse_short_configs(const nlohmann::json& config) {
     std::vector<ShortConfig> entries;
-    const nlohmann::json short_config = config.value("short_config", nlohmann::json::object());
+    const nlohmann::json graph_properties =
+        config.value("graph_properties", nlohmann::json::object());
+    const nlohmann::json short_config =
+        graph_properties.value("short_config", nlohmann::json::object());
     for (const auto& [alias, value] : short_config.items()) {
-        if (value.is_string()) {
-            entries.push_back({.alias = alias,
-                               .pointer = nlohmann::json::json_pointer(value.get<std::string>())});
-        } else {
-            entries.push_back(
-                {.alias = alias,
-                 .pointer = nlohmann::json::json_pointer(value.at("pointer").get<std::string>()),
-                 .required = value.value("required", false)});
-        }
+        entries.push_back(
+            {.alias = alias,
+             .pointer = nlohmann::json::json_pointer(value.at("pointer").get<std::string>()),
+             .required = value.value("required", false)});
     }
     return entries;
 }
@@ -236,7 +234,6 @@ int main(const int argc, const char** argv) {
             SPDLOG_ERROR("could not parse config '{}': {}", config_path->string(), e.what());
             return 1;
         }
-        config.erase("short_config");
     } else if (!options->overrides.empty()) {
         SPDLOG_ERROR("overrides given but no graph config");
         return 1;

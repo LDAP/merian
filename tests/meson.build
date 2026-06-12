@@ -62,6 +62,13 @@ test_scene = executable(
 )
 test('scene', test_scene, timeout: 120)
 
+test_graph_load_store = executable(
+    'test-graph-load-store',
+    'test_graph_load_store.cpp',
+    dependencies: [merian_dep, gtest_main_dep],
+)
+test('graph_load_store', test_graph_load_store, timeout: 120)
+
 test_slang_hot_reload = executable(
     'test-slang-hot-reload',
     'test_slang_hot_reload.cpp',
