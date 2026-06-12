@@ -93,29 +93,38 @@ subdir('vk/imgui')
 # Windows. Optional so it is simply skipped where not present.
 dl_dep = ccx.find_library('dl', required: false)
 
-merian_lib = shared_library(
-    'merian',
-    [merian_src],
-    dependencies: [
-        dl_dep,
-        fmt,
-        glfw,
-        glm,
-        glslang,
-        imgui,
-        nlohmann_json,
-        sdl3,
-        shaderc,
-        slang,
-        spdlog,
-        spirv_reflect,
-        stb,
-        subprocess,
-        tgltf,
-        tol,
-        vma,
-        vulkan,
-    ],
-    include_directories: inc_dirs,
-    install : true
-)
+merian_deps = [
+    dl_dep,
+    fmt,
+    glfw,
+    glm,
+    glslang,
+    imgui,
+    nlohmann_json,
+    sdl3,
+    shaderc,
+    slang,
+    spdlog,
+    spirv_reflect,
+    stb,
+    subprocess,
+    tgltf,
+    tol,
+    vma,
+    vulkan,
+]
+
+if is_msvc
+    merian_objs = static_library('merian-objs', [merian_src],
+        cpp_args: ['-DVULKAN_HPP_STORAGE_SHARED_EXPORT'],
+        dependencies: merian_deps, include_directories: inc_dirs)
+    merian_def = custom_target('merian-def',
+        input: merian_objs, output: 'merian.def',
+        command: [py, gen_def_py, '@OUTPUT@', '@INPUT@'])
+    merian_lib = shared_library('merian',
+        objects: merian_objs.extract_all_objects(recursive: false),
+        vs_module_defs: merian_def, dependencies: merian_deps, install: true)
+else
+    merian_lib = shared_library('merian', [merian_src],
+        dependencies: merian_deps, include_directories: inc_dirs, install: true)
+endif

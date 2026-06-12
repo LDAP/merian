@@ -20,6 +20,10 @@ fs = import('fs')
 
 ccx = meson.get_compiler('cpp')
 
+# export all objects on windows
+is_msvc = ccx.get_argument_syntax() == 'msvc'
+gen_def_py = files('scripts/gen_def.py')
+
 if get_option('loglevel') == 'auto'
     if get_option('buildtype').startswith('debug')
         add_project_arguments('-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_DEBUG', language : 'cpp')
@@ -38,6 +42,11 @@ global_args = [
     '-DGLM_FORCE_DEPTH_ZERO_TO_ONE',
     '-DGLM_FORCE_SWIZZLE=1'
 ]
+
+# the dynamic dispatcher storage lives in merian-core's dll; consumers import it
+if is_msvc
+    global_args += ['-DVULKAN_HPP_STORAGE_SHARED']
+endif
 
 if get_option('performance_profiling')
   global_args += ['-DMERIAN_PROFILER_ENABLE']
