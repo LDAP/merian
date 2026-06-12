@@ -2,6 +2,9 @@
 
 #include "merian/utils/properties.hpp"
 
+#include <algorithm>
+#include <cmath>
+
 namespace merian {
 
 using Key = InputController::Key;
@@ -73,16 +76,12 @@ bool CameraController::on_cursor(InputController& /*controller*/,
         const float dx = static_cast<float>(xpos - last_x);
         const float dy = static_cast<float>(ypos - last_y);
         if (right_held) {
-            target_camera.rotate(dx * look_sensitivity, -dy * look_sensitivity);
+            pending_look += float2(dx * look_sensitivity, -dy * look_sensitivity);
         } else if (key_pan) {
-            // Scale by the target distance so panning keeps pace at any zoom.
-            const float distance =
-                merian::length(target_camera.get_position() - target_camera.get_target());
-            target_camera.move(-dx * pan_sensitivity * distance, dy * pan_sensitivity * distance,
-                               0.0f);
+            pending_pan += float2(dx, dy);
         } else {
             // Orbit moves the eye around the target, so the vertical sign is the opposite of look.
-            target_camera.orbit(dx * orbit_sensitivity, dy * orbit_sensitivity);
+            pending_orbit += float2(dx * orbit_sensitivity, dy * orbit_sensitivity);
         }
     }
     last_x = xpos;
@@ -98,9 +97,7 @@ bool CameraController::on_scroll(InputController& /*controller*/,
         move_speed *= yoffset > 0.0 ? 1.1f : 0.9f;
     } else {
         // A fraction of the current distance keeps the zoom speed proportional at any range.
-        const float distance =
-            merian::length(target_camera.get_position() - target_camera.get_target());
-        target_camera.dolly(-static_cast<float>(yoffset) * dolly_fraction * distance);
+        pending_dolly += static_cast<float>(-yoffset) * dolly_fraction;
     }
     return true;
 }
@@ -110,31 +107,62 @@ void CameraController::attach(const CameraHandle& camera) {
         return;
     }
     attached = camera;
-    target_camera = *camera;
-    animator.snap(*camera);
+    pending_look = float2(0);
+    pending_orbit = float2(0);
+    pending_pan = float2(0);
+    pending_dolly = 0.f;
 }
 
 void CameraController::update(const double dt_seconds) {
+    if (!attached) {
+        return;
+    }
+
+    // fly and mouse-look track the input exactly
     const float right = static_cast<float>(key_right) - static_cast<float>(key_left);
     const float up = static_cast<float>(key_up) - static_cast<float>(key_down);
     const float back = static_cast<float>(key_back) - static_cast<float>(key_forward);
     if (right_held && (right != 0.0f || up != 0.0f || back != 0.0f)) {
         const float3 step = normalize(float3{right, up, back}) *
                             static_cast<float>(move_speed * (key_fast ? 4.0 : 1.0) * dt_seconds);
-        target_camera.fly(step.x, step.y, step.z);
+        attached->fly(step.x, step.y, step.z);
+    }
+    if (pending_look != float2(0)) {
+        attached->rotate(pending_look.x, pending_look.y);
+        pending_look = float2(0);
     }
 
-    if (!attached) {
-        return;
+    // Orbit/pan/dolly ease: consuming an exponential fraction of the pending delta per frame
+    // equals frame-rate-independent damping toward the input target.
+    const float a =
+        1.f - static_cast<float>(std::exp(-dt_seconds / std::max(smoothing_tau, 1e-6f)));
+    const float keep = 1.f - a;
+
+    if (pending_orbit != float2(0)) {
+        attached->orbit(pending_orbit.x * a, pending_orbit.y * a);
+        pending_orbit *= keep;
+        if (merian::length(pending_orbit) < 1e-5f) {
+            pending_orbit = float2(0);
+        }
     }
-    // Orbit eases toward the input target; fly tracks it exactly.
-    if (is_smoothed()) {
-        animator.follow(target_camera, dt_seconds);
-    } else {
-        animator.snap(target_camera);
+    if (pending_pan != float2(0)) {
+        // Scale by the target distance so panning keeps pace at any zoom.
+        const float distance = merian::length(attached->get_position() - attached->get_target());
+        attached->move(-pending_pan.x * a * pan_sensitivity * distance,
+                       pending_pan.y * a * pan_sensitivity * distance, 0.0f);
+        pending_pan *= keep;
+        if (merian::length(pending_pan) < 1e-2f) {
+            pending_pan = float2(0);
+        }
     }
-    const Camera& c = animator.get_current_camera();
-    attached->look_at(c.get_position(), c.get_target(), c.get_up(), c.get_field_of_view_vertical());
+    if (pending_dolly != 0.f) {
+        const float distance = merian::length(attached->get_position() - attached->get_target());
+        attached->dolly(pending_dolly * a * distance);
+        pending_dolly *= keep;
+        if (std::abs(pending_dolly) < 1e-4f) {
+            pending_dolly = 0.f;
+        }
+    }
 }
 
 void CameraController::properties(Properties& config) {
@@ -145,6 +173,8 @@ void CameraController::properties(Properties& config) {
     config.config_float("pan sensitivity", pan_sensitivity, "pan drag (fraction of distance/pixel)",
                         0.0001f, 0.0f);
     config.config_float("move speed", move_speed, "fly WASD speed (units/s)", 0.05f, 0.0f);
+    config.config_float("smoothing", smoothing_tau, "orbit/pan/dolly easing time constant (s)",
+                        0.001f, 0.0f, 1.0f);
 }
 
 } // namespace merian

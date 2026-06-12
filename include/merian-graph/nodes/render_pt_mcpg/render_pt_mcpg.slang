@@ -90,7 +90,7 @@ void main(ParameterBlock<Scene> scene,
     const Hit primary_hit = params.gbuffer.get_hit(pixel);
 
     // primary ray and shading point are identical for every sample
-    const RayDesc primary_ray = scene.camera.generate_ray_pinhole(pixel, dim);
+    const RayDesc primary_ray = scene.generate_camera_ray(pixel, dim);
     const ShadingPoint primary_sp = scene.get_shading_point(primary_ray, primary_hit);
 
     float3 irradiance = float3(0);

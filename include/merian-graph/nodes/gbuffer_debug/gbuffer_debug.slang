@@ -47,7 +47,7 @@ void main(uint3 tid: SV_DispatchThreadID,
         break;
     }
     case 1: { // Simple Shading with Albedo
-        const RayDesc ray = scene.camera.generate_ray_pinhole(pixel, dim);
+        const RayDesc ray = scene.generate_camera_ray(pixel, dim);
         const ShadingPoint sp = scene.get_shading_point(ray, params.gbuffer.get_hit(pixel));
         const float3 l = normalize(float3(0.4, 0.8, 0.6));
         const float ndotl = saturate(dot(normalize(sp.material.shading_normal), l));
@@ -145,7 +145,7 @@ void main(uint3 tid: SV_DispatchThreadID,
     case 10: { // Emissive
         const Hit hit = params.gbuffer.get_hit(pixel);
         if (let gd = scene.get_geometry_data(hit)) {
-            const RayDesc ray = scene.camera.generate_ray_pinhole(pixel, dim);
+            const RayDesc ray = scene.generate_camera_ray(pixel, dim);
             const ShadingPoint sp = scene.get_shading_point(ray, hit, gd);
             color = float4(sp.material.emission, 1);
         } else {

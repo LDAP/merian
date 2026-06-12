@@ -451,7 +451,7 @@ class Scene : public std::enable_shared_from_this<Scene> {
     struct UpdateChanges {
         bool geometry_changed = false;  // a mesh or instance was added or removed
         bool transform_changed = false; // a node transform changed
-        bool camera_changed = false; // the active camera moved or a different one became active
+        bool camera_changed = false;    // the active camera moved or a different one became active
     };
 
     const UpdateChanges& get_last_update_changes() const {
@@ -712,6 +712,10 @@ class Scene : public std::enable_shared_from_this<Scene> {
     SlangCompositionHandle composition;
     Versioned<SlangProgram> layout_program;
     Versioned<ShaderObject> shader_object;
+
+    // Tracks the merian_hint_enable_thin_lens composition constant; toggling recompiles shaders.
+    bool thin_lens_enabled = false;
+    void set_enable_thin_lens(const bool enable);
 
     ASBuilder as_builder;
     bool as_supported = false;

@@ -62,7 +62,8 @@ uint64_t Camera::get_change_id() const noexcept {
 bool Camera::operator==(const Camera& other) const noexcept {
     return position == other.position && target == other.target && up == other.up &&
            field_of_view == other.field_of_view && aspect_ratio == other.aspect_ratio &&
-           near_plane == other.near_plane && far_plane == other.far_plane;
+           near_plane == other.near_plane && far_plane == other.far_plane &&
+           f_number == other.f_number && focus_distance == other.focus_distance;
 }
 
 // -----------------------------------------------------------------------------
@@ -170,6 +171,20 @@ void Camera::set_far_plane(const float far_plane) noexcept {
     projection_change_id++;
 }
 
+void Camera::set_f_number(const float f_number) noexcept {
+    assert(f_number >= 0);
+
+    this->f_number = f_number;
+    projection_change_id++;
+}
+
+void Camera::set_focus_distance(const float focus_distance) noexcept {
+    assert(focus_distance > 0);
+
+    this->focus_distance = focus_distance;
+    projection_change_id++;
+}
+
 float Camera::get_field_of_view_vertical() const noexcept {
     return field_of_view;
 }
@@ -188,6 +203,24 @@ float Camera::get_near_plane() const noexcept {
 
 float Camera::get_far_plane() const noexcept {
     return far_plane;
+}
+
+float Camera::get_f_number() const noexcept {
+    return f_number;
+}
+
+float Camera::get_aperture_radius() const noexcept {
+    if (f_number <= 0.f) {
+        return 0.f;
+    }
+    // focal length for a full-frame sensor (24mm image height) at the current vertical FOV,
+    // in meters; aperture diameter = focal length / N.
+    const float focal_length = 0.012f / std::tan(field_of_view * 0.5f);
+    return focal_length / (2.f * f_number);
+}
+
+float Camera::get_focus_distance() const noexcept {
+    return focus_distance;
 }
 
 void Camera::recompute_ray_basis() {
@@ -284,13 +317,15 @@ void Camera::write_to(ShaderCursor cursor) {
     cursor["position"] = position;
     cursor["target"] = target;
     cursor["up"] = up;
-    cursor["U"] = rgt * (half_vfov_tan * aspect_ratio);
-    cursor["V"] = cross(rgt, fwd) * half_vfov_tan;
-    cursor["W"] = fwd;
+    // basis scaled so position + ndc.x * U + ndc.y * V + W lies on the plane of perfect focus;
+    // normalized directions and projections are invariant to the scale.
+    cursor["U"] = rgt * (half_vfov_tan * aspect_ratio * focus_distance);
+    cursor["V"] = cross(rgt, fwd) * (half_vfov_tan * focus_distance);
+    cursor["W"] = fwd * focus_distance;
     cursor["near"] = near_plane;
     cursor["far"] = far_plane;
     cursor["aspect_ratio"] = aspect_ratio;
-    cursor["aperture_radius"] = 0.0f;
+    cursor["aperture_radius"] = get_aperture_radius();
     cursor["jitter"] = jitter;
 }
 
@@ -434,6 +469,15 @@ void Camera::properties(Properties& props) {
         projection_change_id++;
     }
     if (props.config_float("aspect", aspect_ratio)) {
+        projection_change_id++;
+    }
+    if (props.config_float("f-stop", f_number,
+                           "f-number of the lens, 0 = pinhole; assumes 1 scene unit = 1 meter",
+                           0.1f, 0.0f, 32.0f)) {
+        projection_change_id++;
+    }
+    if (props.config_float("focus distance", focus_distance,
+                           "distance to the plane of perfect focus", 0.001f, 0.01f, 20.0f)) {
         projection_change_id++;
     }
 

@@ -8,11 +8,11 @@ struct Camera {
     float3 target;
     float3 up;
 
-    // normalized base vector, right. Normalized for FOV
+    // base vector, right. Scaled for FOV and focus distance
     float3 U;
-    // normalized base vector, up. Normalized for FOV
+    // base vector, up. Scaled for FOV and focus distance
     float3 V;
-    // normalized base vector, forward. Length == focal length
+    // base vector, forward. Length == focus distance
     float3 W;
 
     float near;
@@ -64,6 +64,7 @@ struct Camera {
         return p * float2(frame_dimensions) - float2(0.5, 0.5);
     }
 
+    // The unperturbed ray target lies on the plane of perfect focus (|W| from the position).
     RayDesc generate_ray_thinlens(const uint2 pixel, const uint2 frame_dimensions, inout RandomGenerator rng) {
         RayDesc ray;
         const float2 ndc = pixel_to_ndc(pixel, frame_dimensions);
@@ -71,13 +72,14 @@ struct Camera {
         ray.Origin = position;
         ray.Direction = ndc.x * U + ndc.y * V + W;
 
-        float2 aperture_sample = sample_disk(rng);
-        float3 ray_target = ray.Origin + ray.Direction;
+        const float2 aperture_sample = sample_disk(rng);
+        const float3 ray_target = ray.Origin + ray.Direction;
         ray.Origin += aperture_radius * (aperture_sample.x * normalize(U) +
                                          aperture_sample.y * normalize(V));
         ray.Direction = normalize(ray_target - ray.Origin);
 
-        float inv_cos = 1.f / dot(normalize(W), ray.Direction);
+        // account for curvature
+        const float inv_cos = 1.f / dot(normalize(W), ray.Direction);
         ray.TMin = near * inv_cos;
         ray.TMax = far * inv_cos;
 

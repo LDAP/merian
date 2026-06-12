@@ -6,6 +6,8 @@ __exported import merian_shaders.scene.scene_data;
 __exported import merian_shaders.scene.hit;
 
 import merian_shaders.utils.encoding;
+import merian_shaders.utils.hash;
+import merian_shaders.utils.random;
 
 // Workaround for https://github.com/shader-slang/slang/pull/10769; scene.cpp injects replacements.
 __exported import scene_as_workaround;
@@ -21,6 +23,9 @@ namespace merian {
 static const float SCENE_RAY_OFFSET = 1e-3f;
 static const float SCENE_RAY_TMIN = 0.f;
 static const float SCENE_RAY_TMAX = 1e7f;
+
+// Enables thin lens depth of field in generate_camera_ray. Set via Scene from the active camera.
+extern static const bool merian_hint_enable_thin_lens = false;
 
 // See scene.hpp for details.
 struct Scene {
@@ -83,6 +88,17 @@ struct Scene {
         _proceed_ray(rq);
 
         return rq.CommittedStatus() == COMMITTED_NOTHING;
+    }
+
+    // Primary camera ray for a pixel. The lens sample depends on (pixel, frame) only, so every
+    // pass that calls this within a frame gets the identical ray.
+    RayDesc generate_camera_ray(const uint2 pixel, const uint2 frame_dimensions) {
+        if (merian_hint_enable_thin_lens && camera.aperture_radius > 0.f) {
+            // 'LENS' salt separates the lens stream from the per-sample seeds (pixel, frame, s).
+            RandomGenerator rng = XorShift32(pcg4d16(uint4(pixel, frame, 0x4c454e53u)));
+            return camera.generate_ray_thinlens(pixel, frame_dimensions, rng);
+        }
+        return camera.generate_ray_pinhole(pixel, frame_dimensions);
     }
 
     // -----------------------------------------
@@ -359,8 +375,16 @@ struct Scene {
         return to_prev_world_position(gd, hit.instance_index, prev_obj);
     }
 
-    // Pixel-space delta from prev_camera projection to current pixel.
-    float2 compute_motion_vector(const float3 prev_pos, const uint2 pixel, const uint2 dim) {
+    // Pixel-space delta of the surface point between the previous and the current projection.
+    float2 compute_motion_vector(const float3 prev_pos,
+                                 const float3 world_pos,
+                                 const uint2 pixel,
+                                 const uint2 dim) {
+        if (merian_hint_enable_thin_lens && camera.aperture_radius > 0.f) {
+            // use the center pixel in this case too
+            return prev_camera.project_pinhole(prev_pos, dim) -
+                   camera.project_pinhole(world_pos, dim);
+        }
         return prev_camera.project_pinhole(prev_pos, dim) - float2(pixel) - camera.jitter;
     }
 

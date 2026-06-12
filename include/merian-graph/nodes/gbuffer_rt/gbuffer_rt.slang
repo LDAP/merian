@@ -23,7 +23,7 @@ void main(uint3 tid: SV_DispatchThreadID,
     const uint2 dim = gbuffer.get_dimensions();
     if (any(pixel >= dim)) return;
 
-    const RayDesc ray = scene.camera.generate_ray_pinhole(pixel, dim);
+    const RayDesc ray = scene.generate_camera_ray(pixel, dim);
     const Hit hit = scene.trace_ray(ray, RAY_FLAG_NONE, params.instance_mask);
 
     if (let gd = scene.get_geometry_data(hit)) {
@@ -37,7 +37,7 @@ void main(uint3 tid: SV_DispatchThreadID,
             const float3 r_y = scene.camera.get_pinhole_direction(pixel + uint2(0, 1), dim);
             const half2 grad_z = surface.compute_grad_z(ray, r_x, r_y, linear_z);
             const float delta_z = length(prev_pos - scene.prev_camera.position) - linear_z;
-            const float2 mv = scene.compute_motion_vector(prev_pos, pixel, dim);
+            const float2 mv = scene.compute_motion_vector(prev_pos, surface.pos, pixel, dim);
 
             // Screen-space UV gradients for anisotropic mip selection.
             const float3 edge01_w =
@@ -74,7 +74,7 @@ void main(uint3 tid: SV_DispatchThreadID,
     const ShadingPoint sp =
         scene._make_environment_map_shading_point(ray, RenderContext(), DefaultLODSampler());
     const float linear_z = length(sp.pos - ray.Origin);
-    const float2 mv = scene.compute_motion_vector(sp.pos, pixel, dim);
+    const float2 mv = scene.compute_motion_vector(sp.pos, sp.pos, pixel, dim);
 
     gbuffer.store_surface(pixel, sp.material.shading_normal, linear_z, half2(0), 0);
     gbuffer.store_hit(pixel, hit);

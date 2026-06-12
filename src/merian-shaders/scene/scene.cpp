@@ -51,6 +51,9 @@ Scene::Scene(const ShaderCompileContextHandle& compile_context,
                        "NullAccelerationStructure; }");
     set_env(std::make_shared<EmptyEnvMap>());
 
+    // register the hint module up front so a runtime toggle replaces it instead of adding it
+    set_enable_thin_lens(false);
+
     composition->add_module_from_path("merian-shaders/scene/scene.slang");
 
     layout_program = SlangProgram::create(compile_context, composition);
@@ -75,6 +78,14 @@ void Scene::set_env(EnvMapHandle env) {
                     env_map->get_slang_module().get_import_path().value_or(
                         env_map->get_slang_module().get_name()),
                     env_map->get_type_name()));
+}
+
+void Scene::set_enable_thin_lens(const bool enable) {
+    thin_lens_enabled = enable;
+    composition->add_module_from_string("scene_thin_lens",
+                                        fmt::format("namespace merian {{ export static const bool "
+                                                    "merian_hint_enable_thin_lens = {}; }}",
+                                                    enable ? "true" : "false"));
 }
 
 ShaderObjectHandle Scene::build_shader_object() const {
@@ -1915,14 +1926,19 @@ void Scene::update(const CommandBufferHandle& cmd,
     needs_regroup = false;
     transforms_changed = false;
 
+    const auto cam = get_active_camera();
+    assert(cam);
+
+    // the thin lens hint must be settled before the shader object is fetched below
+    if (const bool thin_lens = cam->get_aperture_radius() > 0.f; thin_lens != thin_lens_enabled) {
+        set_enable_thin_lens(thin_lens);
+    }
+
     auto c = shader_object.get()->get_cursor();
 
     c["frame"] = frame;
     c["time"] = get_time(time);
     c["time_diff"] = time_diff;
-
-    const auto cam = get_active_camera();
-    assert(cam);
 
     // prev_active_camera still holds last frame's pose here (updated below).
     last_update_changes.camera_changed = !(*cam == prev_active_camera);
