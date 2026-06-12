@@ -74,9 +74,9 @@ VertexData operator*(const float a, const VertexData b) {
 
 struct PackedVertexData {
     float3 position;
-    uint encoded_normal; // oct30 encoded
+    uint32_t encoded_normal; // oct30 encoded
     half2 uv;
-    uint encoded_tangent; // see encode_tangent / decode_tangent in encoding.slang
+    uint32_t encoded_tangent; // see encode_tangent / decode_tangent in encoding.slang
 
 #ifndef __cplusplus
     __init(float3 position, float3 normal, float2 uv, float4 tangent) {
