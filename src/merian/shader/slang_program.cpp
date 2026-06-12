@@ -58,42 +58,36 @@ const SlangCompositionHandle& SlangProgram::get_composition() const {
 // Type layout
 
 slang::TypeLayoutReflection* SlangProgram::get_type_layout(const std::string& type_name) const {
-    // TODO: ShaderObjects should use plain struct layouts (no PB offset) and a wrapping
-    // ParameterBlock ShaderObject should account for the UBO binding offset. For now we
-    // look up ParameterBlock<T> to get the element layout which has correct descriptor
-    // offsets when the type contains uniform data.
-    auto pb_name = fmt::format("ParameterBlock<{}>", type_name);
-    auto* pb_type = get_program_reflection()->findTypeByName(pb_name.c_str());
-    if (pb_type) {
-        auto* pb_layout =
-            get_program_reflection()->getTypeLayout(pb_type, slang::LayoutRules::Default);
-        if (pb_layout) {
-            auto* element_layout = pb_layout->getElementTypeLayout();
-            if (element_layout) {
-                return element_layout;
-            }
-        }
-    }
-
-    // Fallback: standalone type layout (types without uniform data are fine)
     auto* type = get_program_reflection()->findTypeByName(type_name.c_str());
-    if (!type) {
+    if (type == nullptr) {
         throw ShaderCompiler::compilation_failed(fmt::format("type '{}' not found", type_name));
     }
     auto* layout = get_program_reflection()->getTypeLayout(type, slang::LayoutRules::Default);
-    if (!layout) {
+    if (layout == nullptr) {
         throw ShaderCompiler::compilation_failed(
             fmt::format("failed to get type layout for '{}'", type_name));
     }
     return layout;
 }
 
+ShaderObjectLayoutHandle
+SlangProgram::get_or_create_object_layout(const ContextHandle& context,
+                                          slang::TypeLayoutReflection* type_layout) {
+    auto& entry = object_layout_cache[type_layout];
+    if (auto layout = entry.lock()) {
+        return layout;
+    }
+    auto layout = std::make_shared<ShaderObjectLayout>(context, type_layout, shared_from_this());
+    entry = layout;
+    return layout;
+}
+
 ShaderObjectHandle SlangProgram::create_shader_object(const ContextHandle& context,
                                                       const std::string& type_name,
                                                       const ResourceAllocatorHandle& allocator) {
-    auto* type_layout = get_type_layout(type_name);
-    auto layout = std::make_shared<ShaderObjectLayout>(context, type_layout, shared_from_this());
-    return std::make_shared<ShaderObject>(layout, allocator);
+    auto* type_layout = get_type_layout(fmt::format("ParameterBlock<{}>", type_name));
+    return std::make_shared<ShaderObject>(get_or_create_object_layout(context, type_layout),
+                                          allocator);
 }
 
 // ---------------------------------------------------------------

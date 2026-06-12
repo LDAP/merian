@@ -11,12 +11,16 @@
 #include "slang.h"
 
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace merian {
 
 class ShaderObject;
 using ShaderObjectHandle = std::shared_ptr<ShaderObject>;
+
+class ShaderObjectLayout;
+using ShaderObjectLayoutHandle = std::shared_ptr<ShaderObjectLayout>;
 
 class SlangProgram;
 // Holding a handle keeps the program's session and reflection pointers alive.
@@ -47,6 +51,12 @@ class SlangProgram : public std::enable_shared_from_this<SlangProgram> {
 
     slang::TypeLayoutReflection* get_type_layout(const std::string& type_name) const;
 
+    // Layouts are deduplicated per program: link-time constants (extern static const array
+    // sizes) make binding layouts program-dependent, so sharing across programs is not safe.
+    ShaderObjectLayoutHandle get_or_create_object_layout(const ContextHandle& context,
+                                                         slang::TypeLayoutReflection* type_layout);
+
+    // Creates a ParameterBlock<type_name> shader object.
     ShaderObjectHandle create_shader_object(const ContextHandle& context,
                                             const std::string& type_name,
                                             const ResourceAllocatorHandle& allocator);
@@ -83,6 +93,10 @@ class SlangProgram : public std::enable_shared_from_this<SlangProgram> {
 
     mutable Slang::ComPtr<slang::IBlob> binary;
     mutable ShaderModuleHandle shader_module{nullptr};
+
+    // Weak values: layouts hold the program, strong entries would form reference cycles.
+    std::unordered_map<slang::TypeLayoutReflection*, std::weak_ptr<ShaderObjectLayout>>
+        object_layout_cache;
 };
 
 } // namespace merian

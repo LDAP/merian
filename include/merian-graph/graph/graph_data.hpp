@@ -113,7 +113,8 @@ struct NodeData {
 
     // A descriptor set for each combination of resources that can occur, due to delayed accesses.
     // Also keep at least RING_SIZE to allow updating descriptor sets while iterations are in
-    // flight. Access with iteration % data.descriptor_sets.size() (on prepare descriptor sets)
+    // flight. Empty if no connector needs a descriptor. Access with set_index() (on prepare
+    // descriptor sets)
     std::vector<DescriptorSetHandle> descriptor_sets;
     std::vector<NodeIO> resource_maps;
 
@@ -144,8 +145,8 @@ struct NodeData {
     }
 
     uint32_t set_index(const uint64_t run_iteration) const {
-        assert(!descriptor_sets.empty());
-        return run_iteration % descriptor_sets.size();
+        assert(!resource_maps.empty());
+        return run_iteration % resource_maps.size();
     }
 };
 

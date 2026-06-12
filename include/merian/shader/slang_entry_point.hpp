@@ -42,6 +42,7 @@ class SlangProgramEntryPoint : public EntryPoint {
     // ---------------------------------------------------------------
     // ShaderObject helpers
 
+    // The ParameterBlock container layout for a named entry-point parameter.
     ShaderObjectLayoutHandle get_object_layout(const ContextHandle& context,
                                                const std::string& param_name);
 
@@ -60,7 +61,7 @@ class SlangProgramEntryPoint : public EntryPoint {
                                     const ShaderObjectAllocatorHandle& obj_allocator);
 
     // ---------------------------------------------------------------
-    // Global parameter support
+    // Global parameter support (the global scope is one ParameterBlock-like container)
 
     bool has_globals(const ContextHandle& context);
 
@@ -106,29 +107,29 @@ class SlangProgramEntryPoint : public EntryPoint {
            const std::string& entry_point_name = "main");
 
   public:
-    // Tree of nested PB info: sub-object range index in parent → Vulkan set index + children
-    struct NestedPBInfo {
+    // Tree of nested ParameterBlocks: sub-object range index in parent → Vulkan set index +
+    // children
+    struct NestedParameterBlockInfo {
         uint32_t subobject_range_index;
         uint32_t set_index;
-        std::vector<NestedPBInfo> children; // deeply nested PBs within this PB
+        std::vector<NestedParameterBlockInfo> children;
     };
 
   private:
     struct ParameterBlockInfo {
-        ShaderObjectLayoutHandle object_layout;
+        ShaderObjectLayoutHandle object_layout; // ParameterBlock container layout
         uint32_t descriptor_set_index;
-        std::vector<NestedPBInfo>
-            nested_pb_infos; // nested PBs discovered during layout construction
+        std::vector<NestedParameterBlockInfo> nested_parameter_block_infos;
     };
 
     ParameterBlockInfo& find_or_create_param_info(const ContextHandle& context,
                                                   const std::string& param_name);
 
-    void bind_nested_pbs(const ShaderObjectHandle& object,
-                         const std::vector<NestedPBInfo>& nested_infos,
-                         const CommandBufferHandle& cmd,
-                         const PipelineHandle& pipeline,
-                         const ShaderObjectAllocatorHandle& obj_allocator);
+    void bind_nested_parameter_blocks(const ShaderObjectHandle& object,
+                                      const std::vector<NestedParameterBlockInfo>& nested_infos,
+                                      const CommandBufferHandle& cmd,
+                                      const PipelineHandle& pipeline,
+                                      const ShaderObjectAllocatorHandle& obj_allocator);
 
     const SlangProgramHandle program;
     const uint64_t entry_point_index;
@@ -140,8 +141,7 @@ class SlangProgramEntryPoint : public EntryPoint {
     // Global parameter support
     ShaderObjectLayoutHandle global_object_layout;
     uint32_t global_set_index = UINT32_MAX;
-    std::vector<DescriptorSetLayoutHandle> global_set_layouts;
-    std::vector<NestedPBInfo> global_nested_pb_infos;
+    std::vector<NestedParameterBlockInfo> global_nested_parameter_block_infos;
     vk::DeviceSize push_constant_size = 0;
 };
 

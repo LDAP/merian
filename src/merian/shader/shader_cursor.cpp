@@ -4,7 +4,10 @@
 namespace merian {
 
 ShaderCursor::ShaderCursor(ShaderObject* base_object)
-    : base_object(base_object), type_layout(base_object->get_type_layout()) {}
+    : base_object(base_object), type_layout(base_object->get_type_layout()) {
+    assert(base_object->get_object_layout()->is_struct() &&
+           "create cursors through ShaderObject::get_cursor()");
+}
 
 ShaderCursor ShaderCursor::dereference() {
     assert(is_parameter_block() || is_constant_buffer());
@@ -16,15 +19,16 @@ ShaderCursor ShaderCursor::dereference() {
 
     ShaderObjectHandle subobject = base_object->subobjects[subobject_range_index];
     if (!subobject) {
-        // Auto-create the subobject from the pre-computed element layout.
+        // Auto-create the container sub-object from the pre-computed layout.
         const auto& subobject_range_info =
             base_object->get_object_layout()->get_subobject_range_info(subobject_range_index);
-        assert(subobject_range_info.element_layout);
-        subobject = std::make_shared<ShaderObject>(subobject_range_info.element_layout,
+        assert(subobject_range_info.container_layout);
+        subobject = std::make_shared<ShaderObject>(subobject_range_info.container_layout,
                                                    base_object->get_allocator());
         base_object->set_subobject(subobject_range_index, subobject);
     }
 
+    // Containers dereference into their element.
     return subobject->get_cursor();
 }
 
@@ -34,7 +38,7 @@ ShaderCursor ShaderCursor::field(const std::string& name) {
         return ShaderCursor();
     }
 
-    // Auto-dereference PB/CB to navigate into their element type
+    // Auto-dereference ParameterBlock/ConstantBuffer to navigate into their element type
     if (is_parameter_block() || is_constant_buffer()) {
         return dereference().field(name);
     }

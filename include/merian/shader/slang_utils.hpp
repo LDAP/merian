@@ -84,22 +84,6 @@ const char* slang_type_kind_to_string(slang::TypeReflection::Kind kind);
 const char* slang_binding_type_to_string(slang::BindingType type);
 
 /**
- * @brief Create a Vulkan descriptor set layout from Slang type reflection, assuming that the
- * offsets are all 0, i.e. this might not result in the correct layout for nested objects.
- *
- * @param context Vulkan context
- * @param type_layout Slang type layout
- * @param set_index The (relative) descriptor set to extract, i.e. for ParameterBlock element types,
- *                  set 0 contains all bindings.
- * @return Descriptor set layout handle
- */
-DescriptorSetLayoutHandle create_descriptor_set_layout_from_slang_type_layout(
-    const ContextHandle& context,
-    slang::TypeLayoutReflection* type_layout,
-    slang::ProgramLayout* program_layout = nullptr,
-    uint32_t set_index = 0);
-
-/**
  * @brief Recursively format a Slang TypeLayoutReflection for debug output.
  *
  * Recurses into struct/ConstantBuffer/ParameterBlock fields up to max_depth.

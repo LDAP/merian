@@ -1,5 +1,4 @@
 #include "merian/shader/slang_utils.hpp"
-#include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
 
 namespace merian {
 
@@ -117,80 +116,6 @@ const char* slang_binding_type_to_string(slang::BindingType type) {
     default:
         return "Unknown";
     }
-}
-
-DescriptorSetLayoutHandle
-create_descriptor_set_layout_from_slang_type_layout(const ContextHandle& context,
-                                                    slang::TypeLayoutReflection* type_layout,
-                                                    slang::ProgramLayout* program_layout,
-                                                    uint32_t set_index) {
-
-    SPDLOG_DEBUG(format_type_layout(type_layout));
-
-    DescriptorSetLayoutBuilder builder;
-
-    if (type_layout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM) != 0) {
-        builder.add_binding_uniform_buffer(1, vk::ShaderStageFlagBits::eAll, 0);
-    }
-
-    const uint32_t desc_set_count = type_layout->getDescriptorSetCount();
-    if (desc_set_count == 0) {
-        return builder.build_layout(context);
-    }
-
-    assert(set_index < desc_set_count);
-
-    // Iterate binding ranges instead of descriptor ranges so we can access the leaf variable
-    // to resolve link-time constant array sizes via getElementCount(program_layout).
-    const uint32_t binding_range_count = type_layout->getBindingRangeCount();
-    for (uint32_t br = 0; br < binding_range_count; br++) {
-        const SlangInt first_dr = type_layout->getBindingRangeFirstDescriptorRangeIndex(br);
-        const SlangInt dr_count = type_layout->getBindingRangeDescriptorRangeCount(br);
-        if (first_dr < 0 || dr_count <= 0)
-            continue;
-
-        for (SlangInt dr = first_dr; dr < first_dr + dr_count; dr++) {
-            const slang::BindingType binding_type =
-                type_layout->getDescriptorSetDescriptorRangeType(set_index, dr);
-
-            // PushConstants are not descriptors — skip them.
-            if (binding_type == slang::BindingType::PushConstant)
-                continue;
-
-            SlangInt count =
-                type_layout->getDescriptorSetDescriptorRangeDescriptorCount(set_index, dr);
-            const uint32_t binding =
-                type_layout->getDescriptorSetDescriptorRangeIndexOffset(set_index, dr);
-
-            if (count == static_cast<SlangInt>(SLANG_UNKNOWN_SIZE)) {
-                // Array sized by a link-time constant (extern static const).
-                // Resolve via the leaf variable's type and the linked program reflection.
-                if (!program_layout) {
-                    throw std::runtime_error(
-                        "descriptor count depends on an unresolved link-time constant "
-                        "(extern static const). Ensure the constant is defined in the "
-                        "composition and program_layout is passed for resolution.");
-                }
-                auto* leaf_var = type_layout->getBindingRangeLeafVariable(br);
-                assert(leaf_var);
-                auto* leaf_type = leaf_var->getType();
-                assert(leaf_type && leaf_type->isArray());
-                size_t resolved = leaf_type->getElementCount((SlangReflection*)program_layout);
-                if (resolved == SLANG_UNKNOWN_SIZE || resolved == SLANG_UNBOUNDED_SIZE) {
-                    throw std::runtime_error(
-                        "link-time constant array size could not be resolved. "
-                        "Ensure the extern static const is defined in the composition.");
-                }
-                count = static_cast<SlangInt>(resolved);
-            }
-
-            const vk::DescriptorType desc_type = map_slang_to_vk_descriptor_type(binding_type);
-            builder.add_binding(desc_type, static_cast<uint32_t>(count),
-                                vk::ShaderStageFlagBits::eAll, nullptr, binding);
-        }
-    }
-
-    return builder.build_layout(context);
 }
 
 std::string format_type_layout(slang::TypeLayoutReflection* type_layout,

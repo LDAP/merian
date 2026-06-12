@@ -355,8 +355,11 @@ void Graph::run_node(GraphRun& run,
         }
     }
 
-    auto& descriptor_set = data.descriptor_sets[set_idx];
-    {
+    // null if no connector needs a descriptor
+    DescriptorSetHandle descriptor_set = nullptr;
+    if (!data.descriptor_sets.empty()) {
+        descriptor_set = data.descriptor_sets[set_idx];
+
         // apply descriptor set updates
         data.statistics.last_descriptor_set_updates = descriptor_set->update_count();
         if (descriptor_set->has_updates()) {

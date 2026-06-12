@@ -630,9 +630,11 @@ void Graph::prepare_descriptor_sets() {
                 binding_counter++;
             }
         }
-        dst_data.descriptor_set_layout = layout_builder.build_layout(context);
-        SPDLOG_DEBUG("descriptor set layout for node {} ({}):\n{}", dst_data.identifier,
-                     registry.node_type_name(dst_node), dst_data.descriptor_set_layout);
+        if (binding_counter > 0) {
+            dst_data.descriptor_set_layout = layout_builder.build_layout(context);
+            SPDLOG_DEBUG("descriptor set layout for node {} ({}):\n{}", dst_data.identifier,
+                         registry.node_type_name(dst_node), dst_data.descriptor_set_layout);
+        }
 
         // --- FIND NUMBER OF SETS ---
         // the lowest number of descriptor sets needed.
@@ -664,8 +666,10 @@ void Graph::prepare_descriptor_sets() {
         // --- ALLOCATE SETS and PRECOMUTE RESOURCES for each iteration ---
         for (uint32_t set_idx = 0; set_idx < num_sets; set_idx++) {
             // allocate
-            dst_data.descriptor_sets.emplace_back(
-                resource_allocator->allocate_descriptor_set(dst_data.descriptor_set_layout));
+            if (dst_data.descriptor_set_layout) {
+                dst_data.descriptor_sets.emplace_back(
+                    resource_allocator->allocate_descriptor_set(dst_data.descriptor_set_layout));
+            }
 
             // precompute resources for inputs
             for (auto& [input, per_input_info] : dst_data.input_connections) {
@@ -726,10 +730,10 @@ void Graph::prepare_descriptor_sets() {
                                                 dst_data.identifier, event_name},
                                data, notify_all);
                 },
-                [&, set_idx](const InputConnectorHandle& connector) {
+                [&](const InputConnectorHandle& connector) {
                     return dst_data.input_connections[connector].descriptor_set_binding;
                 },
-                [&, set_idx](const OutputConnectorHandle& connector) {
+                [&](const OutputConnectorHandle& connector) {
                     return dst_data.output_connections[connector].descriptor_set_binding;
                 });
         }
