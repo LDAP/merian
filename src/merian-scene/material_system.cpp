@@ -119,6 +119,14 @@ void MaterialSystem::set_enable_iridescence(const bool enable) {
                                                     enable ? "true" : "false"));
 }
 
+void MaterialSystem::set_enable_anisotropy(const bool enable) {
+    enable_anisotropy = enable;
+    composition->add_module_from_string("material_system_enable_anisotropy",
+                                        fmt::format("namespace merian {{ export static const bool "
+                                                    "merian_hint_enable_anisotropy = {}; }}",
+                                                    enable ? "true" : "false"));
+}
+
 void MaterialSystem::properties(Properties& props) {
     float alpha = alpha_test_threshold;
     if (props.config_float("Alpha Test Threshold", alpha, "", 0.01F)) {
@@ -173,6 +181,13 @@ void MaterialSystem::properties(Properties& props) {
                           "Add thin-film interference to the specular reflection, for soap "
                           "bubbles, oil films and similar")) {
         set_enable_iridescence(iridescence);
+    }
+
+    bool anisotropy = enable_anisotropy;
+    if (props.config_bool("Enable Anisotropy", anisotropy,
+                          "Stretch the specular highlight along the surface tangent, for brushed "
+                          "metal and similar")) {
+        set_enable_anisotropy(anisotropy);
     }
 }
 

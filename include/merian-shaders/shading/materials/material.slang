@@ -28,14 +28,21 @@ extern static const bool merian_hint_enable_transmission = false;
 // Enables volume absorption inside transmissive media (coloured glass). Set via MaterialSystem.
 extern static const bool merian_hint_enable_volume = false;
 
-// Enables the clearcoat layer (a thin glossy dielectric coat over the surface). Set via MaterialSystem.
+// Enables the clearcoat layer (a thin glossy dielectric coat over the surface). Set via
+// MaterialSystem.
 extern static const bool merian_hint_enable_clearcoat = false;
 
-// Enables the sheen layer (a retroreflective microfibre coat, for cloth and fabric). Set via MaterialSystem.
+// Enables the sheen layer (a retroreflective microfibre coat, for cloth and fabric). Set via
+// MaterialSystem.
 extern static const bool merian_hint_enable_sheen = false;
 
-// Enables thin-film iridescence on the specular Fresnel (soap bubbles, oil films). Set via MaterialSystem.
+// Enables thin-film iridescence on the specular Fresnel (soap bubbles, oil films). Set via
+// MaterialSystem.
 extern static const bool merian_hint_enable_iridescence = false;
+
+// Enables anisotropic specular roughness along the (rotated) tangent (brushed metal). Set via
+// MaterialSystem.
+extern static const bool merian_hint_enable_anisotropy = false;
 
 // This represents the definition of the material (before being evaluated at a shading point), e.g.
 // Disney, glTF.
@@ -48,8 +55,7 @@ extern static const bool merian_hint_enable_iridescence = false;
 interface MaterialModel {
     associatedtype MaterialSampleImpl : MaterialSample;
 
-    MaterialSampleImpl get_sample(const ShadingData sd,
-                                  const TextureManager texture_manager,
+    MaterialSampleImpl get_sample(const ShadingData sd, const TextureManager texture_manager,
                                   const LODSampler2D lod_sampler);
 }
 
@@ -59,10 +65,14 @@ interface MaterialSample {
 
     associatedtype BSDFImpl : BSDF;
 
-    property float3 emission { get; }
+    property float3 emission {
+        get;
+    }
 
     // The local shading frame (for surfaces).
-    property OrthonormalFrame shading_frame { get; }
+    property OrthonormalFrame shading_frame {
+        get;
+    }
 
     // The BSDF for this Material. BSDFs assume a local tangent space with n = (0,
     // 0, 1), t = (1, 0, 0), b = (0, 1, 0). The incident and outgoing direction point away from the
@@ -72,10 +82,12 @@ interface MaterialSample {
     // ------------------------------------------
 
     // the (representative) shading normal in world space. I.e. to guide a denoiser.
-    property float3 shading_normal { get; }
+    property float3 shading_normal {
+        get;
+    }
 
-    // Relative IOR (incident / transmitted) at this surface; 1.0 for opaque materials. The integrator
-    // multiplies the medium IOR by 1/eta after a transmission event.
+    // Relative IOR (incident / transmitted) at this surface; 1.0 for opaque materials. The
+    // integrator multiplies the medium IOR by 1/eta after a transmission event.
     float get_eta() {
         return 1.0f;
     }
@@ -87,4 +99,4 @@ interface MaterialSample {
     }
 }
 
-}
+} // namespace merian

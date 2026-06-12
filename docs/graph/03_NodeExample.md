@@ -3,9 +3,9 @@
 A complete example of a custom compute node that reads a sampled image and writes a storage image.
 
 ```cpp
-#include "merian-nodes/graph/node.hpp"
-#include "merian-nodes/connectors/image/vk_image_in_sampled.hpp"  // VkSampledImageIn
-#include "merian-nodes/connectors/image/vk_image_out_managed.hpp"
+#include "merian-graph/graph/node.hpp"
+#include "merian-graph/connectors/image/vk_image_in_sampled.hpp"  // VkSampledImageIn
+#include "merian-graph/connectors/image/vk_image_out_managed.hpp"
 
 class MyProcessNode : public merian::Node {
   public:

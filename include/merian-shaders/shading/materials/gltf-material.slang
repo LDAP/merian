@@ -51,6 +51,8 @@ struct GltfMaterial : MaterialModel {
     float iridescence_ior;
     float iridescence_thickness_min;
     float iridescence_thickness_max;
+    float anisotropy_strength;
+    float anisotropy_rotation;
     TextureID metallic_roughness_texture;
     TextureID normal_texture;
     TextureID occlusion_texture;
@@ -61,6 +63,8 @@ struct GltfMaterial : MaterialModel {
     TextureID sheen_roughness_texture;
     TextureID iridescence_texture;
     TextureID iridescence_thickness_texture;
+    TextureID anisotropy_texture;
+    TextureID _pad;
 
     float get_metallic(const TextureManager tm,
                        const float2 uv,
@@ -122,6 +126,26 @@ struct GltfMaterial : MaterialModel {
 
         const float alpha = ggx_roughness_to_alpha(max(roughness, merian_hint_min_roughness));
 
+        // KHR_materials_anisotropy: stretch alpha along the anisotropy direction and rotate the
+        // shading frame so the tangent aligns with it; the bitangent keeps the base roughness.
+        float2 specular_alpha = float2(alpha);
+        if (merian_hint_enable_anisotropy) {
+            float strength = anisotropy_strength;
+            float2 dir = float2(cos(anisotropy_rotation), sin(anisotropy_rotation));
+            if (anisotropy_texture != TextureID(-1)) {
+                const float3 a = lod.sample(tm.get_sampler2D(anisotropy_texture), sd.uv).rgb;
+                const float2 d = normalize(a.xy * 2.0f - 1.0f);
+                dir = float2(dir.x * d.x - dir.y * d.y, dir.x * d.y + dir.y * d.x);
+                strength *= a.b;
+            }
+            if (strength > 0.0f) {
+                specular_alpha.x = lerp(alpha, 1.0f, strength * strength);
+                const float3 t =
+                    dir.x * shading_frame.get_tangent() + dir.y * shading_frame.get_bitangent();
+                shading_frame = OrthonormalFrame(shading_frame.get_normal(), t);
+            }
+        }
+
         // dielectric specular F0 from the IOR (KHR_materials_ior; default 1.5 -> 0.04).
         const float ior_r = (ior - 1.0f) / (ior + 1.0f);
         const float dielectric_f0 = ior_r * ior_r;
@@ -152,14 +176,16 @@ struct GltfMaterial : MaterialModel {
         }
 
         const GltfOpaqueDielectric opaque_dielectric =
-            GltfOpaqueDielectric(SpecularBRDF(alpha), LambertDiffuseBRDF(base.rgb), dielectric_f0,
-                                 eta, iri_ior, iri_thickness, iridescence);
+            GltfOpaqueDielectric(SpecularBRDF(specular_alpha), LambertDiffuseBRDF(base.rgb),
+                                 dielectric_f0, eta, iri_ior, iri_thickness, iridescence);
         // transmission blends the opaque dielectric towards the rough dielectric (glass).
         const GltfDielectric dielectric =
             GltfDielectric(opaque_dielectric, RoughDielectricBSDF(alpha, eta, base.rgb), tw);
-        const GltfReflective reflective = GltfReflective(
-            dielectric, GltfConductor(SpecularBRDF(alpha), base.rgb, iri_ior, iri_thickness, iridescence),
-            metallic);
+        const GltfReflective reflective =
+            GltfReflective(dielectric,
+                           GltfConductor(SpecularBRDF(specular_alpha), base.rgb, iri_ior,
+                                         iri_thickness, iridescence),
+                           metallic);
 
         // Clearcoat weight and roughness, gated by the toggle.
         float coat_weight = 0.0f;
@@ -200,9 +226,9 @@ struct GltfMaterial : MaterialModel {
             GltfSheened(SheenBRDF(sheen_col, sheen_rough), reflective, sheen_rough, max_sheen);
 
         GltfMaterialSample s;
-        s.brdf = GltfBSDF(
-            sheened, GltfCoated(SpecularBRDF(coat_alpha), sheened, GLTF_DIELECTRIC_IOR_F0),
-            coat_weight);
+        s.brdf =
+            GltfBSDF(sheened, GltfCoated(SpecularBRDF(coat_alpha), sheened, GLTF_DIELECTRIC_IOR_F0),
+                     coat_weight);
         s.shading_frame = shading_frame;
         s.emission = emission;
         s.eta = eta;
@@ -225,7 +251,9 @@ struct GltfMaterialSample : MaterialSample {
     }
 
     property float3 shading_normal {
-        get { return shading_frame.get_normal(); }
+        get {
+            return shading_frame.get_normal();
+        }
     }
 
     override float get_eta() {
@@ -237,4 +265,4 @@ struct GltfMaterialSample : MaterialSample {
     }
 }
 
-}
+} // namespace merian

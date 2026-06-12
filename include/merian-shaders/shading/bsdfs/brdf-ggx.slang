@@ -59,10 +59,25 @@ float smith_g2_over_widotn(const float wodotn, const float widotn, const float a
 // Returns G2(wodotn, widotn) = 1 / (1 + lambda(widotn) + lambda(wodotn));
 float smith_g2(const float wodotn, const float widotn, const float alpha_squared) {
 
-
     float g1 = widotn * sqrt(alpha_squared + ((1.0f - alpha_squared) * (wodotn * wodotn)));
     float g2 = wodotn * sqrt(alpha_squared + ((1.0f - alpha_squared) * (widotn * widotn)));
     return (2.0f * wodotn * widotn) / (g1 + g2);
+}
+
+
+// Smiths shadow masking term
+// Returns G1 / wi.z
+float smith_g1_over_widotn(const float3 wi, const float2 alpha) {
+    return 2.0f / (wi.z + length(float3(alpha * wi.xy, wi.z)));
+}
+
+// (Height-correlated) Smiths shadow masking term
+//
+// Returns G2(wo, wi) / wi.z
+float smith_g2_over_widotn(const float3 wo, const float3 wi, const float2 alpha) {
+    const float g1 = wi.z * length(float3(alpha * wo.xy, wo.z));
+    const float g2 = wo.z * length(float3(alpha * wi.xy, wi.z));
+    return (2.0f * wo.z) / (g1 + g2);
 }
 
 // -----------------------------------------------------------------
@@ -72,6 +87,15 @@ float smith_g2(const float wodotn, const float widotn, const float alpha_squared
 float ggx_NDF(float ndoth_squared, float alpha_squared) {
     return alpha_squared /
            (MERIAN_PI * pow2((ndoth_squared * alpha_squared) + (1.0f - ndoth_squared)));
+}
+
+// Returns D(h) for per-axis alpha; division-free form from Heitz 2018,
+// https://jcgt.org/published/0007/04/01/ (Sampling the GGX Distribution of Visible Normals).
+float ggx_NDF(const float3 h, const float2 alpha) {
+    const float alpha_xy = alpha.x * alpha.y;
+    const float3 v = float3(alpha.y * h.x, alpha.x * h.y, alpha_xy * h.z);
+    const float w2 = alpha_xy / dot(v, v);
+    return alpha_xy * w2 * w2 / MERIAN_PI;
 }
 
 /**
@@ -246,10 +270,19 @@ float ggx_VNDF_pdf_wo(float3 wi, float3 wo, float alpha_squared) {
     return ggx_VNDF_pdf_wo(wi.z, pow2(max(0.f, h.z)), alpha_squared);
 }
 
+/**
+ * The VNDF pdf for an outgoing direction (has the Jacobian of the reflection applied), for
+ * per-axis alpha. Takes the half vector, not wo. Assumes a local space with n = (0, 0, 1).
+ */
+float ggx_VNDF_pdf_wo(const float3 wi, const float3 h, const float2 alpha) {
+    return (ggx_NDF(h, alpha) * smith_g1_over_widotn(wi, alpha)) / 4.0f;
+}
+
 // -----------------------------------------------------------------
 
 // Approximate pre-integrated GGX BRDF (Ray Tracing Gems Ch. 32, Eq. 4). Returns F0 · scale + bias.
-// Adapted from: https://github.com/NVIDIAGameWorks/Falcor/blob/eb540f6748774680ce0039aaf3ac9279266ec521/Source/Falcor/Rendering/Materials/IsotropicGGX.slang#L215
+// Adapted from:
+// https://github.com/NVIDIAGameWorks/Falcor/blob/eb540f6748774680ce0039aaf3ac9279266ec521/Source/Falcor/Rendering/Materials/IsotropicGGX.slang#L215
 float3 ggx_integral_approx_(const float3 F0,
                             const float alpha,
                             const float cosTheta,
@@ -275,8 +308,8 @@ float3 ggx_integral_approx_(const float3 F0,
 // Height-correlated Smith G2 variant. Use this when paired with smith_g2_over_widotn.
 float3 ggx_integral_approx_correlated(const float3 F0, const float alpha, const float cosTheta) {
     const float2x2 M1 = float2x2(0.995367f, -1.38839f, -0.24751f, 1.97442f);
-    const float3x3 M2 = float3x3(1.0f, 2.68132f, 52.366f, 16.0932f, -3.98452f, 59.3013f,
-                                 -5.18731f, 255.259f, 2544.07f);
+    const float3x3 M2 = float3x3(1.0f, 2.68132f, 52.366f, 16.0932f, -3.98452f, 59.3013f, -5.18731f,
+                                 255.259f, 2544.07f);
     const float2x2 M3 = float2x2(-0.0564526f, 3.82901f, 16.91f, -11.0303f);
     const float3x3 M4 = float3x3(1.0f, 4.11118f, -1.37886f, 19.3254f, -28.9947f, 16.9514f,
                                  0.545386f, 96.0994f, -79.4492f);
@@ -286,19 +319,24 @@ float3 ggx_integral_approx_correlated(const float3 F0, const float alpha, const 
 // Separable Smith G2 = G1(wi)·G1(wo) variant.
 float3 ggx_integral_approx_separable(const float3 F0, const float alpha, const float cosTheta) {
     const float2x2 M1 = float2x2(0.99044f, -1.28514f, 1.29678f, -0.755907f);
-    const float3x3 M2 = float3x3(1.0f, 2.92338f, 59.4188f, 20.3225f, -27.0302f, 222.592f,
-                                 121.563f, 626.13f, 316.627f);
+    const float3x3 M2 = float3x3(1.0f, 2.92338f, 59.4188f, 20.3225f, -27.0302f, 222.592f, 121.563f,
+                                 626.13f, 316.627f);
     const float2x2 M3 = float2x2(0.0365463f, 3.32707f, 9.0632f, -9.04756f);
-    const float3x3 M4 = float3x3(1.0f, 3.59685f, -1.36772f, 9.04401f, -16.3174f, 9.22949f,
-                                 5.56589f, 19.7886f, -20.2123f);
+    const float3x3 M4 = float3x3(1.0f, 3.59685f, -1.36772f, 9.04401f, -16.3174f, 9.22949f, 5.56589f,
+                                 19.7886f, -20.2123f);
     return ggx_integral_approx_(F0, alpha, cosTheta, M1, M2, M3, M4);
 }
 
-// A specular microfacet BRDF with GGX normal distribution.
+// A specular microfacet BRDF with GGX normal distribution. alpha is per-axis (tangent,
+// bitangent); a scalar broadcast yields the isotropic lobe at no extra cost.
 struct GGXBRDF : BSDF {
-    float alpha;
+    float2 alpha;
 
     __init(float alpha) {
+        this.alpha = float2(alpha);
+    }
+
+    __init(float2 alpha) {
         this.alpha = alpha;
     }
 
@@ -308,9 +346,8 @@ struct GGXBRDF : BSDF {
         }
 
         const float3 h = normalize(wo + wi);
-        const float alpha_squared = pow2(alpha);
-        const float G2_over_widotn = smith_g2_over_widotn(wo.z, wi.z, alpha_squared);
-        const float D = ggx_NDF(pow2(h.z), alpha_squared);
+        const float G2_over_widotn = smith_g2_over_widotn(wo, wi, alpha);
+        const float D = ggx_NDF(h, alpha);
 
         return float3((D * G2_over_widotn) / 4.0f);
     }
@@ -336,16 +373,16 @@ struct GGXBRDF : BSDF {
             return 0.0f;
         }
 
-        float3 h = normalize(wi + wo);
-        return ggx_VNDF_pdf_wo(wi.z, pow2(max(0.f, h.z)), pow2(alpha));
+        const float3 h = normalize(wi + wo);
+        return ggx_VNDF_pdf_wo(wi, h, alpha);
     }
 
-    override Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
+    override Optional<ShadingFunctionSample> sample_eval(const float3 wi,
+                                                         inout RandomGenerator rng) {
         if (wi.z < BSDF_MIN_COS_THETA) {
             return none;
         }
 
-        const float alpha_squared = pow2(alpha);
         const float3 h = ggx_VNDF_sample_H(wi, alpha, rng.next_float2());
         const float3 wo = reflect2(wi, h, dot(wi, h));
         if (wo.z < BSDF_MIN_COS_THETA) {
@@ -353,9 +390,8 @@ struct GGXBRDF : BSDF {
         }
 
         // the NDF and cosines cancel, so it stays finite even at alpha -> 0.
-        const float pdf = ggx_VNDF_pdf_wo(wi.z, pow2(h.z), alpha_squared);
-        const float weight = smith_g2_over_widotn(wo.z, wi.z, alpha_squared) /
-                             smith_g1_over_widotn(wi.z, alpha_squared);
+        const float pdf = ggx_VNDF_pdf_wo(wi, h, alpha);
+        const float weight = smith_g2_over_widotn(wo, wi, alpha) / smith_g1_over_widotn(wi, alpha);
         return ShadingFunctionSample(wo, pdf, float3(weight));
     }
 
@@ -364,7 +400,8 @@ struct GGXBRDF : BSDF {
     }
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
-        return ggx_integral_approx_correlated(F0, alpha, wi.z);
+        // the fit is isotropic; sqrt(alpha_x * alpha_y) preserves the NDF peak.
+        return ggx_integral_approx_correlated(F0, sqrt(alpha.x * alpha.y), wi.z);
     }
 }
 
@@ -426,7 +463,8 @@ struct GGXBTDF : BSDF {
         return ggx_VNDF_H_pdf(wi, h, pow2(alpha)) * abs(wodoth) / pow2(denom);
     }
 
-    override Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
+    override Optional<ShadingFunctionSample> sample_eval(const float3 wi,
+                                                         inout RandomGenerator rng) {
         if (wi.z < BSDF_MIN_COS_THETA) {
             return none;
         }
@@ -460,4 +498,4 @@ struct GGXBTDF : BSDF {
 typealias SpecularBRDF = GGXBRDF;
 typealias SpecularBTDF = GGXBTDF;
 
-}
+} // namespace merian

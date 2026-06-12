@@ -325,6 +325,7 @@ void GLTFScene::load_materials(const CommandBufferHandle& cmd) {
     bool any_clearcoat = false;
     bool any_sheen = false;
     bool any_iridescence = false;
+    bool any_anisotropy = false;
     for (size_t i = 0; i < model->materials.size(); i++) {
         const auto& gmat = model->materials[i];
         const auto& pbr = gmat.pbrMetallicRoughness;
@@ -391,9 +392,8 @@ void GLTFScene::load_materials(const CommandBufferHandle& cmd) {
         if (const auto it = gmat.extensions.find("KHR_materials_volume");
             it != gmat.extensions.end()) {
             const tinygltf::Value& ext = it->second;
-            const double thickness_factor = ext.Has("thicknessFactor")
-                                                ? ext.Get("thicknessFactor").GetNumberAsDouble()
-                                                : 0.0;
+            const double thickness_factor =
+                ext.Has("thicknessFactor") ? ext.Get("thicknessFactor").GetNumberAsDouble() : 0.0;
             float3 att_color(1.0f, 1.0f, 1.0f);
             if (ext.Has("attenuationColor")) {
                 const tinygltf::Value& c = ext.Get("attenuationColor");
@@ -493,12 +493,12 @@ void GLTFScene::load_materials(const CommandBufferHandle& cmd) {
                     static_cast<float>(ext.Get("iridescenceIor").GetNumberAsDouble());
             }
             if (ext.Has("iridescenceThicknessMinimum")) {
-                mat.payload.iridescence_thickness_min = static_cast<float>(
-                    ext.Get("iridescenceThicknessMinimum").GetNumberAsDouble());
+                mat.payload.iridescence_thickness_min =
+                    static_cast<float>(ext.Get("iridescenceThicknessMinimum").GetNumberAsDouble());
             }
             if (ext.Has("iridescenceThicknessMaximum")) {
-                mat.payload.iridescence_thickness_max = static_cast<float>(
-                    ext.Get("iridescenceThicknessMaximum").GetNumberAsDouble());
+                mat.payload.iridescence_thickness_max =
+                    static_cast<float>(ext.Get("iridescenceThicknessMaximum").GetNumberAsDouble());
             }
             const auto ext_texture = [&](const char* key) -> int {
                 if (ext.Has(key) && ext.Get(key).Has("index")) {
@@ -516,6 +516,27 @@ void GLTFScene::load_materials(const CommandBufferHandle& cmd) {
             any_iridescence |= mat.payload.iridescence_factor > 0.0f;
         }
 
+        // KHR_materials_anisotropy — direction (texture RG) and strength (texture B) in the
+        // tangent plane.
+        if (const auto it = gmat.extensions.find("KHR_materials_anisotropy");
+            it != gmat.extensions.end()) {
+            const tinygltf::Value& ext = it->second;
+            if (ext.Has("anisotropyStrength")) {
+                mat.payload.anisotropy_strength =
+                    static_cast<float>(ext.Get("anisotropyStrength").GetNumberAsDouble());
+            }
+            if (ext.Has("anisotropyRotation")) {
+                mat.payload.anisotropy_rotation =
+                    static_cast<float>(ext.Get("anisotropyRotation").GetNumberAsDouble());
+            }
+            if (ext.Has("anisotropyTexture") && ext.Get("anisotropyTexture").Has("index")) {
+                const int idx =
+                    static_cast<int>(ext.Get("anisotropyTexture").Get("index").GetNumberAsDouble());
+                mat.payload.anisotropy_texture = get_or_load_texture(cmd, idx, /*linear=*/true);
+            }
+            any_anisotropy |= mat.payload.anisotropy_strength > 0.0f;
+        }
+
         material_map[i] = get_material_system()->add_material(gltf_type_id, mat);
     }
 
@@ -526,6 +547,7 @@ void GLTFScene::load_materials(const CommandBufferHandle& cmd) {
     get_material_system()->set_enable_clearcoat(any_clearcoat);
     get_material_system()->set_enable_sheen(any_sheen);
     get_material_system()->set_enable_iridescence(any_iridescence);
+    get_material_system()->set_enable_anisotropy(any_anisotropy);
 
     // Default material for primitives without one
     if (material_map.empty()) {

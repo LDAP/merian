@@ -74,6 +74,16 @@ export merian::GGXBRDF make_test_bsdf(BSDFParams p) {
 }
 )";
 
+const char* const CONFIG_GGX_ANISO = R"(
+import merian_shaders.shading.bsdfs.brdf_ggx;
+import bsdf.bsdf_test_common;
+namespace merian_test {
+export merian::GGXBRDF make_test_bsdf(BSDFParams p) {
+    return merian::GGXBRDF(float2(p.alpha, p.alpha_bitangent));
+}
+}
+)";
+
 const char* const CONFIG_FRESNEL_MIX = R"(
 import merian_shaders.shading.bsdfs.bsdf_fresnel_mix;
 import merian_shaders.shading.bsdfs.brdf_ggx;
@@ -133,6 +143,7 @@ class BSDFTest : public ::testing::Test {
         float alpha = 0.3f;
         float3 f0{1.0f, 1.0f, 1.0f};
         float ior_f0 = 0.04f;
+        float alpha_bitangent = 0.3f;
     };
 
     struct CheckResult {
@@ -181,6 +192,7 @@ class BSDFTest : public ::testing::Test {
         cursor["p"]["alpha"] = p.alpha;
         cursor["p"]["f0"] = p.f0;
         cursor["p"]["ior_f0"] = p.ior_f0;
+        cursor["p"]["alpha_bitangent"] = p.alpha_bitangent;
         cursor["output"] = output_buffer;
 
         queue->submit_wait([&](const CommandBufferHandle& cmd) {
@@ -316,6 +328,47 @@ TEST_P(GGXRoughness, Grazing) {
 }
 
 INSTANTIATE_TEST_SUITE_P(Alpha, GGXRoughness, ::testing::Values(0.05f, 0.3f, 0.8f));
+
+// Anisotropic GGX. wi is placed off the alpha axes so the cross terms of D, G and the
+// VNDF warp are exercised; includes the extreme tangent stretch of a full-strength
+// KHR_materials_anisotropy material at minimal base roughness.
+class GGXAnisotropy : public BSDFTest,
+                      public ::testing::WithParamInterface<std::pair<float, float>> {
+  protected:
+    void check(const float3 wi) {
+        BSDFParams p;
+        p.alpha = GetParam().first;
+        p.alpha_bitangent = GetParam().second;
+        const auto r = run(CONFIG_GGX_ANISO, wi, p);
+        expect_sample_pdf_match(r);
+        expect_sample_eval_consistent(r);
+        expect_reciprocal(r);
+        expect_energy_conserving(r);
+    }
+};
+
+float3 wi_from_zenith_azimuth(const float zenith_deg, const float azimuth_deg) {
+    constexpr float TO_RAD = std::numbers::pi_v<float> / 180.0f;
+    const float theta = zenith_deg * TO_RAD;
+    const float phi = azimuth_deg * TO_RAD;
+    return {std::sin(theta) * std::cos(phi), std::sin(theta) * std::sin(phi), std::cos(theta)};
+}
+
+TEST_P(GGXAnisotropy, Normal) {
+    check(wi_from_zenith_azimuth(30.0f, 40.0f));
+}
+TEST_P(GGXAnisotropy, Grazing) {
+    check(wi_from_zenith_azimuth(80.0f, 40.0f));
+}
+
+// The 100:1 stretch is the practical extreme; beyond it the cos/pdf estimator of the
+// sampler check is too heavy-tailed to converge (the lobe degenerates to a 1D sheet).
+INSTANTIATE_TEST_SUITE_P(Alpha,
+                         GGXAnisotropy,
+                         ::testing::Values(std::pair{0.5f, 0.05f},
+                                           std::pair{0.05f, 0.5f},
+                                           std::pair{1.0f, 0.01f},
+                                           std::pair{0.3f, 0.1f}));
 
 // FresnelMix<GGX, Lambert>. Energy conservation is left out: the layered model is a
 // heuristic (no multiscatter term) and slightly gains energy at grazing.

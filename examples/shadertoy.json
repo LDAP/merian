@@ -1,0 +1,58 @@
+{
+    "graph_properties": {
+        "flush thread pool": true,
+        "fps limiter": true,
+        "iterations in flight": 2,
+        "low latency": false,
+        "short_config": {
+            "--": {
+                "pointer": "/nodes/0/properties/shader path",
+                "required": true
+            }
+        },
+        "time overwrite": "None"
+    },
+    "nodes": [
+        {
+            "enabled": true,
+            "id": "shadertoy",
+            "type": "Shadertoy",
+            "outputs": [
+                "out->blit.src"
+            ],
+            "properties": {
+                "shader source": "file",
+                "shader path": "",
+                "width": 1280,
+                "height": 720
+            }
+        },
+        {
+            "enabled": true,
+            "id": "blit",
+            "type": "Swapchain Blit",
+            "outputs": [
+                "acquire->imgui.acquire"
+            ]
+        },
+        {
+            "enabled": true,
+            "id": "window",
+            "type": "Window",
+            "outputs": [
+                "acquire->blit.acquire",
+                "window->imgui.window"
+            ],
+            "properties": {
+                "backend": "SDL3 (Video Subsystem)",
+                "blit mode": "FIT"
+            }
+        },
+        {
+            "enabled": true,
+            "id": "imgui",
+            "type": "ImGui"
+        }
+    ],
+    "version": 3
+}

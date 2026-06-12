@@ -8,6 +8,7 @@ struct BSDFParams {
     float alpha;
     float3 f0;
     float ior_f0;
+    float alpha_bitangent; // second GGX axis for anisotropic configs
 }
 
 }

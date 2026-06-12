@@ -6,15 +6,23 @@
 Merian is split into multiple components:
 
  - [`merian`](https://github.com/LDAP/merian/tree/main/include/merian): Provides core abstractions and utilities (Vulkan context, memory allocation, configuration, IO, ...).
- - [`merian-nodes`](https://github.com/LDAP/merian/tree/main/include/merian-nodes): Implements an extensible Vulkan processing graph. Already implemented nodes can be found [here](https://github.com/LDAP/merian/tree/main/include/merian-nodes/nodes).
- - [`merian-shaders`](https://github.com/LDAP/merian/tree/main/include/merian-shaders): Collection of reusable shader code.
+ - [`merian-graph`](https://github.com/LDAP/merian/tree/main/include/merian-graph): Implements an extensible Vulkan processing graph. Already implemented nodes can be found [here](https://github.com/LDAP/merian/tree/main/include/merian-graph/nodes).
+ - [`merian-scene`](https://github.com/LDAP/merian/tree/main/include/merian-scene): Scene representation, glTF/FBX loaders, material system and texture management.
+ - [`merian-shaders`](https://github.com/LDAP/merian/tree/main/include/merian-shaders): Collection of reusable shader code (header-only).
+
+`merian-graph-run` is a generic executable that loads a processing graph from a JSON file and runs it. It ships with a set of built-in nodes and can be extended with additional node sets and renderers through its [plugin system](#plugins). Current plugins:
+
+ - [merian-quake](https://github.com/LDAP/merian-quake): A path tracer for the original Quake game.
 
 ## Examples
 
-- [merian-quake](https://github.com/LDAP/merian-quake): A path-tracer for the original Quake game.
-- [merian-shadertoy](https://github.com/LDAP/merian-shadertoy): A limited Vulkan implementation for Shadertoys with hot reloading.
-- [merian-hdr-viewer](https://github.com/LDAP/merian-hdr-viewer): A simple HDR viewer with various exposure and tone-mapping controls.
-- [merian-example-sum](https://github.com/LDAP/merian-example-sum): Example on how to compute a sum on the GPU.
+Example graphs for `merian-graph-run` are in the [`examples`](https://github.com/LDAP/merian/tree/main/examples) folder:
+
+- [`hdr_viewer.json`](https://github.com/LDAP/merian/tree/main/examples/hdr_viewer.json): a tone-mapped HDR image viewer — `merian-graph-run examples/hdr_viewer.json <image.hdr>`.
+- [`shadertoy.json`](https://github.com/LDAP/merian/tree/main/examples/shadertoy.json): runs a Shadertoy-style shader — `merian-graph-run examples/shadertoy.json <shader.glsl>`.
+- [`gltf.json`](https://github.com/LDAP/merian/tree/main/examples/gltf.json) / [`fbx.json`](https://github.com/LDAP/merian/tree/main/examples/fbx.json): a path-traced glTF / FBX scene viewer.
+
+For using merian as a library in your own project, see [merian-example-sum](https://github.com/LDAP/merian-example-sum) (computing a sum on the GPU).
 
 Merian aims for compatibility with Windows, Linux as well as all major GPU vendors.
 
@@ -108,11 +116,34 @@ clone-recursive = true
 merian = merian_dep
 ```
 
+## Running a graph
+
+`merian-graph-run` loads a processing graph from a JSON file and runs it:
+
+```sh
+merian-graph-run examples/gltf.json
+```
+
+Example graphs are in the [`examples`](https://github.com/LDAP/merian/tree/main/examples) folder. Run without an argument to start with an empty graph (just a window).
+
+## Plugins
+
+A plugin is a separate repository that builds a `merian-plugin-*` shared library and contributes nodes and/or context extensions, which are discovered automatically at startup by `merian-graph-run` and any merian host. Plugins do not vendor merian — they consume it via `dependency('merian')`.
+
+To build a plugin alongside merian, clone it into the `plugins` folder; `meson compile` then builds it as part of merian (no `PKG_CONFIG_PATH` needed):
+
+```sh
+git clone <plugin-repo> plugins/<name>
+meson compile -C build
+```
+
+See [Plugin Development](docs/PluginDevelopment.md) for writing a plugin and building it standalone against an installed merian.
+
 ## Documentation
 
 Documentation is in the `docs` subdirectory of this repository.
 
-Nodes are documented in their [respective subfolder](https://github.com/LDAP/merian/tree/main/include/merian-nodes/nodes).
+Nodes are documented in their [respective subfolder](https://github.com/LDAP/merian/tree/main/include/merian-graph/nodes).
 
 ## Usage
 

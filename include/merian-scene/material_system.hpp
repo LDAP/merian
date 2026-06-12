@@ -1,7 +1,7 @@
 #pragma once
 
-#include "merian-shaders/shading/materials/material-system-data.slangh"
 #include "merian-scene/texture_manager.hpp"
+#include "merian-shaders/shading/materials/material-system-data.slangh"
 #include "merian/shader/shader_object.hpp"
 #include "merian/shader/slang_composition.hpp"
 #include "merian/shader/slang_program.hpp"
@@ -118,6 +118,11 @@ class MaterialSystem : public std::enable_shared_from_this<MaterialSystem> {
     }
     void set_enable_iridescence(bool enable);
 
+    bool get_enable_anisotropy() const {
+        return enable_anisotropy;
+    }
+    void set_enable_anisotropy(bool enable);
+
     void properties(Properties& props);
 
     const SlangCompositionHandle& get_composition() const {
@@ -180,6 +185,7 @@ class MaterialSystem : public std::enable_shared_from_this<MaterialSystem> {
     bool enable_clearcoat = false;
     bool enable_sheen = false;
     bool enable_iridescence = false;
+    bool enable_anisotropy = false;
     SlangCompositionHandle composition;
     Versioned<SlangProgram> layout_program;
     Versioned<ShaderObject> shader_object;
