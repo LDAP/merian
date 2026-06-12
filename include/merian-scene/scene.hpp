@@ -1,8 +1,8 @@
 #pragma once
 
-#include "merian-shaders/scene/env_map.hpp"
+#include "merian-scene/env_map.hpp"
 #include "merian-shaders/scene/scene-data.slangh"
-#include "merian-shaders/shading/materials/material_system.hpp"
+#include "merian-scene/material_system.hpp"
 #include "merian/shader/shader_object.hpp"
 #include "merian/shader/slang_composition.hpp"
 #include "merian/shader/slang_program.hpp"

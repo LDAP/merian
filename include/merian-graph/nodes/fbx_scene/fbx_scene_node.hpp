@@ -3,12 +3,12 @@
 #include "merian-graph/connectors/ptr_in.hpp"
 #include "merian-graph/connectors/ptr_out.hpp"
 #include "merian-graph/graph/node.hpp"
-#include "merian-shaders/scene/scene.hpp"
+#include "merian-scene/scene.hpp"
 #include "merian/utils/camera/camera_controller.hpp"
 #include "merian/utils/input_controller.hpp"
 
 #ifdef MERIAN_UFBX_ENABLED
-#include "merian-shaders/scene/fbx_scene.hpp"
+#include "merian-scene/fbx_scene.hpp"
 #include "merian/shader/shader_compile_context.hpp"
 #include <filesystem>
 #endif

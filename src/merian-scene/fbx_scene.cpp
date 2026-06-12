@@ -1,6 +1,6 @@
-#include "merian-shaders/scene/fbx_scene.hpp"
+#include "merian-scene/fbx_scene.hpp"
 
-#include "merian-shaders/shading/materials/pbrt_material.hpp"
+#include "merian-scene/pbrt_material.hpp"
 #include "merian/utils/normal_encoding.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 

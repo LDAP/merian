@@ -225,12 +225,12 @@ shader_generator = generator(
 add_project_arguments(global_args, language: 'cpp')
 
 subdir('src/merian')
-subdir('src/merian-shaders')
+subdir('src/merian-scene')
 subdir('src/merian-graph')
 
 merian_dep = declare_dependency(
     compile_args: global_args,
-    link_with : [merian_lib, merian_shaders_lib, merian_graph_lib],
+    link_with : [merian_lib, merian_scene_lib, merian_graph_lib],
     include_directories : inc_dirs,
     dependencies : [
         fmt,
@@ -265,7 +265,7 @@ merian_graph_run = executable(
 # headers with the same defines (Vulkan dynamic dispatch, GLM, feature toggles).
 pkgconfig = import('pkgconfig')
 pkgconfig.generate(
-    libraries: [merian_lib, merian_shaders_lib, merian_graph_lib],
+    libraries: [merian_lib, merian_scene_lib, merian_graph_lib],
     name: 'merian',
     filebase: 'merian',
     description: 'Merian Vulkan development framework',

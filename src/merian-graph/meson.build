@@ -23,6 +23,6 @@ merian_graph_lib = shared_library(
         vulkan,
     ],
     include_directories: inc_dirs,
-    link_with: [merian_lib, merian_shaders_lib],
+    link_with: [merian_lib, merian_scene_lib],
     install : true
 )

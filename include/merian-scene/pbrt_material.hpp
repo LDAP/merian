@@ -1,6 +1,6 @@
 #pragma once
 
-#include "merian-shaders/shading/materials/material_system.hpp"
+#include "merian-scene/material_system.hpp"
 
 #include <cstdint>
 #include <cstring>

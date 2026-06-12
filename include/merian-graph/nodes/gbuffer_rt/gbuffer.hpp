@@ -5,7 +5,7 @@
 #include "merian-graph/connectors/ptr_out.hpp"
 #include "merian-graph/graph/node.hpp"
 #include "merian-shaders/gbuffer.hpp"
-#include "merian-shaders/scene/scene.hpp"
+#include "merian-scene/scene.hpp"
 
 #include "merian/shader/shader_object_allocator.hpp"
 #include "merian/shader/slang_composition.hpp"
