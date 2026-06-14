@@ -124,6 +124,10 @@ void Shadertoy::initialize(const ContextHandle& context, const ResourceAllocator
         spec_info);
 }
 
+std::vector<InputConnectorDescriptor> Shadertoy::describe_inputs() {
+    return {{"controller", con_controller}};
+}
+
 std::vector<OutputConnectorDescriptor>
 Shadertoy::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     if (!reloader) {
@@ -150,6 +154,20 @@ Shadertoy::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
 
 const void* Shadertoy::get_push_constant([[maybe_unused]] GraphRun& run,
                                          [[maybe_unused]] const NodeIO& io) {
+    // iMouse from the optional controller (xy: current, zw: click; y measured from the bottom).
+    if (io.is_connected(con_controller)) {
+        const InputControllerHandle& controller = io[con_controller];
+        if (controller && controller != registered_controller.lock()) {
+            controller->add_listener(mouse_input);
+            registered_controller = controller;
+        }
+        const float h = static_cast<float>(extent.height);
+        constant.iMouse.x = mouse_input->x;
+        constant.iMouse.y = h - mouse_input->y;
+        constant.iMouse.z = mouse_input->down ? mouse_input->click_x : -mouse_input->click_x;
+        constant.iMouse.w = (h - mouse_input->click_y) * (mouse_input->down ? 1.0f : -1.0f);
+    }
+
     constant.iTimeDelta = static_cast<float>(run.get_time_delta());
     constant.iTime = static_cast<float>(run.get_elapsed());
     constant.iFrame = static_cast<int32_t>(run.get_total_iteration());

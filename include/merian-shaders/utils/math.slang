@@ -1,7 +1,8 @@
 #include "math-constants.slangh"
 
-// #define MERIAN_WORKGROUP_INDEX                                                                     \
-//     (gl_WorkGroupID.x + gl_WorkGroupID.y * gl_NumWorkGroups.x + gl_WorkGroupID.z * gl_NumWorkGroups.x * gl_NumWorkGroups.y)
+// #define MERIAN_WORKGROUP_INDEX \
+//     (gl_WorkGroupID.x + gl_WorkGroupID.y * gl_NumWorkGroups.x + gl_WorkGroupID.z *
+//     gl_NumWorkGroups.x * gl_NumWorkGroups.y)
 //
 // #define MERIAN_GLOBAL_INVOCATION_INDEX \
 //     (MERIAN_WORKGROUP_INDEX * gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z +
@@ -11,6 +12,10 @@ namespace merian {
 
 T pow2<T : IFloat>(const T x) {
     return x * x;
+}
+
+float max3(const float3 v) {
+    return max(v.x, max(v.y, v.z));
 }
 
 // returns 1/x if x > 0 else 1.
@@ -253,4 +258,4 @@ float3 latlong_map_to_world(float2 latlong) {
     return float3(sinTheta * sin(phi), cos(theta), -sinTheta * cos(phi));
 }
 
-}
+} // namespace merian

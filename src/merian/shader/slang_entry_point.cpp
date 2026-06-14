@@ -203,6 +203,26 @@ PipelineLayoutHandle SlangProgramEntryPoint::get_pipeline_layout(const ContextHa
 // ---------------------------------------------------------------
 // Binding
 
+// Shared objects can be read by pipelines with other stages than the one binding now, so the
+// upload barriers cover all commands instead of the current pipeline's stages.
+static void barrier_before_uploads(const CommandBufferHandle& cmd) {
+    cmd->barrier(vk::MemoryBarrier2{
+        vk::PipelineStageFlagBits2::eAllCommands,
+        vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eUniformRead,
+        vk::PipelineStageFlagBits2::eTransfer,
+        vk::AccessFlagBits2::eTransferWrite,
+    });
+}
+
+static void barrier_after_uploads(const CommandBufferHandle& cmd) {
+    cmd->barrier(vk::MemoryBarrier2{
+        vk::PipelineStageFlagBits2::eTransfer,
+        vk::AccessFlagBits2::eTransferWrite,
+        vk::PipelineStageFlagBits2::eAllCommands,
+        vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eUniformRead,
+    });
+}
+
 void SlangProgramEntryPoint::bind_entry_point_parameter(
     const std::string& param_name,
     const ShaderObjectHandle& object,
@@ -213,14 +233,10 @@ void SlangProgramEntryPoint::bind_entry_point_parameter(
     get_pipeline_layout(context);
     auto& info = find_or_create_param_info(context, param_name);
 
-    const auto shader_stages = pipeline->get_pipeline_stage_flags2();
-
-    cmd->barrier(vk::MemoryBarrier2{
-        shader_stages,
-        vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eUniformRead,
-        vk::PipelineStageFlagBits2::eTransfer,
-        vk::AccessFlagBits2::eTransferWrite,
-    });
+    const bool needs_upload = object->has_pending_uploads();
+    if (needs_upload) {
+        barrier_before_uploads(cmd);
+    }
 
     if (info.descriptor_set_index != NO_DESCRIPTOR_SET) {
         object->bind_as_parameter_block(cmd, pipeline, info.descriptor_set_index, obj_allocator);
@@ -229,12 +245,9 @@ void SlangProgramEntryPoint::bind_entry_point_parameter(
     bind_nested_parameter_blocks(object, info.nested_parameter_block_infos, cmd, pipeline,
                                  obj_allocator);
 
-    cmd->barrier(vk::MemoryBarrier2{
-        vk::PipelineStageFlagBits2::eTransfer,
-        vk::AccessFlagBits2::eTransferWrite,
-        shader_stages,
-        vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eUniformRead,
-    });
+    if (needs_upload) {
+        barrier_after_uploads(cmd);
+    }
 }
 
 void SlangProgramEntryPoint::bind_nested_parameter_blocks(
@@ -276,14 +289,10 @@ void SlangProgramEntryPoint::bind_global_parameter(
     const CommandBufferHandle& cmd,
     const PipelineHandle& pipeline,
     const ShaderObjectAllocatorHandle& obj_allocator) {
-    const auto shader_stages = pipeline->get_pipeline_stage_flags2();
-
-    cmd->barrier(vk::MemoryBarrier2{
-        shader_stages,
-        vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eUniformRead,
-        vk::PipelineStageFlagBits2::eTransfer,
-        vk::AccessFlagBits2::eTransferWrite,
-    });
+    const bool needs_upload = globals->has_pending_uploads();
+    if (needs_upload) {
+        barrier_before_uploads(cmd);
+    }
 
     if (global_set_index != NO_DESCRIPTOR_SET) {
         globals->bind_as_parameter_block(cmd, pipeline, global_set_index, obj_allocator);
@@ -291,12 +300,9 @@ void SlangProgramEntryPoint::bind_global_parameter(
     bind_nested_parameter_blocks(globals, global_nested_parameter_block_infos, cmd, pipeline,
                                  obj_allocator);
 
-    cmd->barrier(vk::MemoryBarrier2{
-        vk::PipelineStageFlagBits2::eTransfer,
-        vk::AccessFlagBits2::eTransferWrite,
-        shader_stages,
-        vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eUniformRead,
-    });
+    if (needs_upload) {
+        barrier_after_uploads(cmd);
+    }
 }
 
 DescriptorSetLayoutHandle

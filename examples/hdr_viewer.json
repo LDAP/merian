@@ -1,7 +1,7 @@
 {
     "graph_properties": {
         "flush thread pool": true,
-        "fps limiter": true,
+        "fps limiter": false,
         "iterations in flight": 2,
         "low latency": false,
         "short_config": {
@@ -54,7 +54,13 @@
             ],
             "properties": {
                 "backend": "SDL3 (Video Subsystem)",
-                "blit mode": "FIT"
+                "blit mode": "FIT",
+                "present mode": "Fifo",
+                "on_should_close_actions": {
+                    "send sigint": true,
+                    "send sigterm": false,
+                    "remove node": false
+                }
             }
         },
         {

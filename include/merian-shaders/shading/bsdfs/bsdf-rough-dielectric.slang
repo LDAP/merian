@@ -69,7 +69,8 @@ struct RoughDielectricBSDF : BSDF {
         return 0.0f;
     }
 
-    override Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
+    override Optional<ShadingFunctionSample> sample_eval(const float3 wi,
+                                                         inout RandomGenerator rng) {
         if (wi.z < BSDF_MIN_COS_THETA) {
             return none;
         }
@@ -116,4 +117,4 @@ struct RoughDielectricBSDF : BSDF {
     }
 }
 
-}
+} // namespace merian

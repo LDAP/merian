@@ -22,6 +22,7 @@ ShaderObject::ShaderObject(const ShaderObjectLayoutHandle& object_layout,
         // dirty so the zero-initialized staging is uploaded even if never written
         uniform_staging.resize(uniform_size, 0);
         uniform_dirty = true;
+        uploads_pending = true;
         uniform_buffer =
             allocator->create_buffer(uniform_size, vk::BufferUsageFlagBits::eUniformBuffer |
                                                        vk::BufferUsageFlagBits::eTransferDst);
@@ -74,10 +75,10 @@ void ShaderObject::set_subobject(const uint32_t subobject_range_index,
         return;
     }
 
+    assert(object != nullptr && "null is currently not supported");
     assert(subobject_range_index < subobjects.size());
     const auto& range = object_layout->get_subobject_range_info(subobject_range_index);
-    assert(!object ||
-           object->get_object_layout()->get_kind() == range.container_layout->get_kind());
+    assert(object->get_object_layout()->get_kind() == range.container_layout->get_kind());
 
     ShaderObjectHandle& current = subobjects[subobject_range_index];
     if (current == object) {
@@ -95,7 +96,7 @@ void ShaderObject::set_subobject(const uint32_t subobject_range_index,
     }
 
     current = object;
-    if (!object || !range.container_layout->is_constant_buffer()) {
+    if (!range.container_layout->is_constant_buffer()) {
         // Nested ParameterBlocks own their descriptor set; nothing to write here.
         return;
     }
@@ -158,6 +159,11 @@ void ShaderObject::attach(const ShaderObjectHandle& parameter_block, const uint3
 
     descriptor_targets.push_back(DescriptorTarget{parameter_block, binding_base});
     replay_to(*parameter_block, binding_base);
+
+    // A ConstantBuffer written before attachment must still be uploaded by the new block.
+    if (const auto container = owner_container.lock(); container && container->uniform_dirty) {
+        parameter_block->uploads_pending = true;
+    }
 
     // Nested ConstantBuffers land in the same descriptor set.
     for (uint32_t subobject_range_index = 0; subobject_range_index < subobjects.size();
@@ -302,6 +308,23 @@ void ShaderObject::write_uniform(const std::size_t byte_offset,
 
     std::memcpy(uniform_staging.data() + offset, data, size);
     uniform_dirty = true;
+    mark_uploads_pending();
+}
+
+void ShaderObject::mark_uploads_pending() {
+    assert(object_layout->is_container());
+
+    if (object_layout->is_parameter_block()) {
+        uploads_pending = true;
+        return;
+    }
+    // A ConstantBuffer is uploaded by the blocks its element is attached to.
+    if (element) {
+        element->for_each_descriptor_target(
+            [](ShaderObject& parameter_block, const uint32_t /*binding_base*/) {
+                parameter_block.uploads_pending = true;
+            });
+    }
 }
 
 void ShaderObject::write(const ShaderOffset& offset,
@@ -406,6 +429,24 @@ void ShaderObject::upload_uniform_buffers(const CommandBufferHandle& cmd) {
     }
 }
 
+bool ShaderObject::has_pending_uploads() {
+    assert(object_layout->is_parameter_block());
+
+    if (uploads_pending) {
+        return true;
+    }
+    if (!element) {
+        return false;
+    }
+    for (const auto& subobject : element->subobjects) {
+        if (subobject && subobject->object_layout->is_parameter_block() &&
+            subobject->has_pending_uploads()) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void ShaderObject::bind_as_parameter_block(const CommandBufferHandle& cmd,
                                            const PipelineHandle& pipeline,
                                            const uint32_t set_index,
@@ -413,22 +454,14 @@ void ShaderObject::bind_as_parameter_block(const CommandBufferHandle& cmd,
     assert(object_layout->is_parameter_block());
     assert(descriptors && "binding a ParameterBlock without bindings");
 
-    upload_uniform_buffers(cmd);
-
-    const auto container = obj_allocator->allocate(shared_from_this());
-
-    bool found = false;
-    for (auto it = registered_sets.begin(); it != registered_sets.end();) {
-        if (it->expired()) {
-            it = registered_sets.erase(it);
-            continue;
-        }
-        if (it->lock() == container) {
-            found = true;
-        }
-        ++it;
+    if (uploads_pending) {
+        upload_uniform_buffers(cmd);
+        uploads_pending = false;
     }
-    if (!found) {
+
+    const auto [container, freshly_allocated] = obj_allocator->allocate(shared_from_this());
+    if (freshly_allocated) {
+        std::erase_if(registered_sets, [](const auto& set) { return set.expired(); });
         registered_sets.emplace_back(container);
         descriptors->replay_to(*container);
     }

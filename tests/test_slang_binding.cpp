@@ -519,6 +519,80 @@ TEST_F(SlangBindingTest, SubObjectReassignment) {
     EXPECT_EQ(result.data[4], float_bits(66.0f));
 }
 
+// Reassigning a ConstantBuffer that holds a *resource* descriptor must repoint that binding and
+// drop every reference to the replaced object — including in already-registered descriptor sets.
+// The old object and its buffer are destroyed before the second dispatch, so a stale descriptor
+// would be a use-after-free (caught here by the validation layers).
+TEST_F(SlangBindingTest, SubObjectReassignmentResource) {
+    auto program = SlangProgram::create(compile_context, "slang_binding/cb_with_buffer.slang");
+    auto entry_point = SlangProgramEntryPoint::create(program, "main");
+    auto pipe_layout = entry_point.get()->get_pipeline_layout(context);
+    auto vulkan_ep = entry_point.get()->specialize();
+    auto pipeline = ComputePipeline::create(pipe_layout, vulkan_ep);
+    auto obj_allocator = std::make_shared<SimpleShaderObjectAllocator>(allocator);
+
+    auto output_buffer = allocator->create_buffer(
+        2 * sizeof(uint32_t),
+        vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
+        MemoryMappingType::HOST_ACCESS_RANDOM, "test_output");
+
+    const auto make_data_buffer = [&](const uint32_t value) {
+        auto buffer = allocator->create_buffer(sizeof(uint32_t),
+                                               vk::BufferUsageFlagBits::eStorageBuffer |
+                                                   vk::BufferUsageFlagBits::eTransferDst,
+                                               MemoryMappingType::HOST_ACCESS_RANDOM, "test_data");
+        auto* mapped = buffer->get_memory()->map_as<uint32_t>();
+        mapped[0] = value;
+        buffer->get_memory()->unmap();
+        return buffer;
+    };
+
+    auto params = entry_point.get()->create_shader_object(context, "params", allocator);
+    auto cursor = params->get_cursor();
+    cursor["output"] = output_buffer;
+
+    const auto dispatch = [&] {
+        queue->submit_wait([&](const CommandBufferHandle& cmd) {
+            cmd->bind(pipeline);
+            entry_point.get()->bind_entry_point_parameter("params", params, cmd, pipeline,
+                                                          obj_allocator);
+            cmd->dispatch(1, 1, 1);
+        });
+    };
+
+    // First ConstantBuffer, holding buffer A.
+    {
+        auto data_a = make_data_buffer(111u);
+        auto cb_a = params->create_subobject("cb");
+        auto c = cb_a->get_cursor();
+        c["scale"] = 1.0f;
+        c["data"] = data_a;
+        params->set_subobject("cb", cb_a);
+
+        dispatch();
+        auto first = readback(output_buffer, 2);
+        EXPECT_EQ(first.data[0], 111u);
+        EXPECT_EQ(first.data[1], float_bits(1.0f));
+        // cb_a and data_a are dropped here — the reassignment below must leave no reference to
+        // them.
+    }
+
+    // Reassign to a second ConstantBuffer holding buffer B.
+    {
+        auto data_b = make_data_buffer(222u);
+        auto cb_b = params->create_subobject("cb");
+        auto c = cb_b->get_cursor();
+        c["scale"] = 2.0f;
+        c["data"] = data_b;
+        params->set_subobject("cb", cb_b);
+
+        dispatch();
+        auto second = readback(output_buffer, 2);
+        EXPECT_EQ(second.data[0], 222u);
+        EXPECT_EQ(second.data[1], float_bits(2.0f));
+    }
+}
+
 // ===========================================================================
 // 7. ParameterBlock nesting
 // ===========================================================================
@@ -960,4 +1034,50 @@ TEST_F(SlangBindingTest, ForceReloadTriggersFullChain) {
     EXPECT_GT(composition->version(), comp_v0);
     EXPECT_GT(program.version(), prog_v0);
     EXPECT_GT(entry_point.version(), ep_v0);
+}
+
+// ===========================================================================
+// FrameCachingShaderObjectAllocator — per-iteration descriptor sets
+// ===========================================================================
+
+// Regression: the allocator hands out a distinct descriptor set per frame-in-flight. Each one is
+// allocated empty and must be replayed on its first use. Binding the same ShaderObject across more
+// frames than there are iterations exercises every per-iteration set; a set bound without replay
+// trips VUID-vkCmdDispatch-None-08114 (descriptor never updated) under validation.
+TEST_F(SlangBindingTest, FrameCachingReplaysEveryIterationSet) {
+    auto program = SlangProgram::create(compile_context, "slang_binding/scalar_types.slang");
+    auto entry_point = SlangProgramEntryPoint::create(program, "main");
+    auto pipe_layout = entry_point.get()->get_pipeline_layout(context);
+    auto vulkan_ep = entry_point.get()->specialize();
+    auto pipeline = ComputePipeline::create(pipe_layout, vulkan_ep);
+
+    constexpr uint32_t iterations_in_flight = 2;
+    auto obj_allocator =
+        std::make_shared<FrameCachingShaderObjectAllocator>(allocator, iterations_in_flight);
+
+    auto output_buffer = allocator->create_buffer(
+        3 * sizeof(uint32_t),
+        vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
+        MemoryMappingType::HOST_ACCESS_RANDOM, "test_output");
+
+    // Same ShaderObject reused every frame, as in real per-frame binding.
+    auto params = entry_point.get()->create_shader_object(context, "params", allocator);
+    auto cursor = params->get_cursor();
+    cursor["output"] = output_buffer;
+
+    // More iterations than in flight, so every per-iteration set is used at least once and the
+    // first wrap-around reuses an already-replayed set.
+    for (uint32_t iter = 0; iter < iterations_in_flight + 2; ++iter) {
+        obj_allocator->set_iteration(iter);
+        cursor["val_uint"] = iter * 100u;
+
+        queue->submit_wait([&](const CommandBufferHandle& cmd) {
+            cmd->bind(pipeline);
+            entry_point.get()->bind_entry_point_parameter("params", params, cmd, pipeline,
+                                                          obj_allocator);
+            cmd->dispatch(1, 1, 1);
+        });
+
+        EXPECT_EQ(readback(output_buffer, 3).data[2], iter * 100u) << "iteration " << iter;
+    }
 }

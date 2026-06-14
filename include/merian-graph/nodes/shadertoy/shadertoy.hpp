@@ -1,9 +1,11 @@
 #pragma once
 
+#include "merian-graph/connectors/ptr_in.hpp"
 #include "merian-graph/nodes/compute_node/compute_node.hpp"
 
 #include "merian/shader/shader_compiler.hpp"
 #include "merian/shader/shader_hotreloader.hpp"
+#include "merian/utils/input_listener.hpp"
 
 namespace merian {
 
@@ -33,6 +35,8 @@ class Shadertoy : public AbstractCompute {
 
     void initialize(const ContextHandle& context,
                     const ResourceAllocatorHandle& allocator) override;
+
+    std::vector<InputConnectorDescriptor> describe_inputs() override;
 
     std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
@@ -65,6 +69,34 @@ class Shadertoy : public AbstractCompute {
     PushConstant constant;
 
     ShaderCompileContextHandle compile_context;
+
+    // Optional input controller, feeds iMouse.
+    struct MouseInput : public InputListener {
+        float x = 0.f, y = 0.f, click_x = 0.f, click_y = 0.f;
+        bool down = false;
+
+        bool on_cursor(InputController& /*controller*/, double xpos, double ypos) override {
+            x = static_cast<float>(xpos);
+            y = static_cast<float>(ypos);
+            return false;
+        }
+        bool on_mouse_button(InputController& /*controller*/,
+                             const InputController::MouseButton button,
+                             const InputController::KeyStatus status) override {
+            if (button == InputController::MouseButton::MOUSE1) {
+                down = status == InputController::KeyStatus::PRESS;
+                if (down) {
+                    click_x = x;
+                    click_y = y;
+                }
+            }
+            return false;
+        }
+    };
+
+    PtrInHandle<InputController> con_controller = PtrIn<InputController>::create(0, true);
+    std::weak_ptr<InputController> registered_controller;
+    std::shared_ptr<MouseInput> mouse_input = std::make_shared<MouseInput>();
 };
 
 } // namespace merian

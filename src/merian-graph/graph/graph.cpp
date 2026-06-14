@@ -256,7 +256,7 @@ void Graph::reset() {
 
     node_data.clear();
     node_for_identifier.clear();
-    short_configs.clear();
+    short_config = nlohmann::json::object();
     for (uint32_t i = 0; i < ring_fences.size(); i++) {
         InFlightData& in_flight_data = ring_fences.get(i).user_data;
         in_flight_data.in_flight_data.clear();
@@ -356,10 +356,10 @@ void Graph::run_node(GraphRun& run,
     }
 
     // null if no connector needs a descriptor
-    DescriptorSetHandle descriptor_set = nullptr;
-    if (!data.descriptor_sets.empty()) {
-        descriptor_set = data.descriptor_sets[set_idx];
-
+    static const DescriptorSetHandle no_descriptor_set = nullptr;
+    const DescriptorSetHandle& descriptor_set =
+        data.descriptor_sets.empty() ? no_descriptor_set : data.descriptor_sets[set_idx];
+    if (descriptor_set) {
         // apply descriptor set updates
         data.statistics.last_descriptor_set_updates = descriptor_set->update_count();
         if (descriptor_set->has_updates()) {

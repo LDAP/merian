@@ -26,9 +26,9 @@ T fresnel_schlick<T : IFloat>(const float cos_theta, const T F0) {
 }
 
 /**
- * Unpolarized Fresnel reflectance at a dielectric interface. eta is the relative index of refraction
- * (incident / transmitted), cos_i is the cosine of the incidence angle (>= 0). Returns 1.0 on total
- * internal reflection.
+ * Unpolarized Fresnel reflectance at a dielectric interface. eta is the relative index of
+ * refraction (incident / transmitted), cos_i is the cosine of the incidence angle (>= 0).
+ * Returns 1.0 on total internal reflection.
  */
 float fresnel_dielectric(const float cos_i, const float eta) {
     const float sin2_t = eta * eta * (1.0f - cos_i * cos_i);
@@ -64,9 +64,10 @@ float3 iridescence_sensitivity(const float opd, const float3 shift) {
     const float3 val = float3(5.4856e-13f, 4.4201e-13f, 5.2481e-13f);
     const float3 pos = float3(1.6810e+06f, 1.7953e+06f, 2.2084e+06f);
     const float3 var = float3(4.3278e+09f, 9.3046e+09f, 6.6121e+09f);
-    float3 xyz = val * sqrt(2.0f * MERIAN_PI * var) * cos(pos * phase + shift) * exp(-phase * phase * var);
-    xyz.x += 9.7470e-14f * sqrt(2.0f * MERIAN_PI * 4.5282e+09f) * cos(2.2399e+06f * phase + shift.x) *
-             exp(-4.5282e+09f * phase * phase);
+    float3 xyz =
+        val * sqrt(2.0f * MERIAN_PI * var) * cos(pos * phase + shift) * exp(-phase * phase * var);
+    xyz.x += 9.7470e-14f * sqrt(2.0f * MERIAN_PI * 4.5282e+09f) *
+             cos(2.2399e+06f * phase + shift.x) * exp(-4.5282e+09f * phase * phase);
     xyz /= 1.0685e-7f;
     return float3(3.2404542f * xyz.x - 1.5371385f * xyz.y - 0.4985314f * xyz.z,
                   -0.9692660f * xyz.x + 1.8760108f * xyz.y + 0.0415560f * xyz.z,
@@ -102,9 +103,9 @@ float3 fresnel_iridescent(const float outside_ior,
     // Second interface (film | base).
     const float3 base_ior = iridescence_f0_to_ior(clamp(base_f0, 0.0f, 0.9999f));
     const float3 r23 = fresnel_schlick(cos_theta2, iridescence_ior_to_f0(base_ior, iri_ior));
-    const float3 phi23 = float3(base_ior.x < iri_ior ? MERIAN_PI : 0.0f,
-                                base_ior.y < iri_ior ? MERIAN_PI : 0.0f,
-                                base_ior.z < iri_ior ? MERIAN_PI : 0.0f);
+    const float3 phi23 =
+        float3(base_ior.x < iri_ior ? MERIAN_PI : 0.0f, base_ior.y < iri_ior ? MERIAN_PI : 0.0f,
+               base_ior.z < iri_ior ? MERIAN_PI : 0.0f);
 
     // Optical path difference and per-interface phase.
     const float opd = 2.0f * iri_ior * thickness * cos_theta2;
@@ -117,13 +118,14 @@ float3 fresnel_iridescent(const float outside_ior,
 
     float3 result = float3(r12) + rs; // order m = 0
     float3 cm = rs - float3(t121);
-    [ForceUnroll]
-    for (int m = 1; m <= 2; ++m) {
+    [ForceUnroll] for (int m = 1; m <= 2; ++m) {
         cm *= r123_sqrt;
         const float3 sm = 2.0f * iridescence_sensitivity(float(m) * opd, float(m) * phi);
         result += cm * sm;
     }
-    return max(result, float3(0.0f));
+    // Clamp to a physical reflectance: the spectral-sensitivity fit can overshoot [0,1] at
+    // resonances, which would make the complementary transmittance (1 - R) negative.
+    return clamp(result, float3(0.0f), float3(1.0f));
 }
 
-}
+} // namespace merian

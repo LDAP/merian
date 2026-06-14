@@ -46,7 +46,7 @@ void FBXSceneNode::process([[maybe_unused]] GraphRun& run,
 #ifdef MERIAN_UFBX_ENABLED
     const auto& cmd = run.get_cmd();
 
-    if (io.is_connected(con_controller)) {
+    if (scene->is_ready() && io.is_connected(con_controller)) {
         const InputControllerHandle& input = io[con_controller];
         if (input && input != registered_controller.lock()) {
             input->add_listener(cam_controller);

@@ -569,24 +569,32 @@ The bind call triggers this chain:
 ```
 bind_entry_point_parameter("params", params, ...)
   |
+  +- if params->has_pending_uploads(): transfer barrier
+  |
   +- params->bind_as_parameter_block(cmd, pipeline, set=0)
-  |    +- upload dirty uniform staging (own + ConstantBuffer sub-objects, recursively)
-  |    +- obj_allocator->allocate(params) -> descriptor set for set 0
-  |    +- if new set: descriptors->replay_to(set)
+  |    +- if uploads pending: upload dirty uniform staging
+  |    |    (own + ConstantBuffer sub-objects, recursively)
+  |    +- obj_allocator->allocate(params) -> {descriptor set for set 0, freshly_allocated}
+  |    +- if freshly allocated: descriptors->replay_to(set)
   |    +- set->update() + set->bind(cmd, pipeline, 0)
   |
   +- bind_nested_parameter_blocks(params, set index tree)
-       |
-       +- nested->bind_as_parameter_block(cmd, pipeline, set=1)
-       +- bind_nested_parameter_blocks(nested, children)
-            |
-            +- deep->bind_as_parameter_block(cmd, pipeline, set=2)
+  |    |
+  |    +- nested->bind_as_parameter_block(cmd, pipeline, set=1)
+  |    +- bind_nested_parameter_blocks(nested, children)
+  |         |
+  |         +- deep->bind_as_parameter_block(cmd, pipeline, set=2)
+  |
+  +- if uploads happened: transfer barrier
 ```
 
 **Key design point:** descriptor writes (light's uniform buffer, nested's texture, ...)
 were already written to the ParameterBlock's descriptor storage when the cursor
-assignment happened. At bind time, only dirty-guarded staging uploads and descriptor
-set binding occur.
+assignment happened. Uniform writes flag every affected ParameterBlock
+(`uploads_pending`), so a clean frame binds without any transfer barriers, uniform
+walks, or descriptor writes — just the allocator lookup and
+`vkCmdBindDescriptorSets`. Upload barriers cover all commands (not the binding
+pipeline's stages) because shared objects can be read by other pipelines later.
 
 ### Descriptor Set Index Assignment
 
@@ -611,6 +619,13 @@ ParameterBlock (directly at element creation, or transitively when a ConstantBuf
 set into a block) replays the slot record at the accumulated binding offset and recurses
 into ConstantBuffer sub-objects. Reassigning a sub-object detaches the old object's
 element and replays the new one over the same bindings.
+
+A `ConstantBuffer<T>`/`ParameterBlock<T>` field is always present in the layout and must
+stay bound to a fully-populated object; assigning `nullptr` is not supported. Reassignment
+to another fully-written object of the same type is fine: the replacement writes every
+binding the old object did (resources and the implicit uniform-buffer descriptor), so no
+stale descriptor survives. A binding the replacement leaves unwritten would be an unbound
+descriptor regardless — populate every resource the type declares.
 
 ### Resource-Only ParameterBlocks
 

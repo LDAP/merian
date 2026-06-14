@@ -62,9 +62,13 @@ class ShaderObject : public std::enable_shared_from_this<ShaderObject> {
     // ---------------------------------------------------------------
     // Binding (ParameterBlock kind)
 
+    // True if this block or any nested ParameterBlock records a uniform upload on its next
+    // bind. Lets callers elide transfer barriers on clean frames.
+    bool has_pending_uploads();
+
     // The obj_allocator supplies the descriptor container; not stored. Nested ParameterBlock
     // sub-objects are NOT bound here — see SlangProgramEntryPoint. The caller must barrier
-    // uniform buffers (one barrier for the whole bind walk).
+    // uniform buffers when has_pending_uploads() (one barrier for the whole bind walk).
     void bind_as_parameter_block(const CommandBufferHandle& cmd,
                                  const PipelineHandle& pipeline,
                                  uint32_t set_index,
@@ -141,6 +145,8 @@ class ShaderObject : public std::enable_shared_from_this<ShaderObject> {
     // ---- container kinds
 
     void write_uniform(std::size_t byte_offset, const void* data, std::size_t size);
+    // Flags every ParameterBlock that must upload this container's staging on its next bind.
+    void mark_uploads_pending();
     void upload_uniform_buffers(const CommandBufferHandle& cmd);
 
     // ---- ParameterBlock kind
@@ -167,6 +173,7 @@ class ShaderObject : public std::enable_shared_from_this<ShaderObject> {
     // ParameterBlock kind
     DescriptorStorageHandle descriptors = nullptr;
     std::vector<std::weak_ptr<DescriptorContainer>> registered_sets;
+    bool uploads_pending = false;
 
     friend class ShaderCursor;
     friend std::string format_as(const ShaderObject& shader_object, const std::string& indent);

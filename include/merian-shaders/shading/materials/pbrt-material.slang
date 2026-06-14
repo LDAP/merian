@@ -12,12 +12,13 @@ import merian_shaders.utils.normal_map;
 namespace merian {
 
 typealias PBRTDiffuseOrTransmission = MixBSDF<LambertDiffuseBRDF, SpecularBTDF>; // by transmission
-typealias PBRTDielectric = FresnelMixBSDF<SpecularBRDF, PBRTDiffuseOrTransmission>; // specular over base
+typealias PBRTDielectric =
+    FresnelMixBSDF<SpecularBRDF, PBRTDiffuseOrTransmission>; // specular over base
 typealias PBRTMetal = ConductorFresnelBSDF<SpecularBRDF>;
 typealias PBRTSubstrate = MixBSDF<PBRTDielectric, PBRTMetal>; // by metalness
 typealias PBRTCoated = FresnelMixBSDF<SpecularBRDF, PBRTSubstrate>;
-typealias PBRTWithCoat = MixBSDF<PBRTSubstrate, PBRTCoated>;   // by coat weight
-typealias PBRTBSDF = MixBSDF<PBRTWithCoat, SheenBRDF>;         // by sheen weight
+typealias PBRTWithCoat = MixBSDF<PBRTSubstrate, PBRTCoated>; // by coat weight
+typealias PBRTBSDF = MixBSDF<PBRTWithCoat, SheenBRDF>;       // by sheen weight
 
 struct PBRTMaterial : MaterialModel {
     typealias MaterialSampleImpl = PBRTMaterialSample;
@@ -46,6 +47,8 @@ struct PBRTMaterial : MaterialModel {
 
     PBRTMaterialSample
     get_sample(const ShadingData sd, const TextureManager tm, const LODSampler2D lod) {
+        const LOD0Sampler lod0;
+
         float3 base = base_color;
         if (let tex = header.get_alpha_texture_id()) {
             base *= lod.sample(tm.get_sampler2D(tex), sd.uv).rgb;
@@ -53,16 +56,16 @@ struct PBRTMaterial : MaterialModel {
 
         float metal = metalness;
         if (metalness_texture != TextureID(-1)) {
-            metal *= lod.sample(tm.get_sampler2D(metalness_texture), sd.uv).r;
+            metal *= lod0.sample(tm.get_sampler2D(metalness_texture), sd.uv).r;
         }
         float rough = roughness;
         if (roughness_texture != TextureID(-1)) {
-            rough *= lod.sample(tm.get_sampler2D(roughness_texture), sd.uv).r;
+            rough *= lod0.sample(tm.get_sampler2D(roughness_texture), sd.uv).r;
         }
 
         OrthonormalFrame shading_frame = sd.frame;
         if (normal_texture != TextureID(-1)) {
-            const float3 raw = lod.sample(tm.get_sampler2D(normal_texture), sd.uv).rgb;
+            const float3 raw = lod0.sample(tm.get_sampler2D(normal_texture), sd.uv).rgb;
             const float2 nxy = (raw.xy * 2.0f - 1.0f) * normal_scale;
             const float nz = sqrt(max(0.0f, 1.0f - dot(nxy, nxy)));
             const OrthonormalFrame mapped = sd.frame.apply_normal_map(float3(nxy, nz));
@@ -94,14 +97,16 @@ struct PBRTMaterial : MaterialModel {
             tw = transmission_weight;
         }
 
-        const PBRTSubstrate substrate = PBRTSubstrate(
-            PBRTDielectric(SpecularBRDF(alpha),
-                           PBRTDiffuseOrTransmission(LambertDiffuseBRDF(base),
-                                                     SpecularBTDF(alpha, eta, transmission_color), tw),
-                           dielectric_f0),
-            PBRTMetal(SpecularBRDF(alpha), base), metal);
+        const PBRTSubstrate substrate =
+            PBRTSubstrate(PBRTDielectric(SpecularBRDF(alpha),
+                                         PBRTDiffuseOrTransmission(
+                                             LambertDiffuseBRDF(base),
+                                             SpecularBTDF(alpha, eta, transmission_color), tw),
+                                         dielectric_f0),
+                          PBRTMetal(SpecularBRDF(alpha), base), metal);
 
-        // Dielectric clearcoat over the substrate, gated by the toggle (weight 0 -> coat drops out).
+        // Dielectric clearcoat over the substrate, gated by the toggle (weight 0 -> coat drops
+        // out).
         float cw = 0.0f;
         float coat_alpha = ggx_roughness_to_alpha(merian_hint_min_roughness);
         float coat_f0 = 0.0f;
@@ -111,8 +116,8 @@ struct PBRTMaterial : MaterialModel {
             const float coat_t = (coat_ior - 1.0f) / (coat_ior + 1.0f);
             coat_f0 = coat_t * coat_t;
         }
-        const PBRTWithCoat with_coat = PBRTWithCoat(
-            substrate, PBRTCoated(SpecularBRDF(coat_alpha), substrate, coat_f0), cw);
+        const PBRTWithCoat with_coat =
+            PBRTWithCoat(substrate, PBRTCoated(SpecularBRDF(coat_alpha), substrate, coat_f0), cw);
 
         // Sheen lobe, gated by the toggle (weight 0 -> sheen drops out).
         float sw = 0.0f;
@@ -146,7 +151,9 @@ struct PBRTMaterialSample : MaterialSample {
     }
 
     property float3 shading_normal {
-        get { return shading_frame.get_normal(); }
+        get {
+            return shading_frame.get_normal();
+        }
     }
 
     override float get_eta() {
@@ -154,4 +161,4 @@ struct PBRTMaterialSample : MaterialSample {
     }
 }
 
-}
+} // namespace merian

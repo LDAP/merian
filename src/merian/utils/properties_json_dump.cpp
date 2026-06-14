@@ -148,7 +148,9 @@ bool JSONDumpProperties::is_ui() {
     return false;
 }
 bool JSONDumpProperties::serialize_json(const std::string& id, nlohmann::json& json) {
-    current()[id] = json;
+    // Mirror st_end_child: an empty object/array carries nothing, so don't emit it.
+    if (!(json.is_structured() && json.empty()))
+        current()[id] = json;
     return false;
 }
 bool JSONDumpProperties::serialize_string(const std::string& id, std::string& s) {

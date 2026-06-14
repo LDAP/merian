@@ -97,6 +97,42 @@ export merian::FresnelMixBSDF<merian::GGXBRDF, merian::LambertDiffuseBRDF> make_
 }
 )";
 
+const char* const CONFIG_IRIDESCENT_MIX = R"(
+import merian_shaders.shading.bsdfs.bsdf_iridescence;
+import merian_shaders.shading.bsdfs.brdf_ggx;
+import merian_shaders.shading.bsdfs.brdf_lambert_diffuse;
+import bsdf.bsdf_test_common;
+namespace merian_test {
+export merian::IridescentFresnelMixBSDF<merian::GGXBRDF, merian::LambertDiffuseBRDF> make_test_bsdf(BSDFParams p) {
+    return merian::IridescentFresnelMixBSDF<merian::GGXBRDF, merian::LambertDiffuseBRDF>(
+        merian::GGXBRDF(p.alpha), merian::LambertDiffuseBRDF(p.albedo), p.ior_f0,
+        1.0f / 1.5f, 1.3f, 400.0f, p.iridescence);
+}
+}
+)";
+
+const char* const CONFIG_ROUGH_DIELECTRIC_IRID = R"(
+import merian_shaders.shading.bsdfs.bsdf_iridescence;
+import bsdf.bsdf_test_common;
+namespace merian_test {
+export merian::IridescentRoughDielectricBSDF make_test_bsdf(BSDFParams p) {
+    // eta = 1/1.5 (air -> glass), film ior 1.3, 400 nm; albedo is the transmission tint.
+    return merian::IridescentRoughDielectricBSDF(p.alpha, 1.0f / 1.5f, p.albedo, float3(0.04f), 1.3f,
+                                                 400.0f, p.iridescence);
+}
+}
+)";
+
+const char* const CONFIG_ROUGH_DIELECTRIC_PLAIN = R"(
+import merian_shaders.shading.bsdfs.bsdf_rough_dielectric;
+import bsdf.bsdf_test_common;
+namespace merian_test {
+export merian::RoughDielectricBSDF make_test_bsdf(BSDFParams p) {
+    return merian::RoughDielectricBSDF(p.alpha, 1.0f / 1.5f, p.albedo);
+}
+}
+)";
+
 const char* const CONFIG_CONDUCTOR = R"(
 import merian_shaders.shading.bsdfs.bsdf_conductor_fresnel;
 import merian_shaders.shading.bsdfs.brdf_ggx;
@@ -144,6 +180,7 @@ class BSDFTest : public ::testing::Test {
         float3 f0{1.0f, 1.0f, 1.0f};
         float ior_f0 = 0.04f;
         float alpha_bitangent = 0.3f;
+        float iridescence = 0.0f;
     };
 
     struct CheckResult {
@@ -193,6 +230,7 @@ class BSDFTest : public ::testing::Test {
         cursor["p"]["f0"] = p.f0;
         cursor["p"]["ior_f0"] = p.ior_f0;
         cursor["p"]["alpha_bitangent"] = p.alpha_bitangent;
+        cursor["p"]["iridescence"] = p.iridescence;
         cursor["output"] = output_buffer;
 
         queue->submit_wait([&](const CommandBufferHandle& cmd) {
@@ -393,6 +431,74 @@ TEST_P(FresnelMixRoughness, Grazing) {
 }
 
 INSTANTIATE_TEST_SUITE_P(Alpha, FresnelMixRoughness, ::testing::Values(0.05f, 0.3f, 0.8f));
+
+// IridescentFresnelMix<GGX, Lambert> entering at eta = 1/1.5 (film ior 1.3, 400 nm).
+// Energy conservation is left out like FresnelMix (layered heuristic). Both the dielectric split
+// and the thin-film term are evaluated at the half vector (VdotH), so the lobe stays reciprocal at
+// any iridescence strength.
+class IridescentMixStrength : public BSDFTest, public ::testing::WithParamInterface<float> {
+  protected:
+    void check(const float3 wi) {
+        BSDFParams p;
+        p.alpha = 0.3f;
+        p.albedo = {0.7f, 0.7f, 0.7f};
+        p.iridescence = GetParam();
+        const auto r = run(CONFIG_IRIDESCENT_MIX, wi, p);
+        expect_sample_pdf_match(r);
+        expect_sample_eval_consistent(r);
+        expect_reciprocal(r);
+    }
+};
+
+TEST_P(IridescentMixStrength, Normal) {
+    check(WI_NORMAL);
+}
+TEST_P(IridescentMixStrength, Grazing) {
+    check(WI_GRAZING);
+}
+
+INSTANTIATE_TEST_SUITE_P(Strength, IridescentMixStrength, ::testing::Values(0.0f, 1.0f));
+
+// Rough dielectric (coupled reflection + refraction), plain and iridescent. Only sample_eval
+// consistency is asserted: the lobe spans both hemispheres, so the hemispherical furnace /
+// pdf-normalization / reciprocity checks (which assume reflection) do not apply. This pins the
+// (RGB) reflectance split (eval / pdf / sample_eval must agree) across roughness and iridescence.
+struct RoughDielectricCase {
+    const char* config;
+    float alpha;
+    float iridescence;
+};
+class RoughDielectricConsistency : public BSDFTest,
+                                   public ::testing::WithParamInterface<RoughDielectricCase> {
+  protected:
+    void check(const float3 wi) {
+        BSDFParams p;
+        p.alpha = GetParam().alpha;
+        p.iridescence = GetParam().iridescence;
+        p.albedo = {0.9f, 0.95f, 1.0f};
+        const auto r = run(GetParam().config, wi, p);
+        expect_sample_eval_consistent(r);
+    }
+};
+
+TEST_P(RoughDielectricConsistency, Normal) {
+    check(WI_NORMAL);
+}
+TEST_P(RoughDielectricConsistency, Grazing) {
+    check(WI_GRAZING);
+}
+
+// Moderate alpha only: at a near-specular alpha the coupled refraction Jacobian reconstructed by
+// eval()/pdf() diverges from the sampled microfacet by roundoff that the sharp NDF amplifies past
+// the absolute weight tolerance (the same sensitivity the pdf check handles relatively).
+INSTANTIATE_TEST_SUITE_P(
+    AlphaIrid,
+    RoughDielectricConsistency,
+    ::testing::Values(RoughDielectricCase{CONFIG_ROUGH_DIELECTRIC_PLAIN, 0.3f, 0.0f},
+                      RoughDielectricCase{CONFIG_ROUGH_DIELECTRIC_PLAIN, 0.5f, 0.0f},
+                      RoughDielectricCase{CONFIG_ROUGH_DIELECTRIC_IRID, 0.3f, 0.0f},
+                      RoughDielectricCase{CONFIG_ROUGH_DIELECTRIC_IRID, 0.3f, 1.0f},
+                      RoughDielectricCase{CONFIG_ROUGH_DIELECTRIC_IRID, 0.5f, 1.0f}));
 
 // ConductorFresnel<GGX>. Delegates sampling to GGX and scales eval by Fresnel (<= 1), so
 // it stays energy-conserving; pdf normalization is left out for the same reason as GGX.
