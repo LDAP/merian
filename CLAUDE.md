@@ -24,14 +24,12 @@ Run one: `build/tests/test-<name>` (e.g. `test-small-vector`)
 
 A plugin is a `shared_library('merian-plugin-<name>', name_prefix: '')` that consumes merian via
 `dependency('merian')` and exports the `extern "C"` ABI hooks. Cloned into `plugins/<name>`, it is
-auto-built as a merian subproject and discovered at runtime — no edits to merian's build files.
+auto-built as a merian subproject and discovered at runtime without edits to merian's build files.
 
 A plugin shares merian's ABI, so it **must** be built with merian's assertion/optimization config:
 mixing `NDEBUG` / `_GLIBCXX_ASSERTIONS` / optimization across the `.so` boundary is undefined and
-crashes deep in the driver. A plugin therefore must not pin `buildtype`/`b_ndebug` in its
-`project()` — built in-tree it inherits merian's config; standalone, pass `--buildtype`. Per-
-subproject option values are sticky, so after changing merian's buildtype use `meson setup --wipe`,
-not `--reconfigure`, for plugins to follow.
+crashes deep in the driver.A plugin therefore must not pin `buildtype`/`b_ndebug` in its
+`project()`. Plugins cloned to `plugins/<name>` inherit merian's config; standalone, pass `--buildtype`.
 
 # Coding style
 
@@ -39,6 +37,7 @@ Expect the code to be read only by experienced (graphics) programmers.
 
 ## Comments
 
+- Keep a minimal comment style. Only add comments if it's likely that a function would be used in a wrong way otherwise or at very complex code, that is not clear even to an experienced programmer.
 - Single short line is the default; multi-line walls of text are out. If the explanation needs a
   paragraph, the code probably needs restructuring instead.
 - Explain *why*, never *what*. Identifier names already say what. Don't mention implementation
@@ -67,10 +66,9 @@ Expect the code to be read only by experienced (graphics) programmers.
 - Descriptive: `mesh_id`, `node_id`, `vertex_count`, `prim_count` — not `mid`, `nid`, `vc`.
 - Tight-scope math locals can be terse (`m`, `it`, `v`, `pv`) but only when the surrounding code
   makes the role obvious.
-- Lifecycle verb conventions: `add_*`, `mark_*_dirty`, `upload_*`, `compute_*`, `build_*`,
+- Lifecycle verb conventions: `add_*`, `upload_*`, `compute_*`, `build_*`,
   `ensure_*`. One verb per concept; pick one and stick to it.
-- Match existing conventions in this codebase, not generic ones: a connector is `out`, not
-  `output`; a `properties()` parameter is `config`, not `props`.
+- Match existing conventions in this codebase, not generic ones.
 
 ## Code
 
@@ -83,16 +81,13 @@ Expect the code to be read only by experienced (graphics) programmers.
 - Prefer `std::unordered_map` over `std::map` unless iteration order matters.
 - `static_cast`, never C-style casts.
 - Ownership is expressed in the type: own with `std::shared_ptr`, observe with `std::weak_ptr` —
-  never a raw pointer where a handle is expected. A controller that drives a camera owns a
-  `CameraHandle`; a node observing a registered controller holds a `weak_ptr`.
+  never a raw pointer where a handle is expected.
 - No global singletons for cross-cutting wiring. The graph already has an event system — use it
-  (e.g. ImGui draws via a graph event, not a registry singleton). ImGui has no business inside the
-  `Graph` core.
+  (e.g. ImGui draws via a graph event, not a registry singleton).
 - Header/source split: declarations in the `.hpp`, definitions in the `.cpp`. Keep includes
   alphabetical.
 - In `properties()`, render each control inside the method that owns it; don't wrap a node's
-  config at the call site. Group nested settings with `st_begin_child(id, label)` using the default
-  flag — `FRAMED` makes a child look different from its siblings.
+  config at the call site. Group nested settings with `st_begin_child(id, label)`.
 
 ## Process
 

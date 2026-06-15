@@ -64,7 +64,6 @@ float smith_g2(const float wodotn, const float widotn, const float alpha_squared
     return (2.0f * wodotn * widotn) / (g1 + g2);
 }
 
-
 // Smiths shadow masking term
 // Returns G1 / wi.z
 float smith_g1_over_widotn(const float3 wi, const float2 alpha) {
@@ -396,7 +395,7 @@ struct GGXBRDF : BSDF {
     }
 
     Albedo get_albedo(const float3 wi) {
-        return Albedo(float3(1.0f));
+        return Albedo(get_preintegrated_specular(float3(1.0f), wi));
     }
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
@@ -487,7 +486,7 @@ struct GGXBTDF : BSDF {
     }
 
     Albedo get_albedo(const float3 wi) {
-        return Albedo(tint);
+        return Albedo(pow2(eta) * tint);
     }
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {

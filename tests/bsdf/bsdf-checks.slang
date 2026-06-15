@@ -27,9 +27,7 @@ float accumulate_err(const float acc, const float v) {
     return isfinite(v) ? max(acc, v) : 1e30f;
 }
 
-[shader("compute")]
-[numthreads(1, 1, 1)]
-void main(ParameterBlock<Params> params) {
+[shader("compute")][numthreads(1, 1, 1)] void main(ParameterBlock<Params> params) {
     let bsdf = merian_test::make_test_bsdf(params.p);
     const float3 wi = params.wi;
 
@@ -63,8 +61,8 @@ void main(ParameterBlock<Params> params) {
             // relative terms.
             const float pdf_ref = bsdf.pdf(wi, s.wo);
             const float3 eval_ref = bsdf.eval(wi, s.wo, rng);
-            max_pdf_err = accumulate_err(
-                max_pdf_err, abs(s.pdf - pdf_ref) / (max(abs(s.pdf), abs(pdf_ref)) + 1e-6f));
+            max_pdf_err = accumulate_err(max_pdf_err, abs(s.pdf - pdf_ref) /
+                                                          (max(abs(s.pdf), abs(pdf_ref)) + 1e-6f));
             if (pdf_ref > 0) {
                 max_weight_err =
                     accumulate_err(max_weight_err, length(s.weight - (eval_ref / pdf_ref)));
@@ -109,7 +107,8 @@ void main(ParameterBlock<Params> params) {
             const float3 f_oi = bsdf.eval(wo, wi, rng) / wi.z;
             const float3 d = abs(f_io - f_oi);
             const float3 m = max(abs(f_io), abs(f_oi)) + 1e-6f;
-            max_recip_err = accumulate_err(max_recip_err, max(max(d.x / m.x, d.y / m.y), d.z / m.z));
+            max_recip_err =
+                accumulate_err(max_recip_err, max(max(d.x / m.x, d.y / m.y), d.z / m.z));
         }
     }
 
@@ -124,6 +123,13 @@ void main(ParameterBlock<Params> params) {
     params.output[8] = valid;
     params.output[9] = asuint(max_weight_err);
     params.output[10] = asuint(max_pdf_err);
+    // get_albedo must equal the directional albedo (the furnace value): it is the BSDF throughput
+    // a denoiser divides out, so the maximal divisible (high-frequency) content belongs in it.
+    const float3 albedo = bsdf.get_albedo(wi).reflection;
+
     params.output[11] = asuint(pdf_integral);
     params.output[12] = asuint(max_recip_err);
+    params.output[13] = asuint(albedo.r);
+    params.output[14] = asuint(albedo.g);
+    params.output[15] = asuint(albedo.b);
 }

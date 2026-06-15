@@ -60,7 +60,11 @@ struct IridescentConductorBSDF<Inner : BSDF> : BSDF {
     }
 
     Albedo get_albedo(const float3 wi) {
-        return Albedo(bsdf.get_preintegrated_specular(f0, wi));
+        const float3 spec = bsdf.get_preintegrated_specular(f0, wi);
+        if (iridescence <= 0.0f) {
+            return Albedo(spec);
+        }
+        return Albedo(spec * fresnel(wi.z) / max(fresnel_schlick(wi.z, f0), 1e-4f));
     }
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
@@ -140,7 +144,13 @@ struct IridescentFresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
     }
 
     Albedo get_albedo(const float3 wi) {
-        const float3 spec = layer.get_preintegrated_specular(float3(ior_f0), wi);
+        float3 spec = layer.get_preintegrated_specular(float3(ior_f0), wi);
+        if (iridescence > 0.0f) {
+            // Modulate the specular fraction by the thin-film hue at the view angle.
+            const float3 irf = fresnel_iridescent(1.0f, film_ior, float3(ior_f0), thickness, wi.z);
+            const float die = fresnel_dielectric(wi.z, eta);
+            spec = clamp(spec * lerp(float3(1.0f), irf / max(die, 1e-4f), iridescence), 0.0f, 1.0f);
+        }
         return Albedo(spec + (1.0f - spec) * base.get_albedo(wi).reflection);
     }
 
@@ -277,11 +287,19 @@ struct IridescentRoughDielectricBSDF : BSDF {
     }
 
     Albedo get_albedo(const float3 wi) {
-        return Albedo(tint);
+        // Reflected fraction + transmitted rest; the latter carries the eta^2 radiance factor and
+        // tint. The thin-film hue (at the view angle) modulates the reflected fraction.
+        const float3 f0 = float3(pow2((1.0f - eta) / (1.0f + eta)));
+        float3 spec = GGXBRDF(alpha).get_preintegrated_specular(f0, wi);
+        if (iridescence > 0.0f) {
+            spec = clamp(spec * reflectance(wi.z) / max(fresnel_dielectric(wi.z, eta), 1e-4f), 0.0f,
+                         1.0f);
+        }
+        return Albedo(spec + (1.0f - spec) * pow2(eta) * tint);
     }
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
-        return float3(0.0f);
+        return GGXBRDF(alpha).get_preintegrated_specular(F0, wi);
     }
 }
 

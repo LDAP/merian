@@ -14,6 +14,7 @@
 #include "merian/vk/extension/extension_vk_validation_layers.hpp"
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 
+#include <algorithm>
 #include <bit>
 #include <cmath>
 #include <cstring>
@@ -51,6 +52,10 @@ constexpr float PDF_REL_TOL = 1e-3f;
 
 // Midpoint quadrature error of a smooth pdf on the 256x512 grid.
 constexpr float QUADRATURE_TOL = 1e-3f;
+
+// get_albedo only approximates the directional albedo (split-sum fit, single scattering); the
+// relative tolerance still catches gross errors (e.g. a missing eta^2 factor ~ 2x off).
+constexpr float ALBEDO_REL_TOL = 0.15f;
 
 // Link-time config modules: each exports a concrete-typed make_test_bsdf, so the
 // generic bsdf-checks shader is specialized to one BSDF without runtime dispatch.
@@ -193,6 +198,7 @@ class BSDFTest : public ::testing::Test {
         float max_pdf_err;     // max |sample_eval.pdf - pdf(wi,wo)|
         float pdf_integral;    // deterministic quadrature of INT pdf dwo
         float max_recip_err;   // max relative |f(wi,wo) - f(wo,wi)|
+        float3 albedo;         // get_albedo(wi).reflection (should equal the directional albedo)
     };
 
     static float as_float(uint32_t u) {
@@ -214,7 +220,7 @@ class BSDFTest : public ::testing::Test {
         const auto pipeline = ComputePipeline::create(pipe_layout, entry_point.get()->specialize());
         const auto obj_allocator = std::make_shared<SimpleShaderObjectAllocator>(allocator);
 
-        constexpr uint32_t SLOTS = 13;
+        constexpr uint32_t SLOTS = 16;
         const auto output_buffer = allocator->create_buffer(
             SLOTS * sizeof(uint32_t),
             vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
@@ -253,13 +259,16 @@ class BSDFTest : public ::testing::Test {
                             as_float(slots[9]),
                             as_float(slots[10]),
                             as_float(slots[11]),
-                            as_float(slots[12])};
+                            as_float(slots[12]),
+                            {as_float(slots[13]), as_float(slots[14]), as_float(slots[15])}};
         std::fprintf(stderr,
-                     "DUMP furnace=%.6g,%.6g,%.6g fse=%.3g,%.3g,%.3g meancos=%.7f secos=%.4g "
-                     "werr=%.4g perr=%.4g pdfint=%.7f reciperr=%.4g acc=%.5f\n",
+                     "DUMP furnace=%.6g,%.6g,%.6g fse=%.3g,%.3g,%.3g albedo=%.6g,%.6g,%.6g "
+                     "meancos=%.7f secos=%.4g werr=%.4g perr=%.4g pdfint=%.7f reciperr=%.4g "
+                     "acc=%.5f\n",
                      r.furnace.x, r.furnace.y, r.furnace.z, r.furnace_stderr.x, r.furnace_stderr.y,
-                     r.furnace_stderr.z, r.mean_cos, r.stderr_cos, r.max_weight_err, r.max_pdf_err,
-                     r.pdf_integral, r.max_recip_err, float(r.valid) / float(n_samples));
+                     r.furnace_stderr.z, r.albedo.x, r.albedo.y, r.albedo.z, r.mean_cos,
+                     r.stderr_cos, r.max_weight_err, r.max_pdf_err, r.pdf_integral, r.max_recip_err,
+                     float(r.valid) / float(n_samples));
         return r;
     }
 
@@ -299,6 +308,20 @@ class BSDFTest : public ::testing::Test {
     void expect_pdf_normalized(const CheckResult& r) {
         EXPECT_NEAR(r.pdf_integral, PDF_NORMALIZATION, QUADRATURE_TOL) << "INT pdf dwo";
     }
+
+    // get_albedo is the demodulation guide a denoiser divides out; it must track the directional
+    // albedo (the furnace value) so all divisible throughput (tint, Fresnel, eta^2) is removed.
+    // It is an approximation (split-sum fit, single scattering), so a relative tolerance: this
+    // still catches gross errors like a missing eta^2 factor (which would be ~2x off).
+    void expect_albedo_matches_furnace(const CheckResult& r) {
+        const auto check = [&](float a, float f, float se, const char* ch) {
+            const float tol = ALBEDO_REL_TOL * std::max(std::abs(f), 0.05f) + MC_SIGMA * se;
+            EXPECT_NEAR(a, f, tol) << "get_albedo " << ch << " vs directional albedo";
+        };
+        check(r.albedo.x, r.furnace.x, r.furnace_stderr.x, "r");
+        check(r.albedo.y, r.furnace.y, r.furnace_stderr.y, "g");
+        check(r.albedo.z, r.furnace.z, r.furnace_stderr.z, "b");
+    }
 };
 
 ContextHandle BSDFTest::context;
@@ -325,6 +348,7 @@ TEST_F(BSDFTest, LambertNormal) {
     expect_reciprocal(r);
     expect_energy_conserving(r);
     expect_pdf_normalized(r);
+    expect_albedo_matches_furnace(r);
     // Lambert furnace == albedo.
     EXPECT_NEAR(r.furnace.x, p.albedo.x, MC_SIGMA * r.furnace_stderr.x);
     EXPECT_NEAR(r.furnace.y, p.albedo.y, MC_SIGMA * r.furnace_stderr.y);
@@ -478,6 +502,12 @@ class RoughDielectricConsistency : public BSDFTest,
         p.albedo = {0.9f, 0.95f, 1.0f};
         const auto r = run(GetParam().config, wi, p);
         expect_sample_eval_consistent(r);
+        // The albedo guide is exact at facing incidence; at grazing it intentionally diverges (the
+        // split-sum fit, and it uses the plain-dielectric F0 rather than the iridescent
+        // reflectance).
+        if (wi.z > 0.9f) {
+            expect_albedo_matches_furnace(r);
+        }
     }
 };
 
@@ -513,6 +543,7 @@ class ConductorRoughness : public BSDFTest, public ::testing::WithParamInterface
         expect_sample_eval_consistent(r);
         expect_reciprocal(r);
         expect_energy_conserving(r);
+        expect_albedo_matches_furnace(r);
     }
 };
 

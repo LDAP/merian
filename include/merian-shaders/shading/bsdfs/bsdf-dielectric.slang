@@ -1,5 +1,6 @@
 import bsdf;
 import merian_shaders.utils.fresnel;
+import merian_shaders.utils.math;
 
 namespace merian {
 
@@ -45,18 +46,23 @@ struct SmoothDielectricBSDF : BSDF {
         }
         const float3 wt = refract(-wi, float3(0.0f, 0.0f, 1.0f), eta);
         if (all(wt == float3(0.0f))) {
-            return ShadingFunctionSample(reflect_dir(wi), 1.0f, float3(1.0f)); // total internal reflection
+            return ShadingFunctionSample(reflect_dir(wi), 1.0f,
+                                         float3(1.0f)); // total internal reflection
         }
         return ShadingFunctionSample(wt, 1.0f, transmission_color);
     }
 
     Albedo get_albedo(const float3 wi) {
-        return Albedo(float3(1.0f));
+        // Directional albedo of the delta interface: reflected fraction + transmitted rest, the
+        // latter tinted and scaled by the eta^2 radiance factor.
+        const float3 f0 = float3(pow2((1.0f - eta) / (1.0f + eta)));
+        const float3 spec = fresnel_schlick(wi.z, f0);
+        return Albedo(spec + (1.0f - spec) * pow2(eta) * transmission_color);
     }
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
-        return float3(0.0f);
+        return fresnel_schlick(wi.z, F0);
     }
 }
 
-}
+} // namespace merian

@@ -8,20 +8,20 @@ namespace merian {
 
 RWTexture2D<float4> emission;
 // 8-bit TLAS instance cull mask used by the primary ray query. Per-frame from the host.
-struct GBufferParams { uint instance_mask; };
+struct GBufferParams {
+    uint instance_mask;
+};
 ConstantBuffer<GBufferParams> params;
 
 extern static const bool merian_gbuffer_write_emission = true;
 
-[shader("compute")]
-[numthreads(16, 16, 1)]
-void main(uint3 tid: SV_DispatchThreadID,
-          ParameterBlock<Scene> scene,
-          ParameterBlock<WGBuffer> gbuffer) {
-
+[shader("compute")][numthreads(16, 16, 1)] void main(uint3 tid : SV_DispatchThreadID,
+                                                     ParameterBlock<Scene> scene,
+                                                     ParameterBlock<WGBuffer> gbuffer) {
     const uint2 pixel = tid.xy;
     const uint2 dim = gbuffer.get_dimensions();
-    if (any(pixel >= dim)) return;
+    if (any(pixel >= dim))
+        return;
 
     const RayDesc ray = scene.generate_camera_ray(pixel, dim);
     const Hit hit = scene.trace_ray(ray, RAY_FLAG_NONE, params.instance_mask);
@@ -47,24 +47,30 @@ void main(uint3 tid: SV_DispatchThreadID,
             RayDifferential rd = RayDifferential::from_pinhole_camera(ray.Direction, r_x, r_y);
             rd.propagate(ray.Direction, linear_z, surface.face_normal);
             float2 ddx, ddy;
-            rd.compute_uv_gradients(edge01_w, edge02_w, surface.face_normal,
-                                    tri.v0.uv, tri.v1.uv, tri.v2.uv, ddx, ddy);
+            rd.compute_uv_gradients(edge01_w, edge02_w, surface.face_normal, tri.v0.uv, tri.v1.uv,
+                                    tri.v2.uv, ddx, ddy);
 
-            const ShadingData sd = ShadingData(-ray.Direction,
-                                               surface.pos,
-                                               surface.uv,
-                                               scene.time,
-                                               surface.frame,
-                                               surface.face_normal,
-                                               uint16_t(0));
-            let mat = scene.material_system.get_material_sample(
-                surface.material_id, sd, GradLODSampler(ddx, ddy));
+            OrthonormalFrame frame = surface.frame;
+            float3 face_normal = surface.face_normal;
+            bool front_facing = true;
+            if (gd.flags & GeometryDataFlags::TwoSided) {
+                front_facing = dot(-ray.Direction, surface.face_normal) >= 0.f;
+                if (!front_facing) {
+                    frame.flip_normal();
+                    face_normal = -face_normal;
+                }
+            }
+
+            const ShadingData sd = ShadingData(-ray.Direction, surface.pos, surface.uv, scene.time,
+                                               frame, face_normal, uint16_t(0), 1.0f, front_facing);
+            let mat = scene.material_system.get_material_sample(surface.material_id, sd,
+                                                                GradLODSampler(ddx, ddy));
 
             gbuffer.store_surface(pixel, mat.shading_normal, linear_z, grad_z, delta_z);
             gbuffer.store_hit(pixel, hit);
             gbuffer.store_motion_vectors(pixel, mv);
-            gbuffer.store_albedo(pixel,
-                                 mat.get_bsdf().get_albedo(mat.shading_frame.to_local(-ray.Direction)));
+            gbuffer.store_albedo(
+                pixel, mat.get_bsdf().get_albedo(mat.shading_frame.to_local(-ray.Direction)));
             if (merian_gbuffer_write_emission)
                 emission[pixel] = float4(mat.emission, 0);
             return;
@@ -84,4 +90,4 @@ void main(uint3 tid: SV_DispatchThreadID,
         emission[pixel] = float4(sp.material.emission, 0);
 }
 
-}
+} // namespace merian
