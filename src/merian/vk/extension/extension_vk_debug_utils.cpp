@@ -1,6 +1,7 @@
 #include "merian/vk/extension/extension_vk_debug_utils.hpp"
 
 #include <spdlog/spdlog.h>
+#include <string_view>
 #include <vulkan/vulkan.hpp>
 
 namespace {
@@ -38,6 +39,13 @@ VKAPI_ATTR vk::Bool32 VKAPI_CALL ExtensionVkDebugUtils::messenger_callback(
     }
 
     spdlog::level::level_enum severity = get_severity(messageSeverity);
+
+    // the loader's own diagnostics are chatty; demote them so they only show at a debug log level
+    if (severity == spdlog::level::level_enum::info && pCallbackData->pMessageIdName != nullptr &&
+        std::string_view(pCallbackData->pMessageIdName) == "Loader Message") {
+        severity = spdlog::level::level_enum::debug;
+    }
+
     std::string msg_type =
         vk::to_string(static_cast<vk::DebugUtilsMessageTypeFlagsEXT>(messageTypes));
     spdlog::log(severity, "[{}] [{}] [{}] {}", msg_type, pCallbackData->pMessageIdName,
