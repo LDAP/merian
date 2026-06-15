@@ -45,25 +45,19 @@ SlangProgramEntryPoint::find_or_create_param_info(const ContextHandle& context,
         return it->second;
     }
 
-    auto* entry_reflection = get_entry_point_reflection();
-    for (uint32_t i = 0; i < entry_reflection->getParameterCount(); i++) {
-        auto* param = entry_reflection->getParameterByIndex(i);
-        auto* type_layout = param->getTypeLayout();
-
-        if (type_layout->getKind() != slang::TypeReflection::Kind::ParameterBlock ||
-            param_name != param->getName()) {
-            continue;
-        }
-
-        // Set index will be assigned by get_pipeline_layout() before bind() uses it.
-        auto [inserted_it, _] = param_cache.try_emplace(
-            param_name,
-            ParameterBlockInfo{program->get_or_create_object_layout(context, type_layout), 0, {}});
-        return inserted_it->second;
+    auto* param = get_parameter(param_name);
+    if (param == nullptr ||
+        param->getTypeLayout()->getKind() != slang::TypeReflection::Kind::ParameterBlock) {
+        throw std::invalid_argument{
+            fmt::format("ParameterBlock parameter '{}' not found in entry point", param_name)};
     }
 
-    throw std::invalid_argument{
-        fmt::format("ParameterBlock parameter '{}' not found in entry point", param_name)};
+    // Set index will be assigned by get_pipeline_layout() before bind() uses it.
+    auto [inserted_it, _] = param_cache.try_emplace(
+        param_name,
+        ParameterBlockInfo{
+            program->get_or_create_object_layout(context, param->getTypeLayout()), 0, {}});
+    return inserted_it->second;
 }
 
 ShaderObjectLayoutHandle SlangProgramEntryPoint::get_object_layout(const ContextHandle& context,
@@ -71,16 +65,10 @@ ShaderObjectLayoutHandle SlangProgramEntryPoint::get_object_layout(const Context
     return find_or_create_param_info(context, param_name).object_layout;
 }
 
-uint32_t SlangProgramEntryPoint::get_descriptor_set_index(const std::string& param_name) {
-    auto it = param_cache.find(param_name);
-    assert(it != param_cache.end() && "Call get_object_layout first to populate cache");
-    return it->second.descriptor_set_index;
-}
-
-ShaderObjectHandle
-SlangProgramEntryPoint::create_shader_object(const ContextHandle& context,
-                                             const std::string& param_name,
-                                             const ResourceAllocatorHandle& allocator) {
+ShaderObjectHandle SlangProgramEntryPoint::create_shader_object_for_parameter(
+    const ContextHandle& context,
+    const std::string& param_name,
+    const ResourceAllocatorHandle& allocator) {
     return std::make_shared<ShaderObject>(get_object_layout(context, param_name), allocator);
 }
 
@@ -223,48 +211,47 @@ static void barrier_after_uploads(const CommandBufferHandle& cmd) {
     });
 }
 
-void SlangProgramEntryPoint::bind_entry_point_parameter(
-    const std::string& param_name,
+// Binds a parameter block at set_index (skipped when NO_DESCRIPTOR_SET) and recurses into its
+// nested ParameterBlocks, each at the set index assigned during layout build. Root and nested
+// blocks bind the same way; only the root's set index is passed in rather than read from an info.
+void SlangProgramEntryPoint::bind_parameter_blocks(
     const ShaderObjectHandle& object,
-    const CommandBufferHandle& cmd,
-    const PipelineHandle& pipeline,
-    const ShaderObjectAllocatorHandle& obj_allocator) {
-    const auto& context = pipeline->get_layout()->get_context();
-    get_pipeline_layout(context);
-    auto& info = find_or_create_param_info(context, param_name);
-
-    const bool needs_upload = object->has_pending_uploads();
-    if (needs_upload) {
-        barrier_before_uploads(cmd);
-    }
-
-    if (info.descriptor_set_index != NO_DESCRIPTOR_SET) {
-        object->bind_as_parameter_block(cmd, pipeline, info.descriptor_set_index, obj_allocator);
-    }
-
-    bind_nested_parameter_blocks(object, info.nested_parameter_block_infos, cmd, pipeline,
-                                 obj_allocator);
-
-    if (needs_upload) {
-        barrier_after_uploads(cmd);
-    }
-}
-
-void SlangProgramEntryPoint::bind_nested_parameter_blocks(
-    const ShaderObjectHandle& object,
+    const uint32_t set_index,
     const std::vector<NestedParameterBlockInfo>& nested_infos,
     const CommandBufferHandle& cmd,
     const PipelineHandle& pipeline,
     const ShaderObjectAllocatorHandle& obj_allocator) {
+    if (set_index != NO_DESCRIPTOR_SET) {
+        object->bind_as_parameter_block(cmd, pipeline, set_index, obj_allocator);
+    }
     for (const auto& nested_info : nested_infos) {
         const auto& subobject = object->get_subobject(nested_info.subobject_range_index);
         if (!subobject) {
             continue;
         }
-        if (nested_info.set_index != NO_DESCRIPTOR_SET) {
-            subobject->bind_as_parameter_block(cmd, pipeline, nested_info.set_index, obj_allocator);
-        }
-        bind_nested_parameter_blocks(subobject, nested_info.children, cmd, pipeline, obj_allocator);
+        bind_parameter_blocks(subobject, nested_info.set_index, nested_info.children, cmd, pipeline,
+                              obj_allocator);
+    }
+}
+
+void SlangProgramEntryPoint::bind(const std::string& param_name,
+                                  const ShaderObjectHandle& object,
+                                  const CommandBufferHandle& cmd,
+                                  const PipelineHandle& pipeline,
+                                  const ShaderObjectAllocatorHandle& obj_allocator) {
+    const auto& context = pipeline->get_layout()->get_context();
+    get_pipeline_layout(context);
+    auto& info = find_or_create_param_info(context, param_name);
+
+    // Upload barriers wrap the whole tree; has_pending_uploads() already covers nested blocks.
+    const bool needs_upload = object->has_pending_uploads();
+    if (needs_upload) {
+        barrier_before_uploads(cmd);
+    }
+    bind_parameter_blocks(object, info.descriptor_set_index, info.nested_parameter_block_infos, cmd,
+                          pipeline, obj_allocator);
+    if (needs_upload) {
+        barrier_after_uploads(cmd);
     }
 }
 
@@ -284,33 +271,19 @@ SlangProgramEntryPoint::create_global_shader_object(const ContextHandle& context
     return std::make_shared<ShaderObject>(global_object_layout, allocator);
 }
 
-void SlangProgramEntryPoint::bind_global_parameter(
-    const ShaderObjectHandle& globals,
-    const CommandBufferHandle& cmd,
-    const PipelineHandle& pipeline,
-    const ShaderObjectAllocatorHandle& obj_allocator) {
+void SlangProgramEntryPoint::bind_global(const ShaderObjectHandle& globals,
+                                         const CommandBufferHandle& cmd,
+                                         const PipelineHandle& pipeline,
+                                         const ShaderObjectAllocatorHandle& obj_allocator) {
     const bool needs_upload = globals->has_pending_uploads();
     if (needs_upload) {
         barrier_before_uploads(cmd);
     }
-
-    if (global_set_index != NO_DESCRIPTOR_SET) {
-        globals->bind_as_parameter_block(cmd, pipeline, global_set_index, obj_allocator);
-    }
-    bind_nested_parameter_blocks(globals, global_nested_parameter_block_infos, cmd, pipeline,
-                                 obj_allocator);
-
+    bind_parameter_blocks(globals, global_set_index, global_nested_parameter_block_infos, cmd,
+                          pipeline, obj_allocator);
     if (needs_upload) {
         barrier_after_uploads(cmd);
     }
-}
-
-DescriptorSetLayoutHandle
-SlangProgramEntryPoint::get_global_set_layout(const uint32_t set_index) const {
-    if (set_index == 0 && global_object_layout && global_object_layout->has_bindings()) {
-        return global_object_layout->get_descriptor_set_layout();
-    }
-    return nullptr;
 }
 
 uint32_t SlangProgramEntryPoint::get_global_set_count() const {
@@ -322,33 +295,33 @@ vk::DeviceSize SlangProgramEntryPoint::get_push_constant_size() const {
 }
 
 // ---------------------------------------------------------------
-// Parameter discovery
+// Parameter reflection
+
+uint32_t SlangProgramEntryPoint::get_parameter_count() const {
+    return get_entry_point_reflection()->getParameterCount();
+}
+
+slang::VariableLayoutReflection* SlangProgramEntryPoint::get_parameter(const uint32_t index) const {
+    return get_entry_point_reflection()->getParameterByIndex(index);
+}
+
+slang::VariableLayoutReflection*
+SlangProgramEntryPoint::get_parameter(const std::string& param_name) const {
+    auto* entry_reflection = get_entry_point_reflection();
+    for (uint32_t i = 0; i < entry_reflection->getParameterCount(); i++) {
+        auto* param = entry_reflection->getParameterByIndex(i);
+        if (param_name == param->getName()) {
+            return param;
+        }
+    }
+    return nullptr;
+}
 
 bool SlangProgramEntryPoint::has_parameter(const std::string& param_name) const {
-    auto* entry_reflection = get_entry_point_reflection();
-    for (uint32_t i = 0; i < entry_reflection->getParameterCount(); i++) {
-        auto* param = entry_reflection->getParameterByIndex(i);
-        if (param->getTypeLayout()->getKind() == slang::TypeReflection::Kind::ParameterBlock &&
-            param_name == param->getName()) {
-            return true;
-        }
-    }
-    return false;
+    return get_parameter(param_name) != nullptr;
 }
 
-std::vector<std::string> SlangProgramEntryPoint::get_parameter_block_names() const {
-    auto* entry_reflection = get_entry_point_reflection();
-    std::vector<std::string> names;
-    for (uint32_t i = 0; i < entry_reflection->getParameterCount(); i++) {
-        auto* param = entry_reflection->getParameterByIndex(i);
-        if (param->getTypeLayout()->getKind() == slang::TypeReflection::Kind::ParameterBlock) {
-            names.emplace_back(param->getName());
-        }
-    }
-    return names;
-}
-
-std::vector<std::string> SlangProgramEntryPoint::get_all_parameter_names() const {
+std::vector<std::string> SlangProgramEntryPoint::get_parameter_names() const {
     auto* entry_reflection = get_entry_point_reflection();
     std::vector<std::string> names;
     names.reserve(entry_reflection->getParameterCount());

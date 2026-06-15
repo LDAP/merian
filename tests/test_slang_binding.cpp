@@ -91,7 +91,8 @@ class SlangBindingTest : public ::testing::Test {
             MemoryMappingType::HOST_ACCESS_RANDOM, "test_output");
 
         // Create params and set values
-        auto params = entry_point.get()->create_shader_object(context, "params", allocator);
+        auto params =
+            entry_point.get()->create_shader_object_for_parameter(context, "params", allocator);
         SPDLOG_DEBUG("ShaderObject:\n{}", *params);
         auto cursor = params->get_cursor();
         setup_fn(entry_point.get(), cursor, output_buffer);
@@ -99,8 +100,7 @@ class SlangBindingTest : public ::testing::Test {
         // Dispatch
         queue->submit_wait([&](const CommandBufferHandle& cmd) {
             cmd->bind(pipeline);
-            entry_point.get()->bind_entry_point_parameter("params", params, cmd, pipeline,
-                                                          obj_allocator);
+            entry_point.get()->bind("params", params, cmd, pipeline, obj_allocator);
             cmd->dispatch(1, 1, 1);
         });
 
@@ -371,21 +371,21 @@ TEST_F(SlangBindingTest, StorageBuffer) {
 TEST_F(SlangBindingTest, TwoEntryPointPBs) {
     auto ctx = create_multi_pb_context("two_entry_point_pbs", 4);
 
-    auto pa = ctx.entry_point->create_shader_object(context, "pa", allocator);
+    auto pa = ctx.entry_point->create_shader_object_for_parameter(context, "pa", allocator);
     auto cursor_a = pa->get_cursor();
     cursor_a["a"] = 1.5f;
     cursor_a["b"] = 77u;
     cursor_a["output"] = ctx.output_buffer;
 
-    auto pb = ctx.entry_point->create_shader_object(context, "pb", allocator);
+    auto pb = ctx.entry_point->create_shader_object_for_parameter(context, "pb", allocator);
     auto cursor_b = pb->get_cursor();
     cursor_b["c"] = -8;
     cursor_b["d"] = 2.5f;
 
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(ctx.pipeline);
-        ctx.entry_point->bind_entry_point_parameter("pa", pa, cmd, ctx.pipeline, ctx.obj_allocator);
-        ctx.entry_point->bind_entry_point_parameter("pb", pb, cmd, ctx.pipeline, ctx.obj_allocator);
+        ctx.entry_point->bind("pa", pa, cmd, ctx.pipeline, ctx.obj_allocator);
+        ctx.entry_point->bind("pb", pb, cmd, ctx.pipeline, ctx.obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
 
@@ -412,7 +412,8 @@ TEST_F(SlangBindingTest, IncrementalValueUpdate) {
         allocator->create_buffer(sizeof(uint32_t), vk::BufferUsageFlagBits::eStorageBuffer,
                                  MemoryMappingType::HOST_ACCESS_RANDOM, "test_output");
 
-    auto params = entry_point.get()->create_shader_object(context, "params", allocator);
+    auto params =
+        entry_point.get()->create_shader_object_for_parameter(context, "params", allocator);
     auto cursor = params->get_cursor();
     cursor["output"] = output_buffer;
 
@@ -420,8 +421,7 @@ TEST_F(SlangBindingTest, IncrementalValueUpdate) {
     cursor["val"] = 1.0f;
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(pipeline);
-        entry_point.get()->bind_entry_point_parameter("params", params, cmd, pipeline,
-                                                      obj_allocator);
+        entry_point.get()->bind("params", params, cmd, pipeline, obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
 
@@ -435,8 +435,7 @@ TEST_F(SlangBindingTest, IncrementalValueUpdate) {
     cursor["val"] = 2.0f;
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(pipeline);
-        entry_point.get()->bind_entry_point_parameter("params", params, cmd, pipeline,
-                                                      obj_allocator);
+        entry_point.get()->bind("params", params, cmd, pipeline, obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
 
@@ -547,15 +546,15 @@ TEST_F(SlangBindingTest, SubObjectReassignmentResource) {
         return buffer;
     };
 
-    auto params = entry_point.get()->create_shader_object(context, "params", allocator);
+    auto params =
+        entry_point.get()->create_shader_object_for_parameter(context, "params", allocator);
     auto cursor = params->get_cursor();
     cursor["output"] = output_buffer;
 
     const auto dispatch = [&] {
         queue->submit_wait([&](const CommandBufferHandle& cmd) {
             cmd->bind(pipeline);
-            entry_point.get()->bind_entry_point_parameter("params", params, cmd, pipeline,
-                                                          obj_allocator);
+            entry_point.get()->bind("params", params, cmd, pipeline, obj_allocator);
             cmd->dispatch(1, 1, 1);
         });
     };
@@ -600,12 +599,12 @@ TEST_F(SlangBindingTest, SubObjectReassignmentResource) {
 TEST_F(SlangBindingTest, SingleNestedPB) {
     auto ctx = create_multi_pb_context("single_nested_pb", 3);
 
-    auto params = ctx.entry_point->create_shader_object(context, "params", allocator);
+    auto params = ctx.entry_point->create_shader_object_for_parameter(context, "params", allocator);
     auto cursor = params->get_cursor();
     cursor["c"] = 42u;
 
     // The nested PB is a separate ShaderObject bound at its own descriptor set
-    auto inner = ctx.entry_point->create_shader_object(context, "params", allocator);
+    auto inner = ctx.entry_point->create_shader_object_for_parameter(context, "params", allocator);
     // Actually, the nested PB ("inner") is a sub-object of params, not a separate entry point PB.
     // We need to create it through the params object.
     auto inner_obj = params->create_subobject("inner");
@@ -617,8 +616,7 @@ TEST_F(SlangBindingTest, SingleNestedPB) {
 
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(ctx.pipeline);
-        ctx.entry_point->bind_entry_point_parameter("params", params, cmd, ctx.pipeline,
-                                                    ctx.obj_allocator);
+        ctx.entry_point->bind("params", params, cmd, ctx.pipeline, ctx.obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
 
@@ -631,7 +629,7 @@ TEST_F(SlangBindingTest, SingleNestedPB) {
 TEST_F(SlangBindingTest, PBWithCB) {
     auto ctx = create_multi_pb_context("pb_with_cb", 3);
 
-    auto params = ctx.entry_point->create_shader_object(context, "params", allocator);
+    auto params = ctx.entry_point->create_shader_object_for_parameter(context, "params", allocator);
 
     // The nested PB "inner" needs manual setup since it contains a CB
     auto inner_obj = params->create_subobject("inner");
@@ -644,8 +642,7 @@ TEST_F(SlangBindingTest, PBWithCB) {
 
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(ctx.pipeline);
-        ctx.entry_point->bind_entry_point_parameter("params", params, cmd, ctx.pipeline,
-                                                    ctx.obj_allocator);
+        ctx.entry_point->bind("params", params, cmd, ctx.pipeline, ctx.obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
 
@@ -671,7 +668,8 @@ TEST_F(SlangBindingTest, IncrementalCBUpdate) {
         allocator->create_buffer(sizeof(uint32_t), vk::BufferUsageFlagBits::eStorageBuffer,
                                  MemoryMappingType::HOST_ACCESS_RANDOM, "test_output");
 
-    auto params = entry_point.get()->create_shader_object(context, "params", allocator);
+    auto params =
+        entry_point.get()->create_shader_object_for_parameter(context, "params", allocator);
     auto cursor = params->get_cursor();
     cursor["output"] = output_buffer;
 
@@ -679,8 +677,7 @@ TEST_F(SlangBindingTest, IncrementalCBUpdate) {
     cursor["cb"]["val"] = 1.0f;
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(pipeline);
-        entry_point.get()->bind_entry_point_parameter("params", params, cmd, pipeline,
-                                                      obj_allocator);
+        entry_point.get()->bind("params", params, cmd, pipeline, obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
     {
@@ -693,8 +690,7 @@ TEST_F(SlangBindingTest, IncrementalCBUpdate) {
     cursor["cb"]["val"] = 2.0f;
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(pipeline);
-        entry_point.get()->bind_entry_point_parameter("params", params, cmd, pipeline,
-                                                      obj_allocator);
+        entry_point.get()->bind("params", params, cmd, pipeline, obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
     {
@@ -735,7 +731,8 @@ TEST_F(SlangBindingTest, IncrementalResourceUpdate) {
         input_b->get_memory()->unmap();
     }
 
-    auto params = entry_point.get()->create_shader_object(context, "params", allocator);
+    auto params =
+        entry_point.get()->create_shader_object_for_parameter(context, "params", allocator);
     auto cursor = params->get_cursor();
     cursor["output"] = output_buffer;
 
@@ -743,8 +740,7 @@ TEST_F(SlangBindingTest, IncrementalResourceUpdate) {
     cursor["input"] = input_a;
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(pipeline);
-        entry_point.get()->bind_entry_point_parameter("params", params, cmd, pipeline,
-                                                      obj_allocator);
+        entry_point.get()->bind("params", params, cmd, pipeline, obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
     {
@@ -757,8 +753,7 @@ TEST_F(SlangBindingTest, IncrementalResourceUpdate) {
     cursor["input"] = input_b;
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(pipeline);
-        entry_point.get()->bind_entry_point_parameter("params", params, cmd, pipeline,
-                                                      obj_allocator);
+        entry_point.get()->bind("params", params, cmd, pipeline, obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
     {
@@ -830,7 +825,7 @@ TEST_F(SlangBindingTest, GlobalResource) {
 
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(pipeline);
-        entry_point.get()->bind_global_parameter(globals, cmd, pipeline, obj_allocator);
+        entry_point.get()->bind_global(globals, cmd, pipeline, obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
 
@@ -860,7 +855,7 @@ TEST_F(SlangBindingTest, GlobalPB) {
 
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(pipeline);
-        entry_point.get()->bind_global_parameter(globals, cmd, pipeline, obj_allocator);
+        entry_point.get()->bind_global(globals, cmd, pipeline, obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
 
@@ -889,16 +884,16 @@ TEST_F(SlangBindingTest, GlobalWithPB) {
     globals->get_cursor()["g_output"] = output_buffer;
 
     // Set PB params
-    auto params = entry_point.get()->create_shader_object(context, "params", allocator);
+    auto params =
+        entry_point.get()->create_shader_object_for_parameter(context, "params", allocator);
     auto cursor = params->get_cursor();
     cursor["x"] = 1.5f;
     cursor["y"] = -7;
 
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(pipeline);
-        entry_point.get()->bind_global_parameter(globals, cmd, pipeline, obj_allocator);
-        entry_point.get()->bind_entry_point_parameter("params", params, cmd, pipeline,
-                                                      obj_allocator);
+        entry_point.get()->bind_global(globals, cmd, pipeline, obj_allocator);
+        entry_point.get()->bind("params", params, cmd, pipeline, obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
 
@@ -923,8 +918,8 @@ TEST_F(SlangBindingTest, SharedCBacrossPBs) {
         MemoryMappingType::HOST_ACCESS_RANDOM, "test_output_b");
 
     // Create PB objects for 'a' and 'b'
-    auto a_obj = ctx.entry_point->create_shader_object(context, "a", allocator);
-    auto b_obj = ctx.entry_point->create_shader_object(context, "b", allocator);
+    auto a_obj = ctx.entry_point->create_shader_object_for_parameter(context, "a", allocator);
+    auto b_obj = ctx.entry_point->create_shader_object_for_parameter(context, "b", allocator);
 
     // Create ONE shared CB and write values to it
     auto shared_cb = a_obj->create_subobject("cb");
@@ -945,10 +940,8 @@ TEST_F(SlangBindingTest, SharedCBacrossPBs) {
     // Dispatch
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(ctx.pipeline);
-        ctx.entry_point->bind_entry_point_parameter("a", a_obj, cmd, ctx.pipeline,
-                                                    ctx.obj_allocator);
-        ctx.entry_point->bind_entry_point_parameter("b", b_obj, cmd, ctx.pipeline,
-                                                    ctx.obj_allocator);
+        ctx.entry_point->bind("a", a_obj, cmd, ctx.pipeline, ctx.obj_allocator);
+        ctx.entry_point->bind("b", b_obj, cmd, ctx.pipeline, ctx.obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
 
@@ -1061,7 +1054,8 @@ TEST_F(SlangBindingTest, FrameCachingReplaysEveryIterationSet) {
         MemoryMappingType::HOST_ACCESS_RANDOM, "test_output");
 
     // Same ShaderObject reused every frame, as in real per-frame binding.
-    auto params = entry_point.get()->create_shader_object(context, "params", allocator);
+    auto params =
+        entry_point.get()->create_shader_object_for_parameter(context, "params", allocator);
     auto cursor = params->get_cursor();
     cursor["output"] = output_buffer;
 
@@ -1073,8 +1067,7 @@ TEST_F(SlangBindingTest, FrameCachingReplaysEveryIterationSet) {
 
         queue->submit_wait([&](const CommandBufferHandle& cmd) {
             cmd->bind(pipeline);
-            entry_point.get()->bind_entry_point_parameter("params", params, cmd, pipeline,
-                                                          obj_allocator);
+            entry_point.get()->bind("params", params, cmd, pipeline, obj_allocator);
             cmd->dispatch(1, 1, 1);
         });
 

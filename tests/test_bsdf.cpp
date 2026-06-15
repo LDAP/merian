@@ -220,7 +220,8 @@ class BSDFTest : public ::testing::Test {
             vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
             MemoryMappingType::HOST_ACCESS_RANDOM, "bsdf_output");
 
-        const auto params = entry_point.get()->create_shader_object(context, "params", allocator);
+        const auto params =
+            entry_point.get()->create_shader_object_for_parameter(context, "params", allocator);
         auto cursor = params->get_cursor();
         cursor["wi"] = wi;
         cursor["n_samples"] = n_samples;
@@ -235,8 +236,7 @@ class BSDFTest : public ::testing::Test {
 
         queue->submit_wait([&](const CommandBufferHandle& cmd) {
             cmd->bind(pipeline);
-            entry_point.get()->bind_entry_point_parameter("params", params, cmd, pipeline,
-                                                          obj_allocator);
+            entry_point.get()->bind("params", params, cmd, pipeline, obj_allocator);
             cmd->dispatch(1, 1, 1);
         });
 

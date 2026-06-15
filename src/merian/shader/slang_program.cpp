@@ -82,27 +82,27 @@ SlangProgram::get_or_create_object_layout(const ContextHandle& context,
     return layout;
 }
 
-ShaderObjectHandle SlangProgram::create_shader_object(const ContextHandle& context,
-                                                      const std::string& type_name,
-                                                      const ResourceAllocatorHandle& allocator) {
+ShaderObjectHandle
+SlangProgram::create_shader_object_for_type(const ContextHandle& context,
+                                            const std::string& type_name,
+                                            const ResourceAllocatorHandle& allocator) {
     auto* type_layout = get_type_layout(fmt::format("ParameterBlock<{}>", type_name));
     return std::make_shared<ShaderObject>(get_or_create_object_layout(context, type_layout),
                                           allocator);
 }
 
 // ---------------------------------------------------------------
-// Global parameter discovery
+// Parameter reflection (global parameters)
 
-uint32_t SlangProgram::get_global_parameter_count() const {
+uint32_t SlangProgram::get_parameter_count() const {
     return get_program_reflection()->getParameterCount();
 }
 
-slang::VariableLayoutReflection* SlangProgram::get_global_parameter(uint32_t index) const {
+slang::VariableLayoutReflection* SlangProgram::get_parameter(uint32_t index) const {
     return get_program_reflection()->getParameterByIndex(index);
 }
 
-slang::VariableLayoutReflection*
-SlangProgram::find_global_parameter(const std::string& name) const {
+slang::VariableLayoutReflection* SlangProgram::get_parameter(const std::string& name) const {
     auto* layout = get_program_reflection();
     for (uint32_t i = 0; i < layout->getParameterCount(); i++) {
         auto* param = layout->getParameterByIndex(i);
@@ -113,7 +113,7 @@ SlangProgram::find_global_parameter(const std::string& name) const {
     return nullptr;
 }
 
-std::vector<std::string> SlangProgram::get_global_parameter_names() const {
+std::vector<std::string> SlangProgram::get_parameter_names() const {
     auto* layout = get_program_reflection();
     std::vector<std::string> names;
     names.reserve(layout->getParameterCount());
@@ -123,8 +123,8 @@ std::vector<std::string> SlangProgram::get_global_parameter_names() const {
     return names;
 }
 
-bool SlangProgram::has_global_parameter(const std::string& name) const {
-    return find_global_parameter(name) != nullptr;
+bool SlangProgram::has_parameter(const std::string& name) const {
+    return get_parameter(name) != nullptr;
 }
 
 // ---------------------------------------------------------------

@@ -56,19 +56,27 @@ class SlangProgram : public std::enable_shared_from_this<SlangProgram> {
     ShaderObjectLayoutHandle get_or_create_object_layout(const ContextHandle& context,
                                                          slang::TypeLayoutReflection* type_layout);
 
-    // Creates a ParameterBlock<type_name> shader object.
-    ShaderObjectHandle create_shader_object(const ContextHandle& context,
-                                            const std::string& type_name,
-                                            const ResourceAllocatorHandle& allocator);
+    // Creates a ParameterBlock<type_name> shader object from a named Slang type.
+    // Create-for-parameter counterpart: SlangProgramEntryPoint::create_shader_object_for_parameter.
+    ShaderObjectHandle create_shader_object_for_type(const ContextHandle& context,
+                                                     const std::string& type_name,
+                                                     const ResourceAllocatorHandle& allocator);
 
     // ---------------------------------------------------------------
-    // Global parameter discovery
+    // Parameter reflection (global parameters).
+    // Entry-point counterpart: identically-named SlangProgramEntryPoint::get_parameter* /
+    // has_parameter.
 
-    uint32_t get_global_parameter_count() const;
-    slang::VariableLayoutReflection* get_global_parameter(uint32_t index) const;
-    slang::VariableLayoutReflection* find_global_parameter(const std::string& name) const;
-    std::vector<std::string> get_global_parameter_names() const;
-    bool has_global_parameter(const std::string& name) const;
+    uint32_t get_parameter_count() const;
+
+    slang::VariableLayoutReflection* get_parameter(uint32_t index) const;
+
+    // nullptr if no global parameter has this name.
+    slang::VariableLayoutReflection* get_parameter(const std::string& name) const;
+
+    bool has_parameter(const std::string& name) const;
+
+    std::vector<std::string> get_parameter_names() const;
 
     // ---------------------------------------------------------------
     // Debug

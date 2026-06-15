@@ -104,7 +104,8 @@ TEST_F(SlangHotReloadTest, MaterialPipelineRebuildsAfterForceReload) {
             vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
             MemoryMappingType::HOST_ACCESS_RANDOM, "test_output_1");
 
-        auto params = entry_point.get()->create_shader_object(context, "params", allocator);
+        auto params =
+            entry_point.get()->create_shader_object_for_parameter(context, "params", allocator);
         params->get_cursor()["ms"] = ms;
         params->get_cursor()["output"] = output_buffer;
         params->get_cursor()["material_id"] = static_cast<uint32_t>(mat1_id);
@@ -112,8 +113,7 @@ TEST_F(SlangHotReloadTest, MaterialPipelineRebuildsAfterForceReload) {
         queue->submit_wait([&](const CommandBufferHandle& cmd) {
             ms->update(cmd);
             cmd->bind(pipeline.get());
-            entry_point.get()->bind_entry_point_parameter("params", params, cmd, pipeline.get(),
-                                                          obj_allocator);
+            entry_point.get()->bind("params", params, cmd, pipeline.get(), obj_allocator);
             cmd->dispatch(1, 1, 1);
         });
 
@@ -144,7 +144,8 @@ TEST_F(SlangHotReloadTest, MaterialPipelineRebuildsAfterForceReload) {
             vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
             MemoryMappingType::HOST_ACCESS_RANDOM, "test_output_2");
 
-        auto params = entry_point.get()->create_shader_object(context, "params", allocator);
+        auto params =
+            entry_point.get()->create_shader_object_for_parameter(context, "params", allocator);
         params->get_cursor()["ms"] = ms;
         params->get_cursor()["output"] = output_buffer;
         params->get_cursor()["material_id"] = static_cast<uint32_t>(mat2_id);
@@ -152,8 +153,7 @@ TEST_F(SlangHotReloadTest, MaterialPipelineRebuildsAfterForceReload) {
         queue->submit_wait([&](const CommandBufferHandle& cmd) {
             ms->update(cmd);
             cmd->bind(pipeline.get());
-            entry_point.get()->bind_entry_point_parameter("params", params, cmd, pipeline.get(),
-                                                          obj_allocator);
+            entry_point.get()->bind("params", params, cmd, pipeline.get(), obj_allocator);
             cmd->dispatch(1, 1, 1);
         });
 
@@ -220,15 +220,15 @@ TEST_F(SlangHotReloadTest, TextureArrayResizeRebuildsFullPipeline) {
         vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
         MemoryMappingType::HOST_ACCESS_RANDOM, "test_output");
 
-    auto params = entry_point.get()->create_shader_object(context, "params", allocator);
+    auto params =
+        entry_point.get()->create_shader_object_for_parameter(context, "params", allocator);
     params->get_cursor()["tm"] = tm;
     params->get_cursor()["output"] = output_buffer;
     params->get_cursor()["texture_id"] = static_cast<uint32_t>(tex_id);
 
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(pipeline.get());
-        entry_point.get()->bind_entry_point_parameter("params", params, cmd, pipeline.get(),
-                                                      obj_allocator);
+        entry_point.get()->bind("params", params, cmd, pipeline.get(), obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
 

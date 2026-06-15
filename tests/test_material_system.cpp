@@ -121,7 +121,8 @@ TEST_F(MaterialSystemTest, ReadMaterialOnGPU) {
         vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
         MemoryMappingType::HOST_ACCESS_RANDOM, "test_output");
 
-    auto params = entry_point.get()->create_shader_object(context, "params", allocator);
+    auto params =
+        entry_point.get()->create_shader_object_for_parameter(context, "params", allocator);
     auto cursor = params->get_cursor();
     cursor["ms"] = ms;
     cursor["output"] = output_buffer;
@@ -130,8 +131,7 @@ TEST_F(MaterialSystemTest, ReadMaterialOnGPU) {
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         ms->update(cmd);
         cmd->bind(pipeline);
-        entry_point.get()->bind_entry_point_parameter("params", params, cmd, pipeline,
-                                                      obj_allocator);
+        entry_point.get()->bind("params", params, cmd, pipeline, obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
 
@@ -179,7 +179,8 @@ TEST_F(MaterialSystemTest, SampleMaterialOnGPU) {
         vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
         MemoryMappingType::HOST_ACCESS_RANDOM, "test_output");
 
-    auto params = entry_point.get()->create_shader_object(context, "params", allocator);
+    auto params =
+        entry_point.get()->create_shader_object_for_parameter(context, "params", allocator);
     auto cursor = params->get_cursor();
     cursor["ms"] = ms;
     cursor["output"] = output_buffer;
@@ -188,8 +189,7 @@ TEST_F(MaterialSystemTest, SampleMaterialOnGPU) {
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         ms->update(cmd);
         cmd->bind(pipeline);
-        entry_point.get()->bind_entry_point_parameter("params", params, cmd, pipeline,
-                                                      obj_allocator);
+        entry_point.get()->bind("params", params, cmd, pipeline, obj_allocator);
         cmd->dispatch(1, 1, 1);
     });
 

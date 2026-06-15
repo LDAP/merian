@@ -36,8 +36,8 @@ void TextureManager::update_composition_constants() {
 ShaderObjectHandle TextureManager::build_shader_object() const {
     SPDLOG_DEBUG("recreate shader object");
     object_composition_version = composition->version();
-    const ShaderObjectHandle object =
-        layout_program.get()->create_shader_object(context, "merian::TextureManager", allocator);
+    const ShaderObjectHandle object = layout_program.get()->create_shader_object_for_type(
+        context, "merian::TextureManager", allocator);
 
     // declare eShaderReadOnlyOptimal up front: staged uploads are eUndefined until update()
     const auto& dummy = allocator->get_dummy_texture();

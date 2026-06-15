@@ -92,7 +92,7 @@ ShaderObjectHandle Scene::build_shader_object() const {
     SPDLOG_DEBUG("recreate shader object");
 
     const ShaderObjectHandle object =
-        layout_program.get()->create_shader_object(context, "merian::Scene", allocator);
+        layout_program.get()->create_shader_object_for_type(context, "merian::Scene", allocator);
 
     auto c = object->get_cursor();
 

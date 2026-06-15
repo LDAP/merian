@@ -46,19 +46,20 @@ class SlangProgramEntryPoint : public EntryPoint {
     ShaderObjectLayoutHandle get_object_layout(const ContextHandle& context,
                                                const std::string& param_name);
 
-    uint32_t get_descriptor_set_index(const std::string& param_name);
-
-    ShaderObjectHandle create_shader_object(const ContextHandle& context,
-                                            const std::string& param_name,
-                                            const ResourceAllocatorHandle& allocator);
+    // Creates the ParameterBlock object for a named entry-point parameter.
+    // Create-by-type counterpart: SlangProgram::create_shader_object_for_type.
+    ShaderObjectHandle create_shader_object_for_parameter(const ContextHandle& context,
+                                                          const std::string& param_name,
+                                                          const ResourceAllocatorHandle& allocator);
 
     PipelineLayoutHandle get_pipeline_layout(const ContextHandle& context);
 
-    void bind_entry_point_parameter(const std::string& param_name,
-                                    const ShaderObjectHandle& object,
-                                    const CommandBufferHandle& cmd,
-                                    const PipelineHandle& pipeline,
-                                    const ShaderObjectAllocatorHandle& obj_allocator);
+    // Binds a shader object to the named entry-point parameter (with its nested ParameterBlocks).
+    void bind(const std::string& param_name,
+              const ShaderObjectHandle& object,
+              const CommandBufferHandle& cmd,
+              const PipelineHandle& pipeline,
+              const ShaderObjectAllocatorHandle& obj_allocator);
 
     // ---------------------------------------------------------------
     // Global parameter support (the global scope is one ParameterBlock-like container)
@@ -68,12 +69,11 @@ class SlangProgramEntryPoint : public EntryPoint {
     ShaderObjectHandle create_global_shader_object(const ContextHandle& context,
                                                    const ResourceAllocatorHandle& allocator);
 
-    void bind_global_parameter(const ShaderObjectHandle& globals,
-                               const CommandBufferHandle& cmd,
-                               const PipelineHandle& pipeline,
-                               const ShaderObjectAllocatorHandle& obj_allocator);
-
-    DescriptorSetLayoutHandle get_global_set_layout(uint32_t set_index) const;
+    // Binds the whole global scope object (populate it via its cursor first).
+    void bind_global(const ShaderObjectHandle& globals,
+                     const CommandBufferHandle& cmd,
+                     const PipelineHandle& pipeline,
+                     const ShaderObjectAllocatorHandle& obj_allocator);
 
     uint32_t get_global_set_count() const;
 
@@ -85,13 +85,19 @@ class SlangProgramEntryPoint : public EntryPoint {
     std::string format_reflection(const ContextHandle& context);
 
     // ---------------------------------------------------------------
-    // Parameter discovery
+    // Parameter reflection (entry-point parameters).
+    // Global-parameter counterpart: identically-named SlangProgram::get_parameter* / has_parameter.
+
+    uint32_t get_parameter_count() const;
+
+    slang::VariableLayoutReflection* get_parameter(uint32_t index) const;
+
+    // nullptr if no entry-point parameter has this name.
+    slang::VariableLayoutReflection* get_parameter(const std::string& param_name) const;
 
     bool has_parameter(const std::string& param_name) const;
 
-    std::vector<std::string> get_parameter_block_names() const;
-
-    std::vector<std::string> get_all_parameter_names() const;
+    std::vector<std::string> get_parameter_names() const;
 
   public:
     // An entry point that is rebuilt whenever its program changes.
@@ -125,11 +131,12 @@ class SlangProgramEntryPoint : public EntryPoint {
     ParameterBlockInfo& find_or_create_param_info(const ContextHandle& context,
                                                   const std::string& param_name);
 
-    void bind_nested_parameter_blocks(const ShaderObjectHandle& object,
-                                      const std::vector<NestedParameterBlockInfo>& nested_infos,
-                                      const CommandBufferHandle& cmd,
-                                      const PipelineHandle& pipeline,
-                                      const ShaderObjectAllocatorHandle& obj_allocator);
+    void bind_parameter_blocks(const ShaderObjectHandle& object,
+                               uint32_t set_index,
+                               const std::vector<NestedParameterBlockInfo>& nested_infos,
+                               const CommandBufferHandle& cmd,
+                               const PipelineHandle& pipeline,
+                               const ShaderObjectAllocatorHandle& obj_allocator);
 
     const SlangProgramHandle program;
     const uint64_t entry_point_index;

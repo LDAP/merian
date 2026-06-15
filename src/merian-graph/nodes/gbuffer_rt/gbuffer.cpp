@@ -112,11 +112,9 @@ void GBufferRTNode::process(GraphRun& run,
 
     if (scene->is_ready()) {
         cmd->bind(pipe);
-        ep->bind_entry_point_parameter("scene", scene->get_shader_object(), cmd, pipe,
-                                       obj_allocator);
-        ep->bind_entry_point_parameter("gbuffer", gbuffer_obj->get_write_shader_object(), cmd, pipe,
-                                       obj_allocator);
-        ep->bind_global_parameter(globals, cmd, pipe, obj_allocator);
+        ep->bind("scene", scene->get_shader_object(), cmd, pipe, obj_allocator);
+        ep->bind("gbuffer", gbuffer_obj->get_write_shader_object(), cmd, pipe, obj_allocator);
+        ep->bind_global(globals, cmd, pipe, obj_allocator);
         cmd->dispatch(extent, 16, 16);
     }
 

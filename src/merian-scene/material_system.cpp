@@ -194,8 +194,8 @@ void MaterialSystem::properties(Properties& props) {
 ShaderObjectHandle MaterialSystem::build_shader_object() const {
     SPDLOG_DEBUG("recreate shader object");
 
-    const ShaderObjectHandle object =
-        layout_program.get()->create_shader_object(context, "merian::MaterialSystem", allocator);
+    const ShaderObjectHandle object = layout_program.get()->create_shader_object_for_type(
+        context, "merian::MaterialSystem", allocator);
     auto cursor = object->get_cursor();
     cursor["texture_manager"] = texture_manager->get_shader_object();
     if (material_buffer) {

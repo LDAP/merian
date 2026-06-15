@@ -547,7 +547,7 @@ Here is the complete flow for a 3-level deep parameter hierarchy:
 auto entry_point = SlangProgramEntryPoint::create(program, "main");
 auto pipeline_layout = entry_point->get_pipeline_layout(context);
 auto pipeline = ComputePipeline::create(pipeline_layout, entry_point->specialize());
-auto params = entry_point->create_shader_object(context, "params", allocator);
+auto params = entry_point->create_shader_object_for_parameter(context, "params", allocator);
 
 // Write parameters (cursor auto-creates sub-objects)
 auto cursor = params->get_cursor();
@@ -560,30 +560,28 @@ cursor["nested"]["deep"]["value"] = 42.0f;              // value in set 2
 // Bind and dispatch (every frame)
 allocator->set_iteration(frame_index);
 cmd->bind(pipeline);
-entry_point->bind_entry_point_parameter("params", params, cmd, pipeline, obj_allocator);
+entry_point->bind("params", params, cmd, pipeline, obj_allocator);
 cmd->dispatch(extent, 16, 16);
 ```
 
 The bind call triggers this chain:
 
 ```
-bind_entry_point_parameter("params", params, ...)
+bind("params", params, ...)
   |
-  +- if params->has_pending_uploads(): transfer barrier
+  +- if params->has_pending_uploads(): transfer barrier   (covers the whole tree)
   |
-  +- params->bind_as_parameter_block(cmd, pipeline, set=0)
-  |    +- if uploads pending: upload dirty uniform staging
-  |    |    (own + ConstantBuffer sub-objects, recursively)
-  |    +- obj_allocator->allocate(params) -> {descriptor set for set 0, freshly_allocated}
-  |    +- if freshly allocated: descriptors->replay_to(set)
-  |    +- set->update() + set->bind(cmd, pipeline, 0)
-  |
-  +- bind_nested_parameter_blocks(params, set index tree)
-  |    |
-  |    +- nested->bind_as_parameter_block(cmd, pipeline, set=1)
-  |    +- bind_nested_parameter_blocks(nested, children)
-  |         |
-  |         +- deep->bind_as_parameter_block(cmd, pipeline, set=2)
+  +- bind_parameter_blocks(params, set=0, nested tree)     (recursive)
+  |    +- params->bind_as_parameter_block(cmd, pipeline, set=0)
+  |    |    +- if uploads pending: upload dirty uniform staging
+  |    |    |    (own + ConstantBuffer sub-objects, recursively)
+  |    |    +- obj_allocator->allocate(params) -> {descriptor set for set 0, freshly_allocated}
+  |    |    +- if freshly allocated: descriptors->replay_to(set)
+  |    |    +- set->update() + set->bind(cmd, pipeline, 0)
+  |    +- for each nested: bind_parameter_blocks(nested, set=1, children)
+  |         +- nested->bind_as_parameter_block(cmd, pipeline, set=1)
+  |         +- for each child: bind_parameter_blocks(deep, set=2, ...)
+  |              +- deep->bind_as_parameter_block(cmd, pipeline, set=2)
   |
   +- if uploads happened: transfer barrier
 ```

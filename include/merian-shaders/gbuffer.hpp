@@ -18,8 +18,10 @@ class GBuffer {
         composition->add_module_from_path("merian-shaders/gbuffer.slang");
         const SlangProgramHandle program = SlangProgram::create(compile_context, composition).get();
 
-        r_shader_object = program->create_shader_object(context, "merian::GBuffer", allocator);
-        w_shader_object = program->create_shader_object(context, "merian::WGBuffer", allocator);
+        r_shader_object =
+            program->create_shader_object_for_type(context, "merian::GBuffer", allocator);
+        w_shader_object =
+            program->create_shader_object_for_type(context, "merian::WGBuffer", allocator);
     }
 
     const ShaderObjectHandle& get_shader_object() const {

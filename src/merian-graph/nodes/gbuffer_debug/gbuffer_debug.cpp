@@ -66,7 +66,8 @@ void GBufferDebugNode::process(GraphRun& run,
         pipeline.depends_on(entry_point);
 
         params = Versioned<ShaderObject>([this] {
-            return entry_point.get()->create_shader_object(context, "params", resource_allocator);
+            return entry_point.get()->create_shader_object_for_parameter(context, "params",
+                                                                         resource_allocator);
         });
         params.depends_on(entry_point);
 
@@ -85,8 +86,8 @@ void GBufferDebugNode::process(GraphRun& run,
     cursor["output"] = io[con_output].get_texture();
 
     cmd->bind(pipe);
-    ep->bind_entry_point_parameter("scene", scene->get_shader_object(), cmd, pipe, obj_allocator);
-    ep->bind_entry_point_parameter("params", params_obj, cmd, pipe, obj_allocator);
+    ep->bind("scene", scene->get_shader_object(), cmd, pipe, obj_allocator);
+    ep->bind("params", params_obj, cmd, pipe, obj_allocator);
     cmd->push_constant(pipe, static_cast<int>(selected_field));
 
     cmd->dispatch(extent, 16, 16);

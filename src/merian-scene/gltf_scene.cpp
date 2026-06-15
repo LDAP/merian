@@ -604,10 +604,9 @@ TextureID GLTFScene::get_or_load_texture(const CommandBufferHandle& cmd,
     bool generate_mipmaps;
     if (linear) {
         if (wants_mipmaps) {
-            SPDLOG_WARN("GLTFScene: texture {} ('{}') is sampled as a normal/MR/occlusion map but "
-                        "its sampler requests *_MIPMAP_*; generating mipmaps anyway, expect "
-                        "filtering artifacts (specialized mipmap generation is not implemented)",
-                        gltf_tex_idx, img.name);
+            SPDLOG_DEBUG("GLTFScene: texture {} ('{}') is sampled as a normal/MR/occlusion map but "
+                         "its sampler requests *_MIPMAP_*",
+                         gltf_tex_idx, img.name);
         }
         generate_mipmaps = wants_mipmaps;
     } else {
