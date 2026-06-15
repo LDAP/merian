@@ -20,6 +20,8 @@ Run a graph: `build/merian-graph-run <config.json>`, better with timeout:
 Enable tests: `meson configure build -Dtests=true`
 Run one: `build/tests/test-<name>` (e.g. `test-small-vector`)
 
+If a failure is preexisting, but the fix is quick, then fix instead of just report (but ask first).
+
 # Plugins
 
 A plugin is a `shared_library('merian-plugin-<name>', name_prefix: '')` that consumes merian via

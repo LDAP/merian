@@ -40,10 +40,13 @@ VKAPI_ATTR vk::Bool32 VKAPI_CALL ExtensionVkDebugUtils::messenger_callback(
 
     spdlog::level::level_enum severity = get_severity(messageSeverity);
 
-    // the loader's own diagnostics are chatty; demote them so they only show at a debug log level
-    if (severity == spdlog::level::level_enum::info && pCallbackData->pMessageIdName != nullptr &&
-        std::string_view(pCallbackData->pMessageIdName) == "Loader Message") {
-        severity = spdlog::level::level_enum::debug;
+    // the loader's and validation layer's own status diagnostics are chatty; demote them so they
+    // only show at a debug log level
+    if (severity == spdlog::level::level_enum::info && pCallbackData->pMessageIdName != nullptr) {
+        const std::string_view id_name(pCallbackData->pMessageIdName);
+        if (id_name == "Loader Message" || id_name.ends_with("status-message")) {
+            severity = spdlog::level::level_enum::debug;
+        }
     }
 
     std::string msg_type =

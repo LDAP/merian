@@ -7,13 +7,15 @@ import merian_shaders.shading.bsdfs.brdf_sheen;
 import merian_shaders.shading.bsdfs.bsdf_conductor_fresnel;
 import merian_shaders.shading.bsdfs.bsdf_fresnel_mix;
 import merian_shaders.shading.bsdfs.bsdf_mix;
+import merian_shaders.shading.bsdfs.bsdf_rough_dielectric;
 import merian_shaders.utils.normal_map;
 
 namespace merian {
 
-typealias PBRTDiffuseOrTransmission = MixBSDF<LambertDiffuseBRDF, SpecularBTDF>; // by transmission
-typealias PBRTDielectric =
-    FresnelMixBSDF<SpecularBRDF, PBRTDiffuseOrTransmission>; // specular over base
+// Opaque part: specular reflection over diffuse. Transmissive part: a coupled rough dielectric
+// (TIR-aware). Mixed by the transmission weight.
+typealias PBRTOpaqueDielectric = FresnelMixBSDF<SpecularBRDF, LambertDiffuseBRDF>;
+typealias PBRTDielectric = MixBSDF<PBRTOpaqueDielectric, RoughDielectricBSDF>;
 typealias PBRTMetal = ConductorFresnelBSDF<SpecularBRDF>;
 typealias PBRTSubstrate = MixBSDF<PBRTDielectric, PBRTMetal>; // by metalness
 typealias PBRTCoated = FresnelMixBSDF<SpecularBRDF, PBRTSubstrate>;
@@ -97,13 +99,11 @@ struct PBRTMaterial : MaterialModel {
             tw = transmission_weight;
         }
 
+        const PBRTDielectric dielectric = PBRTDielectric(
+            PBRTOpaqueDielectric(SpecularBRDF(alpha), LambertDiffuseBRDF(base), dielectric_f0),
+            RoughDielectricBSDF(alpha, eta, transmission_color), tw);
         const PBRTSubstrate substrate =
-            PBRTSubstrate(PBRTDielectric(SpecularBRDF(alpha),
-                                         PBRTDiffuseOrTransmission(
-                                             LambertDiffuseBRDF(base),
-                                             SpecularBTDF(alpha, eta, transmission_color), tw),
-                                         dielectric_f0),
-                          PBRTMetal(SpecularBRDF(alpha), base), metal);
+            PBRTSubstrate(dielectric, PBRTMetal(SpecularBRDF(alpha), base), metal);
 
         // Dielectric clearcoat over the substrate, gated by the toggle (weight 0 -> coat drops
         // out).

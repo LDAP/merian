@@ -24,14 +24,19 @@ Device::Device(
     };
 
     device = physical_device->get_physical_device().createDevice(device_create_info);
-    SPDLOG_INFO("device ({}) created. (Vulkan supported: {}, target: {}, effective: "
-                "{}, features: [{}], extensions: [{}])",
-                fmt::ptr(VkDevice(device)),
-                format_vk_api_version(physical_device->get_physical_device_vk_api_version()),
-                format_vk_api_version(physical_device->get_instance()->get_target_vk_api_version()),
-                format_vk_api_version(physical_device->get_vk_api_version()),
-                fmt::join(features.get_enabled_features(), ", "),
-                fmt::join(enabled_extensions, ", "));
+    if (spdlog::should_log(spdlog::level::debug)) {
+        SPDLOG_INFO(
+            "device ({}) created. (Vulkan supported: {}, target: {}, effective: "
+            "{}, features: [{}], extensions: [{}])",
+            fmt::ptr(VkDevice(device)),
+            format_vk_api_version(physical_device->get_physical_device_vk_api_version()),
+            format_vk_api_version(physical_device->get_instance()->get_target_vk_api_version()),
+            format_vk_api_version(physical_device->get_vk_api_version()),
+            fmt::join(features.get_enabled_features(), ", "), fmt::join(enabled_extensions, ", "));
+    } else {
+        SPDLOG_INFO("device ({}) created. (Vulkan {})", fmt::ptr(VkDevice(device)),
+                    format_vk_api_version(physical_device->get_vk_api_version()));
+    }
 
     SPDLOG_DEBUG("create pipeline cache");
     vk::PipelineCacheCreateInfo pipeline_cache_create_info{};

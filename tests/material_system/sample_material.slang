@@ -28,7 +28,7 @@ void main(ParameterBlock<Params> params) {
     float3 wi = float3(0, 0, 1);
     float3 wo = float3(0, 0, 1);
     merian::RandomGenerator rng = merian::XorShift32(42);
-    float3 val = sample.get_shading_function().eval(wi, wo, rng);
+    float3 val = sample.get_bsdf().eval(wi, wo, rng);
 
     // For a Lambert BRDF with albedo (r,g,b): eval = INV_PI * albedo * wo.z = INV_PI * albedo
     params.output[0] = asuint(val.r);
