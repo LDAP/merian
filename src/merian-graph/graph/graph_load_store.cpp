@@ -47,6 +47,8 @@ void Graph::from_description(const GraphDescription& description) {
     // Clear existing graph
     reset();
 
+    loaded_description = description;
+
     // Load graph-level properties using JSONLoadProperties
     const auto& graph_props = description.get_graph_properties();
     if (!graph_props.empty()) {
@@ -155,6 +157,8 @@ GraphDescription Graph::to_description() {
                          connection.dst_input);
         }
     }
+
+    description.set_cli(loaded_description.get_cli());
 
     SPDLOG_INFO("Graph stored successfully with {} nodes", node_for_identifier.size());
 

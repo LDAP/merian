@@ -4,13 +4,13 @@
         "fps limiter": false,
         "iterations in flight": 2,
         "low latency": false,
-        "short_config": {
-            "--": {
-                "pointer": "/nodes/0/properties/path",
-                "required": true
-            }
-        },
         "time overwrite": "None"
+    },
+    "cli": {
+        "--": {
+            "pointer": "/nodes/0/properties/path",
+            "required": true
+        }
     },
     "nodes": [
         {

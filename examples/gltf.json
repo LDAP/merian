@@ -5,24 +5,24 @@
         "imgui event": "ui",
         "iterations in flight": 2,
         "low latency": false,
-        "short_config": {
-            "--": {
-                "pointer": "/nodes/7/properties/file"
-            },
-            "env-map": {
-                "pointer": "/nodes/7/properties/env/Path",
-                "set": {
-                    "/nodes/7/properties/env/Type": "LatLong"
-                }
-            },
-            "max-path-length": {
-                "pointer": "/nodes/6/properties/max path length"
-            },
-            "spp": {
-                "pointer": "/nodes/6/properties/samples per pixel"
+        "time overwrite": "None"
+    },
+    "cli": {
+        "--": {
+            "pointer": "/nodes/7/properties/file"
+        },
+        "env-map": {
+            "pointer": "/nodes/7/properties/env/Path",
+            "set": {
+                "/nodes/7/properties/env/Type": "LatLong"
             }
         },
-        "time overwrite": "None"
+        "max-path-length": {
+            "pointer": "/nodes/6/properties/max path length"
+        },
+        "spp": {
+            "pointer": "/nodes/6/properties/samples per pixel"
+        }
     },
     "nodes": [
         {

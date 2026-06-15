@@ -4,24 +4,24 @@
         "fps limiter": false,
         "iterations in flight": 2,
         "low latency": false,
-        "short_config": {
-            "--": {
-                "pointer": "/nodes/5/properties/file"
-            },
-            "env-map": {
-                "pointer": "/nodes/5/properties/env/Path",
-                "set": {
-                    "/nodes/5/properties/env/Type": "LatLong"
-                }
-            },
-            "max-path-length": {
-                "pointer": "/nodes/4/properties/max path length"
-            },
-            "spp": {
-                "pointer": "/nodes/4/properties/samples per pixel"
+        "time overwrite": "None"
+    },
+    "cli": {
+        "--": {
+            "pointer": "/nodes/5/properties/file"
+        },
+        "env-map": {
+            "pointer": "/nodes/5/properties/env/Path",
+            "set": {
+                "/nodes/5/properties/env/Type": "LatLong"
             }
         },
-        "time overwrite": "None"
+        "max-path-length": {
+            "pointer": "/nodes/4/properties/max path length"
+        },
+        "spp": {
+            "pointer": "/nodes/4/properties/samples per pixel"
+        }
     },
     "nodes": [
         {

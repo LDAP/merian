@@ -1,4 +1,5 @@
 #include "merian-graph/graph/graph.hpp"
+#include "merian-graph/graph/graph_description.hpp"
 #include "merian-graph/merian_graph_extension.hpp"
 #include "merian-graph/nodes/window/window_node.hpp"
 #include "merian/io/file_loader.hpp"
@@ -12,10 +13,8 @@
 
 #include <algorithm>
 #include <atomic>
-#include <cctype>
 #include <csignal>
 #include <fstream>
-#include <map>
 #include <optional>
 #include <utility>
 
@@ -34,11 +33,12 @@ void print_usage() {
         "  -log-level=<trace|debug|info|warn|error>\n"
         "  -plugin-path=<dir>            (repeatable)\n"
         "  -validation=<on|off|ifdebug>  Vulkan validation layers (default: ifdebug)\n"
-        "  --<alias> <value>             set a config value declared in the graph's\n"
-        "                                \"short_config\" map\n"
+        "  --merge <file.json>           deep-merge a JSON file into the config (repeatable,\n"
+        "                                last wins)\n"
+        "  --<name> <value>              set an override declared in the graph's \"cli\" block\n"
         "  args...                       everything after graph.json, joined with spaces,\n"
-        "                                sets the short config \"--\" (none: value unchanged)\n"
-        "  -help                         with a graph.json: also lists its short configs\n");
+        "                                feeds the cli \"--\" override (none: value unchanged)\n"
+        "  -help                         with a graph.json: also lists its cli overrides\n");
 }
 
 struct Options {
@@ -54,7 +54,7 @@ bool is_help_flag(const std::string& arg) {
 
 std::optional<Options> parse(const std::vector<std::string>& args) {
     Options options;
-    // -help anywhere wins, so `merian-graph-run graph.json -help` lists the short configs
+    // -help anywhere wins, so `merian-graph-run graph.json -help` lists the cli overrides
     // instead of forwarding "-help" to the graph.
     options.help = std::ranges::any_of(args, is_help_flag);
     for (size_t i = 1; i < args.size(); i++) {
@@ -87,7 +87,7 @@ std::optional<Options> parse(const std::vector<std::string>& args) {
             return std::nullopt;
         } else {
             options.config = arg;
-            // Everything after the config goes verbatim into the "--" short config.
+            // Everything after the config goes verbatim into the "--" override.
             if (i + 1 < args.size()) {
                 std::string joined = args[i + 1];
                 for (size_t j = i + 2; j < args.size(); j++) {
@@ -100,220 +100,6 @@ std::optional<Options> parse(const std::vector<std::string>& args) {
         }
     }
     return options;
-}
-
-// A list of constant writes: JSON pointer -> literal value, applied verbatim.
-using Patch = std::vector<std::pair<nlohmann::json::json_pointer, nlohmann::json>>;
-
-struct ShortConfig {
-    enum class Kind : uint8_t { VALUE, FLAG, VARIANT };
-
-    std::string alias;
-    Kind kind = Kind::VALUE;
-    bool required = false;
-
-    // Value: pointer receives the CLI value, set is applied alongside.
-    nlohmann::json::json_pointer pointer;
-    Patch set;
-
-    // Flag: set on a truthy value, set_off on a falsy one.
-    Patch set_off;
-
-    // Variant: the CLI value selects a named patch; default is applied when the alias is absent.
-    std::map<std::string, Patch> variants;
-    std::optional<std::string> default_variant;
-};
-
-Patch parse_patch(const nlohmann::json& obj) {
-    Patch patch;
-    for (const auto& [pointer, value] : obj.items()) {
-        patch.emplace_back(nlohmann::json::json_pointer(pointer), value);
-    }
-    return patch;
-}
-
-// Short configs are owned by the graph and live at graph_properties/short_config. An entry is one
-// of (discriminated by "type", else inferred from its keys):
-//   value:   {"pointer": "<ptr>", "set": {<ptr>: <const>, ...}}  - pointer takes the CLI value
-//   flag:    {"set": {...}, "set_off": {...}}                    - --alias on|off picks a patch
-//   variant: {"variants": {"name": {...}, ...}, "default": ...}  - --alias <name> picks a patch
-std::vector<ShortConfig> parse_short_configs(const nlohmann::json& config) {
-    std::vector<ShortConfig> entries;
-    const nlohmann::json graph_properties =
-        config.value("graph_properties", nlohmann::json::object());
-    const nlohmann::json short_config =
-        graph_properties.value("short_config", nlohmann::json::object());
-    for (const auto& [alias, value] : short_config.items()) {
-        ShortConfig entry;
-        entry.alias = alias;
-        entry.required = value.value("required", false);
-
-        std::string type;
-        if (value.contains("type")) {
-            type = value.at("type").get<std::string>();
-        } else if (value.contains("variants")) {
-            type = "variant";
-        } else if (value.contains("pointer")) {
-            type = "value";
-        } else {
-            type = "flag";
-        }
-
-        if (type == "variant") {
-            entry.kind = ShortConfig::Kind::VARIANT;
-            const nlohmann::json variants = value.value("variants", nlohmann::json::object());
-            for (const auto& [name, patch] : variants.items()) {
-                entry.variants.emplace(name, parse_patch(patch));
-            }
-            if (value.contains("default")) {
-                entry.default_variant = value.at("default").get<std::string>();
-            }
-        } else if (type == "flag") {
-            entry.kind = ShortConfig::Kind::FLAG;
-            entry.set = parse_patch(value.value("set", nlohmann::json::object()));
-            entry.set_off = parse_patch(value.value("set_off", nlohmann::json::object()));
-        } else {
-            entry.kind = ShortConfig::Kind::VALUE;
-            entry.pointer = nlohmann::json::json_pointer(value.at("pointer").get<std::string>());
-            entry.set = parse_patch(value.value("set", nlohmann::json::object()));
-        }
-        entries.push_back(std::move(entry));
-    }
-    return entries;
-}
-
-void print_short_configs(const std::filesystem::path& config_path,
-                         const std::vector<ShortConfig>& entries) {
-    if (entries.empty()) {
-        fmt::print("'{}' declares no short configs\n", config_path.string());
-        return;
-    }
-    fmt::print("short configs of '{}':\n", config_path.string());
-    for (const auto& entry : entries) {
-        std::string usage;
-        std::string target;
-        switch (entry.kind) {
-        case ShortConfig::Kind::VALUE:
-            usage = entry.alias == "--" ? "args... (after graph.json)"
-                                        : fmt::format("--{} <value>", entry.alias);
-            target = entry.pointer.to_string();
-            if (!entry.set.empty()) {
-                target += fmt::format(" (+{} side effect(s))", entry.set.size());
-            }
-            break;
-        case ShortConfig::Kind::FLAG:
-            usage = fmt::format("--{} <on|off>", entry.alias);
-            target = "flag";
-            break;
-        case ShortConfig::Kind::VARIANT: {
-            std::string names;
-            for (const auto& [name, _] : entry.variants) {
-                names += names.empty() ? name : "|" + name;
-            }
-            usage = fmt::format("--{} <{}>", entry.alias, names);
-            target =
-                entry.default_variant ? fmt::format("default: {}", *entry.default_variant) : "";
-            break;
-        }
-        }
-        fmt::print("  {:<28} -> {}{}\n", usage, target, entry.required ? " (required)" : "");
-    }
-}
-
-// Keeps the type of the value being replaced: non-string targets accept any JSON literal.
-void set_value(nlohmann::json& config,
-               const nlohmann::json::json_pointer& pointer,
-               const std::string& value) {
-    if (!config.contains(pointer) || !config.at(pointer).is_string()) {
-        const nlohmann::json parsed = nlohmann::json::parse(value, nullptr, false);
-        if (!parsed.is_discarded()) {
-            config[pointer] = parsed;
-            return;
-        }
-    }
-    config[pointer] = value;
-}
-
-void apply_patch(nlohmann::json& config, const Patch& patch) {
-    for (const auto& [pointer, value] : patch) {
-        config[pointer] = value;
-    }
-}
-
-// Returns false on an unrecognized variant/flag value (the override is otherwise applied).
-bool apply_override(nlohmann::json& config, const ShortConfig& entry, const std::string& value) {
-    switch (entry.kind) {
-    case ShortConfig::Kind::VALUE:
-        set_value(config, entry.pointer, value);
-        apply_patch(config, entry.set);
-        return true;
-    case ShortConfig::Kind::FLAG: {
-        std::string lower = value;
-        std::ranges::transform(lower, lower.begin(),
-                               [](unsigned char c) { return std::tolower(c); });
-        if (lower.empty() || lower == "on" || lower == "true" || lower == "1" || lower == "yes") {
-            apply_patch(config, entry.set);
-        } else if (lower == "off" || lower == "false" || lower == "0" || lower == "no") {
-            apply_patch(config, entry.set_off);
-        } else {
-            SPDLOG_ERROR("flag --{} expects on|off, got '{}'", entry.alias, value);
-            return false;
-        }
-        return true;
-    }
-    case ShortConfig::Kind::VARIANT: {
-        const auto it = entry.variants.find(value);
-        if (it == entry.variants.end()) {
-            std::string names;
-            for (const auto& [name, _] : entry.variants) {
-                names += names.empty() ? name : ", " + name;
-            }
-            SPDLOG_ERROR("unknown variant '{}' for --{} (expected: {})", value, entry.alias, names);
-            return false;
-        }
-        apply_patch(config, it->second);
-        return true;
-    }
-    }
-    return true;
-}
-
-bool apply_overrides(nlohmann::json& config,
-                     const std::vector<ShortConfig>& entries,
-                     const std::vector<std::pair<std::string, std::string>>& overrides) {
-    bool ok = true;
-    std::vector<bool> provided(entries.size(), false);
-    for (const auto& [alias, value] : overrides) {
-        const auto it =
-            std::ranges::find_if(entries, [&](const ShortConfig& e) { return e.alias == alias; });
-        if (it == entries.end()) {
-            SPDLOG_ERROR("override --{} is not declared in the config's short_config map", alias);
-            ok = false;
-            continue;
-        }
-        ok &= apply_override(config, *it, value);
-        provided[it - entries.begin()] = true;
-        SPDLOG_DEBUG("override {} = {}", alias == "--" ? alias : "--" + alias, value);
-    }
-    for (size_t i = 0; i < entries.size(); i++) {
-        if (provided[i]) {
-            continue;
-        }
-        if (entries[i].kind == ShortConfig::Kind::VARIANT && entries[i].default_variant) {
-            const auto it = entries[i].variants.find(*entries[i].default_variant);
-            if (it == entries[i].variants.end()) {
-                SPDLOG_ERROR("default variant '{}' for --{} is not declared",
-                             *entries[i].default_variant, entries[i].alias);
-                ok = false;
-            } else {
-                apply_patch(config, it->second);
-            }
-        } else if (entries[i].required) {
-            SPDLOG_ERROR("missing required override --{}", entries[i].alias);
-            ok = false;
-        }
-    }
-    return ok;
 }
 
 // Fallback when no config is given: a cleared window with the ImGui overlay.
@@ -351,7 +137,6 @@ int main(const int argc, const char** argv) {
 
     std::optional<std::filesystem::path> config_path;
     nlohmann::json config;
-    std::vector<ShortConfig> short_configs;
     if (options->config) {
         config_path = *options->config;
         if (!std::filesystem::exists(*config_path)) {
@@ -366,7 +151,6 @@ int main(const int argc, const char** argv) {
         }
         try {
             config = nlohmann::json::parse(stream);
-            short_configs = parse_short_configs(config);
         } catch (const nlohmann::json::exception& e) {
             SPDLOG_ERROR("could not parse config '{}': {}", config_path->string(), e.what());
             return 1;
@@ -379,14 +163,18 @@ int main(const int argc, const char** argv) {
     if (options->help) {
         print_usage();
         if (config_path) {
-            print_short_configs(*config_path, short_configs);
+            fmt::print("{}", merian::GraphDescription::cli_help(config));
         }
         return 0;
     }
 
-    if (config_path && !apply_overrides(config, short_configs, options->overrides)) {
-        print_short_configs(*config_path, short_configs);
-        return 1;
+    if (config_path) {
+        std::vector<std::filesystem::path> cli_search_dirs = {config_path->parent_path()};
+        cli_search_dirs.insert(cli_search_dirs.end(), search_paths.begin(), search_paths.end());
+        if (!merian::GraphDescription::apply_cli(config, options->overrides, cli_search_dirs)) {
+            fmt::print("{}", merian::GraphDescription::cli_help(config));
+            return 1;
+        }
     }
 
     std::vector<std::string> context_extensions = {merian::MerianGraphExtension::name};

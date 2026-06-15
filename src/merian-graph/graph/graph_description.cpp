@@ -1,5 +1,7 @@
 #include "merian-graph/graph/graph_description.hpp"
 
+#include <algorithm>
+#include <cctype>
 #include <regex>
 #include <spdlog/spdlog.h>
 #include <stdexcept>
@@ -118,16 +120,15 @@ GraphDescription GraphDescription::from_json(const nlohmann::json& json) {
 
     if (!json.contains(SCHEMA_VERSION_KEY)) {
         parse_graph_v1(json, description);
-        return description;
-    }
-
-    int schema_version = json[SCHEMA_VERSION_KEY].get<int>();
-    if (schema_version == 2) {
-        parse_graph_v2(json, description);
-    } else if (schema_version == 3) {
-        parse_graph_v3(json, description);
     } else {
-        throw std::runtime_error{fmt::format("schema version {} unsupported.", schema_version)};
+        const int schema_version = json[SCHEMA_VERSION_KEY].get<int>();
+        if (schema_version == 2) {
+            parse_graph_v2(json, description);
+        } else if (schema_version == 3) {
+            parse_graph_v3(json, description);
+        } else {
+            throw std::runtime_error{fmt::format("schema version {} unsupported.", schema_version)};
+        }
     }
 
     return description;
@@ -195,6 +196,10 @@ void GraphDescription::dump_graph_v3(nlohmann::json& json) const {
 
     if (!profiler_properties.empty()) {
         json["profiler"] = profiler_properties;
+    }
+
+    if (!cli.empty()) {
+        json["cli"] = cli;
     }
 
     nlohmann::json nodes_json = nlohmann::json::array();
@@ -284,6 +289,10 @@ void GraphDescription::parse_graph_v3(const nlohmann::json& json, GraphDescripti
 
     if (json.contains("profiler")) {
         description.profiler_properties = json["profiler"];
+    }
+
+    if (json.contains("cli")) {
+        description.cli = json["cli"];
     }
 
     if (json.contains("nodes")) {
@@ -390,6 +399,305 @@ std::string GraphDescription::generate_unique_identifier(const std::string& node
     }
 
     return candidate;
+}
+
+// -----------------------------------------------------------------
+// CLI overrides
+// -----------------------------------------------------------------
+
+namespace {
+
+using json = nlohmann::json;
+using JsonPointer = json::json_pointer;
+
+struct Patch {
+    std::vector<std::pair<JsonPointer, json>> assignments;
+    std::vector<std::string> merges;
+};
+
+Patch parse_patch(const json& spec) {
+    Patch patch;
+    const json assignments = spec.value("set", json::object());
+    for (const auto& [pointer, value] : assignments.items()) {
+        patch.assignments.emplace_back(JsonPointer(pointer), value);
+    }
+    if (const auto it = spec.find("merge"); it != spec.end()) {
+        if (it->is_array()) {
+            for (const json& file : *it) {
+                patch.merges.push_back(file.get<std::string>());
+            }
+        } else {
+            patch.merges.push_back(it->get<std::string>());
+        }
+    }
+    return patch;
+}
+
+std::optional<bool> parse_bool(std::string text) {
+    std::ranges::transform(text, text.begin(), [](unsigned char c) { return std::tolower(c); });
+    if (text.empty() || text == "on" || text == "true" || text == "1" || text == "yes") {
+        return true;
+    }
+    if (text == "off" || text == "false" || text == "0" || text == "no") {
+        return false;
+    }
+    return std::nullopt;
+}
+
+json typed_value(const json& config, const JsonPointer& pointer, const std::string& value) {
+    if (config.contains(pointer) && config.at(pointer).is_string()) {
+        return value;
+    }
+    const json parsed = json::parse(value, nullptr, false);
+    return parsed.is_discarded() ? json(value) : parsed;
+}
+
+std::string join_keys(const std::map<std::string, Patch>& map, const char* separator) {
+    std::string out;
+    for (const auto& [key, _] : map) {
+        out += out.empty() ? key : separator + key;
+    }
+    return out;
+}
+
+struct Override {
+    enum class Kind : uint8_t { VALUE, FLAG, VARIANT };
+
+    std::string name;
+    Kind kind = Kind::VALUE;
+    bool required = false;
+
+    JsonPointer pointer;
+    Patch extra;
+    Patch on;
+    Patch off;
+    std::map<std::string, Patch> variants;
+    std::optional<std::string> default_variant;
+};
+
+std::optional<Patch> resolve(const Override& o, const std::string& value, const json& config) {
+    switch (o.kind) {
+    case Override::Kind::VALUE: {
+        Patch patch = o.extra;
+        patch.assignments.insert(patch.assignments.begin(),
+                                 {o.pointer, typed_value(config, o.pointer, value)});
+        return patch;
+    }
+    case Override::Kind::FLAG:
+        if (const auto enabled = parse_bool(value)) {
+            return *enabled ? o.on : o.off;
+        }
+        SPDLOG_ERROR("--{} expects on|off, got '{}'", o.name, value);
+        return std::nullopt;
+    case Override::Kind::VARIANT:
+        if (const auto it = o.variants.find(value); it != o.variants.end()) {
+            return it->second;
+        }
+        SPDLOG_ERROR("--{}: unknown '{}', expected one of {}", o.name, value,
+                     join_keys(o.variants, ", "));
+        return std::nullopt;
+    }
+    return std::nullopt;
+}
+
+std::string usage(const Override& o) {
+    switch (o.kind) {
+    case Override::Kind::VALUE:
+        return o.name == "--" ? "args... (after graph.json)" : fmt::format("--{} <value>", o.name);
+    case Override::Kind::FLAG:
+        return fmt::format("--{} <on|off>", o.name);
+    case Override::Kind::VARIANT:
+        return fmt::format("--{} <{}>", o.name, join_keys(o.variants, "|"));
+    }
+    return {};
+}
+
+std::string target(const Override& o) {
+    switch (o.kind) {
+    case Override::Kind::VALUE: {
+        const std::string pointer = o.pointer.to_string();
+        const size_t count = o.extra.assignments.size() + o.extra.merges.size();
+        return count == 0 ? pointer : fmt::format("{} (+{} more)", pointer, count);
+    }
+    case Override::Kind::FLAG:
+        return "on/off";
+    case Override::Kind::VARIANT:
+        return o.default_variant ? fmt::format("default: {}", *o.default_variant) : "";
+    }
+    return {};
+}
+
+Override::Kind classify(const json& spec) {
+    if (const auto it = spec.find("type"); it != spec.end()) {
+        const std::string type = it->get<std::string>();
+        if (type == "variant") {
+            return Override::Kind::VARIANT;
+        }
+        if (type == "flag") {
+            return Override::Kind::FLAG;
+        }
+        return Override::Kind::VALUE;
+    }
+    if (spec.contains("variants")) {
+        return Override::Kind::VARIANT;
+    }
+    return spec.contains("pointer") ? Override::Kind::VALUE : Override::Kind::FLAG;
+}
+
+std::vector<Override> parse_overrides(const json& config) {
+    std::vector<Override> overrides;
+    const json cli = config.value("cli", json::object());
+    for (const auto& [name, spec] : cli.items()) {
+        Override entry;
+        entry.name = name;
+        entry.kind = classify(spec);
+        entry.required = spec.value("required", false);
+        switch (entry.kind) {
+        case Override::Kind::VALUE:
+            entry.pointer = JsonPointer(spec.at("pointer").get<std::string>());
+            entry.extra = parse_patch(spec);
+            break;
+        case Override::Kind::FLAG:
+            entry.on = parse_patch(spec);
+            if (spec.contains("off")) {
+                entry.off = parse_patch(spec.at("off"));
+            }
+            break;
+        case Override::Kind::VARIANT: {
+            const json variants = spec.value("variants", json::object());
+            for (const auto& [variant, patch] : variants.items()) {
+                entry.variants.emplace(variant, parse_patch(patch));
+            }
+            if (const auto it = spec.find("default"); it != spec.end()) {
+                entry.default_variant = it->get<std::string>();
+            }
+            break;
+        }
+        }
+        overrides.push_back(std::move(entry));
+    }
+    return overrides;
+}
+
+std::optional<std::filesystem::path>
+resolve_file(const std::string& file, const std::vector<std::filesystem::path>& search_dirs) {
+    if (std::filesystem::path direct(file); std::filesystem::exists(direct)) {
+        return direct;
+    }
+    return merian::FileLoader(search_dirs).find_file(file);
+}
+
+bool apply_patch(json& config,
+                 const Patch& patch,
+                 const std::vector<std::filesystem::path>& search_dirs) {
+    for (const auto& [pointer, value] : patch.assignments) {
+        config[pointer] = value;
+    }
+    for (const std::string& file : patch.merges) {
+        const auto path = resolve_file(file, search_dirs);
+        if (!path) {
+            SPDLOG_ERROR("merge file '{}' not found", file);
+            return false;
+        }
+        std::ifstream stream(path->string());
+        const json overwrite = json::parse(stream, nullptr, false);
+        if (overwrite.is_discarded()) {
+            SPDLOG_ERROR("merge file '{}' is not valid JSON", path->string());
+            return false;
+        }
+        merian::GraphDescription::merge_into(config, overwrite);
+    }
+    return true;
+}
+
+} // namespace
+
+void GraphDescription::merge_into(nlohmann::json& base, const nlohmann::json& overwrite) {
+    const auto is_id_array = [](const json& j) {
+        return j.is_array() && !j.empty() && std::ranges::all_of(j, [](const json& e) {
+                   return e.is_object() && e.contains("id");
+               });
+    };
+
+    if (base.is_object() && overwrite.is_object()) {
+        for (const auto& [key, value] : overwrite.items()) {
+            merge_into(base[key], value);
+        }
+    } else if (is_id_array(base) && is_id_array(overwrite)) {
+        for (const json& element : overwrite) {
+            const json& id = element.at("id");
+            const auto match =
+                std::ranges::find_if(base, [&](const json& b) { return b.at("id") == id; });
+            if (match != base.end()) {
+                merge_into(*match, element);
+            } else {
+                base.push_back(element);
+            }
+        }
+    } else {
+        base = overwrite;
+    }
+}
+
+bool GraphDescription::apply_cli(nlohmann::json& config,
+                                 const std::vector<std::pair<std::string, std::string>>& args,
+                                 const std::vector<std::filesystem::path>& search_dirs) {
+    const std::vector<Override> overrides = parse_overrides(config);
+    bool ok = true;
+
+    std::set<std::string> given;
+    for (const auto& [name, value] : args) {
+        given.insert(name);
+    }
+
+    for (const Override& o : overrides) {
+        if (o.default_variant && !given.contains(o.name)) {
+            const auto it = o.variants.find(*o.default_variant);
+            if (it == o.variants.end()) {
+                SPDLOG_ERROR("--{}: default '{}' is not declared", o.name, *o.default_variant);
+                ok = false;
+            } else {
+                ok = apply_patch(config, it->second, search_dirs) && ok;
+            }
+        }
+    }
+
+    for (const auto& [name, value] : args) {
+        if (name == "merge") {
+            ok =
+                apply_patch(config, Patch{.assignments = {}, .merges = {value}}, search_dirs) && ok;
+            continue;
+        }
+        const auto it = std::ranges::find(overrides, name, &Override::name);
+        if (it == overrides.end()) {
+            SPDLOG_ERROR("--{} is not declared in the cli block", name);
+            ok = false;
+            continue;
+        }
+        const std::optional<Patch> patch = resolve(*it, value, config);
+        ok = patch && apply_patch(config, *patch, search_dirs) && ok;
+    }
+
+    for (const Override& o : overrides) {
+        if (o.required && !given.contains(o.name) && !o.default_variant) {
+            SPDLOG_ERROR("missing required --{}", o.name);
+            ok = false;
+        }
+    }
+    return ok;
+}
+
+std::string GraphDescription::cli_help(const nlohmann::json& config) {
+    const std::vector<Override> overrides = parse_overrides(config);
+    if (overrides.empty()) {
+        return "this graph declares no cli overrides\n";
+    }
+    std::string out = "cli overrides:\n";
+    for (const Override& o : overrides) {
+        out +=
+            fmt::format("  {:<28} -> {}{}\n", usage(o), target(o), o.required ? " (required)" : "");
+    }
+    return out;
 }
 
 } // namespace merian

@@ -72,9 +72,6 @@ void Graph::graph_properties(Properties& props) {
         props.config_text("imgui event", imgui_event, false,
                           "Comma-separated events from ImGui nodes that draw this graph's UI."));
 
-    // graph-run owns the schema; the graph only round-trips the blob verbatim.
-    props.serialize_json("short_config", short_config);
-
     if (props.is_ui()) {
         props.st_separate("Events");
         const auto now = std::chrono::steady_clock::now();

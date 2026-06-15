@@ -400,8 +400,7 @@ class Graph : public std::enable_shared_from_this<Graph> {
     std::optional<std::filesystem::path> pending_load;
     std::string imgui_event = "ui";
 
-    // CLI aliases for graph-run, round-tripped verbatim. graph-run owns the schema.
-    nlohmann::json short_config = nlohmann::json::object();
+    GraphDescription loaded_description;
 
     // Nodes
     std::map<std::string, NodeHandle> node_for_identifier;

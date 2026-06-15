@@ -4,11 +4,15 @@
 
 #include <nlohmann/json.hpp>
 
+#include <filesystem>
 #include <fstream>
 #include <map>
 #include <optional>
 #include <set>
+#include <string>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
 namespace merian {
 
@@ -164,6 +168,14 @@ class GraphDescription {
         return profiler_properties;
     }
 
+    void set_cli(const nlohmann::json& value) {
+        cli = value;
+    }
+
+    const nlohmann::json& get_cli() const {
+        return cli;
+    }
+
     // -----------------------------------------------------------------
     // Access to Nodes and Connections
     // -----------------------------------------------------------------
@@ -199,6 +211,18 @@ class GraphDescription {
     nlohmann::json to_json() const;
 
   public:
+    // -----------------------------------------------------------------
+    // CLI overrides (context-free; the reserved name "merge" deep-merges a JSON file)
+    // -----------------------------------------------------------------
+
+    static bool apply_cli(nlohmann::json& config,
+                          const std::vector<std::pair<std::string, std::string>>& args,
+                          const std::vector<std::filesystem::path>& search_dirs = {});
+
+    static std::string cli_help(const nlohmann::json& config);
+
+    static void merge_into(nlohmann::json& base, const nlohmann::json& overwrite);
+
     // Validates that an identifier doesn't contain reserved characters (., ->, /)
     // Throws std::invalid_argument if validation fails
     static void validate_identifier(const std::string& identifier, const std::string& context);
@@ -232,6 +256,8 @@ class GraphDescription {
 
     // Profiler properties
     nlohmann::json profiler_properties{};
+
+    nlohmann::json cli{};
 
     // Updated every time the structure changes (nodes and connections).
     // Node properties do not change the hash if they do not need a graph rebuild.
