@@ -21,12 +21,6 @@ MaterialSystem::MaterialSystem(const ShaderCompileContextHandle& compile_context
     : compile_context(compile_context), context(context), allocator(allocator),
       texture_manager(texture_manager) {
 
-    assert(context->get_device()
-                   ->get_enabled_features()
-                   .get_16_bit_storage_features()
-                   .storageBuffer16BitAccess == VK_TRUE &&
-           "MaterialSystem requires storageBuffer16BitAccess (enable the merian extension)");
-
     // Build the composition once — subsequent changes modify it in-place.
     composition = SlangComposition::create();
     composition->add_composition(texture_manager->get_composition());
@@ -36,6 +30,18 @@ MaterialSystem::MaterialSystem(const ShaderCompileContextHandle& compile_context
     layout_program = SlangProgram::create(compile_context, composition);
     shader_object = Versioned<ShaderObject>([this] { return build_shader_object(); });
     shader_object.depends_on(layout_program);
+}
+
+SlangCompositionHandle MaterialSystem::query_device_support_composition() {
+    const auto composition = SlangComposition::create();
+    composition->add_composition(TextureManager::query_device_support_composition());
+    composition->add_module_from_path("merian-shaders/shading/materials/material-system.slang");
+    composition->add_module_from_string("material_system_constants",
+                                        "namespace merian { export static const int "
+                                        "merian_material_system_payload_max_size = 1; }");
+    composition->add_module_from_path("merian-shaders/shading/materials/diffuse-material.slang");
+    composition->add_type_conformance("merian::MaterialModel", "merian::DiffuseMaterial", 0);
+    return composition;
 }
 
 void MaterialSystem::update_composition_constants() {

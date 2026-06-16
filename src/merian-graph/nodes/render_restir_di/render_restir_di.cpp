@@ -17,7 +17,11 @@ constexpr std::array<const char*, RenderRestirDI::PassCount> PASS_ENTRY_POINTS =
 RenderRestirDI::RenderRestirDI() = default;
 
 DeviceSupportInfo RenderRestirDI::query_device_support(const DeviceSupportQueryInfo& query_info) {
-    return DeviceSupportInfo::check(query_info, {"rayTracingPipeline"}, {"rayQuery"});
+    const auto composition = Scene::query_device_support_composition(query_info);
+    composition->add_module_from_path(SHADER_MODULE, true);
+    const auto program = SlangProgram::create(query_info.compile_context, composition);
+    return DeviceSupportInfo::check(query_info, {"rayTracingPipeline"}, {"rayQuery"}) &
+           program.get()->query_device_support(query_info);
 }
 
 void RenderRestirDI::initialize(const ContextHandle& context,

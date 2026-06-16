@@ -26,6 +26,7 @@ merian_shaders_deps = [
     nlohmann_json,
     slang,
     spdlog,
+    spirv_reflect,
     stb,
     tgltf,
     ufbx,

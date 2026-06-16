@@ -13,8 +13,7 @@ GLTFSceneNode::query_device_support([[maybe_unused]] const DeviceSupportQueryInf
 #ifndef MERIAN_TINYGLTF_ENABLED
     return DeviceSupportInfo{false, "GLTF support disabled at compile time (tinygltf option)"};
 #else
-    return DeviceSupportInfo::check(query_info, {"accelerationStructure", "scalarBlockLayout",
-                                                 "shaderInt64", "bufferDeviceAddress"});
+    return Scene::query_device_support(query_info);
 #endif
 }
 

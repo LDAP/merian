@@ -20,6 +20,8 @@ class TextureManager : public std::enable_shared_from_this<TextureManager> {
                    const ResourceAllocatorHandle& allocator,
                    uint32_t initial_capacity = 4096);
 
+    static SlangCompositionHandle query_device_support_composition();
+
     // Records pending uploads queued by the cmd-less add_/set_ overloads.
     void update(const CommandBufferHandle& cmd);
 

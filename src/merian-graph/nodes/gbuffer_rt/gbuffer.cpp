@@ -10,8 +10,12 @@ namespace merian {
 GBufferRTNode::GBufferRTNode() {}
 
 DeviceSupportInfo GBufferRTNode::query_device_support(const DeviceSupportQueryInfo& query_info) {
+    const auto composition = Scene::query_device_support_composition(query_info);
+    composition->add_module_from_path("merian-graph/nodes/gbuffer_rt/gbuffer_rt.slang", true);
+    const auto program = SlangProgram::create(query_info.compile_context, composition);
     return DeviceSupportInfo::check(query_info,
-                                    {"accelerationStructure", "computeDerivativeGroupQuads"});
+                                    {"accelerationStructure", "computeDerivativeGroupQuads"}) &
+           program.get()->query_device_support(query_info);
 }
 
 void GBufferRTNode::initialize(const ContextHandle& context,

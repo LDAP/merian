@@ -22,6 +22,9 @@ using ShaderObjectHandle = std::shared_ptr<ShaderObject>;
 class ShaderObjectLayout;
 using ShaderObjectLayoutHandle = std::shared_ptr<ShaderObjectLayout>;
 
+struct DeviceSupportInfo;
+struct DeviceSupportQueryInfo;
+
 class SlangProgram;
 // Holding a handle keeps the program's session and reflection pointers alive.
 using SlangProgramHandle = std::shared_ptr<SlangProgram>;
@@ -36,6 +39,9 @@ class SlangProgram : public std::enable_shared_from_this<SlangProgram> {
     ShaderModuleHandle get_shader_module(const ContextHandle& context);
 
     Slang::ComPtr<slang::IBlob> get_binary();
+
+    // Reflects the compiled SPIR-V for the device features, capabilities and extensions it needs.
+    DeviceSupportInfo query_device_support(const DeviceSupportQueryInfo& query_info);
 
     slang::ProgramLayout* get_program_reflection() const;
 
@@ -102,7 +108,6 @@ class SlangProgram : public std::enable_shared_from_this<SlangProgram> {
     mutable Slang::ComPtr<slang::IBlob> binary;
     mutable ShaderModuleHandle shader_module{nullptr};
 
-    // Weak values: layouts hold the program, strong entries would form reference cycles.
     std::unordered_map<slang::TypeLayoutReflection*, std::weak_ptr<ShaderObjectLayout>>
         object_layout_cache;
 };

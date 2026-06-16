@@ -53,6 +53,8 @@ class MaterialSystem : public std::enable_shared_from_this<MaterialSystem> {
                    const ResourceAllocatorHandle& allocator,
                    const TextureManagerHandle& texture_manager);
 
+    static SlangCompositionHandle query_device_support_composition();
+
     // Register a material model type. Returns the type's dispatch ID.
     MaterialModelID register_material_type(const std::string& slang_type_name,
                                            const std::string& slang_module_path);

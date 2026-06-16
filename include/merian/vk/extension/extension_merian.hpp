@@ -20,16 +20,9 @@ class ExtensionMerian : public ContextExtension {
                                             "synchronization2", // for all kinds of sync
                                         },
                                         {
-                                            "maintenance4",              // for memory allocator
-                                            "samplerAnisotropy",         // for sampler pool
-                                            "storageBuffer16BitAccess",              // for material system
-                                            "uniformAndStorageBuffer16BitAccess",    // for material system
-                                            "shaderInt16",                           // for material system
-                                            "shaderFloat16",                         // for shading (half types)
-                                            "storageBuffer8BitAccess",               // for scene uint8 indices
-                                            "uniformAndStorageBuffer8BitAccess",     // for scene uint8 indices
-                                            "shaderInt8",                            // for scene uint8 indices
-                                            "accelerationStructure",                 // for scene AS
+                                            "maintenance4",      // for memory allocator
+                                            "samplerAnisotropy", // for sampler pool
+                                            "scalarBlockLayout", // for scalar-layout buffers
                                         },
                                         {},
                                         {

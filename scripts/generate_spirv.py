@@ -26,6 +26,7 @@ from vulkan_codegen.spec import (
     build_skiplist,
     get_output_paths,
     is_up_to_date,
+    load_spirv_grammar,
     load_vendor_tags,
     load_vulkan_spec,
 )
@@ -76,9 +77,19 @@ class SpirvCapability:
 
     name: str  # e.g., Geometry
     enables: list[SpirvCapabilityEnable] = field(default_factory=list)
+    aliases: list[str] = field(default_factory=list)  # alternate SPIR-V spellings, same enum value
 
 
 out_path, include_path = get_output_paths()
+
+
+def build_capability_alias_map() -> dict[str, list[str]]:
+    """Map each SPIR-V capability enumerant to its alias spellings, from the SPIR-V grammar."""
+    grammar = load_spirv_grammar()
+    for operand_kind in grammar["operand_kinds"]:
+        if operand_kind["kind"] == "Capability":
+            return {e["enumerant"]: e.get("aliases", []) for e in operand_kind["enumerants"]}
+    return {}
 
 
 def parse_spirv_extensions(xml_root) -> list[SpirvExtension]:
@@ -107,13 +118,14 @@ def parse_spirv_extensions(xml_root) -> list[SpirvExtension]:
 def parse_spirv_capabilities(xml_root) -> list[SpirvCapability]:
     """Parse <spirvcapabilities> section from vk.xml."""
     capabilities = []
+    alias_map = build_capability_alias_map()
 
     for cap_elem in xml_root.findall("spirvcapabilities/spirvcapability"):
         name = cap_elem.get("name")
         if not name:
             continue
 
-        cap = SpirvCapability(name=name)
+        cap = SpirvCapability(name=name, aliases=alias_map.get(name, []))
 
         for enable_elem in cap_elem.findall("enable"):
             enable = SpirvCapabilityEnable(
@@ -489,6 +501,14 @@ def generate_spirv_extension_requirements_impl(
     return lines
 
 
+def capability_names_to_emit(cap: SpirvCapability, canonical_names: set[str]):
+    """The capability name plus any alias spellings that aren't themselves canonical names."""
+    yield cap.name
+    for alias in cap.aliases:
+        if alias not in canonical_names:
+            yield alias
+
+
 def generate_spirv_capabilities_impl(capabilities: list[SpirvCapability]) -> list[str]:
     """Generate get_spirv_capabilities() implementation."""
     lines = [
@@ -496,8 +516,10 @@ def generate_spirv_capabilities_impl(capabilities: list[SpirvCapability]) -> lis
         "    static const std::vector<const char*> capabilities = {",
     ]
 
+    canonical_names = {c.name for c in capabilities}
     for cap in sorted(capabilities, key=lambda c: c.name):
-        lines.append(f'        "{cap.name}",')
+        for name in capability_names_to_emit(cap, canonical_names):
+            lines.append(f'        "{name}",')
 
     lines.extend(
         [
@@ -663,6 +685,7 @@ def generate_is_capability_supported_impl(
 
     # Generate a check function for each capability
     map_entries = []
+    canonical_names = {c.name for c in capabilities}
 
     for cap in sorted(capabilities, key=lambda c: c.name):
         # Skip capabilities with no checkable enables
@@ -671,7 +694,8 @@ def generate_is_capability_supported_impl(
 
         # Sanitize capability name for C++ function
         func_name = f"check_capability_{sanitize_capability_name(cap.name)}"
-        map_entries.append((cap.name, func_name))
+        for name in capability_names_to_emit(cap, canonical_names):
+            map_entries.append((name, func_name))
 
         # Generate function header
         lines.extend([
@@ -761,6 +785,7 @@ def generate_capability_extensions_impl(
         "const std::unordered_map<std::string_view, std::vector<CapExtEntry>> cap_ext_map = {",
     ]
 
+    canonical_names = {c.name for c in capabilities}
     for cap in sorted(capabilities, key=lambda c: c.name):
         entries = []
         extensions_added = set()
@@ -787,7 +812,8 @@ def generate_capability_extensions_impl(
             continue
 
         entry_strs = ", ".join(f"{{{ext}, {ver}}}" for ext, ver in entries)
-        lines.append(f'    {{"{cap.name}", {{{entry_strs}}}}},')
+        for name in capability_names_to_emit(cap, canonical_names):
+            lines.append(f'    {{"{name}", {{{entry_strs}}}}},')
 
     lines.extend(
         [
@@ -827,6 +853,7 @@ def generate_capability_features_impl(
         "const std::unordered_map<std::string_view, std::vector<const char*>> cap_feature_map = {",
     ]
 
+    canonical_names = {c.name for c in capabilities}
     for cap in sorted(capabilities, key=lambda c: c.name):
         feature_enables = [
             e for e in cap.enables if e.feature_struct and e.feature_name
@@ -844,7 +871,8 @@ def generate_capability_features_impl(
             feature_names.append(f'"{enable.feature_name}"')
 
         feature_list = ", ".join(feature_names)
-        lines.append(f'    {{"{cap.name}", {{{feature_list}}}}},')
+        for name in capability_names_to_emit(cap, canonical_names):
+            lines.append(f'    {{"{name}", {{{feature_list}}}}},')
 
     lines.extend(
         [

@@ -13,6 +13,8 @@ project(
 
 # attempt to stick to Vulkan SDK versions (vulkan-sdk-X.X.XXX.X tags and update the version in the wrap file).
 vulkan_target_api_version = '1.4.341'
+# update together with SPIRV-Reflect, SPIRV-headers and shaderc wrap
+spirv_headers_version = 'vulkan-sdk-1.4.321.0'
 
 cmake = import('cmake')
 py = import('python').find_installation('python3')
@@ -197,6 +199,7 @@ foreach script : generator_scripts
         py, meson.current_source_dir() / script,
         env: {
             'VULKAN_SPEC_VERSION': 'v' + vulkan_target_api_version,
+            'SPIRV_HEADERS_VERSION': spirv_headers_version,
             'MERIAN_BUILD_DIR': meson.global_build_root(),
         },
         check: true
@@ -268,10 +271,8 @@ merian_graph_run = executable(
     install: true,
 )
 
-# Let external plugin projects consume merian without vendoring it: dependency('merian') resolves
-# via this pkg-config file (installed, or the uninstalled variant in build/meson-uninstalled for
-# building against the build tree directly). global_args is exported so plugins compile merian's
-# headers with the same defines (Vulkan dynamic dispatch, GLM, feature toggles).
+# Let external plugin projects consume merian without vendoring. Use build/meson-uninstalled for
+# building against the build tree directly.
 pkgconfig = import('pkgconfig')
 pkgconfig.generate(
     libraries: [merian_lib, merian_shaders_lib, merian_graph_lib],
@@ -283,9 +284,7 @@ pkgconfig.generate(
 )
 meson.override_dependency('merian', merian_dep)
 
-# Build any plugin cloned into plugins/. meson only resolves subprojects out of subprojects/, so
-# each plugin is symlinked there; subproject() then builds it and it resolves merian in-tree via the
-# override_dependency above (no PKG_CONFIG_PATH needed).
+# Build any plugin cloned into plugins/.
 plugin_names = run_command(find_program('python3'), '-c', '''
 import os, sys
 root, links = sys.argv[1], sys.argv[2]

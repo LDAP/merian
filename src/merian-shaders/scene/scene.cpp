@@ -3,7 +3,9 @@
 #include "merian/io/image_io.hpp"
 #include "merian/shader/entry_point.hpp"
 #include "merian/shader/slang_program.hpp"
+#include "merian/shader/spriv_reflect.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
+#include "merian/vk/extension/extension.hpp"
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
@@ -59,6 +61,40 @@ Scene::Scene(const ShaderCompileContextHandle& compile_context,
     layout_program = SlangProgram::create(compile_context, composition);
     shader_object = Versioned<ShaderObject>([this] { return build_shader_object(); });
     shader_object.depends_on(layout_program);
+}
+
+DeviceSupportInfo Scene::query_device_support(const DeviceSupportQueryInfo& query_info) {
+    const SpirvReflect transform(merian_transform_vertex_slang_spv(),
+                                 merian_transform_vertex_slang_spv_size());
+    const SpirvReflect transform_prev(merian_transform_prev_vertex_slang_spv(),
+                                      merian_transform_prev_vertex_slang_spv_size());
+    return DeviceSupportInfo::check(query_info, {},
+                                    {"accelerationStructure", "storageBuffer16BitAccess",
+                                     "storageBuffer8BitAccess", "uniformAndStorageBuffer8BitAccess"}) &
+           transform.query_device_support(query_info) &
+           transform_prev.query_device_support(query_info);
+}
+
+SlangCompositionHandle Scene::query_device_support_composition(const DeviceSupportQueryInfo& query_info) {
+    const bool as_supported = query_info.physical_device->get_supported_features()
+                                  .get_acceleration_structure_features_khr()
+                                  .accelerationStructure == VK_TRUE;
+
+    const auto composition = SlangComposition::create();
+    composition->add_composition(MaterialSystem::query_device_support_composition());
+    composition->add_module_from_string(
+        "scene_as_workaround",
+        fmt::format("module scene_as_workaround;\n"
+                    "import merian_shaders.scene.acceleration_structure;\n"
+                    "namespace merian {{ public typealias SceneAccelerationStructure = {}; }}",
+                    as_supported ? "HWAccelerationStructure" : "NullAccelerationStructure"));
+    composition->add_module_from_string(
+        "scene_env_map_workaround",
+        "module scene_env_map_workaround;\n"
+        "import \"merian-shaders/scene/environment-map.slang\";\n"
+        "namespace merian { public typealias SceneEnvMap = merian::EmptyEnv; }");
+    composition->add_module_from_path("merian-shaders/scene/scene.slang");
+    return composition;
 }
 
 void Scene::set_env(EnvMapHandle env) {

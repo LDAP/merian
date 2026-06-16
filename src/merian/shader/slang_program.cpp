@@ -2,6 +2,7 @@
 #include "merian/shader/shader_object.hpp"
 #include "merian/shader/shader_object_layout.hpp"
 #include "merian/shader/slang_utils.hpp"
+#include "merian/shader/spriv_reflect.hpp"
 
 namespace merian {
 
@@ -182,6 +183,13 @@ Versioned<SlangProgram> SlangProgram::create(const ShaderCompileContextHandle& c
     auto comp = SlangComposition::create();
     comp->add_module_from_path(path, with_entry_points);
     return create(compile_context, comp);
+}
+
+DeviceSupportInfo SlangProgram::query_device_support(const DeviceSupportQueryInfo& query_info) {
+    const Slang::ComPtr<slang::IBlob> binary = get_binary();
+    const SpirvReflect reflect(static_cast<const uint32_t*>(binary->getBufferPointer()),
+                               binary->getBufferSize());
+    return reflect.query_device_support(query_info);
 }
 
 } // namespace merian

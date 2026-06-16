@@ -22,7 +22,9 @@ ResourceAllocator::ResourceAllocator(const ContextHandle& context,
     SPDLOG_DEBUG("create ResourceAllocator ({})", fmt::ptr(this));
 
     const uint32_t missing_rgba = merian::uint32_from_rgba(1, 0, 1, 1);
+    const uint32_t black_rgba = merian::uint32_from_rgba(0, 0, 0, 1);
     const std::vector<uint32_t> data = {missing_rgba, missing_rgba, missing_rgba, missing_rgba};
+    const std::vector<uint32_t> checker = {missing_rgba, black_rgba, black_rgba, missing_rgba};
     context->get_queue_GCT()->submit_wait([&](const CommandBufferHandle& cmd) {
         const ImageHandle dummy_storage_image =
             create_image_from_rgba8(cmd, data.data(), 2, 2, vk::ImageUsageFlagBits::eStorage, false,
@@ -31,7 +33,7 @@ ResourceAllocator::ResourceAllocator(const ContextHandle& context,
 
         const auto img_transition = dummy_storage_image->barrier2(vk::ImageLayout::eGeneral);
         dummy_texture = create_texture_from_rgba8(
-            cmd, data.data(), 2, 2, vk::SamplerAddressMode::eRepeat, vk::Filter::eNearest,
+            cmd, checker.data(), 2, 2, vk::SamplerAddressMode::eRepeat, vk::Filter::eNearest,
             vk::Filter::eNearest, true, "ResourceAllocator::dummy_texture");
         const auto tex_transition =
             dummy_texture->get_image()->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal);

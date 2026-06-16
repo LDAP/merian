@@ -26,6 +26,15 @@ TextureManager::TextureManager(const ShaderCompileContextHandle& compile_context
     shader_object.depends_on(layout_program);
 }
 
+SlangCompositionHandle TextureManager::query_device_support_composition() {
+    const auto composition = SlangComposition::create();
+    composition->add_module_from_path("merian-shaders/utils/texture-manager.slang");
+    composition->add_module_from_string(
+        "texture_manager_constants",
+        "namespace merian { export static const int merian_texture_manager_texture_count = 1; }");
+    return composition;
+}
+
 void TextureManager::update_composition_constants() {
     composition->add_module_from_string("texture_manager_constants",
                                         fmt::format("namespace merian {{ export static const int "

@@ -13,8 +13,7 @@ FBXSceneNode::query_device_support([[maybe_unused]] const DeviceSupportQueryInfo
 #ifndef MERIAN_UFBX_ENABLED
     return DeviceSupportInfo{false, "FBX support disabled at compile time (ufbx option)"};
 #else
-    return DeviceSupportInfo::check(query_info, {"accelerationStructure", "scalarBlockLayout",
-                                                 "shaderInt64", "bufferDeviceAddress"});
+    return Scene::query_device_support(query_info);
 #endif
 }
 

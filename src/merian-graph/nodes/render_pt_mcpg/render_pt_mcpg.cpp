@@ -18,7 +18,11 @@ struct PushConstant {
 RenderMCPG::RenderMCPG() = default;
 
 DeviceSupportInfo RenderMCPG::query_device_support(const DeviceSupportQueryInfo& query_info) {
-    return DeviceSupportInfo::check(query_info, {"rayTracingPipeline"}, {"rayQuery"});
+    const auto composition = Scene::query_device_support_composition(query_info);
+    composition->add_module_from_path("merian-graph/nodes/render_pt_mcpg/render_pt_mcpg.slang", true);
+    const auto program = SlangProgram::create(query_info.compile_context, composition);
+    return DeviceSupportInfo::check(query_info, {"rayTracingPipeline"}, {"rayQuery"}) &
+           program.get()->query_device_support(query_info);
 }
 
 void RenderMCPG::initialize(const ContextHandle& context,

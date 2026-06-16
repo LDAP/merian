@@ -442,6 +442,11 @@ class Scene : public std::enable_shared_from_this<Scene> {
 
     virtual ~Scene() = default;
 
+    static DeviceSupportInfo query_device_support(const DeviceSupportQueryInfo& query_info);
+
+    static SlangCompositionHandle
+    query_device_support_composition(const DeviceSupportQueryInfo& query_info);
+
     // ------------------------------
 
     void update(const CommandBufferHandle& cmd, float time, float time_diff, uint32_t frame);
