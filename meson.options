@@ -15,7 +15,7 @@ option(
 option(
     'performance_profiling',
     type: 'boolean',
-    value: false,
+    value: true,
     description: 'Enables profiling within the merian library'
 )
 
