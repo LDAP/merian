@@ -9,7 +9,16 @@ Merian is split into multiple components:
  - [`merian-graph`](https://github.com/LDAP/merian/tree/main/include/merian-graph): Implements an extensible Vulkan processing graph. Already implemented nodes can be found [here](https://github.com/LDAP/merian/tree/main/include/merian-graph/nodes).
  - [`merian-shaders`](https://github.com/LDAP/merian/tree/main/include/merian-shaders): Reusable shader code plus the scene representation, glTF/FBX loaders, material system and texture management.
 
-`merian-graph-run` is a generic executable that loads a processing graph from a JSON file and runs it. It ships with a set of built-in nodes and can be extended with additional node sets and renderers through its [plugin system](#plugins). Current plugins:
+`merian-graph-run` is a generic executable that loads a processing graph from a JSON file and runs it (`merian-graph-run [options] [graph.json [args...]]`; without an argument it starts with an empty graph). Options:
+
+- `--loglevel=<trace|debug|info|warn|error>`: log verbosity.
+- `--plugin-path=<dir>`: extra plugin search directory (repeatable).
+- `--validation=<on|off|ifdebug>`: Vulkan validation layers (default: `ifdebug`).
+- `--merge <file.json>`: deep-merge a JSON file into the config (repeatable, last wins).
+- `--<name> <value>`: set an override declared in the graph's `cli` block (see the per-graph options below).
+- `--help`: with a `graph.json`, also lists that graph's `cli` overrides.
+
+It ships with a set of built-in nodes and can be extended with additional node sets and renderers through its [plugin system](#plugins). Current plugins:
 
 ## Examples
 
@@ -17,7 +26,11 @@ Example graphs for `merian-graph-run` are in the [`examples`](https://github.com
 
 - [`hdr_viewer.json`](https://github.com/LDAP/merian/tree/main/examples/hdr_viewer.json): a tone-mapped HDR image viewer — `merian-graph-run examples/hdr_viewer.json <image.hdr>`.
 - [`shadertoy.json`](https://github.com/LDAP/merian/tree/main/examples/shadertoy.json): runs a Shadertoy-style shader — `merian-graph-run examples/shadertoy.json <shader.glsl>`.
-- [`gltf.json`](https://github.com/LDAP/merian/tree/main/examples/gltf.json) / [`fbx.json`](https://github.com/LDAP/merian/tree/main/examples/fbx.json): a path-traced glTF / FBX scene viewer.
+- [`gltf.json`](https://github.com/LDAP/merian/tree/main/examples/gltf.json) / [`fbx.json`](https://github.com/LDAP/merian/tree/main/examples/fbx.json): a path-traced glTF / FBX scene viewer — `merian-graph-run examples/gltf.json <scene.gltf> [options]`. Options:
+    - `<scene>` (required): path to the glTF / FBX scene to load.
+    - `--env-map <path>`: lat-long HDR environment map (sets the env type to `LatLong`).
+    - `--max-path-length <n>`: maximum path-tracer path length.
+    - `--spp <n>`: samples per pixel.
 
 For using merian as a library in your own project, see [merian-example-sum](https://github.com/LDAP/merian-example-sum) (computing a sum on the GPU) and [merian-quake](https://github.com/LDAP/merian-quake), a path tracer for the original Quake game.
 
@@ -124,7 +137,7 @@ merian = merian_dep
 `merian-graph-run` loads a processing graph from a JSON file and runs it:
 
 ```sh
-merian-graph-run examples/gltf.json
+merian-graph-run examples/gltf.json scene.gltf
 ```
 
 Example graphs are in the [`examples`](https://github.com/LDAP/merian/tree/main/examples) folder. Run without an argument to start with an empty graph (just a window).

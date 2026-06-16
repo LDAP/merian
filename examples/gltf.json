@@ -9,7 +9,8 @@
     },
     "cli": {
         "--": {
-            "pointer": "/nodes/7/properties/file"
+            "pointer": "/nodes/7/properties/file",
+            "required": true
         },
         "env-map": {
             "pointer": "/nodes/7/properties/env/Path",
@@ -181,65 +182,12 @@
                 "scene->render.scene"
             ],
             "properties": {
-                "camera_controller": {
-                    "look sensitivity": 0.001500000013038516,
-                    "move speed": 3.0,
-                    "orbit sensitivity": 0.009999999776482582,
-                    "pan sensitivity": 0.0020000000949949026,
-                    "smoothing": 0.029999999329447746
-                },
                 "env": {
-                    "Path": "/home/lucas/repos/glTF-Sample-Environments/artist_workshop_8k.hdr",
                     "Pitch": 0.0,
-                    "Type": "LatLong",
+                    "Type": "Empty",
                     "Yaw": 0.0
                 },
-                "file": "/home/lucas/repos/glTF-Sample-Assets/Models/ABeautifulGame/glTF/ABeautifulGame.gltf",
-                "scene": {
-                    "cameras": {
-                        "active": 0,
-                        "aspect": 1.7777777910232544,
-                        "f-stop": 0.0,
-                        "far": 1000.0,
-                        "fly": [
-                            0.0,
-                            0.0,
-                            0.0
-                        ],
-                        "focus distance": 1.0,
-                        "fov": 91.49284362792969,
-                        "jitter": "R2",
-                        "move": [
-                            0.0,
-                            0.0,
-                            0.0
-                        ],
-                        "near": 0.009999999776482582,
-                        "orbit": [
-                            0.0,
-                            0.0
-                        ],
-                        "position": [
-                            0.4778292775154114,
-                            0.2042236030101776,
-                            0.47782933712005615
-                        ],
-                        "rotate": [
-                            0.0,
-                            0.0
-                        ],
-                        "target": [
-                            0.04549168050289154,
-                            -0.06280853599309921,
-                            0.04549171030521393
-                        ],
-                        "up": [
-                            0.0,
-                            1.0,
-                            0.0
-                        ]
-                    }
-                },
+                "file": "",
                 "settings": {
                     "Alpha Test Threshold": 0.5,
                     "BLAS Rebuild Fraction": 0.33000001311302185,

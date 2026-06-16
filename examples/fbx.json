@@ -8,7 +8,8 @@
     },
     "cli": {
         "--": {
-            "pointer": "/nodes/5/properties/file"
+            "pointer": "/nodes/5/properties/file",
+            "required": true
         },
         "env-map": {
             "pointer": "/nodes/5/properties/env/Path",
@@ -166,12 +167,7 @@
                     "Type": "Empty",
                     "Yaw": 0.0
                 },
-                "file": "/home/lucas/Downloads/Bistro_v5_2/BistroExterior.fbx",
-                "scene": {
-                    "cameras": {
-                        "active": 0
-                    }
-                },
+                "file": "",
                 "settings": {
                     "Alpha Test Threshold": 0.5,
                     "BLAS Rebuild Fraction": 0.33000001311302185,
@@ -211,16 +207,5 @@
             ]
         }
     ],
-    "profiler": {
-        "evict after ms": 5000,
-        "profiling": true,
-        "report intervall": 50,
-        "run": {
-            "cpu auto": true,
-            "cpu max ms": 86.99615478515625,
-            "gpu auto": true,
-            "gpu max ms": 78.98662567138672
-        }
-    },
     "version": 3
 }
