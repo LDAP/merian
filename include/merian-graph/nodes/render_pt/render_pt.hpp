@@ -4,7 +4,7 @@
 #include "merian-graph/connectors/ptr_in.hpp"
 #include "merian-graph/graph/node.hpp"
 #include "merian-shaders/gbuffer.hpp"
-#include "merian-scene/scene.hpp"
+#include "merian-shaders/scene/scene.hpp"
 
 #include "merian/shader/shader_compile_context.hpp"
 #include "merian/shader/shader_object.hpp"

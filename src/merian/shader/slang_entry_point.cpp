@@ -3,6 +3,8 @@
 #include "merian/shader/slang_global_session.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 
+#include <map>
+
 namespace merian {
 
 static constexpr uint32_t NO_DESCRIPTOR_SET = UINT32_MAX;
@@ -72,12 +74,14 @@ ShaderObjectHandle SlangProgramEntryPoint::create_shader_object_for_parameter(
     return std::make_shared<ShaderObject>(get_object_layout(context, param_name), allocator);
 }
 
-// Recursively assign descriptor sets to nested ParameterBlocks (DFS order, matching Slang's
-// SPIR-V output). ParameterBlocks without bindings are skipped and never build a layout.
+// Recursively collects nested ParameterBlock descriptor sets. Slang numbers register spaces in
+// depth-first order of the ParameterBlocks that own a set, so a counter reproduces the relative
+// numbering; the caller seeds next_set with the scope's reflected base space (see
+// get_pipeline_layout) so the numbers are absolute even across multiple entry points.
 static void collect_nested_parameter_block_layouts(
     const ShaderObjectLayoutHandle& container_layout,
-    PipelineLayoutBuilder& builder,
     uint32_t& next_set,
+    std::map<uint32_t, DescriptorSetLayoutHandle>& set_layouts,
     std::vector<SlangProgramEntryPoint::NestedParameterBlockInfo>& nested_infos) {
     for (uint32_t subobject_range_index = 0;
          subobject_range_index < container_layout->get_subobject_range_count();
@@ -90,11 +94,11 @@ static void collect_nested_parameter_block_layouts(
         uint32_t set_index = NO_DESCRIPTOR_SET;
         if (range.container_layout->has_bindings()) {
             set_index = next_set++;
-            builder.add_descriptor_set_layout(range.container_layout->get_descriptor_set_layout());
+            set_layouts[set_index] = range.container_layout->get_descriptor_set_layout();
         }
 
         SlangProgramEntryPoint::NestedParameterBlockInfo info{subobject_range_index, set_index, {}};
-        collect_nested_parameter_block_layouts(range.container_layout, builder, next_set,
+        collect_nested_parameter_block_layouts(range.container_layout, next_set, set_layouts,
                                                info.children);
         nested_infos.push_back(std::move(info));
     }
@@ -139,23 +143,28 @@ PipelineLayoutHandle SlangProgramEntryPoint::get_pipeline_layout(const ContextHa
     auto* entry_reflection = get_entry_point_reflection();
     PipelineLayoutBuilder builder(context);
 
-    // Set indices are assigned sequentially: global sets first, then ParameterBlock sets in DFS
-    // order. This matches Slang's SPIR-V output.
-    uint32_t next_set = 0;
+    // Descriptor set indices are the register spaces Slang assigned, read from reflection. The
+    // whole program is compiled as one module, so spaces are numbered globally across all entry
+    // points; a sequential counter would only match a single-entry-point program.
+    std::map<uint32_t, DescriptorSetLayoutHandle> set_layouts;
 
     // 1. global scope, treated as one ParameterBlock-like container
+    uint32_t global_base = 0;
     if (auto* global_var_layout = program_layout->getGlobalParamsVarLayout()) {
         if (auto* global_type_layout = global_var_layout->getTypeLayout()) {
             global_object_layout = std::make_shared<ShaderObjectLayout>(
                 context, global_type_layout, program, /*as_scope_container=*/true);
+            global_base = static_cast<uint32_t>(
+                global_var_layout->getOffset(SLANG_PARAMETER_CATEGORY_SUB_ELEMENT_REGISTER_SPACE));
         }
     }
     if (global_object_layout) {
+        uint32_t next_set = global_base;
         if (global_object_layout->has_bindings()) {
             global_set_index = next_set++;
-            builder.add_descriptor_set_layout(global_object_layout->get_descriptor_set_layout());
+            set_layouts[global_set_index] = global_object_layout->get_descriptor_set_layout();
         }
-        collect_nested_parameter_block_layouts(global_object_layout, builder, next_set,
+        collect_nested_parameter_block_layouts(global_object_layout, next_set, set_layouts,
                                                global_nested_parameter_block_infos);
     }
 
@@ -165,7 +174,10 @@ PipelineLayoutHandle SlangProgramEntryPoint::get_pipeline_layout(const ContextHa
         builder.add_push_constant(static_cast<uint32_t>(push_constant_size));
     }
 
-    // 3. entry point ParameterBlock parameters
+    // 3. entry point ParameterBlock parameters, numbered from the entry point's space base. Slang
+    // assigns spaces in DFS order, so a counter seeded at the base reproduces the absolute spaces.
+    uint32_t next_set = static_cast<uint32_t>(entry_reflection->getVarLayout()->getOffset(
+        SLANG_PARAMETER_CATEGORY_SUB_ELEMENT_REGISTER_SPACE));
     for (uint32_t i = 0; i < entry_reflection->getParameterCount(); i++) {
         auto* param = entry_reflection->getParameterByIndex(i);
         if (param->getTypeLayout()->getKind() != slang::TypeReflection::Kind::ParameterBlock) {
@@ -175,13 +187,33 @@ PipelineLayoutHandle SlangProgramEntryPoint::get_pipeline_layout(const ContextHa
         auto& info = find_or_create_param_info(context, param->getName());
         if (info.object_layout->has_bindings()) {
             info.descriptor_set_index = next_set++;
-            builder.add_descriptor_set_layout(info.object_layout->get_descriptor_set_layout());
+            set_layouts[info.descriptor_set_index] =
+                info.object_layout->get_descriptor_set_layout();
         } else {
             info.descriptor_set_index = NO_DESCRIPTOR_SET;
         }
 
-        collect_nested_parameter_block_layouts(info.object_layout, builder, next_set,
+        collect_nested_parameter_block_layouts(info.object_layout, next_set, set_layouts,
                                                info.nested_parameter_block_infos);
+    }
+
+    // Vulkan requires pSetLayouts contiguous up to the highest set the shader uses. Spaces owned
+    // by other entry points fall in the gaps; fill them with one shared empty layout.
+    if (!set_layouts.empty()) {
+        DescriptorSetLayoutHandle empty_layout;
+        const uint32_t max_set = set_layouts.rbegin()->first;
+        for (uint32_t set = 0; set <= max_set; set++) {
+            const auto it = set_layouts.find(set);
+            if (it != set_layouts.end()) {
+                builder.add_descriptor_set_layout(it->second);
+            } else {
+                if (!empty_layout) {
+                    empty_layout = std::make_shared<DescriptorSetLayout>(
+                        context, std::vector<vk::DescriptorSetLayoutBinding>{});
+                }
+                builder.add_descriptor_set_layout(empty_layout);
+            }
+        }
     }
 
     cached_pipeline_layout = builder.build_pipeline_layout();

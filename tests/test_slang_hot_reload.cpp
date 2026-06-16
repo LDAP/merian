@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
-#include "merian-scene/material_system.hpp"
-#include "merian-scene/texture_manager.hpp"
+#include "merian-shaders/shading/materials/material_system.hpp"
+#include "merian-shaders/utils/texture_manager.hpp"
 #include "merian/shader/shader_compile_context.hpp"
 #include "merian/shader/shader_cursor.hpp"
 #include "merian/shader/shader_object_allocator.hpp"

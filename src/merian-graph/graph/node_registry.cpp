@@ -24,6 +24,7 @@
 #include "merian-graph/nodes/reduce/reduce.hpp"
 #include "merian-graph/nodes/render_pt/render_pt.hpp"
 #include "merian-graph/nodes/render_pt_mcpg/render_pt_mcpg.hpp"
+#include "merian-graph/nodes/render_restir_di/render_restir_di.hpp"
 #include "merian-graph/nodes/shadertoy/shadertoy.hpp"
 #include "merian-graph/nodes/svgf/svgf.hpp"
 #include "merian-graph/nodes/swapchain_blit/swapchain_blit.hpp"
@@ -86,6 +87,9 @@ NodeRegistry::NodeRegistry() {
                                    "Path-traced renderer using Markov chain path-guiding.");
     register_node_type<RenderPT>("Render (Path-traced)",
                                  "Path-traced renderer using BSDF-sampling path tracer.");
+    register_node_type<RenderRestirDI>(
+        "Render (ReSTIR DI)",
+        "Screen-space ReSTIR direct illumination with spatiotemporal reservoir reuse.");
     register_node_type<Shadertoy>("Shadertoy",
                                   "Execute Shadertoy-like shaders (Limited implementation).");
     register_node_type<SVGF>("Denoiser (SVGF)", "Spatiotemporal Variance-Guided Filtering.");

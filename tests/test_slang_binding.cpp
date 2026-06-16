@@ -1074,3 +1074,41 @@ TEST_F(SlangBindingTest, FrameCachingReplaysEveryIterationSet) {
         EXPECT_EQ(readback(output_buffer, 3).data[2], iter * 100u) << "iteration " << iter;
     }
 }
+
+// ===========================================================================
+// Multiple entry points — descriptor set indices must match Slang's spaces
+// ===========================================================================
+
+// Regression: the whole program is compiled as one module (getTargetCode), so Slang numbers
+// descriptor-set register spaces globally across all entry points. The SECOND entry point's
+// ParameterBlock therefore does not land at space 0. Binding it via the sequentially-invented
+// set index (next_set++) declares the layout at the wrong set -> the shader reads a set the
+// pipeline layout never declared (VUID ...-layout-07988), or reads the wrong descriptor set.
+TEST_F(SlangBindingTest, SecondEntryPointParameterBlock) {
+    auto program = SlangProgram::create(compile_context, "slang_binding/multi_entry_point.slang");
+
+    // Drive the SECOND entry point, whose ParameterBlock Slang places at register space 1.
+    auto entry_point = SlangProgramEntryPoint::create(program, "mainB");
+    auto pipe_layout = entry_point.get()->get_pipeline_layout(context);
+    auto vulkan_ep = entry_point.get()->specialize();
+    auto pipeline = ComputePipeline::create(pipe_layout, vulkan_ep);
+    auto obj_allocator = std::make_shared<SimpleShaderObjectAllocator>(allocator);
+
+    auto output_buffer = allocator->create_buffer(
+        sizeof(uint32_t),
+        vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
+        MemoryMappingType::HOST_ACCESS_RANDOM, "test_output");
+
+    auto b_obj = entry_point.get()->create_shader_object_for_parameter(context, "b", allocator);
+    auto cursor = b_obj->get_cursor();
+    cursor["y"] = 7.5f;
+    cursor["output"] = output_buffer;
+
+    queue->submit_wait([&](const CommandBufferHandle& cmd) {
+        cmd->bind(pipeline);
+        entry_point.get()->bind("b", b_obj, cmd, pipeline, obj_allocator);
+        cmd->dispatch(1, 1, 1);
+    });
+
+    EXPECT_EQ(readback(output_buffer, 1).data[0], float_bits(7.5f));
+}

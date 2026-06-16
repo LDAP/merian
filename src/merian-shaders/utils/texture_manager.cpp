@@ -1,4 +1,4 @@
-#include "merian-scene/texture_manager.hpp"
+#include "merian-shaders/utils/texture_manager.hpp"
 
 #include "merian/utils/properties.hpp"
 #include "merian/vk/utils/blits.hpp"

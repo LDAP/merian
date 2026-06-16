@@ -1,6 +1,6 @@
 #pragma once
 
-#include "merian-scene/scene.hpp"
+#include "merian-shaders/scene/scene.hpp"
 
 #include <filesystem>
 

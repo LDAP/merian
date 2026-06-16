@@ -29,9 +29,9 @@ if is_msvc
     merian_graph_lib = shared_library('merian-graph',
         objects: merian_graph_objs.extract_all_objects(recursive: false),
         vs_module_defs: merian_graph_def, dependencies: merian_graph_deps,
-        link_with: [merian_lib, merian_scene_lib], install: true)
+        link_with: [merian_lib, merian_shaders_lib], install: true)
 else
     merian_graph_lib = shared_library('merian-graph', merian_graph_src,
         dependencies: merian_graph_deps, include_directories: inc_dirs,
-        link_with: [merian_lib, merian_scene_lib], install: true)
+        link_with: [merian_lib, merian_shaders_lib], install: true)
 endif

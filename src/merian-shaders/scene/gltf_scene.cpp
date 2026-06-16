@@ -1,6 +1,6 @@
-#include "merian-scene/gltf_scene.hpp"
+#include "merian-shaders/scene/gltf_scene.hpp"
 
-#include "merian-scene/gltf_material.hpp"
+#include "merian-shaders/shading/materials/gltf_material.hpp"
 #include "merian/utils/normal_encoding.hpp"
 #include "merian/vk/utils/math.hpp"
 

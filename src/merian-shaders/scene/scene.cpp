@@ -1,4 +1,4 @@
-#include "merian-scene/scene.hpp"
+#include "merian-shaders/scene/scene.hpp"
 
 #include "merian/io/image_io.hpp"
 #include "merian/shader/entry_point.hpp"
