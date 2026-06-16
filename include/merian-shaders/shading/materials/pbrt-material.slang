@@ -14,8 +14,8 @@ import merian_shaders.utils.normal_map;
 
 namespace merian {
 
-// Opaque part: specular reflection over diffuse. Transmissive part: a coupled rough dielectric
-// (TIR-aware). Mixed by the transmission weight.
+// Opaque part: specular reflection over diffuse. Transmissive part: a coupled rough dielectric.
+// Mixed by the transmission weight.
 typealias PBRTOpaqueDielectric = FresnelMixBSDF<SpecularBRDF, LambertDiffuseBRDF>;
 typealias PBRTDielectric = MixBSDF<PBRTOpaqueDielectric, RoughDielectricBSDF>;
 typealias PBRTMetal = ConductorFresnelBSDF<SpecularBRDF>;
@@ -63,19 +63,13 @@ struct PBRTMaterial<let TRANSMISSION : bool = false,
     Conditional<PBRTSheen, SHEEN> sheen;
 
     property Optional<PBRTTransmission> transmission_opt {
-        get {
-            return transmission;
-        }
+        get { return transmission; }
     }
     property Optional<PBRTClearcoat> clearcoat_opt {
-        get {
-            return clearcoat;
-        }
+        get { return clearcoat; }
     }
     property Optional<PBRTSheen> sheen_opt {
-        get {
-            return sheen;
-        }
+        get { return sheen; }
     }
 
     PBRTMaterialSample
@@ -180,9 +174,7 @@ struct PBRTMaterialSample : MaterialSample {
     }
 
     property float3 shading_normal {
-        get {
-            return shading_frame.get_normal();
-        }
+        get { return shading_frame.get_normal(); }
     }
 
     override float get_eta() {
