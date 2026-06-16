@@ -91,7 +91,7 @@ float sheen_directional_albedo(const float ndotv, const float roughness) {
     const float b = roughness < 0.25f ? 44.0f * r2 - 23.7f * roughness + 3.26f
                                       : 1.97f * r2 - 3.27f * roughness + 0.72f;
     const float dg = exp(a * cosv + b) + (roughness < 0.25f ? 0.0f : 0.1f * (roughness - 0.25f));
-    return clamp(dg * MERIAN_INV_PI, 0.f, 1.f);
+    return clamp(dg, 0.f, 1.f);
 }
 
-}
+} // namespace merian

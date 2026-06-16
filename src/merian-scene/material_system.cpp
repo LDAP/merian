@@ -79,54 +79,6 @@ void MaterialSystem::set_min_roughness(const float min_roughness) {
                                                     min_roughness));
 }
 
-void MaterialSystem::set_enable_transmission(const bool enable) {
-    enable_transmission = enable;
-    composition->add_module_from_string("material_system_enable_transmission",
-                                        fmt::format("namespace merian {{ export static const bool "
-                                                    "merian_hint_enable_transmission = {}; }}",
-                                                    enable ? "true" : "false"));
-}
-
-void MaterialSystem::set_enable_volume(const bool enable) {
-    enable_volume = enable;
-    composition->add_module_from_string("material_system_enable_volume",
-                                        fmt::format("namespace merian {{ export static const bool "
-                                                    "merian_hint_enable_volume = {}; }}",
-                                                    enable ? "true" : "false"));
-}
-
-void MaterialSystem::set_enable_clearcoat(const bool enable) {
-    enable_clearcoat = enable;
-    composition->add_module_from_string("material_system_enable_clearcoat",
-                                        fmt::format("namespace merian {{ export static const bool "
-                                                    "merian_hint_enable_clearcoat = {}; }}",
-                                                    enable ? "true" : "false"));
-}
-
-void MaterialSystem::set_enable_sheen(const bool enable) {
-    enable_sheen = enable;
-    composition->add_module_from_string("material_system_enable_sheen",
-                                        fmt::format("namespace merian {{ export static const bool "
-                                                    "merian_hint_enable_sheen = {}; }}",
-                                                    enable ? "true" : "false"));
-}
-
-void MaterialSystem::set_enable_iridescence(const bool enable) {
-    enable_iridescence = enable;
-    composition->add_module_from_string("material_system_enable_iridescence",
-                                        fmt::format("namespace merian {{ export static const bool "
-                                                    "merian_hint_enable_iridescence = {}; }}",
-                                                    enable ? "true" : "false"));
-}
-
-void MaterialSystem::set_enable_anisotropy(const bool enable) {
-    enable_anisotropy = enable;
-    composition->add_module_from_string("material_system_enable_anisotropy",
-                                        fmt::format("namespace merian {{ export static const bool "
-                                                    "merian_hint_enable_anisotropy = {}; }}",
-                                                    enable ? "true" : "false"));
-}
-
 void MaterialSystem::properties(Properties& props) {
     float alpha = alpha_test_threshold;
     if (props.config_float("Alpha Test Threshold", alpha, "", 0.01F)) {
@@ -146,48 +98,6 @@ void MaterialSystem::properties(Properties& props) {
             "Lower bound on roughness, preventing the degenerate zero-roughness lobe", 1e-3F, 0.0F,
             1.0F)) {
         set_min_roughness(roughness);
-    }
-
-    bool transmission = enable_transmission;
-    if (props.config_bool("Enable Transmission", transmission,
-                          "Render refraction through glass and other dielectrics; transmissive "
-                          "materials shade as opaque when off")) {
-        set_enable_transmission(transmission);
-    }
-
-    bool volume = enable_volume;
-    if (props.config_bool("Enable Volume Absorption", volume,
-                          "Tint light by the distance it travels through transmissive media, for "
-                          "coloured glass and liquids")) {
-        set_enable_volume(volume);
-    }
-
-    bool clearcoat = enable_clearcoat;
-    if (props.config_bool("Enable Clearcoat", clearcoat,
-                          "Add a thin glossy dielectric coat over the surface, for car paint, "
-                          "lacquer and similar")) {
-        set_enable_clearcoat(clearcoat);
-    }
-
-    bool sheen = enable_sheen;
-    if (props.config_bool("Enable Sheen", sheen,
-                          "Add a retroreflective microfibre sheen layer over the surface, for "
-                          "cloth, velvet and fabric")) {
-        set_enable_sheen(sheen);
-    }
-
-    bool iridescence = enable_iridescence;
-    if (props.config_bool("Enable Iridescence", iridescence,
-                          "Add thin-film interference to the specular reflection, for soap "
-                          "bubbles, oil films and similar")) {
-        set_enable_iridescence(iridescence);
-    }
-
-    bool anisotropy = enable_anisotropy;
-    if (props.config_bool("Enable Anisotropy", anisotropy,
-                          "Stretch the specular highlight along the surface tangent, for brushed "
-                          "metal and similar")) {
-        set_enable_anisotropy(anisotropy);
     }
 }
 
@@ -311,10 +221,6 @@ void MaterialSystem::clear() {
     host_buffer.clear();
     dirty_begin = UINT32_MAX;
     dirty_end = 0;
-    // Reset the feature toggles so a previous scene's lobes don't stay compiled in.
-    set_enable_transmission(false);
-    set_enable_volume(false);
-    set_enable_clearcoat(false);
     // Keep material_buffer handle and max_payload_size; the next add_material
     // call will repopulate from index 0.
 }

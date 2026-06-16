@@ -76,11 +76,7 @@ FBXScene::FBXScene(const ShaderCompileContextHandle& compile_context,
                    const ContextHandle& context,
                    const ResourceAllocatorHandle& allocator,
                    const MaterialSystemHandle& material_system)
-    : Scene(compile_context, context, allocator, material_system) {
-
-    pbrt_type_id = material_system->register_material_type(PBRT_MATERIAL_SLANG_TYPE_NAME,
-                                                           PBRT_MATERIAL_SLANG_MODULE_PATH);
-}
+    : Scene(compile_context, context, allocator, material_system) {}
 
 FBXScene::~FBXScene() {
     free_scene();
@@ -101,12 +97,10 @@ void FBXScene::load_materials(const CommandBufferHandle& cmd) {
     // Textures upload lazily on first material access.
     texture_slots.assign(scene->textures.count, TextureSlot{});
 
-    // ufbx normalizes every source shader into the same `pbr` map set.
+    // ufbx normalizes every source shader into the same `pbr` map set. Each material registers the
+    // specialized variant for the lobes it carries (deduplicated by the material system).
     material_map.resize(scene->materials.count);
     material_flags.assign(scene->materials.count, MeshFlags::IsOpaque);
-    bool any_transmissive = false;
-    bool any_clearcoat = false;
-    bool any_sheen = false;
     for (size_t i = 0; i < scene->materials.count; i++) {
         const ufbx_material* fmat = scene->materials.data[i];
         const ufbx_material_pbr_maps& pbr = fmat->pbr;
@@ -117,10 +111,8 @@ void FBXScene::load_materials(const CommandBufferHandle& cmd) {
         const bool pbr_shader = fmat->shader_type != UFBX_SHADER_FBX_PHONG &&
                                 fmat->shader_type != UFBX_SHADER_FBX_LAMBERT;
         const float transmission = pbr_shader ? map_real(pbr.transmission_factor, 0.f) : 0.f;
-        any_transmissive |= transmission > 0.f;
 
         PBRTMaterial mat;
-        PBRTMaterialPayload& p = mat.payload;
 
         const auto load = [&](const ufbx_material_map& m, const bool linear) -> TextureID {
             return m.texture != nullptr ? get_or_load_texture(cmd, m.texture, linear)
@@ -128,15 +120,15 @@ void FBXScene::load_materials(const CommandBufferHandle& cmd) {
         };
 
         // base color doubles as the alpha-test source (as in glTF/quake).
-        p.base_color = map_vec3(pbr.base_color, float3(1)) * map_real(pbr.base_factor, 1.f);
-        p.opacity = map_real(pbr.opacity, 1.f);
+        mat.base_color = map_vec3(pbr.base_color, float3(1)) * map_real(pbr.base_factor, 1.f);
+        mat.opacity = map_real(pbr.opacity, 1.f);
         mat.header.alpha_texture_id = load(pbr.base_color, false);
 
         const ufbx_texture* base_tex = pbr.base_color.texture;
         const bool base_has_alpha = base_tex != nullptr &&
                                     base_tex->typed_id < texture_slots.size() &&
                                     texture_slots[base_tex->typed_id].has_alpha;
-        const bool opaque = !base_has_alpha && transmission == 0.f && p.opacity >= 0.999f;
+        const bool opaque = !base_has_alpha && transmission == 0.f && mat.opacity >= 0.999f;
         // Back faces are shaded for alpha-cutout (foliage), explicitly double-sided materials, and
         // glass (so the ray hits the exit interface).
         const bool two_sided = base_has_alpha || transmission > 0.f ||
@@ -145,50 +137,46 @@ void FBXScene::load_materials(const CommandBufferHandle& cmd) {
                             (two_sided ? MeshFlags::TwoSided : MeshFlags::None);
 
         // metalness / roughness (linear scalar maps; the texture replaces the constant)
-        p.metalness_texture = load(pbr.metalness, true);
-        p.metalness = p.metalness_texture != TextureID(-1) ? 1.f : map_real(pbr.metalness, 0.f);
-        p.roughness_texture = load(pbr.roughness, true);
-        p.roughness = p.roughness_texture != TextureID(-1) ? 1.f : map_real(pbr.roughness, 1.f);
+        mat.metalness_texture = load(pbr.metalness, true);
+        mat.metalness = mat.metalness_texture != TextureID(-1) ? 1.f : map_real(pbr.metalness, 0.f);
+        mat.roughness_texture = load(pbr.roughness, true);
+        mat.roughness = mat.roughness_texture != TextureID(-1) ? 1.f : map_real(pbr.roughness, 1.f);
 
         // specular
-        p.specular_weight = map_real(pbr.specular_factor, 1.f);
-        p.specular_ior = map_real(pbr.specular_ior, 1.5f);
+        mat.specular_weight = map_real(pbr.specular_factor, 1.f);
+        mat.specular_ior = map_real(pbr.specular_ior, 1.5f);
 
         // emission (sRGB texture × linear factor)
-        p.emission = map_vec3(pbr.emission_color, float3(0)) * map_real(pbr.emission_factor, 1.f);
-        p.emission_texture = load(pbr.emission_color, false);
+        mat.emission = map_vec3(pbr.emission_color, float3(0)) * map_real(pbr.emission_factor, 1.f);
+        mat.emission_texture = load(pbr.emission_color, false);
 
         // normal map (linear)
-        p.normal_texture = load(pbr.normal_map, true);
+        mat.normal_texture = load(pbr.normal_map, true);
 
-        // clearcoat
-        p.coat_weight = map_real(pbr.coat_factor, 0.f);
-        p.coat_roughness = map_real(pbr.coat_roughness, 0.f);
-        p.coat_ior = map_real(pbr.coat_ior, 1.6f);
-        any_clearcoat |= p.coat_weight > 0.f;
+        if (const float coat_weight = map_real(pbr.coat_factor, 0.f); coat_weight > 0.f) {
+            mat.clearcoat = PBRTClearcoatData{coat_weight, map_real(pbr.coat_roughness, 0.f),
+                                              map_real(pbr.coat_ior, 1.6f)};
+        }
+        if (const float sheen_weight = map_real(pbr.sheen_factor, 0.f); sheen_weight > 0.f) {
+            mat.sheen = PBRTSheenData{sheen_weight, map_vec3(pbr.sheen_color, float3(1)),
+                                      map_real(pbr.sheen_roughness, 0.3f)};
+        }
+        if (transmission > 0.f) {
+            mat.transmission =
+                PBRTTransmissionData{transmission, map_vec3(pbr.transmission_color, float3(1))};
+        }
 
-        // sheen
-        p.sheen_weight = map_real(pbr.sheen_factor, 0.f);
-        p.sheen_color = map_vec3(pbr.sheen_color, float3(1));
-        p.sheen_roughness = map_real(pbr.sheen_roughness, 0.3f);
-        any_sheen |= p.sheen_weight > 0.f;
-
-        // transmission (glass)
-        p.transmission_weight = transmission;
-        p.transmission_color = map_vec3(pbr.transmission_color, float3(1));
-
-        material_map[i] = get_material_system()->add_material(pbrt_type_id, mat);
+        const auto type_id = get_material_system()->register_material_type(
+            mat.variant_type_name(), PBRT_MATERIAL_SLANG_MODULE_PATH);
+        material_map[i] = get_material_system()->add_material(type_id, mat);
     }
 
-    // Enable exactly the lobes this asset uses so the Slang compiler folds out the rest.
-    // set_enable_* is a no-op when the flag is unchanged.
-    get_material_system()->set_enable_transmission(any_transmissive);
-    get_material_system()->set_enable_clearcoat(any_clearcoat);
-    get_material_system()->set_enable_sheen(any_sheen);
-
     // Default material for mesh parts without an assigned material.
-    PBRTMaterial default_mat;
-    default_material_id = get_material_system()->add_material(pbrt_type_id, default_mat);
+    const PBRTMaterial default_mat;
+    default_material_id = get_material_system()->add_material(
+        get_material_system()->register_material_type(default_mat.variant_type_name(),
+                                                      PBRT_MATERIAL_SLANG_MODULE_PATH),
+        default_mat);
 }
 
 TextureID FBXScene::get_or_load_texture(const CommandBufferHandle& cmd,

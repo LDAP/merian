@@ -19,11 +19,7 @@ GLTFScene::GLTFScene(const ShaderCompileContextHandle& compile_context,
                      const ContextHandle& context,
                      const ResourceAllocatorHandle& allocator,
                      const MaterialSystemHandle& material_system)
-    : Scene(compile_context, context, allocator, material_system) {
-
-    gltf_type_id = material_system->register_material_type(GLTF_MATERIAL_SLANG_TYPE_NAME,
-                                                           GLTF_MATERIAL_SLANG_MODULE_PATH);
-}
+    : Scene(compile_context, context, allocator, material_system) {}
 
 GLTFScene::~GLTFScene() = default;
 
@@ -318,14 +314,10 @@ void GLTFScene::load_materials(const CommandBufferHandle& cmd) {
     // Reset slot table; textures upload lazily on first material access.
     texture_slots.assign(model->textures.size(), GltfTextureSlot{});
 
-    // Build materials. get_or_load_texture pulls in only the textures actually referenced.
+    // Build materials. get_or_load_texture pulls in only the textures actually referenced. Each
+    // material registers the specialized variant for the extensions it carries (deduplicated by the
+    // material system), so its payload holds only those features.
     material_map.resize(model->materials.size());
-    bool any_transmissive = false;
-    bool any_volume = false;
-    bool any_clearcoat = false;
-    bool any_sheen = false;
-    bool any_iridescence = false;
-    bool any_anisotropy = false;
     for (size_t i = 0; i < model->materials.size(); i++) {
         const auto& gmat = model->materials[i];
         const auto& pbr = gmat.pbrMetallicRoughness;
@@ -333,7 +325,7 @@ void GLTFScene::load_materials(const CommandBufferHandle& cmd) {
         GltfMaterial mat;
 
         // base color (sRGB texture × linear factor)
-        mat.payload.base_color_factor = float4(
+        mat.base_color_factor = float4(
             static_cast<float>(pbr.baseColorFactor[0]), static_cast<float>(pbr.baseColorFactor[1]),
             static_cast<float>(pbr.baseColorFactor[2]), static_cast<float>(pbr.baseColorFactor[3]));
         if (pbr.baseColorTexture.index >= 0) {
@@ -342,53 +334,55 @@ void GLTFScene::load_materials(const CommandBufferHandle& cmd) {
         }
 
         // metallic-roughness (linear; spec: B=metallic, G=roughness)
-        mat.payload.metallic_factor = static_cast<float>(pbr.metallicFactor);
-        mat.payload.roughness_factor = static_cast<float>(pbr.roughnessFactor);
+        mat.metallic_factor = static_cast<float>(pbr.metallicFactor);
+        mat.roughness_factor = static_cast<float>(pbr.roughnessFactor);
         if (pbr.metallicRoughnessTexture.index >= 0) {
-            mat.payload.metallic_roughness_texture =
+            mat.metallic_roughness_texture =
                 get_or_load_texture(cmd, pbr.metallicRoughnessTexture.index, /*linear=*/true);
         }
 
         // normal map (linear) + scale
         if (gmat.normalTexture.index >= 0) {
-            mat.payload.normal_texture =
+            mat.normal_texture =
                 get_or_load_texture(cmd, gmat.normalTexture.index, /*linear=*/true);
-            mat.payload.normal_scale = static_cast<float>(gmat.normalTexture.scale);
+            mat.normal_scale = static_cast<float>(gmat.normalTexture.scale);
         }
 
         // emissive (sRGB texture × linear factor)
-        mat.payload.emissive_factor = float3(static_cast<float>(gmat.emissiveFactor[0]),
-                                             static_cast<float>(gmat.emissiveFactor[1]),
-                                             static_cast<float>(gmat.emissiveFactor[2]));
+        mat.emissive_factor = float3(static_cast<float>(gmat.emissiveFactor[0]),
+                                     static_cast<float>(gmat.emissiveFactor[1]),
+                                     static_cast<float>(gmat.emissiveFactor[2]));
         if (gmat.emissiveTexture.index >= 0) {
-            mat.payload.emissive_texture =
+            mat.emissive_texture =
                 get_or_load_texture(cmd, gmat.emissiveTexture.index, /*linear=*/false);
         }
 
         // occlusion (linear) + strength
         if (gmat.occlusionTexture.index >= 0) {
-            mat.payload.occlusion_texture =
+            mat.occlusion_texture =
                 get_or_load_texture(cmd, gmat.occlusionTexture.index, /*linear=*/true);
-            mat.payload.occlusion_strength = static_cast<float>(gmat.occlusionTexture.strength);
+            mat.occlusion_strength = static_cast<float>(gmat.occlusionTexture.strength);
         }
 
         // KHR_materials_transmission / _ior / _volume — refractive glass.
         if (const auto it = gmat.extensions.find("KHR_materials_transmission");
             it != gmat.extensions.end() && it->second.Has("transmissionFactor")) {
-            mat.payload.transmission_weight =
+            const float weight =
                 static_cast<float>(it->second.Get("transmissionFactor").GetNumberAsDouble());
-            any_transmissive |= mat.payload.transmission_weight > 0.0f;
+            if (weight > 0.0f) {
+                mat.transmission = GltfTransmissionData{weight};
+            }
         }
         if (const auto it = gmat.extensions.find("KHR_materials_ior");
             it != gmat.extensions.end() && it->second.Has("ior")) {
-            mat.payload.ior = static_cast<float>(it->second.Get("ior").GetNumberAsDouble());
+            mat.ior = static_cast<float>(it->second.Get("ior").GetNumberAsDouble());
         }
         // KHR_materials_volume → Beer-Lambert absorption: sigma_a = -ln(attenuationColor) /
-        // attenuationDistance. thicknessFactor == 0 means thin-walled (no volume), so it only
-        // gates volume vs. thin-walled here. The integrator applies the absorption over the actual
-        // world-space distance the ray travels inside the medium, and attenuationDistance is
-        // world-space, so the absorption needs no node-scale adjustment (unlike a rasterizer that
-        // uses the mesh-local thicknessFactor as the path length).
+        // attenuationDistance. thicknessFactor == 0 means thin-walled (no volume). The integrator
+        // applies the absorption over the actual world-space distance the ray travels inside the
+        // medium, and attenuationDistance is world-space, so the absorption needs no node-scale
+        // adjustment (unlike a rasterizer that uses the mesh-local thicknessFactor as the path
+        // length).
         if (const auto it = gmat.extensions.find("KHR_materials_volume");
             it != gmat.extensions.end()) {
             const tinygltf::Value& ext = it->second;
@@ -410,39 +404,40 @@ void GLTFScene::load_materials(const CommandBufferHandle& cmd) {
                 const auto sigma = [att_dist](float c) {
                     return static_cast<float>(-std::log(std::clamp(c, 1e-4f, 1.0f)) / att_dist);
                 };
-                mat.payload.absorption =
-                    float3(sigma(att_color.x), sigma(att_color.y), sigma(att_color.z));
-                any_volume = true;
+                mat.volume = GltfVolumeData{
+                    float3(sigma(att_color.x), sigma(att_color.y), sigma(att_color.z))};
             }
         }
+
+        const auto ext_texture = [&](const tinygltf::Value& ext, const char* key) -> int {
+            if (ext.Has(key) && ext.Get(key).Has("index")) {
+                return static_cast<int>(ext.Get(key).Get("index").GetNumberAsDouble());
+            }
+            return -1;
+        };
 
         // KHR_materials_clearcoat — thin glossy dielectric coat (textures store R = factor, G =
         // roughness).
         if (const auto it = gmat.extensions.find("KHR_materials_clearcoat");
             it != gmat.extensions.end()) {
             const tinygltf::Value& ext = it->second;
+            GltfClearcoatData coat;
             if (ext.Has("clearcoatFactor")) {
-                mat.payload.clearcoat_weight =
-                    static_cast<float>(ext.Get("clearcoatFactor").GetNumberAsDouble());
+                coat.weight = static_cast<float>(ext.Get("clearcoatFactor").GetNumberAsDouble());
             }
             if (ext.Has("clearcoatRoughnessFactor")) {
-                mat.payload.clearcoat_roughness =
+                coat.roughness =
                     static_cast<float>(ext.Get("clearcoatRoughnessFactor").GetNumberAsDouble());
             }
-            const auto ext_texture = [&](const char* key) -> int {
-                if (ext.Has(key) && ext.Get(key).Has("index")) {
-                    return static_cast<int>(ext.Get(key).Get("index").GetNumberAsDouble());
-                }
-                return -1;
-            };
-            if (const int idx = ext_texture("clearcoatTexture"); idx >= 0) {
-                mat.payload.clearcoat_texture = get_or_load_texture(cmd, idx, /*linear=*/true);
+            if (const int idx = ext_texture(ext, "clearcoatTexture"); idx >= 0) {
+                coat.texture = get_or_load_texture(cmd, idx, /*linear=*/true);
             }
-            if (const int idx = ext_texture("clearcoatRoughnessTexture"); idx >= 0) {
-                mat.payload.clearcoat_roughness_texture =
-                    get_or_load_texture(cmd, idx, /*linear=*/true);
+            if (const int idx = ext_texture(ext, "clearcoatRoughnessTexture"); idx >= 0) {
+                coat.roughness_texture = get_or_load_texture(cmd, idx, /*linear=*/true);
             }
-            any_clearcoat |= mat.payload.clearcoat_weight > 0.0f;
+            if (coat.weight > 0.0f) {
+                mat.clearcoat = coat;
+            }
         }
 
         // KHR_materials_sheen — retroreflective microfibre layer (colour in sRGB, roughness in the
@@ -450,70 +445,58 @@ void GLTFScene::load_materials(const CommandBufferHandle& cmd) {
         if (const auto it = gmat.extensions.find("KHR_materials_sheen");
             it != gmat.extensions.end()) {
             const tinygltf::Value& ext = it->second;
+            GltfSheenData sh;
             if (ext.Has("sheenColorFactor")) {
                 const tinygltf::Value& c = ext.Get("sheenColorFactor");
                 if (c.ArrayLen() >= 3) {
-                    mat.payload.sheen_color =
-                        float3(static_cast<float>(c.Get(0).GetNumberAsDouble()),
-                               static_cast<float>(c.Get(1).GetNumberAsDouble()),
-                               static_cast<float>(c.Get(2).GetNumberAsDouble()));
+                    sh.color = float3(static_cast<float>(c.Get(0).GetNumberAsDouble()),
+                                      static_cast<float>(c.Get(1).GetNumberAsDouble()),
+                                      static_cast<float>(c.Get(2).GetNumberAsDouble()));
                 }
             }
             if (ext.Has("sheenRoughnessFactor")) {
-                mat.payload.sheen_roughness =
+                sh.roughness =
                     static_cast<float>(ext.Get("sheenRoughnessFactor").GetNumberAsDouble());
             }
-            const auto ext_texture = [&](const char* key) -> int {
-                if (ext.Has(key) && ext.Get(key).Has("index")) {
-                    return static_cast<int>(ext.Get(key).Get("index").GetNumberAsDouble());
-                }
-                return -1;
-            };
-            if (const int idx = ext_texture("sheenColorTexture"); idx >= 0) {
-                mat.payload.sheen_color_texture = get_or_load_texture(cmd, idx, /*linear=*/false);
+            if (const int idx = ext_texture(ext, "sheenColorTexture"); idx >= 0) {
+                sh.color_texture = get_or_load_texture(cmd, idx, /*linear=*/false);
             }
-            if (const int idx = ext_texture("sheenRoughnessTexture"); idx >= 0) {
-                mat.payload.sheen_roughness_texture =
-                    get_or_load_texture(cmd, idx, /*linear=*/true);
+            if (const int idx = ext_texture(ext, "sheenRoughnessTexture"); idx >= 0) {
+                sh.roughness_texture = get_or_load_texture(cmd, idx, /*linear=*/true);
             }
-            any_sheen |= mat.payload.sheen_color.r > 0.0f || mat.payload.sheen_color.g > 0.0f ||
-                         mat.payload.sheen_color.b > 0.0f;
+            if (sh.color.r > 0.0f || sh.color.g > 0.0f || sh.color.b > 0.0f) {
+                mat.sheen = sh;
+            }
         }
 
         // KHR_materials_iridescence — thin-film interference on the specular Fresnel.
         if (const auto it = gmat.extensions.find("KHR_materials_iridescence");
             it != gmat.extensions.end()) {
             const tinygltf::Value& ext = it->second;
+            GltfIridescenceData iri;
             if (ext.Has("iridescenceFactor")) {
-                mat.payload.iridescence_factor =
-                    static_cast<float>(ext.Get("iridescenceFactor").GetNumberAsDouble());
+                iri.factor = static_cast<float>(ext.Get("iridescenceFactor").GetNumberAsDouble());
             }
             if (ext.Has("iridescenceIor")) {
-                mat.payload.iridescence_ior =
-                    static_cast<float>(ext.Get("iridescenceIor").GetNumberAsDouble());
+                iri.ior = static_cast<float>(ext.Get("iridescenceIor").GetNumberAsDouble());
             }
             if (ext.Has("iridescenceThicknessMinimum")) {
-                mat.payload.iridescence_thickness_min =
+                iri.thickness_min =
                     static_cast<float>(ext.Get("iridescenceThicknessMinimum").GetNumberAsDouble());
             }
             if (ext.Has("iridescenceThicknessMaximum")) {
-                mat.payload.iridescence_thickness_max =
+                iri.thickness_max =
                     static_cast<float>(ext.Get("iridescenceThicknessMaximum").GetNumberAsDouble());
             }
-            const auto ext_texture = [&](const char* key) -> int {
-                if (ext.Has(key) && ext.Get(key).Has("index")) {
-                    return static_cast<int>(ext.Get(key).Get("index").GetNumberAsDouble());
-                }
-                return -1;
-            };
-            if (const int idx = ext_texture("iridescenceTexture"); idx >= 0) {
-                mat.payload.iridescence_texture = get_or_load_texture(cmd, idx, /*linear=*/true);
+            if (const int idx = ext_texture(ext, "iridescenceTexture"); idx >= 0) {
+                iri.texture = get_or_load_texture(cmd, idx, /*linear=*/true);
             }
-            if (const int idx = ext_texture("iridescenceThicknessTexture"); idx >= 0) {
-                mat.payload.iridescence_thickness_texture =
-                    get_or_load_texture(cmd, idx, /*linear=*/true);
+            if (const int idx = ext_texture(ext, "iridescenceThicknessTexture"); idx >= 0) {
+                iri.thickness_texture = get_or_load_texture(cmd, idx, /*linear=*/true);
             }
-            any_iridescence |= mat.payload.iridescence_factor > 0.0f;
+            if (iri.factor > 0.0f) {
+                mat.iridescence = iri;
+            }
         }
 
         // KHR_materials_anisotropy — direction (texture RG) and strength (texture B) in the
@@ -521,38 +504,34 @@ void GLTFScene::load_materials(const CommandBufferHandle& cmd) {
         if (const auto it = gmat.extensions.find("KHR_materials_anisotropy");
             it != gmat.extensions.end()) {
             const tinygltf::Value& ext = it->second;
+            GltfAnisotropyData aniso;
             if (ext.Has("anisotropyStrength")) {
-                mat.payload.anisotropy_strength =
+                aniso.strength =
                     static_cast<float>(ext.Get("anisotropyStrength").GetNumberAsDouble());
             }
             if (ext.Has("anisotropyRotation")) {
-                mat.payload.anisotropy_rotation =
+                aniso.rotation =
                     static_cast<float>(ext.Get("anisotropyRotation").GetNumberAsDouble());
             }
-            if (ext.Has("anisotropyTexture") && ext.Get("anisotropyTexture").Has("index")) {
-                const int idx =
-                    static_cast<int>(ext.Get("anisotropyTexture").Get("index").GetNumberAsDouble());
-                mat.payload.anisotropy_texture = get_or_load_texture(cmd, idx, /*linear=*/true);
+            if (const int idx = ext_texture(ext, "anisotropyTexture"); idx >= 0) {
+                aniso.texture = get_or_load_texture(cmd, idx, /*linear=*/true);
             }
-            any_anisotropy |= mat.payload.anisotropy_strength > 0.0f;
+            if (aniso.strength > 0.0f) {
+                mat.anisotropy = aniso;
+            }
         }
 
-        material_map[i] = get_material_system()->add_material(gltf_type_id, mat);
+        const auto type_id = get_material_system()->register_material_type(
+            mat.variant_type_name(), GLTF_MATERIAL_SLANG_MODULE_PATH);
+        material_map[i] = get_material_system()->add_material(type_id, mat);
     }
-
-    // Enable exactly the lobes this asset uses: features not needed are disabled so the Slang
-    // compiler folds them out of the BRDF. set_enable_* is a no-op when the flag is unchanged.
-    get_material_system()->set_enable_transmission(any_transmissive);
-    get_material_system()->set_enable_volume(any_volume);
-    get_material_system()->set_enable_clearcoat(any_clearcoat);
-    get_material_system()->set_enable_sheen(any_sheen);
-    get_material_system()->set_enable_iridescence(any_iridescence);
-    get_material_system()->set_enable_anisotropy(any_anisotropy);
 
     // Default material for primitives without one
     if (material_map.empty()) {
-        GltfMaterial default_mat;
-        material_map.push_back(get_material_system()->add_material(gltf_type_id, default_mat));
+        const GltfMaterial default_mat;
+        const auto type_id = get_material_system()->register_material_type(
+            default_mat.variant_type_name(), GLTF_MATERIAL_SLANG_MODULE_PATH);
+        material_map.push_back(get_material_system()->add_material(type_id, default_mat));
     }
 }
 

@@ -73,8 +73,6 @@ class FBXScene : public Scene {
     };
     // One entry per ufbx texture typed_id; populated lazily by get_or_load_texture.
     std::vector<TextureSlot> texture_slots;
-
-    MaterialModelID pbrt_type_id;
 };
 
 using FBXSceneHandle = std::shared_ptr<FBXScene>;

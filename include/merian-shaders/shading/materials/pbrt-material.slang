@@ -1,4 +1,6 @@
-// Layered OpenPBR-style surface. The C++ side mirrors this struct byte-for-byte.
+// Layered OpenPBR-style surface. Generic over the optional lobes it carries; an absent lobe is a
+// Conditional<T, false> member that occupies no payload and folds out of get_sample. The C++ side
+// mirrors the present members byte-for-byte.
 
 import merian_shaders.shading.materials.material;
 import merian_shaders.shading.bsdfs.brdf_ggx;
@@ -22,7 +24,24 @@ typealias PBRTCoated = FresnelMixBSDF<SpecularBRDF, PBRTSubstrate>;
 typealias PBRTWithCoat = MixBSDF<PBRTSubstrate, PBRTCoated>; // by coat weight
 typealias PBRTBSDF = MixBSDF<PBRTWithCoat, SheenBRDF>;       // by sheen weight
 
-struct PBRTMaterial : MaterialModel {
+struct PBRTTransmission {
+    float weight;
+    float3 color;
+};
+struct PBRTClearcoat {
+    float weight;
+    float roughness;
+    float ior;
+};
+struct PBRTSheen {
+    float weight;
+    float3 color;
+    float roughness;
+};
+
+struct PBRTMaterial<let TRANSMISSION : bool = false,
+                    let CLEARCOAT : bool = false,
+                    let SHEEN : bool = false> : MaterialModel {
     typealias MaterialSampleImpl = PBRTMaterialSample;
 
     MaterialHeader header; // alpha_texture_id = base color texture
@@ -34,18 +53,30 @@ struct PBRTMaterial : MaterialModel {
     float specular_ior;
     float3 emission;
     float normal_scale;
-    float coat_weight;
-    float coat_roughness;
-    float coat_ior;
-    float sheen_weight;
-    float3 sheen_color;
-    float sheen_roughness;
-    float transmission_weight;
-    float3 transmission_color;
     TextureID metalness_texture;
     TextureID roughness_texture;
     TextureID emission_texture;
     TextureID normal_texture;
+
+    Conditional<PBRTTransmission, TRANSMISSION> transmission;
+    Conditional<PBRTClearcoat, CLEARCOAT> clearcoat;
+    Conditional<PBRTSheen, SHEEN> sheen;
+
+    property Optional<PBRTTransmission> transmission_opt {
+        get {
+            return transmission;
+        }
+    }
+    property Optional<PBRTClearcoat> clearcoat_opt {
+        get {
+            return clearcoat;
+        }
+    }
+    property Optional<PBRTSheen> sheen_opt {
+        get {
+            return sheen;
+        }
+    }
 
     PBRTMaterialSample
     get_sample(const ShadingData sd, const TextureManager tm, const LODSampler2D lod) {
@@ -91,12 +122,13 @@ struct PBRTMaterial : MaterialModel {
         const float ior_t = (specular_ior - 1.0f) / (specular_ior + 1.0f);
         const float dielectric_f0 = clamp(specular_weight * ior_t * ior_t, 0.0f, 1.0f);
 
-        // When transmission is disabled eta/weight stay neutral and the surface shades as opaque.
         float eta = 1.0f;
         float tw = 0.0f;
-        if (merian_hint_enable_transmission) {
+        float3 transmission_color = float3(1.0f);
+        if (let trans = transmission_opt) {
             eta = sd.ior / (sd.front_facing ? specular_ior : 1.0f);
-            tw = transmission_weight;
+            tw = trans.weight;
+            transmission_color = trans.color;
         }
 
         const PBRTDielectric dielectric = PBRTDielectric(
@@ -105,28 +137,25 @@ struct PBRTMaterial : MaterialModel {
         const PBRTSubstrate substrate =
             PBRTSubstrate(dielectric, PBRTMetal(SpecularBRDF(alpha), base), metal);
 
-        // Dielectric clearcoat over the substrate, gated by the toggle (weight 0 -> coat drops
-        // out).
         float cw = 0.0f;
         float coat_alpha = ggx_roughness_to_alpha(merian_hint_min_roughness);
         float coat_f0 = 0.0f;
-        if (merian_hint_enable_clearcoat) {
-            cw = coat_weight;
-            coat_alpha = ggx_roughness_to_alpha(max(coat_roughness, merian_hint_min_roughness));
-            const float coat_t = (coat_ior - 1.0f) / (coat_ior + 1.0f);
+        if (let coat = clearcoat_opt) {
+            cw = coat.weight;
+            coat_alpha = ggx_roughness_to_alpha(max(coat.roughness, merian_hint_min_roughness));
+            const float coat_t = (coat.ior - 1.0f) / (coat.ior + 1.0f);
             coat_f0 = coat_t * coat_t;
         }
         const PBRTWithCoat with_coat =
             PBRTWithCoat(substrate, PBRTCoated(SpecularBRDF(coat_alpha), substrate, coat_f0), cw);
 
-        // Sheen lobe, gated by the toggle (weight 0 -> sheen drops out).
         float sw = 0.0f;
         float3 sheen_col = float3(0.0f);
         float sheen_rough = 0.0f;
-        if (merian_hint_enable_sheen) {
-            sw = sheen_weight;
-            sheen_col = sheen_color;
-            sheen_rough = sheen_roughness;
+        if (let sh = sheen_opt) {
+            sw = sh.weight;
+            sheen_col = sh.color;
+            sheen_rough = sh.roughness;
         }
 
         PBRTMaterialSample s;

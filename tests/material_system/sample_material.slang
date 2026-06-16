@@ -6,9 +6,7 @@ struct Params {
     uint material_id;
 };
 
-[shader("compute")]
-[numthreads(1, 1, 1)]
-void main(ParameterBlock<Params> params) {
+[shader("compute")][numthreads(1, 1, 1)] void main(ParameterBlock<Params> params) {
     // Get the material via dynamic dispatch
     merian::MaterialModel mat = params.ms.get_material(params.material_id);
 

@@ -1,4 +1,3 @@
-// glTF 2.0 metallic-roughness material model. The C++ side mirrors this struct byte-for-byte.
 
 import merian_shaders.shading.materials.material;
 import merian_shaders.shading.bsdfs.brdf_ggx;
@@ -29,7 +28,45 @@ typealias GltfBSDF = MixBSDF<GltfSheened, GltfCoated>;
 
 static const float GLTF_DIELECTRIC_IOR_F0 = 0.04f; // equals ior = 1.5
 
-struct GltfMaterial : MaterialModel {
+// Optional extension payloads, each gated by a bool generic on GltfMaterial.
+struct GltfTransmission {
+    float weight;
+};
+struct GltfVolume {
+    float3 absorption; // precomputed sigma_a (Beer-Lambert)
+};
+struct GltfClearcoat {
+    float weight;
+    float roughness;
+    TextureID texture;
+    TextureID roughness_texture;
+};
+struct GltfSheen {
+    float3 color;
+    float roughness;
+    TextureID color_texture;
+    TextureID roughness_texture;
+};
+struct GltfIridescence {
+    float factor;
+    float ior;
+    float thickness_min; // nm
+    float thickness_max; // nm
+    TextureID texture;
+    TextureID thickness_texture;
+};
+struct GltfAnisotropy {
+    float strength;
+    float rotation; // radians, counter-clockwise from the tangent
+    TextureID texture;
+};
+
+struct GltfMaterial<let TRANSMISSION : bool = false,
+                    let VOLUME : bool = false,
+                    let CLEARCOAT : bool = false,
+                    let SHEEN : bool = false,
+                    let IRIDESCENCE : bool = false,
+                    let ANISOTROPY : bool = false> : MaterialModel {
     typealias MaterialSampleImpl = GltfMaterialSample;
 
     MaterialHeader header; // alpha_texture_id = baseColor texture
@@ -39,31 +76,49 @@ struct GltfMaterial : MaterialModel {
     float roughness_factor;
     float normal_scale;
     float occlusion_strength;
-    float transmission_weight;
     float ior;
-    float clearcoat_weight;
-    float clearcoat_roughness;
-    float3 absorption; // volume absorption coefficient (sigma_a), precomputed by the loader
-    float3 sheen_color;
-    float sheen_roughness;
-    float iridescence_factor;
-    float iridescence_ior;
-    float iridescence_thickness_min;
-    float iridescence_thickness_max;
-    float anisotropy_strength;
-    float anisotropy_rotation;
     TextureID metallic_roughness_texture;
     TextureID normal_texture;
     TextureID occlusion_texture;
     TextureID emissive_texture;
-    TextureID clearcoat_texture;
-    TextureID clearcoat_roughness_texture;
-    TextureID sheen_color_texture;
-    TextureID sheen_roughness_texture;
-    TextureID iridescence_texture;
-    TextureID iridescence_thickness_texture;
-    TextureID anisotropy_texture;
-    TextureID _pad;
+
+    Conditional<GltfTransmission, TRANSMISSION> transmission;
+    Conditional<GltfVolume, VOLUME> volume;
+    Conditional<GltfClearcoat, CLEARCOAT> clearcoat;
+    Conditional<GltfSheen, SHEEN> sheen;
+    Conditional<GltfIridescence, IRIDESCENCE> iridescence;
+    Conditional<GltfAnisotropy, ANISOTROPY> anisotropy;
+
+    property Optional<GltfTransmission> transmission_opt {
+        get {
+            return transmission;
+        }
+    }
+    property Optional<GltfVolume> volume_opt {
+        get {
+            return volume;
+        }
+    }
+    property Optional<GltfClearcoat> clearcoat_opt {
+        get {
+            return clearcoat;
+        }
+    }
+    property Optional<GltfSheen> sheen_opt {
+        get {
+            return sheen;
+        }
+    }
+    property Optional<GltfIridescence> iridescence_opt {
+        get {
+            return iridescence;
+        }
+    }
+    property Optional<GltfAnisotropy> anisotropy_opt {
+        get {
+            return anisotropy;
+        }
+    }
 
     float get_metallic(const TextureManager tm,
                        const float2 uv,
@@ -123,18 +178,15 @@ struct GltfMaterial : MaterialModel {
             emission *= lod.sample(tm.get_sampler2D(emissive_texture), sd.uv).rgb;
         }
 
-        // occlusion only attenuates ambient/indirect light; not applied in a path tracer.
-
         const float alpha = ggx_roughness_to_alpha(max(roughness, merian_hint_min_roughness));
 
-        // KHR_materials_anisotropy: stretch alpha along the anisotropy direction and rotate the
-        // shading frame so the tangent aligns with it; the bitangent keeps the base roughness.
+        // KHR_materials_anisotropy
         float2 specular_alpha = float2(alpha);
-        if (merian_hint_enable_anisotropy) {
-            float strength = anisotropy_strength;
-            float2 dir = float2(cos(anisotropy_rotation), sin(anisotropy_rotation));
-            if (anisotropy_texture != TextureID(-1)) {
-                const float3 a = lod0.sample(tm.get_sampler2D(anisotropy_texture), sd.uv).rgb;
+        if (let aniso = anisotropy_opt) {
+            float strength = aniso.strength;
+            float2 dir = float2(cos(aniso.rotation), sin(aniso.rotation));
+            if (aniso.texture != TextureID(-1)) {
+                const float3 a = lod0.sample(tm.get_sampler2D(aniso.texture), sd.uv).rgb;
                 const float2 d = normalize(a.xy * 2.0f - 1.0f);
                 dir = float2(dir.x * d.x - dir.y * d.y, dir.x * d.y + dir.y * d.x);
                 strength *= a.b;
@@ -154,76 +206,76 @@ struct GltfMaterial : MaterialModel {
         // relative IOR (incident / transmitted); drives the Fresnel split and the refraction.
         const float eta = sd.ior / (sd.front_facing ? ior : 1.0f);
         float tw = 0.0f;
-        if (merian_hint_enable_transmission) {
-            tw = transmission_weight;
+        if (let trans = transmission_opt) {
+            tw = trans.weight;
         }
 
-        // iridescence strength / film index / thickness, gated by the toggle.
-        float iridescence = 0.0f;
+        float iridescence_factor = 0.0f;
         float iri_ior = 1.0f;
         float iri_thickness = 0.0f;
-        if (merian_hint_enable_iridescence) {
-            iridescence = iridescence_factor;
-            if (iridescence_texture != TextureID(-1)) {
-                iridescence *= lod0.sample(tm.get_sampler2D(iridescence_texture), sd.uv).r;
+        if (let iri = iridescence_opt) {
+            iridescence_factor = iri.factor;
+            if (iri.texture != TextureID(-1)) {
+                iridescence_factor *= lod0.sample(tm.get_sampler2D(iri.texture), sd.uv).r;
             }
-            iri_ior = iridescence_ior;
+            iri_ior = iri.ior;
             // Thickness texture green channel selects between min and max; absent -> max.
             float t = 1.0f;
-            if (iridescence_thickness_texture != TextureID(-1)) {
-                t = lod0.sample(tm.get_sampler2D(iridescence_thickness_texture), sd.uv).g;
+            if (iri.thickness_texture != TextureID(-1)) {
+                t = lod0.sample(tm.get_sampler2D(iri.thickness_texture), sd.uv).g;
             }
-            iri_thickness = lerp(iridescence_thickness_min, iridescence_thickness_max, t);
+            iri_thickness = lerp(iri.thickness_min, iri.thickness_max, t);
         }
 
         // Opaque part: iridescent specular reflection over diffuse. Transmissive part: a coupled
         // rough dielectric whose interface reflectance is iridescent. Mixed by the transmission.
         const GltfOpaqueDielectric opaque_dielectric =
             GltfOpaqueDielectric(SpecularBRDF(specular_alpha), LambertDiffuseBRDF(base.rgb),
-                                 dielectric_f0, eta, iri_ior, iri_thickness, iridescence);
+                                 dielectric_f0, eta, iri_ior, iri_thickness, iridescence_factor);
         const GltfDielectric dielectric = GltfDielectric(
             opaque_dielectric,
             IridescentRoughDielectricBSDF(alpha, eta, base.rgb, float3(dielectric_f0), iri_ior,
-                                          iri_thickness, iridescence),
+                                          iri_thickness, iridescence_factor),
             tw);
         const GltfReflective reflective =
             GltfReflective(dielectric,
                            GltfConductor(SpecularBRDF(specular_alpha), base.rgb, iri_ior,
-                                         iri_thickness, iridescence),
+                                         iri_thickness, iridescence_factor),
                            metallic);
 
-        // Clearcoat weight and roughness, gated by the toggle.
         float coat_weight = 0.0f;
         float coat_alpha = ggx_roughness_to_alpha(merian_hint_min_roughness);
-        if (merian_hint_enable_clearcoat) {
-            coat_weight = clearcoat_weight;
-            if (clearcoat_texture != TextureID(-1)) {
-                coat_weight *= lod0.sample(tm.get_sampler2D(clearcoat_texture), sd.uv).r;
+        if (let coat = clearcoat_opt) {
+            coat_weight = coat.weight;
+            if (coat.texture != TextureID(-1)) {
+                coat_weight *= lod0.sample(tm.get_sampler2D(coat.texture), sd.uv).r;
             }
-            float coat_rough = clearcoat_roughness;
-            if (clearcoat_roughness_texture != TextureID(-1)) {
-                coat_rough *= lod0.sample(tm.get_sampler2D(clearcoat_roughness_texture), sd.uv).g;
+            float coat_rough = coat.roughness;
+            if (coat.roughness_texture != TextureID(-1)) {
+                coat_rough *= lod0.sample(tm.get_sampler2D(coat.roughness_texture), sd.uv).g;
             }
             coat_alpha = ggx_roughness_to_alpha(max(coat_rough, merian_hint_min_roughness));
         }
 
         // volume absorption, entered on a front-face transmission.
         float3 absorb = float3(0.0f);
-        if (merian_hint_enable_volume && sd.front_facing) {
-            absorb = absorption;
+        if (sd.front_facing) {
+            if (let vol = volume_opt) {
+                absorb = vol.absorption;
+            }
         }
 
-        // Sheen colour and roughness, gated by the toggle (colour 0 -> the sheen lobe drops out).
+        // Sheen colour and roughness (colour 0 -> the sheen lobe drops out).
         float3 sheen_col = float3(0.0f);
         float sheen_rough = 0.0f;
-        if (merian_hint_enable_sheen) {
-            sheen_col = sheen_color;
-            if (sheen_color_texture != TextureID(-1)) {
-                sheen_col *= lod.sample(tm.get_sampler2D(sheen_color_texture), sd.uv).rgb;
+        if (let sh = sheen_opt) {
+            sheen_col = sh.color;
+            if (sh.color_texture != TextureID(-1)) {
+                sheen_col *= lod.sample(tm.get_sampler2D(sh.color_texture), sd.uv).rgb;
             }
-            sheen_rough = sheen_roughness;
-            if (sheen_roughness_texture != TextureID(-1)) {
-                sheen_rough *= lod0.sample(tm.get_sampler2D(sheen_roughness_texture), sd.uv).a;
+            sheen_rough = sh.roughness;
+            if (sh.roughness_texture != TextureID(-1)) {
+                sheen_rough *= lod0.sample(tm.get_sampler2D(sh.roughness_texture), sd.uv).a;
             }
         }
         const float max_sheen = max(sheen_col.r, max(sheen_col.g, sheen_col.b));

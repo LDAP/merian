@@ -21,29 +21,6 @@ extern static const bool merian_hint_clamp_normals = true;
 // Lower bound on perceptual roughness, avoiding the degenerate zero-roughness GGX lobe.
 extern static const float merian_hint_min_roughness = 0.0316f;
 
-// Enables the dielectric transmission lobe; transmissive materials shade as opaque when false.
-// Set via MaterialSystem.
-extern static const bool merian_hint_enable_transmission = false;
-
-// Enables volume absorption inside transmissive media (coloured glass). Set via MaterialSystem.
-extern static const bool merian_hint_enable_volume = false;
-
-// Enables the clearcoat layer (a thin glossy dielectric coat over the surface). Set via
-// MaterialSystem.
-extern static const bool merian_hint_enable_clearcoat = false;
-
-// Enables the sheen layer (a retroreflective microfibre coat, for cloth and fabric). Set via
-// MaterialSystem.
-extern static const bool merian_hint_enable_sheen = false;
-
-// Enables thin-film iridescence on the specular Fresnel (soap bubbles, oil films). Set via
-// MaterialSystem.
-extern static const bool merian_hint_enable_iridescence = false;
-
-// Enables anisotropic specular roughness along the (rotated) tangent (brushed metal). Set via
-// MaterialSystem.
-extern static const bool merian_hint_enable_anisotropy = false;
-
 // This represents the definition of the material (before being evaluated at a shading point), e.g.
 // Disney, glTF.
 //

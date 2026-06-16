@@ -83,8 +83,6 @@ class GLTFScene : public Scene {
     // One entry per glTF texture index; populated lazily by get_or_load_texture.
     std::vector<GltfTextureSlot> texture_slots;
 
-    MaterialModelID gltf_type_id;
-
     bool force_mipmaps_color = true;
 };
 
