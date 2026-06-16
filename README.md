@@ -11,8 +11,6 @@ Merian is split into multiple components:
 
 `merian-graph-run` is a generic executable that loads a processing graph from a JSON file and runs it. It ships with a set of built-in nodes and can be extended with additional node sets and renderers through its [plugin system](#plugins). Current plugins:
 
- - [merian-quake](https://github.com/LDAP/merian-quake): A path tracer for the original Quake game.
-
 ## Examples
 
 Example graphs for `merian-graph-run` are in the [`examples`](https://github.com/LDAP/merian/tree/main/examples) folder:
@@ -21,9 +19,15 @@ Example graphs for `merian-graph-run` are in the [`examples`](https://github.com
 - [`shadertoy.json`](https://github.com/LDAP/merian/tree/main/examples/shadertoy.json): runs a Shadertoy-style shader — `merian-graph-run examples/shadertoy.json <shader.glsl>`.
 - [`gltf.json`](https://github.com/LDAP/merian/tree/main/examples/gltf.json) / [`fbx.json`](https://github.com/LDAP/merian/tree/main/examples/fbx.json): a path-traced glTF / FBX scene viewer.
 
-For using merian as a library in your own project, see [merian-example-sum](https://github.com/LDAP/merian-example-sum) (computing a sum on the GPU).
+For using merian as a library in your own project, see [merian-example-sum](https://github.com/LDAP/merian-example-sum) (computing a sum on the GPU) and [merian-quake](https://github.com/LDAP/merian-quake), a path tracer for the original Quake game.
 
 Merian aims for compatibility with Windows, Linux as well as all major GPU vendors.
+
+
+<p align="left">
+  <img src="images/ABeautifulGame.png" width="650" />
+</p>
+
 
 ## Getting started
 
