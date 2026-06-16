@@ -279,7 +279,7 @@ pkgconfig.generate(
     filebase: 'merian',
     description: 'Merian Vulkan development framework',
     extra_cflags: global_args,
-    requires: [vulkan, glm, fmt, spdlog, nlohmann_json],
+    requires: [vulkan, fmt, spdlog, nlohmann_json],
 )
 meson.override_dependency('merian', merian_dep)
 
