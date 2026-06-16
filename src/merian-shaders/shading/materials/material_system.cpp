@@ -104,8 +104,8 @@ void MaterialSystem::properties(Properties& props) {
 ShaderObjectHandle MaterialSystem::build_shader_object() const {
     SPDLOG_DEBUG("recreate shader object");
 
-    const ShaderObjectHandle object = layout_program.get()->create_shader_object_for_type(
-        context, "merian::MaterialSystem", allocator);
+    const ShaderObjectHandle object =
+        layout_program->create_shader_object_for_type(context, "merian::MaterialSystem", allocator);
     auto cursor = object->get_cursor();
     cursor["texture_manager"] = texture_manager->get_shader_object();
     if (material_buffer) {
@@ -258,7 +258,7 @@ void MaterialSystem::update(const CommandBufferHandle& cmd) {
         vk::PipelineStageFlagBits2::eTransfer, vk::PipelineStageFlagBits2::eAllCommands,
         vk::AccessFlagBits2::eTransferWrite, vk::AccessFlagBits2::eShaderRead));
 
-    auto cursor = shader_object.get()->get_cursor();
+    auto cursor = shader_object->get_cursor();
     cursor["material_count"] = static_cast<uint32_t>(materials.size());
     cursor["materials"] = material_buffer;
 

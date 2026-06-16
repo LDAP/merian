@@ -1,5 +1,6 @@
 /build
 **/.cache
+**/.merian-cache
 *.sublime-workspace
 
 /subprojects/*

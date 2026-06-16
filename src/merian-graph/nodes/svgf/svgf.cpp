@@ -27,9 +27,9 @@ DeviceSupportInfo SVGF::query_device_support(const DeviceSupportQueryInfo& query
     auto taa_program = SlangProgramEntryPoint::create(compilation_ctx, "svgf_taa.slang");
 
     // Get SPIR-V binaries and reflect to determine requirements
-    auto filter_binary = filter_program.get()->get_program()->get_binary();
-    auto variance_binary = variance_program.get()->get_program()->get_binary();
-    auto taa_binary = taa_program.get()->get_program()->get_binary();
+    auto filter_binary = filter_program->get_program()->get_binary();
+    auto variance_binary = variance_program->get_program()->get_binary();
+    auto taa_binary = taa_program->get_program()->get_binary();
 
     SpirvReflect filter_reflect(static_cast<const uint32_t*>(filter_binary->getBufferPointer()),
                                 filter_binary->getBufferSize());

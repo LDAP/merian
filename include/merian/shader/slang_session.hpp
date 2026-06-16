@@ -9,7 +9,10 @@
 
 #include "slang-com-ptr.h"
 #include "slang.h"
+#include <filesystem>
+#include <optional>
 #include <ranges>
+#include <string_view>
 
 namespace merian {
 
@@ -175,10 +178,37 @@ class SlangSession {
                             const std::string& source,
                             const std::optional<std::filesystem::path>& path) {
         Slang::ComPtr<slang::IBlob> diagnostics_blob;
+
+        const std::string path_str = path ? path->string() : std::string{};
+        const char* path_cstr = path ? path_str.c_str() : nullptr;
+
+        const std::optional<std::filesystem::path> ir_path =
+            cache_enabled()
+                ? std::optional{cache_dir("slang-ir") /
+                                fmt::format("{:016x}.slang-mod", ir_cache_key(name, source, path))}
+                : std::nullopt;
+
+        // 1. try the serialized IR cache
+        if (ir_path) {
+            if (Slang::ComPtr<slang::IBlob> ir = cache_read(*ir_path)) {
+                // path-based modules are re-validated against their (transitive) sources; source
+                // string modules rely solely on the content hash in the key.
+                if (!path || session->isBinaryModuleUpToDate(path_cstr, ir)) {
+                    Slang::ComPtr<slang::IModule> module;
+                    module = session->loadModuleFromIRBlob(name.c_str(), path_cstr, ir,
+                                                           diagnostics_blob.writeRef());
+                    if (module != nullptr) {
+                        SPDLOG_DEBUG("Slang IR cache hit: {}", name);
+                        return module;
+                    }
+                }
+            }
+        }
+
+        // 2. compile from source
         Slang::ComPtr<slang::IModule> module;
-        module = session->loadModuleFromSourceString(name.c_str(),
-                                                     path ? path->string().c_str() : nullptr,
-                                                     source.c_str(), diagnostics_blob.writeRef());
+        module = session->loadModuleFromSourceString(name.c_str(), path_cstr, source.c_str(),
+                                                     diagnostics_blob.writeRef());
 
         if (module == nullptr) {
             throw ShaderCompiler::compilation_failed(diagnostics_as_string(diagnostics_blob));
@@ -188,6 +218,14 @@ class SlangSession {
             SPDLOG_DEBUG("Slang compiling module {} ({}). Diagnostics: {}", name,
                          path.has_value() ? path->string() : "no path",
                          diagnostics_as_string(diagnostics_blob));
+        }
+
+        // 3. store the serialized IR for next launch
+        if (ir_path) {
+            Slang::ComPtr<slang::IBlob> ir;
+            if (SLANG_SUCCEEDED(module->serialize(ir.writeRef())) && ir != nullptr) {
+                cache_write(*ir_path, ir->getBufferPointer(), ir->getBufferSize());
+            }
         }
 
         return module;
@@ -447,6 +485,15 @@ class SlangSession {
     static Slang::ComPtr<slang::IBlob>
     compile(const Slang::ComPtr<slang::IComponentType>& linked_programm,
             const uint32_t entrypoint_index) {
+        const std::optional<std::filesystem::path> spv_path =
+            spirv_cache_path(linked_programm, entrypoint_index);
+        if (spv_path) {
+            if (Slang::ComPtr<slang::IBlob> cached = cache_read(*spv_path)) {
+                SPDLOG_DEBUG("Slang SPIR-V cache hit");
+                return cached;
+            }
+        }
+
         Slang::ComPtr<slang::IBlob> compiled;
         Slang::ComPtr<slang::IBlob> diagnostics_blob;
 
@@ -464,6 +511,10 @@ class SlangSession {
                          diagnostics_as_string(diagnostics_blob));
         }
 
+        if (spv_path) {
+            cache_write(*spv_path, compiled->getBufferPointer(), compiled->getBufferSize());
+        }
+
         return compiled;
     }
 
@@ -471,6 +522,14 @@ class SlangSession {
     // compile all entrypoints in the linked composite.
     static Slang::ComPtr<slang::IBlob>
     compile(const Slang::ComPtr<slang::IComponentType>& linked_programm) {
+        const std::optional<std::filesystem::path> spv_path = spirv_cache_path(linked_programm);
+        if (spv_path) {
+            if (Slang::ComPtr<slang::IBlob> cached = cache_read(*spv_path)) {
+                SPDLOG_DEBUG("Slang SPIR-V cache hit");
+                return cached;
+            }
+        }
+
         Slang::ComPtr<slang::IBlob> compiled;
         Slang::ComPtr<slang::IBlob> diagnostics_blob;
 
@@ -485,6 +544,10 @@ class SlangSession {
         if (diagnostics_blob != nullptr) {
             SPDLOG_DEBUG("Slang compiling. Diagnostics: {}",
                          diagnostics_as_string(diagnostics_blob));
+        }
+
+        if (spv_path) {
+            cache_write(*spv_path, compiled->getBufferPointer(), compiled->getBufferSize());
         }
 
         return compiled;
@@ -611,6 +674,9 @@ class SlangSession {
   public:
     static SlangSessionHandle create(const ShaderCompileContextHandle& shader_compile_context);
 
+    // Runs the on-disk cache size-cap eviction (see cache_evict).
+    ~SlangSession();
+
   private:
     static std::string diagnostics_as_string(Slang::ComPtr<slang::IBlob>& diagnostics_blob) {
         if (diagnostics_blob == nullptr) {
@@ -618,6 +684,31 @@ class SlangSession {
         }
         return (const char*)diagnostics_blob->getBufferPointer();
     }
+
+    // --- on-disk shader cache (serialized IR modules + SPIR-V) ---
+
+    // MERIAN_SHADER_CACHE != "0".
+    static bool cache_enabled();
+    // MERIAN_SHADER_CACHE_DIR, else <cwd>/.merian-cache.
+    static const std::filesystem::path& cache_root();
+    // <root>/<slang-build-tag>/<subdir>; the build-tag level isolates Slang versions.
+    static std::filesystem::path cache_dir(std::string_view subdir);
+    // File -> owning blob (nullptr if absent/unreadable); touches mtime on a hit.
+    static Slang::ComPtr<slang::IBlob> cache_read(const std::filesystem::path& path);
+    // Atomic write (temp + rename), best-effort.
+    static void cache_write(const std::filesystem::path& path, const void* data, size_t size);
+    // LRU size-cap sweep (MERIAN_SHADER_CACHE_MAX_MB, default 128, 0 = unbounded).
+    static void cache_evict();
+
+    uint64_t ir_cache_key(const std::string& name,
+                          const std::string& source,
+                          const std::optional<std::filesystem::path>& path) const;
+    // Slang's own backend cache key (getEntryPointHash) as a hex filename, or nullopt to skip.
+    static std::optional<std::filesystem::path>
+    spirv_cache_path(const Slang::ComPtr<slang::IComponentType>& program);
+    static std::optional<std::filesystem::path>
+    spirv_cache_path(const Slang::ComPtr<slang::IComponentType>& program,
+                     uint32_t entry_point_index);
 
   private:
     const ShaderCompileContextHandle shader_compile_context;

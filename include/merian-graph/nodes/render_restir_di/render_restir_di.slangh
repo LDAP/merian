@@ -15,9 +15,7 @@ import merian_shaders.colors.colorspaces;
 namespace merian {
 
 enum RestirSampleFlags : uint32_t {
-    // The reservoir holds a usable light sample.
     RestirSampleValid = 0x1,
-    // The sample is at (effectively) infinite distance (env map); use the solid-angle measure.
     RestirSampleDistant = 0x2,
 };
 
@@ -27,27 +25,22 @@ enum RestirBiasCorrection : int32_t {
     RestirBiasRaytraced = 2,
 };
 
-// Packed bits in RestirPushConstant.flags.
-enum RestirFlags : uint32_t {
-    RestirFlagTemporalEnable = 0x1,
-    RestirFlagApplyMotion = 0x2,
-    RestirFlagVisibilityShade = 0x4,
-};
-
 struct RestirSample {
-    float3 pos;      // world-space light position (or a far point along the direction for distant)
-    float3 normal;   // world-space light surface normal
-    float3 radiance; // emitted radiance toward the shading point
-    float3 mv;       // light-point velocity (world units / second), for motion extrapolation
-    float time;      // scene time the sample was created at
-    uint32_t flags;  // RestirSampleFlags
+    float3 pos;
+    float3 normal;
+    float3 radiance;
+    float3 mv;
+    float time;
+    uint32_t flags;
 };
 
 struct RestirReservoir {
-    uint32_t M;       // number of candidates that streamed through the reservoir
-    float w_sum_or_W; // RIS weight sum before finalize; the resampling weight W afterwards
-    float p_target;   // target function at the selected sample
-    RestirSample y;   // selected sample
+    uint32_t M;       // number of samples that went into the reservoir
+    float w_sum_or_W; // sum of RIS weights (w_i = p_target / p_sample), or the reservoir weight W
+                      // (eq. 6) after resampling
+    float p_target;   // target function for the current sample (not really a PDF)
+    RestirSample y;   // current sample
+    // one-sample estimator: <L> = (f(y) / p_target) * (w_sum_or_W / M)
 };
 
 #ifdef __cplusplus
@@ -63,30 +56,18 @@ struct RestirPushConstant {
 
     uint32_t frame;
     uint32_t seed;
-    uint32_t pass; // RNG salt so the passes draw independent streams
-    int32_t spp;
-
-    int32_t temporal_bias_correction;
-    int32_t spatial_bias_correction;
+    uint32_t pass;
     int32_t temporal_clamp_m;
-    int32_t spatial_radius;
 
-    int32_t spatial_iterations;
+    int32_t spatial_radius;
     float temporal_normal_reject_cos;
     float temporal_depth_reject;
     float spatial_normal_reject_cos;
 
     float spatial_depth_reject;
-    float boiling_filter_strength;
-    uint32_t flags; // RestirFlags
 };
 
 #ifndef __cplusplus
-
-// --- Reservoir ---
-// Weighted reservoir sampling matching NVIDIA RTXDI (DIReservoir.hlsli): StreamSample,
-// CombineDIReservoirs, FinalizeResampling. w_sum_or_W carries the RIS weight sum while resampling
-// and the resampling weight W (Bitterli et al. 2020, eq. 6) after finalize().
 
 RestirSample restir_sample_init() {
     RestirSample y;
@@ -113,7 +94,7 @@ bool restir_sample_valid(const RestirSample y) {
 }
 
 extension RestirReservoir {
-    // Streams a fresh candidate (RIS update). p_sample is the source pdf (after MIS, if any).
+    // Add a sample. p_sample can also be the effective PDF after MIS (ReSTIR DI, p. 3).
     [mutating]
     bool add_sample(inout RandomGenerator rng,
                     const RestirSample x,
@@ -122,6 +103,8 @@ extension RestirReservoir {
         const float ris_weight = p_target / p_sample;
         M += 1;
         w_sum_or_W += ris_weight;
+        // Weighted Reservoir Sampling (Chao 1982): select x_i with probability w_i / sum(w_i),
+        // storing only the current sample.
         if (rng.next_float() * w_sum_or_W < ris_weight) {
             this.p_target = p_target;
             y = x;
@@ -130,8 +113,9 @@ extension RestirReservoir {
         return false;
     }
 
-    // Merges an already finalized reservoir (w_sum_or_W holds W). p_target_xy is this domain's
-    // target function evaluated at the other reservoir's sample (reweighting across domains).
+    // Combine an already finalized reservoir (w_sum_or_W holds W). p_target_xy is this pixel's
+    // target evaluated at the other reservoir's sample; reweighting is needed because each pixel
+    // uses a different target distribution.
     [mutating]
     bool combine(inout RandomGenerator rng,
                  const RestirReservoir other,
@@ -147,15 +131,14 @@ extension RestirReservoir {
         return false;
     }
 
-    // W = w_sum / (M * p_target).
+    // Normalize after resampling; w_sum_or_W then holds W (eq. 6).
     [mutating]
     void finalize() {
         const float denominator = M * p_target;
         w_sum_or_W = denominator > 0 ? w_sum_or_W / denominator : 0;
     }
 
-    // W = w_sum * numerator / (p_target * denominator); numerator/denominator carry the Talbot MIS
-    // terms for bias correction.
+    // Normalize with explicit MIS terms (numerator/denominator) for bias correction.
     [mutating]
     void finalize(const float numerator, const float denominator) {
         const float d = p_target * denominator;
@@ -170,18 +153,15 @@ extension RestirReservoir {
     }
 }
 
-// --- Surfaces and target function ---
-
 struct RestirBinding {
     ParameterBlock<GBuffer> gbuffer;
     ParameterBlock<GBuffer> prev_gbuffer;
     RWTexture2D<float4> irradiance;
 };
 
-// The primary surface seen through a pixel, rebuilt from the GBuffer hit without re-tracing.
 struct RestirSurface {
     ShadingPoint sp;
-    float3 wi; // direction toward the camera (world space)
+    float3 wi;
     bool valid;
 };
 
@@ -201,8 +181,6 @@ RestirSurface restir_surface(const ParameterBlock<Scene> scene,
     return s;
 }
 
-// Unshadowed target function: luminance of the BSDF response toward the light times the geometry
-// term. Area measure for local lights, solid-angle measure for distant (env) samples.
 float restir_target_pdf(const RestirSample y,
                         const RestirSurface surface,
                         inout RandomGenerator rng) {
@@ -229,8 +207,6 @@ float restir_target_pdf(const RestirSample y,
     return geo * yuv_luminance(f_cos * y.radiance);
 }
 
-// Geometry term that converts the BSDF solid-angle pdf to the target's measure during candidate
-// generation, so the source pdf and target share a measure.
 float restir_geometry_term(const RestirSample y, const float3 surface_pos) {
     if ((y.flags & RestirSampleFlags::RestirSampleDistant) != 0)
         return 1.0f;
@@ -253,7 +229,6 @@ bool restir_trace_visibility(const ParameterBlock<Scene> scene,
     ray.Origin = surface.sp.pos + (dot(dir, ng) < 0 ? -ng : ng) * SCENE_RAY_OFFSET;
     ray.Direction = dir;
     ray.TMin = SCENE_RAY_TMIN;
-    // stop short of the light for local samples, go all the way for distant ones
     ray.TMax = (y.flags & RestirSampleFlags::RestirSampleDistant) != 0 ? SCENE_RAY_TMAX
                                                                        : dist * (1.0f - 1e-2f);
     return scene.trace_visibility_ray(ray, RAY_FLAG_NONE, 0xff);
@@ -267,7 +242,6 @@ bool restir_is_distant(const ParameterBlock<Scene> scene, const Hit hit) {
     return false;
 }
 
-// Discards reservoirs that dominate their subgroup, to suppress temporal boiling.
 void restir_boiling_filter(inout RestirReservoir reservoir, const float strength) {
     const float multiplier = 10.0f / strength - 9.0f;
     const float wave_sum = WaveActiveSum(reservoir.w_sum_or_W);
@@ -277,9 +251,9 @@ void restir_boiling_filter(inout RestirReservoir reservoir, const float strength
         reservoir.discard();
 }
 
-#endif // !__cplusplus
+#endif
 
-} // namespace merian
+}
 
 #ifndef __cplusplus
 
@@ -296,4 +270,4 @@ uint restir_index(const uint2 pixel, const uint2 dim) {
     return pixel.y * dim.x + pixel.x;
 }
 
-#endif // !__cplusplus
+#endif

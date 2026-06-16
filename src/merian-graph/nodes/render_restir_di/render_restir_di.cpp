@@ -1,17 +1,18 @@
 #include "merian-graph/nodes/render_restir_di/render_restir_di.hpp"
 
 #include "merian-graph/nodes/render_restir_di/render_restir_di.slangh"
+#include "merian/shader/shader_compile_context.hpp"
 #include "merian/vk/pipeline/pipeline_ray_tracing_builder.hpp"
+
+#include <fmt/format.h>
 
 namespace merian {
 
 namespace {
-constexpr std::array<const char*, RenderRestirDI::PassCount> PASS_MODULES = {
-    "merian-graph/nodes/render_restir_di/generate.slang",
-    "merian-graph/nodes/render_restir_di/temporal.slang",
-    "merian-graph/nodes/render_restir_di/spatial.slang",
-    "merian-graph/nodes/render_restir_di/shade.slang"};
-} // namespace
+constexpr const char* SHADER_MODULE = "merian-graph/nodes/render_restir_di/render_restir_di.slang";
+constexpr std::array<const char*, RenderRestirDI::PassCount> PASS_ENTRY_POINTS = {
+    "generate", "temporal", "spatial", "shade"};
+}
 
 RenderRestirDI::RenderRestirDI() = default;
 
@@ -27,11 +28,29 @@ void RenderRestirDI::initialize(const ContextHandle& context,
 }
 
 vk::BufferCreateInfo RenderRestirDI::reservoir_buffer_create_info() const {
-    return vk::BufferCreateInfo{{},
-                                vk::DeviceSize(extent.width) * extent.height * sizeof(RestirReservoir),
-                                vk::BufferUsageFlagBits::eStorageBuffer |
-                                    vk::BufferUsageFlagBits::eShaderDeviceAddress |
-                                    vk::BufferUsageFlagBits::eTransferDst};
+    return vk::BufferCreateInfo{
+        {},
+        vk::DeviceSize(extent.width) * extent.height * sizeof(RestirReservoir),
+        vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress |
+            vk::BufferUsageFlagBits::eTransferDst};
+}
+
+void RenderRestirDI::update_render_constants() {
+    composition->add_module_from_string(
+        "render_restir_di_constants",
+        fmt::format("namespace merian {{\n"
+                    "export static const bool merian_render_emission_on_primary = {};\n"
+                    "export static const int merian_restir_spp = {};\n"
+                    "export static const int merian_restir_spatial_iterations = {};\n"
+                    "export static const int merian_restir_temporal_bias_correction = {};\n"
+                    "export static const int merian_restir_spatial_bias_correction = {};\n"
+                    "export static const bool merian_restir_apply_motion = {};\n"
+                    "export static const bool merian_restir_visibility_shade = {};\n"
+                    "export static const float merian_restir_boiling_filter_strength = {:f};\n"
+                    "}}",
+                    emission_on_primary ? "true" : "false", spp, spatial_iterations,
+                    temporal_bias_correction, spatial_bias_correction, apply_mv ? "true" : "false",
+                    visibility_shade ? "true" : "false", boiling_filter_strength));
 }
 
 std::vector<InputConnectorDescriptor> RenderRestirDI::describe_inputs() {
@@ -48,15 +67,26 @@ RenderRestirDI::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout)
     return {{"irradiance", con_irradiance}, {"reservoirs", con_reservoirs}};
 }
 
-RenderRestirDI::NodeStatusFlags
-RenderRestirDI::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
-                             [[maybe_unused]] const DescriptorSetLayoutHandle& descriptor_set_layout) {
-    // force the program graph to be rewired next process()
-    compositions = {};
+RenderRestirDI::NodeStatusFlags RenderRestirDI::on_connected(
+    const NodeIOLayout& io_layout,
+    [[maybe_unused]] const DescriptorSetLayoutHandle& descriptor_set_layout) {
+    composition = nullptr;
     obj_allocator = nullptr;
 
-    pong_buffer = resource_allocator->create_buffer(reservoir_buffer_create_info(),
-                                                    MemoryMappingType::NONE, "ReSTIR DI reservoirs");
+    io_layout.register_event_listener(
+        "/graph/reload_shaders", [this](const GraphEvent::Info&, const GraphEvent::Data& force) {
+            if (composition) {
+                if (std::any_cast<bool>(force)) {
+                    composition->force_reload();
+                } else {
+                    composition->reload(compile_context->get_search_path_file_loader());
+                }
+            }
+            return true;
+        });
+
+    pong_buffer = resource_allocator->create_buffer(
+        reservoir_buffer_create_info(), MemoryMappingType::NONE, "ReSTIR DI reservoirs");
 
     return {};
 }
@@ -71,14 +101,15 @@ void RenderRestirDI::process(GraphRun& run,
     if (!scene || !gbuf || !scene->is_ready())
         return;
 
-    if (!compositions[Generate]) {
-        for (uint32_t p = 0; p < PassCount; p++) {
-            compositions[p] = SlangComposition::create();
-            compositions[p]->add_composition(scene->get_composition());
-            compositions[p]->add_module_from_path(PASS_MODULES[p], true);
+    if (!composition) {
+        composition = SlangComposition::create();
+        composition->add_composition(scene->get_composition());
+        composition->add_module_from_path(SHADER_MODULE, true);
+        update_render_constants();
+        program = SlangProgram::create(compile_context, composition);
 
-            programs[p] = SlangProgram::create(compile_context, compositions[p]);
-            entry_points[p] = SlangProgramEntryPoint::create(programs[p], "main");
+        for (uint32_t p = 0; p < PassCount; p++) {
+            entry_points[p] = SlangProgramEntryPoint::create(program, PASS_ENTRY_POINTS[p]);
 
             pipelines[p] = Versioned<RayTracingPipeline>([this, p] {
                 const auto ep = entry_points[p].get();
@@ -94,8 +125,8 @@ void RenderRestirDI::process(GraphRun& run,
             sbts[p].depends_on(pipelines[p]);
 
             params[p] = Versioned<ShaderObject>([this, p] {
-                return entry_points[p].get()->create_shader_object_for_parameter(
-                    context, "params", resource_allocator);
+                return entry_points[p]->create_shader_object_for_parameter(context, "params",
+                                                                           resource_allocator);
             });
             params[p].depends_on(entry_points[p]);
         }
@@ -111,27 +142,20 @@ void RenderRestirDI::process(GraphRun& run,
     const vk::DeviceAddress out = io[con_reservoirs]->get_device_address();
     const vk::DeviceAddress prev = io[con_prev_reservoirs]->get_device_address();
     const vk::DeviceAddress gen_buffer = spatial_enabled ? scratch : out;
-    const BufferHandle gen_handle = spatial_enabled ? pong_buffer : BufferHandle(io[con_reservoirs]);
+    const BufferHandle gen_handle =
+        spatial_enabled ? pong_buffer : BufferHandle(io[con_reservoirs]);
     const BufferHandle out_handle = io[con_reservoirs];
 
     RestirPushConstant pc{};
     pc.reservoirs_prev = prev;
     pc.frame = static_cast<uint32_t>(run.get_iteration());
     pc.seed = seed;
-    pc.spp = spp;
-    pc.temporal_bias_correction = temporal_bias_correction;
-    pc.spatial_bias_correction = spatial_bias_correction;
     pc.temporal_clamp_m = temporal_clamp_m;
     pc.spatial_radius = spatial_radius;
-    pc.spatial_iterations = spatial_iterations;
     pc.temporal_normal_reject_cos = temporal_normal_reject_cos;
     pc.temporal_depth_reject = temporal_depth_reject;
     pc.spatial_normal_reject_cos = spatial_normal_reject_cos;
     pc.spatial_depth_reject = spatial_depth_reject;
-    pc.boiling_filter_strength = boiling_filter_strength;
-    pc.flags = (apply_mv ? RestirFlagApplyMotion : 0u) |
-               (visibility_shade ? RestirFlagVisibilityShade : 0u) |
-               (temporal_enable ? RestirFlagTemporalEnable : 0u);
 
     const auto bind_params = [&](const Pass p) {
         const auto obj = params[p].get();
@@ -149,8 +173,8 @@ void RenderRestirDI::process(GraphRun& run,
         pc.reservoirs_in = in_addr;
         pc.reservoirs_out = out_addr;
         cmd->bind(pipe);
-        entry_points[p].get()->bind("scene", scene->get_shader_object(), cmd, pipe, obj_allocator);
-        entry_points[p].get()->bind("params", bind_params(p), cmd, pipe, obj_allocator);
+        entry_points[p]->bind("scene", scene->get_shader_object(), cmd, pipe, obj_allocator);
+        entry_points[p]->bind("params", bind_params(p), cmd, pipe, obj_allocator);
         cmd->push_constant(pipe, pc);
         cmd->trace_rays(sbts[p].get(), extent);
     };
@@ -181,51 +205,65 @@ void RenderRestirDI::process(GraphRun& run,
 
 RenderRestirDI::NodeStatusFlags RenderRestirDI::properties(Properties& config) {
     bool needs_reconnect = false;
+    bool constants_changed = false;
 
     config.st_separate("Generate");
-    config.config_int("samples per pixel", spp, "BSDF-sampled candidates per pixel.", 0, 32);
+    constants_changed |=
+        config.config_int("samples per pixel", spp, "BSDF-sampled candidates per pixel.", 0, 32);
     config.config_uint("seed", seed, "Base seed for the per-pixel RNG.");
+    constants_changed |=
+        config.config_bool("emission on primary", emission_on_primary,
+                           "Fold the primary hit's own emission (and the env map on a miss) into "
+                           "the output. Otherwise it is the GBuffer emission texture's job.");
 
     config.st_separate("Temporal reuse");
     config.config_bool("enable temporal reuse", temporal_enable);
     float temporal_angle = std::acos(temporal_normal_reject_cos);
-    config.config_angle("normal threshold", temporal_angle,
+    config.config_angle("normal threshold##temporal", temporal_angle,
                         "Reject reprojections with normals farther apart.", 0, 180);
     temporal_normal_reject_cos = std::cos(temporal_angle);
-    config.config_percent("depth threshold", temporal_depth_reject,
+    config.config_percent("depth threshold##temporal", temporal_depth_reject,
                           "Reject reprojections with depths farther apart (relative to the max).");
     config.config_int("clamp M", temporal_clamp_m,
                       "Clamp the temporal history length. 0 disables.");
-    config.config_options("bias correction", temporal_bias_correction,
-                          {"none", "basic", "raytraced"});
-    config.config_bool("apply motion", apply_mv,
-                       "Extrapolate the light position from its velocity. Reduces flicker on "
-                       "moving lights but biases motion.");
-    config.config_percent("boiling filter", boiling_filter_strength,
-                          "Discard outlier reservoirs within a subgroup. 0 disables.");
+    constants_changed |= config.config_options(
+        "bias correction##temporal", temporal_bias_correction, {"none", "basic", "raytraced"});
+    constants_changed |=
+        config.config_bool("apply motion", apply_mv,
+                           "Extrapolate the light position from its velocity. Reduces flicker on "
+                           "moving lights but biases motion.");
+    constants_changed |=
+        config.config_percent("boiling filter", boiling_filter_strength,
+                              "Discard outlier reservoirs within a subgroup. 0 disables.");
 
     config.st_separate("Spatial reuse");
-    config.config_int("iterations", spatial_iterations, "Neighbors resampled per pixel.", 0, 8);
+    constants_changed |=
+        config.config_int("iterations", spatial_iterations, "Neighbors resampled per pixel.", 0, 8);
     float spatial_angle = std::acos(spatial_normal_reject_cos);
-    config.config_angle("normal threshold", spatial_angle,
+    config.config_angle("normal threshold##spatial", spatial_angle,
                         "Reject neighbors with normals farther apart.", 0, 180);
     spatial_normal_reject_cos = std::cos(spatial_angle);
-    config.config_percent("depth threshold", spatial_depth_reject,
+    config.config_percent("depth threshold##spatial", spatial_depth_reject,
                           "Reject neighbors with depths farther apart (relative to the max).");
     config.config_int("radius", spatial_radius, "Pixel radius for neighbor sampling.", 0, 100);
-    config.config_options("bias correction", spatial_bias_correction,
-                          {"none", "basic", "raytraced"});
+    constants_changed |= config.config_options("bias correction##spatial", spatial_bias_correction,
+                                               {"none", "basic", "raytraced"});
 
     config.st_separate("Shade");
-    config.config_bool("visibility", visibility_shade, "Trace a shadow ray before shading.");
+    constants_changed |=
+        config.config_bool("visibility", visibility_shade, "Trace a shadow ray before shading.");
 
     config.st_separate("Resolution");
     needs_reconnect |= config.config_uint("width", &extent.width);
     needs_reconnect |= config.config_uint("height", &extent.height);
+
+    if (constants_changed && composition) {
+        update_render_constants();
+    }
 
     if (needs_reconnect)
         return NEEDS_RECONNECT;
     return {};
 }
 
-} // namespace merian
+}

@@ -1,5 +1,6 @@
 #include "merian-graph/nodes/gbuffer_debug/gbuffer_debug.hpp"
 
+#include "merian/shader/shader_compile_context.hpp"
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 
 namespace merian {
@@ -31,12 +32,24 @@ GBufferDebugNode::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layou
 }
 
 GBufferDebugNode::NodeStatusFlags GBufferDebugNode::on_connected(
-    [[maybe_unused]] const NodeIOLayout& io_layout,
+    const NodeIOLayout& io_layout,
     [[maybe_unused]] const DescriptorSetLayoutHandle& descriptor_set_layout) {
 
     // force the program graph to be rewired next process()
     composition = nullptr;
     obj_allocator = nullptr;
+
+    io_layout.register_event_listener(
+        "/graph/reload_shaders", [this](const GraphEvent::Info&, const GraphEvent::Data& force) {
+            if (composition) {
+                if (std::any_cast<bool>(force)) {
+                    composition->force_reload();
+                } else {
+                    composition->reload(compile_context->get_search_path_file_loader());
+                }
+            }
+            return true;
+        });
 
     return {};
 }
@@ -66,8 +79,8 @@ void GBufferDebugNode::process(GraphRun& run,
         pipeline.depends_on(entry_point);
 
         params = Versioned<ShaderObject>([this] {
-            return entry_point.get()->create_shader_object_for_parameter(context, "params",
-                                                                         resource_allocator);
+            return entry_point->create_shader_object_for_parameter(context, "params",
+                                                                   resource_allocator);
         });
         params.depends_on(entry_point);
 

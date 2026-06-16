@@ -21,8 +21,6 @@
 
 namespace merian {
 
-// Screen-space ReSTIR DI: BSDF-sampled candidates resampled spatiotemporally into per-pixel
-// reservoirs. Four ray generation passes (generate / temporal / spatial / shade) over the GBuffer.
 class RenderRestirDI : public Node {
 
   public:
@@ -51,12 +49,12 @@ class RenderRestirDI : public Node {
 
   private:
     vk::BufferCreateInfo reservoir_buffer_create_info() const;
+    void update_render_constants();
 
     ContextHandle context;
     ResourceAllocatorHandle resource_allocator;
     ShaderCompileContextHandle compile_context;
 
-    // Connectors
     PtrInHandle<Scene> con_scene = PtrIn<Scene>::create();
     PtrInHandle<GBuffer> con_gbuffer = PtrIn<GBuffer>::create();
     PtrInHandle<GBuffer> con_prev_gbuffer = PtrIn<GBuffer>::create(1);
@@ -68,6 +66,7 @@ class RenderRestirDI : public Node {
 
     int32_t spp = 4;
     uint32_t seed = 0;
+    bool emission_on_primary = true;
 
     bool temporal_enable = true;
     float temporal_normal_reject_cos = 0.96f;
@@ -85,17 +84,15 @@ class RenderRestirDI : public Node {
 
     bool visibility_shade = true;
 
-    // One single-entry-point program per pass; rebuilt when the scene composition changes.
-    std::array<SlangCompositionHandle, PassCount> compositions;
-    std::array<Versioned<SlangProgram>, PassCount> programs;
+    SlangCompositionHandle composition;
+    Versioned<SlangProgram> program;
     std::array<Versioned<SlangProgramEntryPoint>, PassCount> entry_points;
     std::array<Versioned<RayTracingPipeline>, PassCount> pipelines;
     std::array<Versioned<ShaderBindingTable>, PassCount> sbts;
     std::array<Versioned<ShaderObject>, PassCount> params;
     std::shared_ptr<FrameCachingShaderObjectAllocator> obj_allocator;
 
-    // Internal ping-pong scratch (the generate/temporal target when spatial reuse is enabled).
     BufferHandle pong_buffer;
 };
 
-} // namespace merian
+}

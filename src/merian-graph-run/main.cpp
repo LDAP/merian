@@ -30,15 +30,15 @@ void signal_handler(const int /*signal*/) {
 void print_usage() {
     fmt::print(
         "usage: merian-graph-run [options] [graph.json [args...]]\n"
-        "  -log-level=<trace|debug|info|warn|error>\n"
-        "  -plugin-path=<dir>            (repeatable)\n"
-        "  -validation=<on|off|ifdebug>  Vulkan validation layers (default: ifdebug)\n"
+        "  --loglevel=<trace|debug|info|warn|error>\n"
+        "  --plugin-path=<dir>           (repeatable)\n"
+        "  --validation=<on|off|ifdebug> Vulkan validation layers (default: ifdebug)\n"
         "  --merge <file.json>           deep-merge a JSON file into the config (repeatable,\n"
         "                                last wins)\n"
         "  --<name> <value>              set an override declared in the graph's \"cli\" block\n"
         "  args...                       everything after graph.json, joined with spaces,\n"
         "                                feeds the cli \"--\" override (none: value unchanged)\n"
-        "  -help                         with a graph.json: also lists its cli overrides\n");
+        "  --help                        with a graph.json: also lists its cli overrides\n");
 }
 
 struct Options {
@@ -49,7 +49,7 @@ struct Options {
 };
 
 bool is_help_flag(const std::string& arg) {
-    return arg == "-help" || arg == "--help" || arg == "-h";
+    return arg == "--help" || arg == "-h";
 }
 
 std::optional<Options> parse(const std::vector<std::string>& args) {
@@ -62,18 +62,18 @@ std::optional<Options> parse(const std::vector<std::string>& args) {
         if (is_help_flag(arg)) {
             continue;
         }
-        if (arg == "-validation" || arg == "-validation=on") {
+        if (arg == "--validation" || arg == "--validation=on") {
             options.validation = true;
-        } else if (arg == "-validation=off") {
+        } else if (arg == "--validation=off") {
             options.validation = false;
-        } else if (arg == "-validation=ifdebug") {
+        } else if (arg == "--validation=ifdebug") {
             options.validation = merian::Context::IS_DEBUG_BUILD;
-        } else if (arg.starts_with("-validation=")) {
-            SPDLOG_ERROR("invalid -validation value '{}' (expected on/off/ifdebug)", arg);
+        } else if (arg.starts_with("--validation=")) {
+            SPDLOG_ERROR("invalid --validation value '{}' (expected on/off/ifdebug)", arg);
             return std::nullopt;
-        } else if (arg.starts_with("-log-level=")) {
+        } else if (arg.starts_with("--loglevel=")) {
             spdlog::set_level(spdlog::level::from_str(arg.substr(arg.find('=') + 1)));
-        } else if (arg.starts_with("-plugin-path=")) {
+        } else if (arg.starts_with("--plugin-path=")) {
             merian::Plugins::add_search_path(arg.substr(arg.find('=') + 1));
         } else if (arg.starts_with("--")) {
             if (i + 1 >= args.size()) {

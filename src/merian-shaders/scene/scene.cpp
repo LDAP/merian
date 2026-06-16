@@ -92,7 +92,7 @@ ShaderObjectHandle Scene::build_shader_object() const {
     SPDLOG_DEBUG("recreate shader object");
 
     const ShaderObjectHandle object =
-        layout_program.get()->create_shader_object_for_type(context, "merian::Scene", allocator);
+        layout_program->create_shader_object_for_type(context, "merian::Scene", allocator);
 
     auto c = object->get_cursor();
 
@@ -1081,7 +1081,7 @@ void Scene::upload_transforms(const CommandBufferHandle& cmd) {
     }
 
     const auto staging = allocator->get_staging();
-    auto c = shader_object.get()->get_cursor();
+    auto c = shader_object->get_cursor();
 
     if (!instance_transforms.empty()) {
         const vk::DeviceSize transforms_size = instance_transforms.size() * sizeof(float4x4);
@@ -1190,7 +1190,7 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
     }
 
     const auto staging = allocator->get_staging();
-    auto c = shader_object.get()->get_cursor();
+    auto c = shader_object->get_cursor();
 
     if (!geometries.empty()) {
         const vk::DeviceSize geometries_size = geometries.size() * sizeof(GeometryData);
@@ -1798,7 +1798,7 @@ void Scene::build_tlas(const CommandBufferHandle& cmd) {
         // cannot reuse and needs to be allcated
         tlas = allocator->create_acceleration_structure(vk::AccelerationStructureTypeKHR::eTopLevel,
                                                         size_info);
-        shader_object.get()->get_cursor()["as"]["as"] = tlas;
+        shader_object->get_cursor()["as"]["as"] = tlas;
     }
 
     as_builder.queue_build(tlas_instances.size(), tlas_instances_buffer, tlas, size_info);
@@ -1934,7 +1934,7 @@ void Scene::update(const CommandBufferHandle& cmd,
         set_enable_thin_lens(thin_lens);
     }
 
-    auto c = shader_object.get()->get_cursor();
+    auto c = shader_object->get_cursor();
 
     c["frame"] = frame;
     c["time"] = get_time(time);

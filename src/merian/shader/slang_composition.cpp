@@ -88,6 +88,13 @@ void SlangComposition::add_composition(const SlangCompositionHandle& composition
 }
 
 bool SlangComposition::reload(const FileLoader& file_loader) {
+    // Recurse first: a shared subcomposition dedups via its own mtime state, so only the first
+    // caller that sees the change bumps it.
+    bool nested_changed = false;
+    for (const auto& composition : compositions) {
+        nested_changed |= composition->reload(file_loader);
+    }
+
     bool source_changed = false;
 
     // Check path-based modules for file changes
@@ -121,7 +128,7 @@ bool SlangComposition::reload(const FileLoader& file_loader) {
         bump_slang_source_epoch();
         edits++;
     }
-    return source_changed;
+    return source_changed || nested_changed;
 }
 
 void SlangComposition::force_reload() {

@@ -151,6 +151,15 @@ void Graph::properties(Properties& props) {
     needs_reconnect |= props.config_bool("Rebuild");
     props.st_no_space();
     props.output_text("Run iteration: {}", run_iteration);
+    if (props.config_bool("reload shaders",
+                          "Recompile shaders whose source files changed on disk.")) {
+        send_graph_event("reload_shaders", std::any(false));
+    }
+    props.st_no_space();
+    if (props.config_bool("reload shaders (force)",
+                          "Recompile all shaders unconditionally, ignoring mtimes and caches.")) {
+        send_graph_event("reload_shaders", std::any(true));
+    }
 
     if (props.is_ui()) {
         props.st_separate("Load / Store");

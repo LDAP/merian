@@ -41,6 +41,11 @@ template <typename T> class Versioned {
         return state->current;
     }
 
+    // rebuilds like get(); use peek() to access without rebuilding
+    const Ref& operator->() const {
+        return get();
+    }
+
     // null before the first get()
     const Ref& peek() const {
         return state->current;

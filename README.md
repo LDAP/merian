@@ -7,8 +7,7 @@ Merian is split into multiple components:
 
  - [`merian`](https://github.com/LDAP/merian/tree/main/include/merian): Provides core abstractions and utilities (Vulkan context, memory allocation, configuration, IO, ...).
  - [`merian-graph`](https://github.com/LDAP/merian/tree/main/include/merian-graph): Implements an extensible Vulkan processing graph. Already implemented nodes can be found [here](https://github.com/LDAP/merian/tree/main/include/merian-graph/nodes).
- - [`merian-scene`](https://github.com/LDAP/merian/tree/main/include/merian-scene): Scene representation, glTF/FBX loaders, material system and texture management.
- - [`merian-shaders`](https://github.com/LDAP/merian/tree/main/include/merian-shaders): Collection of reusable shader code (header-only).
+ - [`merian-shaders`](https://github.com/LDAP/merian/tree/main/include/merian-shaders): Reusable shader code plus the scene representation, glTF/FBX loaders, material system and texture management.
 
 `merian-graph-run` is a generic executable that loads a processing graph from a JSON file and runs it. It ships with a set of built-in nodes and can be extended with additional node sets and renderers through its [plugin system](#plugins). Current plugins:
 
@@ -125,6 +124,22 @@ merian-graph-run examples/gltf.json
 ```
 
 Example graphs are in the [`examples`](https://github.com/LDAP/merian/tree/main/examples) folder. Run without an argument to start with an empty graph (just a window).
+
+## Environment variables
+
+merian reads the following environment variables at startup:
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `MERIAN_SHADER_CACHE` | on | Set to `0` to disable the on-disk Slang shader cache (serialized IR modules + compiled SPIR-V). |
+| `MERIAN_SHADER_CACHE_DIR` | `./.merian-cache` | Directory for the shader cache. Safe to delete at any time. |
+| `MERIAN_SHADER_CACHE_MAX_MB` | `128` | Cache size cap in MiB, enforced (oldest-first) when a shader session is torn down. `0` = unbounded (manage by hand). |
+| `MERIAN_TARGET_VK_API_VERSION` | highest supported | Target Vulkan API version, e.g. `1.3`. Clamped to the range supported by the Vulkan headers. |
+| `MERIAN_DEFAULT_FILTER_VENDOR_ID` | — | Pick the GPU by PCI vendor id (decimal). |
+| `MERIAN_DEFAULT_FILTER_DEVICE_ID` | — | Pick the GPU by device id (decimal). |
+| `MERIAN_DEFAULT_FILTER_DEVICE_NAME` | — | Pick the GPU by (a substring of) its name. |
+| `MERIAN_DEBUG_UTILS_ASSERT_ERROR` | on | When the `merian-debug-utils` extension is loaded, throw on a validation message of severity error. Set to `false` to only log it. |
+| `MERIAN_PLUGIN_PATH` | — | Extra plugin search directories, separated by `:` (`;` on Windows). In addition, the user data dir is searched: `$XDG_DATA_HOME/merian/plugins` (or `$HOME/.local/share/merian/plugins`; `%APPDATA%\merian\plugins` on Windows). |
 
 ## Plugins
 
