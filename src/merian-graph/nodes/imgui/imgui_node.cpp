@@ -43,11 +43,13 @@ void ImGuiNode::process(GraphRun& run,
     const std::string title =
         fmt::format("merian ({:.2f} ms, {:.1f} fps) Frame {}###{}", dt_ms,
                     dt_ms > 0.0 ? 1000.0 / dt_ms : 0.0, run.get_total_iteration(), imgui_event);
-    if (ImGui::Begin(title.c_str())) {
-        ImGuiProperties props;
-        io.send_event(imgui_event, static_cast<Properties*>(&props));
-    }
-    ImGui::End();
+    imgui_ctx->with_context([&] {
+        if (ImGui::Begin(title.c_str())) {
+            ImGuiProperties props;
+            io.send_event(imgui_event, static_cast<Properties*>(&props));
+        }
+        ImGui::End();
+    });
 
     imgui_renderer->render(run.get_cmd(), acquire->image_view);
 }
