@@ -64,7 +64,8 @@ class SlangProgramEntryPoint : public EntryPoint {
     // ---------------------------------------------------------------
     // Global parameter support (the global scope is one ParameterBlock-like container)
 
-    bool has_globals(const ContextHandle& context);
+    // True if the global scope owns a Vulkan descriptor set (has direct bindings).
+    bool has_global_descriptor_set(const ContextHandle& context);
 
     ShaderObjectHandle create_global_shader_object(const ContextHandle& context,
                                                    const ResourceAllocatorHandle& allocator);
@@ -113,6 +114,9 @@ class SlangProgramEntryPoint : public EntryPoint {
            const std::string& entry_point_name = "main");
 
   public:
+    // set_index sentinel for a ParameterBlock that owns no descriptor set (no bindings).
+    static constexpr uint32_t NO_DESCRIPTOR_SET = UINT32_MAX;
+
     // Tree of nested ParameterBlocks: sub-object range index in parent → Vulkan set index +
     // children
     struct NestedParameterBlockInfo {
@@ -147,7 +151,7 @@ class SlangProgramEntryPoint : public EntryPoint {
 
     // Global parameter support
     ShaderObjectLayoutHandle global_object_layout;
-    uint32_t global_set_index = UINT32_MAX;
+    uint32_t global_set_index = NO_DESCRIPTOR_SET;
     std::vector<NestedParameterBlockInfo> global_nested_parameter_block_infos;
     vk::DeviceSize push_constant_size = 0;
 };

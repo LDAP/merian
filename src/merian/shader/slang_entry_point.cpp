@@ -7,8 +7,6 @@
 
 namespace merian {
 
-static constexpr uint32_t NO_DESCRIPTOR_SET = UINT32_MAX;
-
 SlangProgramEntryPoint::SlangProgramEntryPoint(const SlangProgramHandle& program,
                                                const uint64_t entry_point_index)
     : program(program), entry_point_index(entry_point_index) {
@@ -54,11 +52,12 @@ SlangProgramEntryPoint::find_or_create_param_info(const ContextHandle& context,
             fmt::format("ParameterBlock parameter '{}' not found in entry point", param_name)};
     }
 
-    // Set index will be assigned by get_pipeline_layout() before bind() uses it.
+    // descriptor_set_index is filled in by get_pipeline_layout().
     auto [inserted_it, _] = param_cache.try_emplace(
         param_name,
-        ParameterBlockInfo{
-            program->get_or_create_object_layout(context, param->getTypeLayout()), 0, {}});
+        ParameterBlockInfo{program->get_or_create_object_layout(context, param->getTypeLayout()),
+                           NO_DESCRIPTOR_SET,
+                           {}});
     return inserted_it->second;
 }
 
@@ -74,15 +73,16 @@ ShaderObjectHandle SlangProgramEntryPoint::create_shader_object_for_parameter(
     return std::make_shared<ShaderObject>(get_object_layout(context, param_name), allocator);
 }
 
-// Recursively collects nested ParameterBlock descriptor sets. Slang numbers register spaces in
-// depth-first order of the ParameterBlocks that own a set, so a counter reproduces the relative
-// numbering; the caller seeds next_set with the scope's reflected base space (see
-// get_pipeline_layout) so the numbers are absolute even across multiple entry points.
-static void collect_nested_parameter_block_layouts(
-    const ShaderObjectLayoutHandle& container_layout,
-    uint32_t& next_set,
-    std::map<uint32_t, DescriptorSetLayoutHandle>& set_layouts,
-    std::vector<SlangProgramEntryPoint::NestedParameterBlockInfo>& nested_infos) {
+using NestedParameterBlockInfo = SlangProgramEntryPoint::NestedParameterBlockInfo;
+static constexpr uint32_t NO_DESCRIPTOR_SET = SlangProgramEntryPoint::NO_DESCRIPTOR_SET;
+
+// Slang numbers register spaces depth-first over the ParameterBlocks that own a set; the caller
+// seeds next_set with the scope's reflected base space so the assigned indices are absolute.
+static void
+collect_nested_parameter_block_layouts(const ShaderObjectLayoutHandle& container_layout,
+                                       uint32_t& next_set,
+                                       std::map<uint32_t, DescriptorSetLayoutHandle>& set_layouts,
+                                       std::vector<NestedParameterBlockInfo>& nested_infos) {
     for (uint32_t subobject_range_index = 0;
          subobject_range_index < container_layout->get_subobject_range_count();
          subobject_range_index++) {
@@ -94,14 +94,33 @@ static void collect_nested_parameter_block_layouts(
         uint32_t set_index = NO_DESCRIPTOR_SET;
         if (range.container_layout->has_bindings()) {
             set_index = next_set++;
+            assert(!set_layouts.contains(set_index) &&
+                   "two ParameterBlocks share a register space");
             set_layouts[set_index] = range.container_layout->get_descriptor_set_layout();
         }
 
-        SlangProgramEntryPoint::NestedParameterBlockInfo info{subobject_range_index, set_index, {}};
+        NestedParameterBlockInfo info{subobject_range_index, set_index, {}};
         collect_nested_parameter_block_layouts(range.container_layout, next_set, set_layouts,
                                                info.children);
         nested_infos.push_back(std::move(info));
     }
+}
+
+// Assigns container its own set (if it has bindings) starting from next_set, then collects its
+// nested ParameterBlocks. Returns the container's set index, or NO_DESCRIPTOR_SET.
+static uint32_t
+collect_parameter_block_layouts(const ShaderObjectLayoutHandle& container_layout,
+                                uint32_t& next_set,
+                                std::map<uint32_t, DescriptorSetLayoutHandle>& set_layouts,
+                                std::vector<NestedParameterBlockInfo>& nested_infos) {
+    uint32_t set_index = NO_DESCRIPTOR_SET;
+    if (container_layout->has_bindings()) {
+        set_index = next_set++;
+        assert(!set_layouts.contains(set_index) && "two ParameterBlocks share a register space");
+        set_layouts[set_index] = container_layout->get_descriptor_set_layout();
+    }
+    collect_nested_parameter_block_layouts(container_layout, next_set, set_layouts, nested_infos);
+    return set_index;
 }
 
 // Entry-point uniform parameters and [vk::push_constant] globals map to one push constant range.
@@ -143,9 +162,8 @@ PipelineLayoutHandle SlangProgramEntryPoint::get_pipeline_layout(const ContextHa
     auto* entry_reflection = get_entry_point_reflection();
     PipelineLayoutBuilder builder(context);
 
-    // Descriptor set indices are the register spaces Slang assigned, read from reflection. The
-    // whole program is compiled as one module, so spaces are numbered globally across all entry
-    // points; a sequential counter would only match a single-entry-point program.
+    // Descriptor set indices are the register spaces Slang assigned (read from reflection); they
+    // are numbered globally across all entry points in the program.
     std::map<uint32_t, DescriptorSetLayoutHandle> set_layouts;
 
     // 1. global scope, treated as one ParameterBlock-like container
@@ -160,12 +178,8 @@ PipelineLayoutHandle SlangProgramEntryPoint::get_pipeline_layout(const ContextHa
     }
     if (global_object_layout) {
         uint32_t next_set = global_base;
-        if (global_object_layout->has_bindings()) {
-            global_set_index = next_set++;
-            set_layouts[global_set_index] = global_object_layout->get_descriptor_set_layout();
-        }
-        collect_nested_parameter_block_layouts(global_object_layout, next_set, set_layouts,
-                                               global_nested_parameter_block_infos);
+        global_set_index = collect_parameter_block_layouts(
+            global_object_layout, next_set, set_layouts, global_nested_parameter_block_infos);
     }
 
     // 2. push constants
@@ -174,8 +188,7 @@ PipelineLayoutHandle SlangProgramEntryPoint::get_pipeline_layout(const ContextHa
         builder.add_push_constant(static_cast<uint32_t>(push_constant_size));
     }
 
-    // 3. entry point ParameterBlock parameters, numbered from the entry point's space base. Slang
-    // assigns spaces in DFS order, so a counter seeded at the base reproduces the absolute spaces.
+    // 3. entry point ParameterBlock parameters, numbered from the entry point's space base
     uint32_t next_set = static_cast<uint32_t>(entry_reflection->getVarLayout()->getOffset(
         SLANG_PARAMETER_CATEGORY_SUB_ELEMENT_REGISTER_SPACE));
     for (uint32_t i = 0; i < entry_reflection->getParameterCount(); i++) {
@@ -185,16 +198,8 @@ PipelineLayoutHandle SlangProgramEntryPoint::get_pipeline_layout(const ContextHa
         }
 
         auto& info = find_or_create_param_info(context, param->getName());
-        if (info.object_layout->has_bindings()) {
-            info.descriptor_set_index = next_set++;
-            set_layouts[info.descriptor_set_index] =
-                info.object_layout->get_descriptor_set_layout();
-        } else {
-            info.descriptor_set_index = NO_DESCRIPTOR_SET;
-        }
-
-        collect_nested_parameter_block_layouts(info.object_layout, next_set, set_layouts,
-                                               info.nested_parameter_block_infos);
+        info.descriptor_set_index = collect_parameter_block_layouts(
+            info.object_layout, next_set, set_layouts, info.nested_parameter_block_infos);
     }
 
     // Vulkan requires pSetLayouts contiguous up to the highest set the shader uses. Spaces owned
@@ -290,7 +295,7 @@ void SlangProgramEntryPoint::bind(const std::string& param_name,
 // ---------------------------------------------------------------
 // Global parameter support
 
-bool SlangProgramEntryPoint::has_globals(const ContextHandle& context) {
+bool SlangProgramEntryPoint::has_global_descriptor_set(const ContextHandle& context) {
     get_pipeline_layout(context); // ensure layout is built
     return global_set_index != NO_DESCRIPTOR_SET;
 }

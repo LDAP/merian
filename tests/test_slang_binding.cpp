@@ -814,7 +814,7 @@ TEST_F(SlangBindingTest, GlobalResource) {
         vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
         MemoryMappingType::HOST_ACCESS_RANDOM, "test_output");
 
-    ASSERT_TRUE(entry_point.get()->has_globals(context));
+    ASSERT_TRUE(entry_point.get()->has_global_descriptor_set(context));
     ASSERT_EQ(entry_point.get()->get_global_set_count(), 1u);
 
     auto globals = entry_point.get()->create_global_shader_object(context, allocator);
@@ -877,7 +877,7 @@ TEST_F(SlangBindingTest, GlobalWithPB) {
         vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
         MemoryMappingType::HOST_ACCESS_RANDOM, "test_output");
 
-    ASSERT_TRUE(entry_point.get()->has_globals(context));
+    ASSERT_TRUE(entry_point.get()->has_global_descriptor_set(context));
 
     // Set global resources
     auto globals = entry_point.get()->create_global_shader_object(context, allocator);
