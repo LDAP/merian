@@ -49,7 +49,7 @@ struct SmoothDielectricBSDF : BSDF {
             return ShadingFunctionSample(reflect_dir(wi), 1.0f,
                                          float3(1.0f)); // total internal reflection
         }
-        return ShadingFunctionSample(wt, 1.0f, transmission_color);
+        return ShadingFunctionSample(wt, 1.0f, pow2(eta) * transmission_color);
     }
 
     Albedo get_albedo(const float3 wi) {
