@@ -18,7 +18,7 @@ Inputs:
 | Type       | Input name   | Description                                                                            | Delay |
 |------------|--------------|----------------------------------------------------------------------------------------|-------|
 | VkImageIn  | src          | irradiance in `rgb`, second moment `a`                                                 | no    |
-| VkBufferIn | gbuffer      | GBuffer (see `gbuffer.glsl.h`)                                                         | no    |
+| VkBufferIn | gbuffer      | GBuffer (see `gbuffer.slang`)                                                         | no    |
 | VkImageIn  | mv           | motion vectors in `r` and `g` channel                                                  | no    |
 | VkImageIn  | prev_out     | feedback last `out`                                                                  | 1     |
 | VkBufferIn | prev_gbuf    | previous GBuffer                                                                       | 1     |
