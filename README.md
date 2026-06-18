@@ -20,6 +20,8 @@ Merian is split into multiple components:
 
 It ships with a set of built-in nodes and can be extended with additional node sets and renderers through its [plugin system](#plugins). Current plugins:
 
+- [merian-plugin-quake](https://github.com/LDAP/Merian-plugin-quake): A scene node for Quake backed by the full power of quakespasm, including GUI support. 
+
 ## Examples
 
 Example graphs for `merian-graph-run` are in the [`examples`](https://github.com/LDAP/merian/tree/main/examples) folder:
@@ -132,15 +134,6 @@ clone-recursive = true
 merian = merian_dep
 ```
 
-## Running a graph
-
-`merian-graph-run` loads a processing graph from a JSON file and runs it:
-
-```sh
-merian-graph-run examples/gltf.json scene.gltf
-```
-
-Example graphs are in the [`examples`](https://github.com/LDAP/merian/tree/main/examples) folder. Run without an argument to start with an empty graph (just a window).
 
 ## Environment variables
 
