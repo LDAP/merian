@@ -640,9 +640,41 @@ void GraphDescription::merge_into(nlohmann::json& base, const nlohmann::json& ov
 }
 
 bool GraphDescription::apply_cli(nlohmann::json& config,
-                                 const std::vector<std::pair<std::string, std::string>>& args,
+                                 const std::vector<std::string>& cli_args,
                                  const std::vector<std::filesystem::path>& search_dirs) {
     const std::vector<Override> overrides = parse_overrides(config);
+
+    // Split raw args: a "--name" is a named override only if declared (or the reserved "merge");
+    // everything else is positional and feeds the "--" override, joined in order.
+    std::vector<std::pair<std::string, std::string>> args;
+    std::vector<std::string> positional;
+    for (size_t i = 0; i < cli_args.size(); i++) {
+        const std::string& arg = cli_args[i];
+        if (arg.starts_with("--") && arg.size() > 2) {
+            const std::string name = arg.substr(2);
+            const bool declared =
+                name == "merge" ||
+                std::ranges::any_of(overrides, [&](const Override& o) { return o.name == name; });
+            if (declared) {
+                if (i + 1 >= cli_args.size()) {
+                    SPDLOG_ERROR("missing value for override '{}'", arg);
+                    return false;
+                }
+                args.emplace_back(name, cli_args[++i]);
+                continue;
+            }
+        }
+        positional.push_back(arg);
+    }
+    if (!positional.empty()) {
+        std::string joined = positional.front();
+        for (size_t i = 1; i < positional.size(); i++) {
+            joined += ' ';
+            joined += positional[i];
+        }
+        args.emplace_back("--", std::move(joined));
+    }
+
     bool ok = true;
 
     std::set<std::string> given;

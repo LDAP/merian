@@ -216,7 +216,7 @@ class GraphDescription {
     // -----------------------------------------------------------------
 
     static bool apply_cli(nlohmann::json& config,
-                          const std::vector<std::pair<std::string, std::string>>& args,
+                          const std::vector<std::string>& args,
                           const std::vector<std::filesystem::path>& search_dirs = {});
 
     static std::string cli_help(const nlohmann::json& config);

@@ -16,7 +16,6 @@
 #include <csignal>
 #include <fstream>
 #include <optional>
-#include <utility>
 
 namespace {
 
@@ -35,9 +34,10 @@ void print_usage() {
         "  --validation=<on|off|ifdebug> Vulkan validation layers (default: ifdebug)\n"
         "  --merge <file.json>           deep-merge a JSON file into the config (repeatable,\n"
         "                                last wins)\n"
-        "  --<name> <value>              set an override declared in the graph's \"cli\" block\n"
-        "  args...                       everything after graph.json, joined with spaces,\n"
-        "                                feeds the cli \"--\" override (none: value unchanged)\n"
+        "  --<name> <value>              set an override declared in the graph's \"cli\" block;\n"
+        "                                may appear before or after graph.json, in any order\n"
+        "  args...                       positional args and any unrecognized --flag, joined\n"
+        "                                with spaces in order, feed the cli \"--\" override\n"
         "  --help                        with a graph.json: also lists its cli overrides\n");
 }
 
@@ -45,7 +45,9 @@ struct Options {
     std::optional<std::filesystem::path> config;
     bool validation = merian::Context::IS_DEBUG_BUILD;
     bool help = false;
-    std::vector<std::pair<std::string, std::string>> overrides;
+    // Non-runner tokens in command-line order; classified against the graph's cli block once
+    // the config is loaded. A pre-config override's value is kept adjacent to its --name.
+    std::vector<std::string> graph_args;
 };
 
 bool is_help_flag(const std::string& arg) {
@@ -57,11 +59,13 @@ std::optional<Options> parse(const std::vector<std::string>& args) {
     // -help anywhere wins, so `merian-graph-run graph.json -help` lists the cli overrides
     // instead of forwarding "-help" to the graph.
     options.help = std::ranges::any_of(args, is_help_flag);
+    bool config_found = false;
     for (size_t i = 1; i < args.size(); i++) {
         const std::string& arg = args[i];
         if (is_help_flag(arg)) {
             continue;
         }
+        // Runner flags are consumed in any position and never reach the graph.
         if (arg == "--validation" || arg == "--validation=on") {
             options.validation = true;
         } else if (arg == "--validation=off") {
@@ -75,28 +79,22 @@ std::optional<Options> parse(const std::vector<std::string>& args) {
             spdlog::set_level(spdlog::level::from_str(arg.substr(arg.find('=') + 1)));
         } else if (arg.starts_with("--plugin-path=")) {
             merian::Plugins::add_search_path(arg.substr(arg.find('=') + 1));
+        } else if (config_found) {
+            options.graph_args.push_back(arg);
         } else if (arg.starts_with("--")) {
-            if (i + 1 >= args.size()) {
-                SPDLOG_ERROR("missing value for override '{}'", arg);
-                return std::nullopt;
+            // A named override before the config: keep its value adjacent so the config
+            // (the first bare token) is still located correctly.
+            options.graph_args.push_back(arg);
+            if (i + 1 < args.size()) {
+                options.graph_args.push_back(args[++i]);
             }
-            options.overrides.emplace_back(arg.substr(2), args[++i]);
         } else if (arg.starts_with("-")) {
             SPDLOG_ERROR("unknown option '{}'", arg);
             print_usage();
             return std::nullopt;
         } else {
             options.config = arg;
-            // Everything after the config goes verbatim into the "--" override.
-            if (i + 1 < args.size()) {
-                std::string joined = args[i + 1];
-                for (size_t j = i + 2; j < args.size(); j++) {
-                    joined += ' ';
-                    joined += args[j];
-                }
-                options.overrides.emplace_back("--", std::move(joined));
-            }
-            break;
+            config_found = true;
         }
     }
     return options;
@@ -155,8 +153,8 @@ int main(const int argc, const char** argv) {
             SPDLOG_ERROR("could not parse config '{}': {}", config_path->string(), e.what());
             return 1;
         }
-    } else if (!options->overrides.empty()) {
-        SPDLOG_ERROR("overrides given but no graph config");
+    } else if (!options->graph_args.empty()) {
+        SPDLOG_ERROR("arguments given but no graph config");
         return 1;
     }
 
@@ -171,7 +169,7 @@ int main(const int argc, const char** argv) {
     if (config_path) {
         std::vector<std::filesystem::path> cli_search_dirs = {config_path->parent_path()};
         cli_search_dirs.insert(cli_search_dirs.end(), search_paths.begin(), search_paths.end());
-        if (!merian::GraphDescription::apply_cli(config, options->overrides, cli_search_dirs)) {
+        if (!merian::GraphDescription::apply_cli(config, options->graph_args, cli_search_dirs)) {
             fmt::print("{}", merian::GraphDescription::cli_help(config));
             return 1;
         }

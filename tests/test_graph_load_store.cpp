@@ -54,7 +54,7 @@ TEST(GraphCli, ValueWithSet) {
     })");
 
     EXPECT_TRUE(GraphDescription::apply_cli(
-        config, {{"env-map", "/tmp/x.hdr"}, {"spp", "8"}, {"--", "/scene.gltf"}}));
+        config, {"--env-map", "/tmp/x.hdr", "--spp", "8", "/scene.gltf"}));
 
     EXPECT_EQ(config["nodes"][1]["properties"]["env"]["Path"], "/tmp/x.hdr");
     EXPECT_EQ(config["nodes"][1]["properties"]["env"]["Type"], "LatLong");
@@ -74,11 +74,11 @@ TEST(GraphCli, Variant) {
     EXPECT_EQ(with_default["v"], 8);
 
     json low = base;
-    EXPECT_TRUE(GraphDescription::apply_cli(low, {{"quality", "low"}}));
+    EXPECT_TRUE(GraphDescription::apply_cli(low, {"--quality", "low"}));
     EXPECT_EQ(low["v"], 1);
 
     json bad = base;
-    EXPECT_FALSE(GraphDescription::apply_cli(bad, {{"quality", "ultra"}}));
+    EXPECT_FALSE(GraphDescription::apply_cli(bad, {"--quality", "ultra"}));
     EXPECT_EQ(bad["v"], 0);
 }
 
@@ -89,12 +89,12 @@ TEST(GraphCli, Flag) {
     })");
 
     json on = base;
-    EXPECT_TRUE(GraphDescription::apply_cli(on, {{"denoise", "on"}}));
+    EXPECT_TRUE(GraphDescription::apply_cli(on, {"--denoise", "on"}));
     EXPECT_EQ(on["d"], true);
 
     json off = base;
     off["d"] = true;
-    EXPECT_TRUE(GraphDescription::apply_cli(off, {{"denoise", "off"}}));
+    EXPECT_TRUE(GraphDescription::apply_cli(off, {"--denoise", "off"}));
     EXPECT_EQ(off["d"], false);
 }
 
@@ -108,16 +108,17 @@ TEST(GraphCli, RequiredAndUnknown) {
     EXPECT_FALSE(GraphDescription::apply_cli(missing, {}));
 
     json given = config;
-    EXPECT_TRUE(GraphDescription::apply_cli(given, {{"scene", "/s.gltf"}}));
+    EXPECT_TRUE(GraphDescription::apply_cli(given, {"--scene", "/s.gltf"}));
     EXPECT_EQ(given["nodes"][0]["properties"]["file"], "/s.gltf");
 
+    // An undeclared --flag is positional; with no "--" override declared, that's an error.
     json unknown = config;
-    EXPECT_FALSE(GraphDescription::apply_cli(unknown, {{"nope", "x"}}));
+    EXPECT_FALSE(GraphDescription::apply_cli(unknown, {"--nope", "x"}));
 }
 
 TEST(GraphCli, OrderLastWins) {
     json config = json::parse(R"({"v": 0, "cli": {"spp": {"pointer": "/v"}}})");
-    EXPECT_TRUE(GraphDescription::apply_cli(config, {{"spp", "1"}, {"spp", "2"}}));
+    EXPECT_TRUE(GraphDescription::apply_cli(config, {"--spp", "1", "--spp", "2"}));
     EXPECT_EQ(config["v"], 2);
 }
 
@@ -132,7 +133,7 @@ TEST(GraphCli, MergeFile) {
     json config = json::parse(R"({
         "nodes": [{"id": "render", "properties": {"samples per pixel": 2, "max path length": 5}}]
     })");
-    EXPECT_TRUE(GraphDescription::apply_cli(config, {{"merge", file.string()}}));
+    EXPECT_TRUE(GraphDescription::apply_cli(config, {"--merge", file.string()}));
     EXPECT_EQ(config["nodes"][0]["properties"]["samples per pixel"], 16);
     EXPECT_EQ(config["nodes"][0]["properties"]["max path length"], 5);
 
