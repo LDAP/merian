@@ -1,0 +1,17 @@
+#pragma once
+
+#ifdef __cplusplus
+#include "merian-shaders/types.slang.h"
+#endif
+
+struct HashedIrradianceCacheVertex {
+    uint32_t hash; // grid_idx and level
+    uint32_t lock;
+    half3 irr;
+    uint16_t N;
+};
+
+#ifdef __cplusplus
+static_assert(sizeof(HashedIrradianceCacheVertex) == 16,
+              "HashedIrradianceCacheVertex must match the Slang scalar layout");
+#endif

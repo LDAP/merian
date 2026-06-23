@@ -391,7 +391,7 @@ struct GGXBRDF : BSDF {
         // the NDF and cosines cancel, so it stays finite even at alpha -> 0.
         const float pdf = ggx_VNDF_pdf_wo(wi, h, alpha);
         const float weight = smith_g2_over_widotn(wo, wi, alpha) / smith_g1_over_widotn(wi, alpha);
-        return ShadingFunctionSample(wo, pdf, float3(weight));
+        return ShadingFunctionSample(wo, pdf, float3(weight), BSDFLobe::Glossy);
     }
 
     Albedo get_albedo(const float3 wi) {
@@ -401,6 +401,10 @@ struct GGXBRDF : BSDF {
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
         // the fit is isotropic; sqrt(alpha_x * alpha_y) preserves the NDF peak.
         return ggx_integral_approx_correlated(F0, sqrt(alpha.x * alpha.y), wi.z);
+    }
+
+    property float roughness {
+        get { return sqrt(min(alpha.x, alpha.y)); }
     }
 }
 
@@ -482,7 +486,7 @@ struct GGXBTDF : BSDF {
         // refraction adds an eta^2 radiance factor. It stays finite even at alpha -> 0.
         const float weight = pow2(eta) * smith_g2_over_widotn(abs(wo.z), wi.z, alpha_squared) /
                              smith_g1_over_widotn(wi.z, alpha_squared);
-        return ShadingFunctionSample(wo, pdf, tint * weight);
+        return ShadingFunctionSample(wo, pdf, tint * weight, BSDFLobe::Glossy);
     }
 
     Albedo get_albedo(const float3 wi) {
@@ -491,6 +495,10 @@ struct GGXBTDF : BSDF {
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
         return float3(0.0f);
+    }
+
+    property float roughness {
+        get { return sqrt(alpha); }
     }
 }
 

@@ -35,14 +35,14 @@ struct MixBSDF<B0 : BSDF, B1 : BSDF> : BSDF {
             if (let s = bsdf1.sample_eval(wi, rng)) {
                 const float mix_pdf = lerp(bsdf0.pdf(wi, s.wo), s.pdf, weight);
                 const float3 mix_eval = lerp(bsdf0.eval(wi, s.wo, rng), s.weight * s.pdf, weight);
-                return ShadingFunctionSample(s.wo, mix_pdf, mix_eval / mix_pdf);
+                return ShadingFunctionSample(s.wo, mix_pdf, mix_eval / mix_pdf, s.lobe);
             }
             return none;
         }
         if (let s = bsdf0.sample_eval(wi, rng)) {
             const float mix_pdf = lerp(s.pdf, bsdf1.pdf(wi, s.wo), weight);
             const float3 mix_eval = lerp(s.weight * s.pdf, bsdf1.eval(wi, s.wo, rng), weight);
-            return ShadingFunctionSample(s.wo, mix_pdf, mix_eval / mix_pdf);
+            return ShadingFunctionSample(s.wo, mix_pdf, mix_eval / mix_pdf, s.lobe);
         }
         return none;
     }
@@ -55,6 +55,10 @@ struct MixBSDF<B0 : BSDF, B1 : BSDF> : BSDF {
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
         return lerp(bsdf0.get_preintegrated_specular(F0, wi),
                     bsdf1.get_preintegrated_specular(F0, wi), weight);
+    }
+
+    property float roughness {
+        get { return min(bsdf0.roughness, bsdf1.roughness); }
     }
 }
 

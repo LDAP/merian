@@ -53,7 +53,16 @@ struct SheenLayerBSDF<Base : BSDF> : BSDF {
     }
 
     Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
-        return sample_eval_impl<This>(this, wi, rng);
+        // Sample sheen or base, but evaluate the combined pdf/weight. Delegate to the chosen
+        // sub-BSDF so its lobe classification propagates.
+        const float p = prob_sheen(wi.z);
+        Optional<ShadingFunctionSample> sub =
+            (p > 0.0f && rng.next_float() < p) ? sheen.sample_eval(wi, rng) : base.sample_eval(wi, rng);
+        if (let s = sub) {
+            const float pdf = this.pdf(wi, s.wo);
+            return ShadingFunctionSample(s.wo, pdf, this.eval(wi, s.wo, rng) / pdf, s.lobe);
+        }
+        return none;
     }
 
     Albedo get_albedo(const float3 wi) {
@@ -63,6 +72,10 @@ struct SheenLayerBSDF<Base : BSDF> : BSDF {
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
         return base.get_preintegrated_specular(F0, wi);
+    }
+
+    property float roughness {
+        get { return base.roughness; }
     }
 }
 

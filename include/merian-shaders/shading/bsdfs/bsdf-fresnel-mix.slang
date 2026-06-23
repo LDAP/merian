@@ -34,7 +34,16 @@ struct FresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
     }
 
     Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
-        return sample_eval_impl<This>(this, wi, rng);
+        // Sample one of the two lobes by Fresnel, but evaluate the combined pdf/weight (one-sample
+        // MIS). Delegate to the chosen sub-BSDF so its lobe classification propagates.
+        const float F = fresnel_schlick(wi.z, ior_f0);
+        Optional<ShadingFunctionSample> sub =
+            rng.next_float() < F ? layer.sample_eval(wi, rng) : base.sample_eval(wi, rng);
+        if (let s = sub) {
+            const float p = this.pdf(wi, s.wo);
+            return ShadingFunctionSample(s.wo, p, this.eval(wi, s.wo, rng) / p, s.lobe);
+        }
+        return none;
     }
 
     Albedo get_albedo(const float3 wi) {
@@ -44,6 +53,10 @@ struct FresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
         return layer.get_preintegrated_specular(F0, wi);
+    }
+
+    property float roughness {
+        get { return min(layer.roughness, base.roughness); }
     }
 }
 

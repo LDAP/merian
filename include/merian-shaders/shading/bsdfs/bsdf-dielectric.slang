@@ -42,14 +42,14 @@ struct SmoothDielectricBSDF : BSDF {
             return none;
         }
         if (rng.next_float() < fresnel_dielectric(wi.z, eta)) {
-            return ShadingFunctionSample(reflect_dir(wi), 1.0f, float3(1.0f));
+            return ShadingFunctionSample(reflect_dir(wi), 1.0f, float3(1.0f), BSDFLobe::Delta);
         }
         const float3 wt = refract(-wi, float3(0.0f, 0.0f, 1.0f), eta);
         if (all(wt == float3(0.0f))) {
-            return ShadingFunctionSample(reflect_dir(wi), 1.0f,
-                                         float3(1.0f)); // total internal reflection
+            return ShadingFunctionSample(reflect_dir(wi), 1.0f, float3(1.0f),
+                                         BSDFLobe::Delta); // total internal reflection
         }
-        return ShadingFunctionSample(wt, 1.0f, pow2(eta) * transmission_color);
+        return ShadingFunctionSample(wt, 1.0f, pow2(eta) * transmission_color, BSDFLobe::Delta);
     }
 
     Albedo get_albedo(const float3 wi) {
@@ -62,6 +62,10 @@ struct SmoothDielectricBSDF : BSDF {
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
         return fresnel_schlick(wi.z, F0);
+    }
+
+    property float roughness {
+        get { return 0.0f; }
     }
 }
 

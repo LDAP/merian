@@ -43,6 +43,10 @@ struct ConductorFresnelBSDF<Inner : BSDF> : BSDF {
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
         return bsdf.get_preintegrated_specular(F0, wi);
     }
+
+    property float roughness {
+        get { return bsdf.roughness; }
+    }
 }
 
 }

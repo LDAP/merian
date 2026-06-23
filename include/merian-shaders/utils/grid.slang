@@ -111,7 +111,7 @@ uint hash_grid(const uint3 index, const uint modulus) {
 
 // like hash_grid but with simple normal biasing
 uint hash_grid_normal(const uint3 index, const float3 normal, const uint modulus) {
-    const uint cube = cubemap_side(normal);
+    const uint cube = cubemap_side(normal + 1e-3);
     return ((index.x * GRID_PRIME_X) ^ (index.y * GRID_PRIME_Y) ^ (index.z * GRID_PRIME_Z) ^
             (9351217 * cube + 13 * cube)) %
            modulus;
@@ -121,7 +121,7 @@ uint hash_grid_normal_level(const uint3 index,
                             const float3 normal,
                             const uint level,
                             const uint modulus) {
-    const uint cube = cubemap_side(normal);
+    const uint cube = cubemap_side(normal + 1e-3);
     return ((index.x * GRID_PRIME_X) ^ (index.y * GRID_PRIME_Y) ^ (index.z * GRID_PRIME_Z) ^
             (cube | (level << 16) * 723850877)) %
            modulus;

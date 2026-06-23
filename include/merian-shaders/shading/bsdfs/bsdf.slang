@@ -20,6 +20,9 @@ interface BSDF : ShadingFunction {
 
     // Pre-integrated specular reflectance for the given F0.
     float3 get_preintegrated_specular(const float3 F0, const float3 wi);
+
+    // Perceptual roughness in [0, 1]; 0 for a perfectly specular (delta) lobe, 1 for ideal diffuse.
+    property float roughness { get; }
 }
 
 struct NullBSDF : BSDF {
@@ -31,6 +34,7 @@ struct NullBSDF : BSDF {
     }
     Albedo get_albedo(const float3 wi) { return Albedo(float3(0)); }
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) { return float3(0); }
+    property float roughness { get { return 1.0f; } }
 }
 
 }

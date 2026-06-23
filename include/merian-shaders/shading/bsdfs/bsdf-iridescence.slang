@@ -70,6 +70,10 @@ struct IridescentConductorBSDF<Inner : BSDF> : BSDF {
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
         return bsdf.get_preintegrated_specular(F0, wi);
     }
+
+    property float roughness {
+        get { return bsdf.roughness; }
+    }
 }
 
 // Specular reflection layered over a diffuse/transmission base. The reflect/transmit split uses the
@@ -140,7 +144,16 @@ struct IridescentFresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
     }
 
     Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
-        return sample_eval_impl<This>(this, wi, rng);
+        // Sample layer or base by Fresnel, evaluate the combined pdf/weight, propagate the
+        // chosen sub-BSDF's lobe.
+        const float f = fresnel_dielectric(wi.z, eta);
+        Optional<ShadingFunctionSample> sub =
+            rng.next_float() < f ? layer.sample_eval(wi, rng) : base.sample_eval(wi, rng);
+        if (let s = sub) {
+            const float pdf = this.pdf(wi, s.wo);
+            return ShadingFunctionSample(s.wo, pdf, this.eval(wi, s.wo, rng) / pdf, s.lobe);
+        }
+        return none;
     }
 
     Albedo get_albedo(const float3 wi) {
@@ -156,6 +169,10 @@ struct IridescentFresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
         return layer.get_preintegrated_specular(F0, wi);
+    }
+
+    property float roughness {
+        get { return min(layer.roughness, base.roughness); }
     }
 }
 
@@ -267,7 +284,7 @@ struct IridescentRoughDielectricBSDF : BSDF {
             const float g = smith_g2_over_widotn(wo.z, wi.z, alpha_squared) /
                             smith_g1_over_widotn(wi.z, alpha_squared);
             const float pdf = p * ggx_VNDF_pdf_wo(wi.z, pow2(wm.z), alpha_squared);
-            return ShadingFunctionSample(wo, pdf, (R / p) * g);
+            return ShadingFunctionSample(wo, pdf, (R / p) * g, BSDFLobe::Glossy);
         }
 
         // Refraction. Real TIR was already routed to reflection (p == 1); a refraction failure here
@@ -283,7 +300,8 @@ struct IridescentRoughDielectricBSDF : BSDF {
         // Weight = ((1 - R) / (1 - p)) per channel times the eta^2 radiance factor and tint.
         const float g = smith_g2_over_widotn(abs(wo.z), wi.z, alpha_squared) /
                         smith_g1_over_widotn(wi.z, alpha_squared);
-        return ShadingFunctionSample(wo, pdf, ((1.0f - R) / (1.0f - p)) * pow2(eta) * tint * g);
+        return ShadingFunctionSample(wo, pdf, ((1.0f - R) / (1.0f - p)) * pow2(eta) * tint * g,
+                                     BSDFLobe::Glossy);
     }
 
     Albedo get_albedo(const float3 wi) {
@@ -300,6 +318,10 @@ struct IridescentRoughDielectricBSDF : BSDF {
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
         return GGXBRDF(alpha).get_preintegrated_specular(F0, wi);
+    }
+
+    property float roughness {
+        get { return sqrt(alpha); }
     }
 }
 

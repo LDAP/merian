@@ -89,7 +89,7 @@ struct RoughDielectricBSDF : BSDF {
             const float weight = smith_g2_over_widotn(wo.z, wi.z, alpha_squared) /
                                  smith_g1_over_widotn(wi.z, alpha_squared);
             const float pdf = R * ggx_VNDF_pdf_wo(wi.z, pow2(wm.z), alpha_squared);
-            return ShadingFunctionSample(wo, pdf, float3(weight));
+            return ShadingFunctionSample(wo, pdf, float3(weight), BSDFLobe::Glossy);
         }
 
         // Refraction. Real TIR was already routed to reflection (R == 1); a refraction failure here
@@ -105,7 +105,7 @@ struct RoughDielectricBSDF : BSDF {
         // (1 - R) cancels; the eta^2 radiance factor stays.
         const float weight = pow2(eta) * smith_g2_over_widotn(abs(wo.z), wi.z, alpha_squared) /
                              smith_g1_over_widotn(wi.z, alpha_squared);
-        return ShadingFunctionSample(wo, pdf, tint * weight);
+        return ShadingFunctionSample(wo, pdf, tint * weight, BSDFLobe::Glossy);
     }
 
     Albedo get_albedo(const float3 wi) {
@@ -116,6 +116,10 @@ struct RoughDielectricBSDF : BSDF {
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
         return GGXBRDF(alpha).get_preintegrated_specular(F0, wi);
+    }
+
+    property float roughness {
+        get { return sqrt(alpha); }
     }
 }
 

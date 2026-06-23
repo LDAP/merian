@@ -36,7 +36,7 @@ struct LambertDiffuseBRDF : BSDF {
             return none;
         }
 
-        return ShadingFunctionSample(wo, MERIAN_INV_PI * wo.z, albedo);
+        return ShadingFunctionSample(wo, MERIAN_INV_PI * wo.z, albedo, BSDFLobe::Diffuse);
     }
 
     float pdf(const float3 wi, const float3 wo) {
@@ -53,6 +53,10 @@ struct LambertDiffuseBRDF : BSDF {
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
         return float3(0.0f);
+    }
+
+    property float roughness {
+        get { return 1.0f; }
     }
 }
 

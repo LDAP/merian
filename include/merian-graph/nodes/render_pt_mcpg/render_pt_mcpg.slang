@@ -4,25 +4,24 @@ import merian_shaders.utils.random;
 import merian_shaders.utils.hash;
 import merian_shaders.utils.textures;
 import merian_shaders.colors.colorspaces;
+import merian_shaders.light_cache.hashed_irradiance_cache;
 
 using merian;
 
 namespace merian {
 extern static const bool merian_render_emission_on_primary = false;
+extern static const int merian_render_spp = 1;
+extern static const int merian_render_max_path_length = 8;
+extern static const uint merian_render_instance_mask = 0xFFu;
 }
+
+extern static const int debug_output_selector = 0;
 
 struct RenderBinding {
     ParameterBlock<GBuffer> gbuffer;
     RWTexture2D<float4> irradiance;
+    RWTexture2D<float4> debug;
 };
-
-struct PushConstant {
-    int spp;
-    int max_path_length;
-    uint instance_mask;
-};
-
-[vk::push_constant] ConstantBuffer<PushConstant> pc;
 
 float3 trace_path(const ParameterBlock<Scene> scene,
                   RayDesc ray,
@@ -34,7 +33,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
     float current_ior = 1.0f;
     float3 current_absorption = float3(0.0f);
 
-    for (int bounce = 1; bounce < pc.max_path_length; bounce++) {
+    for (int bounce = 1; bounce < merian_render_max_path_length; bounce++) {
         const OrthonormalFrame frame = sp.material.shading_frame;
         let bsdf = sp.material.get_bsdf();
         const float3 wi_local = frame.to_local(-ray.Direction);
@@ -60,7 +59,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         ray.TMin = SCENE_RAY_TMIN;
         ray.TMax = SCENE_RAY_TMAX;
 
-        const Hit hit = scene.trace_ray(ray, RAY_FLAG_NONE, pc.instance_mask);
+        const Hit hit = scene.trace_ray(ray, RAY_FLAG_NONE, merian_render_instance_mask);
         sp = scene.get_shading_point(ray, hit, RenderContext(uint16_t(bounce), current_ior));
 
         // Beer-Lambert absorption over the segment just travelled inside the medium.
@@ -74,7 +73,8 @@ float3 trace_path(const ParameterBlock<Scene> scene,
 }
 
 [shader("raygeneration")] void main(ParameterBlock<Scene> scene,
-                                    ParameterBlock<RenderBinding> params) {
+                                    ParameterBlock<RenderBinding> params,
+                                    ParameterBlock<HashedIrradianceCache> irr_cache) {
     const uint2 pixel = DispatchRaysIndex().xy;
     if (not_on_texture(pixel, params.irradiance))
         return;
@@ -89,7 +89,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
     float3 irradiance = float3(0);
     float second_moment = 0.f;
 
-    for (int s = 0; s < pc.spp; s++) {
+    for (int s = 0; s < merian_render_spp; s++) {
         RandomGenerator rng = XorShift32(pcg4d16(uint4(pixel, scene.frame, s)));
 
         const float3 contrib = trace_path(scene, primary_ray, primary_sp, rng);
@@ -100,10 +100,34 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         }
     }
 
-    if (pc.spp > 0) {
-        irradiance /= float(pc.spp);
-        second_moment /= float(pc.spp);
+    if (merian_render_spp > 0) {
+        irradiance /= float(merian_render_spp);
+        second_moment /= float(merian_render_spp);
     }
 
     params.irradiance[pixel] = float4(irradiance, second_moment);
+
+    // Populate the irradiance cache at the primary hit.
+    const float3 cam_pos = scene.camera.position;
+    const float3 prev_cam_pos = scene.prev_camera.position;
+    const float3 primary_normal = primary_sp.get_face_normal();
+    RandomGenerator cache_rng = XorShift32(pcg4d16(uint4(pixel, scene.frame, 0xCACE)));
+    irr_cache.update(primary_sp.pos, primary_normal, irradiance, cam_pos, prev_cam_pos, scene.frame,
+                     cache_rng);
+
+    // Debug output. Guiding-specific selectors are filled in by the transport code; for now only
+    // the always-available channels are wired.
+    switch (debug_output_selector) {
+    case 1: // moments
+        params.debug[pixel] = float4(second_moment.xxx, 1);
+        break;
+    case 2: // light cache
+        params.debug[pixel] =
+            float4(irr_cache.get(primary_sp.pos, primary_normal, cam_pos, prev_cam_pos, cache_rng),
+                   1);
+        break;
+    default: // irradiance
+        params.debug[pixel] = float4(irradiance, 1);
+        break;
+    }
 }

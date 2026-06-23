@@ -2,6 +2,12 @@ __exported import merian_shaders.utils.random;
 
 namespace merian {
 
+enum BSDFLobe {
+    Delta,   // singular (perfect mirror / refraction)
+    Glossy,  // microfacet reflection or transmission
+    Diffuse, // Lambertian / ideal-rough
+}
+
 // A sample from a BSDF or PhaseFunction.
 struct ShadingFunctionSample {
     // the outgoing direction
@@ -10,11 +16,21 @@ struct ShadingFunctionSample {
     float pdf;
     // sample weight, i.e. f(wi, wo) * dot(wo, n) / pdf = eval() / pdf().
     float3 weight;
+    // the lobe this sample was drawn from
+    BSDFLobe lobe;
 
     __init(const float3 wo, const float pdf, const float3 weight) {
         this.wo = wo;
         this.pdf = pdf;
         this.weight = weight;
+        this.lobe = BSDFLobe::Glossy;
+    }
+
+    __init(const float3 wo, const float pdf, const float3 weight, const BSDFLobe lobe) {
+        this.wo = wo;
+        this.pdf = pdf;
+        this.weight = weight;
+        this.lobe = lobe;
     }
 }
 

@@ -74,7 +74,12 @@ struct SheenBRDF : BSDF {
     }
 
     Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
-        return sample_eval_impl<This>(this, wi, rng);
+        if (let s = sample_eval_impl<This>(this, wi, rng)) {
+            ShadingFunctionSample r = s;
+            r.lobe = BSDFLobe::Diffuse;
+            return r;
+        }
+        return none;
     }
 
     Albedo get_albedo(const float3 wi) {
