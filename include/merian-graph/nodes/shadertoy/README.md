@@ -2,7 +2,7 @@
 
 A limited reimplementation of Shadertoy.
 
-**Note: The Shadertoy node requires shaderc.**
+**Note: The Shadertoy node requires a GLSL compiler (glslang or glslc).**
 
 Outputs:
 

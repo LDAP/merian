@@ -2,7 +2,7 @@
 directory = vulkan
 
 url = https://github.com/KhronosGroup/Vulkan-Headers
-revision = vulkan-sdk-1.4.341.0
+revision = vulkan-sdk-1.4.350.1
 
 depth = 1
 

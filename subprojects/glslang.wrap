@@ -2,7 +2,7 @@
 directory = glslang
 
 url = https://github.com/KhronosGroup/glslang
-revision = 16.2.0
+revision = vulkan-sdk-1.4.350.1
 depth = 1
 
 patch_directory = glslang

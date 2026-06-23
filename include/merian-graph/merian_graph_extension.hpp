@@ -8,7 +8,6 @@
 #include "merian/vk/extension/extension_glslang_compiler.hpp"
 #include "merian/vk/extension/extension_glslangvalidator_compiler.hpp"
 #include "merian/vk/extension/extension_glslc_compiler.hpp"
-#include "merian/vk/extension/extension_shaderc_compiler.hpp"
 
 namespace merian {
 
@@ -27,7 +26,6 @@ class MerianGraphExtension : public ContextExtension {
         // Request compiler extensions for nodes that need shader compilation
         aggregated.push_back(ExtensionGlslangCompiler::name);
         aggregated.push_back(ExtensionGlslangValidatorCompiler::name);
-        aggregated.push_back(ExtensionShadercCompiler::name);
         aggregated.push_back(ExtensionGlslcCompiler::name);
 
         auto& registry = NodeRegistry::get_instance();

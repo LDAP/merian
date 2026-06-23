@@ -11,7 +11,6 @@
 #include "merian/vk/extension/extension_merian.hpp"
 #include "merian/vk/extension/extension_mitigations.hpp"
 #include "merian/vk/extension/extension_resources.hpp"
-#include "merian/vk/extension/extension_shaderc_compiler.hpp"
 #include "merian/vk/extension/extension_vk_debug_utils.hpp"
 #include "merian/vk/extension/extension_vk_layer_settings.hpp"
 #include "merian/vk/extension/extension_vk_validation_layers.hpp"
@@ -57,8 +56,6 @@ ExtensionRegistry::ExtensionRegistry() {
     register_extension<ExtensionGlslangValidatorCompiler>(
         ExtensionGlslangValidatorCompiler::name, true,
         {ProviderPriority<GLSLCompilerProvider>{80}});
-    register_extension<ExtensionShadercCompiler>(ExtensionShadercCompiler::name, true,
-                                                 {ProviderPriority<GLSLCompilerProvider>{60}});
     register_extension<ExtensionGlslcCompiler>(ExtensionGlslcCompiler::name, true,
                                                {ProviderPriority<GLSLCompilerProvider>{40}});
     register_extension<ExtensionMerian>(ExtensionMerian::name, true);

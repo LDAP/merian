@@ -2,8 +2,8 @@
 directory = spirv-reflect
 
 url = https://github.com/KhronosGroup/SPIRV-Reflect
-# Update together with SPIRV-Headers and shaderc (dictates the header version)
-revision = vulkan-sdk-1.4.321.0
+# Update together with SPIRV-Headers and glslang (dictates the header version)
+revision = vulkan-sdk-1.4.350.1
 depth = 1
 
 patch_directory = spirv-reflect

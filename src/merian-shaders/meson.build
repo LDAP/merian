@@ -1,4 +1,5 @@
 merian_shaders_src = [
+    'light-cache/hashed_irradiance_cache.cpp',
     'scene/scene.cpp',
     'shading/materials/material_system.cpp',
     'utils/texture_manager.cpp',

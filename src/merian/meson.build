@@ -102,7 +102,6 @@ merian_deps = [
     imgui,
     nlohmann_json,
     sdl3,
-    shaderc,
     slang,
     spdlog,
     spirv_reflect,

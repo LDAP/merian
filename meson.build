@@ -12,9 +12,9 @@ project(
 )
 
 # attempt to stick to Vulkan SDK versions (vulkan-sdk-X.X.XXX.X tags and update the version in the wrap file).
-vulkan_target_api_version = '1.4.341'
-# update together with SPIRV-Reflect, SPIRV-headers and shaderc wrap
-spirv_headers_version = 'vulkan-sdk-1.4.321.0'
+vulkan_target_api_version = '1.4.350'
+# update together with SPIRV-Reflect, SPIRV-headers and glslang wrap
+spirv_headers_version = 'vulkan-sdk-1.4.350.1'
 
 cmake = import('cmake')
 py = import('python').find_installation('python3')
@@ -119,31 +119,6 @@ sdl3 = dependency('sdl3', version: ['>=3.4.0'], required: get_option('sdl'), fal
 if get_option('sdl').enable_auto_if(sdl3.found()).enabled()
     global_args += ['-DMERIAN_SDL_ENABLED']
 endif
-shaderc = dependency('shaderc', version: ['>=2025.3'], required: false)
-if not shaderc.found() and get_option('shaderc').enabled()
-    shaderc_options = cmake.subproject_options()
-    shaderc_options.add_cmake_defines({'SHADERC_SKIP_TESTS': true})
-    shaderc_options.add_cmake_defines({'SHADERC_SKIP_EXAMPLES': true})
-    shaderc_options.add_cmake_defines({'SHADERC_ENABLE_SHARED_CRT': true})
-    shaderc_subp = cmake.subproject('shaderc', options: shaderc_options)
-    # ideally we would use shaderc_subp.dependency('shaderc_combined') but that does not work
-    # therefore we combine all dependencies into one.
-    shaderc = declare_dependency(dependencies: [
-        shaderc_subp.dependency('shaderc'),
-        shaderc_subp.dependency('glslang'),
-        shaderc_subp.dependency('MachineIndependent'),
-        shaderc_subp.dependency('GenericCodeGen'),
-        shaderc_subp.dependency('shaderc_util'),
-        shaderc_subp.dependency('SPIRV'),
-        shaderc_subp.dependency('SPIRV-Tools-static'),
-        shaderc_subp.dependency('SPIRV-Tools-opt'),
-    ])
-endif
-if get_option('shaderc').enable_auto_if(shaderc.found()).enabled()
-    global_args += ['-DMERIAN_SHADERC_ENABLED']
-endif
-
-
 glslc = find_program('glslangValidator', required: false)
 glslang = dependency('glslang', version: ['>=16.2.0'], required: false, method: 'cmake',
     modules: ['glslang::glslang', 'glslang::glslang-default-resource-limits', 'glslang::SPIRV'])
@@ -251,7 +226,6 @@ merian_dep = declare_dependency(
         glslang,
         imgui,
         nlohmann_json,
-        shaderc,
         slang,
         spdlog,
         spirv_reflect,

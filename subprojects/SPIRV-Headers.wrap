@@ -2,8 +2,8 @@
 directory = SPIRV-Headers
 
 url = https://github.com/KhronosGroup/SPIRV-Headers
-# Update together with SPIRV-Reflect and shaderc (dictates the header version)
-revision = vulkan-sdk-1.4.321.0
+# Update together with SPIRV-Reflect and glslang (dictates the header version)
+revision = vulkan-sdk-1.4.350.1
 depth = 1
 method = cmake
 

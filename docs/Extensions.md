@@ -33,7 +33,7 @@ int main() {
 | `"merian-resources"` | `ExtensionResources` | `ResourceAllocator`, `MemoryAllocator` and `SamplerPool` via VMA. |
 | `"merian-glfw"` | `ExtensionGLFW` | Initializes GLFW, ensures present support on the GCT queue. |
 | `"merian-debug-utils"` | `ExtensionVkDebugUtils` | Validation layers with spdlog forwarding. Auto-loaded by `"merian"` in debug builds. |
-| `"merian-glsl-compiler"` | `ExtensionGLSLCompiler` | GLSL runtime shader compilation (shaderc/glslang/glslc backend). |
+| `"merian-glsl-compiler"` | `ExtensionGLSLCompiler` | GLSL runtime shader compilation (glslang/glslc backend). |
 | `"merian-validation-layers"` | `ExtensionVkValidationLayers` | Khronos validation layer. |
 | `"merian-layer-settings"` | `ExtensionVkLayerSettings` | Vulkan layer settings. |
 | `"merian-vma"` | `ExtensionVMA` | Vulkan Memory Allocator. Auto-pulled by `"merian-resources"`. |
