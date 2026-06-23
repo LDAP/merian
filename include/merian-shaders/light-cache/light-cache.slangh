@@ -5,7 +5,7 @@
 #endif
 
 struct HashedIrradianceCacheVertex {
-    uint32_t hash; // grid_idx and level
+    uint32_t hash;
     uint32_t lock;
     half3 irr;
     uint16_t N;

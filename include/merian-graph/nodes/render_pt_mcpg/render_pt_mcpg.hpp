@@ -96,6 +96,9 @@ class RenderMCPG : public Node {
 
     // --- Light cache ---
     bool use_light_cache_tail = false;
+    uint32_t lc_buffer_size = 4000037;
+    uint32_t lc_probe_count = 4;
+    bool lc_stochastic_interpolation = false;
 
     // --- Misc ---
     uint32_t seed = 0;

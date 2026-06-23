@@ -42,7 +42,8 @@ void RenderMCPG::initialize(const ContextHandle& context,
     this->context = context;
     this->resource_allocator = allocator;
     this->compile_context = context->get_shader_compile_context();
-    irr_cache = std::make_shared<HashedIrradianceCache>(compile_context, context, allocator);
+    irr_cache = std::make_shared<HashedIrradianceCache>(allocator, lc_buffer_size, lc_probe_count,
+                                                        lc_stochastic_interpolation);
 }
 
 vk::BufferCreateInfo RenderMCPG::mc_state_buffer_create_info() const {
@@ -155,9 +156,6 @@ void RenderMCPG::process(GraphRun& run,
     const auto params_obj = params.get();
     const auto globals_obj = globals.get();
 
-    // Allocate (first frame) and keep the cache's buffer + shader object current.
-    irr_cache->update(cmd);
-
     // Reset the persistent guiding state on the first frame of a run.
     if (run.get_iteration() == 0) {
         cmd->fill(io[con_mc_states]);
@@ -174,6 +172,7 @@ void RenderMCPG::process(GraphRun& run,
     cursor["irradiance"] = io[con_irradiance].get_texture();
     if (auto debug = cursor["debug"]; debug.is_valid())
         debug = io[con_debug].get_texture();
+    irr_cache->write_to(cursor["irr_cache"]);
 
     // Globally-bound Markov-chain state. Guarded so the bind survives until the transport code
     // references the buffer (an unreferenced global is dead-code-eliminated from the layout).
@@ -186,7 +185,6 @@ void RenderMCPG::process(GraphRun& run,
     cmd->bind(pipe);
     ep->bind("scene", scene->get_shader_object(), cmd, pipe, obj_allocator);
     ep->bind("params", params_obj, cmd, pipe, obj_allocator);
-    ep->bind("irr_cache", irr_cache->get_shader_object(), cmd, pipe, obj_allocator);
     if (globals_obj)
         ep->bind_global(globals_obj, cmd, pipe, obj_allocator);
 
@@ -218,6 +216,9 @@ void RenderMCPG::update_render_constants() {
             "export static const float dir_guide_prior = {:f};\n"
             "export static const uint seed = {}u;\n"
             "export static const int debug_output_selector = {};\n"
+            "export static const uint lc_buffer_size = {}u;\n"
+            "export static const uint lc_probe_count = {}u;\n"
+            "export static const bool lc_stochastic_interpolation = {};\n"
             "export static const uint mc_adaptive_grid_type = {}u;\n"
             "export static const float mc_adaptive_grid_tan_alpha_half = {:f};\n"
             "export static const float mc_adaptive_grid_steps_per_unit_size = {:f};\n"
@@ -230,7 +231,9 @@ void RenderMCPG::update_render_constants() {
             (reference_mode || p_guiding == 0.0f) ? "true" : "false",
             use_light_cache_tail ? "true" : "false", missing_light_heuristic ? "true" : "false",
             mc_samples, mc_samples_adaptive_prob, p_guiding, dir_guide_prior, seed,
-            debug_output_selector, mc_adaptive_grid_type, mc_adaptive_grid_tan_alpha_half,
+            debug_output_selector, lc_buffer_size, lc_probe_count,
+            lc_stochastic_interpolation ? "true" : "false", mc_adaptive_grid_type,
+            mc_adaptive_grid_tan_alpha_half,
             mc_adaptive_grid_steps_per_unit_size, mc_adaptive_grid_min_width, mc_adaptive_grid_power,
             mc_adaptive_buffer_size, mc_static_grid_width, mc_static_buffer_size));
 }
@@ -293,6 +296,21 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
     config.st_separate("Light cache");
     constants_changed |= config.config_bool("surf: use LC", use_light_cache_tail,
                                             "Use the light cache for the path tail.");
+    bool recreate_cache = false;
+    recreate_cache |= config.config_uint("LC buffer size", lc_buffer_size,
+                                         "Number of cache slots backing the hash grid.", 1u,
+                                         100000000u);
+    recreate_cache |= config.config_uint("LC probe count", lc_probe_count,
+                                         "Slots probed before evicting (open addressing).", 1u, 16u);
+    recreate_cache |= config.config_bool("LC stochastic interpolation", lc_stochastic_interpolation,
+                                         "Jitter the grid cell per sample (smoother but noisier) "
+                                         "instead of snapping to the nearest cell.");
+    if (recreate_cache) {
+        irr_cache = std::make_shared<HashedIrradianceCache>(
+            resource_allocator, lc_buffer_size, lc_probe_count, lc_stochastic_interpolation);
+        if (composition)
+            update_render_constants();
+    }
     irr_cache->properties(config);
 
     config.st_separate("Resolution");

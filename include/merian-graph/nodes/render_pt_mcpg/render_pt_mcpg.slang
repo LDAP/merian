@@ -17,10 +17,15 @@ extern static const uint merian_render_instance_mask = 0xFFu;
 
 extern static const int debug_output_selector = 0;
 
+extern static const uint lc_buffer_size = 4000000;
+extern static const uint lc_probe_count = 4;
+extern static const bool lc_stochastic_interpolation = false;
+
 struct RenderBinding {
     ParameterBlock<GBuffer> gbuffer;
     RWTexture2D<float4> irradiance;
     RWTexture2D<float4> debug;
+    HashedIrradianceCache<lc_buffer_size, lc_probe_count, lc_stochastic_interpolation> irr_cache;
 };
 
 float3 trace_path(const ParameterBlock<Scene> scene,
@@ -73,8 +78,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
 }
 
 [shader("raygeneration")] void main(ParameterBlock<Scene> scene,
-                                    ParameterBlock<RenderBinding> params,
-                                    ParameterBlock<HashedIrradianceCache> irr_cache) {
+                                    ParameterBlock<RenderBinding> params) {
     const uint2 pixel = DispatchRaysIndex().xy;
     if (not_on_texture(pixel, params.irradiance))
         return;
@@ -112,8 +116,8 @@ float3 trace_path(const ParameterBlock<Scene> scene,
     const float3 prev_cam_pos = scene.prev_camera.position;
     const float3 primary_normal = primary_sp.get_face_normal();
     RandomGenerator cache_rng = XorShift32(pcg4d16(uint4(pixel, scene.frame, 0xCACE)));
-    irr_cache.update(primary_sp.pos, primary_normal, irradiance, cam_pos, prev_cam_pos, scene.frame,
-                     cache_rng);
+    params.irr_cache.update(primary_sp.pos, primary_normal, irradiance, cam_pos, prev_cam_pos,
+                            scene.frame, cache_rng);
 
     // Debug output. Guiding-specific selectors are filled in by the transport code; for now only
     // the always-available channels are wired.
@@ -122,9 +126,9 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         params.debug[pixel] = float4(second_moment.xxx, 1);
         break;
     case 2: // light cache
-        params.debug[pixel] =
-            float4(irr_cache.get(primary_sp.pos, primary_normal, cam_pos, prev_cam_pos, cache_rng),
-                   1);
+        params.debug[pixel] = float4(params.irr_cache.get(primary_sp.pos, primary_normal, cam_pos,
+                                                          prev_cam_pos, cache_rng),
+                                     1);
         break;
     default: // irradiance
         params.debug[pixel] = float4(irradiance, 1);
