@@ -9,20 +9,16 @@ using merian;
 
 namespace merian {
 extern static const bool merian_render_emission_on_primary = false;
+extern static const int merian_render_spp = 1;
+extern static const int merian_render_max_path_length = 8;
+extern static const uint merian_render_instance_mask = 0xFFu;
+extern static const bool merian_render_enable_ser = false;
 }
 
 struct RenderBinding {
     ParameterBlock<GBuffer> gbuffer;
     RWTexture2D<float4> irradiance;
 };
-
-struct PushConstant {
-    int spp;
-    int max_path_length;
-    uint instance_mask;
-};
-
-[vk::push_constant] ConstantBuffer<PushConstant> pc;
 
 float3 trace_path(const ParameterBlock<Scene> scene,
                   RayDesc ray,
@@ -34,16 +30,26 @@ float3 trace_path(const ParameterBlock<Scene> scene,
     float current_ior = 1.0f;
     float3 current_absorption = float3(0.0f);
 
-    for (int bounce = 1; bounce < pc.max_path_length; bounce++) {
+    for (int bounce = 1; bounce < merian_render_max_path_length; bounce++) {
+        if (all(throughput < 1e-5)) {
+            break;
+        }
+
         const OrthonormalFrame frame = sp.material.shading_frame;
         let bsdf = sp.material.get_bsdf();
         const float3 wi_local = frame.to_local(-ray.Direction);
-
         let sample = bsdf.sample_eval(wi_local, rng);
-        if (!sample.hasValue)
+        if (!sample.hasValue) {
             break;
-        const ShadingFunctionSample bs = sample.value;
+        }
 
+#if defined(MERIAN_SPIRV_CAP_SUPPORTED_ShaderInvocationReorderEXT)
+        if (merian_render_enable_ser) {
+            ReorderThread(0, 0);
+        }
+#endif
+
+        const ShadingFunctionSample bs = sample.value;
         const float3 wo = frame.to_world(bs.wo);
         throughput *= bs.weight;
 
@@ -60,7 +66,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         ray.TMin = SCENE_RAY_TMIN;
         ray.TMax = SCENE_RAY_TMAX;
 
-        sp = scene.trace_and_get_shading_point(ray, pc.instance_mask,
+        sp = scene.trace_and_get_shading_point(ray, merian_render_instance_mask,
                                                RenderContext(uint16_t(bounce), current_ior));
 
         // Beer-Lambert absorption over the segment just travelled inside the medium.
@@ -74,8 +80,8 @@ float3 trace_path(const ParameterBlock<Scene> scene,
     return radiance;
 }
 
-[shader("raygeneration")] void main(ParameterBlock<Scene> scene,
-                                    ParameterBlock<RenderBinding> params) {
+[shader("raygeneration")]
+void main(ParameterBlock<Scene> scene, ParameterBlock<RenderBinding> params) {
     const uint2 pixel = DispatchRaysIndex().xy;
     if (not_on_texture(pixel, params.irradiance))
         return;
@@ -90,7 +96,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
     float3 irradiance = float3(0);
     float second_moment = 0.f;
 
-    for (int s = 0; s < pc.spp; s++) {
+    for (int s = 0; s < merian_render_spp; s++) {
         RandomGenerator rng = XorShift32(pcg4d16(uint4(pixel, scene.frame, s)));
 
         const float3 contrib = trace_path(scene, primary_ray, primary_sp, rng);
@@ -101,9 +107,9 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         }
     }
 
-    if (pc.spp > 0) {
-        irradiance /= float(pc.spp);
-        second_moment /= float(pc.spp);
+    if (merian_render_spp > 0) {
+        irradiance /= float(merian_render_spp);
+        second_moment /= float(merian_render_spp);
     }
 
     params.irradiance[pixel] = float4(irradiance, second_moment);

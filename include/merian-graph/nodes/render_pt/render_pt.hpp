@@ -61,6 +61,7 @@ class RenderPT : public Node {
     int32_t max_path_length = 8;
     int32_t emitted_max_path_length = max_path_length;
     bool emission_on_primary = false;
+    bool enable_ser = false;
     std::array<bool, 8> mask_enabled{true, true, true, true, true, true, true, true};
 
     // Slang program + pipeline; rebuilt when the scene composition changes.
