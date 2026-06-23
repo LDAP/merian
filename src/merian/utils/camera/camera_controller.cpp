@@ -148,8 +148,8 @@ void CameraController::update(const double dt_seconds) {
     if (pending_pan != float2(0)) {
         // Scale by the target distance so panning keeps pace at any zoom.
         const float distance = merian::length(attached->get_position() - attached->get_target());
-        attached->move(-pending_pan.x * a * pan_sensitivity * distance,
-                       pending_pan.y * a * pan_sensitivity * distance, 0.0f);
+        attached->fly(-pending_pan.x * a * pan_sensitivity * distance,
+                      pending_pan.y * a * pan_sensitivity * distance, 0.0f);
         pending_pan *= keep;
         if (merian::length(pending_pan) < 1e-2f) {
             pending_pan = float2(0);
