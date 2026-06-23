@@ -69,14 +69,13 @@ struct Camera {
         RayDesc ray;
         const float2 ndc = pixel_to_ndc(pixel, frame_dimensions);
 
-        ray.Origin = position;
         ray.Direction = ndc.x * U + ndc.y * V + W;
 
         const float2 aperture_sample = sample_disk(rng);
-        const float3 ray_target = ray.Origin + ray.Direction;
-        ray.Origin += aperture_radius * (aperture_sample.x * normalize(U) +
-                                         aperture_sample.y * normalize(V));
-        ray.Direction = normalize(ray_target - ray.Origin);
+        const float3 aperture_offset = aperture_radius * (aperture_sample.x * normalize(U) +
+                                                          aperture_sample.y * normalize(V));
+        ray.Origin = position + aperture_offset;
+        ray.Direction = normalize(ray.Direction - aperture_offset);
 
         // account for curvature
         const float inv_cos = 1.f / dot(normalize(W), ray.Direction);
