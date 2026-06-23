@@ -17,8 +17,8 @@ using uint3 = merian::uint3;
 
 using half = merian::half;
 using half2 = merian::half2;
-using half3 = merian::half2;
-using half4 = merian::half2;
+using half3 = merian::half3;
+using half4 = merian::half4;
 
 #endif
 
