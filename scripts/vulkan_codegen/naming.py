@@ -59,15 +59,21 @@ def to_snake_case(name: str) -> str:
 def to_upper_case(name: str) -> str:
     """Convert CamelCase to UPPER_SNAKE_CASE."""
     result = ""
-    prev_lower = False
-    prev_digit = False
+    n = len(name)
 
-    for c in name:
-        if c.isupper() and (prev_lower or prev_digit) or (c.isdigit() and prev_lower):
+    for i, c in enumerate(name):
+        prev = name[i - 1] if i > 0 else ""
+        nxt = name[i + 1] if i + 1 < n else ""
+        if (
+            result
+            and result[-1] != "_"
+            and (
+                (c.isupper() and (prev.islower() or prev.isdigit() or nxt.islower()))
+                or (c.isdigit() and prev.islower())
+            )
+        ):
             result += "_"
         result += c.upper()
-        prev_lower = c.islower()
-        prev_digit = c.isdigit()
 
     return result
 
