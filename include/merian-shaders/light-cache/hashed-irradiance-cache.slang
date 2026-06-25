@@ -33,8 +33,8 @@ struct HashedIrradianceCache<let BUFFER_SIZE : uint,
 
     uint level_for_pos(const float3 pos, const float3 cam_pos) {
         const float w = target_grid_width(pos, cam_pos);
-        return uint(round(grid_steps_per_unit_size *
-                          log(max(w, grid_min_width) / grid_min_width) / log(grid_power)));
+        return uint(round(grid_steps_per_unit_size * log(max(w, grid_min_width) / grid_min_width) /
+                          log(grid_power)));
     }
 
     float grid_width_for_level(const uint level) {
@@ -55,11 +55,19 @@ struct HashedIrradianceCache<let BUFFER_SIZE : uint,
         return hash_key(gidx, normal, level) % BUFFER_SIZE;
     }
 
+    uint collision_key(const int3 gidx, const float3 normal, const uint level) {
+        const uint cube = cubemap_side(normal);
+        return xorshift128(uint4(uint4(gidx, level << 16 | cubemap_side(normal))));
+        // return (uint(gidx.x) & 0xFFu) | ((uint(gidx.y) & 0xFFu) << 8u) |
+        //        ((uint(gidx.z) & 0xFFu) << 16u) | ((level & 0x1Fu) << 24u) | ((cube & 0x7u) <<
+        //        29u);
+    }
+
     Optional<QueryResult>
     get_level(const uint level, const float3 pos, const float3 normal, inout RandomGenerator rng) {
         const int3 gidx = grid_idx(pos, grid_width_for_level(level), rng);
         const uint base = buffer_index(gidx, normal, level);
-        const uint hash = pcg4d16(uint4(gidx, level));
+        const uint hash = collision_key(gidx, normal, level);
 
         for (uint i = 0; i < PROBE_COUNT; i++) {
             uint idx = base + i;
@@ -113,10 +121,11 @@ struct HashedIrradianceCache<let BUFFER_SIZE : uint,
         const uint level = level_for_pos(pos, cam_pos);
         const int3 gidx = grid_idx(pos, grid_width_for_level(level), rng);
         const uint base = buffer_index(gidx, normal, level);
-        const uint hash = pcg4d16(uint4(gidx, level));
+        const uint hash = collision_key(gidx, normal, level);
 
         // Evict least-recently-touched slot.
-        // nice: an uninitialized slot might have a timestamp in the future, so its unsigned age wraps and is reclaimed first (self-healing).
+        // nice: an uninitialized slot might have a timestamp in the future, so its unsigned age
+        // wraps and is reclaimed first (self-healing).
         uint target = base;
         uint max_age = 0;
         for (uint i = 0; i < PROBE_COUNT; i++) {
@@ -169,3 +178,12 @@ struct HashedIrradianceCache<let BUFFER_SIZE : uint,
     }
 }
 }
+
+
+    
+    
+
+
+
+
+
