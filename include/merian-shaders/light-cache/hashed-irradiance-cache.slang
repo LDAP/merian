@@ -31,10 +31,13 @@ struct HashedIrradianceCache<let BUFFER_SIZE : uint,
         return 2 * grid_tan_alpha_half * max(abs_dist.x, max(abs_dist.y, abs_dist.z));
     }
 
-    uint level_for_pos(const float3 pos, const float3 cam_pos) {
+    uint level_for_pos(const float3 pos, const float3 cam_pos, inout RandomGenerator rng) {
         const float w = target_grid_width(pos, cam_pos);
-        return uint(round(grid_steps_per_unit_size * log(max(w, grid_min_width) / grid_min_width) /
-                          log(grid_power)));
+        const float level = grid_steps_per_unit_size *
+                            log(max(w, grid_min_width) / grid_min_width) / log(grid_power);
+        // if (STOCHASTIC_INTERPOLATION)
+        //     return uint(floor(level) + select(rng.next_float() < fract(level), 1.0, 0.0));
+        return uint(round(level));
     }
 
     float grid_width_for_level(const uint level) {
@@ -84,7 +87,7 @@ struct HashedIrradianceCache<let BUFFER_SIZE : uint,
 
     half3
     get(const float3 pos, const float3 normal, const float3 cam_pos, inout RandomGenerator rng) {
-        const uint level = level_for_pos(pos, cam_pos);
+        const uint level = level_for_pos(pos, cam_pos, rng);
         if (let r = get_level(level, pos, normal, rng)) {
             return r.irr;
         }
@@ -96,11 +99,11 @@ struct HashedIrradianceCache<let BUFFER_SIZE : uint,
               const float3 cam_pos,
               const float3 prev_cam_pos,
               inout RandomGenerator rng) {
-        const uint level = level_for_pos(pos, cam_pos);
+        const uint level = level_for_pos(pos, cam_pos, rng);
         if (let r = get_level(level, pos, normal, rng)) {
             return r.irr;
         } else if (any(cam_pos != prev_cam_pos)) {
-            const uint prev_level = level_for_pos(pos, prev_cam_pos);
+            const uint prev_level = level_for_pos(pos, prev_cam_pos, rng);
             if (level != prev_level) {
                 if (let r = get_level(prev_level, pos, normal, rng)) {
                     return r.irr;
@@ -118,7 +121,7 @@ struct HashedIrradianceCache<let BUFFER_SIZE : uint,
                 const float3 prev_cam_pos,
                 const uint frame,
                 inout RandomGenerator rng) {
-        const uint level = level_for_pos(pos, cam_pos);
+        const uint level = level_for_pos(pos, cam_pos, rng);
         const int3 gidx = grid_idx(pos, grid_width_for_level(level), rng);
         const uint base = buffer_index(gidx, normal, level);
         const uint hash = collision_key(gidx, normal, level);
@@ -159,7 +162,7 @@ struct HashedIrradianceCache<let BUFFER_SIZE : uint,
             vtx.hash = hash;
 
             if (any(cam_pos != prev_cam_pos)) {
-                let prev_level = level_for_pos(pos, prev_cam_pos);
+                let prev_level = level_for_pos(pos, prev_cam_pos, rng);
                 if (prev_level != level) {
                     if (let result = get_level(prev_level, pos, normal, rng)) {
                         vtx.irr = result.irr;
@@ -177,13 +180,4 @@ struct HashedIrradianceCache<let BUFFER_SIZE : uint,
         irr_cache[target] = vtx;
     }
 }
-}
-
-
-    
-    
-
-
-
-
-
+} // namespace merian

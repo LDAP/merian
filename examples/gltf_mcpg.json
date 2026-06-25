@@ -187,6 +187,9 @@
                 "5": true,
                 "6": true,
                 "7": true,
+                "LC buffer size": 4000037,
+                "LC probe count": 4,
+                "LC stochastic interpolation": true,
                 "ML prior": 0.20000000298023224,
                 "adaptive grid buf size": 32777259,
                 "adaptive grid min width": 0.009999999776482582,
@@ -195,7 +198,6 @@
                 "adaptive grid steps per unit": 1.0,
                 "adaptive grid tan(alpha/2)": 0.003000000026077032,
                 "adaptive grid type": "exponential",
-                "buffer capacity": 4000000,
                 "debug output": "light cache",
                 "emission on primary": true,
                 "grid min width": 0.0010000000474974513,
@@ -323,9 +325,9 @@
         "report intervall": 50,
         "run": {
             "cpu auto": true,
-            "cpu max ms": 4706.611328125,
+            "cpu max ms": 1545.2940673828125,
             "gpu auto": true,
-            "gpu max ms": 54.16039276123047
+            "gpu max ms": 13.21842098236084
         }
     },
     "version": 3
