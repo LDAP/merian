@@ -94,7 +94,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
     float second_moment = 0.f;
 
     for (int s = 0; s < merian_render_spp; s++) {
-        RandomGenerator rng = XorShift32(pcg4d16(uint4(pixel, scene.frame, s)));
+        RandomGenerator rng = PCG(pcg4d16(uint4(pixel, scene.frame, s)));
 
         const float3 contrib = trace_path(scene, primary_ray, primary_sp, rng);
         if (!any(isnan(contrib)) && !any(isinf(contrib))) {

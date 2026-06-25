@@ -305,13 +305,16 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
     recreate_cache |= config.config_bool("LC stochastic interpolation", lc_stochastic_interpolation,
                                          "Jitter the grid cell per sample (smoother but noisier) "
                                          "instead of snapping to the nearest cell.");
-    if (recreate_cache) {
-        irr_cache = std::make_shared<HashedIrradianceCache>(
-            resource_allocator, lc_buffer_size, lc_probe_count, lc_stochastic_interpolation);
-        if (composition)
-            update_render_constants();
+    // Fail gracefully if compilation fails.
+    if (irr_cache) {
+        if (recreate_cache) {
+            irr_cache = std::make_shared<HashedIrradianceCache>(
+                resource_allocator, lc_buffer_size, lc_probe_count, lc_stochastic_interpolation);
+            if (composition)
+                update_render_constants();
+        }
+        irr_cache->properties(config);
     }
-    irr_cache->properties(config);
 
     config.st_separate("Resolution");
     needs_reconnect |= config.config_uint("width", &extent.width);

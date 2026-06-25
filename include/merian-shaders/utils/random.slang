@@ -1,4 +1,5 @@
 import "merian-shaders/utils/bit-twiddling.slang";
+import merian_shaders.utils.hash;
 
 namespace merian {
 
@@ -66,11 +67,42 @@ struct XorShift32 : RandomGenerator {
 
     [mutating]
     uint next() {
-        state ^= (state << uint(13));
-        state ^= (state >> uint(17));
-        state ^= (state << uint(5));
-
+        state = xorshift32(state);
         return state;
+    }
+}
+
+struct Wang : RandomGenerator {
+    uint state;
+
+    __init(uint seed) {
+        this.state = seed;
+    }
+
+    [mutating]
+    uint next() {
+        state = (state ^ 61) ^ (state >> 16);
+        state *= 9;
+        state = state ^ (state >> 4);
+        state *= 0x27d4eb2d;
+        state = state ^ (state >> 15);
+        return state;
+    }
+}
+
+struct PCG : RandomGenerator {
+    uint state;
+
+    __init(uint seed) {
+        this.state = seed;
+    }
+
+    [mutating]
+    uint next() {
+        uint s = state;
+        state = state * 747796405u + 2891336453u;
+        uint word = ((s >> ((s >> 28u) + 4u)) ^ s) * 277803737u;
+        return (word >> 22u) ^ word;
     }
 }
 

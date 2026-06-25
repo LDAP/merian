@@ -1,12 +1,16 @@
 #include "merian-shaders/light-cache/light-cache.slangh"
 
+import merian_shaders.utils.envmap;
 import merian_shaders.utils.grid;
+import merian_shaders.utils.hash;
 import merian_shaders.utils.random;
 
 namespace merian {
 
 static const uint16_t HASHED_IRR_CACHE_MAX_N = 128;
 static const float HASHED_IRR_CACHE_MIN_ALPHA = 0.01;
+// High bit of the lock word marks an in-flight update; the low bits hold the last-touched frame.
+static const uint HASHED_IRR_CACHE_LOCK_BIT = 0x80000000u;
 
 struct HashedIrradianceCache<let BUFFER_SIZE : uint,
                              let PROBE_COUNT : uint = 4,
@@ -43,11 +47,19 @@ struct HashedIrradianceCache<let BUFFER_SIZE : uint,
         return grid_idx_closest(pos, width);
     }
 
+    uint hash_key(const int3 gidx, const float3 normal, const uint level) {
+        return xxhash32(uint4(gidx, level << 16 | cubemap_side(normal)));
+    }
+
+    uint buffer_index(const int3 gidx, const float3 normal, const uint level) {
+        return hash_key(gidx, normal, level) % BUFFER_SIZE;
+    }
+
     Optional<QueryResult>
     get_level(const uint level, const float3 pos, const float3 normal, inout RandomGenerator rng) {
         const int3 gidx = grid_idx(pos, grid_width_for_level(level), rng);
-        const uint base = hash_grid_normal_level(uint3(gidx), normal, level, BUFFER_SIZE);
-        const uint hash = hash2_grid_level(gidx, level);
+        const uint base = buffer_index(gidx, normal, level);
+        const uint hash = pcg4d16(uint4(gidx, level));
 
         for (uint i = 0; i < PROBE_COUNT; i++) {
             uint idx = base + i;
@@ -100,11 +112,13 @@ struct HashedIrradianceCache<let BUFFER_SIZE : uint,
                 inout RandomGenerator rng) {
         const uint level = level_for_pos(pos, cam_pos);
         const int3 gidx = grid_idx(pos, grid_width_for_level(level), rng);
-        const uint base = hash_grid_normal_level(uint3(gidx), normal, level, BUFFER_SIZE);
-        const uint hash = hash2_grid_level(gidx, level);
+        const uint base = buffer_index(gidx, normal, level);
+        const uint hash = pcg4d16(uint4(gidx, level));
 
+        // Evict least-recently-touched slot.
+        // nice: an uninitialized slot might have a timestamp in the future, so its unsigned age wraps and is reclaimed first (self-healing).
         uint target = base;
-        uint16_t min_N = uint16_t(0xFFFF);
+        uint max_age = 0;
         for (uint i = 0; i < PROBE_COUNT; i++) {
             uint idx = base + i;
             if (idx >= BUFFER_SIZE)
@@ -114,15 +128,17 @@ struct HashedIrradianceCache<let BUFFER_SIZE : uint,
                 target = idx;
                 break;
             }
-            if (probe.N < min_N) {
-                min_N = probe.N;
+            const uint age = frame - (probe.lock & ~HASHED_IRR_CACHE_LOCK_BIT);
+            if (age >= max_age) {
+                max_age = age;
                 target = idx;
             }
         }
 
+        const uint locked = frame | HASHED_IRR_CACHE_LOCK_BIT;
         uint old;
-        InterlockedExchange(irr_cache[target].lock, frame, old);
-        if (old == frame) {
+        InterlockedExchange(irr_cache[target].lock, locked, old);
+        if (old == locked) {
             return;
         }
 
@@ -148,8 +164,8 @@ struct HashedIrradianceCache<let BUFFER_SIZE : uint,
         vtx.irr =
             half3(lerp(float3(vtx.irr), irr, max(1.0 / float(vtx.N), HASHED_IRR_CACHE_MIN_ALPHA)));
 
+        vtx.lock = frame & ~HASHED_IRR_CACHE_LOCK_BIT;
         irr_cache[target] = vtx;
-        irr_cache[target].lock = 0;
     }
 }
 }

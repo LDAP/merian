@@ -1,5 +1,3 @@
-import "merian-shaders/utils/envmap.slang";
-
 namespace merian {
 
 // Determines the grid cell of pos and returns the lower vertex indices.
@@ -97,47 +95,7 @@ int2 grid_idx_interpolate(const float2 pos, const float cell_width, const float 
     return grid_idx_lower(pos, cell_width);
 }
 
-// See Müller et al. (2022): Instant Neural Graphics Primitives with a Multiresolution Hash Encoding
-// Müller et al. uses 1 for X but we observed artifacts when doing so
-#define GRID_PRIME_X 6477089
-#define GRID_PRIME_Y 2654435761
-#define GRID_PRIME_Z 805459861
-
-// Hashes the grid index, for x nothing is multiplied for better cache coherence.
-uint hash_grid(const uint3 index, const uint modulus) {
-    return ((index.x * GRID_PRIME_X) ^ (index.y * GRID_PRIME_Y) ^ (index.z * GRID_PRIME_Z)) %
-           modulus;
-}
-
-// like hash_grid but with simple normal biasing
-uint hash_grid_normal(const uint3 index, const float3 normal, const uint modulus) {
-    const uint cube = cubemap_side(normal + 1e-3);
-    return ((index.x * GRID_PRIME_X) ^ (index.y * GRID_PRIME_Y) ^ (index.z * GRID_PRIME_Z) ^
-            (9351217 * cube + 13 * cube)) %
-           modulus;
-}
-
-uint hash_grid_normal_level(const uint3 index,
-                            const float3 normal,
-                            const uint level,
-                            const uint modulus) {
-    const uint cube = cubemap_side(normal + 1e-3);
-    return ((index.x * GRID_PRIME_X) ^ (index.y * GRID_PRIME_Y) ^ (index.z * GRID_PRIME_Z) ^
-            (cube | (level << 16) * 723850877)) %
-           modulus;
-}
-
-uint hash_grid_level(const uint3 index, const uint level, const uint modulus) {
-    return ((index.x * GRID_PRIME_X) ^ (index.y * GRID_PRIME_Y) ^ (index.z * GRID_PRIME_Z) ^
-            (723850877 * level + 231961 * level)) %
-           modulus;
-}
-
-// Like hash_grid but modulus must be a power of two
-uint hash_grid_2(const int3 index, const uint modulus_power_of_two) {
-    return ((index.x * GRID_PRIME_X) ^ (index.y * GRID_PRIME_Y) ^ (index.z * GRID_PRIME_Z)) &
-           (modulus_power_of_two - 1);
-}
+// -------------------------------------------------
 
 // Level in [0, max_level]. Higher levels have greater width.
 // Claculates b such that min_width * b^max_level = max_width then min_width * b^level is returned.
@@ -164,21 +122,6 @@ float cell_width_for_level_linear(const float level,
                                   const float min_width,
                                   const float max_width) {
     return lerp(min_width, max_width, level / max_level);
-}
-
-#define GRID_PRIME_X_2 74763401
-#define GRID_PRIME_Y_2 2254437599
-#define GRID_PRIME_Z_2 508460413
-
-// Second hash function for collision detection
-uint hash2_grid(const int3 index) {
-    return (index.x * GRID_PRIME_X_2) ^ (index.y * GRID_PRIME_Y_2) ^ (index.z * GRID_PRIME_Z_2);
-}
-
-// Second hash function for collision detection
-uint hash2_grid_level(const int3 index, const uint level) {
-    return (index.x * GRID_PRIME_X_2) ^ (index.y * GRID_PRIME_Y_2) ^ (index.z * GRID_PRIME_Z_2) ^
-           (9351217 * level + 13 * level);
 }
 
 }
