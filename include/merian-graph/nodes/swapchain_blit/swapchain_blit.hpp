@@ -28,7 +28,7 @@ class SwapchainBlit : public Node {
     uint32_t current_src_array_size = 0;
     BlitMode mode = FIT;
 
-    VkImageInHandle con_src = VkImageIn::transfer_src(0, false);
+    VkImageInHandle con_src = VkImageIn::transfer_src(0, true);
     PtrInHandle<SwapchainAcquireResult> con_acquire = PtrIn<SwapchainAcquireResult>::create();
     // Passed through so further nodes (e.g. ImGui) chain after this blit and render on top.
     PtrOutHandle<SwapchainAcquireResult> con_acquire_out = PtrOut<SwapchainAcquireResult>::create();
