@@ -219,7 +219,10 @@ float Camera::get_aperture_radius() const noexcept {
     return focal_length / (2.f * f_number);
 }
 
-float Camera::get_focus_distance() const noexcept {
+float Camera::get_focus_distance() noexcept {
+    if (focus_distance_on_target) {
+        focus_distance = merian::length(target - position);
+    }
     return focus_distance;
 }
 
@@ -313,15 +316,16 @@ void Camera::write_to(ShaderCursor cursor) {
     const float half_vfov_tan = std::tan(field_of_view * 0.5f);
     const float3& fwd = get_forward();
     const float3& rgt = get_right();
+    const float focus = get_focus_distance();
 
     cursor["position"] = position;
     cursor["target"] = target;
     cursor["up"] = up;
     // basis scaled so position + ndc.x * U + ndc.y * V + W lies on the plane of perfect focus;
     // normalized directions and projections are invariant to the scale.
-    cursor["U"] = rgt * (half_vfov_tan * aspect_ratio * focus_distance);
-    cursor["V"] = cross(rgt, fwd) * (half_vfov_tan * focus_distance);
-    cursor["W"] = fwd * focus_distance;
+    cursor["U"] = rgt * (half_vfov_tan * aspect_ratio * focus);
+    cursor["V"] = cross(rgt, fwd) * (half_vfov_tan * focus);
+    cursor["W"] = fwd * focus;
     cursor["near"] = near_plane;
     cursor["far"] = far_plane;
     cursor["aspect_ratio"] = aspect_ratio;
@@ -478,6 +482,13 @@ void Camera::properties(Properties& props) {
     }
     if (props.config_float("focus distance", focus_distance,
                            "distance to the plane of perfect focus", 0.001f, 0.01f, 20.0f)) {
+        focus_distance_on_target = false;
+        projection_change_id++;
+    }
+    if (props.config_bool("focus on target", focus_distance_on_target,
+                          "lock the focus distance to the distance to the target") &&
+        focus_distance_on_target) {
+        focus_distance = merian::length(target - position);
         projection_change_id++;
     }
 

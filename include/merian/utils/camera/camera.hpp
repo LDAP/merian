@@ -117,7 +117,7 @@ class Camera {
     // vertical FOV on a full-frame sensor; assumes 1 scene unit = 1 meter. 0 = pinhole.
     float get_aperture_radius() const noexcept;
 
-    float get_focus_distance() const noexcept;
+    float get_focus_distance() noexcept;
 
     const float3& get_forward() noexcept;
     const float3& get_right() noexcept;
@@ -204,7 +204,8 @@ class Camera {
     float near_plane;
     float far_plane;
     float f_number = 0.f;       // f-number of the lens; 0 = pinhole
-    float focus_distance = 1.f; // distance to the plane of perfect focus, in scene units
+    float focus_distance = 1.f;            // distance to the plane of perfect focus, in scene units
+    bool focus_distance_on_target = true; // lock focus_distance to the distance to the target
 
     // Increase whenever fov, aspect_ratio, near_plane or far_plane changes
     uint32_t projection_change_id = 0;
