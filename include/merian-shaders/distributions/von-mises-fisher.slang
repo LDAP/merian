@@ -55,7 +55,7 @@ float vmf_get_kappa(float max_pdf) {
                          (-1.12718 * max_pdf * max_pdf + 29.1433 * max_pdf + 1.0));
 }
 
-struct VonMisesFisher3<bool centered> : Distribution<float3> {
+struct VonMisesFisher3<bool centered = false> : Distribution<float3> {
     float kappa;
     Conditional<float3, centered> c_mu;
 

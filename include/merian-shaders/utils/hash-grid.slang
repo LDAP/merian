@@ -33,12 +33,27 @@ struct HashGrid<typename T,
         return 2 * grid_tan_alpha_half * max(abs_dist.x, max(abs_dist.y, abs_dist.z));
     }
 
-    uint level_for_pos(const float3 pos, const float3 cam_pos, inout RandomGenerator rng) {
+    float
+    target_level_for_pos_f(const float3 pos, const float3 cam_pos, inout RandomGenerator rng) {
         const float w = target_grid_width(pos, cam_pos);
-        const float level = grid_steps_per_unit_size *
-                            log(max(w, grid_min_width) / grid_min_width) / log(grid_power);
+        return grid_steps_per_unit_size * log(max(w, grid_min_width) / grid_min_width) /
+               log(grid_power);
+    }
+
+    uint target_level_for_pos(const float3 pos, const float3 cam_pos, inout RandomGenerator rng) {
+        const float level = target_level_for_pos_f(pos, cam_pos, rng);
         // if (STOCHASTIC_INTERPOLATION)
         //     return uint(floor(level) + select(rng.next_float() < fract(level), 1.0, 0.0));
+        return uint(round(level));
+    }
+
+    // Attemps to keep expected value of threads threads per cell constant
+    uint
+    distributed_level_for_pos(const float3 pos, const float3 cam_pos, inout RandomGenerator rng) {
+        // / 2 if surface, / 3 if volume -> we use / 3 to bias a bit towards finer levels
+        const float level =
+            target_level_for_pos_f(pos, cam_pos, rng) +
+            (-grid_steps_per_unit_size / 3 * log(1.0 - rng.next_float()) / log(grid_power));
         return uint(round(level));
     }
 
@@ -52,12 +67,12 @@ struct HashGrid<typename T,
         return grid_idx_closest(pos, width);
     }
 
-    uint hash_key(const int3 gidx, const float3 normal, const uint level) {
-        return xxhash32(uint4(gidx, level << 16 | cubemap_side(normal + 1e-3)));
+    uint hash_key(const int3 gidx, const uint level) {
+        return xxhash32(uint4(gidx, level));
     }
 
-    uint buffer_index(const int3 gidx, const float3 normal, const uint level) {
-        return hash_key(gidx, normal, level) % BUFFER_SIZE;
+    uint buffer_index(const int3 gidx, const uint level) {
+        return hash_key(gidx, level) % BUFFER_SIZE;
     }
 
     uint collision_key(const int3 gidx, const float3 normal, const uint level) {
@@ -68,11 +83,15 @@ struct HashGrid<typename T,
         //        29u);
     }
 
-    Optional<T>
-    get_level(const uint level, const float3 pos, const float3 normal, inout RandomGenerator rng) {
-        const int3 gidx = grid_idx(pos, grid_width_for_level(level), rng);
-        uint buffer_idx = buffer_index(gidx, normal, level);
-        const uint hash = collision_key(gidx, normal, level);
+    uint collision_key(const int3 gidx, const uint level) {
+        return xorshift128(uint4(uint4(gidx, level)));
+    }
+
+    Optional<T> get_grid_idx_at_level(const int3 gidx,
+                                      const uint level,
+                                      const uint hash,
+                                      inout RandomGenerator rng) {
+        uint buffer_idx = buffer_index(gidx, level);
 
         for (uint i = 0; i < PROBE_COUNT; i++) {
             let vtx = buffer[buffer_idx];
@@ -89,10 +108,40 @@ struct HashGrid<typename T,
         return none;
     }
 
+    Optional<T> get_grid_idx_at_level(const int3 gidx,
+                                      const uint level,
+                                      const float3 normal,
+                                      inout RandomGenerator rng) {
+        const uint hash = collision_key(gidx, normal, level);
+        return get_grid_idx_at_level(gidx, level, hash, rng);
+    }
+
+    Optional<T>
+    get_grid_idx_at_level(const int3 gidx, const uint level, inout RandomGenerator rng) {
+        const uint hash = collision_key(gidx, level);
+        return get_grid_idx_at_level(gidx, level, hash, rng);
+    }
+
+    Optional<T>
+    get_level(const uint level, const float3 pos, const float3 normal, inout RandomGenerator rng) {
+        const int3 gidx = grid_idx(pos, grid_width_for_level(level), rng);
+        return get_grid_idx_at_level(gidx, level, normal, rng);
+    }
+
     Optional<T>
     get(const float3 pos, const float3 normal, const float3 cam_pos, inout RandomGenerator rng) {
-        const uint level = level_for_pos(pos, cam_pos, rng);
+        const uint level = target_level_for_pos(pos, cam_pos, rng);
         return get_level(level, pos, normal, rng);
+    }
+
+    Optional<T> get_level(const uint level, const float3 pos, inout RandomGenerator rng) {
+        const int3 gidx = grid_idx(pos, grid_width_for_level(level), rng);
+        return get_grid_idx_at_level(gidx, level, rng);
+    }
+
+    Optional<T> get(const float3 pos, const float3 cam_pos, inout RandomGenerator rng) {
+        const uint level = target_level_for_pos(pos, cam_pos, rng);
+        return get_level(level, pos, rng);
     }
 
     Optional<T> get(const float3 pos,
@@ -100,11 +149,11 @@ struct HashGrid<typename T,
                     const float3 cam_pos,
                     const float3 prev_cam_pos,
                     inout RandomGenerator rng) {
-        const uint level = level_for_pos(pos, cam_pos, rng);
+        const uint level = target_level_for_pos(pos, cam_pos, rng);
         if (let r = get_level(level, pos, normal, rng)) {
             return r;
         } else if (any(cam_pos != prev_cam_pos)) {
-            const uint prev_level = level_for_pos(pos, prev_cam_pos, rng);
+            const uint prev_level = target_level_for_pos(pos, prev_cam_pos, rng);
             if (level != prev_level) {
                 return get_level(prev_level, pos, normal, rng);
             }
@@ -113,17 +162,34 @@ struct HashGrid<typename T,
         return none;
     }
 
-    void update(const float3 pos,
-                const float3 normal,
-                const float3 cam_pos,
-                const float3 prev_cam_pos,
-                const uint frame,
-                HashGridUpdateFunction<T> update,
-                inout RandomGenerator rng) {
-        const uint level = level_for_pos(pos, cam_pos, rng);
+    Optional<T> distributed_get(const float3 pos,
+                                const float3 normal,
+                                const float3 cam_pos,
+                                inout RandomGenerator rng) {
+        const uint level = distributed_level_for_pos(pos, cam_pos, rng);
+        return get_level(level, pos, normal, rng);
+    }
+
+    Optional<T> distributed_get(const float3 pos, const float3 cam_pos, inout RandomGenerator rng) {
+        const uint level = distributed_level_for_pos(pos, cam_pos, rng);
+        return get_level(level, pos, rng);
+    }
+
+    void update_at_level<let has_normal : bool>(const uint level,
+                                                const float3 pos,
+                                                const float3 normal,
+                                                const float3 prev_cam_pos,
+                                                const uint frame,
+                                                HashGridUpdateFunction<T> update,
+                                                inout RandomGenerator rng) {
         const int3 gidx = grid_idx(pos, grid_width_for_level(level), rng);
-        const uint base = buffer_index(gidx, normal, level);
-        const uint hash = collision_key(gidx, normal, level);
+        const uint base = buffer_index(gidx, level);
+
+        uint hash;
+        if (has_normal)
+            hash = collision_key(gidx, normal, level);
+        else
+            hash = collision_key(gidx, level);
 
         // Evict least-recently-touched slot.
         // nice: an uninitialized slot might have a timestamp in the future, so its unsigned age
@@ -159,11 +225,15 @@ struct HashGrid<typename T,
 
         if (vtx.hash != hash) {
             vtx.hash = hash;
-            const uint prev_level = level_for_pos(pos, prev_cam_pos, rng);
+            const uint prev_level = target_level_for_pos(pos, prev_cam_pos, rng);
             if (level != prev_level) {
-                if (let r = get_level(prev_level, pos, normal, rng)) {
-                    vtx.data = r;
-                }
+                Optional<T> r;
+                if (has_normal)
+                    r = get_level(prev_level, pos, normal, rng);
+                else
+                    r = get_level(prev_level, pos, rng);
+                if (let v = r)
+                    vtx.data = v;
             }
         }
 
@@ -171,6 +241,48 @@ struct HashGrid<typename T,
 
         vtx.lock = frame & ~MERIAN_HASH_GRID_LOCK_BIT;
         buffer[target] = vtx;
+    }
+
+    void update(const float3 pos,
+                const float3 normal,
+                const float3 cam_pos,
+                const float3 prev_cam_pos,
+                const uint frame,
+                HashGridUpdateFunction<T> update,
+                inout RandomGenerator rng) {
+        update_at_level<true>(target_level_for_pos(pos, cam_pos, rng), pos, normal, prev_cam_pos,
+                              frame, update, rng);
+    }
+
+    void update(const float3 pos,
+                const float3 cam_pos,
+                const float3 prev_cam_pos,
+                const uint frame,
+                HashGridUpdateFunction<T> update,
+                inout RandomGenerator rng) {
+        update_at_level<false>(target_level_for_pos(pos, cam_pos, rng), pos,
+                               float3(0), prev_cam_pos, frame, update, rng);
+    }
+
+    void distributed_update(const float3 pos,
+                            const float3 normal,
+                            const float3 cam_pos,
+                            const float3 prev_cam_pos,
+                            const uint frame,
+                            HashGridUpdateFunction<T> update,
+                            inout RandomGenerator rng) {
+        update_at_level<true>(distributed_level_for_pos(pos, cam_pos, rng), pos, normal,
+                              prev_cam_pos, frame, update, rng);
+    }
+
+    void distributed_update(const float3 pos,
+                            const float3 cam_pos,
+                            const float3 prev_cam_pos,
+                            const uint frame,
+                            HashGridUpdateFunction<T> update,
+                            inout RandomGenerator rng) {
+        update_at_level<false>(distributed_level_for_pos(pos, cam_pos, rng), pos,
+                               float3(0), prev_cam_pos, frame, update, rng);
     }
 }
 
