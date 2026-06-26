@@ -1,8 +1,19 @@
-__exported import "grid.slang";
 import merian_shaders.utils.grid;
 import merian_shaders.utils.random;
 
 using merian;
+
+static const uint MAX_DISTANCE_MC_VERTEX_STATE_COUNT = 10;
+
+struct DistanceMCState {
+    float sum_w;
+    uint N;
+    float2 moments;
+};
+
+struct DistanceMCVertex {
+    DistanceMCState states[MAX_DISTANCE_MC_VERTEX_STATE_COUNT];
+};
 
 static const uint DISTANCE_ML_MAX_N = 1024;
 static const float DISTANCE_ML_MIN_ALPHA = 0.01;

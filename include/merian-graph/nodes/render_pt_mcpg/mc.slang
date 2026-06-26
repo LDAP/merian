@@ -1,8 +1,22 @@
-__exported import "grid.slang";
 import merian_shaders.utils.grid;
 import merian_shaders.utils.random;
 
 using merian;
+
+static const uint GRID_TYPE_EXPONENTIAL = 0;
+static const uint GRID_TYPE_QUADRATIC = 1;
+
+struct MCState {
+    float3 w_tgt;
+    float sum_w;
+    float w_cos;
+
+    half3 mv;
+    float T;
+
+    uint16_t N;
+    uint16_t hash; // grid_idx and level
+};
 
 static const uint16_t ML_MAX_N = 1024;
 static const float ML_MIN_ALPHA = 0.01;

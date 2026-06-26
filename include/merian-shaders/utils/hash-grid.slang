@@ -1,5 +1,3 @@
-#include "merian-shaders/light-cache/light-cache.slangh"
-
 import merian_shaders.utils.envmap;
 import merian_shaders.utils.grid;
 import merian_shaders.utils.hash;
@@ -55,7 +53,7 @@ struct HashGrid<typename T,
     }
 
     uint hash_key(const int3 gidx, const float3 normal, const uint level) {
-        return xxhash32(uint4(gidx, level << 16 | cubemap_side(normal)));
+        return xxhash32(uint4(gidx, level << 16 | cubemap_side(normal + 1e-3)));
     }
 
     uint buffer_index(const int3 gidx, const float3 normal, const uint level) {
@@ -63,8 +61,8 @@ struct HashGrid<typename T,
     }
 
     uint collision_key(const int3 gidx, const float3 normal, const uint level) {
-        const uint cube = cubemap_side(normal);
-        return xorshift128(uint4(uint4(gidx, level << 16 | cubemap_side(normal))));
+        const uint cube = cubemap_side(normal + 1e-3);
+        return xorshift128(uint4(uint4(gidx, level << 16 | cube)));
         // return (uint(gidx.x) & 0xFFu) | ((uint(gidx.y) & 0xFFu) << 8u) |
         //        ((uint(gidx.z) & 0xFFu) << 16u) | ((level & 0x1Fu) << 24u) | ((cube & 0x7u) <<
         //        29u);

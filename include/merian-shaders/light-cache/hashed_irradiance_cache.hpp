@@ -1,6 +1,7 @@
 #pragma once
 
-#include "merian-shaders/light-cache/light-cache.slangh"
+#include "merian-shaders/utils/hash_grid.hpp"
+#include "merian/shader/shader_compile_context.hpp"
 #include "merian/shader/shader_cursor.hpp"
 #include "merian/shader/slang_composition.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
@@ -11,9 +12,10 @@ namespace merian {
 
 class Properties;
 
-class HashedIrradianceCache : public std::enable_shared_from_this<HashedIrradianceCache> {
+class HashedIrradianceCache {
   public:
-    HashedIrradianceCache(const ResourceAllocatorHandle& allocator,
+    HashedIrradianceCache(const ShaderCompileContextHandle& compile_context,
+                          const ResourceAllocatorHandle& allocator,
                           uint32_t buffer_size,
                           uint32_t probe_count = 4,
                           bool stochastic_interpolation = false);
@@ -24,14 +26,20 @@ class HashedIrradianceCache : public std::enable_shared_from_this<HashedIrradian
         return composition;
     }
 
-    void reset(const CommandBufferHandle& cmd);
+    void reset(const CommandBufferHandle& cmd) {
+        grid.reset(cmd);
+    }
 
-    void write_to(ShaderCursor cursor) const;
+    void write_to(ShaderCursor cursor) const {
+        grid.write_to(cursor["grid"]);
+    }
 
-    void properties(Properties& props);
+    void properties(Properties& props) {
+        grid.properties(props);
+    }
 
     uint32_t get_buffer_size() const {
-        return buffer_size;
+        return grid.get_buffer_size();
     }
     uint32_t get_probe_count() const {
         return probe_count;
@@ -41,19 +49,11 @@ class HashedIrradianceCache : public std::enable_shared_from_this<HashedIrradian
     }
 
   private:
-    ResourceAllocatorHandle allocator;
-
-    const uint32_t buffer_size;
     const uint32_t probe_count;
     const bool stochastic_interpolation;
 
-    float grid_tan_alpha_half = 0.006F;
-    float grid_steps_per_unit_size = 2.0F;
-    float grid_min_width = 0.001F;
-    float grid_power = 2.0F;
-
-    BufferHandle buffer;
     SlangCompositionHandle composition;
+    HashGrid grid;
 };
 
 using HashedIrradianceCacheHandle = std::shared_ptr<HashedIrradianceCache>;

@@ -42,8 +42,8 @@ void RenderMCPG::initialize(const ContextHandle& context,
     this->context = context;
     this->resource_allocator = allocator;
     this->compile_context = context->get_shader_compile_context();
-    irr_cache = std::make_shared<HashedIrradianceCache>(allocator, lc_buffer_size, lc_probe_count,
-                                                        lc_stochastic_interpolation);
+    irr_cache = std::make_shared<HashedIrradianceCache>(
+        compile_context, allocator, lc_buffer_size, lc_probe_count, lc_stochastic_interpolation);
 }
 
 vk::BufferCreateInfo RenderMCPG::mc_state_buffer_create_info() const {
@@ -309,7 +309,8 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
     if (irr_cache) {
         if (recreate_cache) {
             irr_cache = std::make_shared<HashedIrradianceCache>(
-                resource_allocator, lc_buffer_size, lc_probe_count, lc_stochastic_interpolation);
+                compile_context, resource_allocator, lc_buffer_size, lc_probe_count,
+                lc_stochastic_interpolation);
             if (composition)
                 update_render_constants();
         }
