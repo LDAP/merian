@@ -40,11 +40,11 @@ void HashedIrradianceCache::reset(const CommandBufferHandle& cmd) {
 }
 
 void HashedIrradianceCache::write_to(ShaderCursor cursor) const {
-    cursor["irr_cache"] = buffer;
-    cursor["grid_tan_alpha_half"] = grid_tan_alpha_half;
-    cursor["grid_min_width"] = grid_min_width;
-    cursor["grid_steps_per_unit_size"] = grid_steps_per_unit_size;
-    cursor["grid_power"] = grid_power;
+    cursor["grid"]["buffer"] = buffer;
+    cursor["grid"]["grid_tan_alpha_half"] = grid_tan_alpha_half;
+    cursor["grid"]["grid_min_width"] = grid_min_width;
+    cursor["grid"]["grid_steps_per_unit_size"] = grid_steps_per_unit_size;
+    cursor["grid"]["grid_power"] = grid_power;
 }
 
 void HashedIrradianceCache::properties(Properties& props) {

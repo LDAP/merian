@@ -206,12 +206,12 @@
                 "grid tan(alpha/2)": 0.006000000052154064,
                 "guiding prob": 0.8500000238418579,
                 "height": 1080,
-                "max path length": 12,
+                "max path length": 8,
                 "mc samples": 5,
                 "missing light heuristic": true,
                 "randomize seed": true,
                 "reference mode": false,
-                "samples per pixel": 2,
+                "samples per pixel": 1,
                 "static grid buf size": 800009,
                 "static grid width": 25.299999237060547,
                 "surf: use LC": false,
@@ -252,7 +252,8 @@
                             0.0,
                             0.0
                         ],
-                        "focus distance": 1.0,
+                        "focus distance": 0.3538513779640198,
+                        "focus on target": true,
                         "fov": 91.49284362792969,
                         "jitter": "R2",
                         "move": [
@@ -266,18 +267,18 @@
                             0.0
                         ],
                         "position": [
-                            -0.331829309463501,
-                            0.06738463789224625,
-                            0.16889026761054993
+                            -0.3766999840736389,
+                            0.06555570662021637,
+                            0.17516915500164032
                         ],
                         "rotate": [
                             0.0,
                             0.0
                         ],
                         "target": [
-                            -0.06391548365354538,
-                            -0.01365643460303545,
-                            0.02941628359258175
+                            -0.09934143722057343,
+                            -0.013220970518887043,
+                            -0.029958287253975868
                         ],
                         "up": [
                             0.0,
@@ -325,9 +326,9 @@
         "report intervall": 50,
         "run": {
             "cpu auto": true,
-            "cpu max ms": 1545.2940673828125,
+            "cpu max ms": 1.9803550243377686,
             "gpu auto": true,
-            "gpu max ms": 13.21842098236084
+            "gpu max ms": 24.573427200317383
         }
     },
     "version": 3

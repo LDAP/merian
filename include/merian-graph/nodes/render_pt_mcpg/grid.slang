@@ -17,13 +17,6 @@ struct MCState {
     uint16_t hash; // grid_idx and level
 };
 
-struct LightCacheVertex {
-    uint hash; // grid_idx and level
-    uint lock;
-    half3 irr;
-    uint16_t N;
-};
-
 struct DistanceMCState {
     float sum_w;
     uint N;
