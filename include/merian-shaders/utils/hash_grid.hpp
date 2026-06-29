@@ -38,9 +38,7 @@ class HashGrid {
     const uint32_t buffer_size;
 
     float grid_tan_alpha_half = 0.006F;
-    float grid_steps_per_unit_size = 2.0F;
     float grid_min_width = 0.001F;
-    float grid_power = 2.0F;
 
     BufferHandle buffer;
 };

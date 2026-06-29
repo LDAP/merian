@@ -20,13 +20,13 @@ interface HashGridUpdateFunction<typename T> {
 struct HashGrid<typename T,
                 let BUFFER_SIZE : uint,
                 let PROBE_COUNT : uint = 4,
-                let STOCHASTIC_INTERPOLATION : bool = false> {
+                let STOCHASTIC_INTERPOLATION : bool = false,
+                let GRID_POWER : uint = 2,
+                let GRID_STEPS_PER_UNIT_SIZE : uint = 2> {
     RWStructuredBuffer<HashGridVertex<T>, ScalarDataLayout> buffer;
 
     float grid_tan_alpha_half;
     float grid_min_width;
-    float grid_steps_per_unit_size;
-    float grid_power;
 
     float target_grid_width(const float3 pos, const float3 cam_pos) {
         const float3 abs_dist = abs(cam_pos - pos);
@@ -36,8 +36,8 @@ struct HashGrid<typename T,
     float
     target_level_for_pos_f(const float3 pos, const float3 cam_pos, inout RandomGenerator rng) {
         const float w = target_grid_width(pos, cam_pos);
-        return grid_steps_per_unit_size * log(max(w, grid_min_width) / grid_min_width) /
-               log(grid_power);
+        return GRID_STEPS_PER_UNIT_SIZE * log(max(w, grid_min_width) / grid_min_width) /
+               log(GRID_POWER);
     }
 
     uint target_level_for_pos(const float3 pos, const float3 cam_pos, inout RandomGenerator rng) {
@@ -51,14 +51,14 @@ struct HashGrid<typename T,
     uint
     distributed_level_for_pos(const float3 pos, const float3 cam_pos, inout RandomGenerator rng) {
         // / 2 if surface, / 3 if volume -> we use / 3 to bias a bit towards finer levels
-        const float level =
-            target_level_for_pos_f(pos, cam_pos, rng) +
-            (-grid_steps_per_unit_size / 3 * log(1.0 - rng.next_float()) / log(grid_power));
+        const float level = target_level_for_pos_f(pos, cam_pos, rng) +
+                            (-float(GRID_STEPS_PER_UNIT_SIZE) / 3.0 * log(1.0 - rng.next_float()) /
+                             log(GRID_POWER));
         return uint(round(level));
     }
 
     float grid_width_for_level(const uint level) {
-        return grid_min_width * pow(grid_power, level / grid_steps_per_unit_size);
+        return grid_min_width * pow(GRID_POWER, level / float(GRID_STEPS_PER_UNIT_SIZE));
     }
 
     int3 grid_idx(const float3 pos, const float width, inout RandomGenerator rng) {
@@ -175,13 +175,13 @@ struct HashGrid<typename T,
         return get_level(level, pos, rng);
     }
 
-    void update_at_level<let has_normal : bool>(const uint level,
-                                                const float3 pos,
-                                                const float3 normal,
-                                                const float3 prev_cam_pos,
-                                                const uint frame,
-                                                HashGridUpdateFunction<T> update,
-                                                inout RandomGenerator rng) {
+    void _update_at_level<let has_normal : bool>(const uint level,
+                                                 const float3 pos,
+                                                 const float3 normal,
+                                                 const float3 prev_cam_pos,
+                                                 const uint frame,
+                                                 HashGridUpdateFunction<T> update,
+                                                 inout RandomGenerator rng) {
         const int3 gidx = grid_idx(pos, grid_width_for_level(level), rng);
         const uint base = buffer_index(gidx, level);
 
@@ -250,8 +250,8 @@ struct HashGrid<typename T,
                 const uint frame,
                 HashGridUpdateFunction<T> update,
                 inout RandomGenerator rng) {
-        update_at_level<true>(target_level_for_pos(pos, cam_pos, rng), pos, normal, prev_cam_pos,
-                              frame, update, rng);
+        _update_at_level<true>(target_level_for_pos(pos, cam_pos, rng), pos, normal, prev_cam_pos,
+                               frame, update, rng);
     }
 
     void update(const float3 pos,
@@ -260,8 +260,8 @@ struct HashGrid<typename T,
                 const uint frame,
                 HashGridUpdateFunction<T> update,
                 inout RandomGenerator rng) {
-        update_at_level<false>(target_level_for_pos(pos, cam_pos, rng), pos,
-                               float3(0), prev_cam_pos, frame, update, rng);
+        _update_at_level<false>(target_level_for_pos(pos, cam_pos, rng), pos, float3(0),
+                                prev_cam_pos, frame, update, rng);
     }
 
     void distributed_update(const float3 pos,
@@ -271,8 +271,8 @@ struct HashGrid<typename T,
                             const uint frame,
                             HashGridUpdateFunction<T> update,
                             inout RandomGenerator rng) {
-        update_at_level<true>(distributed_level_for_pos(pos, cam_pos, rng), pos, normal,
-                              prev_cam_pos, frame, update, rng);
+        _update_at_level<true>(distributed_level_for_pos(pos, cam_pos, rng), pos, normal,
+                               prev_cam_pos, frame, update, rng);
     }
 
     void distributed_update(const float3 pos,
@@ -281,8 +281,96 @@ struct HashGrid<typename T,
                             const uint frame,
                             HashGridUpdateFunction<T> update,
                             inout RandomGenerator rng) {
-        update_at_level<false>(distributed_level_for_pos(pos, cam_pos, rng), pos,
-                               float3(0), prev_cam_pos, frame, update, rng);
+        _update_at_level<false>(distributed_level_for_pos(pos, cam_pos, rng), pos, float3(0),
+                                prev_cam_pos, frame, update, rng);
+    }
+
+    // Replaces the slot value instead of accumulating, so no prev-level lookup is needed.
+    void _set_at_level<let has_normal : bool>(const uint level,
+                                              const float3 pos,
+                                              const float3 normal,
+                                              const uint frame,
+                                              const T t,
+                                              inout RandomGenerator rng) {
+        const int3 gidx = grid_idx(pos, grid_width_for_level(level), rng);
+        const uint base = buffer_index(gidx, level);
+
+        uint hash;
+        if (has_normal)
+            hash = collision_key(gidx, normal, level);
+        else
+            hash = collision_key(gidx, level);
+
+        // Evict least-recently-touched slot.
+        // nice: an uninitialized slot might have a timestamp in the future, so its unsigned age
+        // wraps and is reclaimed first (self-healing).
+        uint target = base;
+        uint max_age = 0;
+        for (uint i = 0; i < PROBE_COUNT; i++) {
+            uint idx = base + i;
+            if (idx >= BUFFER_SIZE)
+                idx -= BUFFER_SIZE;
+            let probe = buffer[idx];
+            if (probe.hash == hash) {
+                target = idx;
+                break;
+            }
+            const uint age = frame - (probe.lock & ~MERIAN_HASH_GRID_LOCK_BIT);
+            if (age >= max_age) {
+                max_age = age;
+                target = idx;
+            }
+        }
+
+        const uint locked = frame | MERIAN_HASH_GRID_LOCK_BIT;
+        uint old;
+        InterlockedExchange(buffer[target].lock, locked, old);
+        if (old == locked) {
+            return;
+        }
+
+        var vtx = buffer[target];
+        vtx.hash = hash;
+        vtx.data = t;
+        vtx.lock = frame & ~MERIAN_HASH_GRID_LOCK_BIT;
+        buffer[target] = vtx;
+    }
+
+    void set(const float3 pos,
+             const float3 normal,
+             const float3 cam_pos,
+             const uint frame,
+             const T t,
+             inout RandomGenerator rng) {
+        _set_at_level<true>(target_level_for_pos(pos, cam_pos, rng), pos, normal, frame, t, rng);
+    }
+
+    void set(const float3 pos,
+             const float3 cam_pos,
+             const uint frame,
+             const T t,
+             inout RandomGenerator rng) {
+        _set_at_level<false>(target_level_for_pos(pos, cam_pos, rng), pos, float3(0), frame, t,
+                             rng);
+    }
+
+    void distributed_set(const float3 pos,
+                         const float3 normal,
+                         const float3 cam_pos,
+                         const uint frame,
+                         const T t,
+                         inout RandomGenerator rng) {
+        _set_at_level<true>(distributed_level_for_pos(pos, cam_pos, rng), pos, normal, frame, t,
+                            rng);
+    }
+
+    void distributed_set(const float3 pos,
+                         const float3 cam_pos,
+                         const uint frame,
+                         const T t,
+                         inout RandomGenerator rng) {
+        _set_at_level<false>(distributed_level_for_pos(pos, cam_pos, rng), pos, float3(0), frame, t,
+                             rng);
     }
 }
 
