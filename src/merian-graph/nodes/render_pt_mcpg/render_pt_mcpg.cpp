@@ -218,7 +218,7 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
     if (config.st_begin_child("mc", "Markov Chain Path Guiding",
                               Properties::ChildFlagBits::DEFAULT_OPEN)) {
         constants_changed |= config.config_percent("ML prior", dir_guide_prior);
-        constants_changed |= config.config_int("mc samples", mc_samples, "", 0, 30);
+        constants_changed |= config.config_int("MC samples", mc_samples, "", 0, 30);
         constants_changed |= config.config_percent("adaptive grid prob", mc_samples_adaptive_prob);
         constants_changed |= config.config_bool(
             "missing light heuristic", missing_light_heuristic,
@@ -280,7 +280,7 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
     constants_changed |=
         config.config_options("debug output", debug_output_selector,
                               {"irradiance", "moments", "light cache", "mc grid", "mc lod",
-                               "mc weight", "mc mean direction", "mc cos", "mc N"});
+                               "mc weight", "mc mean direction", "mc cos", "mc N", "mc mv"});
 
     if (constants_changed && composition) {
         update_render_constants();

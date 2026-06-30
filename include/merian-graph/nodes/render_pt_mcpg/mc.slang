@@ -1,7 +1,7 @@
 import merian_shaders.utils.grid;
 import merian_shaders.utils.random;
 import merian_shaders.utils.hash_grid;
-import merian_shaders.distributions.distribution;
+__exported import merian_shaders.distributions.distribution;
 import merian_shaders.distributions.von_mises_fisher;
 
 using merian;
@@ -17,11 +17,9 @@ struct MCState {
     float w_cos;
 
     half3 mv;
-    uint16_t pad;
+    uint16_t N;
 
     float T;
-    uint16_t N;
-    uint16_t hash; // grid_idx and level
 
     __init() {
         w_tgt = float3(0.0);
@@ -30,7 +28,6 @@ struct MCState {
         mv = half3(0);
         T = 0.0;
         N = uint16_t(0);
-        hash = uint16_t(0);
     }
 
     float3 get_target() {
@@ -123,7 +120,7 @@ struct MCState {
 };
 
 struct MCPG<let ADAPTIVE_BUFFER_SIZE : uint> {
-    HashGrid<MCState, ADAPTIVE_BUFFER_SIZE, 1, true> grid;
+    HashGrid<MCState, ADAPTIVE_BUFFER_SIZE, 4, true> grid;
 
     MCState load(const float3 pos,
                  const float3 normal,
@@ -134,6 +131,8 @@ struct MCPG<let ADAPTIVE_BUFFER_SIZE : uint> {
         var s = grid.distributed_get(pos, normal, cam_pos, rng).value;
         if (s.is_valid()) {
             s.set_w_tgt(s.w_tgt + s.sum_w * (time - s.T) * float3(s.mv));
+        } else {
+            s.sum_w = 0.0;
         }
 
         return s;

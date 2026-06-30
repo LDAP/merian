@@ -87,25 +87,28 @@ struct HashGrid<typename T,
         return xorshift128(uint4(uint4(gidx, level)));
     }
 
-    Optional<T> get_grid_idx_at_level(const int3 gidx,
-                                      const uint level,
-                                      const uint hash,
-                                      inout RandomGenerator rng) {
-        uint buffer_idx = buffer_index(gidx, level);
-
+    // Linear-probe PROBE_COUNT slots starting at buffer_index for a matching hash.
+    Optional<T> get(uint buffer_index, const uint hash) {
         for (uint i = 0; i < PROBE_COUNT; i++) {
-            let vtx = buffer[buffer_idx];
+            let vtx = buffer[buffer_index];
 
             if (vtx.hash == hash) {
                 return vtx.data;
             }
 
-            buffer_idx++;
-            if (buffer_idx >= BUFFER_SIZE)
-                buffer_idx -= BUFFER_SIZE;
+            buffer_index++;
+            if (buffer_index >= BUFFER_SIZE)
+                buffer_index -= BUFFER_SIZE;
         }
 
         return none;
+    }
+
+    Optional<T> get_grid_idx_at_level(const int3 gidx,
+                                      const uint level,
+                                      const uint hash,
+                                      inout RandomGenerator rng) {
+        return get(buffer_index(gidx, level), hash);
     }
 
     Optional<T> get_grid_idx_at_level(const int3 gidx,

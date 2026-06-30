@@ -10,7 +10,9 @@ struct DistributionSample<ValueType : IFloat> {
 interface Distribution<ValueType : IFloat> {
     float pdf(const ValueType s);
 
-    DistributionSample<ValueType> sample(inout RandomGenerator rng);
+    ValueType sample(inout RandomGenerator rng);
+
+    DistributionSample<ValueType> sample_eval(inout RandomGenerator rng);
 }
 
 }

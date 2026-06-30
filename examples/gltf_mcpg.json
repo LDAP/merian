@@ -60,7 +60,7 @@
                 "adaptivity IPR factor": 1.5,
                 "adaptivity percentile lower": 0.05000000074505806,
                 "adaptivity percentile upper": 0.949999988079071,
-                "alpha": 1.0,
+                "alpha": 0.800000011920929,
                 "clear event pattern": "/user/clear,//geometry_changed,//transform_changed,//camera_changed",
                 "depth threshold": 0.03761100023984909,
                 "extended search": true,
@@ -187,9 +187,9 @@
                 "5": true,
                 "6": true,
                 "7": true,
-                "debug output": "mc grid",
+                "debug output": "light cache",
                 "emission on primary": true,
-                "guiding prob": 0.8500000238418579,
+                "guiding prob": 0.0,
                 "height": 1080,
                 "lc": {
                     "LC buffer size": 4000037,
@@ -199,15 +199,15 @@
                     "grid tan(alpha/2)": 0.006000000052154064,
                     "surf: use LC": false
                 },
-                "max path length": 8,
+                "max path length": 2,
                 "mc": {
+                    "MC samples": 5,
                     "ML prior": 0.20000000298023224,
                     "adaptive grid buf size": 32777259,
                     "adaptive grid prob": 0.699999988079071,
                     "grid min width": 0.00019999999494757503,
-                    "grid tan(alpha/2)": 0.0020000000949949026,
-                    "mc samples": 5,
-                    "missing light heuristic": true
+                    "grid tan(alpha/2)": 0.008299999870359898,
+                    "missing light heuristic": false
                 },
                 "randomize seed": true,
                 "reference mode": false,
@@ -232,7 +232,7 @@
                     "smoothing": 0.029999999329447746
                 },
                 "env": {
-                    "Path": "../glTF-Sample-Environments/artist_workshop_8k.hdr",
+                    "Path": "../glTF-Sample-Environments/pisa.hdr",
                     "Pitch": 0.0,
                     "Type": "LatLong",
                     "Yaw": 0.0
@@ -249,7 +249,7 @@
                             0.0,
                             0.0
                         ],
-                        "focus distance": 0.25884467363357544,
+                        "focus distance": 0.5839298367500305,
                         "focus on target": true,
                         "fov": 91.49284362792969,
                         "jitter": "R2",
@@ -264,18 +264,18 @@
                             0.0
                         ],
                         "position": [
-                            -0.26657435297966003,
-                            0.06438913196325302,
-                            0.15172931551933289
+                            -0.5156635046005249,
+                            0.08639642596244812,
+                            0.42362576723098755
                         ],
                         "rotate": [
                             0.0,
                             0.0
                         ],
                         "target": [
-                            -0.09934143722057343,
-                            -0.013220970518887043,
-                            -0.029958287253975868
+                            -0.07631324231624603,
+                            -0.047417428344488144,
+                            0.06301619112491608
                         ],
                         "up": [
                             0.0,
@@ -323,9 +323,9 @@
         "report intervall": 50,
         "run": {
             "cpu auto": true,
-            "cpu max ms": 1.6737236976623535,
+            "cpu max ms": 0.6322906017303467,
             "gpu auto": true,
-            "gpu max ms": 24.668867111206055
+            "gpu max ms": 1.4507529735565186
         }
     },
     "version": 3

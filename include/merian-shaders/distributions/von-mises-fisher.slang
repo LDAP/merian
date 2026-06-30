@@ -57,7 +57,7 @@ float vmf_get_kappa(float max_pdf) {
 
 struct VonMisesFisher3<bool centered = false> : Distribution<float3> {
     float kappa;
-    Conditional<float3, centered> c_mu;
+    Conditional<float3, !centered> c_mu;
 
     __init(float kappa, float3 mu) {
         static_assert(!centered, "distribution cannot be centered.");
@@ -79,7 +79,15 @@ struct VonMisesFisher3<bool centered = false> : Distribution<float3> {
         }
     }
 
-    override DistributionSample<float3> sample(inout RandomGenerator rng) {
+    float3 sample(inout RandomGenerator rng) {
+        if (let mu = c_mu.get()) {
+            return vmf_sample_tokuyosh(mu, kappa, rng.next_float2());
+        } else {
+            return vmf_sample_tokuyosh(kappa, rng.next_float2());
+        }
+    }
+
+    override DistributionSample<float3> sample_eval(inout RandomGenerator rng) {
         if (let mu = c_mu.get()) {
             float3 s = vmf_sample_tokuyosh(mu, kappa, rng.next_float2());
             return DistributionSample<float3>(s, pdf(s));
