@@ -65,13 +65,13 @@ struct Camera {
     }
 
     // The unperturbed ray target lies on the plane of perfect focus (|W| from the position).
-    RayDesc generate_ray_thinlens(const uint2 pixel, const uint2 frame_dimensions, inout RandomGenerator rng) {
+    RayDesc generate_ray_thinlens(const uint2 pixel, const uint2 frame_dimensions, const float2 random) {
         RayDesc ray;
         const float2 ndc = pixel_to_ndc(pixel, frame_dimensions);
 
         ray.Direction = ndc.x * U + ndc.y * V + W;
 
-        const float2 aperture_sample = sample_disk(rng);
+        const float2 aperture_sample = sample_disk(random);
         const float3 aperture_offset = aperture_radius * (aperture_sample.x * normalize(U) +
                                                           aperture_sample.y * normalize(V));
         ray.Origin = position + aperture_offset;

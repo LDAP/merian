@@ -60,20 +60,25 @@ struct TriangleHit {
         return b.x * float2(v0.uv) + b.y * float2(v1.uv) + b.z * float2(v2.uv);
     }
     // in object space
-    float3 get_triangle_edge01() { return v1.position - v0.position; }
+    float3 get_triangle_edge01() {
+        return v1.position - v0.position;
+    }
     // in object space
-    float3 get_triangle_edge02() { return v2.position - v0.position; }
+    float3 get_triangle_edge02() {
+        return v2.position - v0.position;
+    }
 }
 
 struct Surface {
     MaterialID material_id;
-    float3 pos;             // in worldspace
+    float3 pos; // in worldspace
     float2 uv;
-    float3 face_normal;     // in worldspace
+    float3 face_normal; // in worldspace
     OrthonormalFrame frame;
 
     // per-pixel screen-space derivative of linear_z along r_x, r_y
-    half2 compute_grad_z(const RayDesc ray, const float3 r_x, const float3 r_y, const float linear_z) {
+    half2
+    compute_grad_z(const RayDesc ray, const float3 r_x, const float3 r_y, const float linear_z) {
         const float n_dot_oo = dot(face_normal, pos - ray.Origin);
         return half2(half(n_dot_oo / dot(face_normal, r_x) - linear_z),
                      half(n_dot_oo / dot(face_normal, r_y) - linear_z));
@@ -81,8 +86,8 @@ struct Surface {
 }
 
 struct ShadingPoint {
-    float3 pos;             // in worldspace
-    // float3 prev_pos;     // in worldspace, mcpg only — see Scene::get_prev_world_position
+    float3 pos;      // in worldspace
+    float3 prev_pos; // in worldspace, mcpg only — see Scene::get_prev_world_position
     uint enc_face_normal;
     MaterialSample material;
 
@@ -92,4 +97,4 @@ struct ShadingPoint {
     }
 }
 
-}
+} // namespace merian

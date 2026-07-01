@@ -39,6 +39,7 @@ class HashGrid {
 
     float grid_tan_alpha_half = 0.006F;
     float grid_min_width = 0.001F;
+    float grid_distribution_dimension = 2.0F;
 
     BufferHandle buffer;
 };

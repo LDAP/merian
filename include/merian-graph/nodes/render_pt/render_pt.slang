@@ -31,7 +31,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
     float3 current_absorption = float3(0.0f);
 
     for (int bounce = 1; bounce < merian_render_max_path_length; bounce++) {
-        if (all(throughput < 1e-5)) {
+        if (all(throughput < SCENE_THROUGHPUT_THRESHOLD)) {
             break;
         }
 

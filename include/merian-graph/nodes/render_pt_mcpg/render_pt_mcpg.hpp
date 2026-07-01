@@ -82,12 +82,14 @@ class RenderMCPG : public Node {
     bool missing_light_heuristic = true;
 
     uint32_t mc_adaptive_buffer_size = 32777259;
+    uint32_t mc_normal_bits = 8;
 
     // --- Light cache ---
     bool use_light_cache_tail = false;
     uint32_t lc_buffer_size = 4000037;
     uint32_t lc_probe_count = 4;
     bool lc_stochastic_interpolation = false;
+    uint32_t lc_normal_bits = 8;
 
     // --- Misc ---
     uint32_t seed = 0;

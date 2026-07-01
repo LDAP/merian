@@ -5,6 +5,10 @@ namespace merian {
 
 interface RandomGenerator {
 
+    associatedtype CloneType : RandomGenerator;
+
+    CloneType clone();
+
     /**
      * Returns the next uniformly distributed pseudorandom sample.
      */
@@ -54,15 +58,20 @@ interface RandomGenerator {
         sample.w = uint_to_zero_one_float_rust(next());
         return sample;
     }
-
 }
 
 // Algorithm "xor" from p. 4 of Marsaglia, "Xorshift RNGs"
 struct XorShift32 : RandomGenerator {
+    typealias CloneType = XorShift32;
+
     uint state;
 
     __init(uint seed) {
         this.state = seed;
+    }
+
+    CloneType clone() {
+        return XorShift32(this.state);
     }
 
     [mutating]
@@ -73,10 +82,16 @@ struct XorShift32 : RandomGenerator {
 }
 
 struct Wang : RandomGenerator {
+    typealias CloneType = Wang;
+
     uint state;
 
     __init(uint seed) {
         this.state = seed;
+    }
+
+    CloneType clone() {
+        return Wang(this.state);
     }
 
     [mutating]
@@ -91,10 +106,16 @@ struct Wang : RandomGenerator {
 }
 
 struct PCG : RandomGenerator {
+    typealias CloneType = PCG;
+
     uint state;
 
     __init(uint seed) {
         this.state = seed;
+    }
+
+    CloneType clone() {
+        return PCG(this.state);
     }
 
     [mutating]

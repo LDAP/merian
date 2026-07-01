@@ -348,6 +348,7 @@ struct GGXBRDF : BSDF {
         const float G2_over_widotn = smith_g2_over_widotn(wo, wi, alpha);
         const float D = ggx_NDF(h, alpha);
 
+        // wo.z cancels
         return float3((D * G2_over_widotn) / 4.0f);
     }
 
@@ -436,6 +437,7 @@ struct GGXBTDF : BSDF {
 
         const float denom = wodoth + (eta * widoth);
         const float jacobian = pow2(eta) * widoth * wodoth / pow2(denom);
+        // wo.z cancels
         return tint * (D * G2_over_widotn * abs(jacobian));
     }
 

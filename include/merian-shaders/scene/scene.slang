@@ -7,6 +7,7 @@ __exported import merian_shaders.scene.hit;
 
 import merian_shaders.utils.encoding;
 import merian_shaders.utils.hash;
+import merian_shaders.utils.pseudorandom;
 import merian_shaders.utils.random;
 
 // Workaround for https://github.com/shader-slang/slang/pull/10769; scene.cpp injects replacements.
@@ -15,14 +16,15 @@ __exported import scene_env_map_workaround;
 
 namespace merian {
 
-// Once https://github.com/shader-slang/slang/pull/10769 lands these can replace the workaround imports above.
-// extern struct SceneAccelerationStructure : AccelerationStructure = NullAccelerationStructure;
-// extern struct SceneEnvMap : IEnvMap = EmptyEnv;
+// Once https://github.com/shader-slang/slang/pull/10769 lands these can replace the workaround
+// imports above. extern struct SceneAccelerationStructure : AccelerationStructure =
+// NullAccelerationStructure; extern struct SceneEnvMap : IEnvMap = EmptyEnv;
 
-// Continuation-ray offset and interval, shared so all renderers spawn secondary rays identically.
 static const float SCENE_RAY_OFFSET = 1e-3f;
 static const float SCENE_RAY_TMIN = 0.f;
 static const float SCENE_RAY_TMAX = 1e7f;
+
+static const float SCENE_THROUGHPUT_THRESHOLD = 1e-5;
 
 // Enables thin lens depth of field in generate_camera_ray. Set via Scene from the active camera.
 extern static const bool merian_hint_enable_thin_lens = false;
@@ -94,9 +96,10 @@ struct Scene {
     // pass that calls this within a frame gets the identical ray.
     RayDesc generate_camera_ray(const uint2 pixel, const uint2 frame_dimensions) {
         if (merian_hint_enable_thin_lens && camera.aperture_radius > 0.f) {
-            // 'LENS' salt separates the lens stream from the per-sample seeds (pixel, frame, s).
-            RandomGenerator rng = XorShift32(pcg4d16(uint4(pixel, frame, 0x4c454e53u)));
-            return camera.generate_ray_thinlens(pixel, frame_dimensions, rng);
+            // R2 low-discrepancy sequence over frames, per-pixel rotated to decorrelate pixels.
+            RandomGenerator rng = PCG(xxhash32(pixel));
+            const float2 random = frac(r2_sequence(frame) + rng.next_float2());
+            return camera.generate_ray_thinlens(pixel, frame_dimensions, random);
         }
         return camera.generate_ray_pinhole(pixel, frame_dimensions);
     }
@@ -173,9 +176,9 @@ struct Scene {
                                                        const uint primitive_id,
                                                        const float3 barycentrics) {
         const uint3 indices = get_vertex_indices(geometry_data, primitive_id);
-        return { get_packed_vertex_data(geometry_data, indices.x),
-                 get_packed_vertex_data(geometry_data, indices.y),
-                 get_packed_vertex_data(geometry_data, indices.z) };
+        return {get_packed_vertex_data(geometry_data, indices.x),
+                get_packed_vertex_data(geometry_data, indices.y),
+                get_packed_vertex_data(geometry_data, indices.z)};
     }
 
     VertexData get_interpolated_vertex_data(const GeometryData geometry_data,
@@ -290,7 +293,8 @@ struct Scene {
 
     // none on miss
     Optional<GeometryData> get_geometry_data(const Hit hit) {
-        if (!hit.is_valid()) return none;
+        if (!hit.is_valid())
+            return none;
         return get_geometry_data(hit.instance_id, hit.geometry_index);
     }
 
@@ -313,20 +317,22 @@ struct Scene {
         const float3 bary = hit.get_barycentrics3();
 
         const float3 pos = to_world_position(tri.gd, hit.instance_index, tri.get_position(hit));
-        const float3 edge01 = to_world_vector(tri.gd, hit.instance_index, tri.get_triangle_edge01());
-        const float3 edge02 = to_world_vector(tri.gd, hit.instance_index, tri.get_triangle_edge02());
+        const float3 edge01 =
+            to_world_vector(tri.gd, hit.instance_index, tri.get_triangle_edge01());
+        const float3 edge02 =
+            to_world_vector(tri.gd, hit.instance_index, tri.get_triangle_edge02());
 
         float3 face_normal = normalize(cross(edge01, edge02));
-        if (tri.gd.flags & GeometryDataFlags::FlipFacing) face_normal = -face_normal;
+        if (tri.gd.flags & GeometryDataFlags::FlipFacing)
+            face_normal = -face_normal;
 
         float3 vertex_normal;
         if (tri.gd.flags & GeometryDataFlags::FlatShading) {
             vertex_normal = face_normal;
         } else {
-            const float3 n_obj = normalize(
-                bary.x * decode_normal(tri.v0.encoded_normal) +
-                bary.y * decode_normal(tri.v1.encoded_normal) +
-                bary.z * decode_normal(tri.v2.encoded_normal));
+            const float3 n_obj = normalize(bary.x * decode_normal(tri.v0.encoded_normal) +
+                                           bary.y * decode_normal(tri.v1.encoded_normal) +
+                                           bary.z * decode_normal(tri.v2.encoded_normal));
             vertex_normal = to_world_normal(tri.gd, hit.instance_index, n_obj);
         }
 
@@ -396,7 +402,7 @@ struct Scene {
         const TriangleHit tri = get_triangle_hit(hit, gd);
         const Surface surface = get_surface(hit, tri);
 
-        // const float3 prev_pos = get_prev_world_position(hit, gd);
+        const float3 prev_pos = get_prev_world_position(hit, gd);
 
         OrthonormalFrame frame = surface.frame;
         float3 face_normal = surface.face_normal;
@@ -414,8 +420,8 @@ struct Scene {
 
         ShadingPoint sp;
         sp.pos = surface.pos;
+        sp.prev_pos = prev_pos;
         sp.enc_face_normal = encode_normal(surface.face_normal);
-        // sp.prev_pos = prev_pos;
         sp.material = material_system.get_material_sample(surface.material_id, sd, lod);
         return sp;
     }
@@ -451,6 +457,7 @@ struct Scene {
 
         ShadingPoint sp;
         sp.pos = pos;
+        sp.prev_pos = pos;
         sp.enc_face_normal = encode_normal(-ray.Direction);
         sp.material = env_map.get_sample(sd, material_system.texture_manager, lod);
         return sp;

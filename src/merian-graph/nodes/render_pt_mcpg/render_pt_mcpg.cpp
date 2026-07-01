@@ -174,14 +174,17 @@ void RenderMCPG::update_render_constants() {
                     "export static const uint lc_buffer_size = {}u;\n"
                     "export static const uint lc_probe_count = {}u;\n"
                     "export static const bool lc_stochastic_interpolation = {};\n"
-                    "export static const uint mc_adaptive_buffer_size = {}u;\n",
+                    "export static const uint lc_normal_bits = {}u;\n"
+                    "export static const uint mc_adaptive_buffer_size = {}u;\n"
+                    "export static const uint mc_normal_bits = {}u;\n",
                     emission_on_primary ? "true" : "false", spp, max_path_length, mask,
                     (reference_mode || p_guiding == 0.0f) ? "true" : "false",
                     use_light_cache_tail ? "true" : "false",
                     missing_light_heuristic ? "true" : "false", mc_samples,
                     mc_samples_adaptive_prob, p_guiding, dir_guide_prior, seed,
                     debug_output_selector, lc_buffer_size, lc_probe_count,
-                    lc_stochastic_interpolation ? "true" : "false", mc_adaptive_buffer_size));
+                    lc_stochastic_interpolation ? "true" : "false", lc_normal_bits,
+                    mc_adaptive_buffer_size, mc_normal_bits));
 }
 
 RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
@@ -223,6 +226,11 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
         constants_changed |= config.config_bool(
             "missing light heuristic", missing_light_heuristic,
             "Flood the Markov chains with invalidated states when no light is detected.");
+        constants_changed |= config.config_uint(
+            "adaptive grid normal bits", mc_normal_bits,
+            "Octahedral normal bins folded into the hash key; neighbouring bins share. 0 ignores "
+            "the normal.",
+            0u, 16u);
         const bool resize_mcpg =
             config.config_uint("adaptive grid buf size", mc_adaptive_buffer_size,
                                "Buffer size backing the hash grid.");
@@ -251,6 +259,11 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
             config.config_bool("LC stochastic interpolation", lc_stochastic_interpolation,
                                "Jitter the grid cell per sample (smoother but noisier) "
                                "instead of snapping to the nearest cell.");
+        constants_changed |= config.config_uint(
+            "LC normal bits", lc_normal_bits,
+            "Octahedral normal bins folded into the hash key; neighbouring bins share. 0 ignores "
+            "the normal.",
+            0u, 16u);
         // Fail gracefully if compilation fails.
         if (irr_cache) {
             if (recreate_cache) {
@@ -280,7 +293,8 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
     constants_changed |=
         config.config_options("debug output", debug_output_selector,
                               {"irradiance", "moments", "light cache", "mc grid", "mc lod",
-                               "mc weight", "mc mean direction", "mc cos", "mc N", "mc mv"});
+                               "mc weight", "mc mean direction", "mc cos", "mc N", "mc mv",
+                               "lc normal bin (actual)", "lc normal bin (selected)"});
 
     if (constants_changed && composition) {
         update_render_constants();

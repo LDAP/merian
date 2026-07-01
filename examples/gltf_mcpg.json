@@ -60,7 +60,7 @@
                 "adaptivity IPR factor": 1.5,
                 "adaptivity percentile lower": 0.05000000074505806,
                 "adaptivity percentile upper": 0.949999988079071,
-                "alpha": 0.800000011920929,
+                "alpha": 0.0,
                 "clear event pattern": "/user/clear,//geometry_changed,//transform_changed,//camera_changed",
                 "depth threshold": 0.03761100023984909,
                 "extended search": true,
@@ -187,14 +187,16 @@
                 "5": true,
                 "6": true,
                 "7": true,
-                "debug output": "light cache",
+                "debug output": "lc normal bin (selected)",
                 "emission on primary": true,
-                "guiding prob": 0.0,
+                "guiding prob": 0.8999999761581421,
                 "height": 1080,
                 "lc": {
                     "LC buffer size": 4000037,
+                    "LC normal bits": 6,
                     "LC probe count": 4,
-                    "LC stochastic interpolation": false,
+                    "LC stochastic interpolation": true,
+                    "grid distribution dimension": 2.0,
                     "grid min width": 0.0010000000474974513,
                     "grid tan(alpha/2)": 0.006000000052154064,
                     "surf: use LC": false
@@ -204,10 +206,12 @@
                     "MC samples": 5,
                     "ML prior": 0.20000000298023224,
                     "adaptive grid buf size": 32777259,
+                    "adaptive grid normal bits": 6,
                     "adaptive grid prob": 0.699999988079071,
-                    "grid min width": 0.00019999999494757503,
-                    "grid tan(alpha/2)": 0.008299999870359898,
-                    "missing light heuristic": false
+                    "grid distribution dimension": 1.5,
+                    "grid min width": 9.999999747378752e-05,
+                    "grid tan(alpha/2)": 0.0020000000949949026,
+                    "missing light heuristic": true
                 },
                 "randomize seed": true,
                 "reference mode": false,
@@ -249,7 +253,7 @@
                             0.0,
                             0.0
                         ],
-                        "focus distance": 0.5839298367500305,
+                        "focus distance": 0.4582492411136627,
                         "focus on target": true,
                         "fov": 91.49284362792969,
                         "jitter": "R2",
@@ -264,18 +268,18 @@
                             0.0
                         ],
                         "position": [
-                            -0.5156635046005249,
-                            0.08639642596244812,
-                            0.42362576723098755
+                            -0.3846203088760376,
+                            0.08170977979898453,
+                            0.14864328503608704
                         ],
                         "rotate": [
                             0.0,
                             0.0
                         ],
                         "target": [
-                            -0.07631324231624603,
-                            -0.047417428344488144,
-                            0.06301619112491608
+                            0.016226649284362793,
+                            -0.018708672374486923,
+                            -0.04942291975021362
                         ],
                         "up": [
                             0.0,
@@ -323,9 +327,9 @@
         "report intervall": 50,
         "run": {
             "cpu auto": true,
-            "cpu max ms": 0.6322906017303467,
+            "cpu max ms": 1.9797383546829224,
             "gpu auto": true,
-            "gpu max ms": 1.4507529735565186
+            "gpu max ms": 17.430147171020508
         }
     },
     "version": 3

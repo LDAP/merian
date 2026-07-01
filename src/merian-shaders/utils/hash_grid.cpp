@@ -45,12 +45,17 @@ void HashGrid::write_to(ShaderCursor cursor) const {
     cursor["buffer"] = buffer;
     cursor["grid_tan_alpha_half"] = grid_tan_alpha_half;
     cursor["grid_min_width"] = grid_min_width;
+    cursor["grid_distribution_dimension"] = grid_distribution_dimension;
 }
 
 void HashGrid::properties(Properties& props) {
     props.config_float("grid tan(alpha/2)", grid_tan_alpha_half,
                        "Cache resolution, lower means higher resolution.", 0.0001F);
     props.config_float("grid min width", grid_min_width, "", 0.0001F);
+    props.config_float("grid distribution dimension", grid_distribution_dimension,
+                       "Spatial dimensionality the distributed levels are spread over "
+                       "(2 = surface, 3 = volume). Smaller widens the spread.",
+                       0.01F);
 }
 
 } // namespace merian
