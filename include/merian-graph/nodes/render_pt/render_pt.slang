@@ -8,7 +8,7 @@ import merian_shaders.colors.colorspaces;
 using merian;
 
 namespace merian {
-extern static const bool merian_render_emission_on_primary = false;
+extern static const bool merian_render_emission_on_primary = true;
 extern static const int merian_render_spp = 1;
 extern static const int merian_render_max_path_length = 8;
 extern static const uint merian_render_instance_mask = 0xFFu;
@@ -31,7 +31,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
     float3 current_absorption = float3(0.0f);
 
     for (int bounce = 1; bounce < merian_render_max_path_length; bounce++) {
-        if (all(throughput < 1e-5)) {
+        if (all(throughput < SCENE_THROUGHPUT_THRESHOLD)) {
             break;
         }
 

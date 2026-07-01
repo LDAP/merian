@@ -12,18 +12,21 @@ float3 decode_normal(uint enc) {
     return normalize(vec);
 }
 
+// Octahedral projection of a unit vector onto [-1, 1]^2.
+// A Survey of Efficient Representations for Independent Unit Vectors, JCGT Vol. 3, No. 2, 2014.
+float2 octahedral_project(float3 n) {
+    const float invL1Norm = 1.0f / ((abs(n.x) + abs(n.y)) + abs(n.z));
+    if (n.z < 0.0f) {
+        return copysign(1.0f - abs(n.yx * invL1Norm), n.xy);
+    }
+    return n.xy * invL1Norm;
+}
+
 // 32-bit normal encoding from Journal of Computer Graphics Techniques Vol. 3, No. 2, 2014
 // A Survey of Efficient Representations for Independent Unit Vectors,
 // almost like oct30
 uint encode_normal(float3 n) {
-    float invL1Norm = 1.0f / ((abs(n.x) + abs(n.y)) + abs(n.z));
-    float2 enc;
-    if (n.z < 0.0f) {
-        enc = copysign(1.0f - abs(n.yx * invL1Norm), n.xy);
-    } else {
-        enc = n.xy * invL1Norm;
-    }
-    return packSnorm2x16(enc);
+    return packSnorm2x16(octahedral_project(n));
 }
 
 // 32-bit normal encoding from Journal of Computer Graphics Techniques Vol. 3, No. 2, 2014

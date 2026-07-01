@@ -28,8 +28,11 @@ struct HashedIrradianceCacheUpdate : HashGridUpdateFunction<HashedIrradianceCach
 
 struct HashedIrradianceCache<let BUFFER_SIZE : uint,
                              let PROBE_COUNT : uint = 4,
-                             let STOCHASTIC_INTERPOLATION : bool = false> {
-    HashGrid<HashedIrradianceCacheData, BUFFER_SIZE, PROBE_COUNT, STOCHASTIC_INTERPOLATION> grid;
+                             let STOCHASTIC_INTERPOLATION : bool = false,
+                             let NORMAL_BITS : uint = 0> {
+    HashGrid<HashedIrradianceCacheData, BUFFER_SIZE, PROBE_COUNT, STOCHASTIC_INTERPOLATION,
+             NORMAL_BITS>
+        grid;
 
     half3
     get(const float3 pos, const float3 normal, const float3 cam_pos, inout RandomGenerator rng) {

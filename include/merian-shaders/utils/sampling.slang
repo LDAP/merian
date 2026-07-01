@@ -35,10 +35,15 @@ float3 sample_triangle(inout RandomGenerator rng) {
     return float3(1.0f - x, x * (1.0f - xi), x * xi);
 }
 
+// samples coordinates on a unit disk from a uniform sample in [0, 1)^2, p = 1 / A
+float2 sample_disk(const float2 random) {
+    const float angle = MERIAN_TWO_PI * random.x;
+    return float2(cos(angle), sin(angle)) * sqrt(random.y);
+}
+
 // samples coordinates on a unit disk, p = 1 / A
 float2 sample_disk(inout RandomGenerator rng) {
-    const float angle = MERIAN_TWO_PI * rng.next_float();
-    return float2(cos(angle), sin(angle)) * sqrt(rng.next_float());
+    return sample_disk(rng.next_float2());
 }
 
 // returns two samples!
