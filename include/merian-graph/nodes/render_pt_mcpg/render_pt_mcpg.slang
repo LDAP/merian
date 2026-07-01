@@ -1,3 +1,5 @@
+#include "merian-shaders/utils/math-constants.slangh"
+
 import merian_shaders.gbuffer;
 import merian_shaders.scene.scene;
 import merian_shaders.utils.random;
@@ -27,6 +29,7 @@ extern static const uint lc_normal_bits = 8;
 extern static const uint mc_adaptive_buffer_size = 32777259;
 extern static const int mc_samples = 5;
 extern static const float p_guiding = 0.9;
+extern static const bool use_ris = false;
 extern static const bool missing_light_heuristic = true;
 extern static const uint mc_normal_bits = 8;
 
@@ -96,32 +99,105 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         }
 
         // Sample wo from the BSDF or the selected lobe
-        const bool guide = score_sum > 0.0 && rng.next_float() < p_guiding;
         float3 wo_world;
         float3 wo_local;
-        if (guide) {
-            wo_world = vmfs[0].sample(rng);
-            wo_local = frame.to_local(wo_world);
-        } else if (let local = m_bsdf.sample(wi_local, rng)) {
-            wo_local = local;
-            wo_world = frame.to_world(local);
-            selected = MCState();
-            selected_buffer_index = MC_INVALID_INDEX;
-            selected_level = params.mcpg.grid.target_level_for_pos(cur_pos, cam_pos, rng);
-        } else {
-            break;
-        }
+        float wo_p;
 
-        // Stochastic MIS
-        float wo_p = 0.0;
-        if (score_sum > 0) {
-            for (int i = 0; i < mc_samples; i++) {
-                wo_p += scores[i] * vmfs[i].pdf(wo_world);
+        if (use_ris) {
+            if (score_sum == 0.0) {
+                // BSDF Sampling
+                if (let local = m_bsdf.sample(wi_local, rng)) {
+                    wo_local = local;
+                    wo_world = frame.to_world(local);
+                    wo_p = m_bsdf.pdf(wi_local, wo_local);
+                    selected = MCState();
+                    selected_buffer_index = MC_INVALID_INDEX;
+                    selected_level = params.mcpg.grid.target_level_for_pos(cur_pos, cam_pos, rng);
+                } else {
+                    break;
+                }
+            } else {
+                // Sebastians RIS scheme for path guiding
+                const float3 c1 = vmfs[0].sample(rng);
+                float3 c2;
+                if (let local = m_bsdf.sample(wi_local, rng)) {
+                    c2 = frame.to_world(local);
+                } else {
+                    break;
+                }
+                const float3 c1_local = frame.to_local(c1);
+                const float3 c2_local = frame.to_local(c2);
+
+                float g_c1 = 0;
+                float g_c2 = 0;
+                for (int i = 0; i < mc_samples; i++) {
+                    g_c1 += scores[i] * vmfs[i].pdf(c1);
+                    g_c2 += scores[i] * vmfs[i].pdf(c2);
+                }
+
+                const float t_c1 =
+                    yuv_luminance(m_bsdf.eval(wi_local, c1_local, rng)) *
+                    ((1.0 - p_guiding) * MERIAN_INV_FOUR_PI + p_guiding * g_c1 / score_sum);
+                const float t_c2 =
+                    yuv_luminance(m_bsdf.eval(wi_local, c2_local, rng)) *
+                    ((1.0 - p_guiding) * MERIAN_INV_FOUR_PI + p_guiding * g_c2 / score_sum);
+
+                const float p_c1 = 0.5 * m_bsdf.pdf(wi_local, c1_local) + 0.5 * g_c1 / score_sum;
+                const float p_c2 = 0.5 * m_bsdf.pdf(wi_local, c2_local) + 0.5 * g_c2 / score_sum;
+
+                const float w1 = t_c1 / p_c1;
+                const float w2 = t_c2 / p_c2;
+
+                wo_world = c1;
+                wo_local = c1_local;
+                wo_p = p_c1 * w1 * 2 / (w1 + w2);
+                if (rng.next_float() < w2 / (w1 + w2)) {
+                    // resampling
+
+                    wo_world = c2; // => use bsdf
+                    wo_local = c2_local;
+                    wo_p = p_c2 * w2 * 2 / (w1 + w2);
+                    selected = MCState();
+                    selected_buffer_index = MC_INVALID_INDEX;
+                    selected_level = params.mcpg.grid.target_level_for_pos(cur_pos, cam_pos, rng);
+                }
             }
-            wo_p /= score_sum;
+
+            // // Multiple importance sampling
+            // if (score_sum > 0) {
+            //     for (int i = 0; i < mc_samples; i++) {
+            //         wo_p += scores[i] * vmfs[i].pdf(wo_world);
+            //     }
+            //     wo_p /= score_sum;
+            // }
+            // wo_p = (score_sum > 0 ? (1.0 - p_guiding) : 1.0) * m_bsdf.pdf(wi_local, wo_local) +
+            // p_guiding * wo_p;
+        } else {
+            const bool guide = score_sum > 0.0 && rng.next_float() < p_guiding;
+            if (guide) {
+                wo_world = vmfs[0].sample(rng);
+                wo_local = frame.to_local(wo_world);
+            } else if (let local = m_bsdf.sample(wi_local, rng)) {
+                wo_local = local;
+                wo_world = frame.to_world(local);
+                selected = MCState();
+                selected_buffer_index = MC_INVALID_INDEX;
+                selected_level = params.mcpg.grid.target_level_for_pos(cur_pos, cam_pos, rng);
+            } else {
+                break;
+            }
+
+            // Stochastic MIS
+            wo_p = 0.0;
+            if (score_sum > 0) {
+                for (int i = 0; i < mc_samples; i++) {
+                    wo_p += scores[i] * vmfs[i].pdf(wo_world);
+                }
+                wo_p /= score_sum;
+            }
+            const float bsdf_w = score_sum > 0.0 ? (1.0 - p_guiding) : 1.0;
+            wo_p = bsdf_w * m_bsdf.pdf(wi_local, wo_local) + p_guiding * wo_p;
         }
-        const float bsdf_w = score_sum > 0.0 ? (1.0 - p_guiding) : 1.0;
-        wo_p = bsdf_w * m_bsdf.pdf(wi_local, wo_local) + p_guiding * wo_p;
 
         const float3 bsdf = m_bsdf.eval(wi_local, wo_local, rng);
         const bool valid = any(bsdf > 0.0);
@@ -154,7 +230,13 @@ float3 trace_path(const ParameterBlock<Scene> scene,
             radiance += throughput * incident;
         }
 
-        const float mc_f = yuv_luminance(lc_incident * bsdf / wo_p);
+        float mc_f;
+        if (use_ris) {
+            mc_f = yuv_luminance(lc_incident / wo_p);
+        } else {
+            mc_f = yuv_luminance(lc_incident * bsdf / wo_p);
+        }
+
         if (!isinf(mc_f) && !isnan(mc_f)) {
             params.irr_cache.update(cur_pos, normal,
                                     lc_incident * bsdf / wo_p /* / max(wo_p, 10.0)*/, cam_pos,
@@ -305,21 +387,3 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<RenderBinding> params) {
     }
     }
 }
-
- 
-                          
-                          
-                          
- 
-                          
-                          
-                          
- 
-                                 
-                
- 
- 
- 
-                          
-                          
-                          

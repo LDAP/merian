@@ -168,6 +168,7 @@ void RenderMCPG::update_render_constants() {
                     "export static const int mc_samples = {};\n"
                     "export static const float mc_samples_adaptive_prob = {:f};\n"
                     "export static const float p_guiding = {:f};\n"
+                    "export static const bool use_ris = {};\n"
                     "export static const float dir_guide_prior = {:f};\n"
                     "export static const uint seed = {}u;\n"
                     "export static const int debug_output_selector = {};\n"
@@ -181,8 +182,8 @@ void RenderMCPG::update_render_constants() {
                     (reference_mode || p_guiding == 0.0f) ? "true" : "false",
                     use_light_cache_tail ? "true" : "false",
                     missing_light_heuristic ? "true" : "false", mc_samples,
-                    mc_samples_adaptive_prob, p_guiding, dir_guide_prior, seed,
-                    debug_output_selector, lc_buffer_size, lc_probe_count,
+                    mc_samples_adaptive_prob, p_guiding, use_ris ? "true" : "false",
+                    dir_guide_prior, seed, debug_output_selector, lc_buffer_size, lc_probe_count,
                     lc_stochastic_interpolation ? "true" : "false", lc_normal_bits,
                     mc_adaptive_buffer_size, mc_normal_bits));
 }
@@ -217,6 +218,10 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
         config.config_percent("guiding prob", p_guiding,
                               "Probability to sample the guiding distribution instead of "
                               "the BSDF.");
+    constants_changed |=
+        config.config_bool("use RIS", use_ris,
+                           "Combine BSDF and guiding samples with resampled importance sampling "
+                           "instead of multiple importance sampling.");
 
     if (config.st_begin_child("mc", "Markov Chain Path Guiding",
                               Properties::ChildFlagBits::DEFAULT_OPEN)) {

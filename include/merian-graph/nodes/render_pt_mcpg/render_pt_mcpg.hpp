@@ -79,6 +79,7 @@ class RenderMCPG : public Node {
     int32_t mc_samples = 5;
     float mc_samples_adaptive_prob = 0.7f;
     float p_guiding = 0.85f; // probability to sample the guiding distribution instead of the BSDF
+    bool use_ris = false;
     bool missing_light_heuristic = true;
 
     uint32_t mc_adaptive_buffer_size = 32777259;
