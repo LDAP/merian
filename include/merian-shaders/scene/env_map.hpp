@@ -31,6 +31,7 @@ class EnvMap {
         if (changed) {
             rebuild_transform();
         }
+        props.config_float("Intensity", intensity, "", 0.01f, 0.f);
     }
 
     // Seeded by the host once (e.g. Scene::get_up alignment); yaw/pitch compose on top.
@@ -52,6 +53,14 @@ class EnvMap {
         return pitch_rad;
     }
 
+    void set_intensity(const float i) {
+        intensity = i;
+    }
+
+    float get_intensity() const {
+        return intensity;
+    }
+
     void set_transform(const float4x4& m) {
         to_local = m;
     }
@@ -71,6 +80,7 @@ class EnvMap {
     float4x4 base_to_local = identity<float4x4>();
     float yaw_rad = 0.f;
     float pitch_rad = 0.f;
+    float intensity = 1.f;
 };
 using EnvMapHandle = std::shared_ptr<EnvMap>;
 
@@ -104,6 +114,7 @@ class LatLongEnvMap : public EnvMap {
     void write_to(ShaderCursor cursor) const override {
         cursor["env_map"] = texture;
         cursor["to_local"] = to_local;
+        cursor["intensity"] = intensity;
     }
 
     const TextureHandle& get_texture() const {
@@ -139,6 +150,7 @@ class CubeMapEnvMap : public EnvMap {
         cursor["up"] = faces[4];
         cursor["dn"] = faces[5];
         cursor["to_local"] = to_local;
+        cursor["intensity"] = intensity;
     }
 
     const std::array<TextureHandle, 6>& get_faces() const {
