@@ -99,6 +99,14 @@ class Camera {
     // Distance to the plane of perfect focus, in scene units.
     void set_focus_distance(const float focus_distance) noexcept;
 
+    // Focal length in millimeters. Sets the vertical FOV for the current sensor height (reframes).
+    void set_focal_length(const float focal_length_mm) noexcept;
+
+    // Sensor image height in millimeters (vertical dimension); default 24 mm (full-frame). Drives
+    // depth of field and the FOV<->focal-length relation. Changing it at a fixed FOV rescales
+    // depth of field but does not reframe.
+    void set_sensor_height(const float sensor_height_mm) noexcept;
+
     // in radians
     float get_field_of_view_vertical() const noexcept;
 
@@ -114,8 +122,14 @@ class Camera {
     float get_f_number() const noexcept;
 
     // Lens radius in scene units, derived from the f-number and the focal length implied by the
-    // vertical FOV on a full-frame sensor; assumes 1 scene unit = 1 meter. 0 = pinhole.
+    // vertical FOV and the sensor height; assumes 1 scene unit = 1 meter. 0 = pinhole.
     float get_aperture_radius() const noexcept;
+
+    // Focal length in millimeters, derived from the vertical FOV and the sensor height.
+    float get_focal_length() const noexcept;
+
+    // Sensor image height in millimeters (vertical dimension).
+    float get_sensor_height() const noexcept;
 
     float get_focus_distance() noexcept;
 
@@ -203,9 +217,10 @@ class Camera {
     float aspect_ratio;  // aspect_ratio = width / height
     float near_plane;
     float far_plane;
-    float f_number = 0.f;       // f-number of the lens; 0 = pinhole
-    float focus_distance = 1.f;            // distance to the plane of perfect focus, in scene units
+    float f_number = 0.f;                 // f-number of the lens; 0 = pinhole
+    float focus_distance = 1.f;           // distance to the plane of perfect focus, in scene units
     bool focus_distance_on_target = true; // lock focus_distance to the distance to the target
+    float sensor_height = 24.f;           // image height in mm (vertical); full-frame default
 
     // Increase whenever fov, aspect_ratio, near_plane or far_plane changes
     uint32_t projection_change_id = 0;
