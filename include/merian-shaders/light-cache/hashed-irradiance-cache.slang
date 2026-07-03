@@ -30,7 +30,7 @@ struct HashedIrradianceCache<let BUFFER_SIZE : uint,
                              let PROBE_COUNT : uint = 4,
                              let STOCHASTIC_INTERPOLATION : bool = false,
                              let NORMAL_BITS : uint = 0> {
-    HashGrid<HashedIrradianceCacheData, BUFFER_SIZE, PROBE_COUNT, STOCHASTIC_INTERPOLATION,
+    HashGrid<HashedIrradianceCacheData, BUFFER_SIZE, PROBE_COUNT, STOCHASTIC_INTERPOLATION, false,
              NORMAL_BITS>
         grid;
 

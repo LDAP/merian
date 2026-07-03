@@ -24,6 +24,7 @@ struct HashGrid<typename T,
                 let BUFFER_SIZE : uint,
                 let PROBE_COUNT : uint = 4,
                 let STOCHASTIC_INTERPOLATION : bool = false,
+                let LEVEL_STOCHASTIC_INTERPOLATION : bool = false,
                 let NORMAL_BITS : uint = 0,
                 let GRID_POWER : uint = 2,
                 let GRID_STEPS_PER_UNIT_SIZE : uint = 1> {
@@ -44,7 +45,7 @@ struct HashGrid<typename T,
         const float w = target_grid_width(pos, cam_pos);
         const float level = GRID_STEPS_PER_UNIT_SIZE *
                             log(max(w, grid_min_width) / grid_min_width) / log(GRID_POWER);
-        if (STOCHASTIC_INTERPOLATION)
+        if (LEVEL_STOCHASTIC_INTERPOLATION)
             return uint(floor(level) + select(rng.next_float() < fract(level), 1.0, 0.0));
         return uint(round(level));
     }
@@ -63,9 +64,12 @@ struct HashGrid<typename T,
     }
 
     int3 grid_idx(const float3 pos, const float width, inout RandomGenerator rng) {
+        // Offset the lattice by half a cell so that levels of different width don't share vertices
+        // (Müller et al., "Instant Neural Graphics Primitives", Appendix A.)
+        const float3 staggered = pos + 0.5 * width;
         if (STOCHASTIC_INTERPOLATION)
-            return grid_idx_interpolate(pos, width, rng.next_float());
-        return grid_idx_closest(pos, width);
+            return grid_idx_interpolate(staggered, width, rng.next_float());
+        return grid_idx_closest(staggered, width);
     }
 
     uint hash_key(const int3 gidx, const uint level) {

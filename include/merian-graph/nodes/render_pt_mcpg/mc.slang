@@ -122,7 +122,7 @@ struct MCState {
 };
 
 struct MCPG<let ADAPTIVE_BUFFER_SIZE : uint, let NORMAL_BITS : uint = 8> {
-    HashGrid<MCState, ADAPTIVE_BUFFER_SIZE, 2, true, NORMAL_BITS> grid;
+    HashGrid<MCState, ADAPTIVE_BUFFER_SIZE, 2, true, true, NORMAL_BITS> grid;
 
     MCState load(const float3 pos,
                  const float3 normal,
