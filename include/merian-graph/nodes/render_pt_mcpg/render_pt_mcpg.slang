@@ -67,24 +67,24 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         let m_bsdf = sp.material.get_bsdf();
         const float3 wi_local = frame.to_local(-ray.Direction);
 
-        // Resample one guiding lobe from the Markov-chain mixture (using RIS)
+        // Resample one guiding lobe from the level stack target..target+mc_samples-1 (using RIS)
         MCState selected;
         uint selected_buffer_index = MC_INVALID_INDEX;
-        uint selected_level = 0;
+        const uint target_level = params.mcpg.grid.target_level_for_pos(lookup_pos, cam_pos, rng);
+        uint selected_level = target_level;
         float score_sum = 0.0;
         float scores[mc_samples];
         Distribution<float3> vmfs[mc_samples];
         for (int i = 0; i < mc_samples; i++) {
             uint buffer_index;
-            uint level;
-            const MCState s =
-                params.mcpg.load(lookup_pos, normal, cam_pos, scene.time, rng, buffer_index, level);
+            const MCState s = params.mcpg.load_at_level(lookup_pos, normal, target_level + i,
+                                                        scene.time, rng, buffer_index);
             score_sum += s.sum_w;
             // comparison with NaN is false (when s.sum_w == 0 and score_sum == 0)
             if (rng.next_float() < s.sum_w / score_sum) {
                 selected = s;
                 selected_buffer_index = buffer_index;
-                selected_level = level;
+                selected_level = target_level + i;
                 vmfs[i] = vmfs[0];
                 scores[i] = scores[0];
                 scores[0] = s.sum_w;
@@ -107,7 +107,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
             wo_world = frame.to_world(local);
             selected = MCState();
             selected_buffer_index = MC_INVALID_INDEX;
-            selected_level = params.mcpg.grid.target_level_for_pos(cur_pos, cam_pos, rng);
+            selected_level = target_level;
         } else {
             break;
         }
@@ -168,6 +168,8 @@ float3 trace_path(const ParameterBlock<Scene> scene,
                                   rng);
                 params.mcpg.store_at_level(selected, cur_pos, normal, selected_level + 1,
                                            scene.frame, rng);
+                // params.mcpg.store_at_level(selected, cur_pos, normal, max(0, selected_level - 1),
+                //                            scene.frame, rng);
             } else if (missing_light_heuristic && selected_buffer_index != MC_INVALID_INDEX &&
                        selected.light_missing_heuristic(mc_f, wo_world, cur_pos, next_pos)) {
 

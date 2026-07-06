@@ -140,16 +140,14 @@ struct MCPG<let ADAPTIVE_BUFFER_SIZE : uint, let NORMAL_BITS : uint = 8> {
         return s;
     }
 
-    // Reports the queried level and the exact buffer slot the lobe was read from
-    // (MC_INVALID_INDEX if no slot matched).
-    MCState load(const float3 pos,
-                 const float3 normal,
-                 const float3 cam_pos,
-                 const float time,
-                 inout RandomGenerator rng,
-                 out uint buffer_index,
-                 out uint level) {
-        var s = grid.distributed_get(pos, normal, cam_pos, rng, level, buffer_index).value;
+    // Reports the exact buffer slot the lobe was read from (MC_INVALID_INDEX if no slot matched).
+    MCState load_at_level(const float3 pos,
+                          const float3 normal,
+                          const uint level,
+                          const float time,
+                          inout RandomGenerator rng,
+                          out uint buffer_index) {
+        var s = grid.get_level(level, pos, normal, rng, buffer_index).value;
         if (s.is_valid()) {
             s.set_w_tgt(s.w_tgt + s.sum_w * (time - s.T) * float3(s.mv));
         } else {

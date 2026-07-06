@@ -474,6 +474,19 @@ struct HashGrid<typename T,
         buffer[target] = vtx;
     }
 
+    // Overwrites a slot located by a prior get; keeps the slot's hash.
+    void set_at_index(const uint buffer_index, const uint frame, const T t) {
+        const uint locked = frame | MERIAN_HASH_GRID_LOCK_BIT;
+        uint old;
+        InterlockedExchange(buffer[buffer_index].lock, locked, old);
+        if (old == locked) {
+            return;
+        }
+
+        buffer[buffer_index].data = t;
+        buffer[buffer_index].lock = frame & ~MERIAN_HASH_GRID_LOCK_BIT;
+    }
+
     void set_at_level(const uint level,
                       const float3 pos,
                       const float3 normal,
