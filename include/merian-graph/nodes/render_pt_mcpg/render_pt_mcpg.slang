@@ -222,10 +222,14 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<RenderBinding> params) {
         break;
     }
     case 2: { // light cache
-        params.debug[pixel] = float4(
-            params.irr_cache.get(primary_sp.pos, primary_sp.material.shading_frame.get_normal(),
-                                 cam_pos, prev_cam_pos, rng),
-            1);
+        if (let l = params.irr_cache.grid.get(primary_sp.pos,
+                                              primary_sp.material.shading_frame.get_normal(),
+                                              cam_pos, prev_cam_pos, rng)) {
+            params.debug[pixel] = float4(l.irr, 1);
+        } else {
+            params.debug[pixel] = float4(1, 0, 1, 1);
+        }
+
         break;
     }
     case 3: { // mc grid
@@ -306,20 +310,3 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<RenderBinding> params) {
     }
 }
 
- 
-                          
-                          
-                          
- 
-                          
-                          
-                          
- 
-                                 
-                
- 
- 
- 
-                          
-                          
-                          
