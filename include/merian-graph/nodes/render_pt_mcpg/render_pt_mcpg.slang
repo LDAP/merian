@@ -5,7 +5,7 @@ import merian_shaders.utils.hash;
 import merian_shaders.utils.textures;
 import merian_shaders.colors.debug;
 import merian_shaders.colors.colorspaces;
-import merian_shaders.light_cache.hashed_irradiance_cache;
+import merian_shaders.light_cache.sharc;
 import mc;
 
 using merian;
@@ -19,11 +19,6 @@ extern static const uint merian_render_instance_mask = 0xFFu;
 
 extern static const int debug_output_selector = 0;
 
-extern static const uint lc_buffer_size = 4000000;
-extern static const uint lc_probe_count = 4;
-extern static const bool lc_stochastic_interpolation = false;
-extern static const uint lc_normal_bits = 8;
-
 extern static const uint mc_adaptive_buffer_size = 32777259;
 extern static const int mc_samples = 5;
 extern static const float p_guiding = 0.9;
@@ -34,10 +29,7 @@ struct RenderBinding {
     ParameterBlock<GBuffer> gbuffer;
     RWTexture2D<float4> irradiance;
     RWTexture2D<float4> debug;
-    HashedIrradianceCache<lc_buffer_size,
-                          lc_probe_count,
-                          lc_stochastic_interpolation,
-                          lc_normal_bits> irr_cache;
+    Sharc sharc;
     MCPG<mc_adaptive_buffer_size, mc_normal_bits> mcpg;
 };
 
@@ -48,7 +40,6 @@ float3 trace_path(const ParameterBlock<Scene> scene,
                   const int sample_i,
                   inout RandomGenerator rng) {
     const float3 cam_pos = scene.camera.position;
-    const float3 prev_cam_pos = scene.prev_camera.position;
 
     float3 radiance = merian_render_emission_on_primary ? sp.material.emission : float3(0);
     float3 throughput = float3(1);
@@ -147,8 +138,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
             lc_incident =
                 any(incident > 0.0) || merian_render_max_path_length == 2
                     ? incident
-                    : float3(params.irr_cache.get(next_pos, sp.material.shading_frame.get_normal(),
-                                                  cam_pos, prev_cam_pos, rng));
+                    : params.sharc.get(next_pos, sp.material.shading_frame.get_normal());
 
             throughput *= bsdf / wo_p;
             radiance += throughput * incident;
@@ -156,9 +146,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
 
         const float mc_f = yuv_luminance(lc_incident * bsdf / wo_p);
         if (!isinf(mc_f) && !isnan(mc_f)) {
-            params.irr_cache.update(cur_pos, normal,
-                                    lc_incident * bsdf / wo_p /* / max(wo_p, 10.0)*/, cam_pos,
-                                    prev_cam_pos, scene.frame, rng);
+            params.sharc.update(cur_pos, normal, lc_incident * bsdf / wo_p);
 
             if (rng.next_float() * score_sum < mc_f * mc_samples) {
                 const half3 target_mv = half3((sp.pos - sp.prev_pos) / scene.time_diff);
@@ -215,7 +203,6 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<RenderBinding> params) {
     params.irradiance[pixel] = float4(irradiance, second_moment);
 
     const float3 cam_pos = scene.camera.position;
-    const float3 prev_cam_pos = scene.prev_camera.position;
     switch (debug_output_selector) {
     case 1: { // moments
         params.debug[pixel] = float4(yuv_luminance(irradiance), second_moment.x, 0, 1);
@@ -223,9 +210,7 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<RenderBinding> params) {
     }
     case 2: { // light cache
         params.debug[pixel] = float4(
-            params.irr_cache.get(primary_sp.pos, primary_sp.material.shading_frame.get_normal(),
-                                 cam_pos, prev_cam_pos, rng),
-            1);
+            params.sharc.get(primary_sp.pos, primary_sp.material.shading_frame.get_normal()), 1);
         break;
     }
     case 3: { // mc grid
@@ -287,16 +272,13 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<RenderBinding> params) {
         params.debug[pixel] = float4(float3(mc_state.mv), 1);
         break;
     }
-    case 10: { // lc normal bin (actual)
+    case 10: { // sharc hash
         const float3 n = primary_sp.material.shading_frame.get_normal();
-        params.debug[pixel] = float4(random_color(params.irr_cache.grid.normal_bin(n)), 1);
+        params.debug[pixel] = float4(params.sharc.debug_hash_color(primary_sp.pos, n), 1);
         break;
     }
-    case 11: { // lc normal bin (selected)
-        const float3 n = primary_sp.material.shading_frame.get_normal();
-        const uint bin = params.irr_cache.grid.debug_selected_bin(primary_sp.pos, n, cam_pos, rng);
-        params.debug[pixel] =
-            bin == 0xFFFFFFFFu ? float4(0, 0, 0, 1) : float4(random_color(bin), 1);
+    case 11: { // sharc voxel level
+        params.debug[pixel] = float4(float3(params.sharc.voxel_level(primary_sp.pos) / 15.0), 1);
         break;
     }
     default: { // irradiance

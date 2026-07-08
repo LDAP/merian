@@ -4,8 +4,8 @@
 #include "merian-graph/connectors/ptr_in.hpp"
 #include "merian-graph/graph/node.hpp"
 #include "merian-graph/nodes/render_pt_mcpg/mcpg.hpp"
+#include "merian-graph/nodes/render_pt_mcpg/sharc.hpp"
 #include "merian-shaders/gbuffer.hpp"
-#include "merian-shaders/light-cache/hashed_irradiance_cache.hpp"
 #include "merian-shaders/scene/scene.hpp"
 
 #include "merian/shader/shader_compile_context.hpp"
@@ -61,7 +61,7 @@ class RenderMCPG : public Node {
     ManagedVkImageOutHandle con_debug;
 
     // Owns its own persistent buffer + shader binding (composed into this node's program).
-    HashedIrradianceCacheHandle irr_cache;
+    SharcHandle sharc;
     MCPGHandle mcpg;
 
     vk::Extent3D extent = vk::Extent3D{1920, 1080, 1};
@@ -84,12 +84,8 @@ class RenderMCPG : public Node {
     uint32_t mc_adaptive_buffer_size = 32777259;
     uint32_t mc_normal_bits = 8;
 
-    // --- Light cache ---
-    bool use_light_cache_tail = false;
-    uint32_t lc_buffer_size = 4000037;
-    uint32_t lc_probe_count = 4;
-    bool lc_stochastic_interpolation = false;
-    uint32_t lc_normal_bits = 8;
+    // --- SHARC radiance cache ---
+    uint32_t sharc_capacity = 1u << 22;
 
     // --- Misc ---
     uint32_t seed = 0;

@@ -965,6 +965,17 @@ void Context::prepare_file_loader(const ContextCreateInfo& create_info) {
         SPDLOG_ERROR("merian-shaders header not found! Shader compilers will not work correctly");
     }
 
+    // TESTING: make the NVIDIA SHARC shader headers reachable (third_party/SHARC/include).
+    if (const std::filesystem::path sharc_headers =
+            development_headers.parent_path() / "third_party" / "SHARC" / "include";
+        FileLoader::exists(sharc_headers)) {
+        file_loader->add_search_path(std::filesystem::weakly_canonical(sharc_headers.string()));
+    } else if (const std::optional<std::filesystem::path> sharc =
+                   FileLoader::search_cwd_parents("third_party/SHARC/include");
+               sharc.has_value()) {
+        file_loader->add_search_path(std::filesystem::weakly_canonical(sharc->string()));
+    }
+
     // Add common folders to file loader
     if (const auto portable_prefix = FileLoader::portable_prefix(); portable_prefix) {
         file_loader->add_search_path(*portable_prefix);

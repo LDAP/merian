@@ -13,7 +13,7 @@ RenderMCPG::RenderMCPG() = default;
 
 DeviceSupportInfo RenderMCPG::query_device_support(const DeviceSupportQueryInfo& query_info) {
     const auto composition = Scene::query_device_support_composition(query_info);
-    composition->add_composition(HashedIrradianceCache::query_device_support_composition());
+    composition->add_composition(Sharc::query_device_support_composition());
     composition->add_composition(MCPG::query_device_support_composition());
     composition->add_module_from_path("merian-graph/nodes/render_pt_mcpg/render_pt_mcpg.slang",
                                       true);
@@ -27,8 +27,7 @@ void RenderMCPG::initialize(const ContextHandle& context,
     this->context = context;
     this->resource_allocator = allocator;
     this->compile_context = context->get_shader_compile_context();
-    irr_cache = std::make_shared<HashedIrradianceCache>(
-        compile_context, allocator, lc_buffer_size, lc_probe_count, lc_stochastic_interpolation);
+    sharc = std::make_shared<Sharc>(context, compile_context, allocator, sharc_capacity);
     mcpg = std::make_shared<MCPG>(compile_context, allocator, mc_adaptive_buffer_size);
 }
 
@@ -50,9 +49,13 @@ RenderMCPG::on_connected(const NodeIOLayout& io_layout,
     // force the program graph to be rewired next process()
     composition = nullptr;
     obj_allocator = nullptr;
+    if (sharc)
+        sharc->invalidate();
 
     io_layout.register_event_listener(
         "/graph/reload_shaders", [this](const GraphEvent::Info&, const GraphEvent::Data& force) {
+            if (sharc)
+                sharc->invalidate();
             if (composition) {
                 if (std::any_cast<bool>(force)) {
                     composition->force_reload();
@@ -89,7 +92,7 @@ void RenderMCPG::process(GraphRun& run,
 
         composition = SlangComposition::create();
         composition->add_composition(scene->get_composition());
-        composition->add_composition(irr_cache->get_composition());
+        composition->add_composition(sharc->get_composition());
         composition->add_composition(mcpg->get_composition());
         composition->add_module_from_path("merian-graph/nodes/render_pt_mcpg/render_pt_mcpg.slang",
                                           true);
@@ -128,16 +131,20 @@ void RenderMCPG::process(GraphRun& run,
 
     // Reset the persistent guiding state on the first frame of a run.
     if (run.get_iteration() == 0) {
-        irr_cache->reset(cmd);
+        sharc->reset(cmd);
         mcpg->reset(cmd);
     }
+
+    const auto camera = scene->get_active_camera();
+    sharc->begin_frame(camera ? camera->get_position() : float3(0),
+                       static_cast<uint32_t>(run.get_iteration()));
 
     auto cursor = params_obj->get_cursor();
     cursor["gbuffer"] = gbuf->get_shader_object();
     cursor["irradiance"] = io[con_irradiance].get_texture();
     if (auto debug = cursor["debug"]; debug.is_valid())
         debug = io[con_debug].get_texture();
-    irr_cache->write_to(cursor["irr_cache"]);
+    sharc->write_to(cursor["sharc"]);
     mcpg->write_to(cursor["mcpg"]);
 
     cmd->bind(pipe);
@@ -145,6 +152,9 @@ void RenderMCPG::process(GraphRun& run,
     ep->bind("params", params_obj, cmd, pipe, obj_allocator);
 
     cmd->trace_rays(sbt.get(), extent);
+
+    // SHARC: combine this frame's accumulation with the resolved history for next-frame queries.
+    sharc->resolve(run, cmd);
 }
 
 void RenderMCPG::update_render_constants() {
@@ -163,7 +173,6 @@ void RenderMCPG::update_render_constants() {
                     "export static const uint merian_render_instance_mask = {}u;\n"
                     "}}\n"
                     "export static const bool reference_mode = {};\n"
-                    "export static const bool use_light_cache_tail = {};\n"
                     "export static const bool missing_light_heuristic = {};\n"
                     "export static const int mc_samples = {};\n"
                     "export static const float mc_samples_adaptive_prob = {:f};\n"
@@ -171,20 +180,13 @@ void RenderMCPG::update_render_constants() {
                     "export static const float dir_guide_prior = {:f};\n"
                     "export static const uint seed = {}u;\n"
                     "export static const int debug_output_selector = {};\n"
-                    "export static const uint lc_buffer_size = {}u;\n"
-                    "export static const uint lc_probe_count = {}u;\n"
-                    "export static const bool lc_stochastic_interpolation = {};\n"
-                    "export static const uint lc_normal_bits = {}u;\n"
                     "export static const uint mc_adaptive_buffer_size = {}u;\n"
                     "export static const uint mc_normal_bits = {}u;\n",
                     emission_on_primary ? "true" : "false", spp, max_path_length, mask,
                     (reference_mode || p_guiding == 0.0f) ? "true" : "false",
-                    use_light_cache_tail ? "true" : "false",
                     missing_light_heuristic ? "true" : "false", mc_samples,
                     mc_samples_adaptive_prob, p_guiding, dir_guide_prior, seed,
-                    debug_output_selector, lc_buffer_size, lc_probe_count,
-                    lc_stochastic_interpolation ? "true" : "false", lc_normal_bits,
-                    mc_adaptive_buffer_size, mc_normal_bits));
+                    debug_output_selector, mc_adaptive_buffer_size, mc_normal_bits));
 }
 
 RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
@@ -245,35 +247,18 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
         config.st_end_child();
     }
 
-    if (config.st_begin_child("lc", "Light cache", Properties::ChildFlagBits::DEFAULT_OPEN)) {
-        constants_changed |= config.config_bool("surf: use LC", use_light_cache_tail,
-                                                "Use the light cache for the path tail.");
-        bool recreate_cache = false;
-        recreate_cache |=
-            config.config_uint("LC buffer size", lc_buffer_size,
-                               "Number of cache slots backing the hash grid.", 1u, 100000000u);
-        recreate_cache |=
-            config.config_uint("LC probe count", lc_probe_count,
-                               "Slots probed before evicting (open addressing).", 1u, 16u);
-        recreate_cache |=
-            config.config_bool("LC stochastic interpolation", lc_stochastic_interpolation,
-                               "Jitter the grid cell per sample (smoother but noisier) "
-                               "instead of snapping to the nearest cell.");
-        constants_changed |= config.config_uint(
-            "LC normal bits", lc_normal_bits,
-            "Octahedral normal bins folded into the hash key; neighbouring bins share. 0 ignores "
-            "the normal.",
-            0u, 16u);
+    if (config.st_begin_child("sharc", "SHARC radiance cache",
+                              Properties::ChildFlagBits::DEFAULT_OPEN)) {
+        const bool recreate_cache =
+            config.config_uint("capacity", sharc_capacity,
+                               "Number of voxels (entries) in each SHARC buffer.", 1u, 100000000u);
         // Fail gracefully if compilation fails.
-        if (irr_cache) {
+        if (sharc) {
             if (recreate_cache) {
-                irr_cache = std::make_shared<HashedIrradianceCache>(
-                    compile_context, resource_allocator, lc_buffer_size, lc_probe_count,
-                    lc_stochastic_interpolation);
-                if (composition)
-                    update_render_constants();
+                sharc = std::make_shared<Sharc>(context, compile_context, resource_allocator,
+                                                sharc_capacity);
             }
-            irr_cache->properties(config);
+            sharc->properties(config);
         }
         config.st_end_child();
     }
@@ -290,11 +275,10 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
     }
 
     config.st_separate("Debug");
-    constants_changed |=
-        config.config_options("debug output", debug_output_selector,
-                              {"irradiance", "moments", "light cache", "mc grid", "mc lod",
-                               "mc weight", "mc mean direction", "mc cos", "mc N", "mc mv",
-                               "lc normal bin (actual)", "lc normal bin (selected)"});
+    constants_changed |= config.config_options(
+        "debug output", debug_output_selector,
+        {"irradiance", "moments", "sharc cache", "mc grid", "mc lod", "mc weight",
+         "mc mean direction", "mc cos", "mc N", "mc mv", "sharc hash", "sharc voxel level"});
 
     if (constants_changed && composition) {
         update_render_constants();
