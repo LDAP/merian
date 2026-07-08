@@ -63,7 +63,8 @@ bool Camera::operator==(const Camera& other) const noexcept {
     return position == other.position && target == other.target && up == other.up &&
            field_of_view == other.field_of_view && aspect_ratio == other.aspect_ratio &&
            near_plane == other.near_plane && far_plane == other.far_plane &&
-           f_number == other.f_number && focus_distance == other.focus_distance;
+           f_number == other.f_number && focus_distance == other.focus_distance &&
+           sensor_height == other.sensor_height;
 }
 
 // -----------------------------------------------------------------------------
@@ -185,6 +186,20 @@ void Camera::set_focus_distance(const float focus_distance) noexcept {
     projection_change_id++;
 }
 
+void Camera::set_focal_length(const float focal_length_mm) noexcept {
+    assert(focal_length_mm > 0.f);
+
+    field_of_view = 2.f * std::atan((sensor_height * 0.5f) / focal_length_mm);
+    projection_change_id++;
+}
+
+void Camera::set_sensor_height(const float sensor_height_mm) noexcept {
+    assert(sensor_height_mm > 0.f);
+
+    this->sensor_height = sensor_height_mm;
+    projection_change_id++;
+}
+
 float Camera::get_field_of_view_vertical() const noexcept {
     return field_of_view;
 }
@@ -209,14 +224,22 @@ float Camera::get_f_number() const noexcept {
     return f_number;
 }
 
+float Camera::get_focal_length() const noexcept {
+    // inverse of vfov = 2 * atan((sensor_height / 2) / focal_length)
+    return (sensor_height * 0.5f) / std::tan(field_of_view * 0.5f);
+}
+
+float Camera::get_sensor_height() const noexcept {
+    return sensor_height;
+}
+
 float Camera::get_aperture_radius() const noexcept {
     if (f_number <= 0.f) {
         return 0.f;
     }
-    // focal length for a full-frame sensor (24mm image height) at the current vertical FOV,
-    // in meters; aperture diameter = focal length / N.
-    const float focal_length = 0.012f / std::tan(field_of_view * 0.5f);
-    return focal_length / (2.f * f_number);
+    // aperture diameter = focal length / N; mm -> scene units (1 unit = 1 meter).
+    const float focal_length_m = get_focal_length() * 0.001f;
+    return focal_length_m / (2.f * f_number);
 }
 
 float Camera::get_focus_distance() noexcept {
@@ -466,6 +489,12 @@ void Camera::properties(Properties& props) {
     if (props.config_float("fov", fov_hdeg, "horizontal, in degrees", 0.1f, 0.01f, 179.9f)) {
         set_field_of_view_horizontal(radians(fov_hdeg));
     }
+    float focal_length = get_focal_length();
+    if (props.config_float("focal length", focal_length,
+                           "in mm, derived from vertical FOV and sensor height", 0.1f, 1.0f,
+                           2000.0f)) {
+        set_focal_length(focal_length);
+    }
     if (props.config_float("near", near_plane, "", 0.1f, 0.0f, far_plane - 0.1f)) {
         projection_change_id++;
     }
@@ -474,6 +503,28 @@ void Camera::properties(Properties& props) {
     }
     if (props.config_float("aspect", aspect_ratio)) {
         projection_change_id++;
+    }
+
+    props.st_separate();
+
+    static const std::vector<std::string> sensor_presets = {"Full-frame", "APS-C",   "Micro 4/3",
+                                                            "1\"",        "1/2.3\"", "Custom"};
+    static const std::array<float, 5> sensor_heights = {24.0f, 15.6f, 13.0f, 8.8f, 4.55f};
+    int sensor_selected = static_cast<int>(sensor_heights.size()); // Custom
+    for (size_t i = 0; i < sensor_heights.size(); i++) {
+        if (std::abs(sensor_height - sensor_heights[i]) < 1e-3f) {
+            sensor_selected = static_cast<int>(i);
+            break;
+        }
+    }
+    if (props.config_options("sensor", sensor_selected, sensor_presets,
+                             Properties::OptionsStyle::COMBO) &&
+        sensor_selected < static_cast<int>(sensor_heights.size())) {
+        set_sensor_height(sensor_heights[sensor_selected]);
+    }
+    if (props.config_float("sensor height", sensor_height, "image height in mm (vertical)", 0.01f,
+                           0.1f, 100.0f)) {
+        set_sensor_height(sensor_height);
     }
     if (props.config_float("f-stop", f_number,
                            "f-number of the lens, 0 = pinhole; assumes 1 scene unit = 1 meter",
