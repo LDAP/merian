@@ -31,23 +31,20 @@ struct HashGrid<typename T,
     RWStructuredBuffer<HashGridVertex<T>, ScalarDataLayout> buffer;
 
     float grid_tan_alpha_half;
-    float grid_min_width;
+    // SHARC-style LOD bias: shifts the level quantization / near-camera detail (0 = neutral).
+    float grid_level_bias;
     // Effective spatial dimensionality the distributed levels are spread over (2 = surface,
     // 3 = volume). Keeps the expected threads per cell roughly constant; smaller widens the spread.
     float grid_distribution_dimension;
 
-    float target_grid_width(const float3 pos, const float3 cam_pos) {
-        const float3 abs_dist = abs(cam_pos - pos);
-        return 2 * grid_tan_alpha_half * max(abs_dist.x, max(abs_dist.y, abs_dist.z));
-    }
-
     uint target_level_for_pos(const float3 pos, const float3 cam_pos, inout RandomGenerator rng) {
-        const float w = target_grid_width(pos, cam_pos);
-        const float level = GRID_STEPS_PER_UNIT_SIZE *
-                            log(max(w, grid_min_width) / grid_min_width) / log(GRID_POWER);
+        const float3 d = cam_pos - pos;
+        const float dist2 = max(dot(d, d), 1e-12);
+        const float level =
+            max(GRID_STEPS_PER_UNIT_SIZE * 0.5 * log(dist2) / log(GRID_POWER) + grid_level_bias, 1.0);
         if (LEVEL_STOCHASTIC_INTERPOLATION)
             return uint(floor(level) + select(rng.next_float() < fract(level), 1.0, 0.0));
-        return uint(round(level));
+        return uint(floor(level));
     }
 
     // Attemps to keep expected value of threads threads per cell constant
@@ -60,7 +57,8 @@ struct HashGrid<typename T,
     }
 
     float grid_width_for_level(const uint level) {
-        return grid_min_width * pow(GRID_POWER, level / float(GRID_STEPS_PER_UNIT_SIZE));
+        return 2 * grid_tan_alpha_half *
+               pow(GRID_POWER, (float(level) - grid_level_bias) / float(GRID_STEPS_PER_UNIT_SIZE));
     }
 
     int3 grid_idx(const float3 pos, const float width, inout RandomGenerator rng) {
@@ -69,7 +67,7 @@ struct HashGrid<typename T,
         const float3 staggered = pos + 0.5 * width;
         if (STOCHASTIC_INTERPOLATION)
             return grid_idx_interpolate(staggered, width, rng.next_float());
-        return grid_idx_closest(staggered, width);
+        return grid_idx_lower(staggered, width);
     }
 
     uint hash_key(const int3 gidx, const uint level) {
@@ -98,12 +96,12 @@ struct HashGrid<typename T,
 
     // Spatial hash in the upper bits, octahedral normal cell in the low NORMAL_BITS.
     uint collision_key(const int3 gidx, const float3 normal, const uint level) {
-        const uint spatial = xorshift128(uint4(gidx, level));
+        const uint spatial = pcg4d16(uint4(gidx, level));
         return (spatial & ~normal_bin_mask()) | normal_bin(normal);
     }
 
     uint collision_key(const int3 gidx, const uint level) {
-        return xorshift128(uint4(gidx, level)) & ~normal_bin_mask();
+        return pcg4d16(uint4(gidx, level)) & ~normal_bin_mask();
     }
 
     // Ignores the normal bins, so a normal-less query matches an entry stored with any normal.

@@ -60,7 +60,7 @@
                 "adaptivity IPR factor": 1.5,
                 "adaptivity percentile lower": 0.05000000074505806,
                 "adaptivity percentile upper": 0.949999988079071,
-                "alpha": 1.0,
+                "alpha": 0.0,
                 "clear event pattern": "/user/clear,//geometry_changed,//transform_changed,//camera_changed",
                 "depth threshold": 0.03761100023984909,
                 "extended search": true,
@@ -194,10 +194,10 @@
                 "lc": {
                     "LC buffer size": 8000009,
                     "LC normal bits": 4,
-                    "LC probe count": 4,
-                    "LC stochastic interpolation": true,
+                    "LC probe count": 8,
+                    "LC stochastic interpolation": false,
                     "grid distribution dimension": 2.0,
-                    "grid min width": 0.0010000000474974513,
+                    "grid level bias": 0.0,
                     "grid tan(alpha/2)": 0.006000000052154064,
                     "surf: use LC": false
                 },
@@ -206,10 +206,10 @@
                     "MC samples": 5,
                     "ML prior": 0.20000000298023224,
                     "adaptive grid buf size": 32777259,
-                    "adaptive grid normal bits": 6,
+                    "adaptive grid normal bits": 4,
                     "adaptive grid prob": 0.699999988079071,
                     "grid distribution dimension": 1.4900000095367432,
-                    "grid min width": 9.999999747378752e-05,
+                    "grid level bias": 0.0,
                     "grid tan(alpha/2)": 0.002099999925121665,
                     "missing light heuristic": true
                 },
@@ -247,13 +247,14 @@
                     "cameras": {
                         "active": 0,
                         "aspect": 1.7777777910232544,
-                        "f-stop": 2.5999999046325684,
+                        "f-stop": 0.0,
                         "far": 1000.0,
                         "fly": [
                             0.0,
                             0.0,
                             0.0
                         ],
+                        "focal length": 30.4106388092041,
                         "focus distance": 14.98799991607666,
                         "focus on target": false,
                         "fov": 70.0999984741211,
@@ -269,18 +270,20 @@
                             0.0
                         ],
                         "position": [
-                            9.995309829711914,
-                            4.8795576095581055,
-                            3.1308960914611816
+                            -2.5565836429595947,
+                            7.93381404876709,
+                            1.2818526029586792
                         ],
                         "rotate": [
                             0.0,
                             0.0
                         ],
+                        "sensor": "Full-frame",
+                        "sensor height": 24.0,
                         "target": [
-                            0.20287077128887177,
-                            3.7701926231384277,
-                            -1.8270045518875122
+                            -0.5770039558410645,
+                            8.379672050476074,
+                            2.726891040802002
                         ],
                         "up": [
                             0.0,
@@ -328,9 +331,9 @@
         "report intervall": 50,
         "run": {
             "cpu auto": true,
-            "cpu max ms": 0.9597957730293274,
+            "cpu max ms": 0.66200852394104,
             "gpu auto": true,
-            "gpu max ms": 12.93478012084961
+            "gpu max ms": 8.613353729248047
         }
     },
     "version": 3
