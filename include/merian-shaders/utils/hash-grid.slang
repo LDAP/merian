@@ -18,8 +18,9 @@ interface HashGridUpdateFunction<typename T> {
     void update(inout T t);
 }
 
-// NORMAL_BITS: the bits for normal bin count, neighboring bins share their entries. Set to 0 to
-// ignore the normal. 6 => ~22° cells, 8 => ~11° cells (more hurts the hash quality)
+// NORMAL_BITS: octahedral normal bins hashed into the key (SHARC-style; the normal selects the
+// bucket and is matched exactly, no tolerance). Set to 0 to ignore the normal. 6 => ~22° cells,
+// 8 => ~11° cells.
 struct HashGrid<typename T,
                 let BUFFER_SIZE : uint,
                 let PROBE_COUNT : uint = 4,
@@ -40,8 +41,8 @@ struct HashGrid<typename T,
     uint target_level_for_pos(const float3 pos, const float3 cam_pos, inout RandomGenerator rng) {
         const float3 d = cam_pos - pos;
         const float dist2 = max(dot(d, d), 1e-12);
-        const float level =
-            max(GRID_STEPS_PER_UNIT_SIZE * 0.5 * log(dist2) / log(GRID_POWER) + grid_level_bias, 1.0);
+        const float level = max(
+            GRID_STEPS_PER_UNIT_SIZE * 0.5 * log(dist2) / log(GRID_POWER) + grid_level_bias, 1.0);
         if (LEVEL_STOCHASTIC_INTERPOLATION)
             return uint(floor(level) + select(rng.next_float() < fract(level), 1.0, 0.0));
         return uint(floor(level));
@@ -70,18 +71,6 @@ struct HashGrid<typename T,
         return grid_idx_lower(staggered, width);
     }
 
-    uint hash_key(const int3 gidx, const uint level) {
-        return xxhash32(uint4(gidx, level));
-    }
-
-    uint buffer_index(const int3 gidx, const uint level) {
-        return hash_key(gidx, level) % BUFFER_SIZE;
-    }
-
-    uint normal_bin_mask() {
-        return NORMAL_BITS == 0 ? 0u : ((1u << NORMAL_BITS) - 1u);
-    }
-
     // Octahedral cell of the normal, packed into NORMAL_BITS (half the bits per oct axis).
     // Bias off the axes so an axis-aligned normal doesn't sit exactly on a cell edge and flicker.
     uint normal_bin(const float3 normal) {
@@ -94,34 +83,37 @@ struct HashGrid<typename T,
         return (uint(cell.x) << per_axis) | uint(cell.y);
     }
 
-    // Spatial hash in the upper bits, octahedral normal cell in the low NORMAL_BITS.
+    // Pack the LOD level and the octahedral normal cell into one word (normal in the low bits), so
+    // the normal is hashed into the key SHARC-style: it selects the bucket and is matched exactly.
+    uint level_normal_word(const uint level, const float3 normal) {
+        return (level << NORMAL_BITS) | normal_bin(normal);
+    }
+
+    uint level_normal_word(const uint level) {
+        return level << NORMAL_BITS;
+    }
+
+    // Stored/compared key: a hash of (gidx, level, normal).
     uint collision_key(const int3 gidx, const float3 normal, const uint level) {
-        const uint spatial = pcg4d16(uint4(gidx, level));
-        return (spatial & ~normal_bin_mask()) | normal_bin(normal);
+        return pcg4d16(uint4(gidx, level_normal_word(level, normal)));
     }
 
     uint collision_key(const int3 gidx, const uint level) {
-        return pcg4d16(uint4(gidx, level)) & ~normal_bin_mask();
+        return pcg4d16(uint4(gidx, level_normal_word(level)));
     }
 
-    // Ignores the normal bins, so a normal-less query matches an entry stored with any normal.
-    bool keys_match_spatial(const uint stored, const uint query) {
-        return (stored & ~normal_bin_mask()) == (query & ~normal_bin_mask());
+    // Slot from the key, so the hashed-in normal also selects the bucket.
+    uint buffer_index(const uint key) {
+        return key % BUFFER_SIZE;
     }
 
-    // Match the spatial hash exactly and the octahedral cell within a 1-cell (Chebyshev) tolerance,
-    // so normals up to ~one bin apart share a slot without hard binning seams.
+    // Spatial (normal-less) slot, for debug coloring by cell.
+    uint buffer_index(const int3 gidx, const uint level) {
+        return buffer_index(collision_key(gidx, level));
+    }
+
     bool keys_match(const uint stored, const uint query) {
-        if (NORMAL_BITS == 0)
-            return stored == query;
-        if ((stored & ~normal_bin_mask()) != (query & ~normal_bin_mask()))
-            return false;
-        const uint per_axis = NORMAL_BITS / 2;
-        const uint axis_mask = (1u << per_axis) - 1u;
-        const int2 s = int2((stored >> per_axis) & axis_mask, stored & axis_mask);
-        const int2 q = int2((query >> per_axis) & axis_mask, query & axis_mask);
-        const int2 d = abs(s - q);
-        return max(d.x, d.y) <= 1;
+        return stored == query;
     }
 
     // Linear-probe PROBE_COUNT slots starting at buffer_index for a matching hash.
@@ -130,23 +122,6 @@ struct HashGrid<typename T,
             let vtx = buffer[buffer_index];
 
             if (keys_match(vtx.hash, hash)) {
-                return vtx.data;
-            }
-
-            buffer_index++;
-            if (buffer_index >= BUFFER_SIZE)
-                buffer_index -= BUFFER_SIZE;
-        }
-
-        return none;
-    }
-
-    // Linear-probe ignoring the normal bins, matching an entry stored with any normal.
-    Optional<T> get_any_normal(uint buffer_index, const uint hash) {
-        for (uint i = 0; i < PROBE_COUNT; i++) {
-            let vtx = buffer[buffer_index];
-
-            if (keys_match_spatial(vtx.hash, hash)) {
                 return vtx.data;
             }
 
@@ -177,8 +152,8 @@ struct HashGrid<typename T,
         return none;
     }
 
-    // Debug only: octahedral bin of the slot a normal query actually reads at its target level,
-    // or 0xFFFFFFFF on miss. Compare against normal_bin(normal) to see tolerance merges.
+    // Debug only: octahedral bin of the normal if an exact slot matches at the target level, else
+    // 0xFFFFFFFF.
     uint debug_selected_bin(const float3 pos,
                             const float3 normal,
                             const float3 cam_pos,
@@ -186,11 +161,10 @@ struct HashGrid<typename T,
         const uint level = target_level_for_pos(pos, cam_pos, rng);
         const int3 gidx = grid_idx(pos, grid_width_for_level(level), rng);
         const uint hash = collision_key(gidx, normal, level);
-        uint bi = buffer_index(gidx, level);
+        uint bi = buffer_index(hash);
         for (uint i = 0; i < PROBE_COUNT; i++) {
-            let vtx = buffer[bi];
-            if (keys_match(vtx.hash, hash))
-                return vtx.hash & normal_bin_mask();
+            if (keys_match(buffer[bi].hash, hash))
+                return normal_bin(normal);
             bi++;
             if (bi >= BUFFER_SIZE)
                 bi -= BUFFER_SIZE;
@@ -202,7 +176,7 @@ struct HashGrid<typename T,
                                       const uint level,
                                       const uint hash,
                                       inout RandomGenerator rng) {
-        return get(buffer_index(gidx, level), hash);
+        return get(buffer_index(hash), hash);
     }
 
     Optional<T> get_grid_idx_at_level(const int3 gidx,
@@ -210,7 +184,7 @@ struct HashGrid<typename T,
                                       const uint hash,
                                       inout RandomGenerator rng,
                                       out uint matched_index) {
-        return get(buffer_index(gidx, level), hash, matched_index);
+        return get(buffer_index(hash), hash, matched_index);
     }
 
     Optional<T> get_grid_idx_at_level(const int3 gidx,
@@ -232,7 +206,8 @@ struct HashGrid<typename T,
 
     Optional<T>
     get_grid_idx_at_level(const int3 gidx, const uint level, inout RandomGenerator rng) {
-        return get_any_normal(buffer_index(gidx, level), collision_key(gidx, level));
+        const uint hash = collision_key(gidx, level);
+        return get(buffer_index(hash), hash);
     }
 
     Optional<T>
@@ -315,13 +290,13 @@ struct HashGrid<typename T,
                                                  HashGridUpdateFunction<T> update,
                                                  inout RandomGenerator rng) {
         const int3 gidx = grid_idx(pos, grid_width_for_level(level), rng);
-        const uint base = buffer_index(gidx, level);
 
         uint hash;
         if (has_normal)
             hash = collision_key(gidx, normal, level);
         else
             hash = collision_key(gidx, level);
+        const uint base = buffer_index(hash);
 
         // Evict least-recently-touched slot.
         // nice: an uninitialized slot might have a timestamp in the future, so its unsigned age
@@ -425,13 +400,13 @@ struct HashGrid<typename T,
                                               const T t,
                                               inout RandomGenerator rng) {
         const int3 gidx = grid_idx(pos, grid_width_for_level(level), rng);
-        const uint base = buffer_index(gidx, level);
 
         uint hash;
         if (has_normal)
             hash = collision_key(gidx, normal, level);
         else
             hash = collision_key(gidx, level);
+        const uint base = buffer_index(hash);
 
         // Evict least-recently-touched slot.
         // nice: an uninitialized slot might have a timestamp in the future, so its unsigned age
@@ -464,7 +439,7 @@ struct HashGrid<typename T,
         }
 
         var vtx = buffer[target];
-        // keep the anchoring bin on a tolerance match so the slot's oct cell doesn't drift
+        // only stamp the key into a freshly-claimed slot
         if (!matched)
             vtx.hash = hash;
         vtx.data = t;

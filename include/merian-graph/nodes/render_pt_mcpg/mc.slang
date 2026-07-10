@@ -1,6 +1,8 @@
 import merian_shaders.utils.grid;
 import merian_shaders.utils.random;
 import merian_shaders.utils.hash_grid;
+import merian_shaders.utils.frame;
+import merian_shaders.utils.sampling;
 __exported import merian_shaders.distributions.distribution;
 import merian_shaders.distributions.von_mises_fisher;
 
@@ -124,13 +126,20 @@ struct MCState {
 struct MCPG<let ADAPTIVE_BUFFER_SIZE : uint, let NORMAL_BITS : uint = 8> {
     HashGrid<MCState, ADAPTIVE_BUFFER_SIZE, 2, true, true, NORMAL_BITS> grid;
 
+    // Stochastic normal binning: cosine-jitter the access normal around the surface normal so
+    // nearby normals probabilistically share hash buckets (replaces the removed normal-tolerance
+    // probing).
+    float3 jitter_normal(const float3 normal, inout RandomGenerator rng) {
+        return OrthonormalFrame(normal).to_world(sample_cos(rng));
+    }
+
     MCState load(const float3 pos,
                  const float3 normal,
                  const float3 cam_pos,
                  const float time,
                  inout RandomGenerator rng) {
         // slang defaults initializes none optionals
-        var s = grid.distributed_get(pos, normal, cam_pos, rng).value;
+        var s = grid.distributed_get(pos, jitter_normal(normal, rng), cam_pos, rng).value;
         if (s.is_valid()) {
             s.set_w_tgt(s.w_tgt + s.sum_w * (time - s.T) * float3(s.mv));
         } else {
@@ -149,7 +158,9 @@ struct MCPG<let ADAPTIVE_BUFFER_SIZE : uint, let NORMAL_BITS : uint = 8> {
                  inout RandomGenerator rng,
                  out uint buffer_index,
                  out uint level) {
-        var s = grid.distributed_get(pos, normal, cam_pos, rng, level, buffer_index).value;
+        var s =
+            grid.distributed_get(pos, jitter_normal(normal, rng), cam_pos, rng, level, buffer_index)
+                .value;
         if (s.is_valid()) {
             s.set_w_tgt(s.w_tgt + s.sum_w * (time - s.T) * float3(s.mv));
         } else {
@@ -165,7 +176,7 @@ struct MCPG<let ADAPTIVE_BUFFER_SIZE : uint, let NORMAL_BITS : uint = 8> {
                const float3 cam_pos,
                const uint frame,
                inout RandomGenerator rng) {
-        grid.distributed_set(pos, normal, cam_pos, frame, s, rng);
+        grid.distributed_set(pos, jitter_normal(normal, rng), cam_pos, frame, s, rng);
     }
 
     void store_at_level(const MCState s,
@@ -174,7 +185,7 @@ struct MCPG<let ADAPTIVE_BUFFER_SIZE : uint, let NORMAL_BITS : uint = 8> {
                         const uint level,
                         const uint frame,
                         inout RandomGenerator rng) {
-        grid.set_at_level(level, pos, normal, frame, s, rng);
+        grid.set_at_level(level, pos, jitter_normal(normal, rng), frame, s, rng);
     }
 
     // Missing-light heuristic: invalidate the exact loaded slot in place.
