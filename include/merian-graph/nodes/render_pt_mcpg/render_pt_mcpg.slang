@@ -78,7 +78,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
             uint buffer_index;
             uint level;
             const MCState s =
-                params.mcpg.load(lookup_pos, normal, cam_pos, scene.time, rng, buffer_index, level);
+                params.mcpg.load(lookup_pos, frame, cam_pos, scene.time, rng, buffer_index, level);
             score_sum += s.sum_w;
             // comparison with NaN is false (when s.sum_w == 0 and score_sum == 0)
             if (rng.next_float() < s.sum_w / score_sum) {
@@ -164,9 +164,9 @@ float3 trace_path(const ParameterBlock<Scene> scene,
                 const half3 target_mv = half3((sp.pos - sp.prev_pos) / scene.time_diff);
                 selected.add_sample(cur_pos, mc_f, next_pos, target_mv, scene.time);
                 // sharp update at the queried level, plus a coarse propagation one level up
-                params.mcpg.store(selected, cur_pos, normal, scene.camera.position, scene.frame,
+                params.mcpg.store(selected, cur_pos, frame, scene.camera.position, scene.frame,
                                   rng);
-                params.mcpg.store_at_level(selected, cur_pos, normal, selected_level + 1,
+                params.mcpg.store_at_level(selected, cur_pos, frame, selected_level + 1,
                                            scene.frame, rng);
             } else if (missing_light_heuristic && selected_buffer_index != MC_INVALID_INDEX &&
                        selected.light_missing_heuristic(mc_f, wo_world, cur_pos, next_pos)) {
@@ -246,7 +246,7 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<RenderBinding> params) {
     }
     case 5: { // mc weight
         const MCState mc_state =
-            params.mcpg.load(primary_sp.pos, primary_sp.material.shading_frame.get_normal(),
+            params.mcpg.load(primary_sp.pos, primary_sp.material.shading_frame,
                              cam_pos, scene.time, rng);
         if (mc_state.is_valid())
             params.debug[pixel] = float4(debug_color(mc_state.sum_w * 0.1), 1);
@@ -256,7 +256,7 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<RenderBinding> params) {
     }
     case 6: { // mc mean direction
         const MCState mc_state =
-            params.mcpg.load(primary_sp.pos, primary_sp.material.shading_frame.get_normal(),
+            params.mcpg.load(primary_sp.pos, primary_sp.material.shading_frame,
                              cam_pos, scene.time, rng);
         if (mc_state.is_valid())
             params.debug[pixel] = float4((mc_state.get_dir(primary_sp.pos) + 1) / 2, 1);
@@ -266,7 +266,7 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<RenderBinding> params) {
     }
     case 7: { // mc cos
         const MCState mc_state =
-            params.mcpg.load(primary_sp.pos, primary_sp.material.shading_frame.get_normal(),
+            params.mcpg.load(primary_sp.pos, primary_sp.material.shading_frame,
                              cam_pos, scene.time, rng);
         if (mc_state.is_valid())
             params.debug[pixel] = float4(debug_color(mc_state.w_cos / mc_state.sum_w), 1);
@@ -276,7 +276,7 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<RenderBinding> params) {
     }
     case 8: { // mc N
         const MCState mc_state =
-            params.mcpg.load(primary_sp.pos, primary_sp.material.shading_frame.get_normal(),
+            params.mcpg.load(primary_sp.pos, primary_sp.material.shading_frame,
                              cam_pos, scene.time, rng);
         if (mc_state.is_valid())
             params.debug[pixel] = float4(float3(float(mc_state.N) / float(ML_MAX_N)), 1);
@@ -286,7 +286,7 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<RenderBinding> params) {
     }
     case 9: { // mc mv
         const MCState mc_state =
-            params.mcpg.load(primary_sp.pos, primary_sp.material.shading_frame.get_normal(),
+            params.mcpg.load(primary_sp.pos, primary_sp.material.shading_frame,
                              cam_pos, scene.time, rng);
         params.debug[pixel] = float4(float3(mc_state.mv), 1);
         break;
