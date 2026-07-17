@@ -8,20 +8,32 @@
     },
     "cli": {
         "--": {
-            "pointer": "/nodes/5/properties/file",
+            "pointer": "/nodes/scene/properties/file",
             "required": true
         },
         "env-map": {
-            "pointer": "/nodes/5/properties/env/Path",
+            "pointer": "/nodes/scene/properties/env/Path",
             "set": {
-                "/nodes/5/properties/env/Type": "LatLong"
+                "/nodes/scene/properties/env/Type": "LatLong"
             }
         },
-        "max-path-length": {
-            "pointer": "/nodes/4/properties/max path length"
-        },
-        "spp": {
-            "pointer": "/nodes/4/properties/samples per pixel"
+        "renderer": {
+            "type": "variant",
+            "default": "pt",
+            "variants": {
+                "pt": {
+                    "merge": "renderers/pt.json",
+                    "set": {
+                        "/nodes/render/properties/max path length": 3
+                    }
+                },
+                "mcpg": {
+                    "merge": "renderers/mcpg.json"
+                },
+                "restir_di": {
+                    "merge": "renderers/restir_di.json"
+                }
+            }
         }
     },
     "nodes": [
@@ -130,29 +142,6 @@
                 "acquire->blit.acquire",
                 "window->imgui.window"
             ]
-        },
-        {
-            "enabled": true,
-            "id": "render",
-            "outputs": [
-                "irradiance->accumulate.src"
-            ],
-            "properties": {
-                "0": true,
-                "1": true,
-                "2": true,
-                "3": true,
-                "4": true,
-                "5": true,
-                "6": true,
-                "7": true,
-                "emission on primary": true,
-                "height": 1080,
-                "max path length": 3,
-                "samples per pixel": 2,
-                "width": 1920
-            },
-            "type": "Render (Path-traced)"
         },
         {
             "enabled": true,

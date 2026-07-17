@@ -36,6 +36,8 @@ void print_usage() {
         "                                last wins)\n"
         "  --<name> <value>              set an override declared in the graph's \"cli\" block;\n"
         "                                may appear before or after graph.json, in any order\n"
+        "                                variant selections persist when the graph is stored;\n"
+        "                                re-selecting re-applies the variant's preset\n"
         "  args...                       positional args and any unrecognized --flag, joined\n"
         "                                with spaces in order, feed the cli \"--\" override\n"
         "  --help                        with a graph.json: also lists its cli overrides\n");
@@ -158,19 +160,23 @@ int main(const int argc, const char** argv) {
         return 1;
     }
 
+    std::vector<std::filesystem::path> cli_search_dirs;
+    if (config_path) {
+        cli_search_dirs.push_back(config_path->parent_path());
+        cli_search_dirs.insert(cli_search_dirs.end(), search_paths.begin(), search_paths.end());
+    }
+
     if (options->help) {
         print_usage();
         if (config_path) {
-            fmt::print("{}", merian::GraphDescription::cli_help(config));
+            fmt::print("{}", merian::GraphDescription::cli_help(config, cli_search_dirs));
         }
         return 0;
     }
 
     if (config_path) {
-        std::vector<std::filesystem::path> cli_search_dirs = {config_path->parent_path()};
-        cli_search_dirs.insert(cli_search_dirs.end(), search_paths.begin(), search_paths.end());
         if (!merian::GraphDescription::apply_cli(config, options->graph_args, cli_search_dirs)) {
-            fmt::print("{}", merian::GraphDescription::cli_help(config));
+            fmt::print("{}", merian::GraphDescription::cli_help(config, cli_search_dirs));
             return 1;
         }
     }

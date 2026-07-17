@@ -444,8 +444,57 @@ std::optional<bool> parse_bool(std::string text) {
     return std::nullopt;
 }
 
+// Resolves id-based array tokens ("/nodes/scene/..." -> "/nodes/7/...") so pointers survive
+// node reordering and merging. Numeric tokens pass through; tokens past a missing path are
+// appended verbatim (assignments may create them).
+std::optional<JsonPointer> resolve_id_pointer(const json& config, const JsonPointer& pointer) {
+    const std::string raw = pointer.to_string();
+    JsonPointer resolved;
+    const json* cursor = &config;
+    size_t begin = 1;
+    while (begin <= raw.size()) {
+        const size_t end = std::min(raw.find('/', begin), raw.size());
+        std::string token = raw.substr(begin, end - begin);
+        begin = end + 1;
+        // unescape per RFC 6901
+        token = std::regex_replace(token, std::regex("~1"), "/");
+        token = std::regex_replace(token, std::regex("~0"), "~");
+
+        const auto is_numeric = [](const std::string& t) {
+            return !t.empty() && std::ranges::all_of(
+                                     t, [](const unsigned char c) { return std::isdigit(c) != 0; });
+        };
+        if (cursor != nullptr && cursor->is_array() && !is_numeric(token) && token != "-") {
+            const auto match = std::ranges::find_if(*cursor, [&](const json& element) {
+                return element.is_object() && element.contains("id") && element.at("id") == token;
+            });
+            if (match == cursor->end()) {
+                SPDLOG_ERROR("no element with id '{}' for pointer '{}'", token, raw);
+                return std::nullopt;
+            }
+            token = std::to_string(match - cursor->begin());
+        }
+        resolved.push_back(token);
+
+        if (cursor == nullptr) {
+            continue;
+        }
+        if (cursor->is_object()) {
+            const auto it = cursor->find(token);
+            cursor = it != cursor->end() ? &*it : nullptr;
+        } else if (cursor->is_array() && is_numeric(token)) {
+            const size_t index = std::stoul(token);
+            cursor = index < cursor->size() ? &(*cursor)[index] : nullptr;
+        } else {
+            cursor = nullptr;
+        }
+    }
+    return resolved;
+}
+
 json typed_value(const json& config, const JsonPointer& pointer, const std::string& value) {
-    if (config.contains(pointer) && config.at(pointer).is_string()) {
+    if (const auto resolved = resolve_id_pointer(config, pointer);
+        resolved && config.contains(*resolved) && config.at(*resolved).is_string()) {
         return value;
     }
     const json parsed = json::parse(value, nullptr, false);
@@ -473,6 +522,9 @@ struct Override {
     Patch off;
     std::map<std::string, Patch> variants;
     std::optional<std::string> default_variant;
+    // Persisted selection: set once a variant is applied, so a stored config neither reverts to
+    // the default nor re-applies the variant's patch on rerun.
+    std::optional<std::string> selected;
 };
 
 std::optional<Patch> resolve(const Override& o, const std::string& value, const json& config) {
@@ -522,6 +574,9 @@ std::string target(const Override& o) {
     case Override::Kind::FLAG:
         return "on/off";
     case Override::Kind::VARIANT:
+        if (o.selected) {
+            return fmt::format("selected: {}", *o.selected);
+        }
         return o.default_variant ? fmt::format("default: {}", *o.default_variant) : "";
     }
     return {};
@@ -548,6 +603,9 @@ std::vector<Override> parse_overrides(const json& config) {
     std::vector<Override> overrides;
     const json cli = config.value("cli", json::object());
     for (const auto& [name, spec] : cli.items()) {
+        if (spec.is_null()) {
+            continue; // a fragment removes an inherited override by merging null over it
+        }
         Override entry;
         entry.name = name;
         entry.kind = classify(spec);
@@ -571,6 +629,9 @@ std::vector<Override> parse_overrides(const json& config) {
             if (const auto it = spec.find("default"); it != spec.end()) {
                 entry.default_variant = it->get<std::string>();
             }
+            if (const auto it = spec.find("selected"); it != spec.end()) {
+                entry.selected = it->get<std::string>();
+            }
             break;
         }
         }
@@ -587,12 +648,10 @@ resolve_file(const std::string& file, const std::vector<std::filesystem::path>& 
     return merian::FileLoader(search_dirs).find_file(file);
 }
 
+// Merges first so assignments can target (and win over) merged content.
 bool apply_patch(json& config,
                  const Patch& patch,
                  const std::vector<std::filesystem::path>& search_dirs) {
-    for (const auto& [pointer, value] : patch.assignments) {
-        config[pointer] = value;
-    }
     for (const std::string& file : patch.merges) {
         const auto path = resolve_file(file, search_dirs);
         if (!path) {
@@ -607,7 +666,47 @@ bool apply_patch(json& config,
         }
         merian::GraphDescription::merge_into(config, overwrite);
     }
+    for (const auto& [pointer, value] : patch.assignments) {
+        const std::optional<JsonPointer> resolved = resolve_id_pointer(config, pointer);
+        if (!resolved) {
+            return false;
+        }
+        config[*resolved] = value;
+    }
     return true;
+}
+
+// Applies pending default/selected variants until none remain; applied patches can merge
+// fragments that declare further variants, hence the re-parse loop. A variant with a persisted
+// "selected" counts as settled without re-applying its patch.
+bool settle_variants(json& config,
+                     const std::set<std::string>& suppressed,
+                     const std::vector<std::filesystem::path>& search_dirs) {
+    bool ok = true;
+    std::set<std::string> settled;
+    while (true) {
+        const std::vector<Override> overrides = parse_overrides(config);
+        const auto pending = std::ranges::find_if(overrides, [&](const Override& o) {
+            return o.kind == Override::Kind::VARIANT && (o.default_variant || o.selected) &&
+                   !settled.contains(o.name) && !suppressed.contains(o.name);
+        });
+        if (pending == overrides.end()) {
+            return ok;
+        }
+        settled.insert(pending->name);
+        if (pending->selected) {
+            continue;
+        }
+        const auto variant = pending->variants.find(*pending->default_variant);
+        if (variant == pending->variants.end()) {
+            SPDLOG_ERROR("--{}: default '{}' is not declared", pending->name,
+                         *pending->default_variant);
+            ok = false;
+            continue;
+        }
+        ok = apply_patch(config, variant->second, search_dirs) && ok;
+        config["cli"][pending->name]["selected"] = *pending->default_variant;
+    }
 }
 
 } // namespace
@@ -642,85 +741,128 @@ void GraphDescription::merge_into(nlohmann::json& base, const nlohmann::json& ov
 bool GraphDescription::apply_cli(nlohmann::json& config,
                                  const std::vector<std::string>& cli_args,
                                  const std::vector<std::filesystem::path>& search_dirs) {
-    const std::vector<Override> overrides = parse_overrides(config);
-
-    // Split raw args: a "--name" is a named override only if declared (or the reserved "merge");
-    // everything else is positional and feeds the "--" override, joined in order.
-    std::vector<std::pair<std::string, std::string>> args;
-    std::vector<std::string> positional;
-    for (size_t i = 0; i < cli_args.size(); i++) {
-        const std::string& arg = cli_args[i];
+    // A raw "--name" presence suppresses that variant's default even if its value later fails.
+    std::set<std::string> raw_names;
+    for (const std::string& arg : cli_args) {
         if (arg.starts_with("--") && arg.size() > 2) {
+            raw_names.insert(arg.substr(2));
+        }
+    }
+
+    bool ok = settle_variants(config, raw_names, search_dirs);
+
+    // Overrides declared by merged fragments must be recognized in the same invocation: consume
+    // one recognized "--name value" at a time and re-parse after each application.
+    std::vector<bool> consumed(cli_args.size(), false);
+    std::set<std::string> given;
+    while (true) {
+        const std::vector<Override> overrides = parse_overrides(config);
+        size_t applied = cli_args.size();
+        for (size_t i = 0; i < cli_args.size(); i++) {
+            const std::string& arg = cli_args[i];
+            if (consumed[i] || !arg.starts_with("--") || arg.size() <= 2) {
+                continue;
+            }
             const std::string name = arg.substr(2);
             const bool declared =
                 name == "merge" ||
                 std::ranges::any_of(overrides, [&](const Override& o) { return o.name == name; });
-            if (declared) {
-                if (i + 1 >= cli_args.size()) {
-                    SPDLOG_ERROR("missing value for override '{}'", arg);
-                    return false;
-                }
-                args.emplace_back(name, cli_args[++i]);
+            if (!declared) {
                 continue;
             }
+            if (i + 1 >= cli_args.size() || consumed[i + 1]) {
+                SPDLOG_ERROR("missing value for override '{}'", arg);
+                return false;
+            }
+            consumed[i] = consumed[i + 1] = true;
+            given.insert(name);
+            const std::string& value = cli_args[i + 1];
+            if (name == "merge") {
+                ok =
+                    apply_patch(config, Patch{.assignments = {}, .merges = {value}}, search_dirs) &&
+                    ok;
+            } else {
+                const auto it = std::ranges::find(overrides, name, &Override::name);
+                const std::optional<Patch> patch = resolve(*it, value, config);
+                ok = patch && apply_patch(config, *patch, search_dirs) && ok;
+                if (patch && it->kind == Override::Kind::VARIANT) {
+                    config["cli"][name]["selected"] = value;
+                }
+            }
+            ok = settle_variants(config, raw_names, search_dirs) && ok;
+            applied = i;
+            break;
         }
-        positional.push_back(arg);
+        if (applied == cli_args.size()) {
+            break;
+        }
     }
-    if (!positional.empty()) {
-        std::string joined = positional.front();
-        for (size_t i = 1; i < positional.size(); i++) {
+
+    // Remaining tokens are positional and feed the "--" override, joined in order.
+    std::string joined;
+    bool positional = false;
+    for (size_t i = 0; i < cli_args.size(); i++) {
+        if (consumed[i]) {
+            continue;
+        }
+        if (positional) {
             joined += ' ';
-            joined += positional[i];
         }
-        args.emplace_back("--", std::move(joined));
+        joined += cli_args[i];
+        positional = true;
     }
 
-    bool ok = true;
-
-    std::set<std::string> given;
-    for (const auto& [name, value] : args) {
-        given.insert(name);
+    const std::vector<Override> overrides = parse_overrides(config);
+    if (positional) {
+        given.insert("--");
+        const auto it = std::ranges::find(overrides, "--", &Override::name);
+        if (it == overrides.end()) {
+            SPDLOG_ERROR("positional arguments given but '--' is not declared in the cli block");
+            ok = false;
+        } else {
+            const std::optional<Patch> patch = resolve(*it, joined, config);
+            ok = patch && apply_patch(config, *patch, search_dirs) && ok;
+        }
     }
 
     for (const Override& o : overrides) {
-        if (o.default_variant && !given.contains(o.name)) {
-            const auto it = o.variants.find(*o.default_variant);
-            if (it == o.variants.end()) {
-                SPDLOG_ERROR("--{}: default '{}' is not declared", o.name, *o.default_variant);
-                ok = false;
-            } else {
-                ok = apply_patch(config, it->second, search_dirs) && ok;
+        if (!o.required || given.contains(o.name) || o.default_variant || o.selected) {
+            continue;
+        }
+        // a value a stored session already materialized (e.g. the scene file) satisfies
+        if (o.kind == Override::Kind::VALUE) {
+            const std::optional<JsonPointer> resolved = resolve_id_pointer(config, o.pointer);
+            if (resolved && config.contains(*resolved)) {
+                const json& value = config.at(*resolved);
+                if (value.is_string() ? !value.get<std::string>().empty() : !value.is_null()) {
+                    continue;
+                }
             }
         }
-    }
-
-    for (const auto& [name, value] : args) {
-        if (name == "merge") {
-            ok =
-                apply_patch(config, Patch{.assignments = {}, .merges = {value}}, search_dirs) && ok;
-            continue;
-        }
-        const auto it = std::ranges::find(overrides, name, &Override::name);
-        if (it == overrides.end()) {
-            SPDLOG_ERROR("--{} is not declared in the cli block", name);
-            ok = false;
-            continue;
-        }
-        const std::optional<Patch> patch = resolve(*it, value, config);
-        ok = patch && apply_patch(config, *patch, search_dirs) && ok;
-    }
-
-    for (const Override& o : overrides) {
-        if (o.required && !given.contains(o.name) && !o.default_variant) {
+        if (o.name == "--") {
+            SPDLOG_ERROR("missing required positional args (see --help)");
+        } else {
             SPDLOG_ERROR("missing required --{}", o.name);
-            ok = false;
+        }
+        ok = false;
+    }
+
+    // Null entries only mark removal (see parse_overrides); drop them from the stored config.
+    if (const auto cli = config.find("cli"); cli != config.end() && cli->is_object()) {
+        for (auto it = cli->begin(); it != cli->end();) {
+            it = it->is_null() ? cli->erase(it) : std::next(it);
         }
     }
+
     return ok;
 }
 
-std::string GraphDescription::cli_help(const nlohmann::json& config) {
-    const std::vector<Override> overrides = parse_overrides(config);
+std::string GraphDescription::cli_help(const nlohmann::json& config,
+                                       const std::vector<std::filesystem::path>& search_dirs) {
+    // Settle pending selections on a copy so overrides declared by merged fragments show up.
+    nlohmann::json settled = config;
+    settle_variants(settled, {}, search_dirs);
+    const std::vector<Override> overrides = parse_overrides(settled);
     if (overrides.empty()) {
         return "this graph declares no cli overrides\n";
     }

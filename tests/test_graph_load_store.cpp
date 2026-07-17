@@ -37,6 +37,15 @@ TEST(GraphLoadStore, CliRoundTrip) {
 
     graph->load_from_json(json::parse(R"({"version": 3, "nodes": []})"));
     EXPECT_FALSE(graph->store_to_json().contains("cli"));
+
+    // node metadata only lives in the loaded description and must be carried through
+    const json with_metadata = json::parse(R"({
+        "version": 3,
+        "nodes": [{"id": "color", "type": "Color", "metadata": {"pos": [10, 20]}}]
+    })");
+    graph->load_from_json(with_metadata);
+    EXPECT_EQ(graph->store_to_json().at("nodes").at(0).at("metadata"),
+              with_metadata.at("nodes").at(0).at("metadata"));
 }
 
 TEST(GraphCli, ValueWithSet) {
@@ -111,6 +120,9 @@ TEST(GraphCli, RequiredAndUnknown) {
     EXPECT_TRUE(GraphDescription::apply_cli(given, {"--scene", "/s.gltf"}));
     EXPECT_EQ(given["nodes"][0]["properties"]["file"], "/s.gltf");
 
+    // a value a stored session already materialized satisfies the requirement
+    EXPECT_TRUE(GraphDescription::apply_cli(given, {}));
+
     // An undeclared --flag is positional; with no "--" override declared, that's an error.
     json unknown = config;
     EXPECT_FALSE(GraphDescription::apply_cli(unknown, {"--nope", "x"}));
@@ -120,6 +132,148 @@ TEST(GraphCli, OrderLastWins) {
     json config = json::parse(R"({"v": 0, "cli": {"spp": {"pointer": "/v"}}})");
     EXPECT_TRUE(GraphDescription::apply_cli(config, {"--spp", "1", "--spp", "2"}));
     EXPECT_EQ(config["v"], 2);
+}
+
+TEST(GraphCli, IdBasedPointer) {
+    json config = json::parse(R"({
+        "nodes": [
+            {"id": "render", "properties": {"samples per pixel": 2}},
+            {"id": "scene",  "properties": {"file": ""}}
+        ],
+        "cli": {
+            "--":  {"pointer": "/nodes/scene/properties/file"},
+            "spp": {"pointer": "/nodes/render/properties/samples per pixel"},
+            "old": {"pointer": "/nodes/0/properties/samples per pixel"}
+        }
+    })");
+
+    EXPECT_TRUE(GraphDescription::apply_cli(config, {"--spp", "8", "/scene.gltf"}));
+    EXPECT_EQ(config["nodes"][0]["properties"]["samples per pixel"], 8);
+    EXPECT_EQ(config["nodes"][1]["properties"]["file"], "/scene.gltf");
+
+    // numeric pointers keep working
+    EXPECT_TRUE(GraphDescription::apply_cli(config, {"--old", "4"}));
+    EXPECT_EQ(config["nodes"][0]["properties"]["samples per pixel"], 4);
+
+    json unknown = json::parse(R"({
+        "nodes": [{"id": "render", "properties": {}}],
+        "cli": {"spp": {"pointer": "/nodes/nope/properties/spp"}}
+    })");
+    EXPECT_FALSE(GraphDescription::apply_cli(unknown, {"--spp", "8"}));
+}
+
+TEST(GraphCli, MergeDeclaresOverride) {
+    const std::filesystem::path file =
+        std::filesystem::temp_directory_path() / "merian-test-fragment.json";
+    {
+        std::ofstream out(file);
+        out << R"({
+            "nodes": [{"id": "render", "properties": {"samples per pixel": 2}}],
+            "cli": {"spp": {"pointer": "/nodes/render/properties/samples per pixel"}}
+        })";
+    }
+
+    // overrides declared by a merged fragment are recognized in the same invocation, in any
+    // argument order, and the explicit value wins over the fragment's
+    for (const auto& args : {std::vector<std::string>{"--merge", file.string(), "--spp", "8"},
+                             std::vector<std::string>{"--spp", "8", "--merge", file.string()}}) {
+        json config = json::parse(R"({"nodes": [{"id": "scene"}]})");
+        EXPECT_TRUE(GraphDescription::apply_cli(config, args));
+        EXPECT_EQ(config["nodes"][1]["properties"]["samples per pixel"], 8);
+    }
+
+    std::filesystem::remove(file);
+}
+
+TEST(GraphCli, DefaultVariantDeclaresOverride) {
+    const std::filesystem::path file =
+        std::filesystem::temp_directory_path() / "merian-test-renderer.json";
+    {
+        std::ofstream out(file);
+        out << R"({
+            "nodes": [{"id": "render", "properties": {"samples per pixel": 2}}],
+            "cli": {"spp": {"pointer": "/nodes/render/properties/samples per pixel"}}
+        })";
+    }
+
+    json config = json::parse(R"({
+        "nodes": [{"id": "scene"}],
+        "cli": {"renderer": {"type": "variant", "default": "pt", "variants": {"pt": {}}}}
+    })");
+    config["cli"]["renderer"]["variants"]["pt"]["merge"] = file.string();
+
+    EXPECT_TRUE(GraphDescription::apply_cli(config, {"--spp", "8"}));
+    EXPECT_EQ(config["nodes"][1]["properties"]["samples per pixel"], 8);
+    EXPECT_EQ(config["cli"]["renderer"]["selected"], "pt");
+
+    std::filesystem::remove(file);
+}
+
+TEST(GraphCli, VariantSticky) {
+    const json base = json::parse(R"({
+        "v": 0,
+        "cli": {"quality": {"type": "variant", "default": "high",
+                            "variants": {"low": {"set": {"/v": 1}}, "high": {"set": {"/v": 8}}}}}
+    })");
+
+    json config = base;
+    EXPECT_TRUE(GraphDescription::apply_cli(config, {}));
+    EXPECT_EQ(config["v"], 8);
+    EXPECT_EQ(config["cli"]["quality"]["selected"], "high");
+
+    // a persisted selection is not re-applied
+    config["v"] = 42;
+    EXPECT_TRUE(GraphDescription::apply_cli(config, {}));
+    EXPECT_EQ(config["v"], 42);
+
+    // an explicit selection always re-applies its patch
+    EXPECT_TRUE(GraphDescription::apply_cli(config, {"--quality", "high"}));
+    EXPECT_EQ(config["v"], 8);
+
+    EXPECT_TRUE(GraphDescription::apply_cli(config, {"--quality", "low"}));
+    EXPECT_EQ(config["v"], 1);
+    EXPECT_EQ(config["cli"]["quality"]["selected"], "low");
+}
+
+TEST(GraphCli, PatchMergeThenSet) {
+    const std::filesystem::path file =
+        std::filesystem::temp_directory_path() / "merian-test-merge-set.json";
+    {
+        std::ofstream out(file);
+        out << R"({"nodes": [{"id": "render", "properties": {"max path length": 12}}]})";
+    }
+
+    // the set targets a node that only exists after the patch's own merge
+    json config = json::parse(R"({
+        "nodes": [{"id": "scene"}],
+        "cli": {"renderer": {"type": "variant", "variants": {"pt": {
+            "set": {"/nodes/render/properties/max path length": 3}}}}}
+    })");
+    config["cli"]["renderer"]["variants"]["pt"]["merge"] = file.string();
+
+    EXPECT_TRUE(GraphDescription::apply_cli(config, {"--renderer", "pt"}));
+    EXPECT_EQ(config["nodes"][1]["properties"]["max path length"], 3);
+
+    std::filesystem::remove(file);
+}
+
+TEST(GraphCli, NullRemovesOverride) {
+    const std::filesystem::path file =
+        std::filesystem::temp_directory_path() / "merian-test-null.json";
+    {
+        std::ofstream out(file);
+        out << R"({"cli": {"max-path-length": null}})";
+    }
+
+    json config = json::parse(R"({"v": 5, "cli": {"max-path-length": {"pointer": "/v"}}})");
+    EXPECT_TRUE(GraphDescription::apply_cli(config, {"--merge", file.string()}));
+    EXPECT_FALSE(config["cli"].contains("max-path-length"));
+
+    // the removed override is no longer recognized
+    json again = config;
+    EXPECT_FALSE(GraphDescription::apply_cli(again, {"--max-path-length", "3"}));
+
+    std::filesystem::remove(file);
 }
 
 TEST(GraphCli, MergeFile) {

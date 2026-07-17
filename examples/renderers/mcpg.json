@@ -1,0 +1,71 @@
+{
+    "cli": {
+        "max-path-length": {
+            "pointer": "/nodes/render/properties/max path length"
+        },
+        "spp": {
+            "pointer": "/nodes/render/properties/samples per pixel"
+        }
+    },
+    "nodes": [
+        {
+            "enabled": true,
+            "id": "render",
+            "outputs": [
+                "irradiance->accumulate.src"
+            ],
+            "properties": {
+                "0": true,
+                "1": true,
+                "2": true,
+                "3": true,
+                "4": true,
+                "5": true,
+                "6": true,
+                "7": true,
+                "emission on primary": true,
+                "guiding prob": 0.8999999761581421,
+                "height": 1080,
+                "lc": {
+                    "LC buffer size": 8000009,
+                    "LC normal bits": 4,
+                    "LC probe count": 8,
+                    "LC stochastic interpolation": false,
+                    "grid distribution dimension": 2.0,
+                    "grid level bias": 0.0,
+                    "grid tan(alpha/2)": 0.006000000052154064,
+                    "surf: use LC": false
+                },
+                "max path length": 4,
+                "mc": {
+                    "MC samples": 5,
+                    "ML prior": 0.20000000298023224,
+                    "adaptive grid buf size": 32777259,
+                    "adaptive grid normal bits": 4,
+                    "adaptive grid prob": 0.699999988079071,
+                    "grid distribution dimension": 1.4900000095367432,
+                    "grid level bias": 0.0,
+                    "grid tan(alpha/2)": 0.002099999925121665,
+                    "missing light heuristic": true
+                },
+                "randomize seed": true,
+                "reference mode": false,
+                "samples per pixel": 1,
+                "width": 1920
+            },
+            "type": "Render (Path-traced, MCPG)"
+        },
+        {
+            "id": "gbuffer",
+            "outputs": [
+                "denoiser->accumulate.gbuffer.tex0",
+                "denoiser->accumulate.prev_gbuffer.tex0",
+                "gbuffer->render.gbuffer",
+                "hit_info->accumulate.gbuffer.tex1",
+                "hit_info->accumulate.prev_gbuffer.tex1",
+                "mv->accumulate.gbuffer.tex2",
+                "mv->accumulate.prev_gbuffer.tex2"
+            ]
+        }
+    ]
+}

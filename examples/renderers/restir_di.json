@@ -1,0 +1,38 @@
+{
+    "cli": {
+        "max-path-length": null,
+        "spp": {
+            "pointer": "/nodes/render/properties/samples per pixel"
+        }
+    },
+    "nodes": [
+        {
+            "enabled": true,
+            "id": "render",
+            "outputs": [
+                "irradiance->accumulate.src",
+                "reservoirs->render.prev_reservoirs"
+            ],
+            "properties": {
+                "emission on primary": true,
+                "height": 1080,
+                "samples per pixel": 4,
+                "width": 1920
+            },
+            "type": "Render (ReSTIR DI)"
+        },
+        {
+            "id": "gbuffer",
+            "outputs": [
+                "denoiser->accumulate.gbuffer.tex0",
+                "denoiser->accumulate.prev_gbuffer.tex0",
+                "gbuffer->render.gbuffer",
+                "gbuffer->render.prev_gbuffer",
+                "hit_info->accumulate.gbuffer.tex1",
+                "hit_info->accumulate.prev_gbuffer.tex1",
+                "mv->accumulate.gbuffer.tex2",
+                "mv->accumulate.prev_gbuffer.tex2"
+            ]
+        }
+    ]
+}

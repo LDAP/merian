@@ -219,7 +219,8 @@ class GraphDescription {
                           const std::vector<std::string>& args,
                           const std::vector<std::filesystem::path>& search_dirs = {});
 
-    static std::string cli_help(const nlohmann::json& config);
+    static std::string cli_help(const nlohmann::json& config,
+                                const std::vector<std::filesystem::path>& search_dirs = {});
 
     static void merge_into(nlohmann::json& base, const nlohmann::json& overwrite);
 

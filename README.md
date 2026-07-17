@@ -28,10 +28,11 @@ Example graphs for `merian-graph-run` are in the [`examples`](https://github.com
 
 - [`hdr_viewer.json`](https://github.com/LDAP/merian/tree/main/examples/hdr_viewer.json): a tone-mapped HDR image viewer — `merian-graph-run examples/hdr_viewer.json <image.hdr>`.
 - [`shadertoy.json`](https://github.com/LDAP/merian/tree/main/examples/shadertoy.json): runs a Shadertoy-style shader — `merian-graph-run examples/shadertoy.json <shader.glsl>`.
-- [`gltf.json`](https://github.com/LDAP/merian/tree/main/examples/gltf.json) / [`fbx.json`](https://github.com/LDAP/merian/tree/main/examples/fbx.json): a path-traced glTF / FBX scene viewer — `merian-graph-run examples/gltf.json <scene.gltf> [options]`. Options:
+- [`gltf.json`](https://github.com/LDAP/merian/tree/main/examples/gltf.json) / [`fbx.json`](https://github.com/LDAP/merian/tree/main/examples/fbx.json): a glTF / FBX scene viewer — `merian-graph-run examples/gltf.json <scene.gltf> [options]`. Options:
     - `<scene>` (required): path to the glTF / FBX scene to load.
+    - `--renderer <pt|mcpg|restir_di>`: renderer, merged from [`examples/renderers`](https://github.com/LDAP/merian/tree/main/examples/renderers) (default: `pt`; the selection persists when the graph is stored).
     - `--env-map <path>`: lat-long HDR environment map (sets the env type to `LatLong`).
-    - `--max-path-length <n>`: maximum path-tracer path length.
+    - `--max-path-length <n>`: maximum path length (`pt`, `mcpg`).
     - `--spp <n>`: samples per pixel.
 
 For using merian as a library in your own project, see [merian-example-sum](https://github.com/LDAP/merian-example-sum) (computing a sum on the GPU) and [merian-quake](https://github.com/LDAP/merian-quake), a path tracer for the original Quake game.
