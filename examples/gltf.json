@@ -1,12 +1,4 @@
 {
-    "graph_properties": {
-        "flush thread pool": true,
-        "fps limiter": false,
-        "imgui event": "ui",
-        "iterations in flight": 2,
-        "low latency": false,
-        "time overwrite": "None"
-    },
     "cli": {
         "--": {
             "pointer": "/nodes/scene/properties/file",
@@ -19,14 +11,14 @@
             }
         },
         "renderer": {
-            "type": "variant",
             "default": "pt",
+            "type": "variant",
             "variants": {
-                "pt": {
-                    "merge": "renderers/pt.json"
-                },
                 "mcpg": {
                     "merge": "renderers/mcpg.json"
+                },
+                "pt": {
+                    "merge": "renderers/pt.json"
                 },
                 "restir_di": {
                     "merge": "renderers/restir_di.json"
@@ -34,10 +26,17 @@
             }
         }
     },
-    "nodes": [
-        {
+    "graph_properties": {
+        "flush thread pool": true,
+        "fps limiter": false,
+        "imgui event": "ui",
+        "iterations in flight": 2,
+        "low latency": false,
+        "time overwrite": "None"
+    },
+    "nodes": {
+        "accumulate": {
             "enabled": true,
-            "id": "accumulate",
             "outputs": [
                 "history->accumulate.prev_history",
                 "out->accumulate.prev_out",
@@ -67,9 +66,8 @@
             },
             "type": "Accumulate"
         },
-        {
+        "blit": {
             "enabled": true,
-            "id": "blit",
             "outputs": [
                 "acquire->imgui.acquire"
             ],
@@ -79,9 +77,8 @@
             },
             "type": "Swapchain Blit"
         },
-        {
+        "exposure": {
             "enabled": true,
-            "id": "exposure",
             "outputs": [
                 "out->tonemap.src"
             ],
@@ -102,9 +99,8 @@
             },
             "type": "Exposure"
         },
-        {
+        "gbuffer": {
             "enabled": true,
-            "id": "gbuffer",
             "outputs": [
                 "denoiser->accumulate.gbuffer.tex0",
                 "denoiser->accumulate.prev_gbuffer.tex0",
@@ -128,17 +124,15 @@
             },
             "type": "GBuffer (Raytraced)"
         },
-        {
+        "imgui": {
             "enabled": true,
-            "id": "imgui",
             "properties": {
                 "imgui event": "ui"
             },
             "type": "ImGui"
         },
-        {
+        "output": {
             "enabled": true,
-            "id": "output",
             "outputs": [
                 "acquire->blit.acquire",
                 "controller->scene.controller",
@@ -160,9 +154,8 @@
             },
             "type": "Window"
         },
-        {
+        "scene": {
             "enabled": true,
-            "id": "scene",
             "outputs": [
                 "scene->gbuffer.scene",
                 "scene->render.scene"
@@ -183,9 +176,8 @@
             },
             "type": "GLTF Scene"
         },
-        {
+        "tonemap": {
             "enabled": true,
-            "id": "tonemap",
             "outputs": [
                 "out->blit.src"
             ],
@@ -206,6 +198,6 @@
             },
             "type": "Tonemap"
         }
-    ],
-    "version": 3
+    },
+    "version": 4
 }

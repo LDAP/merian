@@ -232,9 +232,9 @@ class GraphDescription {
     static void parse_graph_v1(const nlohmann::json& json, GraphDescription& description);
     static void parse_graph_v2(const nlohmann::json& json, GraphDescription& description);
     static void parse_graph_v3(const nlohmann::json& json, GraphDescription& description);
+    static void parse_graph_v4(const nlohmann::json& json, GraphDescription& description);
 
-    void dump_graph_v2(nlohmann::json& json) const;
-    void dump_graph_v3(nlohmann::json& json) const;
+    void dump_graph_v4(nlohmann::json& json) const;
 
     std::string generate_unique_identifier(const std::string& node_type);
 

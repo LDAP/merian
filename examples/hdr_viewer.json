@@ -1,4 +1,10 @@
 {
+    "cli": {
+        "--": {
+            "pointer": "/nodes/0/properties/path",
+            "required": true
+        }
+    },
     "graph_properties": {
         "flush thread pool": true,
         "fps limiter": false,
@@ -6,48 +12,41 @@
         "low latency": false,
         "time overwrite": "None"
     },
-    "cli": {
-        "--": {
-            "pointer": "/nodes/0/properties/path",
-            "required": true
-        }
-    },
-    "nodes": [
-        {
+    "nodes": {
+        "blit": {
             "enabled": true,
-            "id": "image",
-            "type": "HDR Image",
+            "outputs": [
+                "acquire->imgui.acquire"
+            ],
+            "type": "Swapchain Blit"
+        },
+        "image": {
+            "enabled": true,
             "outputs": [
                 "out->tonemap.src"
             ],
             "properties": {
                 "path": ""
-            }
+            },
+            "type": "HDR Image"
         },
-        {
+        "imgui": {
             "enabled": true,
-            "id": "tonemap",
-            "type": "Tonemap",
+            "type": "ImGui"
+        },
+        "tonemap": {
+            "enabled": true,
             "outputs": [
                 "out->blit.src"
             ],
             "properties": {
-                "tonemap": "Uncharted 2",
-                "exposure bias": 2.0
-            }
+                "exposure bias": 2.0,
+                "tonemap": "Uncharted 2"
+            },
+            "type": "Tonemap"
         },
-        {
+        "window": {
             "enabled": true,
-            "id": "blit",
-            "type": "Swapchain Blit",
-            "outputs": [
-                "acquire->imgui.acquire"
-            ]
-        },
-        {
-            "enabled": true,
-            "id": "window",
-            "type": "Window",
             "outputs": [
                 "acquire->blit.acquire",
                 "window->imgui.window"
@@ -55,19 +54,15 @@
             "properties": {
                 "backend": "SDL3 (Video Subsystem)",
                 "blit mode": "FIT",
-                "present mode": "Fifo",
                 "on_should_close_actions": {
+                    "remove node": false,
                     "send sigint": true,
-                    "send sigterm": false,
-                    "remove node": false
-                }
-            }
-        },
-        {
-            "enabled": true,
-            "id": "imgui",
-            "type": "ImGui"
+                    "send sigterm": false
+                },
+                "present mode": "Fifo"
+            },
+            "type": "Window"
         }
-    ],
-    "version": 3
+    },
+    "version": 4
 }

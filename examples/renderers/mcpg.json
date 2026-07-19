@@ -7,10 +7,20 @@
             "pointer": "/nodes/render/properties/samples per pixel"
         }
     },
-    "nodes": [
-        {
+    "nodes": {
+        "gbuffer": {
+            "outputs": [
+                "denoiser->accumulate.gbuffer.tex0",
+                "denoiser->accumulate.prev_gbuffer.tex0",
+                "gbuffer->render.gbuffer",
+                "hit_info->accumulate.gbuffer.tex1",
+                "hit_info->accumulate.prev_gbuffer.tex1",
+                "mv->accumulate.gbuffer.tex2",
+                "mv->accumulate.prev_gbuffer.tex2"
+            ]
+        },
+        "render": {
             "enabled": true,
-            "id": "render",
             "outputs": [
                 "irradiance->accumulate.src"
             ],
@@ -24,7 +34,7 @@
                 "6": true,
                 "7": true,
                 "emission on primary": true,
-                "guiding prob": 0.8999999761581421,
+                "guiding prob": 0.9,
                 "height": 1080,
                 "lc": {
                     "LC buffer size": 8000009,
@@ -33,39 +43,26 @@
                     "LC stochastic interpolation": false,
                     "grid distribution dimension": 2.0,
                     "grid level bias": 0.0,
-                    "grid tan(alpha/2)": 0.006000000052154064,
+                    "grid tan(alpha/2)": 0.012000000052154064,
                     "surf: use LC": false
                 },
-                "max path length": 4,
+                "max path length": 5,
                 "mc": {
                     "MC samples": 5,
-                    "ML prior": 0.20000000298023224,
+                    "ML prior": 0.2,
                     "adaptive grid buf size": 32777259,
                     "adaptive grid normal bits": 4,
-                    "adaptive grid prob": 0.699999988079071,
-                    "grid distribution dimension": 1.4900000095367432,
+                    "grid distribution dimension": 1.5,
                     "grid level bias": 0.0,
-                    "grid tan(alpha/2)": 0.002099999925121665,
+                    "grid tan(alpha/2)": 0.003,
                     "missing light heuristic": true
                 },
                 "randomize seed": true,
                 "reference mode": false,
-                "samples per pixel": 1,
+                "samples per pixel": 2,
                 "width": 1920
             },
             "type": "Render (Path-traced, MCPG)"
-        },
-        {
-            "id": "gbuffer",
-            "outputs": [
-                "denoiser->accumulate.gbuffer.tex0",
-                "denoiser->accumulate.prev_gbuffer.tex0",
-                "gbuffer->render.gbuffer",
-                "hit_info->accumulate.gbuffer.tex1",
-                "hit_info->accumulate.prev_gbuffer.tex1",
-                "mv->accumulate.gbuffer.tex2",
-                "mv->accumulate.prev_gbuffer.tex2"
-            ]
         }
-    ]
+    }
 }

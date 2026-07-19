@@ -7,10 +7,20 @@
             "pointer": "/nodes/render/properties/samples per pixel"
         }
     },
-    "nodes": [
-        {
+    "nodes": {
+        "gbuffer": {
+            "outputs": [
+                "denoiser->accumulate.gbuffer.tex0",
+                "denoiser->accumulate.prev_gbuffer.tex0",
+                "gbuffer->render.gbuffer",
+                "hit_info->accumulate.gbuffer.tex1",
+                "hit_info->accumulate.prev_gbuffer.tex1",
+                "mv->accumulate.gbuffer.tex2",
+                "mv->accumulate.prev_gbuffer.tex2"
+            ]
+        },
+        "render": {
             "enabled": true,
-            "id": "render",
             "outputs": [
                 "irradiance->accumulate.src"
             ],
@@ -25,23 +35,11 @@
                 "7": true,
                 "emission on primary": true,
                 "height": 1080,
-                "max path length": 12,
+                "max path length": 5,
                 "samples per pixel": 2,
                 "width": 1920
             },
             "type": "Render (Path-traced)"
-        },
-        {
-            "id": "gbuffer",
-            "outputs": [
-                "denoiser->accumulate.gbuffer.tex0",
-                "denoiser->accumulate.prev_gbuffer.tex0",
-                "gbuffer->render.gbuffer",
-                "hit_info->accumulate.gbuffer.tex1",
-                "hit_info->accumulate.prev_gbuffer.tex1",
-                "mv->accumulate.gbuffer.tex2",
-                "mv->accumulate.prev_gbuffer.tex2"
-            ]
         }
-    ]
+    }
 }

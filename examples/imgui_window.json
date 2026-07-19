@@ -6,15 +6,13 @@
         "low latency": false,
         "time overwrite": "None"
     },
-    "nodes": [
-        {
+    "nodes": {
+        "imgui": {
             "enabled": true,
-            "id": "imgui",
             "type": "ImGui"
         },
-        {
+        "window": {
             "enabled": true,
-            "id": "window",
             "outputs": [
                 "acquire->imgui.acquire",
                 "window->imgui.window"
@@ -33,6 +31,6 @@
             },
             "type": "Window"
         }
-    ],
-    "version": 3
+    },
+    "version": 4
 }

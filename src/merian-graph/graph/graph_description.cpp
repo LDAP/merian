@@ -126,6 +126,8 @@ GraphDescription GraphDescription::from_json(const nlohmann::json& json) {
             parse_graph_v2(json, description);
         } else if (schema_version == 3) {
             parse_graph_v3(json, description);
+        } else if (schema_version == 4) {
+            parse_graph_v4(json, description);
         } else {
             throw std::runtime_error{fmt::format("schema version {} unsupported.", schema_version)};
         }
@@ -136,59 +138,12 @@ GraphDescription GraphDescription::from_json(const nlohmann::json& json) {
 
 nlohmann::json GraphDescription::to_json() const {
     nlohmann::json json;
-    dump_graph_v3(json);
+    dump_graph_v4(json);
     return json;
 }
 
-void GraphDescription::dump_graph_v2(nlohmann::json& json) const {
-    json[SCHEMA_VERSION_KEY] = 2;
-
-    if (!graph_properties.empty()) {
-        json["graph_properties"] = graph_properties;
-    }
-
-    if (!profiler_properties.empty()) {
-        json["profiler"] = profiler_properties;
-    }
-
-    nlohmann::json nodes_json;
-    for (const auto& [identifier, node_info] : nodes) {
-        nlohmann::json node_json;
-        node_json["type"] = node_info.node_type;
-        node_json["disable"] = !node_info.enabled;
-
-        if (!node_info.config.empty()) {
-            node_json["properties"] = node_info.config;
-        }
-
-        nodes_json[identifier] = node_json;
-    }
-    if (!nodes_json.empty()) {
-        json["nodes"] = nodes_json;
-    }
-
-    nlohmann::json connections_json = nlohmann::json::array();
-    for (const auto& [src, node_info] : nodes) {
-        for (const auto& [src_output, output_info] : node_info.outgoing_connections) {
-            for (const auto& [dst, dst_inputs] : output_info.target) {
-                for (const auto& dst_input : dst_inputs) {
-                    nlohmann::json connection;
-                    connection["src"] = src;
-                    connection["src_output"] = src_output;
-                    connection["dst"] = dst;
-                    connection["dst_input"] = dst_input;
-                    connections_json.push_back(connection);
-                }
-            }
-        }
-    }
-    if (!connections_json.empty()) {
-        json["connections"] = connections_json;
-    }
-}
-
-void GraphDescription::dump_graph_v3(nlohmann::json& json) const {
-    json[SCHEMA_VERSION_KEY] = 3;
+void GraphDescription::dump_graph_v4(nlohmann::json& json) const {
+    json[SCHEMA_VERSION_KEY] = 4;
 
     if (!graph_properties.empty()) {
         json["graph_properties"] = graph_properties;
@@ -202,10 +157,9 @@ void GraphDescription::dump_graph_v3(nlohmann::json& json) const {
         json["cli"] = cli;
     }
 
-    nlohmann::json nodes_json = nlohmann::json::array();
+    nlohmann::json nodes_json = nlohmann::json::object();
     for (const auto& [identifier, node_info] : nodes) {
         nlohmann::json node_json;
-        node_json["id"] = identifier;
         node_json["type"] = node_info.node_type;
         node_json["enabled"] = node_info.enabled;
 
@@ -230,7 +184,7 @@ void GraphDescription::dump_graph_v3(nlohmann::json& json) const {
             node_json["outputs"] = outputs_array;
         }
 
-        nodes_json.push_back(node_json);
+        nodes_json[identifier] = node_json;
     }
     if (!nodes_json.empty()) {
         json["nodes"] = nodes_json;
@@ -283,6 +237,22 @@ void GraphDescription::parse_graph_v2(const nlohmann::json& json, GraphDescripti
 }
 
 void GraphDescription::parse_graph_v3(const nlohmann::json& json, GraphDescription& description) {
+    // V3 stores nodes as an array with an explicit "id"; re-key and reuse the V4 parser.
+    nlohmann::json v4 = json;
+    if (json.contains("nodes")) {
+        nlohmann::json nodes_json = nlohmann::json::object();
+        for (const auto& node_json : json["nodes"]) {
+            nlohmann::json entry = node_json;
+            const std::string identifier = entry.at("id").get<std::string>();
+            entry.erase("id");
+            nodes_json[identifier] = std::move(entry);
+        }
+        v4["nodes"] = std::move(nodes_json);
+    }
+    parse_graph_v4(v4, description);
+}
+
+void GraphDescription::parse_graph_v4(const nlohmann::json& json, GraphDescription& description) {
     if (json.contains("graph_properties")) {
         description.graph_properties = json["graph_properties"];
     }
@@ -298,8 +268,7 @@ void GraphDescription::parse_graph_v3(const nlohmann::json& json, GraphDescripti
     if (json.contains("nodes")) {
         const auto& nodes_json = json["nodes"];
         // Nodes with Metadata
-        for (const auto& node_json : nodes_json) {
-            const std::string identifier = node_json["id"].get<std::string>();
+        for (const auto& [identifier, node_json] : nodes_json.items()) {
             const std::string node_type = node_json["type"].get<std::string>();
             const nlohmann::json config =
                 node_json.contains("properties") ? node_json["properties"] : nlohmann::json{};
@@ -314,9 +283,8 @@ void GraphDescription::parse_graph_v3(const nlohmann::json& json, GraphDescripti
             }
         }
         // Connections
-        for (const auto& node_json : nodes_json) {
+        for (const auto& [identifier, node_json] : nodes_json.items()) {
             if (node_json.contains("outputs")) {
-                const std::string identifier = node_json["id"].get<std::string>();
                 const auto& outputs_json = node_json["outputs"];
 
                 if (outputs_json.is_object()) {
@@ -444,57 +412,8 @@ std::optional<bool> parse_bool(std::string text) {
     return std::nullopt;
 }
 
-// Resolves id-based array tokens ("/nodes/scene/..." -> "/nodes/7/...") so pointers survive
-// node reordering and merging. Numeric tokens pass through; tokens past a missing path are
-// appended verbatim (assignments may create them).
-std::optional<JsonPointer> resolve_id_pointer(const json& config, const JsonPointer& pointer) {
-    const std::string raw = pointer.to_string();
-    JsonPointer resolved;
-    const json* cursor = &config;
-    size_t begin = 1;
-    while (begin <= raw.size()) {
-        const size_t end = std::min(raw.find('/', begin), raw.size());
-        std::string token = raw.substr(begin, end - begin);
-        begin = end + 1;
-        // unescape per RFC 6901
-        token = std::regex_replace(token, std::regex("~1"), "/");
-        token = std::regex_replace(token, std::regex("~0"), "~");
-
-        const auto is_numeric = [](const std::string& t) {
-            return !t.empty() && std::ranges::all_of(
-                                     t, [](const unsigned char c) { return std::isdigit(c) != 0; });
-        };
-        if (cursor != nullptr && cursor->is_array() && !is_numeric(token) && token != "-") {
-            const auto match = std::ranges::find_if(*cursor, [&](const json& element) {
-                return element.is_object() && element.contains("id") && element.at("id") == token;
-            });
-            if (match == cursor->end()) {
-                SPDLOG_ERROR("no element with id '{}' for pointer '{}'", token, raw);
-                return std::nullopt;
-            }
-            token = std::to_string(match - cursor->begin());
-        }
-        resolved.push_back(token);
-
-        if (cursor == nullptr) {
-            continue;
-        }
-        if (cursor->is_object()) {
-            const auto it = cursor->find(token);
-            cursor = it != cursor->end() ? &*it : nullptr;
-        } else if (cursor->is_array() && is_numeric(token)) {
-            const size_t index = std::stoul(token);
-            cursor = index < cursor->size() ? &(*cursor)[index] : nullptr;
-        } else {
-            cursor = nullptr;
-        }
-    }
-    return resolved;
-}
-
 json typed_value(const json& config, const JsonPointer& pointer, const std::string& value) {
-    if (const auto resolved = resolve_id_pointer(config, pointer);
-        resolved && config.contains(*resolved) && config.at(*resolved).is_string()) {
+    if (config.contains(pointer) && config.at(pointer).is_string()) {
         return value;
     }
     const json parsed = json::parse(value, nullptr, false);
@@ -667,11 +586,7 @@ bool apply_patch(json& config,
         merian::GraphDescription::merge_into(config, overwrite);
     }
     for (const auto& [pointer, value] : patch.assignments) {
-        const std::optional<JsonPointer> resolved = resolve_id_pointer(config, pointer);
-        if (!resolved) {
-            return false;
-        }
-        config[*resolved] = value;
+        config[pointer] = value;
     }
     return true;
 }
@@ -712,26 +627,9 @@ bool settle_variants(json& config,
 } // namespace
 
 void GraphDescription::merge_into(nlohmann::json& base, const nlohmann::json& overwrite) {
-    const auto is_id_array = [](const json& j) {
-        return j.is_array() && !j.empty() && std::ranges::all_of(j, [](const json& e) {
-                   return e.is_object() && e.contains("id");
-               });
-    };
-
     if (base.is_object() && overwrite.is_object()) {
         for (const auto& [key, value] : overwrite.items()) {
             merge_into(base[key], value);
-        }
-    } else if (is_id_array(base) && is_id_array(overwrite)) {
-        for (const json& element : overwrite) {
-            const json& id = element.at("id");
-            const auto match =
-                std::ranges::find_if(base, [&](const json& b) { return b.at("id") == id; });
-            if (match != base.end()) {
-                merge_into(*match, element);
-            } else {
-                base.push_back(element);
-            }
         }
     } else {
         base = overwrite;
@@ -830,13 +728,10 @@ bool GraphDescription::apply_cli(nlohmann::json& config,
             continue;
         }
         // a value a stored session already materialized (e.g. the scene file) satisfies
-        if (o.kind == Override::Kind::VALUE) {
-            const std::optional<JsonPointer> resolved = resolve_id_pointer(config, o.pointer);
-            if (resolved && config.contains(*resolved)) {
-                const json& value = config.at(*resolved);
-                if (value.is_string() ? !value.get<std::string>().empty() : !value.is_null()) {
-                    continue;
-                }
+        if (o.kind == Override::Kind::VALUE && config.contains(o.pointer)) {
+            const json& value = config.at(o.pointer);
+            if (value.is_string() ? !value.get<std::string>().empty() : !value.is_null()) {
+                continue;
             }
         }
         if (o.name == "--") {

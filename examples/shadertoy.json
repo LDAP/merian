@@ -1,4 +1,10 @@
 {
+    "cli": {
+        "--": {
+            "pointer": "/nodes/0/properties/shader path",
+            "required": true
+        }
+    },
     "graph_properties": {
         "flush thread pool": true,
         "fps limiter": false,
@@ -6,39 +12,33 @@
         "low latency": false,
         "time overwrite": "None"
     },
-    "cli": {
-        "--": {
-            "pointer": "/nodes/0/properties/shader path",
-            "required": true
-        }
-    },
-    "nodes": [
-        {
+    "nodes": {
+        "blit": {
             "enabled": true,
-            "id": "shadertoy",
-            "type": "Shadertoy",
+            "outputs": [
+                "acquire->imgui.acquire"
+            ],
+            "type": "Swapchain Blit"
+        },
+        "imgui": {
+            "enabled": true,
+            "type": "ImGui"
+        },
+        "shadertoy": {
+            "enabled": true,
             "outputs": [
                 "out->blit.src"
             ],
             "properties": {
-                "shader source": "file",
+                "height": 720,
                 "shader path": "",
-                "width": 1280,
-                "height": 720
-            }
+                "shader source": "file",
+                "width": 1280
+            },
+            "type": "Shadertoy"
         },
-        {
+        "window": {
             "enabled": true,
-            "id": "blit",
-            "type": "Swapchain Blit",
-            "outputs": [
-                "acquire->imgui.acquire"
-            ]
-        },
-        {
-            "enabled": true,
-            "id": "window",
-            "type": "Window",
             "outputs": [
                 "acquire->blit.acquire",
                 "controller->shadertoy.controller",
@@ -47,19 +47,15 @@
             "properties": {
                 "backend": "SDL3 (Video Subsystem)",
                 "blit mode": "FIT",
-                "present mode": "Immediate",
                 "on_should_close_actions": {
+                    "remove node": false,
                     "send sigint": true,
-                    "send sigterm": false,
-                    "remove node": false
-                }
-            }
-        },
-        {
-            "enabled": true,
-            "id": "imgui",
-            "type": "ImGui"
+                    "send sigterm": false
+                },
+                "present mode": "Immediate"
+            },
+            "type": "Window"
         }
-    ],
-    "version": 3
+    },
+    "version": 4
 }

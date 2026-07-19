@@ -1,11 +1,4 @@
 {
-    "graph_properties": {
-        "flush thread pool": true,
-        "fps limiter": false,
-        "iterations in flight": 2,
-        "low latency": false,
-        "time overwrite": "None"
-    },
     "cli": {
         "--": {
             "pointer": "/nodes/scene/properties/file",
@@ -18,17 +11,17 @@
             }
         },
         "renderer": {
-            "type": "variant",
             "default": "pt",
+            "type": "variant",
             "variants": {
+                "mcpg": {
+                    "merge": "renderers/mcpg.json"
+                },
                 "pt": {
                     "merge": "renderers/pt.json",
                     "set": {
                         "/nodes/render/properties/max path length": 3
                     }
-                },
-                "mcpg": {
-                    "merge": "renderers/mcpg.json"
                 },
                 "restir_di": {
                     "merge": "renderers/restir_di.json"
@@ -36,10 +29,16 @@
             }
         }
     },
-    "nodes": [
-        {
+    "graph_properties": {
+        "flush thread pool": true,
+        "fps limiter": false,
+        "iterations in flight": 2,
+        "low latency": false,
+        "time overwrite": "None"
+    },
+    "nodes": {
+        "accumulate": {
             "enabled": true,
-            "id": "accumulate",
             "outputs": [
                 "history->accumulate.prev_history",
                 "out->accumulate.prev_out",
@@ -54,7 +53,6 @@
                 "alpha": 1.0,
                 "clear event pattern": "/user/clear,//geometry_changed,//transform_changed,//camera_changed,//bounces_changed",
                 "depth threshold": 1.0,
-                "use motion vectors": true,
                 "extended search": true,
                 "filter mode": "nearest",
                 "firefly filter bias": 0.20000000298023224,
@@ -65,13 +63,20 @@
                 "hard clamp": "inf",
                 "max history": "inf",
                 "normal threshold": 3.1415927410125732,
-                "reuse border": false
+                "reuse border": false,
+                "use motion vectors": true
             },
             "type": "Accumulate"
         },
-        {
+        "blit": {
             "enabled": true,
-            "id": "exposure",
+            "outputs": [
+                "acquire->imgui.acquire"
+            ],
+            "type": "Swapchain Blit"
+        },
+        "exposure": {
+            "enabled": true,
             "outputs": [
                 "out->tonemap.src"
             ],
@@ -92,9 +97,8 @@
             },
             "type": "Exposure"
         },
-        {
+        "gbuffer": {
             "enabled": true,
-            "id": "gbuffer",
             "outputs": [
                 "denoiser->accumulate.gbuffer.tex0",
                 "denoiser->accumulate.prev_gbuffer.tex0",
@@ -118,9 +122,17 @@
             },
             "type": "GBuffer (Raytraced)"
         },
-        {
+        "imgui": {
             "enabled": true,
-            "id": "output",
+            "type": "ImGui"
+        },
+        "output": {
+            "enabled": true,
+            "outputs": [
+                "controller->scene.controller",
+                "acquire->blit.acquire",
+                "window->imgui.window"
+            ],
             "properties": {
                 "acquire timeout": 100000000,
                 "backend": "SDL3 (Video Subsystem)",
@@ -136,16 +148,10 @@
                 "source array element": 0,
                 "surface format": "R8G8B8A8Srgb, SrgbNonlinear"
             },
-            "type": "Window",
-            "outputs": [
-                "controller->scene.controller",
-                "acquire->blit.acquire",
-                "window->imgui.window"
-            ]
+            "type": "Window"
         },
-        {
+        "scene": {
             "enabled": true,
-            "id": "scene",
             "outputs": [
                 "scene->gbuffer.scene",
                 "scene->render.scene"
@@ -166,9 +172,8 @@
             },
             "type": "FBX Scene"
         },
-        {
+        "tonemap": {
             "enabled": true,
-            "id": "tonemap",
             "outputs": [
                 "out->blit.src"
             ],
@@ -181,20 +186,7 @@
                 "tonemap": "Uncharted 2"
             },
             "type": "Tonemap"
-        },
-        {
-            "enabled": true,
-            "id": "imgui",
-            "type": "ImGui"
-        },
-        {
-            "enabled": true,
-            "id": "blit",
-            "type": "Swapchain Blit",
-            "outputs": [
-                "acquire->imgui.acquire"
-            ]
         }
-    ],
-    "version": 3
+    },
+    "version": 4
 }
