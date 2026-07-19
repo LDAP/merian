@@ -4,6 +4,24 @@ import merian_shaders.utils.encoding;
 
 namespace merian {
 
+static const float SCENE_RAY_TMIN = 0.f;
+static const float SCENE_RAY_TMAX = 1e7f;
+
+// Offsets pos along n to avoid self-intersection: a fixed number of ULPs so the offset scales
+// with the position's magnitude, a small constant offset near the origin.
+// Wächter and Binder, "A Fast and Robust Method for Avoiding Self-Intersection", RTG 2019.
+// Assumes pos was computed via barycentric interpolation, not from the ray t.
+float3 offset_ray_origin(const float3 pos, const float3 n) {
+    static const float origin = 1.f / 16.f;
+    static const float float_scale = 3.f / 65536.f;
+    static const float int_scale = 3.f * 256.f;
+
+    const int3 int_offset = int3(n * int_scale);
+    const float3 int_pos = asfloat(asint(pos) + select(pos < 0.f, -int_offset, int_offset));
+
+    return select(abs(pos) < origin, pos + n * float_scale, int_pos);
+}
+
 struct Hit {
     uint instance_id;
     uint instance_index;
@@ -94,6 +112,23 @@ struct ShadingPoint {
     // in worldspace
     float3 get_face_normal() {
         return decode_normal(enc_face_normal);
+    }
+
+    // Continuation ray for a scatter event; transmission is the shading-frame classification
+    // (wi_local.z * wo_local.z < 0). Returns none if the geometric sides disagree, e.g. a
+    // normal-mapped "reflection" that would tunnel through the surface.
+    Optional<RayDesc> make_ray(const float3 wi, const float3 wo, const bool transmission) {
+        const float3 ng = get_face_normal();
+        const float wo_ng = dot(wo, ng);
+        if (((dot(wi, ng) < 0.f) != (wo_ng < 0.f)) != transmission)
+            return none;
+
+        RayDesc ray;
+        ray.Origin = offset_ray_origin(pos, wo_ng < 0.f ? -ng : ng);
+        ray.Direction = wo;
+        ray.TMin = SCENE_RAY_TMIN;
+        ray.TMax = SCENE_RAY_TMAX;
+        return ray;
     }
 }
 

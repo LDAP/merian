@@ -166,7 +166,6 @@ void RenderMCPG::update_render_constants() {
                     "export static const bool use_light_cache_tail = {};\n"
                     "export static const bool missing_light_heuristic = {};\n"
                     "export static const int mc_samples = {};\n"
-                    "export static const float mc_samples_adaptive_prob = {:f};\n"
                     "export static const float p_guiding = {:f};\n"
                     "export static const float dir_guide_prior = {:f};\n"
                     "export static const uint seed = {}u;\n"
@@ -175,15 +174,15 @@ void RenderMCPG::update_render_constants() {
                     "export static const uint lc_probe_count = {}u;\n"
                     "export static const bool lc_stochastic_interpolation = {};\n"
                     "export static const uint lc_normal_bits = {}u;\n"
+                    "export static const float lc_min_pdf = {:f};\n"
                     "export static const uint mc_adaptive_buffer_size = {}u;\n"
                     "export static const uint mc_normal_bits = {}u;\n",
                     emission_on_primary ? "true" : "false", spp, max_path_length, mask,
                     (reference_mode || p_guiding == 0.0f) ? "true" : "false",
                     use_light_cache_tail ? "true" : "false",
-                    missing_light_heuristic ? "true" : "false", mc_samples,
-                    mc_samples_adaptive_prob, p_guiding, dir_guide_prior, seed,
-                    debug_output_selector, lc_buffer_size, lc_probe_count,
-                    lc_stochastic_interpolation ? "true" : "false", lc_normal_bits,
+                    missing_light_heuristic ? "true" : "false", mc_samples, p_guiding,
+                    dir_guide_prior, seed, debug_output_selector, lc_buffer_size, lc_probe_count,
+                    lc_stochastic_interpolation ? "true" : "false", lc_normal_bits, lc_min_pdf,
                     mc_adaptive_buffer_size, mc_normal_bits));
 }
 
@@ -222,7 +221,6 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
                               Properties::ChildFlagBits::DEFAULT_OPEN)) {
         constants_changed |= config.config_percent("ML prior", dir_guide_prior);
         constants_changed |= config.config_int("MC samples", mc_samples, "", 0, 30);
-        constants_changed |= config.config_percent("adaptive grid prob", mc_samples_adaptive_prob);
         constants_changed |= config.config_bool(
             "missing light heuristic", missing_light_heuristic,
             "Flood the Markov chains with invalidated states when no light is detected.");
@@ -264,6 +262,11 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
             "Octahedral normal bins folded into the hash key; neighbouring bins share. 0 ignores "
             "the normal.",
             0u, 16u);
+        constants_changed |= config.config_float(
+            "LC min pdf", lc_min_pdf,
+            "Increase to reduce fireflies in the irradiance cache and bias the guiding towards "
+            "direct light, especially useful for short maximum path lengths.",
+            0.1f, 0.0f);
         // Fail gracefully if compilation fails.
         if (irr_cache) {
             if (recreate_cache) {

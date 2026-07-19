@@ -7,6 +7,9 @@ import merian_shaders.utils.random;
 namespace merian {
 
 static const uint MERIAN_HASH_GRID_LOCK_BIT = 0x80000000u;
+// Shifts log(dist) positive so sub-unit distances map to valid uint levels (down to ~2^-31 units);
+// cancels out in grid_width_for_level, keeping widths purely angular and scene-scale-free.
+static const float MERIAN_HASH_GRID_LEVEL_OFFSET = 32.0;
 
 struct HashGridVertex<typename T> {
     uint32_t hash;
@@ -41,8 +44,10 @@ struct HashGrid<typename T,
     uint target_level_for_pos(const float3 pos, const float3 cam_pos, inout RandomGenerator rng) {
         const float3 d = cam_pos - pos;
         const float dist2 = max(dot(d, d), 1e-12);
-        const float level = max(
-            GRID_STEPS_PER_UNIT_SIZE * 0.5 * log(dist2) / log(GRID_POWER) + grid_level_bias, 1.0);
+        const float level = max(GRID_STEPS_PER_UNIT_SIZE * (0.5 * log(dist2) / log(GRID_POWER) +
+                                                            MERIAN_HASH_GRID_LEVEL_OFFSET) +
+                                    grid_level_bias,
+                                1.0);
         if (LEVEL_STOCHASTIC_INTERPOLATION)
             return uint(floor(level) + select(rng.next_float() < fract(level), 1.0, 0.0));
         return uint(floor(level));
@@ -59,7 +64,8 @@ struct HashGrid<typename T,
 
     float grid_width_for_level(const uint level) {
         return 2 * grid_tan_alpha_half *
-               pow(GRID_POWER, (float(level) - grid_level_bias) / float(GRID_STEPS_PER_UNIT_SIZE));
+               pow(GRID_POWER, (float(level) - grid_level_bias) / float(GRID_STEPS_PER_UNIT_SIZE) -
+                                   MERIAN_HASH_GRID_LEVEL_OFFSET);
     }
 
     int3 grid_idx(const float3 pos, const float width, inout RandomGenerator rng) {

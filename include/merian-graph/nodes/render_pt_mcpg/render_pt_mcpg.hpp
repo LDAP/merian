@@ -77,7 +77,6 @@ class RenderMCPG : public Node {
     // --- Guiding Markov chain ---
     float dir_guide_prior = 0.2f;
     int32_t mc_samples = 5;
-    float mc_samples_adaptive_prob = 0.7f;
     float p_guiding = 0.85f; // probability to sample the guiding distribution instead of the BSDF
     bool missing_light_heuristic = true;
 
@@ -90,6 +89,7 @@ class RenderMCPG : public Node {
     uint32_t lc_probe_count = 4;
     bool lc_stochastic_interpolation = false;
     uint32_t lc_normal_bits = 8;
+    float lc_min_pdf = 1.0f;
 
     // --- Misc ---
     uint32_t seed = 0;

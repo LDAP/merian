@@ -53,18 +53,18 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         const float3 wo = frame.to_world(bs.wo);
         throughput *= bs.weight;
 
-        const float3 ng = sp.get_face_normal();
-        // A transmission event crosses the geometric surface; update the medium we are now in.
-        if ((dot(wo, ng) < 0.f) != (dot(-ray.Direction, ng) < 0.f)) {
+        // A transmission event crosses the surface; update the medium we are now in.
+        const bool transmission = wi_local.z * bs.wo.z < 0.f;
+        if (transmission) {
             current_ior /= sp.material.get_eta();
             current_absorption = sp.material.get_absorption();
         }
 
-        // avoid self-intersection by nudging off the surface on wo's side
-        ray.Origin = sp.pos + (dot(wo, ng) < 0.f ? -ng : ng) * SCENE_RAY_OFFSET;
-        ray.Direction = wo;
-        ray.TMin = SCENE_RAY_TMIN;
-        ray.TMax = SCENE_RAY_TMAX;
+        if (let next = sp.make_ray(-ray.Direction, wo, transmission)) {
+            ray = next;
+        } else {
+            break;
+        }
 
         sp = scene.trace_and_get_shading_point(ray, merian_render_instance_mask,
                                                RenderContext(uint16_t(bounce), current_ior));

@@ -28,7 +28,6 @@ void generate(ParameterBlock<Scene> scene, ParameterBlock<RestirBinding> params)
         const OrthonormalFrame frame = surface.sp.material.shading_frame;
         let bsdf = surface.sp.material.get_bsdf();
         const float3 wi_local = frame.to_local(surface.wi);
-        const float3 ng = surface.sp.get_face_normal();
 
         for (int s = 0; s < merian_restir_spp; s++) {
             let bs_opt = bsdf.sample_eval(wi_local, rng);
@@ -36,14 +35,14 @@ void generate(ParameterBlock<Scene> scene, ParameterBlock<RestirBinding> params)
                 continue;
             const ShadingFunctionSample bs = bs_opt.value;
             const float3 wo = frame.to_world(bs.wo);
-            if (bs.pdf <= 0 || dot(wo, ng) <= 1e-3f)
+            if (bs.pdf <= 0)
                 continue;
 
-            RayDesc ray;
-            ray.Origin = surface.sp.pos + ng * SCENE_RAY_OFFSET;
-            ray.Direction = wo;
-            ray.TMin = SCENE_RAY_TMIN;
-            ray.TMax = SCENE_RAY_TMAX;
+            const bool transmission = wi_local.z * bs.wo.z < 0.f;
+            let ray_opt = surface.sp.make_ray(surface.wi, wo, transmission);
+            if (!ray_opt.hasValue)
+                continue;
+            const RayDesc ray = ray_opt.value;
             const Hit hit = scene.trace_ray(ray, RAY_FLAG_NONE, 0xff);
             const ShadingPoint lit = scene.get_shading_point(ray, hit);
             if (all(lit.material.emission <= float3(0)))

@@ -23,6 +23,7 @@ extern static const uint lc_buffer_size = 4000000;
 extern static const uint lc_probe_count = 4;
 extern static const bool lc_stochastic_interpolation = false;
 extern static const uint lc_normal_bits = 8;
+extern static const float lc_min_pdf = 1.0;
 
 extern static const uint mc_adaptive_buffer_size = 32777259;
 extern static const int mc_samples = 5;
@@ -124,20 +125,19 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         wo_p = bsdf_w * m_bsdf.pdf(wi_local, wo_local) + p_guiding * wo_p;
 
         const float3 bsdf = m_bsdf.eval(wi_local, wo_local, rng);
-        const bool valid = any(bsdf > 0.0);
+        const bool transmission = wi_local.z * wo_local.z < 0.f;
+        Optional<RayDesc> next_ray = none;
+        if (any(bsdf > 0.0))
+            next_ray = sp.make_ray(-ray.Direction, wo_world, transmission);
 
         float3 incident = float3(0);
         float3 lc_incident = float3(0);
         float3 next_pos = cur_pos;
 
-        if (valid) {
-            const float3 ng = sp.get_face_normal();
-            if ((dot(wo_world, ng) < 0.f) != (dot(-ray.Direction, ng) < 0.f))
+        if (let next = next_ray) {
+            if (transmission)
                 current_ior /= sp.material.get_eta();
-            ray.Origin = cur_pos + (dot(wo_world, ng) < 0.f ? -ng : ng) * SCENE_RAY_OFFSET;
-            ray.Direction = wo_world;
-            ray.TMin = SCENE_RAY_TMIN;
-            ray.TMax = SCENE_RAY_TMAX;
+            ray = next;
             sp = scene.trace_and_get_shading_point(ray, merian_render_instance_mask,
                                                    RenderContext(bounce, current_ior));
             next_pos = sp.pos;
@@ -157,7 +157,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         const float mc_f = yuv_luminance(lc_incident * bsdf / wo_p);
         if (!isinf(mc_f) && !isnan(mc_f)) {
             params.irr_cache.update(cur_pos, normal,
-                                    lc_incident * bsdf / wo_p /* / max(wo_p, 10.0)*/, cam_pos,
+                                    lc_incident * bsdf / max(wo_p, lc_min_pdf), cam_pos,
                                     prev_cam_pos, scene.frame, rng);
 
             if (rng.next_float() * score_sum < mc_f * mc_samples) {
@@ -175,7 +175,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
             }
         }
 
-        if (!valid)
+        if (!next_ray.hasValue)
             break;
     }
 

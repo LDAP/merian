@@ -20,10 +20,6 @@ namespace merian {
 // imports above. extern struct SceneAccelerationStructure : AccelerationStructure =
 // NullAccelerationStructure; extern struct SceneEnvMap : IEnvMap = EmptyEnv;
 
-static const float SCENE_RAY_OFFSET = 1e-3f;
-static const float SCENE_RAY_TMIN = 0.f;
-static const float SCENE_RAY_TMAX = 1e7f;
-
 static const float SCENE_THROUGHPUT_THRESHOLD = 1e-5;
 
 // Enables thin lens depth of field in generate_camera_ray. Set via Scene from the active camera.
