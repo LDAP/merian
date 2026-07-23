@@ -172,7 +172,9 @@ RestirSurface restir_surface(const ParameterBlock<Scene> scene,
     RestirSurface s;
     s.wi = float3(0, 0, 1);
     const Hit hit = gbuffer.get_hit(pixel);
-    s.valid = hit.is_valid();
+    // the previous frame's gbuffer can reference despawned or resized geometry
+    s.valid = hit.is_valid() && scene.is_valid_geometry_id(hit.get_geometry_id()) &&
+              hit.primitive_id < scene.get_geometry_data(hit.get_geometry_id()).primitive_count;
     if (!s.valid)
         return s;
     const RayDesc ray = scene.generate_camera_ray(pixel, dim);
@@ -223,10 +225,13 @@ bool restir_trace_visibility(const ParameterBlock<Scene> scene,
     const float3 ng = surface.sp.get_face_normal();
     const float3 to_light = y.pos - surface.sp.pos;
     const float dist = length(to_light);
+    // degenerate (zero/non-finite direction) rays hang the traversal hardware
+    if (!(dist > 0.f) || isinf(dist) || isnan(dist))
+        return false;
     const float3 dir = to_light / dist;
 
     RayDesc ray;
-    ray.Origin = surface.sp.pos + (dot(dir, ng) < 0 ? -ng : ng) * SCENE_RAY_OFFSET;
+    ray.Origin = offset_ray_origin(surface.sp.pos, select(dot(dir, ng) < 0, -ng, ng));
     ray.Direction = dir;
     ray.TMin = SCENE_RAY_TMIN;
     ray.TMax = (y.flags & RestirSampleFlags::RestirSampleDistant) != 0 ? SCENE_RAY_TMAX
@@ -261,6 +266,8 @@ void restir_boiling_filter(inout RestirReservoir reservoir, const float strength
 ConstantBuffer<merian::RestirPushConstant> pc;
 
 static const int RESTIR_MAX_SPATIAL = 8;
+// squared units/second; samples faster than this carry bogus prev positions (spawned geometry)
+static const float RESTIR_MAX_SAMPLE_SPEED_2 = 1e8f;
 
 merian::RandomGenerator restir_rng(const uint2 pixel) {
     return merian::XorShift32(merian::pcg4d16(uint4(pixel, pc.frame * 5 + pc.pass, pc.seed)));

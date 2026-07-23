@@ -3,7 +3,7 @@
 namespace merian {
 
 std::vector<InputConnectorDescriptor> SwapchainBlit::describe_inputs() {
-    return {{"src", con_src}, {"acquire", con_acquire}};
+    return {{"src", con_src, ConnectorAccess::transfer_src, 0, true}, {"acquire", con_acquire}};
 }
 
 std::vector<OutputConnectorDescriptor>
@@ -11,9 +11,7 @@ SwapchainBlit::describe_outputs(const NodeIOLayout& /*io_layout*/) {
     return {{"acquire", con_acquire_out}};
 }
 
-void SwapchainBlit::process(GraphRun& run,
-                            const DescriptorSetHandle& /*descriptor_set*/,
-                            const NodeIO& io) {
+void SwapchainBlit::process(GraphRun& run, const NodeIO& io) {
     const std::shared_ptr<SwapchainAcquireResult>& acquire = io[con_acquire];
     io[con_acquire_out] = acquire;
     if (!acquire) {
@@ -44,9 +42,9 @@ void SwapchainBlit::process(GraphRun& run,
         src_image->format_features() & vk::FormatFeatureFlagBits::eSampledImageFilterLinear
             ? vk::Filter::eLinear
             : vk::Filter::eNearest;
-    cmd_blit(mode, cmd, src_image, vk::ImageLayout::eTransferSrcOptimal, src_image->get_extent(),
-             dst_image, vk::ImageLayout::eTransferDstOptimal, dst_image->get_extent(),
-             vk::ClearColorValue{}, filter);
+    cmd_blit(mode, cmd, src_image, vk::ImageLayout::eGeneral, src_image->get_extent(), dst_image,
+             vk::ImageLayout::eTransferDstOptimal, dst_image->get_extent(), vk::ClearColorValue{},
+             filter);
 }
 
 Node::NodeStatusFlags SwapchainBlit::properties(Properties& config) {

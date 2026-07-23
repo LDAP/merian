@@ -7,7 +7,7 @@ ColorImage::ColorImage() : Node() {}
 ColorImage::~ColorImage() {}
 
 std::vector<InputConnectorDescriptor> ColorImage::describe_inputs() {
-    return {{"resolution", con_resolution}};
+    return {{"resolution", con_resolution, {}, 0, true}};
 }
 
 std::vector<OutputConnectorDescriptor>
@@ -19,14 +19,12 @@ ColorImage::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
         extent = io_layout[con_resolution]->value();
     }
 
-    con_out = ManagedVkImageOut::transfer_write(format, extent, true);
+    con_out = ManagedVkImageOut::create(format, extent, true);
 
-    return {{"out", con_out}};
+    return {{"out", con_out, ConnectorAccess::transfer_dst}};
 }
 
-void ColorImage::process([[maybe_unused]] GraphRun& run,
-                         [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
-                         const NodeIO& io) {
+void ColorImage::process([[maybe_unused]] GraphRun& run, const NodeIO& io) {
     if (needs_run) {
         run.get_cmd()->clear(io[con_out], color);
         needs_run = false;

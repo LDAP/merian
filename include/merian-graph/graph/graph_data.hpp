@@ -41,6 +41,21 @@ struct NodeData {
     // Errors in on_connected and while run.
     std::vector<std::string> errors_queued{};
 
+    // (on cache_node_input_connectors / cache_node_output_connectors)
+    std::unordered_map<ConnectorHandle, ConnectorAccess> connector_access;
+
+    // Wiring declared by the input descriptors. (on cache_node_input_connectors)
+    std::unordered_map<InputConnectorHandle, uint32_t> input_delay;
+    std::unordered_map<InputConnectorHandle, bool> input_optional;
+
+    // Shader cursor field name NodeIO::bind writes each connector to: in_<name> / out_<name>.
+    // (on cache_node_input_connectors / cache_node_output_connectors)
+    std::unordered_map<ConnectorHandle, std::string> bind_field_name;
+
+    // Dependency layer: 0 for sources, else 1 + max over producers of non-delayed inputs.
+    // (on build_layers)
+    uint32_t level{0};
+
     // Cache input connectors (node->describe_inputs())
     // (on start_nodes added and checked for name conflicts)
     std::vector<InputConnectorHandle> input_connectors;
@@ -69,12 +84,9 @@ struct NodeData {
         NodeHandle node{};
         OutputConnectorHandle output{};
 
-        uint32_t descriptor_set_binding{
-            DescriptorSet::NO_DESCRIPTOR_BINDING}; // (on prepare_descriptor_sets)
-        // precomputed such that (iteration % precomputed_resources.size()) is the index of the
-        // resource that must be used in the iteration. Matches the descriptor_sets array below.
-        // (resource handle, resource index the resources array of the corresponding output)
-        // (on prepare_descriptor_sets)
+        // precomputed such that (iteration % precomputed_resources.size()) is the index of
+        // the resource that must be used in the iteration. (resource handle, resource index in
+        // the resources array of the corresponding output) (on precompute_resources)
         //
         // resources can be null if an optional input is not connected, the resource index is then
         // -1ul;
@@ -85,45 +97,24 @@ struct NodeData {
     // node (on connect)
     struct PerResourceInfo {
         GraphResourceHandle resource;
-
-        // precomputed occurrences in descriptor sets (needed to "record" descriptor set updates)
-        // in descriptor sets of the node this output / resource belongs to
-        std::vector<uint32_t> set_indices{};
-        // in descriptor sets of other nodes this resource is accessed using inputs
-        // (using in node, input connector, set_idx)
-        std::vector<std::tuple<NodeHandle, InputConnectorHandle, uint32_t>> other_set_indices{};
     };
     struct PerOutputInfo {
         // (max_delay + 1) resources
         std::vector<PerResourceInfo> resources;
         std::vector<std::tuple<NodeHandle, InputConnectorHandle>> inputs;
-        uint32_t descriptor_set_binding{
-            DescriptorSet::NO_DESCRIPTOR_BINDING}; // (on prepare_descriptor_sets)
-        // precomputed such that (iteration % precomputed_resources.size()) is the index of the
-        // resource that must be used in the iteration. Matches the descriptor_sets array below.
-        // (resource handle, resource index the resources array)
-        std::vector<std::tuple<GraphResourceHandle, uint32_t>>
-            precomputed_resources{}; // (on prepare_descriptor_sets)
+        // precomputed such that (iteration % precomputed_resources.size()) is the index of
+        // the resource that must be used in the iteration. (on precompute_resources)
+        std::vector<std::tuple<GraphResourceHandle, uint32_t>> precomputed_resources{};
     };
     std::unordered_map<OutputConnectorHandle, PerOutputInfo> output_connections{};
 
-    // Precomputed descriptor set layout including all input and output connectors which
-    // get_descriptor_info() does not return std::nullopt.
-    DescriptorSetLayoutHandle descriptor_set_layout;
-
-    // A descriptor set for each combination of resources that can occur, due to delayed accesses.
-    // Also keep at least RING_SIZE to allow updating descriptor sets while iterations are in
-    // flight. Empty if no connector needs a descriptor. Access with set_index() (on prepare
-    // descriptor sets)
-    std::vector<DescriptorSetHandle> descriptor_sets;
     std::vector<NodeIO> resource_maps;
 
-    struct NodeStatistics {
-        uint32_t last_descriptor_set_updates{};
-    };
-    NodeStatistics statistics{};
-
     void reset() {
+        connector_access.clear();
+        input_delay.clear();
+        input_optional.clear();
+        bind_field_name.clear();
         input_connectors.clear();
         output_connectors.clear();
 
@@ -136,10 +127,6 @@ struct NodeData {
         output_connections.clear();
 
         resource_maps.clear();
-        descriptor_sets.clear();
-        descriptor_set_layout.reset();
-
-        statistics = {};
 
         errors.clear();
     }
@@ -149,10 +136,6 @@ struct NodeData {
         return run_iteration % resource_maps.size();
     }
 };
-
-inline std::string format_as(const NodeData::NodeStatistics stats) {
-    return fmt::format("Descriptor bindings updated: {}", stats.last_descriptor_set_updates);
-}
 
 } // namespace graph_internal
 } // namespace merian

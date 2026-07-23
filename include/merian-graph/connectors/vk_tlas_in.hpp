@@ -10,35 +10,28 @@ namespace merian {
 class VkTLASIn;
 using VkTLASInHandle = std::shared_ptr<VkTLASIn>;
 
-// Input a TLAS.
+// Input a TLAS. Declare how the node accesses it via ConnectorAccess in the descriptor.
 class VkTLASIn : public InputConnector,
                  public OutputAccessibleInputConnector<VkTLASOutHandle>,
                  public AccessibleConnector<const AccelerationStructureHandle&> {
-    friend class VkTLASOut;
-
   public:
-    VkTLASIn(const vk::ShaderStageFlags stage_flags, const vk::PipelineStageFlags2 pipeline_stages);
+    VkTLASIn();
 
     void on_connect_output(const OutputConnectorHandle& output) override;
 
-    std::optional<vk::DescriptorSetLayoutBinding> get_descriptor_info() const override;
-
-    void get_descriptor_update(const uint32_t binding,
-                               const GraphResourceHandle& resource,
-                               const DescriptorSetHandle& update,
-                               const ResourceAllocatorHandle& allocator) override;
-
     const AccelerationStructureHandle& resource(const GraphResourceHandle& resource) override;
 
+    bool shader_bindable() const override {
+        return true;
+    }
+
+    void bind(ShaderCursor& cursor,
+              const GraphResourceHandle& resource,
+              const ResourceAllocatorHandle& allocator,
+              const ConnectorAccess& access) override;
+
   public:
-    // Creates an output that has to set the TLAS and can it read in a shader.
-    static VkTLASInHandle compute_read();
-
-    static VkTLASInHandle fragment_read();
-
-  private:
-    const vk::ShaderStageFlags stage_flags;
-    const vk::PipelineStageFlags2 pipeline_stages;
+    static VkTLASInHandle create();
 };
 
 } // namespace merian

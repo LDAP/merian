@@ -2,63 +2,28 @@
 
 namespace merian {
 
-VkStorageImageIn::VkStorageImageIn(const vk::AccessFlags2 access_flags,
-                                   const vk::PipelineStageFlags2 pipeline_stages,
-                                   const vk::ImageUsageFlags usage_flags,
-                                   const vk::ShaderStageFlags stage_flags,
-                                   const uint32_t delay,
-                                   const bool optional,
-                                   const vk::ImageLayout required_layout)
-    : VkImageIn(access_flags,
-                pipeline_stages,
-                required_layout,
-                usage_flags,
-                stage_flags,
-                delay,
-                optional) {
-    assert(stage_flags);
-}
-
-std::optional<vk::DescriptorSetLayoutBinding> VkStorageImageIn::get_descriptor_info() const {
-    return vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eStorageImage, get_array_size(),
-                                          get_stage_flags(), nullptr};
-}
-
-void VkStorageImageIn::get_descriptor_update(const uint32_t binding,
-                                             const GraphResourceHandle& resource,
-                                             const DescriptorSetHandle& update,
-                                             const ResourceAllocatorHandle& allocator) {
-    if (!resource) {
-        // the optional connector was not connected
+void VkStorageImageIn::bind(ShaderCursor& cursor,
+                            const GraphResourceHandle& resource,
+                            const ResourceAllocatorHandle& allocator,
+                            [[maybe_unused]] const ConnectorAccess& access) {
+    const auto write = [&](ShaderCursor field, const uint32_t index) {
+        const TextureHandle tex =
+            resource ? debugable_ptr_cast<ImageArrayResource>(resource)->get_texture(index)
+                     : nullptr;
+        field.write(tex ? tex->get_view() : allocator->get_dummy_storage_image_view(),
+                    vk::ImageLayout::eGeneral);
+    };
+    if (get_array_size() == 1) {
+        write(cursor, 0);
+    } else {
         for (uint32_t i = 0; i < get_array_size(); i++) {
-            update->queue_descriptor_write_image(binding, allocator->get_dummy_storage_image_view(),
-                                                 i, vk::ImageLayout::eGeneral);
-        }
-
-        return;
-    }
-
-    const auto& res = debugable_ptr_cast<ImageArrayResource>(resource);
-
-    for (auto& update_idx : res->pending_updates) {
-        const TextureHandle tex = res->get_texture(update_idx);
-        if (tex) {
-            update->queue_descriptor_write_image(binding, tex->get_view(), update_idx,
-                                                 vk::ImageLayout::eShaderReadOnlyOptimal);
-        } else {
-            update->queue_descriptor_write_image(binding, allocator->get_dummy_storage_image_view(),
-                                                 update_idx,
-                                                 vk::ImageLayout::eShaderReadOnlyOptimal);
+            write(cursor[i], i);
         }
     }
 }
 
-std::shared_ptr<VkStorageImageIn> VkStorageImageIn::compute_read(const uint32_t delay,
-                                                                 const bool optional) {
-    return std::make_shared<VkStorageImageIn>(
-        vk::AccessFlagBits2::eShaderRead, vk::PipelineStageFlagBits2::eComputeShader,
-        vk::ImageUsageFlagBits::eStorage, vk::ShaderStageFlagBits::eCompute, delay, optional,
-        vk::ImageLayout::eShaderReadOnlyOptimal);
+VkStorageImageInHandle VkStorageImageIn::create() {
+    return std::make_shared<VkStorageImageIn>();
 }
 
 } // namespace merian

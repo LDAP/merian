@@ -40,7 +40,7 @@ void ImageWrite::initialize(const ContextHandle& context,
 }
 
 std::vector<InputConnectorDescriptor> ImageWrite::describe_inputs() {
-    return {{"src", con_src}};
+    return {{"src", con_src, ConnectorAccess::transfer_src}};
 }
 
 void ImageWrite::record(const std::chrono::nanoseconds& current_graph_time) {
@@ -102,9 +102,7 @@ ImageWrite::NodeStatusFlags ImageWrite::pre_process(const GraphRun& run,
     return {};
 };
 
-void ImageWrite::process(GraphRun& run,
-                         [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
-                         const NodeIO& io) {
+void ImageWrite::process(GraphRun& run, const NodeIO& io) {
 
     //--------- Make sure we always increase the iteration counter
     defer {
@@ -177,8 +175,8 @@ void ImageWrite::process(GraphRun& run,
 
     // RECORD FRAME
 
-    const vk::Format format = format_is_float(this->format) ? vk::Format::eR32G32B32A32Sfloat
-                                                             : vk::Format::eR8G8B8A8Srgb;
+    const vk::Format format =
+        format_is_float(this->format) ? vk::Format::eR32G32B32A32Sfloat : vk::Format::eR8G8B8A8Srgb;
     const vk::FormatProperties format_properties =
         context->get_physical_device()->get_physical_device().getFormatProperties(format);
 

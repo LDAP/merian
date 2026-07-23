@@ -160,31 +160,34 @@ void Graph::run() {
             connect();
         }
 
-        graph_run.begin_run(ring_fences.size(), cmd_cache, run_iteration, total_iteration,
-                            ring_fences.current_cycle_index(), time_delta, duration_elapsed,
-                            duration_elapsed_since_connect, profiler);
+        shader_object_allocator->set_iteration(ring_fences.current_cycle_index());
+
+        graph_run.begin_run(ring_fences.size(), cmd_cache, shader_object_allocator, run_iteration,
+                            total_iteration, ring_fences.current_cycle_index(), time_delta,
+                            duration_elapsed, duration_elapsed_since_connect, profiler);
 
         // While preprocessing nodes can signalize that they need to reconnect as well
         {
             MERIAN_PROFILE_SCOPE(profiler, "Preprocess nodes");
-            for (auto& node : flat_topology) {
-                NodeData& data = node_data.at(node);
-                MERIAN_PROFILE_SCOPE(profiler, fmt::format("{} ({})", data.identifier,
-                                                           registry.node_type_name(node)));
-                const uint32_t set_idx = data.set_index(run_iteration);
-                Node::NodeStatusFlags flags =
-                    node->pre_process(graph_run, data.resource_maps[set_idx]);
-                if ((flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT) != 0u) {
-                    SPDLOG_DEBUG("node {} requested reconnect in pre_process", data.identifier);
-                    request_reconnect();
+            for (auto& layer : layers)
+                for (auto& node : layer.nodes) {
+                    NodeData& data = node_data.at(node);
+                    MERIAN_PROFILE_SCOPE(profiler, fmt::format("{} ({})", data.identifier,
+                                                               registry.node_type_name(node)));
+                    const uint32_t set_idx = data.set_index(run_iteration);
+                    Node::NodeStatusFlags flags =
+                        node->pre_process(graph_run, data.resource_maps[set_idx]);
+                    if ((flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT) != 0u) {
+                        SPDLOG_DEBUG("node {} requested reconnect in pre_process", data.identifier);
+                        request_reconnect();
+                    }
+                    if ((flags & Node::NodeStatusFlagBits::RESET_IN_FLIGHT_DATA) != 0u) {
+                        in_flight_data.in_flight_data[node].reset();
+                    }
+                    if ((flags & Node::NodeStatusFlagBits::REMOVE_NODE) != 0u) {
+                        remove_node(data.identifier);
+                    }
                 }
-                if ((flags & Node::NodeStatusFlagBits::RESET_IN_FLIGHT_DATA) != 0u) {
-                    in_flight_data.in_flight_data[node].reset();
-                }
-                if ((flags & Node::NodeStatusFlagBits::REMOVE_NODE) != 0u) {
-                    remove_node(data.identifier);
-                }
-            }
         }
     } while (needs_reconnect);
 
@@ -196,19 +199,26 @@ void Graph::run() {
     }
     {
         MERIAN_PROFILE_SCOPE_GPU(profiler, graph_run.get_cmd(), "Run nodes");
-        for (auto& node : flat_topology) {
-            NodeData& data = node_data.at(node);
-            if (debug_utils) {
-                const std::string node_debug_name =
-                    fmt::format("{} ({})", data.identifier, registry.node_type_name(node));
-                debug_utils->cmd_begin_label(*graph_run.get_cmd(), node_debug_name);
-                SPDLOG_TRACE("running node: {}", node_debug_name);
+        for (auto& layer : layers) {
+            if (layer.barrier.dstStageMask) {
+                graph_run.get_cmd()->barrier(layer.barrier);
             }
 
-            run_node(graph_run, node, data, profiler);
+            for (auto& node : layer.nodes) {
+                NodeData& data = node_data.at(node);
 
-            if (debug_utils)
-                debug_utils->cmd_end_label(*graph_run.get_cmd());
+                if (debug_utils) {
+                    const std::string node_debug_name =
+                        fmt::format("{} ({})", data.identifier, registry.node_type_name(node));
+                    debug_utils->cmd_begin_label(*graph_run.get_cmd(), node_debug_name);
+                    SPDLOG_TRACE("running node: {}", node_debug_name);
+                }
+
+                run_node(graph_run, node, data, profiler);
+
+                if (debug_utils)
+                    debug_utils->cmd_end_label(*graph_run.get_cmd());
+            }
         }
     }
 
@@ -321,12 +331,6 @@ void Graph::run_node(GraphRun& run,
             auto& [resource, resource_index] = per_input_info.precomputed_resources[set_idx];
             const Connector::ConnectorStatusFlags flags = input->on_pre_process(
                 run, run.get_cmd(), resource, node, image_barriers, buffer_barriers);
-            if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_DESCRIPTOR_UPDATE) != 0u) {
-                NodeData& src_data = node_data.at(per_input_info.node);
-                record_descriptor_updates(src_data, per_input_info.output,
-                                          src_data.output_connections[per_input_info.output],
-                                          resource_index);
-            }
             if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) != 0u) {
                 SPDLOG_DEBUG("input connector {} at node {} requested reconnect.",
                              data.input_name_for_connector.at(input), data.identifier);
@@ -337,9 +341,6 @@ void Graph::run_node(GraphRun& run,
             auto& [resource, resource_index] = per_output_info.precomputed_resources[set_idx];
             const Connector::ConnectorStatusFlags flags = output->on_pre_process(
                 run, run.get_cmd(), resource, node, image_barriers, buffer_barriers);
-            if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_DESCRIPTOR_UPDATE) != 0u) {
-                record_descriptor_updates(data, output, per_output_info, resource_index);
-            }
             if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) != 0u) {
                 SPDLOG_DEBUG("output connector {} at node {} requested reconnect.",
                              data.output_name_for_connector.at(output), data.identifier);
@@ -347,31 +348,15 @@ void Graph::run_node(GraphRun& run,
             }
         }
 
-        if (!image_barriers.empty() || !buffer_barriers.empty()) {
-            vk::DependencyInfoKHR dep_info{{}, {}, buffer_barriers, image_barriers};
-            run.get_cmd()->barrier({}, buffer_barriers, image_barriers);
+        if (!image_barriers.empty()) {
+            run.get_cmd()->barrier(image_barriers);
             image_barriers.clear();
-            buffer_barriers.clear();
-        }
-    }
-
-    // null if no connector needs a descriptor
-    static const DescriptorSetHandle no_descriptor_set = nullptr;
-    const DescriptorSetHandle& descriptor_set =
-        data.descriptor_sets.empty() ? no_descriptor_set : data.descriptor_sets[set_idx];
-    if (descriptor_set) {
-        // apply descriptor set updates
-        data.statistics.last_descriptor_set_updates = descriptor_set->update_count();
-        if (descriptor_set->has_updates()) {
-            SPDLOG_TRACE("applying {} descriptor set updates for node {}, set {}",
-                         descriptor_set->update_count(), data.identifier, set_idx);
-            descriptor_set->update();
         }
     }
 
     {
         try {
-            node->process(run, descriptor_set, data.resource_maps[set_idx]);
+            node->process(run, data.resource_maps[set_idx]);
         } catch (const graph_errors::node_error& e) {
             data.errors_queued.emplace_back(fmt::format("node error: {}", e.what()));
         } catch (const GLSLShaderCompiler::compilation_failed& e) {
@@ -403,12 +388,6 @@ void Graph::run_node(GraphRun& run,
             auto& [resource, resource_index] = per_input_info.precomputed_resources[set_idx];
             const Connector::ConnectorStatusFlags flags = input->on_post_process(
                 run, run.get_cmd(), resource, node, image_barriers, buffer_barriers);
-            if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_DESCRIPTOR_UPDATE) != 0u) {
-                NodeData& src_data = node_data.at(per_input_info.node);
-                record_descriptor_updates(src_data, per_input_info.output,
-                                          src_data.output_connections[per_input_info.output],
-                                          resource_index);
-            }
             if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) != 0u) {
                 SPDLOG_DEBUG("input connector {} at node {} requested reconnect.",
                              data.input_name_for_connector.at(input), data.identifier);
@@ -419,9 +398,6 @@ void Graph::run_node(GraphRun& run,
             auto& [resource, resource_index] = per_output_info.precomputed_resources[set_idx];
             const Connector::ConnectorStatusFlags flags = output->on_post_process(
                 run, run.get_cmd(), resource, node, image_barriers, buffer_barriers);
-            if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_DESCRIPTOR_UPDATE) != 0u) {
-                record_descriptor_updates(data, output, per_output_info, resource_index);
-            }
             if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) != 0u) {
                 SPDLOG_DEBUG("output connector {} at node {} requested reconnect.",
                              data.output_name_for_connector.at(output), data.identifier);
@@ -429,32 +405,9 @@ void Graph::run_node(GraphRun& run,
             }
         }
 
-        if (!image_barriers.empty() || !buffer_barriers.empty()) {
-            run.get_cmd()->barrier({}, buffer_barriers, image_barriers);
+        if (!image_barriers.empty()) {
+            run.get_cmd()->barrier(image_barriers);
         }
-    }
-}
-
-void Graph::record_descriptor_updates(NodeData& src_data,
-                                      const OutputConnectorHandle& src_output,
-                                      NodeData::PerOutputInfo& per_output_info,
-                                      const uint32_t resource_index) {
-    NodeData::PerResourceInfo& resource_info = per_output_info.resources[resource_index];
-
-    if (per_output_info.descriptor_set_binding != DescriptorSet::NO_DESCRIPTOR_BINDING)
-        for (auto& set_idx : resource_info.set_indices) {
-            src_output->get_descriptor_update(
-                per_output_info.descriptor_set_binding, resource_info.resource,
-                src_data.descriptor_sets[set_idx], resource_allocator);
-        }
-
-    for (auto& [dst_node, dst_input, set_idx] : resource_info.other_set_indices) {
-        NodeData& dst_data = node_data.at(dst_node);
-        NodeData::PerInputInfo& per_input_info = dst_data.input_connections[dst_input];
-        if (per_input_info.descriptor_set_binding != DescriptorSet::NO_DESCRIPTOR_BINDING)
-            dst_input->get_descriptor_update(per_input_info.descriptor_set_binding,
-                                             resource_info.resource,
-                                             dst_data.descriptor_sets[set_idx], resource_allocator);
     }
 }
 

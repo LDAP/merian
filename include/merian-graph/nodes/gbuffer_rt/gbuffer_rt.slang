@@ -15,10 +15,9 @@ ConstantBuffer<GBufferParams> params;
 
 extern static const bool merian_gbuffer_write_emission = true;
 
-[shader("compute")][numthreads(16, 16, 1)] void main(uint3 tid : SV_DispatchThreadID,
-                                                     ParameterBlock<Scene> scene,
-                                                     ParameterBlock<WGBuffer> gbuffer) {
-    const uint2 pixel = tid.xy;
+[shader("raygeneration")]
+void main(ParameterBlock<Scene> scene, ParameterBlock<WGBuffer> gbuffer) {
+    const uint2 pixel = DispatchRaysIndex().xy;
     const uint2 dim = gbuffer.get_dimensions();
     if (any(pixel >= dim))
         return;

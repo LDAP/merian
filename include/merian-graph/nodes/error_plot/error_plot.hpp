@@ -4,19 +4,20 @@
 #include "merian-graph/connectors/image/vk_image_in_sampled.hpp"
 #include "merian-graph/connectors/image/vk_image_out_managed.hpp"
 #include "merian-graph/graph/node.hpp"
+#include "merian-graph/nodes/compute_node/compute_kernel.hpp"
 
-#include "merian/shader/entry_point.hpp"
 #include "merian/utils/enums.hpp"
 #include "merian/utils/stopwatch.hpp"
 #include "merian/utils/vector_matrix.hpp"
 #include "merian/vk/imgui/imgui_context.hpp"
 #include "merian/vk/imgui/imgui_merian_backend.hpp"
 #include "merian/vk/imgui/imgui_renderer.hpp"
-#include "merian/vk/pipeline/pipeline.hpp"
+#include "merian/vk/pipeline/specialization_info.hpp"
 
 #include <array>
 #include <deque>
 #include <mutex>
+#include <optional>
 
 namespace merian {
 
@@ -80,11 +81,9 @@ class ErrorPlot : public Node {
 
     std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
-    NodeStatusFlags on_connected(const NodeIOLayout& io_layout,
-                                 const DescriptorSetLayoutHandle& descriptor_set_layout) override;
+    NodeStatusFlags on_connected(const NodeConnectedInfo& info) override;
 
-    void
-    process(GraphRun& run, const DescriptorSetHandle& descriptor_set, const NodeIO& io) override;
+    void process(GraphRun& run, const NodeIO& io) override;
 
     NodeStatusFlags properties(Properties& config) override;
 
@@ -96,27 +95,21 @@ class ErrorPlot : public Node {
 
     ContextHandle context;
     ResourceAllocatorHandle allocator;
+    ShaderCompileContextHandle compile_context;
 
     // both inputs are sampled by the metric shader and blitted into the split view
-    const VkSampledImageInHandle con_reference = std::make_shared<VkSampledImageIn>(
-        vk::AccessFlagBits2::eShaderRead,
-        vk::PipelineStageFlagBits2::eComputeShader,
-        vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferSrc,
-        vk::ShaderStageFlagBits::eCompute);
-    const VkSampledImageInHandle con_input = std::make_shared<VkSampledImageIn>(
-        vk::AccessFlagBits2::eShaderRead,
-        vk::PipelineStageFlagBits2::eComputeShader,
-        vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferSrc,
-        vk::ShaderStageFlagBits::eCompute);
+    const VkSampledImageInHandle con_reference = VkSampledImageIn::create();
+    const VkSampledImageInHandle con_input = VkSampledImageIn::create();
     ManagedVkImageOutHandle con_out;
     ManagedVkBufferOutHandle con_error;
 
     PushConstant pc{};
 
-    EntryPointHandle error_to_buffer_shader;
-    EntryPointHandle reduce_buffer_shader;
-    PipelineHandle error_to_buffer;
-    PipelineHandle reduce_buffer;
+    Versioned<SpecializationInfo> error_to_buffer_spec;
+    Versioned<SpecializationInfo> reduce_buffer_spec;
+
+    std::optional<ComputeKernel> error_to_buffer_kernel;
+    std::optional<ComputeKernel> reduce_buffer_kernel;
 
     // overlay rendering onto the node output
     ImGuiContextHandle imgui_ctx;

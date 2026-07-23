@@ -22,18 +22,17 @@ void GBufferDebugNode::initialize(const ContextHandle& context,
 }
 
 std::vector<InputConnectorDescriptor> GBufferDebugNode::describe_inputs() {
-    return {{"scene", con_scene}, {"gbuffer", con_gbuffer}};
+    return {{"scene", con_scene}, {"gbuffer", con_gbuffer, ConnectorAccess::compute_read}};
 }
 
 std::vector<OutputConnectorDescriptor>
 GBufferDebugNode::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
-    con_output = ManagedVkImageOut::compute_write(vk::Format::eR8G8B8A8Unorm, extent);
-    return {{"image", con_output}};
+    con_output = ManagedVkImageOut::create(vk::Format::eR8G8B8A8Unorm, extent);
+    return {{"image", con_output, ConnectorAccess::compute_write}};
 }
 
-GBufferDebugNode::NodeStatusFlags GBufferDebugNode::on_connected(
-    const NodeIOLayout& io_layout,
-    [[maybe_unused]] const DescriptorSetLayoutHandle& descriptor_set_layout) {
+GBufferDebugNode::NodeStatusFlags GBufferDebugNode::on_connected(const NodeConnectedInfo& info) {
+    const NodeIOLayout& io_layout = info.io_layout;
 
     // force the program graph to be rewired next process()
     composition = nullptr;
@@ -54,13 +53,11 @@ GBufferDebugNode::NodeStatusFlags GBufferDebugNode::on_connected(
     return {};
 }
 
-void GBufferDebugNode::process(GraphRun& run,
-                               [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
-                               const NodeIO& io) {
+void GBufferDebugNode::process(GraphRun& run, const NodeIO& io) {
     const auto& cmd = run.get_cmd();
     const auto& scene = io[con_scene];
-    const auto& gbuf = io[con_gbuffer];
-    if (!scene || !gbuf || !scene->is_ready())
+    const auto gbuf = io[con_gbuffer];
+    if (!scene || !scene->is_ready())
         return;
 
     if (!composition) {
@@ -95,7 +92,7 @@ void GBufferDebugNode::process(GraphRun& run,
     const auto params_obj = params.get();
 
     auto cursor = params_obj->get_cursor();
-    cursor["gbuffer"] = gbuf->get_shader_object();
+    cursor["gbuffer"] = gbuf.r();
     cursor["output"] = io[con_output].get_texture();
 
     cmd->bind(pipe);

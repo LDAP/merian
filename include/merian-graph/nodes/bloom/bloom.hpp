@@ -4,9 +4,11 @@
 #include "merian-graph/connectors/image/vk_image_out_managed.hpp"
 
 #include "merian-graph/graph/node.hpp"
+#include "merian-graph/nodes/compute_node/compute_kernel.hpp"
 
-#include "merian/shader/entry_point.hpp"
-#include "merian/vk/pipeline/pipeline.hpp"
+#include "merian/vk/pipeline/specialization_info.hpp"
+
+#include <optional>
 
 namespace merian {
 
@@ -34,28 +36,26 @@ class Bloom : public Node {
 
     std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
-    NodeStatusFlags on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
-                                 const DescriptorSetLayoutHandle& descriptor_set_layout) override;
+    NodeStatusFlags on_connected(const NodeConnectedInfo& info) override;
 
-    void
-    process(GraphRun& run, const DescriptorSetHandle& descriptor_set, const NodeIO& io) override;
+    void process(GraphRun& run, const NodeIO& io) override;
 
     NodeStatusFlags properties(Properties& config) override;
 
   private:
     ContextHandle context;
+    ResourceAllocatorHandle allocator;
+    ShaderCompileContextHandle compile_context;
 
-    VkSampledImageInHandle con_src = VkSampledImageIn::compute_read();
+    VkSampledImageInHandle con_src = VkSampledImageIn::create();
     ManagedVkImageOutHandle con_out;
     ManagedVkImageOutHandle con_interm;
 
     PushConstant pc;
+    Versioned<SpecializationInfo> spec_info;
 
-    EntryPointHandle separate_module;
-    EntryPointHandle composite_module;
-
-    PipelineHandle separate;
-    PipelineHandle composite;
+    std::optional<ComputeKernel> separate_kernel;
+    std::optional<ComputeKernel> composite_kernel;
 
     int32_t mode = 0;
 };

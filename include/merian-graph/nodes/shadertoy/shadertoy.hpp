@@ -3,9 +3,9 @@
 #include "merian-graph/connectors/ptr_in.hpp"
 #include "merian-graph/nodes/compute_node/compute_node.hpp"
 
-#include "merian/shader/shader_compiler.hpp"
-#include "merian/shader/shader_hotreloader.hpp"
 #include "merian/utils/input_listener.hpp"
+
+#include <filesystem>
 
 namespace merian {
 
@@ -33,9 +33,6 @@ class Shadertoy : public AbstractCompute {
 
     DeviceSupportInfo query_device_support(const DeviceSupportQueryInfo& query_info) override;
 
-    void initialize(const ContextHandle& context,
-                    const ResourceAllocatorHandle& allocator) override;
-
     std::vector<InputConnectorDescriptor> describe_inputs() override;
 
     std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
@@ -45,30 +42,33 @@ class Shadertoy : public AbstractCompute {
     std::tuple<uint32_t, uint32_t, uint32_t>
     get_group_count(const NodeIO& io) const noexcept override;
 
-    VulkanEntryPointHandle get_entry_point() override;
+    SlangCompositionHandle create_composition() override;
+
+    // Polls the shader file for changes in file mode.
+    void write_constants(GraphRun& run, const NodeIO& io, ShaderCursor& cursor) override;
 
     NodeStatusFlags properties(Properties& config) override;
 
   private:
-    // none if shader compiler is not available.
-    GLSLShaderCompilerHandle compiler = nullptr;
-    // none if shader compiler is not available.
-    std::unique_ptr<HotReloader> reloader = nullptr;
+    std::string current_body() const;
+
+    // Wraps the user body in the slang boilerplate, injecting numthreads from local_size_x/y.
+    static std::string compose_source(const std::string& body);
+
+    // Validates the composed shader; stores the error and returns false on failure.
+    bool try_compile(const std::string& body);
 
     int shader_source_selector = 0;
     std::string shader_glsl;
     std::string shader_path = {0};
     std::filesystem::path resolved_shader_path;
+    std::filesystem::file_time_type last_write_time{};
 
     vk::Extent3D extent = {1920, 1080, 1};
 
-    SpecializationInfoHandle spec_info;
-    VulkanEntryPointHandle shader;
-    std::optional<GLSLShaderCompiler::compilation_failed> error;
+    std::optional<std::string> error;
 
     PushConstant constant;
-
-    ShaderCompileContextHandle compile_context;
 
     // Optional input controller, feeds iMouse.
     struct MouseInput : public InputListener {
@@ -94,7 +94,7 @@ class Shadertoy : public AbstractCompute {
         }
     };
 
-    PtrInHandle<InputController> con_controller = PtrIn<InputController>::create(0, true);
+    PtrInHandle<InputController> con_controller = PtrIn<InputController>::create();
     std::weak_ptr<InputController> registered_controller;
     std::shared_ptr<MouseInput> mouse_input = std::make_shared<MouseInput>();
 };

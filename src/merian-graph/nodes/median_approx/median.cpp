@@ -1,84 +1,79 @@
 #include "merian-graph/nodes/median_approx/median.hpp"
 
-#include "merian/vk/pipeline/pipeline_compute.hpp"
-#include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
-#include "median_histogram.comp.spv.h"
-#include "median_reduce.comp.spv.h"
-
-#include "merian/shader/spriv_reflect.hpp"
-
 namespace merian {
+
+namespace {
+constexpr const char* HISTOGRAM_MODULE = "merian-graph/nodes/median_approx/median_histogram.slang";
+constexpr const char* REDUCE_MODULE = "merian-graph/nodes/median_approx/median_reduce.slang";
+} // namespace
 
 MedianApproxNode::MedianApproxNode() {}
 
 MedianApproxNode::~MedianApproxNode() {}
 
 DeviceSupportInfo MedianApproxNode::query_device_support(const DeviceSupportQueryInfo& query_info) {
-    SpirvReflect reflect_hist(merian_median_histogram_comp_spv(),
-                              merian_median_histogram_comp_spv_size());
-    SpirvReflect reflect_reduce(merian_median_reduce_comp_spv(),
-                                merian_median_reduce_comp_spv_size());
-    return reflect_hist.query_device_support(query_info) &
-           reflect_reduce.query_device_support(query_info);
+    DeviceSupportInfo support{true};
+    for (const char* module : {HISTOGRAM_MODULE, REDUCE_MODULE}) {
+        const auto composition = SlangComposition::create();
+        composition->add_module_from_path(module, true);
+        support = support & SlangProgram::create(query_info.compile_context, composition)
+                                .get()
+                                ->query_device_support(query_info);
+    }
+    return support;
 }
 
 void MedianApproxNode::initialize(const ContextHandle& context,
-                                  const ResourceAllocatorHandle& /*allocator*/) {
+                                  const ResourceAllocatorHandle& allocator) {
     this->context = context;
+    this->allocator = allocator;
+    this->compile_context = context->get_shader_compile_context();
+    make_spec_info();
 
-    histogram = EntryPoint::create(context, merian_median_histogram_comp_spv(),
-                                   merian_median_histogram_comp_spv_size(), "main",
-                                   vk::ShaderStageFlagBits::eCompute);
-    reduce = EntryPoint::create(context, merian_median_reduce_comp_spv(),
-                                merian_median_reduce_comp_spv_size(), "main",
-                                vk::ShaderStageFlagBits::eCompute);
+    histogram_kernel.emplace(context, allocator, compile_context, HISTOGRAM_MODULE, spec_info);
+    reduce_kernel.emplace(context, allocator, compile_context, REDUCE_MODULE, spec_info);
+}
+
+void MedianApproxNode::make_spec_info() {
+    auto spec_builder = SpecializationInfoBuilder();
+    spec_builder.add_entry(local_size_x, local_size_y, component);
+    spec_info.set(spec_builder.build());
 }
 
 std::vector<InputConnectorDescriptor> MedianApproxNode::describe_inputs() {
-    return {{"src", con_src}};
+    return {{"src", con_src, ConnectorAccess::compute_read}};
 }
 
 std::vector<OutputConnectorDescriptor>
 MedianApproxNode::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
 
-    con_median = std::make_shared<ManagedVkBufferOut>(
-        vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
-        vk::PipelineStageFlagBits2::eComputeShader, vk::ShaderStageFlagBits::eCompute,
+    con_median = ManagedVkBufferOut::create(
         vk::BufferCreateInfo({}, sizeof(float), vk::BufferUsageFlagBits::eStorageBuffer));
-    con_histogram = std::make_shared<ManagedVkBufferOut>(
-        vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
-        vk::PipelineStageFlagBits2::eComputeShader, vk::ShaderStageFlagBits::eCompute,
-        vk::BufferCreateInfo({}, local_size_x * local_size_y * sizeof(uint32_t),
-                             vk::BufferUsageFlagBits::eStorageBuffer));
-    return {{"median", con_median}, {"histogram", con_histogram}};
+    con_histogram = ManagedVkBufferOut::create(vk::BufferCreateInfo(
+        {}, local_size_x * local_size_y * sizeof(uint32_t),
+        vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst));
+    return {{"median", con_median, ConnectorAccess::compute_read_write},
+            {"histogram", con_histogram,
+             ConnectorAccess::compute_read_write | ConnectorAccess::transfer_dst}};
 }
 
-MedianApproxNode::NodeStatusFlags
-MedianApproxNode::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
-                               const DescriptorSetLayoutHandle& descriptor_set_layout) {
-    pipe_layout = PipelineLayoutBuilder(context)
-                      .add_descriptor_set_layout(descriptor_set_layout)
-                      .add_push_constant<PushConstant>()
-                      .build_pipeline_layout();
+MedianApproxNode::NodeStatusFlags MedianApproxNode::on_connected(const NodeConnectedInfo& info) {
+    const NodeIOLayout& io_layout = info.io_layout;
+    io_layout.register_event_listener(
+        "/graph/reload_shaders", [this](const GraphEvent::Info&, const GraphEvent::Data& force) {
+            for (auto* kernel : {&histogram_kernel, &reduce_kernel}) {
+                (*kernel)->reload(std::any_cast<bool>(force), compile_context);
+            }
+            return true;
+        });
 
     return {};
 }
 
-void MedianApproxNode::process([[maybe_unused]] GraphRun& run,
-                               [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
-                               [[maybe_unused]] const NodeIO& io) {
+void MedianApproxNode::process([[maybe_unused]] GraphRun& run, [[maybe_unused]] const NodeIO& io) {
     const CommandBufferHandle& cmd = run.get_cmd();
-
-    if (!pipe_reduce) {
-        auto spec_builder = SpecializationInfoBuilder();
-        spec_builder.add_entry(local_size_x, local_size_y, component);
-        SpecializationInfoHandle spec = spec_builder.build();
-
-        pipe_histogram = ComputePipeline::create(pipe_layout, histogram, spec);
-        pipe_reduce = ComputePipeline::create(pipe_layout, reduce, spec);
-    }
 
     cmd->fill(io[con_histogram], 0);
     auto bar = io[con_histogram]->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
@@ -87,9 +82,8 @@ void MedianApproxNode::process([[maybe_unused]] GraphRun& run,
     cmd->barrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eComputeShader,
                  bar);
 
-    cmd->bind(pipe_histogram);
-    cmd->bind_descriptor_set(pipe_histogram, descriptor_set);
-    cmd->push_constant(pipe_histogram, pc);
+    const auto histogram_pipe = histogram_kernel->bind(run, io);
+    cmd->push_constant(histogram_pipe, pc);
     cmd->dispatch(io[con_src]->get_extent(), local_size_x, local_size_y);
 
     bar = io[con_histogram]->buffer_barrier(vk::AccessFlagBits::eShaderRead |
@@ -98,15 +92,14 @@ void MedianApproxNode::process([[maybe_unused]] GraphRun& run,
     cmd->barrier(vk::PipelineStageFlagBits::eComputeShader,
                  vk::PipelineStageFlagBits::eComputeShader, bar);
 
-    cmd->bind(pipe_reduce);
-    cmd->bind_descriptor_set(pipe_reduce, descriptor_set);
-    cmd->push_constant(pipe_reduce, pc);
+    const auto reduce_pipe = reduce_kernel->bind(run, io);
+    cmd->push_constant(reduce_pipe, pc);
     cmd->dispatch(1, 1, 1);
 }
 
 MedianApproxNode::NodeStatusFlags MedianApproxNode::properties(Properties& config) {
     if (config.config_options("component", component, {"R", "G", "B", "A"})) {
-        pipe_reduce.reset();
+        make_spec_info();
     }
 
     config.config_float("min", pc.min);

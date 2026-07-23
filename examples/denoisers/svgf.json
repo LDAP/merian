@@ -1,0 +1,33 @@
+{
+    "nodes": {
+        "accumulate": {
+            "outputs": [
+                "history->accumulate.prev_history",
+                "history->svgf.history",
+                "out->accumulate.prev_out",
+                "out->svgf.src"
+            ]
+        },
+        "gbuffer": {
+            "$+$outputs": [
+                "gbuffer->svgf.gbuffer"
+            ]
+        },
+        "render": {
+            "properties": {
+                "demodulate albedo": true
+            }
+        },
+        "svgf": {
+            "outputs": [
+                "out->exposure.src",
+                "out->svgf.prev_out"
+            ],
+            "properties": {
+                "SVGF iterations": 5,
+                "TAA alpha": 0.5
+            },
+            "type": "Denoiser (SVGF)"
+        }
+    }
+}

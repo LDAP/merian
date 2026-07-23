@@ -9,11 +9,8 @@ class ManagedImageArrayResource : public ImageArrayResource {
     friend class ManagedVkImageOut;
 
   public:
-    ManagedImageArrayResource(uint32_t array_size,
-                              const vk::PipelineStageFlags2 input_stage_flags,
-                              const vk::AccessFlags2 input_access_flags)
-        : ImageArrayResource(array_size, input_stage_flags, input_access_flags),
-          images(array_size) {}
+    ManagedImageArrayResource(uint32_t array_size)
+        : ImageArrayResource(array_size), images(array_size) {}
 
     // can be nullptr
     virtual const merian::ImageHandle& get_image(const uint32_t index) const override {

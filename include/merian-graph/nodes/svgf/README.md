@@ -28,7 +28,6 @@ But modifies the original code in that:
 | Image  | mv           | motion vectors in `r` and `g` channel                       | no    |
 |        |
 | Buffer | gbuffer      | GBuffer (see `gbuffer.slang`)                              | no    |
-| Buffer | prev_gbuffer | previous GBuffer                                            | 1     |
 
 #### Outputs:
 

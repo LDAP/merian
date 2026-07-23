@@ -543,23 +543,25 @@ void Camera::properties(Properties& props) {
         projection_change_id++;
     }
 
-    props.st_separate();
+    if (props.is_ui()) {
+        props.st_separate();
 
-    float3 d_fly(0);
-    if (props.config_vec("fly", d_fly)) {
-        fly(d_fly.x, d_fly.y, d_fly.z);
-    }
-    float3 d_move(0);
-    if (props.config_vec("move", d_move)) {
-        move(d_move.x, d_move.y, d_move.z);
-    }
-    float2 d_rotate(0);
-    if (props.config_vec("rotate", d_rotate)) {
-        rotate(d_rotate.x, d_rotate.y);
-    }
-    float2 d_orbit(0);
-    if (props.config_vec("orbit", d_orbit)) {
-        orbit(d_orbit.x, d_orbit.y);
+        float3 d_fly(0);
+        if (props.config_vec("fly", d_fly)) {
+            fly(d_fly.x, d_fly.y, d_fly.z);
+        }
+        float3 d_move(0);
+        if (props.config_vec("move", d_move)) {
+            move(d_move.x, d_move.y, d_move.z);
+        }
+        float2 d_rotate(0);
+        if (props.config_vec("rotate", d_rotate)) {
+            rotate(d_rotate.x, d_rotate.y);
+        }
+        float2 d_orbit(0);
+        if (props.config_vec("orbit", d_orbit)) {
+            orbit(d_orbit.x, d_orbit.y);
+        }
     }
 
     props.st_separate();

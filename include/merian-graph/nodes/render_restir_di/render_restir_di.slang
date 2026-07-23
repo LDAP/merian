@@ -4,6 +4,7 @@ using merian;
 
 namespace merian {
 extern static const bool merian_render_emission_on_primary = true;
+extern static const bool merian_render_demodulate_albedo = false;
 extern static const int merian_restir_spp = 4;
 extern static const int merian_restir_spatial_iterations = 1;
 extern static const int merian_restir_temporal_bias_correction = 2;
@@ -61,7 +62,14 @@ void generate(ParameterBlock<Scene> scene, ParameterBlock<RestirBinding> params)
             if (!distant && merian_restir_apply_motion &&
                 scene.time_diff > 0) {
                 if (let gd = scene.get_geometry_data(hit)) {
-                    x.mv = (x.pos - scene.get_prev_world_position(hit, gd)) / scene.time_diff;
+                    const float3 mv =
+                        (x.pos - scene.get_prev_world_position(hit, gd)) / scene.time_diff;
+                    // newly spawned geometry has no valid previous position - a bogus velocity
+                    // advances the sample to infinity in the temporal pass (degenerate rays hang
+                    // the traversal hardware)
+                    if (all(isfinite(mv)) && dot(mv, mv) < RESTIR_MAX_SAMPLE_SPEED_2) {
+                        x.mv = mv;
+                    }
                 }
             }
 
@@ -244,6 +252,10 @@ void shade(ParameterBlock<Scene> scene, ParameterBlock<RestirBinding> params) {
         const RayDesc ray = scene.generate_camera_ray(pixel, dim);
         const ShadingPoint primary = scene.get_shading_point(ray, params.gbuffer.get_hit(pixel));
         irradiance += primary.material.emission;
+    }
+
+    if (merian_render_demodulate_albedo) {
+        irradiance /= params.gbuffer.get_demodulation_albedo(pixel);
     }
 
     const float l = yuv_luminance(irradiance);

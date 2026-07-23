@@ -2,16 +2,17 @@
 
 #include "merian-graph/connectors/image/vk_image_out_managed.hpp"
 #include "merian-graph/connectors/ptr_in.hpp"
-#include "merian-graph/connectors/ptr_out.hpp"
+#include "merian-graph/connectors/shader_object_out.hpp"
 #include "merian-graph/graph/node.hpp"
-#include "merian-shaders/gbuffer.hpp"
+#include "merian-graph/objects/gbuffer_object.hpp"
 #include "merian-shaders/scene/scene.hpp"
 
 #include "merian/shader/shader_object_allocator.hpp"
 #include "merian/shader/slang_composition.hpp"
 #include "merian/shader/slang_entry_point.hpp"
 #include "merian/shader/slang_program.hpp"
-#include "merian/vk/pipeline/pipeline.hpp"
+#include "merian/vk/pipeline/pipeline_ray_tracing.hpp"
+#include "merian/vk/raytrace/shader_binding_table.hpp"
 
 #include <array>
 
@@ -33,11 +34,9 @@ class GBufferRTNode : public Node {
 
     std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
-    NodeStatusFlags on_connected(const NodeIOLayout& io_layout,
-                                 const DescriptorSetLayoutHandle& descriptor_set_layout) override;
+    NodeStatusFlags on_connected(const NodeConnectedInfo& info) override;
 
-    void
-    process(GraphRun& run, const DescriptorSetHandle& descriptor_set, const NodeIO& io) override;
+    void process(GraphRun& run, const NodeIO& io) override;
 
     NodeStatusFlags properties(Properties& config) override;
 
@@ -50,13 +49,7 @@ class GBufferRTNode : public Node {
 
     // Connectors
     PtrInHandle<Scene> con_scene = PtrIn<Scene>::create();
-    PtrOutHandle<GBuffer> con_gbuffer;
-
-    // Image connectors (managed by graph, also exposed individually)
-    ManagedVkImageOutHandle con_denoiser;
-    ManagedVkImageOutHandle con_hit_info;
-    ManagedVkImageOutHandle con_mv;
-    ManagedVkImageOutHandle con_albedo;
+    ShaderObjectOutHandle<GBufferObject> con_gbuffer;
     ManagedVkImageOutHandle con_emission;
 
     // Resolution
@@ -70,11 +63,10 @@ class GBufferRTNode : public Node {
     SlangCompositionHandle composition;
     Versioned<SlangProgram> program;
     Versioned<SlangProgramEntryPoint> entry_point;
-    Versioned<Pipeline> pipeline;
+    Versioned<RayTracingPipeline> pipeline;
+    Versioned<ShaderBindingTable> sbt;
     Versioned<ShaderObject> globals_obj;
 
-    // ShaderObject for GBuffer parameter
-    GBufferHandle gbuffer_obj;
     std::shared_ptr<FrameCachingShaderObjectAllocator> obj_allocator;
 };
 

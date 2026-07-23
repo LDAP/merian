@@ -40,16 +40,13 @@ class GBuffer {
                        const ImageViewHandle& tex1,
                        const ImageViewHandle& tex2,
                        const ImageViewHandle& tex3) {
-        auto r_cursor = r_shader_object->get_cursor();
-        r_cursor["tex0"] = tex0;
-        r_cursor["tex1"] = tex1;
-        r_cursor["tex2"] = tex2;
-        r_cursor["tex3"] = tex3;
-        auto w_cursor = w_shader_object->get_cursor();
-        w_cursor["tex0"] = tex0;
-        w_cursor["tex1"] = tex1;
-        w_cursor["tex2"] = tex2;
-        w_cursor["tex3"] = tex3;
+        for (const auto& object : {r_shader_object, w_shader_object}) {
+            auto cursor = object->get_cursor();
+            cursor["tex0"].write(tex0, vk::ImageLayout::eGeneral);
+            cursor["tex1"].write(tex1, vk::ImageLayout::eGeneral);
+            cursor["tex2"].write(tex2, vk::ImageLayout::eGeneral);
+            cursor["tex3"].write(tex3, vk::ImageLayout::eGeneral);
+        }
     }
 
     vk::Extent3D get_extent() const {

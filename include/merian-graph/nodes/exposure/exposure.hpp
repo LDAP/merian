@@ -4,9 +4,11 @@
 #include "merian-graph/connectors/image/vk_image_in_sampled.hpp"
 #include "merian-graph/connectors/image/vk_image_out_managed.hpp"
 #include "merian-graph/graph/node.hpp"
+#include "merian-graph/nodes/compute_node/compute_kernel.hpp"
 
-#include "merian/shader/entry_point.hpp"
-#include "merian/vk/pipeline/pipeline.hpp"
+#include "merian/vk/pipeline/specialization_info.hpp"
+
+#include <optional>
 
 namespace merian {
 
@@ -53,32 +55,29 @@ class AutoExposure : public Node {
 
     std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
-    NodeStatusFlags on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
-                                 const DescriptorSetLayoutHandle& descriptor_set_layout) override;
+    NodeStatusFlags on_connected(const NodeConnectedInfo& info) override;
 
-    void
-    process(GraphRun& run, const DescriptorSetHandle& descriptor_set, const NodeIO& io) override;
+    void process(GraphRun& run, const NodeIO& io) override;
 
     NodeStatusFlags properties(Properties& config) override;
 
   private:
     ContextHandle context;
+    ResourceAllocatorHandle allocator;
+    ShaderCompileContextHandle compile_context;
 
-    VkSampledImageInHandle con_src = VkSampledImageIn::compute_read();
+    VkSampledImageInHandle con_src = VkSampledImageIn::create();
 
     ManagedVkImageOutHandle con_out;
     ManagedVkBufferOutHandle con_hist;
     ManagedVkBufferOutHandle con_luminance;
 
     PushConstant pc;
+    Versioned<SpecializationInfo> spec_info;
 
-    EntryPointHandle histogram_module;
-    EntryPointHandle luminance_module;
-    EntryPointHandle exposure_module;
-
-    PipelineHandle histogram;
-    PipelineHandle luminance;
-    PipelineHandle exposure;
+    std::optional<ComputeKernel> histogram_kernel;
+    std::optional<ComputeKernel> luminance_kernel;
+    std::optional<ComputeKernel> exposure_kernel;
 };
 
 } // namespace merian

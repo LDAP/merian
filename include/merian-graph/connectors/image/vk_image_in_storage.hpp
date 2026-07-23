@@ -9,26 +9,19 @@ using VkStorageImageInHandle = std::shared_ptr<VkStorageImageIn>;
 
 class VkStorageImageIn : public VkImageIn {
   public:
-    VkStorageImageIn(const vk::AccessFlags2 access_flags,
-                     const vk::PipelineStageFlags2 pipeline_stages,
-                     const vk::ImageUsageFlags usage_flags,
-                     const vk::ShaderStageFlags stage_flags,
-                     const uint32_t delay = 0,
-                     const bool optional = false,
-                     const vk::ImageLayout required_layout = vk::ImageLayout::eGeneral);
+    VkStorageImageIn() = default;
 
-    virtual std::optional<vk::DescriptorSetLayoutBinding> get_descriptor_info() const override;
+    bool shader_bindable() const override {
+        return true;
+    }
 
-    // For a optional input, resource can be nullptr here to signalize that no output was connected.
-    // Provide a dummy binding in this case so that descriptor sets do not need to change.
-    virtual void get_descriptor_update(const uint32_t binding,
-                                       const GraphResourceHandle& resource,
-                                       const DescriptorSetHandle& update,
-                                       const ResourceAllocatorHandle& allocator) override;
+    void bind(ShaderCursor& cursor,
+              const GraphResourceHandle& resource,
+              const ResourceAllocatorHandle& allocator,
+              const ConnectorAccess& access) override;
 
   public:
-    static VkStorageImageInHandle compute_read(const uint32_t delay = 0,
-                                               const bool optional = false);
+    static VkStorageImageInHandle create();
 };
 
 } // namespace merian

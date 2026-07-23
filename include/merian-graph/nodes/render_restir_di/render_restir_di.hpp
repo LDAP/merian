@@ -4,7 +4,9 @@
 #include "merian-graph/connectors/buffer/vk_buffer_out_managed.hpp"
 #include "merian-graph/connectors/image/vk_image_out_managed.hpp"
 #include "merian-graph/connectors/ptr_in.hpp"
+#include "merian-graph/connectors/shader_object_in.hpp"
 #include "merian-graph/graph/node.hpp"
+#include "merian-graph/objects/gbuffer_object.hpp"
 #include "merian-shaders/gbuffer.hpp"
 #include "merian-shaders/scene/scene.hpp"
 
@@ -39,11 +41,9 @@ class RenderRestirDI : public Node {
 
     std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
-    NodeStatusFlags on_connected(const NodeIOLayout& io_layout,
-                                 const DescriptorSetLayoutHandle& descriptor_set_layout) override;
+    NodeStatusFlags on_connected(const NodeConnectedInfo& info) override;
 
-    void
-    process(GraphRun& run, const DescriptorSetHandle& descriptor_set, const NodeIO& io) override;
+    void process(GraphRun& run, const NodeIO& io) override;
 
     NodeStatusFlags properties(Properties& config) override;
 
@@ -56,9 +56,9 @@ class RenderRestirDI : public Node {
     ShaderCompileContextHandle compile_context;
 
     PtrInHandle<Scene> con_scene = PtrIn<Scene>::create();
-    PtrInHandle<GBuffer> con_gbuffer = PtrIn<GBuffer>::create();
-    PtrInHandle<GBuffer> con_prev_gbuffer = PtrIn<GBuffer>::create(1);
-    VkBufferInHandle con_prev_reservoirs = VkBufferIn::compute_read(1);
+    ShaderObjectInHandle<GBufferObject> con_gbuffer = ShaderObjectIn<GBufferObject>::create();
+    ShaderObjectInHandle<GBufferObject> con_prev_gbuffer = ShaderObjectIn<GBufferObject>::create();
+    VkBufferInHandle con_prev_reservoirs = VkBufferIn::create();
     ManagedVkImageOutHandle con_irradiance;
     ManagedVkBufferOutHandle con_reservoirs;
 
@@ -67,6 +67,7 @@ class RenderRestirDI : public Node {
     int32_t spp = 4;
     uint32_t seed = 0;
     bool emission_on_primary = true;
+    bool demodulate_albedo = false;
 
     bool temporal_enable = true;
     float temporal_normal_reject_cos = 0.96f;
@@ -95,4 +96,4 @@ class RenderRestirDI : public Node {
     BufferHandle pong_buffer;
 };
 
-}
+} // namespace merian

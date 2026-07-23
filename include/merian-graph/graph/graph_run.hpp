@@ -1,6 +1,7 @@
 #pragma once
 
 #include "merian/shader/glsl_shader_compiler.hpp"
+#include "merian/shader/shader_object_allocator.hpp"
 #include "merian/utils/chrono.hpp"
 #include "merian/utils/concurrent/thread_pool.hpp"
 #include "merian/vk/command/caching_command_pool.hpp"
@@ -114,6 +115,11 @@ class GraphRun {
     // returns the number of iterations that might be in flight at a certain time.
     const uint32_t& get_iterations_in_flight() const noexcept {
         return iterations_in_flight;
+    }
+
+    // Graph-owned allocator for binding shader objects; cycles with the in-flight index.
+    const ShaderObjectAllocatorHandle& get_shader_object_allocator() const noexcept {
+        return shader_object_allocator;
     }
 
     // Returns the time difference to the last run in seconds.
@@ -265,6 +271,7 @@ class GraphRun {
   private:
     void begin_run(const uint32_t iterations_in_flight,
                    const std::shared_ptr<CachingCommandPool>& cmd_cache,
+                   const ShaderObjectAllocatorHandle& shader_object_allocator,
                    const uint64_t iteration,
                    const uint64_t total_iteration,
                    const uint32_t in_flight_index,
@@ -287,6 +294,7 @@ class GraphRun {
 
         this->iterations_in_flight = iterations_in_flight;
         this->cmd_cache = cmd_cache;
+        this->shader_object_allocator = shader_object_allocator;
         this->iteration = iteration;
         this->total_iteration = total_iteration;
         this->in_flight_index = in_flight_index;
@@ -348,6 +356,8 @@ class GraphRun {
     const GLSLShaderCompilerHandle shader_compiler;
 
     TimelineSemaphoreHandle iteration_semaphore;
+
+    ShaderObjectAllocatorHandle shader_object_allocator;
 
     ProfilerHandle profiler;
     uint32_t iterations_in_flight;

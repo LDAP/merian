@@ -6,7 +6,8 @@ namespace merian {
 AbstractABCompare::~AbstractABCompare() {}
 
 std::vector<InputConnectorDescriptor> AbstractABCompare::describe_inputs() {
-    return {{"a", con_in_a}, {"b", con_in_b}};
+    return {{"a", con_in_a, ConnectorAccess::transfer_src},
+            {"b", con_in_b, ConnectorAccess::transfer_src}};
 }
 
 std::vector<OutputConnectorDescriptor> ABSplit::describe_outputs(const NodeIOLayout& io_layout) {
@@ -16,31 +17,29 @@ std::vector<OutputConnectorDescriptor> ABSplit::describe_outputs(const NodeIOLay
     vk::Extent3D extent =
         output_extent.has_value() ? vk::Extent3D(output_extent.value(), 1) : create_info.extent;
 
-    con_out = ManagedVkImageOut::transfer_write(format, extent.width, extent.height);
+    con_out = ManagedVkImageOut::create(format, extent.width, extent.height);
 
-    return {{"out", con_out}};
+    return {{"out", con_out, ConnectorAccess::transfer_dst}};
 }
 
-void ABSplit::process([[maybe_unused]] GraphRun& run,
-                      [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
-                      const NodeIO& io) {
+void ABSplit::process([[maybe_unused]] GraphRun& run, const NodeIO& io) {
     const CommandBufferHandle& cmd = run.get_cmd();
     const ImageHandle& a = io[con_in_a];
     const ImageHandle& b = io[con_in_b];
     const ImageHandle& result = io[con_out];
 
-    cmd_blit_fit(cmd, b, vk::ImageLayout::eTransferSrcOptimal, b->get_extent(), result,
-                 vk::ImageLayout::eTransferDstOptimal, result->get_extent());
+    cmd_blit_fit(cmd, b, vk::ImageLayout::eGeneral, b->get_extent(), result,
+                 vk::ImageLayout::eGeneral, result->get_extent());
 
-    cmd->barrier(result->barrier2(vk::ImageLayout::eTransferDstOptimal));
+    cmd->barrier(result->barrier2(vk::ImageLayout::eGeneral));
 
     vk::Extent3D a_extent = a->get_extent();
     a_extent.width /= 2;
     vk::Extent3D result_extent = result->get_extent();
     result_extent.width /= 2;
 
-    cmd_blit_fit(cmd, a, vk::ImageLayout::eTransferSrcOptimal, a_extent, result,
-                 vk::ImageLayout::eTransferDstOptimal, result_extent, std::nullopt);
+    cmd_blit_fit(cmd, a, vk::ImageLayout::eGeneral, a_extent, result, vk::ImageLayout::eGeneral,
+                 result_extent, std::nullopt);
 }
 
 // --------------------------------------------------------------------------------
@@ -59,14 +58,12 @@ ABSideBySide::describe_outputs(const NodeIOLayout& io_layout) {
         extent.width *= 2;
     }
 
-    con_out = ManagedVkImageOut::transfer_write(format, extent.width, extent.height);
+    con_out = ManagedVkImageOut::create(format, extent.width, extent.height);
 
-    return {{"out", con_out}};
+    return {{"out", con_out, ConnectorAccess::transfer_dst}};
 }
 
-void ABSideBySide::process([[maybe_unused]] GraphRun& run,
-                           [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
-                           [[maybe_unused]] const NodeIO& io) {
+void ABSideBySide::process([[maybe_unused]] GraphRun& run, [[maybe_unused]] const NodeIO& io) {
     const CommandBufferHandle& cmd = run.get_cmd();
     const ImageHandle& a = io[con_in_a];
     const ImageHandle& b = io[con_in_b];
@@ -75,8 +72,8 @@ void ABSideBySide::process([[maybe_unused]] GraphRun& run,
     vk::Extent3D half_result_extent = result->get_extent();
     half_result_extent.width /= 2;
 
-    cmd_blit_fit(cmd, a, vk::ImageLayout::eTransferSrcOptimal, a->get_extent(), result,
-                 vk::ImageLayout::eTransferDstOptimal, half_result_extent, vk::ClearColorValue());
+    cmd_blit_fit(cmd, a, vk::ImageLayout::eGeneral, a->get_extent(), result,
+                 vk::ImageLayout::eGeneral, half_result_extent, vk::ClearColorValue());
 
     // manual blit since we need offset by half result extent...
     vk::ImageBlit region{merian::first_layer(), {}, merian::first_layer(), {}};

@@ -4,6 +4,16 @@
             "pointer": "/nodes/scene/properties/file",
             "required": true
         },
+        "denoiser": {
+            "default": "none",
+            "type": "variant",
+            "variants": {
+                "none": {},
+                "svgf": {
+                    "merge": "denoisers/svgf.json"
+                }
+            }
+        },
         "env-map": {
             "pointer": "/nodes/scene/properties/env/Path",
             "set": {
@@ -102,13 +112,9 @@
         "gbuffer": {
             "enabled": true,
             "outputs": [
-                "denoiser->accumulate.gbuffer.tex0",
-                "denoiser->accumulate.prev_gbuffer.tex0",
-                "gbuffer->render.gbuffer",
-                "hit_info->accumulate.gbuffer.tex1",
-                "hit_info->accumulate.prev_gbuffer.tex1",
-                "mv->accumulate.gbuffer.tex2",
-                "mv->accumulate.prev_gbuffer.tex2"
+                "gbuffer->accumulate.gbuffer",
+                "gbuffer->accumulate.prev_gbuffer",
+                "gbuffer->render.gbuffer"
             ],
             "properties": {
                 "0": true,

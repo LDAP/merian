@@ -61,10 +61,13 @@ class MerianGraphExtension : public ContextExtension {
     }
 
     DeviceSupportInfo query_device_support(const DeviceSupportQueryInfo& query_info) override {
-        DeviceSupportInfo aggregated = DeviceSupportInfo::check(query_info, {
-                                                                                "timelineSemaphore",
-                                                                                "hostQueryReset",
-                                                                            });
+        DeviceSupportInfo aggregated = DeviceSupportInfo::check(query_info,
+                                                                {
+                                                                    "timelineSemaphore",
+                                                                    "hostQueryReset",
+                                                                    "unifiedImageLayouts",
+                                                                },
+                                                                {}, {}, {});
 
         if (!aggregated.supported) {
             return aggregated;

@@ -33,19 +33,19 @@ void RenderMCPG::initialize(const ContextHandle& context,
 }
 
 std::vector<InputConnectorDescriptor> RenderMCPG::describe_inputs() {
-    return {{"scene", con_scene}, {"gbuffer", con_gbuffer}};
+    return {{"scene", con_scene}, {"gbuffer", con_gbuffer, ConnectorAccess::ray_tracing_read}};
 }
 
 std::vector<OutputConnectorDescriptor>
 RenderMCPG::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
-    con_irradiance = ManagedVkImageOut::compute_write(vk::Format::eR32G32B32A32Sfloat, extent);
-    con_debug = ManagedVkImageOut::compute_write(vk::Format::eR16G16B16A16Sfloat, extent);
-    return {{"irradiance", con_irradiance}, {"debug", con_debug}};
+    con_irradiance = ManagedVkImageOut::create(vk::Format::eR32G32B32A32Sfloat, extent);
+    con_debug = ManagedVkImageOut::create(vk::Format::eR16G16B16A16Sfloat, extent);
+    return {{"irradiance", con_irradiance, ConnectorAccess::ray_tracing_write},
+            {"debug", con_debug, ConnectorAccess::ray_tracing_write}};
 }
 
-RenderMCPG::NodeStatusFlags
-RenderMCPG::on_connected(const NodeIOLayout& io_layout,
-                         [[maybe_unused]] const DescriptorSetLayoutHandle& descriptor_set_layout) {
+RenderMCPG::NodeStatusFlags RenderMCPG::on_connected(const NodeConnectedInfo& info) {
+    const NodeIOLayout& io_layout = info.io_layout;
 
     // force the program graph to be rewired next process()
     composition = nullptr;
@@ -66,13 +66,11 @@ RenderMCPG::on_connected(const NodeIOLayout& io_layout,
     return {};
 }
 
-void RenderMCPG::process(GraphRun& run,
-                         [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
-                         const NodeIO& io) {
+void RenderMCPG::process(GraphRun& run, const NodeIO& io) {
     const auto& cmd = run.get_cmd();
     const auto& scene = io[con_scene];
-    const auto& gbuf = io[con_gbuffer];
-    if (!scene || !gbuf || !scene->is_ready())
+    const auto gbuf = io[con_gbuffer];
+    if (!scene || !scene->is_ready())
         return;
 
     if (max_path_length != emitted_max_path_length) {
@@ -133,7 +131,7 @@ void RenderMCPG::process(GraphRun& run,
     }
 
     auto cursor = params_obj->get_cursor();
-    cursor["gbuffer"] = gbuf->get_shader_object();
+    cursor["gbuffer"] = gbuf.r();
     cursor["irradiance"] = io[con_irradiance].get_texture();
     if (auto debug = cursor["debug"]; debug.is_valid())
         debug = io[con_debug].get_texture();
@@ -161,6 +159,7 @@ void RenderMCPG::update_render_constants() {
                     "export static const int merian_render_spp = {};\n"
                     "export static const int merian_render_max_path_length = {};\n"
                     "export static const uint merian_render_instance_mask = {}u;\n"
+                    "export static const bool merian_render_demodulate_albedo = {};\n"
                     "}}\n"
                     "export static const bool reference_mode = {};\n"
                     "export static const bool use_light_cache_tail = {};\n"
@@ -178,6 +177,7 @@ void RenderMCPG::update_render_constants() {
                     "export static const uint mc_adaptive_buffer_size = {}u;\n"
                     "export static const uint mc_normal_bits = {}u;\n",
                     emission_on_primary ? "true" : "false", spp, max_path_length, mask,
+                    demodulate_albedo ? "true" : "false",
                     (reference_mode || p_guiding == 0.0f) ? "true" : "false",
                     use_light_cache_tail ? "true" : "false",
                     missing_light_heuristic ? "true" : "false", mc_samples, p_guiding,
@@ -204,6 +204,10 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
         config.config_bool("emission on primary", emission_on_primary,
                            "Fold primary-hit emission into irradiance (self-contained). "
                            "Otherwise it is the GBuffer emission texture's job.");
+    constants_changed |= config.config_bool(
+        "demodulate albedo", demodulate_albedo,
+        "Divide the primary-hit albedo out of the output so a denoiser can re-modulate after "
+        "filtering. Use with 'emission on primary' disabled (emission is albedo-independent).");
 
     config.st_separate("RT Surface");
     constants_changed |=

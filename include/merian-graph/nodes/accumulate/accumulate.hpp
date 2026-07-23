@@ -1,12 +1,15 @@
 #pragma once
 
-#include "merian-graph/connectors/connector_utils.hpp"
 #include "merian-graph/connectors/image/vk_image_in_sampled.hpp"
+#include "merian-graph/connectors/shader_object_in.hpp"
+#include "merian-graph/objects/gbuffer_object.hpp"
 
+#include "merian-graph/connectors/image/vk_image_out_managed.hpp"
 #include "merian-graph/graph/node.hpp"
-#include "merian/shader/entry_point.hpp"
+#include "merian-graph/nodes/compute_node/compute_kernel.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
-#include "merian/vk/pipeline/pipeline.hpp"
+#include "merian/vk/pipeline/specialization_info.hpp"
+
 #include <optional>
 
 namespace merian {
@@ -54,11 +57,9 @@ class Accumulate : public Node {
 
     std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
-    NodeStatusFlags on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
-                                 const DescriptorSetLayoutHandle& descriptor_set_layout) override;
+    NodeStatusFlags on_connected(const NodeConnectedInfo& info) override;
 
-    void
-    process(GraphRun& run, const DescriptorSetHandle& descriptor_set, const NodeIO& io) override;
+    void process(GraphRun& run, const NodeIO& io) override;
 
     NodeStatusFlags properties([[maybe_unused]] Properties& config) override;
 
@@ -68,6 +69,7 @@ class Accumulate : public Node {
   private:
     ContextHandle context;
     ResourceAllocatorHandle allocator;
+    ShaderCompileContextHandle compile_context;
     std::optional<vk::Format> format = vk::Format::eR32G32B32A32Sfloat;
 
     static constexpr uint32_t PERCENTILE_LOCAL_SIZE_X = 8;
@@ -76,20 +78,11 @@ class Accumulate : public Node {
     static constexpr uint32_t FILTER_LOCAL_SIZE_Y = 16;
 
     // Graph IO
-    // binding 0
-    VkSampledImageInHandle con_src = VkSampledImageIn::compute_read();
-    // bindings 1,2,3 (GBuffer: tex0, tex1, tex2)
-    VkSampledImageInHandle con_gbuf_tex0 = VkSampledImageIn::compute_read();
-    VkSampledImageInHandle con_gbuf_tex1 = VkSampledImageIn::compute_read();
-    VkSampledImageInHandle con_gbuf_tex2 = VkSampledImageIn::compute_read();
-    // binding 4
-    VkSampledImageInHandle con_prev_out = VkSampledImageIn::compute_read(1);
-    // bindings 5,6,7 (prev GBuffer: tex0, tex1, tex2)
-    VkSampledImageInHandle con_prev_gbuf_tex0 = VkSampledImageIn::compute_read(1);
-    VkSampledImageInHandle con_prev_gbuf_tex1 = VkSampledImageIn::compute_read(1);
-    VkSampledImageInHandle con_prev_gbuf_tex2 = VkSampledImageIn::compute_read(1);
-    // binding 8
-    VkSampledImageInHandle con_prev_history = VkSampledImageIn::compute_read(1);
+    VkSampledImageInHandle con_src = VkSampledImageIn::create();
+    ShaderObjectInHandle<GBufferObject> con_gbuffer = ShaderObjectIn<GBufferObject>::create();
+    VkSampledImageInHandle con_prev_out = VkSampledImageIn::create();
+    ShaderObjectInHandle<GBufferObject> con_prev_gbuffer = ShaderObjectIn<GBufferObject>::create();
+    VkSampledImageInHandle con_prev_history = VkSampledImageIn::create();
 
     ManagedVkImageOutHandle con_out;
     ManagedVkImageOutHandle con_history;
@@ -103,19 +96,13 @@ class Accumulate : public Node {
 
     TextureHandle percentile_texture;
 
-    EntryPointHandle percentile_module;
-    EntryPointHandle accumulate_module;
+    Versioned<SpecializationInfo> percentile_spec_info;
+    Versioned<SpecializationInfo> accumulate_spec_info;
+    std::optional<ComputeKernel> percentile_kernel;
+    std::optional<ComputeKernel> accumulate_kernel;
 
     FilterPushConstant accumulate_pc;
     QuartilePushConstant percentile_pc;
-
-    PipelineHandle calculate_percentiles;
-    PipelineHandle accumulate;
-
-    DescriptorSetLayoutHandle percentile_desc_layout;
-    DescriptorSetHandle percentile_set;
-    DescriptorSetLayoutHandle accumulate_desc_layout;
-    DescriptorSetHandle accumulate_set;
 
     bool clear = false;
     int filter_mode = 0;

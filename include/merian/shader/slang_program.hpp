@@ -94,6 +94,10 @@ class SlangProgram : public std::enable_shared_from_this<SlangProgram> {
     static Versioned<SlangProgram> create(const ShaderCompileContextHandle& compile_context,
                                           const SlangCompositionHandle& composition);
 
+    // Tracks both recomposition (Versioned invalidate) and in-place edits of the composition.
+    static Versioned<SlangProgram> create(const ShaderCompileContextHandle& compile_context,
+                                          const Versioned<SlangComposition>& composition);
+
     static Versioned<SlangProgram> create(const ShaderCompileContextHandle& compile_context,
                                           const std::filesystem::path& path,
                                           const bool with_entry_points = true);

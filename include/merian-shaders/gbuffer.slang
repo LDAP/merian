@@ -112,6 +112,13 @@ extension __GBuffer<0> {
         static_assert(sizeof(Albedo) <= 4 * 4, "size of Albedo larger as uint4");
         return Albedo(tex3[pixel].rgb);
     }
+
+    // Floored albedo for demodulation. Divider and multiplier must use the same value or
+    // channels below the floor do not cancel; the floor bounds the amplification of the
+    // demodulated signal.
+    float3 get_demodulation_albedo(uint2 pixel) {
+        return max(get_albedo(pixel).reflection, 1e-2f);
+    }
 }
 
 // Write-only accessors

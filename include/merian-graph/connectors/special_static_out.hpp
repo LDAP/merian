@@ -23,6 +23,7 @@ class SpecialStaticOut : public OutputConnector,
 
     virtual GraphResourceHandle create_resource(
         [[maybe_unused]] const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
+        [[maybe_unused]] const ConnectorAccess& combined_access,
         [[maybe_unused]] const ResourceAllocatorHandle& allocator,
         [[maybe_unused]] const ResourceAllocatorHandle& aliasing_allocator,
         [[maybe_unused]] const uint32_t resource_index,

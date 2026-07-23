@@ -1,7 +1,7 @@
 {
     "cli": {
         "--": {
-            "pointer": "/nodes/0/properties/shader path",
+            "pointer": "/nodes/shadertoy/properties/shader path",
             "required": true
         }
     },

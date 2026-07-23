@@ -31,7 +31,7 @@ void GLTFSceneNode::initialize([[maybe_unused]] const ContextHandle& context,
 }
 
 std::vector<InputConnectorDescriptor> GLTFSceneNode::describe_inputs() {
-    return {{"controller", con_controller}};
+    return {{"controller", con_controller, {}, 0, true}};
 }
 
 std::vector<OutputConnectorDescriptor>
@@ -39,9 +39,7 @@ GLTFSceneNode::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) 
     return {{"scene", con_scene}};
 }
 
-void GLTFSceneNode::process([[maybe_unused]] GraphRun& run,
-                            [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
-                            [[maybe_unused]] const NodeIO& io) {
+void GLTFSceneNode::process([[maybe_unused]] GraphRun& run, [[maybe_unused]] const NodeIO& io) {
 #ifdef MERIAN_TINYGLTF_ENABLED
     const auto& cmd = run.get_cmd();
 

@@ -10,22 +10,10 @@ namespace merian {
 class InputConnector : public Connector {
 
   public:
-    InputConnector(const uint32_t delay, const bool optional = false)
-        : delay(delay), optional(optional) {}
-
-    virtual void properties(Properties& config) {
-        config.output_text(fmt::format("delay: {}\noptional: {}", delay, optional));
-    }
-
     // Throw invalid_connection, if the resource cannot interface with the supplied connector (try
     // dynamic cast or use merian::test_shared_ptr_types). Can also be used to pre-compute barriers
     // or similar.
     virtual void on_connect_output([[maybe_unused]] const OutputConnectorHandle& output) {}
-
-  public:
-    // The number of iterations the corresponding resource is accessed later.
-    const uint32_t delay;
-    const bool optional;
 };
 
 using InputConnectorHandle = std::shared_ptr<InputConnector>;

@@ -10,80 +10,37 @@ namespace merian {
 class VkBufferIn;
 using VkBufferInHandle = std::shared_ptr<VkBufferIn>;
 
+// Receives a buffer (array). Declare how the node accesses it via ConnectorAccess in the
+// descriptor; the graph synchronizes.
 class VkBufferIn : public InputConnector,
                    public OutputAccessibleInputConnector<VkBufferOutHandle>,
                    public AccessibleConnector<const BufferArrayResource&> {
 
   public:
-    // A descriptor binding is only created if stage flags are supplied.
-    VkBufferIn(const vk::BufferUsageFlags usage_flags = {},
-               const vk::ShaderStageFlags stage_flags = {},
-               const vk::AccessFlags2 access_flags = {},
-               const vk::PipelineStageFlags2 pipeline_stages = {},
-               const uint32_t delay = 0,
-               const bool optional = false);
-
-    std::optional<vk::DescriptorSetLayoutBinding> get_descriptor_info() const override;
-
-    void get_descriptor_update(const uint32_t binding,
-                               const GraphResourceHandle& resource,
-                               const DescriptorSetHandle& update,
-                               const ResourceAllocatorHandle& allocator) override;
+    VkBufferIn() = default;
 
     void on_connect_output(const OutputConnectorHandle& output) override;
 
-    ConnectorStatusFlags
-    on_pre_process(GraphRun& run,
-                   const CommandBufferHandle& cmd,
-                   const GraphResourceHandle& resource,
-                   const NodeHandle& node,
-                   std::vector<vk::ImageMemoryBarrier2>& image_barriers,
-                   std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override;
-
     const BufferArrayResource& resource(const GraphResourceHandle& resource) override;
 
-    // ---------------------------------
+    bool shader_bindable() const override {
+        return true;
+    }
+
+    void bind(ShaderCursor& cursor,
+              const GraphResourceHandle& resource,
+              const ResourceAllocatorHandle& allocator,
+              const ConnectorAccess& access) override;
 
     uint32_t get_array_size() const {
         return array_size;
     }
 
-    vk::BufferUsageFlags get_usage_flags() const {
-        return usage_flags;
-    }
-    vk::ShaderStageFlags get_stage_flags() const {
-        return stage_flags;
-    }
-    vk::AccessFlags2 get_access_flags() const {
-        return access_flags;
-    }
-    vk::PipelineStageFlags2 get_pipeline_stages() const {
-        return pipeline_stages;
-    }
-
   public:
-    static VkBufferInHandle
-    compute_read(const uint32_t delay = 0,
-                 const bool optional = false,
-                 const vk::BufferUsageFlags usage = vk::BufferUsageFlagBits::eStorageBuffer);
-
-    static VkBufferInHandle
-    fragment_read(const uint32_t delay = 0,
-                  const bool optional = false,
-                  const vk::BufferUsageFlags usage = vk::BufferUsageFlagBits::eStorageBuffer);
-
-    static VkBufferInHandle acceleration_structure_read(const uint32_t delay = 0,
-                                                        const bool optional = false);
-
-    static VkBufferInHandle transfer_src(const uint32_t delay = 0, const bool optional = false);
+    static VkBufferInHandle create();
 
   private:
-    const vk::BufferUsageFlags usage_flags;
-    const vk::ShaderStageFlags stage_flags;
-    const vk::AccessFlags2 access_flags;
-    const vk::PipelineStageFlags2 pipeline_stages;
-
-    // set from output in create resource
+    // set from output in on_connect_output
     uint32_t array_size = 1;
 };
 

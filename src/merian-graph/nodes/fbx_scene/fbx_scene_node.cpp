@@ -31,7 +31,7 @@ void FBXSceneNode::initialize([[maybe_unused]] const ContextHandle& context,
 }
 
 std::vector<InputConnectorDescriptor> FBXSceneNode::describe_inputs() {
-    return {{"controller", con_controller}};
+    return {{"controller", con_controller, {}, 0, true}};
 }
 
 std::vector<OutputConnectorDescriptor>
@@ -39,9 +39,7 @@ FBXSceneNode::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     return {{"scene", con_scene}};
 }
 
-void FBXSceneNode::process([[maybe_unused]] GraphRun& run,
-                           [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
-                           [[maybe_unused]] const NodeIO& io) {
+void FBXSceneNode::process([[maybe_unused]] GraphRun& run, [[maybe_unused]] const NodeIO& io) {
 #ifdef MERIAN_UFBX_ENABLED
     const auto& cmd = run.get_cmd();
 

@@ -2,22 +2,21 @@
 
 #include "merian-graph/connectors/image/vk_image_out_managed.hpp"
 #include "merian-graph/graph/errors.hpp"
-#include "merian/shader/glsl_compiler_provider.hpp"
-#include "merian/vk/pipeline/specialization_info_builder.hpp"
+#include "merian/io/file_loader.hpp"
 
 namespace merian {
 
-static const char* shadertoy_pre = R"(#version 460
-#extension GL_EXT_scalar_block_layout : require
+// The user body is GLSL-flavored (mainImage(out vec4, in vec2)); slang's glsl module keeps the
+// common Shadertoy vocabulary (vec*, mix, fract, ...) valid.
+static const char* shadertoy_pre = R"(import glsl;
 
-// Use constants to set local size
-layout(local_size_x_id = 0, local_size_y_id = 1) in;
+RWTexture2D<float4> out_out;
 
-layout(binding = 0, set = 0, rgba8) uniform restrict image2D result;
-layout(push_constant) uniform constants {
-    vec4 iMouse;
-    vec4 iDate;
-    vec2 iResolution;
+[vk::push_constant]
+cbuffer constants {
+    float4 iMouse;
+    float4 iDate;
+    float2 iResolution;
     float iTime;
     float iTimeDelta;
     int iFrame;
@@ -25,120 +24,78 @@ layout(push_constant) uniform constants {
 
 )";
 
-static const char* shadertoy_post = R"(vec4 _merian_shadertoy_toLinear(vec4 sRGB)
+// numthreads is injected between these two halves so it tracks local_size_x/y.
+static const char* shadertoy_post_head = R"(
+float4 _merian_shadertoy_toLinear(float4 sRGB)
 {
-    bvec4 cutoff = lessThan(sRGB, vec4(0.04045));
-    vec4 higher = pow((sRGB + vec4(0.055))/vec4(1.055), vec4(2.4));
-    vec4 lower = sRGB/vec4(12.92);
-
-    return mix(higher, lower, cutoff);
-}
-
-void main()
-{
-  const uvec2 pixel = gl_GlobalInvocationID.xy;
-  if((pixel.x >= iResolution.x) || (pixel.y >= iResolution.y))
-  {
-    return;
-  }
-
-  vec4 frag_color;
-  mainImage(frag_color, vec2(pixel.x, iResolution.y - pixel.y - 1));
-  // WebGL or Shadertoy does not do a Linear->sRGB conversion
-  // thus the shader must output sRGB. But here the shader is expected to output
-  // linear!
-  imageStore(result, ivec2(pixel), _merian_shadertoy_toLinear(frag_color));
+    const float4 higher = pow((sRGB + 0.055) / 1.055, 2.4);
+    const float4 lower = sRGB / 12.92;
+    return select(sRGB < 0.04045, lower, higher);
 }
 
 )";
 
+static const char* shadertoy_main = R"([shader("compute")]
+void main(uint3 _merian_tid: SV_DispatchThreadID)
+{
+    const uint2 pixel = _merian_tid.xy;
+    if ((pixel.x >= uint(iResolution.x)) || (pixel.y >= uint(iResolution.y)))
+        return;
+
+    vec4 frag_color;
+    mainImage(frag_color, vec2(pixel.x, iResolution.y - pixel.y - 1));
+    // WebGL or Shadertoy does not do a Linear->sRGB conversion
+    // thus the shader must output sRGB. But here the shader is expected to output
+    // linear!
+    out_out.Store(int2(pixel), _merian_shadertoy_toLinear(frag_color));
+}
+)";
+
 static const char* default_shader = R"(
-void mainImage(out vec4 fragColor, in vec2 fragCoord) { 
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     fragColor = vec4(vec3(0), 1.);
 }
 )";
 
-class ShadertoyInjectCompiler : public GLSLShaderCompiler {
-  public:
-    ShadertoyInjectCompiler(const GLSLShaderCompilerHandle& forwarding_compiler)
-        : GLSLShaderCompiler(), forwarding_compiler(forwarding_compiler) {}
-
-    ~ShadertoyInjectCompiler() {}
-
-    BlobHandle
-    compile_glsl(const std::string& source,
-                 const std::string& source_name,
-                 const vk::ShaderStageFlagBits shader_kind,
-                 const ShaderCompileContextHandle& shader_compile_context) const final override {
-        SPDLOG_INFO("(re-)compiling {}", source_name);
-        return forwarding_compiler->compile_glsl(shadertoy_pre + source + shadertoy_post,
-                                                 source_name, shader_kind, shader_compile_context);
-    }
-
-    bool available() const override {
-        return true;
-    }
-
-  private:
-    const GLSLShaderCompilerHandle forwarding_compiler;
-};
-
 Shadertoy::Shadertoy() : AbstractCompute(sizeof(PushConstant)), shader_glsl(default_shader) {}
 
 DeviceSupportInfo Shadertoy::query_device_support(const DeviceSupportQueryInfo& query_info) {
-    if (query_info.extension_container.find_provider<GLSLCompilerProvider>(true) == nullptr) {
-        return DeviceSupportInfo{false, "No GLSL compiler available"};
-    }
-
     return DeviceSupportInfo::check(query_info, {}, {}, {}, {}, {"Shader", "ImageQuery"}, {}, {},
                                     {});
 }
 
-void Shadertoy::initialize(const ContextHandle& context, const ResourceAllocatorHandle& allocator) {
-    AbstractCompute::initialize(context, allocator);
-
-    compile_context = ShaderCompileContext::create(context);
-
-    GLSLShaderCompilerHandle forwarding_compiler;
-    if (auto provider = context->find_provider<GLSLCompilerProvider>(true)) {
-        forwarding_compiler = provider->get_glsl_compiler();
-    }
-    if (!forwarding_compiler) {
-        return;
-    }
-    if (!forwarding_compiler->available()) {
-        return;
-    }
-
-    compiler = std::make_shared<ShadertoyInjectCompiler>(forwarding_compiler);
-    reloader = std::make_unique<HotReloader>(context, compile_context, compiler);
-
-    auto spec_builder = SpecializationInfoBuilder();
-    spec_builder.add_entry(local_size_x, local_size_y);
-    spec_info = spec_builder.build();
-
-    shader = EntryPoint::create(
-        "main", vk::ShaderStageFlagBits::eCompute,
-        compiler->compile_glsl_to_shadermodule(context, shader_glsl, "<memory>Shadertoy.comp",
-                                               vk::ShaderStageFlagBits::eCompute, compile_context),
-        spec_info);
+std::vector<InputConnectorDescriptor> Shadertoy::describe_inputs() {
+    return {{"controller", con_controller, {}, 0, true}};
 }
 
-std::vector<InputConnectorDescriptor> Shadertoy::describe_inputs() {
-    return {{"controller", con_controller}};
+std::string Shadertoy::current_body() const {
+    if (shader_source_selector == 1) {
+        return FileLoader::load_file_as_string(resolved_shader_path);
+    }
+    return shader_glsl;
+}
+
+std::string Shadertoy::compose_source(const std::string& body) {
+    return shadertoy_pre + body + shadertoy_post_head +
+           fmt::format("[numthreads({}, {}, 1)]\n", local_size_x, local_size_y) + shadertoy_main;
+}
+
+bool Shadertoy::try_compile(const std::string& body) {
+    try {
+        const auto composition = SlangComposition::create();
+        composition->add_module_from_string("merian_shadertoy", compose_source(body), true);
+        SlangProgram::create(compile_context, composition).get();
+        error.reset();
+        return true;
+    } catch (const std::exception& e) {
+        error = e.what();
+        return false;
+    }
 }
 
 std::vector<OutputConnectorDescriptor>
 Shadertoy::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
-    if (!reloader) {
-        throw graph_errors::node_error{"no shader compiler available."};
-    }
-
-    if (shader_source_selector == 0) {
-        if (error) {
-            throw graph_errors::node_error{error->what()};
-        }
-    } else if (shader_source_selector == 1) {
+    if (shader_source_selector == 1) {
         if (resolved_shader_path.empty()) {
             throw graph_errors::node_error{"no shader path is set."};
         }
@@ -146,10 +103,39 @@ Shadertoy::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
             throw graph_errors::node_error{
                 fmt::format("file does not exist: {}", resolved_shader_path.string())};
         }
+        last_write_time = std::filesystem::last_write_time(resolved_shader_path);
+    }
+
+    if (!try_compile(current_body())) {
+        throw graph_errors::node_error{*error};
     }
 
     constant.iResolution = {extent.width, extent.height};
-    return {{"out", ManagedVkImageOut::compute_write(vk::Format::eR8G8B8A8Unorm, extent)}};
+    return {{"out", ManagedVkImageOut::create(vk::Format::eR8G8B8A8Unorm, extent),
+             ConnectorAccess::compute_write}};
+}
+
+SlangCompositionHandle Shadertoy::create_composition() {
+    const auto composition = SlangComposition::create();
+    composition->add_module_from_string("merian_shadertoy", compose_source(current_body()), true);
+    return composition;
+}
+
+void Shadertoy::write_constants([[maybe_unused]] GraphRun& run,
+                                [[maybe_unused]] const NodeIO& io,
+                                [[maybe_unused]] ShaderCursor& cursor) {
+    // hot reload: pick up edits to the shader file; keep the last working shader on error
+    if (shader_source_selector != 1 || !std::filesystem::exists(resolved_shader_path)) {
+        return;
+    }
+    const auto write_time = std::filesystem::last_write_time(resolved_shader_path);
+    if (write_time == last_write_time) {
+        return;
+    }
+    last_write_time = write_time;
+    if (try_compile(current_body())) {
+        invalidate_shader();
+    }
 }
 
 const void* Shadertoy::get_push_constant([[maybe_unused]] GraphRun& run,
@@ -177,7 +163,7 @@ const void* Shadertoy::get_push_constant([[maybe_unused]] GraphRun& run,
     const std::chrono::year_month_day ymd(now_d);
     constant.iDate.x = static_cast<float>(static_cast<int>(ymd.year()));
     constant.iDate.y = static_cast<float>(static_cast<unsigned int>(ymd.month()));
-    constant.iDate.y = static_cast<float>(static_cast<unsigned int>(ymd.day()));
+    constant.iDate.z = static_cast<float>(static_cast<unsigned int>(ymd.day()));
     constant.iDate.w =
         std::chrono::duration_cast<std::chrono::duration<float>>(now - now_d).count();
 
@@ -190,44 +176,21 @@ Shadertoy::get_group_count([[maybe_unused]] const NodeIO& io) const noexcept {
             (extent.height + local_size_y - 1) / local_size_y, 1};
 };
 
-VulkanEntryPointHandle Shadertoy::get_entry_point() {
-    if (shader_source_selector == 1) {
-        try {
-            ShaderModuleHandle shader_module =
-                reloader->get_shader(resolved_shader_path, vk::ShaderStageFlagBits::eCompute);
-            if (shader_module != shader->vulkan_shader_module(context)) {
-                shader = EntryPoint::create("main", vk::ShaderStageFlagBits::eCompute,
-                                            shader_module, spec_info);
-            }
-            error.reset();
-        } catch (const GLSLShaderCompiler::compilation_failed& e) {
-            error = e;
-        }
-    }
-
-    return shader;
-}
-
 AbstractCompute::NodeStatusFlags Shadertoy::properties(Properties& config) {
     bool needs_reconnect = false;
-    bool needs_compile = false;
 
     if (config.config_options("shader source", shader_source_selector, {"inline", "file"},
                               Properties::OptionsStyle::COMBO)) {
         needs_reconnect = true;
-        if (shader_source_selector == 0) {
-            needs_compile = true;
-        }
         error.reset();
     }
 
     switch (shader_source_selector) {
     case 0: {
         if (config.config_text_multiline("shader", shader_glsl, false)) {
-            needs_compile = true;
-        }
-        if (reloader) {
-            reloader->clear();
+            if (try_compile(shader_glsl)) {
+                invalidate_shader();
+            }
         }
         break;
     }
@@ -242,7 +205,9 @@ AbstractCompute::NodeStatusFlags Shadertoy::properties(Properties& config) {
             if (config.config_bool("convert to inline")) {
                 shader_source_selector = 0;
                 shader_glsl = FileLoader::load_file_as_string(resolved_shader_path);
-                needs_compile = true;
+                if (try_compile(shader_glsl)) {
+                    invalidate_shader();
+                }
             }
         }
         break;
@@ -253,20 +218,7 @@ AbstractCompute::NodeStatusFlags Shadertoy::properties(Properties& config) {
 
     if (error) {
         config.st_separate("Compilation failed.");
-        config.output_text(error->what());
-    }
-
-    if (compiler && needs_compile) {
-        try {
-            ShaderModuleHandle shader_module = compiler->compile_glsl_to_shadermodule(
-                context, shader_glsl, "<memory>Shadertoy.comp", vk::ShaderStageFlagBits::eCompute,
-                compile_context);
-            shader = EntryPoint::create("main", vk::ShaderStageFlagBits::eCompute, shader_module,
-                                        spec_info);
-            error.reset();
-        } catch (const GLSLShaderCompiler::compilation_failed& e) {
-            error = e;
-        }
+        config.output_text(*error);
     }
 
     config.st_separate();

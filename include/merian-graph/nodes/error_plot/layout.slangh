@@ -1,0 +1,22 @@
+[vk::constant_id(0)]
+const int workgroup_size_x = 1;
+[vk::constant_id(1)]
+const int workgroup_size_y = 1;
+
+Sampler2D<float4> in_reference;
+Sampler2D<float4> in_input;
+RWStructuredBuffer<float4, ScalarDataLayout> out_error;
+
+struct PushConstant {
+    uint divisor;
+
+    int size;
+    int offset;
+    int count;
+
+    // 1: squared difference (MSE/RMSE), 0: absolute difference (MAE)
+    uint squared;
+};
+
+[vk::push_constant]
+ConstantBuffer<PushConstant> params;

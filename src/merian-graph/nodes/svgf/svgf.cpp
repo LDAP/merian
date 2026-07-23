@@ -1,12 +1,11 @@
 #include "merian-graph/nodes/svgf/svgf.hpp"
 #include "merian-graph/nodes/svgf/config.h"
 #include "merian/utils/math.hpp"
-#include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
 
+#include "merian/shader/shader_object.hpp"
 #include "merian/shader/slang_entry_point.hpp"
 #include "merian/shader/spriv_reflect.hpp"
 #include "merian/vk/pipeline/pipeline_compute.hpp"
-#include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
 namespace merian {
@@ -51,16 +50,10 @@ void SVGF::initialize(const ContextHandle& context, const ResourceAllocatorHandl
 
 std::vector<InputConnectorDescriptor> SVGF::describe_inputs() {
     return {
-        {"prev_out", con_prev_out},
-        {"src", con_src},
-        {"history", con_history},
-        {"albedo", con_albedo},
-        {"gbuffer.tex0", con_gbuf_tex0},
-        {"gbuffer.tex1", con_gbuf_tex1},
-        {"gbuffer.tex2", con_gbuf_tex2},
-        {"prev_gbuffer.tex0", con_prev_gbuf_tex0},
-        {"prev_gbuffer.tex1", con_prev_gbuf_tex1},
-        {"prev_gbuffer.tex2", con_prev_gbuf_tex2},
+        {"prev_out", con_prev_out, ConnectorAccess::compute_read, 1},
+        {"src", con_src, ConnectorAccess::compute_read},
+        {"history", con_history, ConnectorAccess::compute_read},
+        {"gbuffer", con_gbuffer, ConnectorAccess::compute_read},
     };
 }
 
@@ -69,13 +62,12 @@ std::vector<OutputConnectorDescriptor> SVGF::describe_outputs(const NodeIOLayout
     if (output_format)
         irr_create_info.format = output_format.value();
 
-    con_out = ManagedVkImageOut::compute_write(irr_create_info.format, irr_create_info.extent);
+    con_out = ManagedVkImageOut::create(irr_create_info.format, irr_create_info.extent);
 
-    return {{"out", con_out}};
+    return {{"out", con_out, ConnectorAccess::compute_write}};
 }
 
-SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
-                                         const DescriptorSetLayoutHandle& graph_layout) {
+SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeConnectedInfo& info) {
     const uint32_t max_wg_size_vendor = context->get_physical_device()->is_amd() ? 32 : 16;
 
     variance_estimate_local_size = workgroup_size_for_shared_memory_with_halo(
@@ -89,17 +81,10 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
     }
     taa_local_size = max_wg_size_vendor;
 
-    if (!ping_pong_layout) {
-        ping_pong_layout = DescriptorSetLayoutBuilder()
-                               .add_binding_combined_sampler() // irradiance
-                               .add_binding_storage_image()
-                               .add_binding_combined_sampler() // gbuffer
-                               .add_binding_storage_image()
-                               .build_layout(context);
-    }
-
     // Ping pong textures
-    irr_create_info.usage |= vk::ImageUsageFlagBits::eSampled;
+    // internal ping-pong: written as storage, sampled the next iteration (the graph no longer
+    // bakes usage into create infos)
+    irr_create_info.usage = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage;
     if (kaleidoscope) {
         const uint32_t padding_multiple =
             std::max((uint32_t)1 << (std::max(svgf_iterations, 1) - 1), filter_local_size);
@@ -110,9 +95,6 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
     }
 
     for (int i = 0; i < 2; i++) {
-        if (!ping_pong_res[i].set)
-            ping_pong_res[i].set = allocator->allocate_descriptor_set(ping_pong_layout);
-
         // irradiance
         ImageHandle tmp_irr_image = allocator->create_image(
             irr_create_info, MemoryMappingType::NONE, fmt::format("SVGF ping pong: {}", i));
@@ -132,19 +114,6 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
         ping_pong_res[i].gbuf_ping_pong =
             allocator->create_texture(tmp_gbuf_image, tmp_gbuf_image->make_view_create_info(),
                                       allocator->get_sampler_pool()->nearest_mirrored_repeat());
-    }
-    for (int i = 0; i < 2; i++) {
-        ping_pong_res[i]
-            .set
-            ->queue_descriptor_write_texture(0, ping_pong_res[i].ping_pong, 0,
-                                             vk::ImageLayout::eShaderReadOnlyOptimal)
-            .queue_descriptor_write_texture(1, ping_pong_res[i ^ 1].ping_pong, 0,
-                                            vk::ImageLayout::eGeneral)
-            .queue_descriptor_write_texture(2, ping_pong_res[i].gbuf_ping_pong, 0,
-                                            vk::ImageLayout::eShaderReadOnlyOptimal)
-            .queue_descriptor_write_texture(3, ping_pong_res[i ^ 1].gbuf_ping_pong, 0,
-                                            vk::ImageLayout::eGeneral)
-            .update();
     }
 
     {
@@ -167,29 +136,14 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
         taa_module =
             SlangProgramEntryPoint::create(compilation_session_desc, "svgf_taa.slang").get();
 
-        auto variance_estimate_pipe_layout = PipelineLayoutBuilder(context)
-                                                 .add_descriptor_set_layout(graph_layout)
-                                                 .add_descriptor_set_layout(ping_pong_layout)
-                                                 .add_push_constant<VarianceEstimatePushConstant>()
-                                                 .build_pipeline_layout();
-        auto filter_pipe_layout = PipelineLayoutBuilder(context)
-                                      .add_descriptor_set_layout(graph_layout)
-                                      .add_descriptor_set_layout(ping_pong_layout)
-                                      .add_push_constant<FilterPushConstant>()
-                                      .build_pipeline_layout();
-        auto taa_pipe_layout = PipelineLayoutBuilder(context)
-                                   .add_descriptor_set_layout(graph_layout)
-                                   .add_descriptor_set_layout(ping_pong_layout)
-                                   .add_push_constant<TAAPushConstant>()
-                                   .build_pipeline_layout();
-
         {
             auto spec_builder = SpecializationInfoBuilder();
             spec_builder.add_entry(variance_estimate_local_size, variance_estimate_local_size,
                                    svgf_iterations);
             SpecializationInfoHandle variance_estimate_spec = spec_builder.build();
             variance_estimate = ComputePipeline::create(
-                variance_estimate_pipe_layout, variance_estimate_module, variance_estimate_spec);
+                variance_estimate_module->get_pipeline_layout(context),
+                variance_estimate_module->specialize(variance_estimate_spec));
         }
         {
             filters.clear();
@@ -200,24 +154,73 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
                 spec_builder.add_entry(filter_local_size, filter_local_size, gap, i,
                                        svgf_iterations - 1);
                 SpecializationInfoHandle filter_spec = spec_builder.build();
-                filters[i] =
-                    ComputePipeline::create(filter_pipe_layout, filter_module, filter_spec);
+                filters[i] = ComputePipeline::create(filter_module->get_pipeline_layout(context),
+                                                     filter_module->specialize(filter_spec));
             }
         }
         {
             auto spec_builder = SpecializationInfoBuilder();
             spec_builder.add_entry(taa_local_size, taa_local_size, taa_debug, taa_filter_prev,
-                                   taa_clamping, taa_mv_sampling, enable_mv);
+                                   taa_clamping, taa_mv_sampling, enable_mv, taa_modulate_albedo);
             SpecializationInfoHandle taa_spec = spec_builder.build();
-            taa = ComputePipeline::create(taa_pipe_layout, taa_module, taa_spec);
+            taa = ComputePipeline::create(taa_module->get_pipeline_layout(context),
+                                          taa_module->specialize(taa_spec));
         }
+    }
+
+    // Globals objects; internal ping-pong resources are static per connect and written once,
+    // graph io is bound per frame in process().
+    variance_estimate_globals =
+        variance_estimate_module->create_global_shader_object(context, allocator);
+    {
+        // variance estimate writes into ping_pong_res[0]
+        ShaderCursor cursor = variance_estimate_globals->get_cursor();
+        cursor["img_filter_in"].write(ping_pong_res[0].ping_pong->get_view(),
+                                      vk::ImageLayout::eGeneral);
+        cursor["img_gbuf_in"].write(ping_pong_res[0].gbuf_ping_pong->get_view(),
+                                    vk::ImageLayout::eGeneral);
+    }
+
+    for (int d = 0; d < 2; d++) {
+        filter_globals[d] = filter_module->create_global_shader_object(context, allocator);
+        ShaderCursor cursor = filter_globals[d]->get_cursor();
+        cursor["img_filter_in"].write(ping_pong_res[d].ping_pong,
+                                      vk::ImageLayout::eShaderReadOnlyOptimal);
+        cursor["img_filter_out"].write(ping_pong_res[d ^ 1].ping_pong->get_view(),
+                                       vk::ImageLayout::eGeneral);
+        cursor["img_gbuf_in"].write(ping_pong_res[d].gbuf_ping_pong,
+                                    vk::ImageLayout::eShaderReadOnlyOptimal);
+        cursor["img_gbuf_out"].write(ping_pong_res[d ^ 1].gbuf_ping_pong->get_view(),
+                                     vk::ImageLayout::eGeneral);
+    }
+
+    taa_globals = taa_module->create_global_shader_object(context, allocator);
+    {
+        // after the filter loop the last written texture is ping_pong_res[svgf_iterations & 1]
+        ShaderCursor cursor = taa_globals->get_cursor();
+        cursor["img_filter_result"].write(ping_pong_res[svgf_iterations & 1].ping_pong,
+                                          vk::ImageLayout::eShaderReadOnlyOptimal);
     }
 
     return {};
 }
 
-void SVGF::process(GraphRun& run, const DescriptorSetHandle& descriptor_set, const NodeIO& io) {
+void SVGF::process(GraphRun& run, const NodeIO& io) {
     const CommandBufferHandle& cmd = run.get_cmd();
+
+    // graph resources can change every iteration (ring, delay)
+    {
+        ShaderCursor cursor = variance_estimate_globals->get_cursor();
+        io.bind(cursor);
+    }
+    for (int d = 0; d < 2; d++) {
+        ShaderCursor cursor = filter_globals[d]->get_cursor();
+        io.bind(cursor);
+    }
+    {
+        ShaderCursor cursor = taa_globals->get_cursor();
+        io.bind(cursor);
+    }
 
     // PREPARE (VARIANCE ESTIMATE)
     {
@@ -236,7 +239,8 @@ void SVGF::process(GraphRun& run, const DescriptorSetHandle& descriptor_set, con
 
         // run kernel
         cmd->bind(variance_estimate);
-        cmd->bind_descriptor_set(variance_estimate, descriptor_set, ping_pong_res[1].set);
+        variance_estimate_module->bind_global(variance_estimate_globals, cmd, variance_estimate,
+                                              run.get_shader_object_allocator());
         VarianceEstimatePushConstant precomputed_variance_estimate_pc = variance_estimate_pc;
         precomputed_variance_estimate_pc.depth_accept =
             -10.0f / precomputed_variance_estimate_pc.depth_accept;
@@ -258,7 +262,6 @@ void SVGF::process(GraphRun& run, const DescriptorSetHandle& descriptor_set, con
     }
 
     // FILTER
-    DescriptorSetHandle read_set = ping_pong_res[0].set;
     for (int i = 0; i < svgf_iterations; i++) {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, fmt::format("filter iteration {}", i));
         EAWRes& write_res = ping_pong_res[!(i & 1)];
@@ -275,9 +278,10 @@ void SVGF::process(GraphRun& run, const DescriptorSetHandle& descriptor_set, con
         cmd->barrier(vk::PipelineStageFlagBits::eComputeShader,
                      vk::PipelineStageFlagBits::eComputeShader, {bar, gbuf_bar});
 
-        // run filter
+        // run filter; filter_globals[i & 1] reads ping_pong_res[i & 1], writes write_res
         cmd->bind(filters[i]);
-        cmd->bind_descriptor_set(filters[i], descriptor_set, read_set);
+        filter_module->bind_global(filter_globals[i & 1], cmd, filters[i],
+                                   run.get_shader_object_allocator());
         FilterPushConstant precomputed_filter_pc = filter_pc;
         precomputed_filter_pc.param_z = -10.0f / precomputed_filter_pc.param_z;
         cmd->push_constant(filters[i], precomputed_filter_pc);
@@ -293,15 +297,13 @@ void SVGF::process(GraphRun& run, const DescriptorSetHandle& descriptor_set, con
             all_levels_and_layers());
         cmd->barrier(vk::PipelineStageFlagBits::eComputeShader,
                      vk::PipelineStageFlagBits::eComputeShader, {bar, gbuf_bar});
-
-        read_set = write_res.set;
     }
 
     // TAA
     {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "taa");
         cmd->bind(taa);
-        cmd->bind_descriptor_set(taa, descriptor_set, read_set);
+        taa_module->bind_global(taa_globals, cmd, taa, run.get_shader_object_allocator());
         cmd->push_constant(taa, taa_pc);
         cmd->dispatch(io[con_out]->get_extent(), taa_local_size, taa_local_size);
     }
@@ -351,6 +353,10 @@ SVGF::NodeStatusFlags SVGF::properties(Properties& config) {
 
     needs_rebuild |=
         config.config_bool("enable motion vectors", enable_mv, "uses motion vectors if connected.");
+    needs_rebuild |= config.config_bool(
+        "modulate albedo", taa_modulate_albedo,
+        "Re-modulate the gbuffer albedo the renderer demodulated out. Disable if the renderer's "
+        "'demodulate albedo' is off.");
     if (enable_mv) {
         needs_rebuild |=
             config.config_options("mv sampling", taa_mv_sampling, {"center", "magnitude dilation"},

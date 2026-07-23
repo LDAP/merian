@@ -35,15 +35,12 @@ HDRImageRead::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
         throw graph_errors::node_error{e.what()};
     }
 
-    con_out =
-        ManagedVkImageOut::transfer_write(vk::Format::eR32G32B32A32Sfloat, width, height, 1, true);
+    con_out = ManagedVkImageOut::create(vk::Format::eR32G32B32A32Sfloat, width, height, 1, true);
     needs_run = true;
-    return {{"out", con_out}};
+    return {{"out", con_out, ConnectorAccess::transfer_dst}};
 }
 
-void HDRImageRead::process([[maybe_unused]] GraphRun& run,
-                           [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
-                           const NodeIO& io) {
+void HDRImageRead::process([[maybe_unused]] GraphRun& run, const NodeIO& io) {
     if (!needs_run) {
         return;
     }
@@ -54,7 +51,8 @@ void HDRImageRead::process([[maybe_unused]] GraphRun& run,
     SPDLOG_INFO("Loaded image from {} ({}x{}, {} channels)", filename.string(), width, height,
                 channels);
 
-    run.get_allocator()->get_staging()->cmd_to_device(run.get_cmd(), io[con_out], image->get_data());
+    run.get_allocator()->get_staging()->cmd_to_device(run.get_cmd(), io[con_out],
+                                                      image->get_data());
 
     if (!keep_on_host) {
         image.reset();

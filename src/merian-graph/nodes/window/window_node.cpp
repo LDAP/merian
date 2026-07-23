@@ -17,8 +17,7 @@ void WindowNode::initialize(const ContextHandle& context,
     }
 }
 
-WindowNode::NodeStatusFlags WindowNode::on_connected(const NodeIOLayout& /*io_layout*/,
-                                                     const DescriptorSetLayoutHandle& /*dsl*/) {
+WindowNode::NodeStatusFlags WindowNode::on_connected(const NodeConnectedInfo& /*info*/) {
     const auto& selected = get_selected_provider();
     if (!window || selected != active_provider) {
         window = selected->create_window(context->get_device(), create_info);
@@ -35,7 +34,7 @@ std::vector<InputConnectorDescriptor> WindowNode::describe_inputs() {
     if (providers.empty()) {
         throw graph_errors::node_error{"WindowNode requires at least one WindowProvider"};
     }
-    return {{"src", image_in}};
+    return {{"src", image_in, ConnectorAccess::transfer_src, 0, true}};
 }
 
 std::vector<OutputConnectorDescriptor> WindowNode::describe_outputs(const NodeIOLayout& /*io*/) {
@@ -53,9 +52,7 @@ WindowNode::NodeStatusFlags WindowNode::pre_process([[maybe_unused]] const Graph
     return {};
 }
 
-void WindowNode::process(GraphRun& run,
-                         [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
-                         const NodeIO& io) {
+void WindowNode::process(GraphRun& run, const NodeIO& io) {
     assert(swapchain_manager);
 
     const int64_t signed_max_img_count = get_swapchain()->get_max_image_count();
@@ -101,9 +98,9 @@ void WindowNode::process(GraphRun& run,
                             vk::FormatFeatureFlagBits::eSampledImageFilterLinear
                         ? vk::Filter::eLinear
                         : vk::Filter::eNearest;
-                cmd_blit(mode, cmd, src_image, vk::ImageLayout::eTransferSrcOptimal,
-                         src_image->get_extent(), image, vk::ImageLayout::eTransferDstOptimal,
-                         image->get_extent(), vk::ClearColorValue{}, filter);
+                cmd_blit(mode, cmd, src_image, vk::ImageLayout::eGeneral, src_image->get_extent(),
+                         image, vk::ImageLayout::eTransferDstOptimal, image->get_extent(),
+                         vk::ClearColorValue{}, filter);
             } else {
                 cmd->clear(image);
             }

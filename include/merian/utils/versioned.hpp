@@ -14,10 +14,26 @@ template <typename T> class Versioned {
   public:
     using Ref = std::shared_ptr<T>;
 
-    Versioned() = default;
+    // Copies taken before the first set() must already share the state.
+    Versioned() : state(std::make_shared<State>(nullptr)) {}
 
     explicit Versioned(std::function<Ref()> build)
         : state(std::make_shared<State>(std::move(build))) {}
+
+    // A settable slot without a builder; set() replaces the value and bumps the version.
+    explicit Versioned(Ref initial) : state(std::make_shared<State>(nullptr)) {
+        state->current = std::move(initial);
+    }
+
+    void set(Ref value) {
+        state->current = std::move(value);
+        state->version++;
+    }
+
+    // Discards the current value so the next get() rebuilds it.
+    void invalidate() {
+        state->current = nullptr;
+    }
 
     template <typename U> Versioned& depends_on(const Versioned<U>& dep) {
         return depends_on([dep] {
@@ -32,6 +48,9 @@ template <typename T> class Versioned {
     }
 
     const Ref& get() const {
+        if (!state->build) {
+            return state->current;
+        }
         const uint64_t inputs = state->inputs_version();
         if (!state->current || inputs != state->built_at) {
             state->current = state->build();

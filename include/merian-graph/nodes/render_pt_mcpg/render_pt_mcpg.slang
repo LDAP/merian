@@ -15,6 +15,7 @@ extern static const bool merian_render_emission_on_primary = true;
 extern static const int merian_render_spp = 1;
 extern static const int merian_render_max_path_length = 8;
 extern static const uint merian_render_instance_mask = 0xFFu;
+extern static const bool merian_render_demodulate_albedo = false;
 } // namespace merian
 
 extern static const int debug_output_selector = 0;
@@ -194,11 +195,17 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<RenderBinding> params) {
     const ShadingPoint primary_sp =
         scene.get_shading_point(primary_ray, params.gbuffer.get_hit(pixel));
 
+    // demodulate per sample so the second moment stays consistent with the stored radiance
+    const float3 demod_albedo = merian_render_demodulate_albedo
+                                    ? params.gbuffer.get_demodulation_albedo(pixel)
+                                    : float3(1);
+
     float3 irradiance = float3(0);
     float second_moment = 0.f;
 
     for (int sample_i = 0; sample_i < merian_render_spp; sample_i++) {
-        const float3 contrib = trace_path(scene, params, primary_ray, primary_sp, sample_i, rng);
+        const float3 contrib =
+            trace_path(scene, params, primary_ray, primary_sp, sample_i, rng) / demod_albedo;
 
         if (!any(isnan(contrib)) && !any(isinf(contrib))) {
             irradiance += contrib;

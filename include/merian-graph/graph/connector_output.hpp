@@ -24,12 +24,15 @@ class OutputConnector : public Connector {
     // connector.on_post_process with this resource the memory is not in use and syncronization is
     // ensured.
     //
-    // The inputs are supplied in the order they are serialized by the graph.
+    // The inputs are supplied in the order they are serialized by the graph. combined_access is
+    // the union of the declared ConnectorAccess of this port and all connected inputs (use its
+    // usage flags for allocation).
     //
     // resource_index: 0 <= i <= max_delay
     // ring_size: Number of iterations in flight
     virtual GraphResourceHandle
     create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
+                    const ConnectorAccess& combined_access,
                     const ResourceAllocatorHandle& allocator,
                     const ResourceAllocatorHandle& aliasing_allocator,
                     const uint32_t resource_index,
@@ -39,6 +42,12 @@ class OutputConnector : public Connector {
     // dynamic cast or use merian::test_shared_ptr_types). Can also be used to pre-compute barriers
     // or similar.
     virtual void on_connect_input([[maybe_unused]] const InputConnectorHandle& input) {}
+
+    // Called once after the graph is connected with all resources of this output (one per ring
+    // slot). Record one-time device initialization on cmd; it is submitted and awaited before the
+    // first run.
+    virtual void on_connected([[maybe_unused]] const CommandBufferHandle& cmd,
+                              [[maybe_unused]] const std::vector<GraphResourceHandle>& resources) {}
 
     virtual void properties(Properties& config) {
         config.output_text(fmt::format("supports delay: {}", supports_delay));

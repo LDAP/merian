@@ -35,17 +35,15 @@ class FXAA : public AbstractCompute {
     std::tuple<uint32_t, uint32_t, uint32_t>
     get_group_count(const NodeIO& io) const noexcept override;
 
-    VulkanEntryPointHandle get_entry_point() override;
+    SlangCompositionHandle create_composition() override;
 
     NodeStatusFlags properties(Properties& config) override;
 
   private:
     vk::Extent3D extent;
     PushConstant pc;
-    SpecializationInfoHandle spec_info;
-    VulkanEntryPointHandle shader;
 
-    VkSampledImageInHandle con_src = VkSampledImageIn::compute_read();
+    VkSampledImageInHandle con_src = VkSampledImageIn::create();
 };
 
 } // namespace merian

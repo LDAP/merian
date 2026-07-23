@@ -1,0 +1,18 @@
+[vk::constant_id(0)]
+const int workgroup_size_x = 1;
+[vk::constant_id(1)]
+const int workgroup_size_y = 1;
+
+Sampler2D<float4> in_src;
+RWStructuredBuffer<float4, ScalarDataLayout> out_mean;
+
+struct PushConstant {
+    uint divisor;
+
+    int size;
+    int offset;
+    int count;
+};
+
+[vk::push_constant]
+ConstantBuffer<PushConstant> params;

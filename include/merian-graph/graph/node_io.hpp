@@ -6,6 +6,14 @@
 
 namespace merian {
 
+class Graph;
+class Node;
+using NodeHandle = std::shared_ptr<Node>;
+
+namespace graph_internal {
+struct NodeData;
+}
+
 class GraphEvent {
   public:
     struct Info {
@@ -27,10 +35,11 @@ class GraphEvent {
 // Access the outputs that are connected to your inputs.
 class NodeIOLayout {
   public:
-    NodeIOLayout(const std::function<OutputConnectorHandle(const InputConnectorHandle&)>& io_layout,
-                 const std::function<void(const std::string&, const GraphEvent::Listener&)>&
-                     register_event_listener_f)
-        : io_layout(io_layout), register_event_listener_f(register_event_listener_f) {}
+    NodeIOLayout(Graph* graph,
+                 graph_internal::NodeData* data,
+                 const NodeHandle& node,
+                 const bool allow_delayed)
+        : graph(graph), data(data), node(node), allow_delayed(allow_delayed) {}
 
     // Behavior undefined if an optional input connector is not connected.
     template <
@@ -39,15 +48,15 @@ class NodeIOLayout {
         std::enable_if_t<std::is_base_of_v<OutputAccessibleInputConnector<OutputConnectorType>, T>,
                          bool> = true>
     OutputConnectorType operator[](const std::shared_ptr<T>& input_connector) const {
-        assert(io_layout(input_connector) && "optional input connector is not connected");
-        return input_connector->output_connector(io_layout(input_connector));
+        assert(output_for_input(input_connector) && "optional input connector is not connected");
+        return input_connector->output_connector(output_for_input(input_connector));
     }
 
     // Returns if an input is connected. This is always true for non-optional inputs.
     bool is_connected(const InputConnectorHandle& input_connector) const {
         // if not optional, an output must exist!
-        assert(input_connector->optional || io_layout(input_connector));
-        return io_layout(input_connector) != nullptr;
+        assert(input_optional(input_connector) || output_for_input(input_connector));
+        return output_for_input(input_connector) != nullptr;
     }
 
     /*
@@ -64,34 +73,25 @@ class NodeIOLayout {
      * event is distributed to all listeners.
      */
     void register_event_listener(const std::string& event_pattern,
-                                 const GraphEvent::Listener& event_listerner) const {
-        register_event_listener_f(event_pattern, event_listerner);
-    }
+                                 const GraphEvent::Listener& event_listener) const;
 
   private:
-    const std::function<OutputConnectorHandle(const InputConnectorHandle&)> io_layout;
+    OutputConnectorHandle output_for_input(const InputConnectorHandle& input_connector) const;
+    bool input_optional(const InputConnectorHandle& input_connector) const;
 
-    const std::function<void(const std::string&, const GraphEvent::Listener&)>
-        register_event_listener_f;
+    Graph* graph;
+    graph_internal::NodeData* data;
+    NodeHandle node;
+    bool allow_delayed;
 };
 
 class NodeIO {
   public:
-    NodeIO(const std::function<GraphResourceHandle(const InputConnectorHandle&)>&
-               resource_for_input_connector,
-           const std::function<GraphResourceHandle(const OutputConnectorHandle&)>&
-               resource_for_output_connector,
-           const std::function<bool(const OutputConnectorHandle&)>& output_is_connected,
-           const std::function<std::any&()>& get_frame_data,
-           const std::function<void(
-               const std::string& event_name, const GraphEvent::Data&, const bool)>& send_event_f,
-           const std::function<uint32_t(const InputConnectorHandle&)> binding_for_input_connector,
-           const std::function<uint32_t(const OutputConnectorHandle&)> binding_for_output_connector)
-        : resource_for_input_connector(resource_for_input_connector),
-          resource_for_output_connector(resource_for_output_connector),
-          output_is_connected(output_is_connected), get_frame_data(get_frame_data),
-          send_event_f(send_event_f), binding_for_input_connector(binding_for_input_connector),
-          binding_for_output_connector(binding_for_output_connector) {}
+    NodeIO(Graph* graph,
+           graph_internal::NodeData* data,
+           const NodeHandle& node,
+           const uint32_t set_idx)
+        : graph(graph), data(data), node(node), set_idx(set_idx) {}
 
     // Behavior undefined if an optional input connector is not connected.
     template <typename T,
@@ -101,12 +101,12 @@ class NodeIO {
                                bool> = true>
     ResourceAccessType operator[](const std::shared_ptr<T>& input_connector) const {
         assert(input_connector && "input connector cannot be null");
-        assert((input_connector->optional || resource_for_input_connector(input_connector)) &&
+        assert((input_optional(input_connector) || resource_for_input(input_connector)) &&
                "non-optional input connector is not connected. This should be prevented by the "
                "Graph.");
-        assert((!input_connector->optional || resource_for_input_connector(input_connector)) &&
+        assert((!input_optional(input_connector) || resource_for_input(input_connector)) &&
                "optional input connector is not connected");
-        return input_connector->resource(resource_for_input_connector(input_connector));
+        return input_connector->resource(resource_for_input(input_connector));
     }
 
     template <typename T,
@@ -115,20 +115,18 @@ class NodeIO {
                                    std::is_base_of_v<OutputConnector, T>,
                                bool> = true>
     ResourceAccessType operator[](const std::shared_ptr<T>& output_connector) const {
-        return output_connector->resource(resource_for_output_connector(output_connector));
+        return output_connector->resource(resource_for_output(output_connector));
     }
 
     // Returns if an input is connected. This is always true for non-optional inputs.
     bool is_connected(const InputConnectorHandle& input_connector) const {
         // if not optional, a resource must exist!
-        assert(input_connector->optional || resource_for_input_connector(input_connector));
-        return resource_for_input_connector(input_connector) != nullptr;
+        assert(input_optional(input_connector) || resource_for_input(input_connector));
+        return resource_for_input(input_connector) != nullptr;
     }
 
     // Returns if at least one input is connected to this output.
-    bool is_connected(const OutputConnectorHandle& output_connector) const {
-        return output_is_connected(output_connector);
-    }
+    bool is_connected(const OutputConnectorHandle& output_connector) const;
 
     // Returns a reference to the frame data as the template type.
     //
@@ -143,39 +141,27 @@ class NodeIO {
         return std::any_cast<T&>(data);
     }
 
+    // Binds every shader-visible input and output whose name matches a cursor field:
+    // input "src" -> "in_src", output "irr" -> "out_irr", either at the cursor root or inside
+    // a "graph_in" / "graph_out" struct field. Unmatched ports are skipped (the shader may not
+    // need them); unconnected optional inputs with a matching field receive a dummy.
+    void bind(const ShaderObjectHandle& object) const;
+    void bind(ShaderCursor cursor) const;
+
     void send_event(const std::string& event_name,
-                    const GraphEvent::Data& data = {},
-                    const bool notify_all = true) const {
-        send_event_f(event_name, data, notify_all);
-    }
-
-    uint32_t get_binding(const InputConnectorHandle& input_connector) const {
-        const uint32_t binding = binding_for_input_connector(input_connector);
-        assert(binding != DescriptorSet::NO_DESCRIPTOR_BINDING);
-        return binding;
-    }
-
-    uint32_t get_binding(const OutputConnectorHandle& output_connector) const {
-        const uint32_t binding = binding_for_output_connector(output_connector);
-        assert(binding != DescriptorSet::NO_DESCRIPTOR_BINDING);
-        return binding;
-    }
+                    const GraphEvent::Data& event_data = {},
+                    const bool notify_all = true) const;
 
   private:
-    const std::function<GraphResourceHandle(const InputConnectorHandle&)>
-        resource_for_input_connector;
-    const std::function<GraphResourceHandle(const OutputConnectorHandle&)>
-        resource_for_output_connector;
+    GraphResourceHandle resource_for_input(const InputConnectorHandle& input_connector) const;
+    GraphResourceHandle resource_for_output(const OutputConnectorHandle& output_connector) const;
+    bool input_optional(const InputConnectorHandle& input_connector) const;
+    std::any& get_frame_data() const;
 
-    const std::function<bool(const OutputConnectorHandle&)> output_is_connected;
-
-    const std::function<std::any&()> get_frame_data;
-
-    const std::function<void(const std::string& event_name, const GraphEvent::Data&, const bool)>
-        send_event_f;
-
-    const std::function<uint32_t(const InputConnectorHandle&)> binding_for_input_connector;
-
-    const std::function<uint32_t(const OutputConnectorHandle&)> binding_for_output_connector;
+    Graph* graph;
+    graph_internal::NodeData* data;
+    NodeHandle node;
+    uint32_t set_idx;
 };
+
 } // namespace merian

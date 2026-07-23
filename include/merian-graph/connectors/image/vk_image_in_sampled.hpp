@@ -9,33 +9,20 @@ using VkSampledImageInHandle = std::shared_ptr<VkSampledImageIn>;
 
 class VkSampledImageIn : public VkImageIn {
   public:
-    VkSampledImageIn(
-        const vk::AccessFlags2 access_flags,
-        const vk::PipelineStageFlags2 pipeline_stages,
-        const vk::ImageUsageFlags usage_flags,
-        const vk::ShaderStageFlags stage_flags,
-        const uint32_t delay = 0,
-        const bool optional = false,
-        const std::optional<SamplerHandle>& overwrite_sampler = std::nullopt,
-        const vk::ImageLayout required_layout = vk::ImageLayout::eShaderReadOnlyOptimal);
+    VkSampledImageIn(const std::optional<SamplerHandle>& overwrite_sampler = std::nullopt);
 
-    virtual std::optional<vk::DescriptorSetLayoutBinding> get_descriptor_info() const override;
+    bool shader_bindable() const override {
+        return true;
+    }
 
-    // For a optional input, resource can be nullptr here to signalize that no output was connected.
-    // Provide a dummy binding in this case so that descriptor sets do not need to change.
-    virtual void get_descriptor_update(const uint32_t binding,
-                                       const GraphResourceHandle& resource,
-                                       const DescriptorSetHandle& update,
-                                       const ResourceAllocatorHandle& allocator) override;
+    void bind(ShaderCursor& cursor,
+              const GraphResourceHandle& resource,
+              const ResourceAllocatorHandle& allocator,
+              const ConnectorAccess& access) override;
 
   public:
     static VkSampledImageInHandle
-    compute_read(const uint32_t delay = 0,
-                 const bool optional = false,
-                 const std::optional<SamplerHandle>& overwrite_sampler = std::nullopt);
-
-    static VkSampledImageInHandle fragment_read(const uint32_t delay = 0,
-                                                const bool optional = false);
+    create(const std::optional<SamplerHandle>& overwrite_sampler = std::nullopt);
 
   private:
     const std::optional<SamplerHandle> overwrite_sampler;

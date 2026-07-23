@@ -2,8 +2,10 @@
 
 #include <memory>
 
+#include "connector_access.hpp"
 #include "graph_run.hpp"
 
+#include "merian/shader/shader_cursor.hpp"
 #include "merian/utils/properties.hpp"
 #include "merian/vk/descriptors/descriptor_set.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
@@ -22,17 +24,8 @@ class Connector : public std::enable_shared_from_this<Connector> {
     using ConnectorStatusFlags = uint32_t;
 
     enum ConnectorStatusFlagBits {
-        // Signalize that the resource has changed and descriptor set updates are necessary.
-        //  You can assume that after you return this falg the descriptor sets are updated (and
-        //  you can reset needs_descriptor_update).
-        //
-        //  Not only the descriptor set for this connector but every descriptor set that accesses
-        //  the resource is
-        //  updated.
-        NEEDS_DESCRIPTOR_UPDATE = 0b1,
-
         // Signalize that a graph reconnect is required, for example to recreate all resoruces.
-        NEEDS_RECONNECT = 0b10,
+        NEEDS_RECONNECT = 0b1,
     };
 
   public:
@@ -40,21 +33,19 @@ class Connector : public std::enable_shared_from_this<Connector> {
 
     virtual ~Connector() {};
 
-    // If the resource should be available in a shader, return a DescriptorSetLayoutBinding.
-    // Note, that the binding value is ignored!
-    virtual std::optional<vk::DescriptorSetLayoutBinding> get_descriptor_info() const {
-        return std::nullopt;
+    // Whether NodeIO::bind writes this connector into a shader cursor field.
+    virtual bool shader_bindable() const {
+        return false;
     }
 
-    // Write the descriptor update to the specified binding (please).
-    // This is only called if get_descriptor_info() != std::nullopt.
-    //
-    // Assume that the last updates are persisted and only changes need to be recorded.
-    virtual void get_descriptor_update([[maybe_unused]] const uint32_t binding,
-                                       [[maybe_unused]] const GraphResourceHandle& resource,
-                                       [[maybe_unused]] const DescriptorSetHandle& update,
-                                       [[maybe_unused]] const ResourceAllocatorHandle& allocator) {
-        throw std::runtime_error{"resource is not accessible using a descriptor"};
+    // Write the resource into the shader cursor field named after this connector.
+    // resource is null if an optional input is not connected - write a dummy then.
+    // access is the declared ConnectorAccess of the port.
+    virtual void bind([[maybe_unused]] ShaderCursor& cursor,
+                      [[maybe_unused]] const GraphResourceHandle& resource,
+                      [[maybe_unused]] const ResourceAllocatorHandle& allocator,
+                      [[maybe_unused]] const ConnectorAccess& access) {
+        throw std::runtime_error{"connector does not support shader binding"};
     }
 
     // Called right after the node with this connector has finished node.pre_process() and before

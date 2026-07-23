@@ -1,13 +1,12 @@
 #pragma once
 
+#include "connector_access.hpp"
 #include "connector_input.hpp"
 #include "connector_output.hpp"
 #include "graph_run.hpp"
 #include "node_io.hpp"
 
 #include "merian/utils/properties.hpp"
-#include "merian/vk/descriptors/descriptor_set.hpp"
-#include "merian/vk/descriptors/descriptor_set_layout.hpp"
 #include "merian/vk/extension/extension.hpp"
 
 #include <memory>
@@ -25,6 +24,12 @@ class GraphInfo {};
 struct InputConnectorDescriptor {
     std::string name;
     InputConnectorHandle connector;
+    // How this node accesses the resource. Host-side connectors (Ptr, Any, SpecialStatic) leave
+    // it empty.
+    ConnectorAccess access{};
+    // Receive the resource from delay iterations earlier.
+    uint32_t delay = 0;
+    bool optional = false;
 };
 
 /**
@@ -36,6 +41,15 @@ struct InputConnectorDescriptor {
 struct OutputConnectorDescriptor {
     std::string name;
     OutputConnectorHandle connector;
+    // How this node accesses the resource. Host-side connectors (Ptr, Any, SpecialStatic) leave
+    // it empty.
+    ConnectorAccess access{};
+};
+
+struct NodeConnectedInfo {
+    const NodeIOLayout& io_layout;
+    // Record one-time device initialization here; submitted and awaited before the first run.
+    const CommandBufferHandle& cmd;
 };
 
 class Node : public std::enable_shared_from_this<Node> {
@@ -157,21 +171,14 @@ class Node : public std::enable_shared_from_this<Node> {
     }
 
     // Called when the graph is fully connected and all inputs and outputs are defined.
-    // This is a good place to create layouts and pipelines.
+    // This is a good place to create pipelines.
     // This might be called multiple times in the nodes life-cycle (whenever a connection changes or
     // other nodes request reconnects). It can be assumed that at the time of calling processing of
     // all in-flight data has finished, that means old pipelines and such can be safely destroyed.
     //
-    // The descriptor set layout is automatically constructed from the inputs and outputs.
-    // It contains all input and output connectors for which get_descriptor_info() method does not
-    // return std::nullopt. The order is guaranteed to be all inputs in the order of
-    // describe_inputs() then outputs in the order of describe_outputs().
-    //
     // Here also delayed inputs can be accessed from io_layout.
     [[nodiscard]]
-    virtual NodeStatusFlags
-    on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
-                 [[maybe_unused]] const DescriptorSetLayoutHandle& descriptor_set_layout) {
+    virtual NodeStatusFlags on_connected([[maybe_unused]] const NodeConnectedInfo& info) {
         return {};
     }
 
@@ -181,10 +188,7 @@ class Node : public std::enable_shared_from_this<Node> {
     // outputs change. The graph then has to reconnect itself before calling cmd_process. Note, that
     // this method is called again after the reconnect until no node requests a reconnect.
     //
-    // Here you can access the resources for the run or set your own, depending on the descriptor
-    // type. It is guaranteed that the descriptor set in process(...) is accordingly updated. If you
-    // update resources in process(...) the descriptor set will reflect the changes one iteration
-    // later.
+    // Here you can access the resources for the run or set your own.
     [[nodiscard]]
     virtual NodeStatusFlags pre_process([[maybe_unused]] const GraphRun& run,
                                         [[maybe_unused]] const NodeIO& io) {
@@ -202,9 +206,7 @@ class Node : public std::enable_shared_from_this<Node> {
     //
     // You can throw node_error and compilation_failed here. The graph then attempts to finish the
     // run and rebuild, however this is not supported and not recommended.
-    virtual void process([[maybe_unused]] GraphRun& run,
-                         [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
-                         [[maybe_unused]] const NodeIO& io) {}
+    virtual void process([[maybe_unused]] GraphRun& run, [[maybe_unused]] const NodeIO& io) {}
 
     // Declare your configuration options and output status information.
     // This method is not called as part of a run, meaning you cannot rely on it being called!

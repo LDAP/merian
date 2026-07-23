@@ -21,8 +21,8 @@ class AbstractABCompare : public Node {
     std::optional<vk::Format> output_format = std::nullopt;
     std::optional<vk::Extent2D> output_extent = std::nullopt;
 
-    const VkImageInHandle con_in_a = VkImageIn::transfer_src();
-    const VkImageInHandle con_in_b = VkImageIn::transfer_src();
+    const VkImageInHandle con_in_a = VkImageIn::create();
+    const VkImageInHandle con_in_b = VkImageIn::create();
 };
 
 class ABSplit : public AbstractABCompare {
@@ -32,8 +32,7 @@ class ABSplit : public AbstractABCompare {
 
     std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
-    void
-    process(GraphRun& run, const DescriptorSetHandle& descriptor_set, const NodeIO& io) override;
+    void process(GraphRun& run, const NodeIO& io) override;
 
   private:
     ManagedVkImageOutHandle con_out;
@@ -46,8 +45,7 @@ class ABSideBySide : public AbstractABCompare {
 
     std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
-    void
-    process(GraphRun& run, const DescriptorSetHandle& descriptor_set, const NodeIO& io) override;
+    void process(GraphRun& run, const NodeIO& io) override;
 
   private:
     ManagedVkImageOutHandle con_out;

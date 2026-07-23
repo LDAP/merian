@@ -24,18 +24,17 @@ void RenderPT::initialize(const ContextHandle& context, const ResourceAllocatorH
 }
 
 std::vector<InputConnectorDescriptor> RenderPT::describe_inputs() {
-    return {{"scene", con_scene}, {"gbuffer", con_gbuffer}};
+    return {{"scene", con_scene}, {"gbuffer", con_gbuffer, ConnectorAccess::ray_tracing_read}};
 }
 
 std::vector<OutputConnectorDescriptor>
 RenderPT::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
-    con_irradiance = ManagedVkImageOut::compute_write(vk::Format::eR32G32B32A32Sfloat, extent);
-    return {{"irradiance", con_irradiance}};
+    con_irradiance = ManagedVkImageOut::create(vk::Format::eR32G32B32A32Sfloat, extent);
+    return {{"irradiance", con_irradiance, ConnectorAccess::ray_tracing_write}};
 }
 
-RenderPT::NodeStatusFlags
-RenderPT::on_connected(const NodeIOLayout& io_layout,
-                       [[maybe_unused]] const DescriptorSetLayoutHandle& descriptor_set_layout) {
+RenderPT::NodeStatusFlags RenderPT::on_connected(const NodeConnectedInfo& info) {
+    const NodeIOLayout& io_layout = info.io_layout;
 
     // force the program graph to be rewired next process()
     composition = nullptr;
@@ -56,13 +55,11 @@ RenderPT::on_connected(const NodeIOLayout& io_layout,
     return {};
 }
 
-void RenderPT::process(GraphRun& run,
-                       [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
-                       const NodeIO& io) {
+void RenderPT::process(GraphRun& run, const NodeIO& io) {
     const auto& cmd = run.get_cmd();
     const auto& scene = io[con_scene];
-    const auto& gbuf = io[con_gbuffer];
-    if (!scene || !gbuf || !scene->is_ready())
+    const auto gbuf = io[con_gbuffer];
+    if (!scene || !scene->is_ready())
         return;
 
     if (max_path_length != emitted_max_path_length) {
@@ -108,7 +105,7 @@ void RenderPT::process(GraphRun& run,
     const auto params_obj = params.get();
 
     auto cursor = params_obj->get_cursor();
-    cursor["gbuffer"] = gbuf->get_shader_object();
+    cursor["gbuffer"] = gbuf.r();
     cursor["irradiance"] = io[con_irradiance].get_texture();
 
     cmd->bind(pipe);
@@ -133,17 +130,18 @@ void RenderPT::update_render_constants() {
                     "export static const int merian_render_max_path_length = {};\n"
                     "export static const uint merian_render_instance_mask = {}u;\n"
                     "export static const bool merian_render_enable_ser = {};\n"
+                    "export static const bool merian_render_demodulate_albedo = {};\n"
                     "}}",
                     emission_on_primary ? "true" : "false", spp, max_path_length, mask,
-                    enable_ser ? "true" : "false"));
+                    enable_ser ? "true" : "false", demodulate_albedo ? "true" : "false"));
 }
 
 RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
     bool needs_reconnect = false;
     bool constants_changed = false;
 
-    constants_changed |=
-        config.config_int("samples per pixel", spp, "Number of BSDF-sampled paths per pixel.", 1, 16);
+    constants_changed |= config.config_int("samples per pixel", spp,
+                                           "Number of BSDF-sampled paths per pixel.", 1, 16);
     constants_changed |=
         config.config_int("max path length", max_path_length,
                           "Maximum number of path segments, including the primary hit.", 1, 16);
@@ -154,6 +152,10 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
     constants_changed |=
         config.config_bool("shader execution reordering", enable_ser,
                            "Reorder threads after the primary hit to improve coherence.");
+    constants_changed |= config.config_bool(
+        "demodulate albedo", demodulate_albedo,
+        "Divide the primary-hit albedo out of the output so a denoiser can re-modulate after "
+        "filtering. Use with 'emission on primary' disabled (emission is albedo-independent).");
 
     needs_reconnect |= config.config_uint("width", &extent.width);
     needs_reconnect |= config.config_uint("height", &extent.height);

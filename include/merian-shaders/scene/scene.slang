@@ -107,6 +107,15 @@ struct Scene {
         return geometries[geometry_id];
     }
 
+    // Hits recorded in earlier frames may reference geometry that no longer exists (the id is at
+    // best stale, at worst out of bounds). Check before dereferencing such hits.
+    bool is_valid_geometry_id(const GeometryID geometry_id) {
+        uint count;
+        uint stride;
+        geometries.GetDimensions(count, stride);
+        return geometry_id < count;
+    }
+
     // Loads the geometry data from memory.
     GeometryData get_geometry_data(const uint instance_id, const uint geometry_index) {
         return get_geometry_data(instance_id + geometry_index);

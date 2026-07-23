@@ -1,10 +1,12 @@
 #pragma once
 
-#include "merian-graph/connectors/connector_utils.hpp"
 #include "merian-graph/connectors/image/vk_image_in_sampled.hpp"
+#include "merian-graph/connectors/image/vk_image_out_managed.hpp"
+#include "merian-graph/connectors/shader_object_in.hpp"
 #include "merian-graph/graph/node.hpp"
+#include "merian-graph/objects/gbuffer_object.hpp"
 
-#include "merian/shader/entry_point.hpp"
+#include "merian/shader/slang_entry_point.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 
@@ -48,11 +50,9 @@ class SVGF : public Node {
 
     std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
-    NodeStatusFlags on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
-                                 const DescriptorSetLayoutHandle& descriptor_set_layout) override;
+    NodeStatusFlags on_connected(const NodeConnectedInfo& info) override;
 
-    void
-    process(GraphRun& run, const DescriptorSetHandle& descriptor_set, const NodeIO& io) override;
+    void process(GraphRun& run, const NodeIO& io) override;
 
     NodeStatusFlags properties(Properties& config) override;
 
@@ -66,28 +66,21 @@ class SVGF : public Node {
     uint32_t filter_local_size;
     uint32_t taa_local_size;
 
-    // binding 0
-    VkSampledImageInHandle con_prev_out = VkSampledImageIn::compute_read(1);
-    // binding 1
-    VkSampledImageInHandle con_src = VkSampledImageIn::compute_read();
-    // binding 2
-    VkSampledImageInHandle con_history = VkSampledImageIn::compute_read();
-    // binding 3
-    VkSampledImageInHandle con_albedo = VkSampledImageIn::compute_read();
-    // bindings 4,5,6 (GBuffer: tex0, tex1, tex2)
-    VkSampledImageInHandle con_gbuf_tex0 = VkSampledImageIn::compute_read();
-    VkSampledImageInHandle con_gbuf_tex1 = VkSampledImageIn::compute_read();
-    VkSampledImageInHandle con_gbuf_tex2 = VkSampledImageIn::compute_read();
-    // bindings 7,8,9 (prev GBuffer: tex0, tex1, tex2)
-    VkSampledImageInHandle con_prev_gbuf_tex0 = VkSampledImageIn::compute_read(1);
-    VkSampledImageInHandle con_prev_gbuf_tex1 = VkSampledImageIn::compute_read(1);
-    VkSampledImageInHandle con_prev_gbuf_tex2 = VkSampledImageIn::compute_read(1);
+    VkSampledImageInHandle con_prev_out = VkSampledImageIn::create();
+    VkSampledImageInHandle con_src = VkSampledImageIn::create();
+    VkSampledImageInHandle con_history = VkSampledImageIn::create();
+    ShaderObjectInHandle<GBufferObject> con_gbuffer = ShaderObjectIn<GBufferObject>::create();
 
     ManagedVkImageOutHandle con_out;
 
-    EntryPointHandle variance_estimate_module;
-    EntryPointHandle filter_module;
-    EntryPointHandle taa_module;
+    std::shared_ptr<SlangProgramEntryPoint> variance_estimate_module;
+    std::shared_ptr<SlangProgramEntryPoint> filter_module;
+    std::shared_ptr<SlangProgramEntryPoint> taa_module;
+
+    ShaderObjectHandle variance_estimate_globals;
+    // [d] reads ping_pong_res[d], writes ping_pong_res[d ^ 1]
+    std::array<ShaderObjectHandle, 2> filter_globals;
+    ShaderObjectHandle taa_globals;
 
     VarianceEstimatePushConstant variance_estimate_pc;
     FilterPushConstant filter_pc;
@@ -101,14 +94,11 @@ class SVGF : public Node {
 
     int svgf_iterations = 0;
 
-    DescriptorSetLayoutHandle ping_pong_layout;
     struct EAWRes {
         TextureHandle ping_pong;
         TextureHandle gbuf_ping_pong;
-        // Set reads from this resources and writes to i ^ 1
-        DescriptorSetHandle set;
     };
-    std::array<EAWRes, 2> ping_pong_res; // Ping pong sets
+    std::array<EAWRes, 2> ping_pong_res; // Ping pong textures
 
     int filter_type = 2;
 
@@ -117,6 +107,7 @@ class SVGF : public Node {
     int taa_clamping = 0;
     int taa_mv_sampling = 0;
     bool enable_mv = true;
+    bool taa_modulate_albedo = true;
 
     bool kaleidoscope = false;
     bool kaleidoscope_use_shmem = true;

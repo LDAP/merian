@@ -18,7 +18,6 @@
 #include "merian/utils/math.hpp"
 #include "merian/vk/command/caching_command_pool.hpp"
 #include "merian/vk/context.hpp"
-#include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
 #include "merian/vk/extension/extension_vk_debug_utils.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/sync/ring_fences.hpp"
@@ -57,6 +56,8 @@ class MerianGraphExtension;
  */
 class Graph : public std::enable_shared_from_this<Graph> {
     friend MerianGraphExtension;
+    friend NodeIO;
+    friend NodeIOLayout;
 
     // Data that is stored for every iteration in flight.
     // Created for each iteration in flight in Graph::Graph.
@@ -241,11 +242,6 @@ class Graph : public std::enable_shared_from_this<Graph> {
                   NodeData& data,
                   [[maybe_unused]] const ProfilerHandle& profiler);
 
-    void record_descriptor_updates(NodeData& src_data,
-                                   const OutputConnectorHandle& src_output,
-                                   NodeData::PerOutputInfo& per_output_info,
-                                   const uint32_t resource_index);
-
     // --- Graph connect sub-tasks ---
 
     // Removes all connections, frees graph resources and resets the precomputed topology.
@@ -292,11 +288,11 @@ class Graph : public std::enable_shared_from_this<Graph> {
     // non-disabled nodes.
     //
     // Returns false if failed and needs reconnect.
-    bool connect_nodes();
+    bool connect_nodes(std::vector<NodeHandle>& topology);
 
     void allocate_resources();
 
-    void prepare_descriptor_sets();
+    void precompute_resources();
 
     std::string make_error_input_not_connected(const InputConnectorHandle& input,
                                                const NodeHandle& node,
@@ -405,9 +401,21 @@ class Graph : public std::enable_shared_from_this<Graph> {
     // Nodes
     std::map<std::string, NodeHandle> node_for_identifier;
     std::unordered_map<NodeHandle, NodeData> node_data;
-    // After connect() contains the nodes as far as a connection was possible in topological
-    // order
-    std::vector<NodeHandle> flat_topology;
+
+    // Nodes of one dependency layer have no ordering constraints among each other; the barrier
+    // is emitted before the layer's nodes run. Its src covers all previous layers cumulatively;
+    // layers[0].barrier orders the whole frame against the previous iteration.
+    struct Layer {
+        vk::MemoryBarrier2 barrier;
+        std::vector<NodeHandle> nodes;
+    };
+    // The topology in execution order. (on build_layers)
+    std::vector<Layer> layers;
+
+    std::shared_ptr<FrameCachingShaderObjectAllocator> shader_object_allocator;
+
+    void build_layers(const std::vector<NodeHandle>& topology);
+
     // Store connectors that might be connected in start_nodes.
     // There may still be an invalid connection or an outputing node might be actually disabled.
     std::unordered_map<InputConnectorHandle, NodeHandle> maybe_connected_inputs;

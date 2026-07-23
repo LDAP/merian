@@ -269,6 +269,12 @@ void GraphDescription::parse_graph_v4(const nlohmann::json& json, GraphDescripti
         const auto& nodes_json = json["nodes"];
         // Nodes with Metadata
         for (const auto& [identifier, node_json] : nodes_json.items()) {
+            if (!node_json.contains("type")) {
+                throw std::runtime_error{fmt::format(
+                    "node '{}' has no type (a cli pointer to a nonexistent node id creates such "
+                    "an entry - check the config's cli block)",
+                    identifier)};
+            }
             const std::string node_type = node_json["type"].get<std::string>();
             const nlohmann::json config =
                 node_json.contains("properties") ? node_json["properties"] : nlohmann::json{};
@@ -628,8 +634,23 @@ bool settle_variants(json& config,
 
 void GraphDescription::merge_into(nlohmann::json& base, const nlohmann::json& overwrite) {
     if (base.is_object() && overwrite.is_object()) {
+        static constexpr std::string_view append_prefix = "$+$";
         for (const auto& [key, value] : overwrite.items()) {
-            merge_into(base[key], value);
+            // "$+$key": [..] appends its (deduplicated) elements to base["key"] instead of replacing
+            // it, so independent variant fragments can each contribute to the same array.
+            if (value.is_array() && key.starts_with(append_prefix)) {
+                nlohmann::json& target = base[key.substr(append_prefix.size())];
+                if (!target.is_array()) {
+                    target = nlohmann::json::array();
+                }
+                for (const auto& element : value) {
+                    if (std::ranges::find(target, element) == target.end()) {
+                        target.push_back(element);
+                    }
+                }
+            } else {
+                merge_into(base[key], value);
+            }
         }
     } else {
         base = overwrite;

@@ -18,8 +18,7 @@ class SwapchainBlit : public Node {
 
     std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
-    void
-    process(GraphRun& run, const DescriptorSetHandle& descriptor_set, const NodeIO& io) override;
+    void process(GraphRun& run, const NodeIO& io) override;
 
     NodeStatusFlags properties(Properties& config) override;
 
@@ -28,7 +27,7 @@ class SwapchainBlit : public Node {
     uint32_t current_src_array_size = 0;
     BlitMode mode = FIT;
 
-    VkImageInHandle con_src = VkImageIn::transfer_src(0, true);
+    VkImageInHandle con_src = VkImageIn::create();
     PtrInHandle<SwapchainAcquireResult> con_acquire = PtrIn<SwapchainAcquireResult>::create();
     // Passed through so further nodes (e.g. ImGui) chain after this blit and render on top.
     PtrOutHandle<SwapchainAcquireResult> con_acquire_out = PtrOut<SwapchainAcquireResult>::create();

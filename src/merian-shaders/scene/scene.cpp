@@ -70,12 +70,14 @@ DeviceSupportInfo Scene::query_device_support(const DeviceSupportQueryInfo& quer
                                       merian_transform_prev_vertex_slang_spv_size());
     return DeviceSupportInfo::check(query_info, {},
                                     {"accelerationStructure", "storageBuffer16BitAccess",
-                                     "storageBuffer8BitAccess", "uniformAndStorageBuffer8BitAccess"}) &
+                                     "storageBuffer8BitAccess",
+                                     "uniformAndStorageBuffer8BitAccess"}) &
            transform.query_device_support(query_info) &
            transform_prev.query_device_support(query_info);
 }
 
-SlangCompositionHandle Scene::query_device_support_composition(const DeviceSupportQueryInfo& query_info) {
+SlangCompositionHandle
+Scene::query_device_support_composition(const DeviceSupportQueryInfo& query_info) {
     const bool as_supported = query_info.physical_device->get_supported_features()
                                   .get_acceleration_structure_features_khr()
                                   .accelerationStructure == VK_TRUE;
@@ -611,10 +613,13 @@ void Scene::properties_mesh_group(Properties& props, const MeshGroupID group_id)
 
 void Scene::properties_cameras(Properties& props) {
     if (!cameras.empty()) {
+        props.config_bool("store cameras", store_cameras,
+                          "persist the active camera in stored graphs");
         props.config_uint("active", active_camera, "", 0u, static_cast<uint32_t>(cameras.size()));
-        props.st_separate("Active Camera");
-        // Persisted (not is_ui gated) so the navigated camera is part of a stored graph.
-        get_active_camera()->properties(props);
+        if (props.is_ui() || store_cameras) {
+            props.st_separate("Active Camera");
+            get_active_camera()->properties(props);
+        }
         if (props.is_ui() && aabb.is_valid() &&
             props.config_bool("Fit AABB", "Rotates and moves the camera to fit the scene AABB.")) {
             get_active_camera()->look_at_bounding_box(aabb);
@@ -1187,6 +1192,7 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
 
                 GeometryData gd;
                 gd.material_id = mesh.material_id;
+                gd.primitive_count = mesh.get_primitive_count();
                 gd.vertices = info.vertex_buffer.get_device_address();
                 gd.indices = info.index_buffer ? info.index_buffer.get_device_address()
                                                : vk::DeviceAddress{0};

@@ -124,6 +124,8 @@ struct GeometryData {
 
     MaterialID material_id;
     GeometryDataFlags flags;
+    // to validate hits recorded in earlier frames against despawned/resized geometry
+    uint32_t primitive_count;
 };
 
 struct TransformVertexJob {

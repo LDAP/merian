@@ -1,0 +1,33 @@
+[vk::constant_id(0)]
+const int workgroup_size_x = 1;
+[vk::constant_id(1)]
+const int workgroup_size_y = 1;
+
+Sampler2D<float4> in_src;
+RWTexture2D<float4> out_out;
+RWStructuredBuffer<uint, ScalarDataLayout> out_histogram;
+RWStructuredBuffer<float, ScalarDataLayout> out_avg_luminance;
+
+struct PushConstant {
+    int automatic;
+
+    float iso;
+    float q;
+
+    float shutter_time;
+    float aperature;
+
+    float K;
+    float speed_up;
+    float speed_down;
+    float timediff;
+    int reset;
+    float min_log_histogram;
+    float max_log_histogram;
+    int metering;
+    float min_exposure;
+    float max_exposure;
+};
+
+[vk::push_constant]
+ConstantBuffer<PushConstant> params;

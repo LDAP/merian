@@ -1,21 +1,24 @@
 #include "merian-graph/nodes/tonemap/tonemap.hpp"
-#include "config.h"
 #include "merian-graph/connectors/image/vk_image_out_managed.hpp"
+#include "merian-graph/nodes/tonemap/config.h"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
-#include "tonemap.slang.spv.h"
-
-#include "merian/shader/spriv_reflect.hpp"
-
 namespace merian {
+
+namespace {
+constexpr const char* SHADER_MODULE = "merian-graph/nodes/tonemap/tonemap.slang";
+}
 
 Tonemap::Tonemap() : AbstractCompute(sizeof(PushConstant)) {}
 
 Tonemap::~Tonemap() {}
 
 DeviceSupportInfo Tonemap::query_device_support(const DeviceSupportQueryInfo& query_info) {
-    SpirvReflect reflect(merian_tonemap_slang_spv(), merian_tonemap_slang_spv_size());
-    return reflect.query_device_support(query_info);
+    const auto composition = SlangComposition::create();
+    composition->add_module_from_path(SHADER_MODULE, true);
+    return SlangProgram::create(query_info.compile_context, composition)
+        .get()
+        ->query_device_support(query_info);
 }
 
 void Tonemap::initialize(const ContextHandle& context, const ResourceAllocatorHandle& allocator) {
@@ -23,18 +26,16 @@ void Tonemap::initialize(const ContextHandle& context, const ResourceAllocatorHa
     make_spec_info();
 }
 
-void Tonemap::make_spec_info() {
-    if (context == nullptr) {
-        return;
-    }
+SlangCompositionHandle Tonemap::create_composition() {
+    const auto composition = SlangComposition::create();
+    composition->add_module_from_path(SHADER_MODULE, true);
+    return composition;
+}
 
+void Tonemap::make_spec_info() {
     auto spec_builder = SpecializationInfoBuilder();
     spec_builder.add_entry(local_size_x, local_size_y, tonemap, alpha_mode, clamp_output);
-    spec_info = spec_builder.build();
-
-    shader =
-        EntryPoint::create(context, merian_tonemap_slang_spv(), merian_tonemap_slang_spv_size(),
-                           "main", vk::ShaderStageFlagBits::eCompute, spec_info);
+    spec_info.set(spec_builder.build());
 }
 
 void Tonemap::apply_agx_look() {
@@ -66,7 +67,7 @@ void Tonemap::apply_agx_look() {
 
 std::vector<InputConnectorDescriptor> Tonemap::describe_inputs() {
     return {
-        {"src", con_src},
+        {"src", con_src, ConnectorAccess::compute_read},
     };
 }
 
@@ -78,7 +79,7 @@ Tonemap::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     const vk::Format format = output_format.value_or(create_info.format);
 
     return {
-        {"out", ManagedVkImageOut::compute_write(format, extent)},
+        {"out", ManagedVkImageOut::create(format, extent), ConnectorAccess::compute_write},
     };
 }
 
@@ -92,10 +93,6 @@ Tonemap::get_group_count([[maybe_unused]] const NodeIO& io) const noexcept {
     return {(extent.width + local_size_x - 1) / local_size_x,
             (extent.height + local_size_y - 1) / local_size_y, 1};
 };
-
-VulkanEntryPointHandle Tonemap::get_entry_point() {
-    return shader;
-}
 
 AbstractCompute::NodeStatusFlags Tonemap::properties(Properties& config) {
     bool needs_rebuild = false;

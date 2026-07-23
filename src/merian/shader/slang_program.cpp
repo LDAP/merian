@@ -178,6 +178,16 @@ Versioned<SlangProgram> SlangProgram::create(const ShaderCompileContextHandle& c
 }
 
 Versioned<SlangProgram> SlangProgram::create(const ShaderCompileContextHandle& compile_context,
+                                             const Versioned<SlangComposition>& composition) {
+    auto program = Versioned<SlangProgram>([compile_context, composition] {
+        return SlangProgramHandle(new SlangProgram(compile_context, composition.get()));
+    });
+    program.depends_on(composition);
+    program.depends_on([composition] { return composition.get()->version(); });
+    return program;
+}
+
+Versioned<SlangProgram> SlangProgram::create(const ShaderCompileContextHandle& compile_context,
                                              const std::filesystem::path& path,
                                              const bool with_entry_points) {
     auto comp = SlangComposition::create();

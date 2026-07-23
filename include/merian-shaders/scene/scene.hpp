@@ -794,6 +794,7 @@ class Scene : public std::enable_shared_from_this<Scene> {
 
     std::vector<CameraHandle> cameras;
     uint32_t active_camera = 0;
+    bool store_cameras = false;
     AABB aabb; // can be invalid if information is not available.
 
     // Buffers dropped by remove_mesh; drained at the top of update() via

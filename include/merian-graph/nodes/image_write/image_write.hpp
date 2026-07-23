@@ -25,8 +25,7 @@ class ImageWrite : public Node {
 
     virtual NodeStatusFlags pre_process(const GraphRun& run, const NodeIO& io) override;
 
-    virtual void
-    process(GraphRun& run, const DescriptorSetHandle& descriptor_set, const NodeIO& io) override;
+    virtual void process(GraphRun& run, const NodeIO& io) override;
 
     virtual NodeStatusFlags properties(Properties& config) override;
 
@@ -66,7 +65,7 @@ class ImageWrite : public Node {
     ContextHandle context;
     ResourceAllocatorHandle allocator;
 
-    VkImageInHandle con_src = VkImageIn::transfer_src();
+    VkImageInHandle con_src = VkImageIn::create();
 
     std::function<void()> callback;
 

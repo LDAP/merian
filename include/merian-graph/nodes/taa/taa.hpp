@@ -36,17 +36,15 @@ class TAA : public AbstractCompute {
     std::tuple<uint32_t, uint32_t, uint32_t>
     get_group_count([[maybe_unused]] const NodeIO& io) const noexcept override;
 
-    VulkanEntryPointHandle get_entry_point() override;
+    SlangCompositionHandle create_composition() override;
 
     NodeStatusFlags properties(Properties& config) override;
 
   private:
     const bool inverse_motion = false;
-    VulkanEntryPointHandle shader;
-    SpecializationInfoHandle spec_info;
 
-    VkSampledImageInHandle con_src = VkSampledImageIn::compute_read();
-    VkSampledImageInHandle con_mv = VkSampledImageIn::compute_read(0, true);
+    VkSampledImageInHandle con_src = VkSampledImageIn::create();
+    VkSampledImageInHandle con_mv = VkSampledImageIn::create();
 
     PushConstant pc;
     uint32_t width{};

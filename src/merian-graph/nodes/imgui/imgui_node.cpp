@@ -21,9 +21,7 @@ std::vector<OutputConnectorDescriptor> ImGuiNode::describe_outputs(const NodeIOL
     return {{"acquire", con_acquire_out}};
 }
 
-void ImGuiNode::process(GraphRun& run,
-                        const DescriptorSetHandle& /*descriptor_set*/,
-                        const NodeIO& io) {
+void ImGuiNode::process(GraphRun& run, const NodeIO& io) {
     const std::shared_ptr<SwapchainAcquireResult>& acquire = io[con_acquire];
     io[con_acquire_out] = acquire;
     if (!acquire) {

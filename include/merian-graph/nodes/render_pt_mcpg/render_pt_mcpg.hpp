@@ -2,8 +2,10 @@
 
 #include "merian-graph/connectors/image/vk_image_out_managed.hpp"
 #include "merian-graph/connectors/ptr_in.hpp"
+#include "merian-graph/connectors/shader_object_in.hpp"
 #include "merian-graph/graph/node.hpp"
 #include "merian-graph/nodes/render_pt_mcpg/mcpg.hpp"
+#include "merian-graph/objects/gbuffer_object.hpp"
 #include "merian-shaders/gbuffer.hpp"
 #include "merian-shaders/light-cache/hashed_irradiance_cache.hpp"
 #include "merian-shaders/scene/scene.hpp"
@@ -39,11 +41,9 @@ class RenderMCPG : public Node {
 
     std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
-    NodeStatusFlags on_connected(const NodeIOLayout& io_layout,
-                                 const DescriptorSetLayoutHandle& descriptor_set_layout) override;
+    NodeStatusFlags on_connected(const NodeConnectedInfo& info) override;
 
-    void
-    process(GraphRun& run, const DescriptorSetHandle& descriptor_set, const NodeIO& io) override;
+    void process(GraphRun& run, const NodeIO& io) override;
 
     NodeStatusFlags properties(Properties& config) override;
 
@@ -56,7 +56,7 @@ class RenderMCPG : public Node {
 
     // Connectors
     PtrInHandle<Scene> con_scene = PtrIn<Scene>::create();
-    PtrInHandle<GBuffer> con_gbuffer = PtrIn<GBuffer>::create();
+    ShaderObjectInHandle<GBufferObject> con_gbuffer = ShaderObjectIn<GBufferObject>::create();
     ManagedVkImageOutHandle con_irradiance;
     ManagedVkImageOutHandle con_debug;
 
@@ -71,6 +71,7 @@ class RenderMCPG : public Node {
     int32_t max_path_length = 8;
     int32_t emitted_max_path_length = max_path_length;
     bool emission_on_primary = true;
+    bool demodulate_albedo = false;
     bool reference_mode = false;
     std::array<bool, 8> mask_enabled{true, true, true, true, true, true, true, true};
 

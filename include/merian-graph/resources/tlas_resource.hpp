@@ -11,13 +11,9 @@ class TLASResource : public GraphResource {
     friend class VkTLASOut;
 
   public:
-    TLASResource(const vk::PipelineStageFlags2 read_pipeline_stages)
-        : input_pipeline_stages(read_pipeline_stages) {}
+    TLASResource() = default;
 
     void properties(merian::Properties& props) override {
-        props.output_text(
-            fmt::format("Input pipeline stages: {}", vk::to_string(input_pipeline_stages)));
-
         if (tlas) {
             tlas->properties(props);
         } else {
@@ -30,13 +26,8 @@ class TLASResource : public GraphResource {
         return *this;
     }
 
-  public:
-    // combined pipeline stage flags of all inputs
-    const vk::PipelineStageFlags2 input_pipeline_stages;
-
   private:
     merian::AccelerationStructureHandle tlas;
-    merian::AccelerationStructureHandle last_tlas;
 };
 
 using TLASResourceHandle = std::shared_ptr<TLASResource>;

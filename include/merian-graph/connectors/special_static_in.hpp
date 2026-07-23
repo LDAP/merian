@@ -16,7 +16,7 @@ class SpecialStaticIn : public InputConnector,
                         public OutputAccessibleInputConnector<SpecialStaticOutHandle<ValueType>>,
                         public AccessibleConnector<const ValueType&> {
   public:
-    SpecialStaticIn(const bool optional = false) : InputConnector(0, optional) {}
+    SpecialStaticIn() = default;
 
     const ValueType& resource([[maybe_unused]] const GraphResourceHandle& resource) override {
         return debugable_ptr_cast<SpecialStaticOut<ValueType>>(resource)->value();
@@ -29,8 +29,8 @@ class SpecialStaticIn : public InputConnector,
         }
     }
 
-    static SpecialStaticInHandle<ValueType> create(const bool optional = false) {
-        return std::make_shared<SpecialStaticIn<ValueType>>(optional);
+    static SpecialStaticInHandle<ValueType> create() {
+        return std::make_shared<SpecialStaticIn<ValueType>>();
     }
 };
 

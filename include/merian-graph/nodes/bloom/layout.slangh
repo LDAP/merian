@@ -1,0 +1,20 @@
+[vk::constant_id(0)]
+const int workgroup_size_x = 1;
+[vk::constant_id(1)]
+const int workgroup_size_y = 1;
+
+[vk::constant_id(2)]
+const int MODE = 0;
+
+Sampler2D<float4> in_src;
+RWTexture2D<float4> out_out;
+[format("rgba16f")]
+RWTexture2D<float4> out_interm;
+
+struct PushConstant {
+    float threshold;
+    float strength;
+};
+
+[vk::push_constant]
+ConstantBuffer<PushConstant> pc;

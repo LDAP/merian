@@ -6,6 +6,7 @@
 #include "merian/shader/shader_cursor.hpp"
 #include "merian/shader/shader_object_allocator.hpp"
 #include "merian/shader/slang_entry_point.hpp"
+#include "merian/shader/slang_global_session.hpp"
 #include "merian/shader/slang_program.hpp"
 #include "merian/vk/command/queue.hpp"
 #include "merian/vk/context.hpp"
@@ -166,6 +167,65 @@ TEST_F(SlangHotReloadTest, MaterialPipelineRebuildsAfterForceReload) {
         EXPECT_EQ(mapped[6], 2u);
         output_buffer->get_memory()->unmap();
     }
+}
+
+// ---------------------------------------------------------------------------
+// Generated-source nodes (Reduce, Shadertoy) recompile a module under a fixed name with changed
+// content. The session caches modules by name, so the new source is only picked up once the
+// source epoch is bumped — which is exactly what AbstractCompute::invalidate_shader does.
+// ---------------------------------------------------------------------------
+
+TEST_F(SlangHotReloadTest, RegeneratedModuleUnderFixedNamePicksUpNewSource) {
+    const auto dispatch_writing = [&](const std::string& module_name, uint32_t value) -> uint32_t {
+        const std::string source = fmt::format(R"(
+            struct Params {{ RWStructuredBuffer<uint> output; }};
+            [shader("compute")]
+            [numthreads(1, 1, 1)]
+            void main(ParameterBlock<Params> params) {{ params.output[0] = {}u; }}
+        )",
+                                               value);
+
+        // A fresh composition each time, matching the generated-source node pattern.
+        auto composition = SlangComposition::create();
+        composition->add_module_from_string(module_name, source, true);
+        auto program = SlangProgram::create(compile_context, composition);
+        auto entry_point = SlangProgramEntryPoint::create(program, "main");
+        auto pipeline = ComputePipeline::create(entry_point.get()->get_pipeline_layout(context),
+                                                entry_point.get()->specialize());
+
+        auto output_buffer = allocator->create_buffer(
+            sizeof(uint32_t),
+            vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
+            MemoryMappingType::HOST_ACCESS_RANDOM, "regen_output");
+        auto params =
+            entry_point.get()->create_shader_object_for_parameter(context, "params", allocator);
+        params->get_cursor()["output"] = output_buffer;
+        queue->submit_wait([&](const CommandBufferHandle& cmd) {
+            cmd->bind(pipeline);
+            entry_point.get()->bind("params", params, cmd, pipeline, obj_allocator);
+            cmd->dispatch(1, 1, 1);
+        });
+        auto* mapped = output_buffer->get_memory()->map_as<uint32_t>();
+        const uint32_t result = mapped[0];
+        output_buffer->get_memory()->unmap();
+        return result;
+    };
+
+    // Distinct names never collide, even within one session generation: two Reduce instances
+    // must not shadow one another (they use per-instance module names).
+    EXPECT_EQ(dispatch_writing("regen_a", 7), 7u);
+    EXPECT_EQ(dispatch_writing("regen_b", 8), 8u);
+
+    EXPECT_EQ(dispatch_writing("regen_fixed_name", 11), 11u);
+
+    // Without retiring the session the cache returns the first module for the reused name.
+    EXPECT_EQ(dispatch_writing("regen_fixed_name", 22), 11u)
+        << "session cache is keyed by module name";
+
+    // invalidate_shader bumps the epoch, retiring the session so the new source is compiled.
+    bump_slang_source_epoch();
+    EXPECT_EQ(dispatch_writing("regen_fixed_name", 22), 22u)
+        << "epoch bump retires the stale session";
 }
 
 // ---------------------------------------------------------------------------

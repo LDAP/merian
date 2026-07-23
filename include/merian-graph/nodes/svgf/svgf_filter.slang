@@ -1,13 +1,24 @@
-#include "config.h"
-#include "svgf_graph_layout.slangh"
+#include "merian-graph/nodes/svgf/config.h"
 
-[vk::binding(0, 1)]
+[vk::constant_id(0)]
+const int workgroup_size_x = 1;
+[vk::constant_id(1)]
+const int workgroup_size_y = 1;
+
+import merian_shaders.gbuffer;
+import merian_shaders.utils.textures;
+import merian_shaders.utils.shared_memory;
+import merian_shaders.colors.colorspaces;
+
+using merian;
+
+// graph-bound
+ParameterBlock<GBuffer> in_gbuffer;
+
+// internal ping-pong (bound by the node)
 Sampler2D<float4> img_filter_in;
-[vk::binding(1, 1)]
 RWTexture2D<float4> img_filter_out;
-[vk::binding(2, 1)]
 Sampler2D<uint4> img_gbuf_in;
-[vk::binding(3, 1)]
 RWTexture2D<uint4> img_gbuf_out;
 
 [vk::constant_id(2)]
@@ -36,12 +47,6 @@ struct PushConstant {
 }
 [vk::push_constant]
 ConstantBuffer<PushConstant> params;
-
-import merian_shaders.utils.textures;
-import merian_shaders.utils.shared_memory;
-import merian_shaders.colors.colorspaces;
-
-using merian;
 
 // --------------------------------------------------------------
 
@@ -153,8 +158,8 @@ void _tap(const int2 offset, const float kernel_weight) {
 #define grad_offset (offset * GAP)
 #else
     const float4 p_irr_var = img_filter_in[ipos + offset];
-    const float3 p_n = gbuffer.get_normal(uint2(ipos + offset));
-    const float p_z = gbuffer.get_linear_z(uint2(ipos + offset));
+    const float3 p_n = in_gbuffer.get_normal(uint2(ipos + offset));
+    const float p_z = in_gbuffer.get_linear_z(uint2(ipos + offset));
 #define grad_offset offset
 #endif
 
@@ -227,7 +232,7 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
         return;
 
     filter_irr_var = img_filter_in[ipos];
-    const SurfaceData c_surf = gbuffer.get_surface(uint2(ipos));
+    const SurfaceData c_surf = in_gbuffer.get_surface(uint2(ipos));
     c_n = c_surf.normal;
     c_z = c_surf.linear_z;
     c_grad_z = float2(c_surf.grad_z);
@@ -363,4 +368,3 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
 
     img_filter_out.Store(ipos, filter_irr_var);
 }
-

@@ -61,6 +61,11 @@ void Graph::graph_properties(Properties& props) {
     }
 
     props.st_separate();
+    if (props.is_ui() && !layers.empty()) {
+        props.output_text("dependency layers: {}", layers.size());
+    }
+
+    props.st_separate();
     props.config_bool("flush thread pool", flush_thread_pool_at_run_start,
                       "If enabled, the tasks queue of the thread pool is flushed when a "
                       "run starts. HIGHLY RECOOMMENDED as it limits memory allocations and "
@@ -330,10 +335,6 @@ void Graph::properties(Properties& props) {
                     }
                     props.st_end_child();
                 }
-                if (props.st_begin_child("stats", "Statistics")) {
-                    props.output_text(fmt::format("{}", data.statistics));
-                    props.st_end_child();
-                };
                 io_props_for_node(props, node, data);
                 props.st_end_child();
             }
@@ -343,11 +344,6 @@ void Graph::properties(Properties& props) {
 }
 
 void Graph::io_props_for_node(Properties& config, NodeHandle& node, NodeData& data) {
-    if (data.descriptor_set_layout &&
-        config.st_begin_child("desc_set_layout", "Descriptor Set Layout")) {
-        config.output_text(fmt::format("{}", data.descriptor_set_layout));
-        config.st_end_child();
-    }
     if (!needs_reconnect && !data.output_connections.empty() &&
         config.st_begin_child("outputs", "Outputs")) {
         for (auto& [output, per_output_info] : data.output_connections) {
@@ -370,14 +366,10 @@ void Graph::io_props_for_node(Properties& config, NodeHandle& node, NodeData& da
                         "{:02}", std::get<1>(per_output_info.precomputed_resources[set_idx]));
                 }
 
-                config.output_text(fmt::format(
-                    "Descriptor set binding: {}\n# Resources: {:02}\nResource index: "
-                    "{}\nSending to: [{}]",
-                    per_output_info.descriptor_set_binding == DescriptorSet::NO_DESCRIPTOR_BINDING
-                        ? "none"
-                        : std::to_string(per_output_info.descriptor_set_binding),
-                    per_output_info.resources.size(), current_resource_index,
-                    fmt::join(receivers, ", ")));
+                config.output_text(
+                    fmt::format("# Resources: {:02}\nResource index: {}\nSending to: [{}]",
+                                per_output_info.resources.size(), current_resource_index,
+                                fmt::join(receivers, ", ")));
 
                 config.st_separate("Connector Properties");
                 output->properties(config);
@@ -405,12 +397,6 @@ void Graph::io_props_for_node(Properties& config, NodeHandle& node, NodeData& da
                 config.st_separate("Connection");
                 if (data.input_connections.contains(input)) {
                     auto& per_input_info = data.input_connections.at(input);
-                    config.output_text(
-                        fmt::format("Descriptor set binding: {}",
-                                    per_input_info.descriptor_set_binding ==
-                                            DescriptorSet::NO_DESCRIPTOR_BINDING
-                                        ? "None"
-                                        : std::to_string(per_input_info.descriptor_set_binding)));
                     if (per_input_info.output) {
                         const std::string& src_output_name =
                             node_data.at(per_input_info.node)

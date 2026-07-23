@@ -8,8 +8,6 @@
 
 namespace merian {
 
-AnyIn::AnyIn(const uint32_t delay) : InputConnector(delay) {}
-
 const std::any& AnyIn::resource(const GraphResourceHandle& resource) {
     return debugable_ptr_cast<AnyResource>(resource)->any;
 }
@@ -37,8 +35,8 @@ AnyIn::on_post_process([[maybe_unused]] GraphRun& run,
     return {};
 }
 
-AnyInHandle AnyIn::create(const uint32_t delay) {
-    return std::make_shared<AnyIn>(delay);
+AnyInHandle AnyIn::create() {
+    return std::make_shared<AnyIn>();
 }
 
 } // namespace merian

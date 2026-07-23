@@ -1,7 +1,7 @@
 {
     "cli": {
         "--": {
-            "pointer": "/nodes/0/properties/path",
+            "pointer": "/nodes/image/properties/path",
             "required": true
         }
     },

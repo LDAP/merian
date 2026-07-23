@@ -31,8 +31,7 @@ class GLTFSceneNode : public Node {
 
     std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
-    void
-    process(GraphRun& run, const DescriptorSetHandle& descriptor_set, const NodeIO& io) override;
+    void process(GraphRun& run, const NodeIO& io) override;
 
     NodeStatusFlags properties(Properties& config) override;
 
@@ -51,7 +50,7 @@ class GLTFSceneNode : public Node {
 
     PtrOutHandle<Scene> con_scene = PtrOut<Scene>::create(true);
 
-    PtrInHandle<InputController> con_controller = PtrIn<InputController>::create(0, true);
+    PtrInHandle<InputController> con_controller = PtrIn<InputController>::create();
     std::shared_ptr<CameraController> cam_controller = std::make_shared<CameraController>();
     std::weak_ptr<InputController> registered_controller;
 };

@@ -1,18 +1,21 @@
 #include "merian-graph/nodes/taa/taa.hpp"
 
 #include "merian-graph/connectors/image/vk_image_out_managed.hpp"
+#include "merian-graph/nodes/taa/config.h"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
-
-#include "config.h"
-#include "taa.slang.spv.h"
-
-#include "merian/shader/spriv_reflect.hpp"
 
 namespace merian {
 
+namespace {
+constexpr const char* SHADER_MODULE = "merian-graph/nodes/taa/taa.slang";
+}
+
 DeviceSupportInfo TAA::query_device_support(const DeviceSupportQueryInfo& query_info) {
-    SpirvReflect reflect(merian_taa_slang_spv(), merian_taa_slang_spv_size());
-    return reflect.query_device_support(query_info);
+    const auto composition = SlangComposition::create();
+    composition->add_module_from_path(SHADER_MODULE, true);
+    return SlangProgram::create(query_info.compile_context, composition)
+        .get()
+        ->query_device_support(query_info);
 }
 
 TAA::TAA() : AbstractCompute(sizeof(PushConstant)) {
@@ -25,17 +28,20 @@ void TAA::initialize(const ContextHandle& context, const ResourceAllocatorHandle
 
     auto spec_builder = SpecializationInfoBuilder();
     spec_builder.add_entry(local_size_x, local_size_y, inverse_motion);
-    spec_info = spec_builder.build();
+    spec_info.set(spec_builder.build());
+}
 
-    shader = EntryPoint::create(context, merian_taa_slang_spv(), merian_taa_slang_spv_size(),
-                                "main", vk::ShaderStageFlagBits::eCompute, spec_info);
+SlangCompositionHandle TAA::create_composition() {
+    const auto composition = SlangComposition::create();
+    composition->add_module_from_path(SHADER_MODULE, true);
+    return composition;
 }
 
 std::vector<InputConnectorDescriptor> TAA::describe_inputs() {
     return {
-        {"src", con_src},
-        {"prev_src", VkSampledImageIn::compute_read(1)},
-        {"mv", con_mv},
+        {"src", con_src, ConnectorAccess::compute_read},
+        {"prev_src", VkSampledImageIn::create(), ConnectorAccess::compute_read, 1},
+        {"mv", con_mv, ConnectorAccess::compute_read, 0, true},
     };
 }
 
@@ -47,7 +53,8 @@ TAA::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
 
     pc.enable_mv = static_cast<VkBool32>(io_layout.is_connected(con_mv));
     return {
-        {"out", ManagedVkImageOut::compute_write(create_info.format, width, height)},
+        {"out", ManagedVkImageOut::create(create_info.format, width, height),
+         ConnectorAccess::compute_write},
     };
 }
 
@@ -60,10 +67,6 @@ std::tuple<uint32_t, uint32_t, uint32_t>
 TAA::get_group_count([[maybe_unused]] const NodeIO& io) const noexcept {
     return {(width + local_size_x - 1) / local_size_x, (height + local_size_y - 1) / local_size_y,
             1};
-}
-
-VulkanEntryPointHandle TAA::get_entry_point() {
-    return shader;
 }
 
 AbstractCompute::NodeStatusFlags TAA::properties(Properties& config) {

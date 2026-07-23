@@ -12,7 +12,7 @@ namespace {
 constexpr const char* SHADER_MODULE = "merian-graph/nodes/render_restir_di/render_restir_di.slang";
 constexpr std::array<const char*, RenderRestirDI::PassCount> PASS_ENTRY_POINTS = {
     "generate", "temporal", "spatial", "shade"};
-}
+} // namespace
 
 RenderRestirDI::RenderRestirDI() = default;
 
@@ -44,6 +44,7 @@ void RenderRestirDI::update_render_constants() {
         "render_restir_di_constants",
         fmt::format("namespace merian {{\n"
                     "export static const bool merian_render_emission_on_primary = {};\n"
+                    "export static const bool merian_render_demodulate_albedo = {};\n"
                     "export static const int merian_restir_spp = {};\n"
                     "export static const int merian_restir_spatial_iterations = {};\n"
                     "export static const int merian_restir_temporal_bias_correction = {};\n"
@@ -52,28 +53,29 @@ void RenderRestirDI::update_render_constants() {
                     "export static const bool merian_restir_visibility_shade = {};\n"
                     "export static const float merian_restir_boiling_filter_strength = {:f};\n"
                     "}}",
-                    emission_on_primary ? "true" : "false", spp, spatial_iterations,
+                    emission_on_primary ? "true" : "false",
+                    demodulate_albedo ? "true" : "false", spp, spatial_iterations,
                     temporal_bias_correction, spatial_bias_correction, apply_mv ? "true" : "false",
                     visibility_shade ? "true" : "false", boiling_filter_strength));
 }
 
 std::vector<InputConnectorDescriptor> RenderRestirDI::describe_inputs() {
     return {{"scene", con_scene},
-            {"gbuffer", con_gbuffer},
-            {"prev_gbuffer", con_prev_gbuffer},
-            {"prev_reservoirs", con_prev_reservoirs}};
+            {"gbuffer", con_gbuffer, ConnectorAccess::ray_tracing_read},
+            {"prev_gbuffer", con_prev_gbuffer, ConnectorAccess::ray_tracing_read, 1},
+            {"prev_reservoirs", con_prev_reservoirs, ConnectorAccess::ray_tracing_read, 1}};
 }
 
 std::vector<OutputConnectorDescriptor>
 RenderRestirDI::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
-    con_irradiance = ManagedVkImageOut::compute_write(vk::Format::eR32G32B32A32Sfloat, extent);
-    con_reservoirs = ManagedVkBufferOut::compute_write(reservoir_buffer_create_info(), true);
-    return {{"irradiance", con_irradiance}, {"reservoirs", con_reservoirs}};
+    con_irradiance = ManagedVkImageOut::create(vk::Format::eR32G32B32A32Sfloat, extent);
+    con_reservoirs = ManagedVkBufferOut::create(reservoir_buffer_create_info(), true);
+    return {{"irradiance", con_irradiance, ConnectorAccess::ray_tracing_write},
+            {"reservoirs", con_reservoirs, ConnectorAccess::ray_tracing_read_write}};
 }
 
-RenderRestirDI::NodeStatusFlags RenderRestirDI::on_connected(
-    const NodeIOLayout& io_layout,
-    [[maybe_unused]] const DescriptorSetLayoutHandle& descriptor_set_layout) {
+RenderRestirDI::NodeStatusFlags RenderRestirDI::on_connected(const NodeConnectedInfo& info) {
+    const NodeIOLayout& io_layout = info.io_layout;
     composition = nullptr;
     obj_allocator = nullptr;
 
@@ -95,14 +97,12 @@ RenderRestirDI::NodeStatusFlags RenderRestirDI::on_connected(
     return {};
 }
 
-void RenderRestirDI::process(GraphRun& run,
-                             [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
-                             const NodeIO& io) {
+void RenderRestirDI::process(GraphRun& run, const NodeIO& io) {
     const auto& cmd = run.get_cmd();
     const auto& scene = io[con_scene];
-    const auto& gbuf = io[con_gbuffer];
-    const auto& prev_gbuf = io[con_prev_gbuffer];
-    if (!scene || !gbuf || !scene->is_ready())
+    const auto gbuf = io[con_gbuffer];
+    const auto prev_gbuf = io[con_prev_gbuffer];
+    if (!scene || !scene->is_ready())
         return;
 
     if (!composition) {
@@ -164,8 +164,8 @@ void RenderRestirDI::process(GraphRun& run,
     const auto bind_params = [&](const Pass p) {
         const auto obj = params[p].get();
         auto cursor = obj->get_cursor();
-        cursor["gbuffer"] = gbuf->get_shader_object();
-        cursor["prev_gbuffer"] = (prev_gbuf ? prev_gbuf : gbuf)->get_shader_object();
+        cursor["gbuffer"] = gbuf.r();
+        cursor["prev_gbuffer"] = prev_gbuf.r();
         cursor["irradiance"] = io[con_irradiance].get_texture();
         return obj;
     };
@@ -219,6 +219,10 @@ RenderRestirDI::NodeStatusFlags RenderRestirDI::properties(Properties& config) {
         config.config_bool("emission on primary", emission_on_primary,
                            "Fold the primary hit's own emission (and the env map on a miss) into "
                            "the output. Otherwise it is the GBuffer emission texture's job.");
+    constants_changed |= config.config_bool(
+        "demodulate albedo", demodulate_albedo,
+        "Divide the primary-hit albedo out of the output so a denoiser can re-modulate after "
+        "filtering. Use with 'emission on primary' disabled (emission is albedo-independent).");
 
     config.st_separate("Temporal reuse");
     config.config_bool("enable temporal reuse", temporal_enable);
@@ -270,4 +274,4 @@ RenderRestirDI::NodeStatusFlags RenderRestirDI::properties(Properties& config) {
     return {};
 }
 
-}
+} // namespace merian

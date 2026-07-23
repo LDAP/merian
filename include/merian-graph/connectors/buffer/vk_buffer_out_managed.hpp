@@ -8,61 +8,40 @@ namespace merian {
 class ManagedVkBufferOut;
 using ManagedVkBufferOutHandle = std::shared_ptr<ManagedVkBufferOut>;
 
-// Output a Vulkan image that is allocated and managed by the graph.
-// Note that it only supplies a descriptor if stage_flags contains at least one bit.
+// Output a buffer that is allocated and managed by the graph. Usage flags are the create info's
+// usage plus the union of the declared ConnectorAccess of this port and all connected inputs.
 class ManagedVkBufferOut : public VkBufferOut,
                            public AccessibleConnector<const BufferArrayResource&> {
   public:
-    ManagedVkBufferOut(const vk::AccessFlags2& access_flags,
-                       const vk::PipelineStageFlags2& pipeline_stages,
-                       const vk::ShaderStageFlags& stage_flags,
-                       const vk::BufferCreateInfo& create_info,
+    ManagedVkBufferOut(const vk::BufferCreateInfo& create_info,
                        const bool persistent = false,
                        const uint32_t array_size = 1);
 
-    virtual std::optional<vk::DescriptorSetLayoutBinding> get_descriptor_info() const override;
-
-    virtual void get_descriptor_update(const uint32_t binding,
-                                       const GraphResourceHandle& resource,
-                                       const DescriptorSetHandle& update,
-                                       const ResourceAllocatorHandle& allocator) override;
-
-    virtual ConnectorStatusFlags
-    on_pre_process(GraphRun& run,
-                   const CommandBufferHandle& cmd,
-                   const GraphResourceHandle& resource,
-                   const NodeHandle& node,
-                   std::vector<vk::ImageMemoryBarrier2>& image_barriers,
-                   std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override;
-
-    virtual ConnectorStatusFlags
-    on_post_process(GraphRun& run,
-                    const CommandBufferHandle& cmd,
-                    const GraphResourceHandle& resource,
-                    const NodeHandle& node,
-                    std::vector<vk::ImageMemoryBarrier2>& image_barriers,
-                    std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override;
-
-    virtual GraphResourceHandle
+    GraphResourceHandle
     create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
+                    const ConnectorAccess& combined_access,
                     const ResourceAllocatorHandle& allocator,
                     const ResourceAllocatorHandle& aliasing_allocator,
                     const uint32_t resource_index,
                     const uint32_t ring_size) override;
 
-    virtual BufferArrayResource& resource(const GraphResourceHandle& resource) override;
+    BufferArrayResource& resource(const GraphResourceHandle& resource) override;
+
+    bool shader_bindable() const override {
+        return true;
+    }
+
+    void bind(ShaderCursor& cursor,
+              const GraphResourceHandle& resource,
+              const ResourceAllocatorHandle& allocator,
+              const ConnectorAccess& access) override;
 
   public:
-    static ManagedVkBufferOutHandle compute_write(const vk::BufferCreateInfo& create_info,
-                                                  const bool persistent = false);
+    static ManagedVkBufferOutHandle create(const vk::BufferCreateInfo& create_info,
+                                           const bool persistent = false,
+                                           const uint32_t array_size = 1);
 
-    static ManagedVkBufferOutHandle transfer_write(const vk::BufferCreateInfo& create_info,
-                                                   const bool persistent = false);
-
-  private:
-    const vk::AccessFlags2 access_flags;
-    const vk::PipelineStageFlags2 pipeline_stages;
-    const vk::ShaderStageFlags stage_flags;
+  public:
     const vk::BufferCreateInfo create_info;
     const bool persistent;
 };

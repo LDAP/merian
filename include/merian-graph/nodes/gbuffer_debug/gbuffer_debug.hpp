@@ -2,7 +2,9 @@
 
 #include "merian-graph/connectors/image/vk_image_out_managed.hpp"
 #include "merian-graph/connectors/ptr_in.hpp"
+#include "merian-graph/connectors/shader_object_in.hpp"
 #include "merian-graph/graph/node.hpp"
+#include "merian-graph/objects/gbuffer_object.hpp"
 #include "merian-shaders/gbuffer.hpp"
 #include "merian-shaders/scene/scene.hpp"
 
@@ -31,11 +33,9 @@ class GBufferDebugNode : public Node {
 
     std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
-    NodeStatusFlags on_connected(const NodeIOLayout& io_layout,
-                                 const DescriptorSetLayoutHandle& descriptor_set_layout) override;
+    NodeStatusFlags on_connected(const NodeConnectedInfo& info) override;
 
-    void
-    process(GraphRun& run, const DescriptorSetHandle& descriptor_set, const NodeIO& io) override;
+    void process(GraphRun& run, const NodeIO& io) override;
 
     NodeStatusFlags properties(Properties& config) override;
 
@@ -46,7 +46,7 @@ class GBufferDebugNode : public Node {
 
     // Connectors
     PtrInHandle<Scene> con_scene = PtrIn<Scene>::create();
-    PtrInHandle<GBuffer> con_gbuffer = PtrIn<GBuffer>::create();
+    ShaderObjectInHandle<GBufferObject> con_gbuffer = ShaderObjectIn<GBufferObject>::create();
     ManagedVkImageOutHandle con_output;
 
     vk::Extent3D extent = vk::Extent3D{1920, 1080, 1};

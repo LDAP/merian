@@ -19,8 +19,7 @@ class WindowNode : public Node {
     void initialize(const ContextHandle& context,
                     const ResourceAllocatorHandle& allocator) override;
 
-    NodeStatusFlags on_connected(const NodeIOLayout& io_layout,
-                                 const DescriptorSetLayoutHandle& descriptor_set_layout) override;
+    NodeStatusFlags on_connected(const NodeConnectedInfo& info) override;
 
     std::vector<InputConnectorDescriptor> describe_inputs() override;
 
@@ -28,8 +27,7 @@ class WindowNode : public Node {
 
     NodeStatusFlags pre_process(const GraphRun& run, const NodeIO& io) override;
 
-    void
-    process(GraphRun& run, const DescriptorSetHandle& descriptor_set, const NodeIO& io) override;
+    void process(GraphRun& run, const NodeIO& io) override;
 
     NodeStatusFlags properties(Properties& config) override;
 
@@ -64,7 +62,7 @@ class WindowNode : public Node {
 
     BlitMode mode = FIT;
 
-    VkImageInHandle image_in = VkImageIn::transfer_src(0, true);
+    VkImageInHandle image_in = VkImageIn::create();
 
     PtrOutHandle<SwapchainAcquireResult> con_acquire = PtrOut<SwapchainAcquireResult>::create();
     PtrOutHandle<InputController> con_controller = PtrOut<InputController>::create();

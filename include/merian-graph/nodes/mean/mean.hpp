@@ -3,9 +3,11 @@
 #include "merian-graph/connectors/buffer/vk_buffer_out_managed.hpp"
 #include "merian-graph/connectors/image/vk_image_in_sampled.hpp"
 #include "merian-graph/graph/node.hpp"
+#include "merian-graph/nodes/compute_node/compute_kernel.hpp"
 
-#include "merian/shader/entry_point.hpp"
-#include "merian/vk/pipeline/pipeline.hpp"
+#include "merian/vk/pipeline/specialization_info.hpp"
+
+#include <optional>
 
 namespace merian {
 
@@ -37,25 +39,25 @@ class MeanToBuffer : public Node {
 
     std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
-    NodeStatusFlags on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
-                                 const DescriptorSetLayoutHandle& descriptor_set_layout) override;
+    NodeStatusFlags on_connected(const NodeConnectedInfo& info) override;
 
-    void
-    process(GraphRun& run, const DescriptorSetHandle& descriptor_set, const NodeIO& io) override;
+    void process(GraphRun& run, const NodeIO& io) override;
 
   private:
     ContextHandle context;
+    ResourceAllocatorHandle allocator;
+    ShaderCompileContextHandle compile_context;
 
-    VkSampledImageInHandle con_src = VkSampledImageIn::compute_read();
+    VkSampledImageInHandle con_src = VkSampledImageIn::create();
     ManagedVkBufferOutHandle con_mean;
 
     PushConstant pc;
 
-    EntryPointHandle image_to_buffer_shader;
-    EntryPointHandle reduce_buffer_shader;
+    Versioned<SpecializationInfo> image_to_buffer_spec;
+    Versioned<SpecializationInfo> reduce_buffer_spec;
 
-    PipelineHandle image_to_buffer;
-    PipelineHandle reduce_buffer;
+    std::optional<ComputeKernel> image_to_buffer_kernel;
+    std::optional<ComputeKernel> reduce_buffer_kernel;
 };
 
 } // namespace merian

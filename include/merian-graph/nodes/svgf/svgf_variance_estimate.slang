@@ -1,7 +1,12 @@
 
-#include "config.h"
-#include "svgf_graph_layout.slangh"
+#include "merian-graph/nodes/svgf/config.h"
 
+[vk::constant_id(0)]
+const int workgroup_size_x = 1;
+[vk::constant_id(1)]
+const int workgroup_size_y = 1;
+
+import merian_shaders.gbuffer;
 import merian_shaders.utils.textures;
 import merian_shaders.utils.shared_memory;
 import merian_shaders.colors.colorspaces;
@@ -16,13 +21,13 @@ using merian;
 [vk::constant_id(2)]
 const int SVGF_ITERATIONS = 0;
 
-[vk::binding(0, 1)]
-Sampler2D<float4> img_filter_unused; // unused needed to match the filter layout
-[vk::binding(1, 1)]
+// graph-bound
+ParameterBlock<GBuffer> in_gbuffer;
+Sampler2D<float4> in_src;
+Sampler2D<float4> in_history;
+
+// internal ping-pong (bound by the node)
 RWTexture2D<float4> img_filter_in;
-[vk::binding(2, 1)]
-Sampler2D<uint4> img_gbuf_unused; // unused needed to match the filter layout
-[vk::binding(3, 1)]
 RWTexture2D<uint4> img_gbuf_in;
 
 struct PushConstant {
@@ -51,7 +56,7 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
     if (SVGF_ITERATIONS == 0) {
         if (is_on_texture(dispatch_thread_id, img_filter_in))
             img_filter_in.Store(dispatch_thread_id,
-                                float4(img_irr.Load(uint3(dispatch_thread_id, 0)).rgb, 0));
+                                float4(in_src.Load(uint3(dispatch_thread_id, 0)).rgb, 0));
         return;
     }
 
@@ -69,14 +74,14 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
 
     // fill in padding and halo with valid information
     const int2 mirror_repeat_ipos =
-        texturewrap_mirror_repeat(dispatch_thread_id, texture_dimensions(img_irr, 0));
+        texturewrap_mirror_repeat(dispatch_thread_id, texture_dimensions(in_src, 0));
 
     {
         {
             // center
             {
-                const SurfaceData surf = gbuffer.get_surface(uint2(mirror_repeat_ipos));
-                irr_moments = img_irr.Load(uint3(mirror_repeat_ipos, 0));
+                const SurfaceData surf = in_gbuffer.get_surface(uint2(mirror_repeat_ipos));
+                irr_moments = in_src.Load(uint3(mirror_repeat_ipos, 0));
                 irr_moments.rgb = rgb_to_yuv(irr_moments.rgb);
 
                 center_irr_moments = irr_moments;
@@ -90,12 +95,12 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
             if (load_halo_index(SVGF_VE_HALO_RADIUS, WorkgroupSize().xy, group_id, group_index,
                                 shared_index, global_index)) {
                 const int2 halo_mirror_repeat_ipos =
-                    texturewrap_mirror_repeat(global_index, texture_dimensions(img_irr, 0));
+                    texturewrap_mirror_repeat(global_index, texture_dimensions(in_src, 0));
                 shared_irr_moments[shared_index.y][shared_index.x] =
-                    img_irr.Load(uint3(halo_mirror_repeat_ipos, 0));
+                    in_src.Load(uint3(halo_mirror_repeat_ipos, 0));
                 shared_normal_z[shared_index.y][shared_index.x] =
-                    float4(gbuffer.get_normal(uint2(halo_mirror_repeat_ipos)),
-                           gbuffer.get_linear_z(uint2(halo_mirror_repeat_ipos)));
+                    float4(in_gbuffer.get_normal(uint2(halo_mirror_repeat_ipos)),
+                           in_gbuffer.get_linear_z(uint2(halo_mirror_repeat_ipos)));
             }
 
             GroupMemoryBarrierWithGroupSync();
@@ -146,7 +151,7 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
 
     irr_moments /= sum_w;
 
-    const float history = img_history.Load(uint3(mirror_repeat_ipos, 0)).r;
+    const float history = in_history.Load(uint3(mirror_repeat_ipos, 0)).r;
     const float alpha = saturate(params.spatial_bias / pow(history, params.spatial_falloff));
 
     irr_moments = lerp(center_irr_moments, irr_moments, alpha);
@@ -154,4 +159,3 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
     const float variance = max(0.0, irr_moments.a - irr_moments.r * irr_moments.r);
     img_filter_in.Store(dispatch_thread_id, float4(irr_moments.rgb, variance));
 }
-

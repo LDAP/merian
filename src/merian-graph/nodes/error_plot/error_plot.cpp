@@ -1,15 +1,9 @@
 #include "merian-graph/nodes/error_plot/error_plot.hpp"
 
-#include "merian/shader/spriv_reflect.hpp"
-#include "merian/vk/pipeline/pipeline_compute.hpp"
-#include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 #include "merian/vk/utils/blits.hpp"
 
 #include "merian-graph/graph/errors.hpp"
-
-#include "error_reduce_buffer.comp.spv.h"
-#include "error_to_buffer.comp.spv.h"
 
 #include <imgui.h>
 
@@ -18,29 +12,46 @@
 
 namespace merian {
 
+namespace {
+constexpr const char* ERROR_TO_BUFFER_MODULE =
+    "merian-graph/nodes/error_plot/error_to_buffer.slang";
+constexpr const char* REDUCE_BUFFER_MODULE =
+    "merian-graph/nodes/error_plot/error_reduce_buffer.slang";
+} // namespace
+
 ErrorPlot::ErrorPlot() = default;
 
 ErrorPlot::~ErrorPlot() = default;
 
 DeviceSupportInfo ErrorPlot::query_device_support(const DeviceSupportQueryInfo& query_info) {
-    SpirvReflect reflect_error(merian_error_to_buffer_comp_spv(),
-                               merian_error_to_buffer_comp_spv_size());
-    SpirvReflect reflect_reduce(merian_error_reduce_buffer_comp_spv(),
-                                merian_error_reduce_buffer_comp_spv_size());
-    return reflect_error.query_device_support(query_info) &
-           reflect_reduce.query_device_support(query_info);
+    DeviceSupportInfo support{true};
+    for (const char* module : {ERROR_TO_BUFFER_MODULE, REDUCE_BUFFER_MODULE}) {
+        const auto composition = SlangComposition::create();
+        composition->add_module_from_path(module, true);
+        support = support & SlangProgram::create(query_info.compile_context, composition)
+                                .get()
+                                ->query_device_support(query_info);
+    }
+    return support;
 }
 
 void ErrorPlot::initialize(const ContextHandle& context, const ResourceAllocatorHandle& allocator) {
     this->context = context;
     this->allocator = allocator;
+    this->compile_context = context->get_shader_compile_context();
 
-    error_to_buffer_shader = EntryPoint::create(context, merian_error_to_buffer_comp_spv(),
-                                                merian_error_to_buffer_comp_spv_size(), "main",
-                                                vk::ShaderStageFlagBits::eCompute);
-    reduce_buffer_shader = EntryPoint::create(context, merian_error_reduce_buffer_comp_spv(),
-                                              merian_error_reduce_buffer_comp_spv_size(), "main",
-                                              vk::ShaderStageFlagBits::eCompute);
+    auto error_spec = SpecializationInfoBuilder();
+    error_spec.add_entry(local_size_x, local_size_y);
+    error_to_buffer_spec.set(error_spec.build());
+
+    auto reduce_spec = SpecializationInfoBuilder();
+    reduce_spec.add_entry(workgroup_size, 1u);
+    reduce_buffer_spec.set(reduce_spec.build());
+
+    error_to_buffer_kernel.emplace(context, allocator, compile_context, ERROR_TO_BUFFER_MODULE,
+                                   error_to_buffer_spec);
+    reduce_buffer_kernel.emplace(context, allocator, compile_context, REDUCE_BUFFER_MODULE,
+                                 reduce_buffer_spec);
 
     ::ImGuiContext* const prev_imgui_ctx = ImGui::GetCurrentContext();
     imgui_ctx = std::make_shared<ImGuiContext>();
@@ -50,7 +61,9 @@ void ErrorPlot::initialize(const ContextHandle& context, const ResourceAllocator
 }
 
 std::vector<InputConnectorDescriptor> ErrorPlot::describe_inputs() {
-    return {{"reference", con_reference}, {"input", con_input}};
+    return {
+        {"reference", con_reference, ConnectorAccess::compute_read | ConnectorAccess::transfer_src},
+        {"input", con_input, ConnectorAccess::compute_read | ConnectorAccess::transfer_src}};
 }
 
 std::vector<OutputConnectorDescriptor> ErrorPlot::describe_outputs(const NodeIOLayout& io_layout) {
@@ -65,12 +78,9 @@ std::vector<OutputConnectorDescriptor> ErrorPlot::describe_outputs(const NodeIOL
     const auto group_count_y = (extent.height + local_size_y - 1) / local_size_y;
     const std::size_t buffer_size = group_count_x * group_count_y;
 
-    con_error = std::make_shared<ManagedVkBufferOut>(
-        vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
-        vk::PipelineStageFlagBits2::eComputeShader, vk::ShaderStageFlagBits::eCompute,
-        vk::BufferCreateInfo({}, buffer_size * sizeof(float4),
-                             vk::BufferUsageFlagBits::eStorageBuffer |
-                                 vk::BufferUsageFlagBits::eTransferSrc));
+    con_error = ManagedVkBufferOut::create(vk::BufferCreateInfo(
+        {}, buffer_size * sizeof(float4),
+        vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferSrc));
 
     // blit target for the split view and color attachment for the overlay
     const vk::ImageCreateInfo out_info{
@@ -88,41 +98,27 @@ std::vector<OutputConnectorDescriptor> ErrorPlot::describe_outputs(const NodeIOL
         {},
         vk::ImageLayout::eUndefined,
     };
-    con_out = ManagedVkImageOut::create(
-        vk::AccessFlagBits2::eTransferWrite, vk::PipelineStageFlagBits2::eAllTransfer,
-        vk::ImageLayout::eTransferDstOptimal, vk::ShaderStageFlags{}, out_info);
+    con_out = ManagedVkImageOut::create(out_info);
 
-    return {{"out", con_out}, {"error", con_error}};
+    return {
+        {"out", con_out, ConnectorAccess::transfer_dst},
+        {"error", con_error, ConnectorAccess::compute_read_write | ConnectorAccess::transfer_src}};
 }
 
-ErrorPlot::NodeStatusFlags
-ErrorPlot::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
-                        const DescriptorSetLayoutHandle& descriptor_set_layout) {
-    if (!error_to_buffer) {
-        const auto pipe_layout = PipelineLayoutBuilder(context)
-                                     .add_descriptor_set_layout(descriptor_set_layout)
-                                     .add_push_constant<PushConstant>()
-                                     .build_pipeline_layout();
-        const uint32_t subgroup_size =
-            context->get_physical_device()->get_properties().get_subgroup_properties().subgroupSize;
-
-        auto error_spec = SpecializationInfoBuilder();
-        error_spec.add_entry(local_size_x, local_size_y, subgroup_size);
-        error_to_buffer =
-            ComputePipeline::create(pipe_layout, error_to_buffer_shader, error_spec.build());
-
-        auto reduce_spec = SpecializationInfoBuilder();
-        reduce_spec.add_entry(local_size_x * local_size_y, 1, subgroup_size);
-        reduce_buffer =
-            ComputePipeline::create(pipe_layout, reduce_buffer_shader, reduce_spec.build());
-    }
+ErrorPlot::NodeStatusFlags ErrorPlot::on_connected(const NodeConnectedInfo& info) {
+    const NodeIOLayout& io_layout = info.io_layout;
+    io_layout.register_event_listener(
+        "/graph/reload_shaders", [this](const GraphEvent::Info&, const GraphEvent::Data& force) {
+            for (auto* kernel : {&error_to_buffer_kernel, &reduce_buffer_kernel}) {
+                (*kernel)->reload(std::any_cast<bool>(force), compile_context);
+            }
+            return true;
+        });
 
     return {};
 }
 
-void ErrorPlot::process(GraphRun& run,
-                        const DescriptorSetHandle& descriptor_set,
-                        const NodeIO& io) {
+void ErrorPlot::process(GraphRun& run, const NodeIO& io) {
     const CommandBufferHandle& cmd = run.get_cmd();
 
     // 1. pull the latest async readback into the plot history (graph thread only)
@@ -153,9 +149,8 @@ void ErrorPlot::process(GraphRun& run,
     // 2. per-pixel error into the reduction buffer
     {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "error to buffer");
-        cmd->bind(error_to_buffer);
-        cmd->bind_descriptor_set(error_to_buffer, descriptor_set);
-        cmd->push_constant(error_to_buffer, pc);
+        const auto pipe = error_to_buffer_kernel->bind(run, io);
+        cmd->push_constant(pipe, pc);
         cmd->dispatch(group_count_x, group_count_y, 1);
     }
 
@@ -163,6 +158,7 @@ void ErrorPlot::process(GraphRun& run,
     pc.size = group_count_x * group_count_y;
     pc.offset = 1;
     pc.count = group_count_x * group_count_y;
+    PipelineHandle reduce_pipe;
     while (pc.count > 1) {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd,
                                  fmt::format("reduce {} elements", pc.count));
@@ -171,9 +167,10 @@ void ErrorPlot::process(GraphRun& run,
                      io[con_error]->buffer_barrier(
                          vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite,
                          vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite));
-        cmd->bind(reduce_buffer);
-        cmd->bind_descriptor_set(reduce_buffer, descriptor_set);
-        cmd->push_constant(reduce_buffer, pc);
+        if (!reduce_pipe) {
+            reduce_pipe = reduce_buffer_kernel->bind(run, io);
+        }
+        cmd->push_constant(reduce_pipe, pc);
         cmd->dispatch((pc.count + workgroup_size - 1) / workgroup_size, 1, 1);
 
         pc.count = (pc.count + workgroup_size - 1) / workgroup_size;
@@ -209,19 +206,19 @@ void ErrorPlot::process(GraphRun& run,
     const ImageHandle out_img = io[con_out];
     {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "split view");
-        cmd->barrier(reference_img->barrier2(vk::ImageLayout::eTransferSrcOptimal));
-        cmd->barrier(input_img->barrier2(vk::ImageLayout::eTransferSrcOptimal));
+        cmd->barrier(reference_img->barrier2(vk::ImageLayout::eGeneral));
+        cmd->barrier(input_img->barrier2(vk::ImageLayout::eGeneral));
 
-        cmd_blit_fit(cmd, input_img, vk::ImageLayout::eTransferSrcOptimal, input_img->get_extent(),
-                     out_img, vk::ImageLayout::eTransferDstOptimal, out_img->get_extent());
-        cmd->barrier(out_img->barrier2(vk::ImageLayout::eTransferDstOptimal));
+        cmd_blit_fit(cmd, input_img, vk::ImageLayout::eGeneral, input_img->get_extent(), out_img,
+                     vk::ImageLayout::eGeneral, out_img->get_extent());
+        cmd->barrier(out_img->barrier2(vk::ImageLayout::eGeneral));
 
         vk::Extent3D reference_extent = reference_img->get_extent();
         reference_extent.width /= 2;
         vk::Extent3D out_half = out_img->get_extent();
         out_half.width /= 2;
-        cmd_blit_fit(cmd, reference_img, vk::ImageLayout::eTransferSrcOptimal, reference_extent,
-                     out_img, vk::ImageLayout::eTransferDstOptimal, out_half, std::nullopt);
+        cmd_blit_fit(cmd, reference_img, vk::ImageLayout::eGeneral, reference_extent, out_img,
+                     vk::ImageLayout::eGeneral, out_half, std::nullopt);
     }
 
     // 6. overlay the plot, labels and values onto the split view

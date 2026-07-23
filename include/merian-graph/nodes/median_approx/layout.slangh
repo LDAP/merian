@@ -1,0 +1,18 @@
+[vk::constant_id(0)]
+const int workgroup_size_x = 1;
+[vk::constant_id(1)]
+const int workgroup_size_y = 1;
+[vk::constant_id(2)]
+const int COMPONENT = 0;
+
+Sampler2D<float4> in_src;
+RWStructuredBuffer<float, ScalarDataLayout> out_median;
+RWStructuredBuffer<uint, ScalarDataLayout> out_histogram;
+
+struct PushConstant {
+    float min;
+    float max;
+};
+
+[vk::push_constant]
+ConstantBuffer<PushConstant> params;

@@ -2,17 +2,20 @@
 #include "merian-graph/connectors/image/vk_image_out_managed.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
-#include "vkdt_filmcurv.slang.spv.h"
-
-#include "merian/shader/spriv_reflect.hpp"
-
 namespace merian {
+
+namespace {
+constexpr const char* SHADER_MODULE = "merian-graph/nodes/vkdt_filmcurv/vkdt_filmcurv.slang";
+}
 
 VKDTFilmcurv::VKDTFilmcurv() : TypedPCAbstractCompute() {}
 
 DeviceSupportInfo VKDTFilmcurv::query_device_support(const DeviceSupportQueryInfo& query_info) {
-    SpirvReflect reflect(merian_vkdt_filmcurv_slang_spv(), merian_vkdt_filmcurv_slang_spv_size());
-    return reflect.query_device_support(query_info);
+    const auto composition = SlangComposition::create();
+    composition->add_module_from_path(SHADER_MODULE, true);
+    return SlangProgram::create(query_info.compile_context, composition)
+        .get()
+        ->query_device_support(query_info);
 }
 
 void VKDTFilmcurv::initialize(const ContextHandle& context,
@@ -21,16 +24,18 @@ void VKDTFilmcurv::initialize(const ContextHandle& context,
 
     auto spec_builder = SpecializationInfoBuilder();
     spec_builder.add_entry(local_size_x, local_size_y);
-    spec_info = spec_builder.build();
+    spec_info.set(spec_builder.build());
+}
 
-    shader = EntryPoint::create(context, merian_vkdt_filmcurv_slang_spv(),
-                                merian_vkdt_filmcurv_slang_spv_size(), "main",
-                                vk::ShaderStageFlagBits::eCompute, spec_info);
+SlangCompositionHandle VKDTFilmcurv::create_composition() {
+    const auto composition = SlangComposition::create();
+    composition->add_module_from_path(SHADER_MODULE, true);
+    return composition;
 }
 
 std::vector<InputConnectorDescriptor> VKDTFilmcurv::describe_inputs() {
     return {
-        {"src", con_src},
+        {"src", con_src, ConnectorAccess::compute_read},
     };
 }
 
@@ -42,7 +47,7 @@ VKDTFilmcurv::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     const vk::Format format = output_format.value_or(create_info.format);
 
     return {
-        {"out", ManagedVkImageOut::compute_write(format, extent)},
+        {"out", ManagedVkImageOut::create(format, extent), ConnectorAccess::compute_write},
     };
 }
 
@@ -56,10 +61,6 @@ std::tuple<uint32_t, uint32_t, uint32_t>
 VKDTFilmcurv::get_group_count([[maybe_unused]] const NodeIO& io) const noexcept {
     return {(extent.width + local_size_x - 1) / local_size_x,
             (extent.height + local_size_y - 1) / local_size_y, 1};
-}
-
-VulkanEntryPointHandle VKDTFilmcurv::get_entry_point() {
-    return shader;
 }
 
 AbstractCompute::NodeStatusFlags VKDTFilmcurv::properties(Properties& config) {

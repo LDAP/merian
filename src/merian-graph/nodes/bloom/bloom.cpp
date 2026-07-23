@@ -1,42 +1,45 @@
 #include "merian-graph/nodes/bloom/bloom.hpp"
 
-#include "merian/vk/pipeline/pipeline_compute.hpp"
-#include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
-#include "bloom_composite.slang.spv.h"
-#include "bloom_separate.slang.spv.h"
-
-#include "merian/shader/spriv_reflect.hpp"
-
 namespace merian {
+
+namespace {
+constexpr const char* SEPARATE_MODULE = "merian-graph/nodes/bloom/bloom_separate.slang";
+constexpr const char* COMPOSITE_MODULE = "merian-graph/nodes/bloom/bloom_composite.slang";
+} // namespace
 
 Bloom::Bloom() {}
 
 Bloom::~Bloom() {}
 
 DeviceSupportInfo Bloom::query_device_support(const DeviceSupportQueryInfo& query_info) {
-    SpirvReflect reflect_sep(merian_bloom_separate_slang_spv(),
-                             merian_bloom_separate_slang_spv_size());
-    SpirvReflect reflect_comp(merian_bloom_composite_slang_spv(),
-                              merian_bloom_composite_slang_spv_size());
-    return reflect_sep.query_device_support(query_info) &
-           reflect_comp.query_device_support(query_info);
+    DeviceSupportInfo support{true};
+    for (const char* module : {SEPARATE_MODULE, COMPOSITE_MODULE}) {
+        const auto composition = SlangComposition::create();
+        composition->add_module_from_path(module, true);
+        support = support & SlangProgram::create(query_info.compile_context, composition)
+                                .get()
+                                ->query_device_support(query_info);
+    }
+    return support;
 }
 
-void Bloom::initialize(const ContextHandle& context, const ResourceAllocatorHandle& /*allocator*/) {
+void Bloom::initialize(const ContextHandle& context, const ResourceAllocatorHandle& allocator) {
     this->context = context;
+    this->allocator = allocator;
+    this->compile_context = context->get_shader_compile_context();
 
-    separate_module = EntryPoint::create(context, merian_bloom_separate_slang_spv(),
-                                         merian_bloom_separate_slang_spv_size(), "main",
-                                         vk::ShaderStageFlagBits::eCompute);
-    composite_module = EntryPoint::create(context, merian_bloom_composite_slang_spv(),
-                                          merian_bloom_composite_slang_spv_size(), "main",
-                                          vk::ShaderStageFlagBits::eCompute);
+    auto spec_builder = SpecializationInfoBuilder();
+    spec_builder.add_entry(local_size_x, local_size_y, mode);
+    spec_info.set(spec_builder.build());
+
+    separate_kernel.emplace(context, allocator, compile_context, SEPARATE_MODULE, spec_info);
+    composite_kernel.emplace(context, allocator, compile_context, COMPOSITE_MODULE, spec_info);
 }
 
 std::vector<InputConnectorDescriptor> Bloom::describe_inputs() {
-    return {{"src", con_src}};
+    return {{"src", con_src, ConnectorAccess::compute_read}};
 }
 
 std::vector<OutputConnectorDescriptor> Bloom::describe_outputs(const NodeIOLayout& io_layout) {
@@ -44,38 +47,32 @@ std::vector<OutputConnectorDescriptor> Bloom::describe_outputs(const NodeIOLayou
     const vk::Format format = create_info.format;
     const vk::Extent3D extent = create_info.extent;
 
-    con_out = ManagedVkImageOut::compute_write(format, extent);
-    con_interm = ManagedVkImageOut::compute_read_write(vk::Format::eR16G16B16A16Sfloat, extent);
+    con_out = ManagedVkImageOut::create(format, extent);
+    con_interm = ManagedVkImageOut::create(vk::Format::eR16G16B16A16Sfloat, extent);
 
     return {
-        {"out", con_out},
-        {"interm", con_interm},
+        {"out", con_out, ConnectorAccess::compute_write},
+        {"interm", con_interm, ConnectorAccess::compute_read_write},
     };
 }
 
-Bloom::NodeStatusFlags Bloom::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
-                                           const DescriptorSetLayoutHandle& descriptor_set_layout) {
-    auto pipe_layout = PipelineLayoutBuilder(context)
-                           .add_descriptor_set_layout(descriptor_set_layout)
-                           .add_push_constant<PushConstant>()
-                           .build_pipeline_layout();
-    auto spec_builder = SpecializationInfoBuilder();
-    spec_builder.add_entry(local_size_x, local_size_y, mode);
-    SpecializationInfoHandle spec = spec_builder.build();
-
-    separate = ComputePipeline::create(pipe_layout, separate_module, spec);
-    composite = ComputePipeline::create(pipe_layout, composite_module, spec);
+Bloom::NodeStatusFlags Bloom::on_connected(const NodeConnectedInfo& info) {
+    const NodeIOLayout& io_layout = info.io_layout;
+    io_layout.register_event_listener(
+        "/graph/reload_shaders", [this](const GraphEvent::Info&, const GraphEvent::Data& force) {
+            for (auto* kernel : {&separate_kernel, &composite_kernel}) {
+                (*kernel)->reload(std::any_cast<bool>(force), compile_context);
+            }
+            return true;
+        });
 
     return {};
 }
 
-void Bloom::process([[maybe_unused]] GraphRun& run,
-                    const DescriptorSetHandle& descriptor_set,
-                    const NodeIO& io) {
+void Bloom::process(GraphRun& run, const NodeIO& io) {
     const CommandBufferHandle& cmd = run.get_cmd();
-    cmd->bind(separate);
-    cmd->bind_descriptor_set(separate, descriptor_set);
-    cmd->push_constant(separate, pc);
+    const auto separate_pipe = separate_kernel->bind(run, io);
+    cmd->push_constant(separate_pipe, pc);
     cmd->dispatch(io[con_out]->get_extent(), local_size_x, local_size_y);
 
     const auto bar =
@@ -84,9 +81,8 @@ void Bloom::process([[maybe_unused]] GraphRun& run,
     cmd->barrier(vk::PipelineStageFlagBits::eComputeShader,
                  vk::PipelineStageFlagBits::eComputeShader, bar);
 
-    cmd->bind(composite);
-    cmd->bind_descriptor_set(composite, descriptor_set);
-    cmd->push_constant(composite, pc);
+    const auto composite_pipe = composite_kernel->bind(run, io);
+    cmd->push_constant(composite_pipe, pc);
     cmd->dispatch(io[con_out]->get_extent(), local_size_x, local_size_y);
 }
 
@@ -96,11 +92,13 @@ Bloom::NodeStatusFlags Bloom::properties(Properties& config) {
     config.config_float("strengh", pc.strength, "Controls the strength of the effect", .0001);
 
     config.st_separate("Debug");
-    bool value_changed =
+    const bool value_changed =
         config.config_options("mode", mode, {"combined", "bloom only", "bloom off"});
 
     if (value_changed) {
-        return NEEDS_RECONNECT;
+        auto spec_builder = SpecializationInfoBuilder();
+        spec_builder.add_entry(local_size_x, local_size_y, mode);
+        spec_info.set(spec_builder.build());
     }
     return {};
 }

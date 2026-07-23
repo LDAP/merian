@@ -30,6 +30,7 @@ class VkTLASOut : public OutputConnector, public AccessibleConnector<TLASResourc
 
     GraphResourceHandle
     create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
+                    const ConnectorAccess& combined_access,
                     const ResourceAllocatorHandle& allocator,
                     const ResourceAllocatorHandle& aliasing_allocator,
                     const uint32_t resource_index,

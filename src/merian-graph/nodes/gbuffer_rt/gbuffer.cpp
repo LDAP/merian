@@ -1,7 +1,7 @@
 #include "merian-graph/nodes/gbuffer_rt/gbuffer.hpp"
 
 #include "merian/shader/shader_compile_context.hpp"
-#include "merian/vk/pipeline/pipeline_compute.hpp"
+#include "merian/vk/pipeline/pipeline_ray_tracing_builder.hpp"
 
 #include <fmt/format.h>
 
@@ -13,8 +13,8 @@ DeviceSupportInfo GBufferRTNode::query_device_support(const DeviceSupportQueryIn
     const auto composition = Scene::query_device_support_composition(query_info);
     composition->add_module_from_path("merian-graph/nodes/gbuffer_rt/gbuffer_rt.slang", true);
     const auto program = SlangProgram::create(query_info.compile_context, composition);
-    return DeviceSupportInfo::check(query_info,
-                                    {"accelerationStructure", "computeDerivativeGroupQuads"}) &
+    return DeviceSupportInfo::check(query_info, {"rayTracingPipeline", "accelerationStructure"},
+                                    {"rayQuery"}) &
            program.get()->query_device_support(query_info);
 }
 
@@ -31,26 +31,21 @@ std::vector<InputConnectorDescriptor> GBufferRTNode::describe_inputs() {
 
 std::vector<OutputConnectorDescriptor>
 GBufferRTNode::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
-    con_gbuffer = PtrOut<GBuffer>::create();
-    con_denoiser = ManagedVkImageOut::compute_read_write(vk::Format::eR32G32B32A32Uint, extent);
-    con_hit_info = ManagedVkImageOut::compute_read_write(vk::Format::eR32G32B32A32Uint, extent);
-    con_mv = ManagedVkImageOut::compute_read_write(vk::Format::eR16G16Sfloat, extent);
-    con_albedo = ManagedVkImageOut::compute_read_write(vk::Format::eR32G32B32A32Sfloat, extent);
-    con_emission = ManagedVkImageOut::compute_read_write(vk::Format::eR32G32B32A32Sfloat, extent);
+    con_gbuffer = ShaderObjectOut<GBufferObject>::create(
+        [extent = extent] { return std::make_shared<GBufferObject>(extent); });
+    con_emission = ManagedVkImageOut::create(vk::Format::eR32G32B32A32Sfloat, extent);
 
     return {
-        {"gbuffer", con_gbuffer}, {"denoiser", con_denoiser}, {"hit_info", con_hit_info},
-        {"mv", con_mv},           {"albedo", con_albedo},     {"emission", con_emission},
+        {"gbuffer", con_gbuffer, ConnectorAccess::ray_tracing_write},
+        {"emission", con_emission, ConnectorAccess::ray_tracing_write},
     };
 }
 
-GBufferRTNode::NodeStatusFlags GBufferRTNode::on_connected(
-    const NodeIOLayout& io_layout,
-    [[maybe_unused]] const DescriptorSetLayoutHandle& descriptor_set_layout) {
+GBufferRTNode::NodeStatusFlags GBufferRTNode::on_connected(const NodeConnectedInfo& info) {
+    const NodeIOLayout& io_layout = info.io_layout;
 
     // force the program graph to be rewired next process()
     composition = nullptr;
-    gbuffer_obj = nullptr;
     obj_allocator = nullptr;
 
     io_layout.register_event_listener(
@@ -68,9 +63,7 @@ GBufferRTNode::NodeStatusFlags GBufferRTNode::on_connected(
     return {};
 }
 
-void GBufferRTNode::process(GraphRun& run,
-                            [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
-                            const NodeIO& io) {
+void GBufferRTNode::process(GraphRun& run, const NodeIO& io) {
     const auto& cmd = run.get_cmd();
     const auto& scene = io[con_scene];
 
@@ -85,11 +78,17 @@ void GBufferRTNode::process(GraphRun& run,
         program = SlangProgram::create(compile_context, composition);
         entry_point = SlangProgramEntryPoint::create(program, "main");
 
-        pipeline = Versioned<Pipeline>([this] {
+        pipeline = Versioned<RayTracingPipeline>([this] {
             const auto ep = entry_point.get();
-            return ComputePipeline::create(ep->get_pipeline_layout(context), ep->specialize());
+            return RayTracingPipelineBuilder()
+                .add_raygen_group(ep->specialize())
+                .build(ep->get_pipeline_layout(context));
         });
         pipeline.depends_on(entry_point);
+
+        sbt = Versioned<ShaderBindingTable>(
+            [this] { return ShaderBindingTable::create(pipeline.get(), resource_allocator); });
+        sbt.depends_on(pipeline);
 
         globals_obj = Versioned<ShaderObject>([this] {
             return entry_point->create_global_shader_object(context, resource_allocator);
@@ -101,16 +100,6 @@ void GBufferRTNode::process(GraphRun& run,
     }
 
     obj_allocator->set_iteration(run.get_in_flight_index());
-
-    if (!gbuffer_obj) {
-        gbuffer_obj =
-            std::make_shared<GBuffer>(compile_context, context, resource_allocator, extent);
-    }
-
-    // Bind graph-managed textures to the shader object
-    gbuffer_obj->set_resources(
-        io[con_denoiser].get_texture()->get_view(), io[con_hit_info].get_texture()->get_view(),
-        io[con_mv].get_texture()->get_view(), io[con_albedo].get_texture()->get_view());
 
     const auto ep = entry_point.get();
     const auto pipe = pipeline.get();
@@ -129,17 +118,10 @@ void GBufferRTNode::process(GraphRun& run,
     if (scene->is_ready()) {
         cmd->bind(pipe);
         ep->bind("scene", scene->get_shader_object(), cmd, pipe, obj_allocator);
-        ep->bind("gbuffer", gbuffer_obj->get_write_shader_object(), cmd, pipe, obj_allocator);
+        ep->bind("gbuffer", io[con_gbuffer].w(), cmd, pipe, obj_allocator);
         ep->bind_global(globals, cmd, pipe, obj_allocator);
-        cmd->dispatch(extent, 16, 16);
+        cmd->trace_rays(sbt.get(), extent);
     }
-
-    // cmd->barrier({io[con_denoiser]->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal),
-    //               io[con_hit_info]->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal),
-    //               io[con_mv]->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal),
-    //               io[con_albedo]->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal)});
-
-    io[con_gbuffer] = gbuffer_obj;
 }
 
 void GBufferRTNode::update_gbuffer_constants() {
