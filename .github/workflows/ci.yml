@@ -10,7 +10,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
         buildtype: [debugoptimized, release]
-        meson_version: ["1.10.1"]
+        meson_version: ["1.11.2"]
     env:
       SCCACHE_GHA_ENABLED: "true"
     steps:
@@ -31,6 +31,15 @@ jobs:
           vulkan-use-cache: true
       - name: Install dependencies
         run: python -m pip install meson==${{ matrix.meson_version }} ninja
+      # Meson's CMake subproject translation misses compile-order dependencies on
+      # generated files (OBJECT_DEPENDS and transitive target dependencies), which
+      # breaks clean builds of the glslang/SPIRV-Tools wrap.
+      # See https://github.com/mesonbuild/meson/issues/9062 - drop once fixed upstream.
+      - name: Patch meson CMake subproject dependencies
+        shell: bash
+        run: |
+          MESON_DIR=$(python -c "import mesonbuild, os; print(os.path.dirname(os.path.dirname(mesonbuild.__file__)))")
+          git apply --unsafe-paths --directory="$MESON_DIR" .github/meson-cmake-generated-deps.patch
       - name: Prepare MSVC
         uses: ilammy/msvc-dev-cmd@v1
         if: matrix.os == 'windows-latest'
