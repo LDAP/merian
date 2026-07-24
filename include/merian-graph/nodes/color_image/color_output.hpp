@@ -1,7 +1,6 @@
 #pragma once
 
 #include "merian-graph/connectors/image/vk_image_out_managed.hpp"
-#include "merian-graph/connectors/special_static_in.hpp"
 #include "merian-graph/graph/node.hpp"
 
 namespace merian {
@@ -13,8 +12,6 @@ class ColorImage : public Node {
 
     ~ColorImage();
 
-    std::vector<InputConnectorDescriptor> describe_inputs() override;
-
     std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
     [[nodiscard]] NodeStatusFlags
@@ -24,13 +21,11 @@ class ColorImage : public Node {
 
   private:
     vk::Format format = vk::Format::eR16G16B16A16Sfloat;
-    bool extent_from_input = false;
     vk::Extent3D extent = vk::Extent3D{1920, 1080, 1};
     vk::ClearColorValue color = {};
 
     bool needs_run = true;
     ManagedVkImageOutHandle con_out;
-    SpecialStaticInHandle<vk::Extent3D> con_resolution = SpecialStaticIn<vk::Extent3D>::create();
 };
 
 } // namespace merian

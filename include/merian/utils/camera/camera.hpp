@@ -5,6 +5,7 @@
 #include "merian/utils/vector_matrix.hpp"
 
 #include <memory>
+#include <optional>
 
 namespace merian {
 
@@ -86,8 +87,15 @@ class Camera {
     // in radians, converted to vertical using the current aspect ratio
     void set_field_of_view_horizontal(const float field_of_view) noexcept;
 
-    // aspect_ratio = width / height
+    // aspect_ratio = width / height; resets the resolution (a directly authored aspect has no
+    // resolution opinion).
     void set_aspect_ratio(const float aspect_ratio) noexcept;
+
+    // Native render resolution; the aspect ratio follows from it.
+    void set_resolution(const vk::Extent3D& resolution) noexcept;
+
+    // nullopt if the camera has no resolution opinion (aspect ratio stands alone).
+    const std::optional<vk::Extent3D>& get_resolution() const noexcept;
 
     void set_near_plane(const float near_plane) noexcept;
 
@@ -215,6 +223,7 @@ class Camera {
 
     float field_of_view; // vertical FOV, in radians
     float aspect_ratio;  // aspect_ratio = width / height
+    std::optional<vk::Extent3D> resolution;
     float near_plane;
     float far_plane;
     float f_number = 0.f;                 // f-number of the lens; 0 = pinhole

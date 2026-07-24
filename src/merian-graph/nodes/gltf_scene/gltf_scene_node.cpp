@@ -67,6 +67,16 @@ GLTFSceneNode::process([[maybe_unused]] const NodeIO& io,
     if (changes.camera_changed)
         io.send_event("camera_changed");
 
+#endif
+    return {};
+}
+
+GLTFSceneNode::NodeStatusFlags
+GLTFSceneNode::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
+                            [[maybe_unused]] const NodeIO& io,
+                            [[maybe_unused]] const NodeConnectionInfo& info,
+                            [[maybe_unused]] Submission& submission) {
+#ifdef MERIAN_TINYGLTF_ENABLED
     io[con_scene] = std::static_pointer_cast<Scene>(scene);
 #endif
     return {};

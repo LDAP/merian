@@ -59,6 +59,9 @@ class NodeIOLayout {
         return output_for_input(input_connector) != nullptr;
     }
 
+    // Returns if at least one input is connected to the output.
+    bool is_connected(const OutputConnectorHandle& output_connector) const;
+
     /*
      * Event pattern:
      * - nodeType/nodeIdentifier/eventName

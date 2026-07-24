@@ -62,7 +62,6 @@ class GBufferDebugNode : public Node {
     Versioned<SlangProgramEntryPoint> entry_point;
     Versioned<Pipeline> pipeline;
     Versioned<ShaderObject> params;
-    std::shared_ptr<FrameCachingShaderObjectAllocator> obj_allocator;
 };
 
 } // namespace merian

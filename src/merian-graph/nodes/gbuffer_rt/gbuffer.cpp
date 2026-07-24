@@ -31,8 +31,7 @@ std::vector<InputConnectorDescriptor> GBufferRTNode::describe_inputs() {
 
 std::vector<OutputConnectorDescriptor>
 GBufferRTNode::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
-    con_gbuffer = ShaderObjectOut<GBufferObject>::create(
-        [extent = extent] { return std::make_shared<GBufferObject>(extent); });
+    con_gbuffer = ShaderObjectOut<GBufferObject>::create({extent});
     con_emission = ManagedVkImageOut::create(vk::Format::eR32G32B32A32Sfloat, extent);
 
     return {
@@ -43,13 +42,12 @@ GBufferRTNode::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) 
 
 GBufferRTNode::NodeStatusFlags
 GBufferRTNode::on_connected(const NodeIOLayout& io_layout,
-                            [[maybe_unused]] const NodeIO& io,
+                            const NodeIO& io,
                             [[maybe_unused]] const NodeConnectionInfo& info,
                             [[maybe_unused]] Submission& submission) {
 
     // force the program graph to be rewired next process()
     composition = nullptr;
-    obj_allocator = nullptr;
 
     io_layout.register_event_listener(
         "/graph/reload_shaders", [this](const GraphEvent::Info&, const GraphEvent::Data& force) {
@@ -63,6 +61,54 @@ GBufferRTNode::on_connected(const NodeIOLayout& io_layout,
             return true;
         });
 
+    emission_connected = io_layout.is_connected(con_emission);
+
+    if (const SceneHandle& scene = io[con_scene]; scene && scene->is_ready()) {
+        ensure_pipeline(scene);
+    }
+
+    return {};
+}
+
+void GBufferRTNode::ensure_pipeline(const SceneHandle& scene) {
+    if (composition) {
+        return;
+    }
+
+    composition = SlangComposition::create();
+    composition->add_composition(scene->get_composition());
+    composition->add_module_from_path("merian-graph/nodes/gbuffer_rt/gbuffer_rt.slang", true);
+    update_gbuffer_constants();
+
+    program = SlangProgram::create(compile_context, composition);
+    entry_point = SlangProgramEntryPoint::create(program, "main");
+
+    pipeline = Versioned<RayTracingPipeline>([this] {
+        const auto ep = entry_point.get();
+        return RayTracingPipelineBuilder()
+            .add_raygen_group(ep->specialize())
+            .build(ep->get_pipeline_layout(context));
+    });
+    pipeline.depends_on(entry_point);
+
+    sbt = Versioned<ShaderBindingTable>(
+        [this] { return ShaderBindingTable::create(pipeline.get(), resource_allocator); });
+    sbt.depends_on(pipeline);
+
+    globals_obj = Versioned<ShaderObject>(
+        [this] { return entry_point->create_global_shader_object(context, resource_allocator); });
+    globals_obj.depends_on(entry_point);
+}
+
+[[nodiscard]] GBufferRTNode::NodeStatusFlags
+GBufferRTNode::pre_process(const NodeIO& io, [[maybe_unused]] const NodeProcessInfo& info) {
+    const SceneHandle& scene = io[con_scene];
+    const std::optional<vk::Extent3D> resolution = scene ? scene->get_resolution() : std::nullopt;
+    resolution_from_scene = resolution.has_value();
+    if (resolution && *resolution != extent) {
+        extent = *resolution;
+        return NodeStatusFlagBits::NEEDS_RECONNECT;
+    }
     return {};
 }
 
@@ -71,39 +117,9 @@ GBufferRTNode::process(const NodeIO& io, const NodeProcessInfo& info, Submission
     const auto& cmd = submission.get_cmd();
     const auto& scene = io[con_scene];
 
-    emission_connected = io.is_connected(con_emission);
+    ensure_pipeline(scene);
 
-    if (!composition) {
-        composition = SlangComposition::create();
-        composition->add_composition(scene->get_composition());
-        composition->add_module_from_path("merian-graph/nodes/gbuffer_rt/gbuffer_rt.slang", true);
-        update_gbuffer_constants();
-
-        program = SlangProgram::create(compile_context, composition);
-        entry_point = SlangProgramEntryPoint::create(program, "main");
-
-        pipeline = Versioned<RayTracingPipeline>([this] {
-            const auto ep = entry_point.get();
-            return RayTracingPipelineBuilder()
-                .add_raygen_group(ep->specialize())
-                .build(ep->get_pipeline_layout(context));
-        });
-        pipeline.depends_on(entry_point);
-
-        sbt = Versioned<ShaderBindingTable>(
-            [this] { return ShaderBindingTable::create(pipeline.get(), resource_allocator); });
-        sbt.depends_on(pipeline);
-
-        globals_obj = Versioned<ShaderObject>([this] {
-            return entry_point->create_global_shader_object(context, resource_allocator);
-        });
-        globals_obj.depends_on(entry_point);
-
-        obj_allocator = std::make_shared<FrameCachingShaderObjectAllocator>(
-            resource_allocator, info.get_iterations_in_flight());
-    }
-
-    obj_allocator->set_iteration(info.get_in_flight_index());
+    const ShaderObjectAllocatorHandle& obj_allocator = info.get_shader_object_allocator();
 
     const auto ep = entry_point.get();
     const auto pipe = pipeline.get();
@@ -138,8 +154,12 @@ void GBufferRTNode::update_gbuffer_constants() {
 
 GBufferRTNode::NodeStatusFlags GBufferRTNode::properties(Properties& config) {
     bool needs_reconnect = false;
-    needs_reconnect |= config.config_uint("width", &extent.width);
-    needs_reconnect |= config.config_uint("height", &extent.height);
+    if (resolution_from_scene) {
+        config.output_text("resolution from scene camera: {}x{}", extent.width, extent.height);
+    } else {
+        needs_reconnect |= config.config_uint("width", &extent.width);
+        needs_reconnect |= config.config_uint("height", &extent.height);
+    }
 
     config.st_separate("instance mask");
     for (uint32_t bit = 0; bit < 8; ++bit) {

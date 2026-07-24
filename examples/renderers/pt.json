@@ -23,10 +23,8 @@
                 "6": true,
                 "7": true,
                 "emission on primary": true,
-                "height": 1080,
                 "max path length": 5,
-                "samples per pixel": 2,
-                "width": 1920
+                "samples per pixel": 2
             },
             "type": "Render (Path-traced)"
         }

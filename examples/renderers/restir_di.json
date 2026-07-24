@@ -19,9 +19,7 @@
             ],
             "properties": {
                 "emission on primary": true,
-                "height": 1080,
-                "samples per pixel": 4,
-                "width": 1920
+                "samples per pixel": 4
             },
             "type": "Render (ReSTIR DI)"
         }

@@ -63,10 +63,14 @@ template <typename T>
     requires std::derived_from<T, GraphShaderObject>
 class ShaderObjectOut : public OutputConnector, public AccessibleConnector<ShaderObjectAccess<T>> {
   public:
-    using Factory = std::function<std::shared_ptr<T>()>;
+    using CreateInfo = typename T::CreateInfo;
 
-    ShaderObjectOut(const Factory& factory, const bool persistent)
-        : OutputConnector(!persistent), factory(factory), persistent(persistent) {}
+    ShaderObjectOut(const CreateInfo& create_info, const bool persistent)
+        : OutputConnector(!persistent), create_info(create_info), persistent(persistent) {}
+
+    const CreateInfo& get_create_info() const {
+        return create_info;
+    }
 
     GraphResourceHandle create_resource(
         [[maybe_unused]] const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
@@ -75,7 +79,7 @@ class ShaderObjectOut : public OutputConnector, public AccessibleConnector<Shade
         const ResourceAllocatorHandle& aliasing_allocator,
         const uint32_t resource_index,
         const uint32_t ring_size) override {
-        const std::shared_ptr<T> instance = factory();
+        const std::shared_ptr<T> instance = std::make_shared<T>(create_info);
         const ContextHandle& context = allocator->get_context();
         instance->allocate(ShaderObjectAllocateInfo{
             .context = context,
@@ -115,12 +119,13 @@ class ShaderObjectOut : public OutputConnector, public AccessibleConnector<Shade
     }
 
   public:
-    static ShaderObjectOutHandle<T> create(const Factory& factory, const bool persistent = false) {
-        return std::make_shared<ShaderObjectOut<T>>(factory, persistent);
+    static ShaderObjectOutHandle<T> create(const CreateInfo& create_info,
+                                           const bool persistent = false) {
+        return std::make_shared<ShaderObjectOut<T>>(create_info, persistent);
     }
 
   private:
-    const Factory factory;
+    const CreateInfo create_info;
 
   public:
     const bool persistent;

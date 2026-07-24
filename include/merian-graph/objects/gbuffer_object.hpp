@@ -11,7 +11,11 @@ class GBufferObject : public GraphShaderObject {
     static constexpr uint32_t tex_count = 4;
 
   public:
-    GBufferObject(const vk::Extent3D extent) : extent(extent) {}
+    struct CreateInfo {
+        vk::Extent3D extent;
+    };
+
+    GBufferObject(const CreateInfo& create_info) : extent(create_info.extent) {}
 
     void allocate(const ShaderObjectAllocateInfo& info) override {
         constexpr std::array<vk::Format, tex_count> formats = {

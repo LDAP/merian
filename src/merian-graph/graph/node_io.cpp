@@ -13,6 +13,10 @@ bool NodeIOLayout::input_optional(const InputConnectorHandle& input_connector) c
     return data->input_optional.at(input_connector);
 }
 
+bool NodeIOLayout::is_connected(const OutputConnectorHandle& output_connector) const {
+    return !data->output_connections.at(output_connector).inputs.empty();
+}
+
 OutputConnectorHandle
 NodeIOLayout::output_for_input(const InputConnectorHandle& input_connector) const {
 #ifndef NDEBUG

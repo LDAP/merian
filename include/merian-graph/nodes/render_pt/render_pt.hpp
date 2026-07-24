@@ -49,6 +49,7 @@ class RenderPT : public Node {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
+    void ensure_pipeline(const SceneHandle& scene);
     void update_render_constants();
 
     ContextHandle context;
@@ -76,7 +77,6 @@ class RenderPT : public Node {
     Versioned<RayTracingPipeline> pipeline;
     Versioned<ShaderBindingTable> sbt;
     Versioned<ShaderObject> params;
-    std::shared_ptr<FrameCachingShaderObjectAllocator> obj_allocator;
 };
 
 } // namespace merian

@@ -27,20 +27,19 @@ std::vector<InputConnectorDescriptor> RenderPT::describe_inputs() {
     return {{"scene", con_scene}, {"gbuffer", con_gbuffer, ConnectorAccess::ray_tracing_read}};
 }
 
-std::vector<OutputConnectorDescriptor>
-RenderPT::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
+std::vector<OutputConnectorDescriptor> RenderPT::describe_outputs(const NodeIOLayout& io_layout) {
+    extent = io_layout[con_gbuffer]->get_create_info().extent;
     con_irradiance = ManagedVkImageOut::create(vk::Format::eR32G32B32A32Sfloat, extent);
     return {{"irradiance", con_irradiance, ConnectorAccess::ray_tracing_write}};
 }
 
 RenderPT::NodeStatusFlags RenderPT::on_connected(const NodeIOLayout& io_layout,
-                                                 [[maybe_unused]] const NodeIO& io,
+                                                 const NodeIO& io,
                                                  [[maybe_unused]] const NodeConnectionInfo& info,
                                                  [[maybe_unused]] Submission& submission) {
 
     // force the program graph to be rewired next process()
     composition = nullptr;
-    obj_allocator = nullptr;
 
     io_layout.register_event_listener(
         "/graph/reload_shaders", [this](const GraphEvent::Info&, const GraphEvent::Data& force) {
@@ -54,7 +53,42 @@ RenderPT::NodeStatusFlags RenderPT::on_connected(const NodeIOLayout& io_layout,
             return true;
         });
 
+    if (const SceneHandle& scene = io[con_scene]; scene && scene->is_ready()) {
+        ensure_pipeline(scene);
+    }
+
     return {};
+}
+
+void RenderPT::ensure_pipeline(const SceneHandle& scene) {
+    if (composition) {
+        return;
+    }
+    composition = SlangComposition::create();
+    composition->add_composition(scene->get_composition());
+    composition->add_module_from_path("merian-graph/nodes/render_pt/render_pt.slang", true);
+    update_render_constants();
+
+    program = SlangProgram::create(compile_context, composition);
+    entry_point = SlangProgramEntryPoint::create(program, "main");
+
+    pipeline = Versioned<RayTracingPipeline>([this] {
+        const auto ep = entry_point.get();
+        return RayTracingPipelineBuilder()
+            .add_raygen_group(ep->specialize())
+            .build(ep->get_pipeline_layout(context));
+    });
+    pipeline.depends_on(entry_point);
+
+    sbt = Versioned<ShaderBindingTable>(
+        [this] { return ShaderBindingTable::create(pipeline.get(), resource_allocator); });
+    sbt.depends_on(pipeline);
+
+    params = Versioned<ShaderObject>([this] {
+        return entry_point->create_shader_object_for_parameter(context, "params",
+                                                               resource_allocator);
+    });
+    params.depends_on(entry_point);
 }
 
 [[nodiscard]] RenderPT::NodeStatusFlags
@@ -70,38 +104,8 @@ RenderPT::process(const NodeIO& io, const NodeProcessInfo& info, Submission& sub
         io.send_event("bounces_changed");
     }
 
-    if (!composition) {
-        composition = SlangComposition::create();
-        composition->add_composition(scene->get_composition());
-        composition->add_module_from_path("merian-graph/nodes/render_pt/render_pt.slang", true);
-        update_render_constants();
-
-        program = SlangProgram::create(compile_context, composition);
-        entry_point = SlangProgramEntryPoint::create(program, "main");
-
-        pipeline = Versioned<RayTracingPipeline>([this] {
-            const auto ep = entry_point.get();
-            return RayTracingPipelineBuilder()
-                .add_raygen_group(ep->specialize())
-                .build(ep->get_pipeline_layout(context));
-        });
-        pipeline.depends_on(entry_point);
-
-        sbt = Versioned<ShaderBindingTable>(
-            [this] { return ShaderBindingTable::create(pipeline.get(), resource_allocator); });
-        sbt.depends_on(pipeline);
-
-        params = Versioned<ShaderObject>([this] {
-            return entry_point->create_shader_object_for_parameter(context, "params",
-                                                                   resource_allocator);
-        });
-        params.depends_on(entry_point);
-
-        obj_allocator = std::make_shared<FrameCachingShaderObjectAllocator>(
-            resource_allocator, info.get_iterations_in_flight());
-    }
-
-    obj_allocator->set_iteration(info.get_in_flight_index());
+    ensure_pipeline(scene);
+    const ShaderObjectAllocatorHandle& obj_allocator = info.get_shader_object_allocator();
 
     const auto ep = entry_point.get();
     const auto pipe = pipeline.get();
@@ -160,9 +164,6 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
         "demodulate albedo", demodulate_albedo,
         "Divide the primary-hit albedo out of the output so a denoiser can re-modulate after "
         "filtering. Use with 'emission on primary' disabled (emission is albedo-independent).");
-
-    needs_reconnect |= config.config_uint("width", &extent.width);
-    needs_reconnect |= config.config_uint("height", &extent.height);
 
     config.st_separate("instance mask");
     for (uint32_t bit = 0; bit < 8; ++bit) {

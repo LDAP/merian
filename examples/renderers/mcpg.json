@@ -24,7 +24,6 @@
                 "7": true,
                 "emission on primary": true,
                 "guiding prob": 0.9,
-                "height": 1080,
                 "lc": {
                     "LC buffer size": 8000009,
                     "LC normal bits": 4,
@@ -48,8 +47,7 @@
                 },
                 "randomize seed": true,
                 "reference mode": false,
-                "samples per pixel": 2,
-                "width": 1920
+                "samples per pixel": 2
             },
             "type": "Render (Path-traced, MCPG)"
         }

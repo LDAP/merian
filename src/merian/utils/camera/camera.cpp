@@ -128,6 +128,7 @@ void Camera::set_perspective(const float field_of_view,
 
     this->field_of_view = field_of_view;
     this->aspect_ratio = aspect_ratio;
+    resolution.reset();
     this->near_plane = near_plane;
     this->far_plane = far_plane;
 
@@ -155,7 +156,17 @@ void Camera::set_aspect_ratio(const float aspect_ratio) noexcept {
     assert(aspect_ratio > 0);
 
     this->aspect_ratio = aspect_ratio;
+    resolution.reset();
     projection_change_id++;
+}
+
+void Camera::set_resolution(const vk::Extent3D& resolution) noexcept {
+    set_aspect_ratio(static_cast<float>(resolution.width) / static_cast<float>(resolution.height));
+    this->resolution = resolution;
+}
+
+const std::optional<vk::Extent3D>& Camera::get_resolution() const noexcept {
+    return resolution;
 }
 
 void Camera::set_near_plane(const float near_plane) noexcept {

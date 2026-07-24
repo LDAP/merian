@@ -67,7 +67,8 @@ std::vector<InputConnectorDescriptor> RenderRestirDI::describe_inputs() {
 }
 
 std::vector<OutputConnectorDescriptor>
-RenderRestirDI::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
+RenderRestirDI::describe_outputs(const NodeIOLayout& io_layout) {
+    extent = io_layout[con_gbuffer]->get_create_info().extent;
     con_irradiance = ManagedVkImageOut::create(vk::Format::eR32G32B32A32Sfloat, extent);
     con_reservoirs = ManagedVkBufferOut::create(reservoir_buffer_create_info(), true);
     return {{"irradiance", con_irradiance, ConnectorAccess::ray_tracing_write},
@@ -76,11 +77,10 @@ RenderRestirDI::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout)
 
 RenderRestirDI::NodeStatusFlags
 RenderRestirDI::on_connected(const NodeIOLayout& io_layout,
-                             [[maybe_unused]] const NodeIO& io,
+                             const NodeIO& io,
                              [[maybe_unused]] const NodeConnectionInfo& info,
-                             [[maybe_unused]] Submission& submission) {
+                             Submission& submission) {
     composition = nullptr;
-    obj_allocator = nullptr;
 
     io_layout.register_event_listener(
         "/graph/reload_shaders", [this](const GraphEvent::Info&, const GraphEvent::Data& force) {
@@ -97,7 +97,50 @@ RenderRestirDI::on_connected(const NodeIOLayout& io_layout,
     pong_buffer = resource_allocator->create_buffer(
         reservoir_buffer_create_info(), MemoryMappingType::NONE, "ReSTIR DI reservoirs");
 
+    // the temporal pass resamples from reservoirs of the previous iteration
+    submission.get_cmd()->fill(pong_buffer);
+    submission.get_cmd()->fill(io[con_reservoirs]);
+
+    if (const SceneHandle& scene = io[con_scene]; scene && scene->is_ready()) {
+        ensure_pipeline(scene);
+    }
+
     return {};
+}
+
+void RenderRestirDI::ensure_pipeline(const SceneHandle& scene) {
+    if (composition) {
+        return;
+    }
+
+    composition = SlangComposition::create();
+    composition->add_composition(scene->get_composition());
+    composition->add_module_from_path(SHADER_MODULE, true);
+    update_render_constants();
+    program = SlangProgram::create(compile_context, composition);
+
+    for (uint32_t p = 0; p < PassCount; p++) {
+        entry_points[p] = SlangProgramEntryPoint::create(program, PASS_ENTRY_POINTS[p]);
+
+        pipelines[p] = Versioned<RayTracingPipeline>([this, p] {
+            const auto ep = entry_points[p].get();
+            return RayTracingPipelineBuilder()
+                .add_raygen_group(ep->specialize())
+                .build(ep->get_pipeline_layout(context));
+        });
+        pipelines[p].depends_on(entry_points[p]);
+
+        sbts[p] = Versioned<ShaderBindingTable>([this, p] {
+            return ShaderBindingTable::create(pipelines[p].get(), resource_allocator);
+        });
+        sbts[p].depends_on(pipelines[p]);
+
+        params[p] = Versioned<ShaderObject>([this, p] {
+            return entry_points[p]->create_shader_object_for_parameter(context, "params",
+                                                                       resource_allocator);
+        });
+        params[p].depends_on(entry_points[p]);
+    }
 }
 
 [[nodiscard]] RenderRestirDI::NodeStatusFlags
@@ -109,41 +152,9 @@ RenderRestirDI::process(const NodeIO& io, const NodeProcessInfo& info, Submissio
     if (!scene || !scene->is_ready())
         return {};
 
-    if (!composition) {
-        composition = SlangComposition::create();
-        composition->add_composition(scene->get_composition());
-        composition->add_module_from_path(SHADER_MODULE, true);
-        update_render_constants();
-        program = SlangProgram::create(compile_context, composition);
+    ensure_pipeline(scene);
 
-        for (uint32_t p = 0; p < PassCount; p++) {
-            entry_points[p] = SlangProgramEntryPoint::create(program, PASS_ENTRY_POINTS[p]);
-
-            pipelines[p] = Versioned<RayTracingPipeline>([this, p] {
-                const auto ep = entry_points[p].get();
-                return RayTracingPipelineBuilder()
-                    .add_raygen_group(ep->specialize())
-                    .build(ep->get_pipeline_layout(context));
-            });
-            pipelines[p].depends_on(entry_points[p]);
-
-            sbts[p] = Versioned<ShaderBindingTable>([this, p] {
-                return ShaderBindingTable::create(pipelines[p].get(), resource_allocator);
-            });
-            sbts[p].depends_on(pipelines[p]);
-
-            params[p] = Versioned<ShaderObject>([this, p] {
-                return entry_points[p]->create_shader_object_for_parameter(context, "params",
-                                                                           resource_allocator);
-            });
-            params[p].depends_on(entry_points[p]);
-        }
-
-        obj_allocator = std::make_shared<FrameCachingShaderObjectAllocator>(
-            resource_allocator, info.get_iterations_in_flight());
-    }
-
-    obj_allocator->set_iteration(info.get_in_flight_index());
+    const ShaderObjectAllocatorHandle& obj_allocator = info.get_shader_object_allocator();
 
     const bool spatial_enabled = spatial_iterations > 0;
     const vk::DeviceAddress scratch = pong_buffer->get_device_address();
@@ -265,10 +276,6 @@ RenderRestirDI::NodeStatusFlags RenderRestirDI::properties(Properties& config) {
     config.st_separate("Shade");
     constants_changed |=
         config.config_bool("visibility", visibility_shade, "Trace a shadow ray before shading.");
-
-    config.st_separate("Resolution");
-    needs_reconnect |= config.config_uint("width", &extent.width);
-    needs_reconnect |= config.config_uint("height", &extent.height);
 
     if (constants_changed && composition) {
         update_render_constants();

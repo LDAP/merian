@@ -36,8 +36,8 @@ std::vector<InputConnectorDescriptor> RenderMCPG::describe_inputs() {
     return {{"scene", con_scene}, {"gbuffer", con_gbuffer, ConnectorAccess::ray_tracing_read}};
 }
 
-std::vector<OutputConnectorDescriptor>
-RenderMCPG::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
+std::vector<OutputConnectorDescriptor> RenderMCPG::describe_outputs(const NodeIOLayout& io_layout) {
+    extent = io_layout[con_gbuffer]->get_create_info().extent;
     con_irradiance = ManagedVkImageOut::create(vk::Format::eR32G32B32A32Sfloat, extent);
     con_debug = ManagedVkImageOut::create(vk::Format::eR16G16B16A16Sfloat, extent);
     return {{"irradiance", con_irradiance, ConnectorAccess::ray_tracing_write},
@@ -46,13 +46,12 @@ RenderMCPG::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
 
 RenderMCPG::NodeStatusFlags
 RenderMCPG::on_connected(const NodeIOLayout& io_layout,
-                         [[maybe_unused]] const NodeIO& io,
+                         const NodeIO& io,
                          [[maybe_unused]] const NodeConnectionInfo& info,
                          [[maybe_unused]] Submission& submission) {
 
     // force the program graph to be rewired next process()
     composition = nullptr;
-    obj_allocator = nullptr;
 
     io_layout.register_event_listener(
         "/graph/reload_shaders", [this](const GraphEvent::Info&, const GraphEvent::Data& force) {
@@ -66,7 +65,52 @@ RenderMCPG::on_connected(const NodeIOLayout& io_layout,
             return true;
         });
 
+    if (const SceneHandle& scene = io[con_scene]; scene && scene->is_ready()) {
+        ensure_pipeline(scene);
+    }
+
     return {};
+}
+
+void RenderMCPG::ensure_pipeline(const SceneHandle& scene) {
+    if (composition) {
+        return;
+    }
+
+    if (randomize_seed) {
+        std::random_device dev;
+        std::mt19937 rng(dev());
+        seed = std::uniform_int_distribution<uint32_t>{}(rng);
+    }
+
+    composition = SlangComposition::create();
+    composition->add_composition(scene->get_composition());
+    composition->add_composition(irr_cache->get_composition());
+    composition->add_composition(mcpg->get_composition());
+    composition->add_module_from_path("merian-graph/nodes/render_pt_mcpg/render_pt_mcpg.slang",
+                                      true);
+    update_render_constants();
+
+    program = SlangProgram::create(compile_context, composition);
+    entry_point = SlangProgramEntryPoint::create(program, "main");
+
+    pipeline = Versioned<RayTracingPipeline>([this] {
+        const auto ep = entry_point.get();
+        return RayTracingPipelineBuilder()
+            .add_raygen_group(ep->specialize())
+            .build(ep->get_pipeline_layout(context));
+    });
+    pipeline.depends_on(entry_point);
+
+    sbt = Versioned<ShaderBindingTable>(
+        [this] { return ShaderBindingTable::create(pipeline.get(), resource_allocator); });
+    sbt.depends_on(pipeline);
+
+    params = Versioned<ShaderObject>([this] {
+        return entry_point->create_shader_object_for_parameter(context, "params",
+                                                               resource_allocator);
+    });
+    params.depends_on(entry_point);
 }
 
 [[nodiscard]] RenderMCPG::NodeStatusFlags
@@ -82,47 +126,9 @@ RenderMCPG::process(const NodeIO& io, const NodeProcessInfo& info, Submission& s
         io.send_event("bounces_changed");
     }
 
-    if (!composition) {
-        if (randomize_seed) {
-            std::random_device dev;
-            std::mt19937 rng(dev());
-            seed = std::uniform_int_distribution<uint32_t>{}(rng);
-        }
+    ensure_pipeline(scene);
 
-        composition = SlangComposition::create();
-        composition->add_composition(scene->get_composition());
-        composition->add_composition(irr_cache->get_composition());
-        composition->add_composition(mcpg->get_composition());
-        composition->add_module_from_path("merian-graph/nodes/render_pt_mcpg/render_pt_mcpg.slang",
-                                          true);
-        update_render_constants();
-
-        program = SlangProgram::create(compile_context, composition);
-        entry_point = SlangProgramEntryPoint::create(program, "main");
-
-        pipeline = Versioned<RayTracingPipeline>([this] {
-            const auto ep = entry_point.get();
-            return RayTracingPipelineBuilder()
-                .add_raygen_group(ep->specialize())
-                .build(ep->get_pipeline_layout(context));
-        });
-        pipeline.depends_on(entry_point);
-
-        sbt = Versioned<ShaderBindingTable>(
-            [this] { return ShaderBindingTable::create(pipeline.get(), resource_allocator); });
-        sbt.depends_on(pipeline);
-
-        params = Versioned<ShaderObject>([this] {
-            return entry_point->create_shader_object_for_parameter(context, "params",
-                                                                   resource_allocator);
-        });
-        params.depends_on(entry_point);
-
-        obj_allocator = std::make_shared<FrameCachingShaderObjectAllocator>(
-            resource_allocator, info.get_iterations_in_flight());
-    }
-
-    obj_allocator->set_iteration(info.get_in_flight_index());
+    const ShaderObjectAllocatorHandle& obj_allocator = info.get_shader_object_allocator();
 
     const auto ep = entry_point.get();
     const auto pipe = pipeline.get();
@@ -289,10 +295,6 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
         }
         config.st_end_child();
     }
-
-    config.st_separate("Resolution");
-    needs_reconnect |= config.config_uint("width", &extent.width);
-    needs_reconnect |= config.config_uint("height", &extent.height);
 
     config.st_separate("instance mask");
     for (uint32_t bit = 0; bit < 8; ++bit) {

@@ -52,6 +52,7 @@ class RenderRestirDI : public Node {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
+    void ensure_pipeline(const SceneHandle& scene);
     vk::BufferCreateInfo reservoir_buffer_create_info() const;
     void update_render_constants();
 
@@ -95,7 +96,6 @@ class RenderRestirDI : public Node {
     std::array<Versioned<RayTracingPipeline>, PassCount> pipelines;
     std::array<Versioned<ShaderBindingTable>, PassCount> sbts;
     std::array<Versioned<ShaderObject>, PassCount> params;
-    std::shared_ptr<FrameCachingShaderObjectAllocator> obj_allocator;
 
     BufferHandle pong_buffer;
 };

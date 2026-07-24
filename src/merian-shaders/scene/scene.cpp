@@ -356,6 +356,13 @@ CameraHandle Scene::get_active_camera() const {
     return cameras[active_camera];
 }
 
+std::optional<vk::Extent3D> Scene::get_resolution() const {
+    if (cameras.empty()) {
+        return std::nullopt;
+    }
+    return get_active_camera()->get_resolution();
+}
+
 void Scene::set_active_camera(const uint32_t index) {
     assert(index < cameras.size());
     active_camera = index;

@@ -25,7 +25,7 @@ class GraphInfo {};
 struct InputConnectorDescriptor {
     std::string name;
     InputConnectorHandle connector;
-    // How this node accesses the resource. Host-side connectors (Ptr, Any, SpecialStatic) leave
+    // How this node accesses the resource. Host-side connectors (Ptr, Any) leave
     // it empty.
     ConnectorAccess access{};
     // Receive the resource from delay iterations earlier.
@@ -42,7 +42,7 @@ struct InputConnectorDescriptor {
 struct OutputConnectorDescriptor {
     std::string name;
     OutputConnectorHandle connector;
-    // How this node accesses the resource. Host-side connectors (Ptr, Any, SpecialStatic) leave
+    // How this node accesses the resource. Host-side connectors (Ptr, Any) leave
     // it empty.
     ConnectorAccess access{};
 };

@@ -39,12 +39,16 @@ class GBufferRTNode : public Node {
                                  const NodeConnectionInfo& info,
                                  Submission& submission) override;
 
+    [[nodiscard]] NodeStatusFlags pre_process(const NodeIO& io,
+                                              const NodeProcessInfo& info) override;
+
     [[nodiscard]] NodeStatusFlags
     process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) override;
 
     NodeStatusFlags properties(Properties& config) override;
 
   private:
+    void ensure_pipeline(const SceneHandle& scene);
     void update_gbuffer_constants();
 
     ContextHandle context;
@@ -56,8 +60,9 @@ class GBufferRTNode : public Node {
     ShaderObjectOutHandle<GBufferObject> con_gbuffer;
     ManagedVkImageOutHandle con_emission;
 
-    // Resolution
+    // Resolution; the connected scene overrides it to match its camera aspect.
     vk::Extent3D extent = vk::Extent3D{1920, 1080, 1};
+    bool resolution_from_scene = false;
 
     std::array<bool, 8> mask_enabled{true, true, true, true, true, true, true, true};
 
@@ -70,8 +75,6 @@ class GBufferRTNode : public Node {
     Versioned<RayTracingPipeline> pipeline;
     Versioned<ShaderBindingTable> sbt;
     Versioned<ShaderObject> globals_obj;
-
-    std::shared_ptr<FrameCachingShaderObjectAllocator> obj_allocator;
 };
 
 } // namespace merian

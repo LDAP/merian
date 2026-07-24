@@ -26,7 +26,8 @@ std::vector<InputConnectorDescriptor> GBufferDebugNode::describe_inputs() {
 }
 
 std::vector<OutputConnectorDescriptor>
-GBufferDebugNode::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
+GBufferDebugNode::describe_outputs(const NodeIOLayout& io_layout) {
+    extent = io_layout[con_gbuffer]->get_create_info().extent;
     con_output = ManagedVkImageOut::create(vk::Format::eR8G8B8A8Unorm, extent);
     return {{"image", con_output, ConnectorAccess::compute_write}};
 }
@@ -39,7 +40,6 @@ GBufferDebugNode::on_connected(const NodeIOLayout& io_layout,
 
     // force the program graph to be rewired next process()
     composition = nullptr;
-    obj_allocator = nullptr;
 
     io_layout.register_event_listener(
         "/graph/reload_shaders", [this](const GraphEvent::Info&, const GraphEvent::Data& force) {
@@ -84,12 +84,9 @@ GBufferDebugNode::process(const NodeIO& io, const NodeProcessInfo& info, Submiss
                                                                    resource_allocator);
         });
         params.depends_on(entry_point);
-
-        obj_allocator = std::make_shared<FrameCachingShaderObjectAllocator>(
-            resource_allocator, info.get_iterations_in_flight());
     }
 
-    obj_allocator->set_iteration(info.get_in_flight_index());
+    const ShaderObjectAllocatorHandle& obj_allocator = info.get_shader_object_allocator();
 
     const auto ep = entry_point.get();
     const auto pipe = pipeline.get();
@@ -145,9 +142,6 @@ GBufferDebugNode::NodeStatusFlags GBufferDebugNode::properties(Properties& confi
     };
 
     config.config_options("field", selected_field, field_names);
-
-    needs_reconnect |= config.config_uint("width", &extent.width);
-    needs_reconnect |= config.config_uint("height", &extent.height);
 
     if (needs_reconnect) {
         return NEEDS_RECONNECT;

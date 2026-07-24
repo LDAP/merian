@@ -349,6 +349,10 @@ void Graph::run_node(Submission& submission,
             submission.get_cmd()->barrier(image_barriers);
             image_barriers.clear();
         }
+        if (!buffer_barriers.empty()) {
+            submission.get_cmd()->barrier(buffer_barriers);
+            buffer_barriers.clear();
+        }
     }
 
     {
@@ -405,6 +409,9 @@ void Graph::run_node(Submission& submission,
 
         if (!image_barriers.empty()) {
             submission.get_cmd()->barrier(image_barriers);
+        }
+        if (!buffer_barriers.empty()) {
+            submission.get_cmd()->barrier(buffer_barriers);
         }
     }
 }
