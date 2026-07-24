@@ -183,7 +183,7 @@ class Node : public std::enable_shared_from_this<Node> {
     // Called before each run.
     //
     // Note that requesting a reconnect is a heavy operation and should only be called if the
-    // outputs change. The graph then has to reconnect itself before calling cmd_process. Note, that
+    // outputs change. The graph then has to reconnect itself before calling process. Note, that
     // this method is called again after the reconnect until no node requests a reconnect.
     //
     // Here you can access the resources for the run or set your own.
@@ -199,7 +199,7 @@ class Node : public std::enable_shared_from_this<Node> {
     // connector documentation. If you need to perform layout transitions use the barrier() methods
     // of the images.
     //
-    // You can provide data that that is required for the current run by setting the io map
+    // You can provide data that is required for the current run by setting the io map
     // in_flight_data. The pointer is persisted and supplied again after (graph ring size - 1) runs.
     //
     // You can throw node_error and compilation_failed here. The graph then attempts to finish the

@@ -43,7 +43,6 @@ class ManagedVkBufferOut : public VkBufferOut,
 
   public:
     const vk::BufferCreateInfo create_info;
-    const bool persistent;
 };
 
 } // namespace merian

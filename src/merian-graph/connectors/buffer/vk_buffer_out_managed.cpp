@@ -8,7 +8,7 @@ namespace merian {
 ManagedVkBufferOut::ManagedVkBufferOut(const vk::BufferCreateInfo& create_info,
                                        const bool persistent,
                                        const uint32_t array_size)
-    : VkBufferOut(!persistent, array_size), create_info(create_info), persistent(persistent) {}
+    : VkBufferOut(persistent, array_size), create_info(create_info) {}
 
 GraphResourceHandle ManagedVkBufferOut::create_resource(
     [[maybe_unused]] const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,

@@ -214,7 +214,11 @@ ErrorPlot::process(const NodeIO& io, const NodeProcessInfo& info, Submission& su
 
         cmd_blit_fit(cmd, input_img, vk::ImageLayout::eGeneral, input_img->get_extent(), out_img,
                      vk::ImageLayout::eGeneral, out_img->get_extent());
-        cmd->barrier(out_img->barrier2(vk::ImageLayout::eGeneral));
+        // the second blit overwrites the left half of the first (WAW)
+        cmd->barrier(out_img->barrier2(
+            vk::ImageLayout::eGeneral, vk::AccessFlagBits2::eTransferWrite,
+            vk::AccessFlagBits2::eTransferWrite, vk::PipelineStageFlagBits2::eTransfer,
+            vk::PipelineStageFlagBits2::eTransfer));
 
         vk::Extent3D reference_extent = reference_img->get_extent();
         reference_extent.width /= 2;

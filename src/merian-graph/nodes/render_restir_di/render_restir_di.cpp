@@ -70,7 +70,7 @@ std::vector<OutputConnectorDescriptor>
 RenderRestirDI::describe_outputs(const NodeIOLayout& io_layout) {
     extent = io_layout[con_gbuffer]->get_create_info().extent;
     con_irradiance = ManagedVkImageOut::create(vk::Format::eR32G32B32A32Sfloat, extent);
-    con_reservoirs = ManagedVkBufferOut::create(reservoir_buffer_create_info(), true);
+    con_reservoirs = ManagedVkBufferOut::create(reservoir_buffer_create_info());
     return {{"irradiance", con_irradiance, ConnectorAccess::ray_tracing_write},
             {"reservoirs", con_reservoirs, ConnectorAccess::ray_tracing_read_write}};
 }
