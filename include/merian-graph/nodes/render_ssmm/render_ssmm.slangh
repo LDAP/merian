@@ -1,0 +1,49 @@
+#pragma once
+
+#ifdef __cplusplus
+#include "merian-shaders/types.slang.h"
+#include <vulkan/vulkan.hpp>
+#else
+import merian_shaders.gbuffer;
+import merian_shaders.scene.scene;
+import merian_shaders.utils.random;
+import merian_shaders.utils.hash;
+import merian_shaders.colors.colorspaces;
+import merian_shaders.distributions.von_mises_fisher;
+#endif
+
+namespace merian {
+
+struct SSMCState {
+    float3 sum_tgt;
+    float sum_w;
+    uint32_t N;
+    float sum_len;
+    float f;
+};
+
+#ifdef __cplusplus
+using SSMCStateAddress = vk::DeviceAddress;
+#else
+typealias SSMCStateAddress = SSMCState*;
+#endif
+
+struct SSMMPushConstant {
+    SSMCStateAddress ssmc_prev;
+    SSMCStateAddress ssmc_out;
+    uint32_t frame;
+    uint32_t seed;
+};
+
+}
+
+#ifndef __cplusplus
+
+[vk::push_constant]
+ConstantBuffer<merian::SSMMPushConstant> pc;
+
+uint ssmm_index(const int2 pixel, const uint2 dim) {
+    return pixel.y * dim.x + pixel.x;
+}
+
+#endif

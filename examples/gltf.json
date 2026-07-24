@@ -32,6 +32,9 @@
                 },
                 "restir_di": {
                     "merge": "renderers/restir_di.json"
+                },
+                "ssmm": {
+                    "merge": "renderers/ssmm.json"
                 }
             }
         }
