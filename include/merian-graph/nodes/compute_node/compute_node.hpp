@@ -28,24 +28,28 @@ class AbstractCompute : public Node {
     virtual SlangCompositionHandle create_composition() = 0;
 
     // Return a pointer to your push constant if push_constant_size is not std::nullopt.
-    virtual const void* get_push_constant([[maybe_unused]] GraphRun& run,
-                                          [[maybe_unused]] const NodeIO& io) {
+    virtual const void* get_push_constant([[maybe_unused]] const NodeIO& io,
+                                          [[maybe_unused]] const NodeProcessInfo& info) {
         throw std::runtime_error{
             "get_push_constant must be overwritten when push_constant_size is not std::nullopt"};
     }
 
     // Write per-run constants into the globals cursor. Graph io fields are bound separately.
-    virtual void write_constants([[maybe_unused]] GraphRun& run,
-                                 [[maybe_unused]] const NodeIO& io,
+    virtual void write_constants([[maybe_unused]] const NodeIO& io,
+                                 [[maybe_unused]] const NodeProcessInfo& info,
                                  [[maybe_unused]] ShaderCursor& cursor) {}
 
     // Return the group count for x, y and z. Called in every run.
     virtual std::tuple<uint32_t, uint32_t, uint32_t>
     get_group_count(const NodeIO& io) const noexcept = 0;
 
-    virtual NodeStatusFlags on_connected(const NodeConnectedInfo& info) override;
+    virtual NodeStatusFlags on_connected(const NodeIOLayout& io_layout,
+                                         const NodeIO& io,
+                                         const NodeConnectionInfo& info,
+                                         Submission& submission) override;
 
-    virtual void process(GraphRun& run, const NodeIO& io) override final;
+    [[nodiscard]] virtual NodeStatusFlags
+    process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) override final;
 
   protected:
     // Force shader recompilation after the composed source changed. Retires the shared session so
@@ -68,13 +72,13 @@ template <class PushConstant> class TypedPCAbstractCompute : public AbstractComp
   public:
     TypedPCAbstractCompute() : AbstractCompute(sizeof(PushConstant)) {}
 
-    virtual const void* get_push_constant([[maybe_unused]] GraphRun& run,
-                                          [[maybe_unused]] const NodeIO& io) final {
-        return &get_typed_push_constant(run, io);
+    virtual const void* get_push_constant(const NodeIO& io, const NodeProcessInfo& info) final {
+        return &get_typed_push_constant(io, info);
     }
 
-    virtual const PushConstant& get_typed_push_constant([[maybe_unused]] GraphRun& run,
-                                                        [[maybe_unused]] const NodeIO& io) = 0;
+    virtual const PushConstant&
+    get_typed_push_constant([[maybe_unused]] const NodeIO& io,
+                            [[maybe_unused]] const NodeProcessInfo& info) = 0;
 };
 
 } // namespace merian

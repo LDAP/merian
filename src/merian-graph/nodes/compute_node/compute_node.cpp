@@ -23,8 +23,11 @@ void AbstractCompute::initialize(const ContextHandle& context,
         context, allocator, compile_context, [this] { return create_composition(); }, spec_info);
 }
 
-AbstractCompute::NodeStatusFlags AbstractCompute::on_connected(const NodeConnectedInfo& info) {
-    const NodeIOLayout& io_layout = info.io_layout;
+AbstractCompute::NodeStatusFlags
+AbstractCompute::on_connected(const NodeIOLayout& io_layout,
+                              [[maybe_unused]] const NodeIO& io,
+                              [[maybe_unused]] const NodeConnectionInfo& info,
+                              [[maybe_unused]] Submission& submission) {
     io_layout.register_event_listener(
         "/graph/reload_shaders", [this](const GraphEvent::Info&, const GraphEvent::Data& force) {
             kernel->reload(std::any_cast<bool>(force), compile_context);
@@ -34,18 +37,20 @@ AbstractCompute::NodeStatusFlags AbstractCompute::on_connected(const NodeConnect
     return {};
 }
 
-void AbstractCompute::process(GraphRun& run, const NodeIO& io) {
+[[nodiscard]] AbstractCompute::NodeStatusFlags
+AbstractCompute::process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) {
     ShaderCursor cursor = kernel->globals_cursor();
-    write_constants(run, io, cursor);
+    write_constants(io, info, cursor);
 
-    const PipelineHandle pipe = kernel->bind(run, io);
+    const PipelineHandle pipe = kernel->bind(io, info, submission);
 
-    const CommandBufferHandle& cmd = run.get_cmd();
+    const CommandBufferHandle& cmd = submission.get_cmd();
     if (push_constant_size.has_value()) {
-        cmd->push_constant(pipe, get_push_constant(run, io));
+        cmd->push_constant(pipe, get_push_constant(io, info));
     }
     const auto [x, y, z] = get_group_count(io);
     cmd->dispatch(x, y, z);
+    return {};
 }
 
 } // namespace merian

@@ -30,8 +30,8 @@ class TAA : public AbstractCompute {
 
     std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
-    const void* get_push_constant([[maybe_unused]] GraphRun& run,
-                                  [[maybe_unused]] const NodeIO& io) override;
+    const void* get_push_constant([[maybe_unused]] const NodeIO& io,
+                                  [[maybe_unused]] const NodeProcessInfo& info) override;
 
     std::tuple<uint32_t, uint32_t, uint32_t>
     get_group_count([[maybe_unused]] const NodeIO& io) const noexcept override;

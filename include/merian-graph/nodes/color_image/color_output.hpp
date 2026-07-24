@@ -17,7 +17,8 @@ class ColorImage : public Node {
 
     std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
-    void process(GraphRun& run, const NodeIO& io) override;
+    [[nodiscard]] NodeStatusFlags
+    process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) override;
 
     NodeStatusFlags properties(Properties& config) override;
 
@@ -29,8 +30,7 @@ class ColorImage : public Node {
 
     bool needs_run = true;
     ManagedVkImageOutHandle con_out;
-    SpecialStaticInHandle<vk::Extent3D> con_resolution =
-        SpecialStaticIn<vk::Extent3D>::create();
+    SpecialStaticInHandle<vk::Extent3D> con_resolution = SpecialStaticIn<vk::Extent3D>::create();
 };
 
 } // namespace merian

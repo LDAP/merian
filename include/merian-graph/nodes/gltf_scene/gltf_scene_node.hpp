@@ -31,7 +31,8 @@ class GLTFSceneNode : public Node {
 
     std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
-    void process(GraphRun& run, const NodeIO& io) override;
+    [[nodiscard]] NodeStatusFlags
+    process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) override;
 
     NodeStatusFlags properties(Properties& config) override;
 

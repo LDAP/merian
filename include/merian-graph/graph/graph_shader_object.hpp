@@ -4,7 +4,7 @@
 
 #include "merian/shader/shader_compile_context.hpp"
 #include "merian/shader/shader_object.hpp"
-#include "merian/vk/command/command_buffer.hpp"
+#include "merian/vk/command/submission.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 
 namespace merian {
@@ -44,7 +44,7 @@ class GraphShaderObject {
 
     // Called once after (re)connect, before the first run. Initialize device resources here:
     // delayed inputs read a ring slot before its producer ever ran on it.
-    virtual void on_connected([[maybe_unused]] const CommandBufferHandle& cmd) {}
+    virtual void on_connected([[maybe_unused]] Submission& submission) {}
 };
 
 using GraphShaderObjectHandle = std::shared_ptr<GraphShaderObject>;

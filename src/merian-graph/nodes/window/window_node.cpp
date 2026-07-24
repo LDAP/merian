@@ -17,7 +17,10 @@ void WindowNode::initialize(const ContextHandle& context,
     }
 }
 
-WindowNode::NodeStatusFlags WindowNode::on_connected(const NodeConnectedInfo& /*info*/) {
+WindowNode::NodeStatusFlags WindowNode::on_connected(const NodeIOLayout& /*io_layout*/,
+                                                     const NodeIO& /*io*/,
+                                                     const NodeConnectionInfo& /*info*/,
+                                                     Submission& /*submission*/) {
     const auto& selected = get_selected_provider();
     if (!window || selected != active_provider) {
         window = selected->create_window(context->get_device(), create_info);
@@ -41,8 +44,8 @@ std::vector<OutputConnectorDescriptor> WindowNode::describe_outputs(const NodeIO
     return {{"acquire", con_acquire}, {"controller", con_controller}, {"window", con_window}};
 }
 
-WindowNode::NodeStatusFlags WindowNode::pre_process([[maybe_unused]] const GraphRun& run,
-                                                    [[maybe_unused]] const NodeIO& io) {
+WindowNode::NodeStatusFlags WindowNode::pre_process([[maybe_unused]] const NodeIO& io,
+                                                    [[maybe_unused]] const NodeProcessInfo& info) {
     if (window) {
         window->poll_events();
         if (on_should_close_remove_node && window->should_close()) {
@@ -52,25 +55,27 @@ WindowNode::NodeStatusFlags WindowNode::pre_process([[maybe_unused]] const Graph
     return {};
 }
 
-void WindowNode::process(GraphRun& run, const NodeIO& io) {
+[[nodiscard]] WindowNode::NodeStatusFlags
+WindowNode::process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) {
     assert(swapchain_manager);
+    NodeStatusFlags flags{};
 
     const int64_t signed_max_img_count = get_swapchain()->get_max_image_count();
-    const int64_t signed_iteration = static_cast<int64_t>(run.get_iteration());
-    throttle = !run.get_iteration_semaphore()->wait(
+    const int64_t signed_iteration = static_cast<int64_t>(info.get_iteration());
+    throttle = !info.get_iteration_semaphore()->wait(
         std::max(static_cast<int64_t>(0), signed_iteration - signed_max_img_count + 1), 0);
-    run.get_iteration_semaphore()->wait(
+    info.get_iteration_semaphore()->wait(
         std::max(static_cast<int64_t>(0), signed_iteration - signed_max_img_count + 1));
 
-    get_swapchain()->set_min_images(run.get_iterations_in_flight());
+    get_swapchain()->set_min_images(info.get_iterations_in_flight());
     std::optional<SwapchainAcquireResult> acquire;
     {
-        MERIAN_PROFILE_SCOPE(run.get_profiler(), "acquire");
+        MERIAN_PROFILE_SCOPE(info.get_profiler(), "acquire");
         acquire = swapchain_manager->acquire(window, acquire_timeout_ns);
     }
 
     if (acquire) {
-        const CommandBufferHandle& cmd = run.get_cmd();
+        const CommandBufferHandle& cmd = submission.get_cmd();
         const ImageHandle image = acquire->image_view->get_image();
 
         io[con_acquire] = std::make_shared<SwapchainAcquireResult>(*acquire);
@@ -91,7 +96,7 @@ void WindowNode::process(GraphRun& run, const NodeIO& io) {
         }
 
         {
-            MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "blit/clear");
+            MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "blit/clear");
             if (src_image) {
                 const vk::Filter filter =
                     src_image->format_features() &
@@ -108,28 +113,28 @@ void WindowNode::process(GraphRun& run, const NodeIO& io) {
 
         // Transition to present once the canvas and any downstream "acquire" consumer have
         // rendered.
-        run.add_pre_submit_callback([image](GraphRun& pre_submit_run) {
-            pre_submit_run.get_cmd()->barrier(image->barrier2(vk::ImageLayout::ePresentSrcKHR));
+        submission.add_pre_submit_callback([image](Submission& submission) {
+            submission.get_cmd()->barrier(image->barrier2(vk::ImageLayout::ePresentSrcKHR));
         });
 
-        run.add_wait_semaphore(acquire->wait_semaphore, vk::PipelineStageFlagBits::eTransfer);
-        run.add_signal_semaphore(acquire->signal_semaphore);
+        submission.add_wait_semaphore(acquire->wait_semaphore,
+                                      vk::PipelineStageFlagBits::eTransfer);
+        submission.add_signal_semaphore(acquire->signal_semaphore);
 
         uint32_t index = acquire->index;
         SwapchainHandle swapchain = get_swapchain();
-        run.add_submit_callback([index, swapchain](const QueueHandle& queue, GraphRun& run) {
-            try {
-                MERIAN_PROFILE_SCOPE(run.get_profiler(), "present");
-                Stopwatch present_duration;
-                swapchain->present(queue, index);
-                run.hint_external_wait_time(present_duration.duration());
-            } catch (const Swapchain::needs_recreate&) {
-                return;
-            }
-        });
+        submission.add_submit_callback(
+            [index, swapchain, &info](const QueueHandle& queue, Submission& /*submission*/) {
+                try {
+                    MERIAN_PROFILE_SCOPE(info.get_profiler(), "present");
+                    swapchain->present(queue, index);
+                } catch (const Swapchain::needs_recreate&) {
+                    return;
+                }
+            });
 
         if (request_rebuild_on_recreate && acquire->did_recreate)
-            run.request_reconnect();
+            flags |= NodeStatusFlagBits::NEEDS_RECONNECT;
     }
 
     if (window && window->should_close()) {
@@ -138,6 +143,7 @@ void WindowNode::process(GraphRun& run, const NodeIO& io) {
         if (on_should_close_sigterm)
             raise(SIGTERM);
     }
+    return flags;
 }
 
 const SwapchainHandle& WindowNode::get_swapchain() {

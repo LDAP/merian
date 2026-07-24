@@ -52,8 +52,8 @@ VKDTFilmcurv::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
 }
 
 const VKDTFilmcurvePushConstant&
-VKDTFilmcurv::get_typed_push_constant([[maybe_unused]] GraphRun& run,
-                                      [[maybe_unused]] const NodeIO& io) {
+VKDTFilmcurv::get_typed_push_constant([[maybe_unused]] const NodeIO& io,
+                                      [[maybe_unused]] const NodeProcessInfo& info) {
     return pc;
 }
 

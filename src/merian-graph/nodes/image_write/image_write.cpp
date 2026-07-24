@@ -11,6 +11,8 @@
 
 namespace merian {
 
+using namespace std::literals::chrono_literals;
+
 #define FORMAT_PNG 0
 #define FORMAT_JPG 1
 #define FORMAT_HDR 2
@@ -58,21 +60,21 @@ void ImageWrite::record(const std::chrono::nanoseconds& current_graph_time) {
         callback();
 }
 
-ImageWrite::NodeStatusFlags ImageWrite::pre_process(const GraphRun& run,
-                                                    [[maybe_unused]] const NodeIO& io) {
+ImageWrite::NodeStatusFlags ImageWrite::pre_process(const NodeIO& io, const NodeProcessInfo& info) {
     // START TRIGGER
-    if (!record_enable && (start_stop_record || (int64_t)run.get_iteration() == start_at_run)) {
-        record(run.get_elapsed_duration());
+    if (!record_enable &&
+        (start_stop_record || static_cast<int64_t>(info.get_iteration()) == start_at_run)) {
+        record(info.get_elapsed_duration());
         start_stop_record = false;
         io.send_event("start");
     }
 
     const std::chrono::nanoseconds time_since_record =
-        run.get_elapsed_duration() - record_graph_time_point;
+        info.get_elapsed_duration() - record_graph_time_point;
 
     // STOP TRIGGER
     if (record_enable &&
-        (start_stop_record || stop_at_run == (int64_t)run.get_iteration() ||
+        (start_stop_record || stop_at_run == static_cast<int64_t>(info.get_iteration()) ||
          (stop_after_iteration >= 0 && stop_after_iteration < iteration) ||
          stop_after_num_captures_since_record == num_captures_since_record ||
          (stop_after_seconds >= 0 && to_seconds(time_since_record) >= stop_after_seconds))) {
@@ -87,7 +89,8 @@ ImageWrite::NodeStatusFlags ImageWrite::pre_process(const GraphRun& run,
     }
 
     // SIGTERM TRIGGER
-    if (exit_at_run == (int64_t)run.get_iteration() || exit_at_iteration == iteration) {
+    if (exit_at_run == static_cast<int64_t>(info.get_iteration()) ||
+        exit_at_iteration == iteration) {
         raise(SIGTERM);
     }
     if (exit_after_seconds >= 0 && to_seconds(time_since_record) >= exit_after_seconds) {
@@ -102,17 +105,18 @@ ImageWrite::NodeStatusFlags ImageWrite::pre_process(const GraphRun& run,
     return {};
 };
 
-void ImageWrite::process(GraphRun& run, const NodeIO& io) {
+[[nodiscard]] ImageWrite::NodeStatusFlags
+ImageWrite::process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) {
 
     //--------- Make sure we always increase the iteration counter
     defer {
         iteration++;
     };
 
-    const CommandBufferHandle& cmd = run.get_cmd();
+    const CommandBufferHandle& cmd = submission.get_cmd();
 
     const std::chrono::nanoseconds system_time_since_record = record_time_point.duration();
-    const std::chrono::nanoseconds& graph_time = run.get_elapsed_duration();
+    const std::chrono::nanoseconds& graph_time = info.get_elapsed_duration();
     const std::chrono::nanoseconds graph_time_since_record = graph_time - record_graph_time_point;
 
     assert(time_reference == 0 || time_reference == 1);
@@ -150,7 +154,7 @@ void ImageWrite::process(GraphRun& run, const NodeIO& io) {
     vk::Extent3D scaled = max(src->get_extent() * scale, {1, 1, 1});
     fmt::dynamic_format_arg_store<fmt::format_context> arg_store;
     get_format_args([&](const auto& arg) { arg_store.push_back(arg); }, src->get_extent(), scaled,
-                    run.get_iteration(), graph_time_since_record, graph_time,
+                    info.get_iteration(), graph_time_since_record, graph_time,
                     system_time_since_record);
     std::filesystem::path path;
     try {
@@ -164,11 +168,11 @@ void ImageWrite::process(GraphRun& run, const NodeIO& io) {
         record_enable = false;
         record_next = false;
         SPDLOG_ERROR(e.what());
-        return;
+        return {};
     }
 
     if (!record_next)
-        return;
+        return {};
     // needs correction else we might take more pictures if the
     // record framerate is slightly below the actual framerate
     last_record_time_millis = std::max(time_millis, optimal_timing);
@@ -203,7 +207,7 @@ void ImageWrite::process(GraphRun& run, const NodeIO& io) {
 
     if (format_properties.linearTilingFeatures & vk::FormatFeatureFlagBits::eBlitDst) {
         // blit directly onto the linear image
-        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "blit to linear image");
+        MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "blit to linear image");
         cmd_blit_stretch(cmd, src, src->get_current_layout(), src->get_extent(), linear_image,
                          vk::ImageLayout::eTransferDstOptimal, linear_image->get_extent());
 
@@ -228,7 +232,7 @@ void ImageWrite::process(GraphRun& run, const NodeIO& io) {
         ImageHandle intermediate_image = allocator->create_image(intermediate_info);
 
         {
-            MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "blit to optimal tiled image");
+            MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "blit to optimal tiled image");
 
             cmd->barrier(vk::PipelineStageFlagBits::eTopOfPipe,
                          vk::PipelineStageFlagBits::eTransfer,
@@ -243,7 +247,7 @@ void ImageWrite::process(GraphRun& run, const NodeIO& io) {
                                                      vk::AccessFlagBits::eTransferRead));
         }
         {
-            MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "copy to linear image");
+            MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "copy to linear image");
             cmd->copy(intermediate_image, linear_image);
         }
     }
@@ -282,10 +286,11 @@ void ImageWrite::process(GraphRun& run, const NodeIO& io) {
         return;
     });
 
-    run.sync_to_cpu(std::move(write_task));
+    submission.sync_to_cpu(std::move(write_task));
 
+    NodeStatusFlags flags{};
     if (rebuild_after_capture)
-        run.request_reconnect();
+        flags |= NodeStatusFlagBits::NEEDS_RECONNECT;
     if (callback_after_capture && callback)
         callback();
     io.send_event("capture");
@@ -295,6 +300,7 @@ void ImageWrite::process(GraphRun& run, const NodeIO& io) {
 
     record_iteration *= record_enable ? it_power : 1;
     record_iteration += record_enable ? it_offset : 0;
+    return flags;
 }
 
 ImageWrite::NodeStatusFlags ImageWrite::properties([[maybe_unused]] Properties& config) {

@@ -77,55 +77,56 @@ void Graph::connect() {
 
         {
             MERIAN_PROFILE_SCOPE(profiler, "on_connected");
-            queue->submit_wait([&](const CommandBufferHandle& cmd) {
-                for (const auto& layer : layers)
-                    for (const NodeHandle& node : layer.nodes) {
-                        for (auto& [output, per_output_info] :
-                             node_data.at(node).output_connections) {
-                            std::vector<GraphResourceHandle> resources;
-                            resources.reserve(per_output_info.resources.size());
-                            for (const auto& per_resource : per_output_info.resources) {
-                                resources.push_back(per_resource.resource);
-                            }
-                            output->on_connected(cmd, resources);
+            Submission submission(context, queue, cpu_queue);
+            for (const auto& layer : layers)
+                for (const NodeHandle& node : layer.nodes) {
+                    for (auto& [output, per_output_info] : node_data.at(node).output_connections) {
+                        std::vector<GraphResourceHandle> resources;
+                        resources.reserve(per_output_info.resources.size());
+                        for (const auto& per_resource : per_output_info.resources) {
+                            resources.push_back(per_resource.resource);
                         }
+                        output->on_connected(submission, resources);
                     }
+                }
 
-                for (auto& layer : layers)
-                    for (auto& node : layer.nodes) {
-                        NodeData& data = node_data.at(node);
-                        MERIAN_PROFILE_SCOPE(profiler, fmt::format("{} ({})", data.identifier,
-                                                                   registry.node_type_name(node)));
-                        SPDLOG_DEBUG("on_connected node: {} ({})", data.identifier,
-                                     registry.node_type_name(node));
-                        const NodeIOLayout io_layout(this, &data, node, /*allow_delayed*/ true);
-                        try {
-                            const Node::NodeStatusFlags flags =
-                                node->on_connected(NodeConnectedInfo{io_layout, cmd});
-                            needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
-                            if ((flags & Node::NodeStatusFlagBits::RESET_IN_FLIGHT_DATA) != 0u) {
-                                for (uint32_t i = 0; i < ring_fences.size(); i++) {
-                                    ring_fences.get(i).user_data.in_flight_data.at(node).reset();
-                                }
+            for (auto& layer : layers)
+                for (auto& node : layer.nodes) {
+                    NodeData& data = node_data.at(node);
+                    MERIAN_PROFILE_SCOPE(profiler, fmt::format("{} ({})", data.identifier,
+                                                               registry.node_type_name(node)));
+                    SPDLOG_DEBUG("on_connected node: {} ({})", data.identifier,
+                                 registry.node_type_name(node));
+                    const NodeIOLayout io_layout(this, &data, node, /*allow_delayed*/ true);
+                    const NodeIO io(this, &data, node, data.set_index(0));
+                    try {
+                        const Node::NodeStatusFlags flags = node->on_connected(
+                            io_layout, io, NodeConnectionInfo{ring_fences.size()}, submission);
+                        needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
+                        if ((flags & Node::NodeStatusFlagBits::RESET_IN_FLIGHT_DATA) != 0u) {
+                            for (uint32_t i = 0; i < ring_fences.size(); i++) {
+                                ring_fences.get(i).user_data.in_flight_data.at(node).reset();
                             }
-                            if ((flags & Node::NodeStatusFlagBits::REMOVE_NODE) != 0u) {
-                                remove_node(data.identifier);
-                            }
-                        } catch (const graph_errors::node_error& e) {
-                            data.errors_queued.emplace_back(
-                                fmt::format("node error: {}", e.what()));
-                        } catch (const GLSLShaderCompiler::compilation_failed& e) {
-                            data.errors_queued.emplace_back(
-                                fmt::format("compilation failed: {}", e.what()));
                         }
-                        if (!data.errors_queued.empty()) {
-                            SPDLOG_ERROR("on_connected on node '{}' failed:\n - {}",
-                                         data.identifier, fmt::join(data.errors_queued, "\n   - "));
-                            request_reconnect();
-                            SPDLOG_ERROR("emergency reconnect.");
+                        if ((flags & Node::NodeStatusFlagBits::REMOVE_NODE) != 0u) {
+                            remove_node(data.identifier);
                         }
+                    } catch (const graph_errors::node_error& e) {
+                        data.errors_queued.emplace_back(fmt::format("node error: {}", e.what()));
+                    } catch (const GLSLShaderCompiler::compilation_failed& e) {
+                        data.errors_queued.emplace_back(
+                            fmt::format("compilation failed: {}", e.what()));
                     }
-            });
+                    if (!data.errors_queued.empty()) {
+                        SPDLOG_ERROR("on_connected on node '{}' failed:\n - {}", data.identifier,
+                                     fmt::join(data.errors_queued, "\n   - "));
+                        request_reconnect();
+                        SPDLOG_ERROR("emergency reconnect.");
+                    }
+                }
+
+            submission.finish();
+            queue->wait_idle();
         }
     }
 

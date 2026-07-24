@@ -22,8 +22,9 @@ std::vector<OutputConnectorDescriptor> ABSplit::describe_outputs(const NodeIOLay
     return {{"out", con_out, ConnectorAccess::transfer_dst}};
 }
 
-void ABSplit::process([[maybe_unused]] GraphRun& run, const NodeIO& io) {
-    const CommandBufferHandle& cmd = run.get_cmd();
+[[nodiscard]] ABSplit::NodeStatusFlags ABSplit::process(
+    const NodeIO& io, [[maybe_unused]] const NodeProcessInfo& info, Submission& submission) {
+    const CommandBufferHandle& cmd = submission.get_cmd();
     const ImageHandle& a = io[con_in_a];
     const ImageHandle& b = io[con_in_b];
     const ImageHandle& result = io[con_out];
@@ -40,6 +41,7 @@ void ABSplit::process([[maybe_unused]] GraphRun& run, const NodeIO& io) {
 
     cmd_blit_fit(cmd, a, vk::ImageLayout::eGeneral, a_extent, result, vk::ImageLayout::eGeneral,
                  result_extent, std::nullopt);
+    return {};
 }
 
 // --------------------------------------------------------------------------------
@@ -63,8 +65,9 @@ ABSideBySide::describe_outputs(const NodeIOLayout& io_layout) {
     return {{"out", con_out, ConnectorAccess::transfer_dst}};
 }
 
-void ABSideBySide::process([[maybe_unused]] GraphRun& run, [[maybe_unused]] const NodeIO& io) {
-    const CommandBufferHandle& cmd = run.get_cmd();
+[[nodiscard]] ABSideBySide::NodeStatusFlags ABSideBySide::process(
+    const NodeIO& io, [[maybe_unused]] const NodeProcessInfo& info, Submission& submission) {
+    const CommandBufferHandle& cmd = submission.get_cmd();
     const ImageHandle& a = io[con_in_a];
     const ImageHandle& b = io[con_in_b];
     const ImageHandle& result = io[con_out];
@@ -84,6 +87,7 @@ void ABSideBySide::process([[maybe_unused]] GraphRun& run, [[maybe_unused]] cons
             to_offset(result->get_extent()));
 
     cmd->blit(b, b->get_current_layout(), result, result->get_current_layout(), region);
+    return {};
 }
 
 } // namespace merian

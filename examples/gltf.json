@@ -41,7 +41,6 @@
         "fps limiter": false,
         "imgui event": "ui",
         "iterations in flight": 2,
-        "low latency": false,
         "time overwrite": "None"
     },
     "nodes": {

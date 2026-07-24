@@ -1,12 +1,13 @@
 #pragma once
 
-#include "merian-graph/graph/graph_run.hpp"
 #include "merian-graph/graph/node_io.hpp"
+#include "merian-graph/graph/node_process_info.hpp"
 
 #include "merian/shader/shader_object.hpp"
 #include "merian/shader/slang_composition.hpp"
 #include "merian/shader/slang_entry_point.hpp"
 #include "merian/shader/slang_program.hpp"
+#include "merian/vk/command/submission.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 
 #include <functional>
@@ -34,7 +35,7 @@ class ComputeKernel {
     ComputeKernel& operator=(const ComputeKernel&) = delete;
 
     // Binds graph io; returns the pipeline so the caller can push constants and dispatch.
-    PipelineHandle bind(GraphRun& run, const NodeIO& io);
+    PipelineHandle bind(const NodeIO& io, const NodeProcessInfo& info, Submission& submission);
 
     // Cursor into the global shader object, for writing node-internal (non-graph) fields before
     // bind().

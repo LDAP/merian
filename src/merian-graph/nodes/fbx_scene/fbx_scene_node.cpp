@@ -39,9 +39,12 @@ FBXSceneNode::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     return {{"scene", con_scene}};
 }
 
-void FBXSceneNode::process([[maybe_unused]] GraphRun& run, [[maybe_unused]] const NodeIO& io) {
+[[nodiscard]] FBXSceneNode::NodeStatusFlags
+FBXSceneNode::process([[maybe_unused]] const NodeIO& io,
+                      [[maybe_unused]] const NodeProcessInfo& info,
+                      Submission& submission) {
 #ifdef MERIAN_UFBX_ENABLED
-    const auto& cmd = run.get_cmd();
+    const auto& cmd = submission.get_cmd();
 
     if (scene->is_ready() && io.is_connected(con_controller)) {
         const InputControllerHandle& input = io[con_controller];
@@ -50,11 +53,11 @@ void FBXSceneNode::process([[maybe_unused]] GraphRun& run, [[maybe_unused]] cons
             registered_controller = input;
         }
         cam_controller->attach(scene->get_active_camera());
-        cam_controller->update(run.get_time_delta());
+        cam_controller->update(info.get_time_delta());
     }
 
-    scene->update(cmd, static_cast<float>(run.get_elapsed()),
-                  static_cast<float>(run.get_time_delta()), run.get_total_iteration());
+    scene->update(cmd, static_cast<float>(info.get_elapsed()),
+                  static_cast<float>(info.get_time_delta()), info.get_total_iteration());
 
     const Scene::UpdateChanges& changes = scene->get_last_update_changes();
     if (changes.geometry_changed)
@@ -66,6 +69,7 @@ void FBXSceneNode::process([[maybe_unused]] GraphRun& run, [[maybe_unused]] cons
 
     io[con_scene] = std::static_pointer_cast<Scene>(scene);
 #endif
+    return {};
 }
 
 FBXSceneNode::NodeStatusFlags FBXSceneNode::properties([[maybe_unused]] Properties& config) {

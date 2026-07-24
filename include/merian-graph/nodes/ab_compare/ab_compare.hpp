@@ -32,7 +32,8 @@ class ABSplit : public AbstractABCompare {
 
     std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
-    void process(GraphRun& run, const NodeIO& io) override;
+    [[nodiscard]] NodeStatusFlags
+    process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) override;
 
   private:
     ManagedVkImageOutHandle con_out;
@@ -45,7 +46,8 @@ class ABSideBySide : public AbstractABCompare {
 
     std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
-    void process(GraphRun& run, const NodeIO& io) override;
+    [[nodiscard]] NodeStatusFlags
+    process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) override;
 
   private:
     ManagedVkImageOutHandle con_out;

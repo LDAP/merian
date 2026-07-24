@@ -32,20 +32,14 @@ Graph::Graph(const GraphCreateInfo& create_info)
                   2,
                   [this](const uint32_t /*index*/) {
                       InFlightData in_flight_data;
-                      in_flight_data.command_pool = CommandPool::create(queue);
-                      in_flight_data.command_buffer_cache =
-                          std::make_shared<CachingCommandPool>(in_flight_data.command_pool);
+                      in_flight_data.submission =
+                          std::make_shared<Submission>(context, queue, cpu_queue);
                       in_flight_data.profiler_query_pool =
                           std::make_shared<merian::QueryPool<vk::QueryType::eTimestamp>>(
                               context, 1024, true);
                       return in_flight_data;
                   }),
-      run_profiler(std::make_shared<merian::Profiler>(context)),
-      graph_run(thread_pool,
-                cpu_queue,
-                resource_allocator,
-                queue,
-                context->find_provider<GLSLCompilerProvider>()->get_glsl_compiler()) {
+      run_profiler(std::make_shared<merian::Profiler>(context)), run_info(resource_allocator) {
 
     debug_utils = context->get_context_extension<ExtensionVkDebugUtils>(true);
     time_connect_reference = time_reference = std::chrono::high_resolution_clock::now();
@@ -100,15 +94,7 @@ void Graph::run() {
     InFlightData& in_flight_data = ring_fences.next_cycle_wait_get();
     gpu_wait_time = gpu_wait_time * 0.9 + sw_gpu_wait.duration() * 0.1;
 
-    // LOW LATENCY MODE
-    if (low_latency_mode && !needs_reconnect) {
-        const auto total_wait = std::max(
-            (std::max(gpu_wait_time, external_wait_time) + in_flight_data.cpu_sleep_time - 0.1ms),
-            0.00ms);
-        in_flight_data.cpu_sleep_time = 0.92 * total_wait;
-    } else {
-        in_flight_data.cpu_sleep_time = 0ms;
-    }
+    in_flight_data.cpu_sleep_time = 0ms;
 
     // FPS LIMITER
     if (limit_fps != 0) {
@@ -125,8 +111,7 @@ void Graph::run() {
         std::this_thread::sleep_for(in_flight_data.cpu_sleep_time);
     }
 
-    const std::shared_ptr<CachingCommandPool>& cmd_cache = in_flight_data.command_buffer_cache;
-    cmd_cache->reset();
+    in_flight_data.submission->reset();
 
     // Compute time stuff
     assert(time_overwrite < 3);
@@ -162,9 +147,21 @@ void Graph::run() {
 
         shader_object_allocator->set_iteration(ring_fences.current_cycle_index());
 
-        graph_run.begin_run(ring_fences.size(), cmd_cache, shader_object_allocator, run_iteration,
-                            total_iteration, ring_fences.current_cycle_index(), time_delta,
-                            duration_elapsed, duration_elapsed_since_connect, profiler);
+        // run_iteration resets on connect; timeline values must increase, so start a fresh
+        // semaphore.
+        if (run_iteration == 0) {
+            iteration_semaphore = TimelineSemaphore::create(context);
+        }
+        run_info.iteration_semaphore = iteration_semaphore;
+        run_info.shader_object_allocator = shader_object_allocator;
+        run_info.profiler = profiler;
+        run_info.iteration = run_iteration;
+        run_info.total_iteration = total_iteration;
+        run_info.in_flight_index = ring_fences.current_cycle_index();
+        run_info.iterations_in_flight = ring_fences.size();
+        run_info.time_delta = time_delta;
+        run_info.elapsed = duration_elapsed;
+        run_info.elapsed_since_connect = duration_elapsed_since_connect;
 
         // While preprocessing nodes can signalize that they need to reconnect as well
         {
@@ -176,7 +173,7 @@ void Graph::run() {
                                                                registry.node_type_name(node)));
                     const uint32_t set_idx = data.set_index(run_iteration);
                     Node::NodeStatusFlags flags =
-                        node->pre_process(graph_run, data.resource_maps[set_idx]);
+                        node->pre_process(data.resource_maps[set_idx], run_info);
                     if ((flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT) != 0u) {
                         SPDLOG_DEBUG("node {} requested reconnect in pre_process", data.identifier);
                         request_reconnect();
@@ -192,16 +189,17 @@ void Graph::run() {
     } while (needs_reconnect);
 
     // RUN
+    Submission& submission = *in_flight_data.submission;
     {
         MERIAN_PROFILE_SCOPE(profiler, "on_run_starting");
-        SPDLOG_TRACE("starting run: iteration: {}", graph_run.get_iteration());
-        on_run_starting(graph_run);
+        SPDLOG_TRACE("starting run: iteration: {}", run_info.get_iteration());
+        on_run_starting(run_info);
     }
     {
-        MERIAN_PROFILE_SCOPE_GPU(profiler, graph_run.get_cmd(), "Run nodes");
+        MERIAN_PROFILE_SCOPE_GPU(profiler, submission.get_cmd(), "Run nodes");
         for (auto& layer : layers) {
             if (layer.barrier.dstStageMask) {
-                graph_run.get_cmd()->barrier(layer.barrier);
+                submission.get_cmd()->barrier(layer.barrier);
             }
 
             for (auto& node : layer.nodes) {
@@ -210,14 +208,14 @@ void Graph::run() {
                 if (debug_utils) {
                     const std::string node_debug_name =
                         fmt::format("{} ({})", data.identifier, registry.node_type_name(node));
-                    debug_utils->cmd_begin_label(*graph_run.get_cmd(), node_debug_name);
+                    debug_utils->cmd_begin_label(*submission.get_cmd(), node_debug_name);
                     SPDLOG_TRACE("running node: {}", node_debug_name);
                 }
 
-                run_node(graph_run, node, data, profiler);
+                run_node(submission, node, data, profiler);
 
                 if (debug_utils)
-                    debug_utils->cmd_end_label(*graph_run.get_cmd());
+                    debug_utils->cmd_end_label(*submission.get_cmd());
             }
         }
     }
@@ -225,22 +223,21 @@ void Graph::run() {
     // FINISH RUN: submit
 
     {
-        MERIAN_PROFILE_SCOPE_GPU(profiler, graph_run.get_cmd(), "on_pre_submit");
-        on_pre_submit(graph_run);
+        MERIAN_PROFILE_SCOPE_GPU(profiler, submission.get_cmd(), "on_pre_submit");
+        on_pre_submit(run_info);
     }
 
     {
 
         MERIAN_PROFILE_SCOPE(profiler, "end run");
-        graph_run.end_run(ring_fences.reset());
+        submission.add_signal_semaphore(iteration_semaphore, run_iteration + 1);
+        submission.finish(ring_fences.reset());
     }
     {
         MERIAN_PROFILE_SCOPE(profiler, "on_post_submit");
         on_post_submit();
     }
 
-    external_wait_time = 0.9 * external_wait_time + 0.1 * graph_run.external_wait_time;
-    needs_reconnect |= graph_run.needs_reconnect;
     ++run_iteration;
     ++total_iteration;
     run_in_progress = false;
@@ -307,14 +304,14 @@ ProfilerHandle Graph::prepare_profiler_for_run(InFlightData& in_flight_data) {
     return run_profiler;
 }
 
-void Graph::run_node(GraphRun& run,
+void Graph::run_node(Submission& submission,
                      const NodeHandle& node,
                      NodeData& data,
                      [[maybe_unused]] const ProfilerHandle& profiler) {
     const uint32_t set_idx = data.set_index(run_iteration);
 
     MERIAN_PROFILE_SCOPE_GPU(
-        profiler, run.get_cmd(),
+        profiler, submission.get_cmd(),
         fmt::format("{} ({})", data.identifier, registry.node_type_name(node)));
 
     std::vector<vk::ImageMemoryBarrier2> image_barriers;
@@ -329,8 +326,8 @@ void Graph::run_node(GraphRun& run,
             }
 
             auto& [resource, resource_index] = per_input_info.precomputed_resources[set_idx];
-            const Connector::ConnectorStatusFlags flags = input->on_pre_process(
-                run, run.get_cmd(), resource, node, image_barriers, buffer_barriers);
+            const Connector::ConnectorStatusFlags flags =
+                input->on_pre_process(submission, resource, node, image_barriers, buffer_barriers);
             if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) != 0u) {
                 SPDLOG_DEBUG("input connector {} at node {} requested reconnect.",
                              data.input_name_for_connector.at(input), data.identifier);
@@ -339,8 +336,8 @@ void Graph::run_node(GraphRun& run,
         }
         for (auto& [output, per_output_info] : data.output_connections) {
             auto& [resource, resource_index] = per_output_info.precomputed_resources[set_idx];
-            const Connector::ConnectorStatusFlags flags = output->on_pre_process(
-                run, run.get_cmd(), resource, node, image_barriers, buffer_barriers);
+            const Connector::ConnectorStatusFlags flags =
+                output->on_pre_process(submission, resource, node, image_barriers, buffer_barriers);
             if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) != 0u) {
                 SPDLOG_DEBUG("output connector {} at node {} requested reconnect.",
                              data.output_name_for_connector.at(output), data.identifier);
@@ -349,14 +346,22 @@ void Graph::run_node(GraphRun& run,
         }
 
         if (!image_barriers.empty()) {
-            run.get_cmd()->barrier(image_barriers);
+            submission.get_cmd()->barrier(image_barriers);
             image_barriers.clear();
         }
     }
 
     {
         try {
-            node->process(run, data.resource_maps[set_idx]);
+            const Node::NodeStatusFlags flags =
+                node->process(data.resource_maps[set_idx], run_info, submission);
+            if ((flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT) != 0u) {
+                SPDLOG_DEBUG("node {} requested reconnect in process", data.identifier);
+                request_reconnect();
+            }
+            if ((flags & Node::NodeStatusFlagBits::REMOVE_NODE) != 0u) {
+                remove_node(data.identifier);
+            }
         } catch (const graph_errors::node_error& e) {
             data.errors_queued.emplace_back(fmt::format("node error: {}", e.what()));
         } catch (const GLSLShaderCompiler::compilation_failed& e) {
@@ -368,13 +373,6 @@ void Graph::run_node(GraphRun& run,
             request_reconnect();
             SPDLOG_ERROR("emergency reconnect.");
         }
-
-#ifndef NDEBUG
-        if (run.needs_reconnect && !get_needs_reconnect()) {
-            SPDLOG_DEBUG("node {} requested reconnect in process", data.identifier);
-            request_reconnect();
-        }
-#endif
     }
 
     {
@@ -386,8 +384,8 @@ void Graph::run_node(GraphRun& run,
             }
 
             auto& [resource, resource_index] = per_input_info.precomputed_resources[set_idx];
-            const Connector::ConnectorStatusFlags flags = input->on_post_process(
-                run, run.get_cmd(), resource, node, image_barriers, buffer_barriers);
+            const Connector::ConnectorStatusFlags flags =
+                input->on_post_process(submission, resource, node, image_barriers, buffer_barriers);
             if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) != 0u) {
                 SPDLOG_DEBUG("input connector {} at node {} requested reconnect.",
                              data.input_name_for_connector.at(input), data.identifier);
@@ -397,7 +395,7 @@ void Graph::run_node(GraphRun& run,
         for (auto& [output, per_output_info] : data.output_connections) {
             auto& [resource, resource_index] = per_output_info.precomputed_resources[set_idx];
             const Connector::ConnectorStatusFlags flags = output->on_post_process(
-                run, run.get_cmd(), resource, node, image_barriers, buffer_barriers);
+                submission, resource, node, image_barriers, buffer_barriers);
             if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) != 0u) {
                 SPDLOG_DEBUG("output connector {} at node {} requested reconnect.",
                              data.output_name_for_connector.at(output), data.identifier);
@@ -406,7 +404,7 @@ void Graph::run_node(GraphRun& run,
         }
 
         if (!image_barriers.empty()) {
-            run.get_cmd()->barrier(image_barriers);
+            submission.get_cmd()->barrier(image_barriers);
         }
     }
 }

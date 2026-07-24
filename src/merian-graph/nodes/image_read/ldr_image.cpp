@@ -26,11 +26,11 @@ LDRImageRead::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     }
 
     try {
-        ImageInfo info;
-        image = image_load_u8(filename, info, 4);
-        width = info.width;
-        height = info.height;
-        channels = info.channels;
+        ImageInfo image_info;
+        image = image_load_u8(filename, image_info, 4);
+        width = image_info.width;
+        height = image_info.height;
+        channels = image_info.channels;
     } catch (const std::runtime_error& e) {
         throw graph_errors::node_error{e.what()};
     }
@@ -40,24 +40,26 @@ LDRImageRead::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     return {{"out", con_out, ConnectorAccess::transfer_dst}};
 }
 
-void LDRImageRead::process([[maybe_unused]] GraphRun& run, const NodeIO& io) {
+[[nodiscard]] LDRImageRead::NodeStatusFlags
+LDRImageRead::process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) {
     if (!needs_run) {
-        return;
+        return {};
     }
     if (!image) {
-        ImageInfo info;
-        image = image_load_u8(filename, info, 4);
+        ImageInfo image_info;
+        image = image_load_u8(filename, image_info, 4);
     }
     SPDLOG_INFO("Loaded image from {} ({}x{}, {} channels)", filename.string(), width, height,
                 channels);
 
-    run.get_allocator()->get_staging()->cmd_to_device(run.get_cmd(), io[con_out],
-                                                      image->get_data());
+    info.get_allocator()->get_staging()->cmd_to_device(submission.get_cmd(), io[con_out],
+                                                       image->get_data());
 
     if (!keep_on_host) {
         image.reset();
     }
     needs_run = false;
+    return {};
 }
 
 LDRImageRead::NodeStatusFlags LDRImageRead::properties(Properties& config) {

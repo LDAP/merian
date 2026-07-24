@@ -6,8 +6,7 @@
 namespace merian {
 
 Connector::ConnectorStatusFlags
-VkImageIn::on_pre_process([[maybe_unused]] GraphRun& run,
-                          [[maybe_unused]] const CommandBufferHandle& cmd,
+VkImageIn::on_pre_process([[maybe_unused]] Submission& submission,
                           const GraphResourceHandle& resource,
                           [[maybe_unused]] const NodeHandle& node,
                           std::vector<vk::ImageMemoryBarrier2>& image_barriers,

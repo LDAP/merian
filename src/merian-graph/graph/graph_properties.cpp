@@ -12,7 +12,6 @@ void Graph::graph_properties(Properties& props) {
     props.output_text("Total Elapsed: {:%H:%M:%S}s", duration_elapsed);
     props.output_text("Time delta: {:04f}ms", to_milliseconds(time_delta));
     props.output_text("GPU wait: {:04f}ms", to_milliseconds(gpu_wait_time));
-    props.output_text("External wait: {:04f}ms", to_milliseconds(external_wait_time));
     props.output_text("Iterations in flight {:02}/{:02}", ring_fences.count_waiting(),
                       ring_fences.size());
 
@@ -51,10 +50,7 @@ void Graph::graph_properties(Properties& props) {
             limit_fps = std::max(1, limit_fps);
         }
     }
-    props.config_bool("low latency", low_latency_mode,
-                      "Experimental: Delays CPU processing to recude input latency in GPU bound "
-                      "applications. Might reduce framerate.");
-    if (low_latency_mode || limit_fps > 0) {
+    if (limit_fps > 0) {
         const InFlightData& in_flight_data = ring_fences.get().user_data;
         props.output_text("CPU sleep time: {:04f}ms",
                           to_milliseconds(in_flight_data.cpu_sleep_time));

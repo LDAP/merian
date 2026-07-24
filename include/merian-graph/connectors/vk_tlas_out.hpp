@@ -39,16 +39,14 @@ class VkTLASOut : public OutputConnector, public AccessibleConnector<TLASResourc
     TLASResource& resource(const GraphResourceHandle& resource) override;
 
     ConnectorStatusFlags
-    on_pre_process(GraphRun& run,
-                   const CommandBufferHandle& cmd,
+    on_pre_process(Submission& submission,
                    const GraphResourceHandle& resource,
                    const NodeHandle& node,
                    std::vector<vk::ImageMemoryBarrier2>& image_barriers,
                    std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override;
 
     ConnectorStatusFlags
-    on_post_process(GraphRun& run,
-                    const CommandBufferHandle& cmd,
+    on_post_process(Submission& submission,
                     const GraphResourceHandle& resource,
                     const NodeHandle& node,
                     std::vector<vk::ImageMemoryBarrier2>& image_barriers,

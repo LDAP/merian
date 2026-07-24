@@ -37,7 +37,7 @@ class Shadertoy : public AbstractCompute {
 
     std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
-    const void* get_push_constant(GraphRun& run, const NodeIO& io) override;
+    const void* get_push_constant(const NodeIO& io, const NodeProcessInfo& info) override;
 
     std::tuple<uint32_t, uint32_t, uint32_t>
     get_group_count(const NodeIO& io) const noexcept override;
@@ -45,7 +45,8 @@ class Shadertoy : public AbstractCompute {
     SlangCompositionHandle create_composition() override;
 
     // Polls the shader file for changes in file mode.
-    void write_constants(GraphRun& run, const NodeIO& io, ShaderCursor& cursor) override;
+    void
+    write_constants(const NodeIO& io, const NodeProcessInfo& info, ShaderCursor& cursor) override;
 
     NodeStatusFlags properties(Properties& config) override;
 

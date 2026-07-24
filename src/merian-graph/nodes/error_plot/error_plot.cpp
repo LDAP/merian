@@ -105,8 +105,10 @@ std::vector<OutputConnectorDescriptor> ErrorPlot::describe_outputs(const NodeIOL
         {"error", con_error, ConnectorAccess::compute_read_write | ConnectorAccess::transfer_src}};
 }
 
-ErrorPlot::NodeStatusFlags ErrorPlot::on_connected(const NodeConnectedInfo& info) {
-    const NodeIOLayout& io_layout = info.io_layout;
+ErrorPlot::NodeStatusFlags ErrorPlot::on_connected(const NodeIOLayout& io_layout,
+                                                   [[maybe_unused]] const NodeIO& io,
+                                                   const NodeConnectionInfo& info,
+                                                   [[maybe_unused]] Submission& submission) {
     io_layout.register_event_listener(
         "/graph/reload_shaders", [this](const GraphEvent::Info&, const GraphEvent::Data& force) {
             for (auto* kernel : {&error_to_buffer_kernel, &reduce_buffer_kernel}) {
@@ -115,11 +117,21 @@ ErrorPlot::NodeStatusFlags ErrorPlot::on_connected(const NodeConnectedInfo& info
             return true;
         });
 
+    readback_buffers.resize(info.iterations_in_flight);
+    for (BufferHandle& buffer : readback_buffers) {
+        if (!buffer) {
+            buffer = allocator->create_buffer(sizeof(float4), vk::BufferUsageFlagBits::eTransferDst,
+                                              MemoryMappingType::HOST_ACCESS_RANDOM,
+                                              "error_plot readback");
+        }
+    }
+
     return {};
 }
 
-void ErrorPlot::process(GraphRun& run, const NodeIO& io) {
-    const CommandBufferHandle& cmd = run.get_cmd();
+[[nodiscard]] ErrorPlot::NodeStatusFlags
+ErrorPlot::process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) {
+    const CommandBufferHandle& cmd = submission.get_cmd();
 
     // 1. pull the latest async readback into the plot history (graph thread only)
     bool new_sample = false;
@@ -148,8 +160,8 @@ void ErrorPlot::process(GraphRun& run, const NodeIO& io) {
 
     // 2. per-pixel error into the reduction buffer
     {
-        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "error to buffer");
-        const auto pipe = error_to_buffer_kernel->bind(run, io);
+        MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "error to buffer");
+        const auto pipe = error_to_buffer_kernel->bind(io, info, submission);
         cmd->push_constant(pipe, pc);
         cmd->dispatch(group_count_x, group_count_y, 1);
     }
@@ -160,7 +172,7 @@ void ErrorPlot::process(GraphRun& run, const NodeIO& io) {
     pc.count = group_count_x * group_count_y;
     PipelineHandle reduce_pipe;
     while (pc.count > 1) {
-        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd,
+        MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd,
                                  fmt::format("reduce {} elements", pc.count));
         cmd->barrier(vk::PipelineStageFlagBits::eComputeShader,
                      vk::PipelineStageFlagBits::eComputeShader,
@@ -168,7 +180,7 @@ void ErrorPlot::process(GraphRun& run, const NodeIO& io) {
                          vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite,
                          vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite));
         if (!reduce_pipe) {
-            reduce_pipe = reduce_buffer_kernel->bind(run, io);
+            reduce_pipe = reduce_buffer_kernel->bind(io, info, submission);
         }
         cmd->push_constant(reduce_pipe, pc);
         cmd->dispatch((pc.count + workgroup_size - 1) / workgroup_size, 1, 1);
@@ -178,21 +190,12 @@ void ErrorPlot::process(GraphRun& run, const NodeIO& io) {
     }
 
     // 4. non-blocking readback of the reduced value (must not stall the graph)
-    const uint32_t in_flight = run.get_in_flight_index();
-    if (readback_buffers.size() != run.get_iterations_in_flight()) {
-        readback_buffers.assign(run.get_iterations_in_flight(), nullptr);
-    }
-    if (!readback_buffers[in_flight]) {
-        readback_buffers[in_flight] =
-            allocator->create_buffer(sizeof(float4), vk::BufferUsageFlagBits::eTransferDst,
-                                     MemoryMappingType::HOST_ACCESS_RANDOM, "error_plot readback");
-    }
-    const BufferHandle readback = readback_buffers[in_flight];
+    const BufferHandle readback = readback_buffers[info.get_in_flight_index()];
     cmd->barrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eTransfer,
                  io[con_error]->buffer_barrier(vk::AccessFlagBits::eShaderWrite,
                                                vk::AccessFlagBits::eTransferRead));
     cmd->copy(static_cast<const BufferHandle&>(io[con_error]), readback);
-    run.sync_to_cpu([this, readback]() {
+    submission.sync_to_cpu([this, readback]() {
         const float4 value = *readback->get_memory()->map_as<float4>();
         readback->get_memory()->unmap();
         const std::scoped_lock lock(result_mutex);
@@ -205,7 +208,7 @@ void ErrorPlot::process(GraphRun& run, const NodeIO& io) {
     const ImageHandle input_img = io[con_input];
     const ImageHandle out_img = io[con_out];
     {
-        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "split view");
+        MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "split view");
         cmd->barrier(reference_img->barrier2(vk::ImageLayout::eGeneral));
         cmd->barrier(input_img->barrier2(vk::ImageLayout::eGeneral));
 
@@ -223,7 +226,7 @@ void ErrorPlot::process(GraphRun& run, const NodeIO& io) {
 
     // 6. overlay the plot, labels and values onto the split view
     {
-        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "overlay");
+        MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "overlay");
         const vk::Extent3D out_extent = out_img->get_extent();
         imgui_ctx->get_io().DisplaySize =
             ImVec2(static_cast<float>(out_extent.width), static_cast<float>(out_extent.height));
@@ -232,6 +235,7 @@ void ErrorPlot::process(GraphRun& run, const NodeIO& io) {
         imgui_ctx->with_context([&] { draw_overlay(out_extent.width, out_extent.height); });
         imgui_renderer->render(cmd, io[con_out].get_texture(0)->get_view());
     }
+    return {};
 }
 
 float4 ErrorPlot::metric_error() const {

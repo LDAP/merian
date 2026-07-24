@@ -56,8 +56,10 @@ std::vector<OutputConnectorDescriptor> Bloom::describe_outputs(const NodeIOLayou
     };
 }
 
-Bloom::NodeStatusFlags Bloom::on_connected(const NodeConnectedInfo& info) {
-    const NodeIOLayout& io_layout = info.io_layout;
+Bloom::NodeStatusFlags Bloom::on_connected(const NodeIOLayout& io_layout,
+                                           [[maybe_unused]] const NodeIO& io,
+                                           [[maybe_unused]] const NodeConnectionInfo& info,
+                                           [[maybe_unused]] Submission& submission) {
     io_layout.register_event_listener(
         "/graph/reload_shaders", [this](const GraphEvent::Info&, const GraphEvent::Data& force) {
             for (auto* kernel : {&separate_kernel, &composite_kernel}) {
@@ -69,9 +71,10 @@ Bloom::NodeStatusFlags Bloom::on_connected(const NodeConnectedInfo& info) {
     return {};
 }
 
-void Bloom::process(GraphRun& run, const NodeIO& io) {
-    const CommandBufferHandle& cmd = run.get_cmd();
-    const auto separate_pipe = separate_kernel->bind(run, io);
+[[nodiscard]] Bloom::NodeStatusFlags
+Bloom::process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) {
+    const CommandBufferHandle& cmd = submission.get_cmd();
+    const auto separate_pipe = separate_kernel->bind(io, info, submission);
     cmd->push_constant(separate_pipe, pc);
     cmd->dispatch(io[con_out]->get_extent(), local_size_x, local_size_y);
 
@@ -81,9 +84,10 @@ void Bloom::process(GraphRun& run, const NodeIO& io) {
     cmd->barrier(vk::PipelineStageFlagBits::eComputeShader,
                  vk::PipelineStageFlagBits::eComputeShader, bar);
 
-    const auto composite_pipe = composite_kernel->bind(run, io);
+    const auto composite_pipe = composite_kernel->bind(io, info, submission);
     cmd->push_constant(composite_pipe, pc);
     cmd->dispatch(io[con_out]->get_extent(), local_size_x, local_size_y);
+    return {};
 }
 
 Bloom::NodeStatusFlags Bloom::properties(Properties& config) {

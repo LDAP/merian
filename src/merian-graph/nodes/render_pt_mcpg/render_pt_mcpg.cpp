@@ -44,8 +44,11 @@ RenderMCPG::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
             {"debug", con_debug, ConnectorAccess::ray_tracing_write}};
 }
 
-RenderMCPG::NodeStatusFlags RenderMCPG::on_connected(const NodeConnectedInfo& info) {
-    const NodeIOLayout& io_layout = info.io_layout;
+RenderMCPG::NodeStatusFlags
+RenderMCPG::on_connected(const NodeIOLayout& io_layout,
+                         [[maybe_unused]] const NodeIO& io,
+                         [[maybe_unused]] const NodeConnectionInfo& info,
+                         [[maybe_unused]] Submission& submission) {
 
     // force the program graph to be rewired next process()
     composition = nullptr;
@@ -66,12 +69,13 @@ RenderMCPG::NodeStatusFlags RenderMCPG::on_connected(const NodeConnectedInfo& in
     return {};
 }
 
-void RenderMCPG::process(GraphRun& run, const NodeIO& io) {
-    const auto& cmd = run.get_cmd();
+[[nodiscard]] RenderMCPG::NodeStatusFlags
+RenderMCPG::process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) {
+    const auto& cmd = submission.get_cmd();
     const auto& scene = io[con_scene];
     const auto gbuf = io[con_gbuffer];
     if (!scene || !scene->is_ready())
-        return;
+        return {};
 
     if (max_path_length != emitted_max_path_length) {
         emitted_max_path_length = max_path_length;
@@ -115,17 +119,17 @@ void RenderMCPG::process(GraphRun& run, const NodeIO& io) {
         params.depends_on(entry_point);
 
         obj_allocator = std::make_shared<FrameCachingShaderObjectAllocator>(
-            resource_allocator, run.get_iterations_in_flight());
+            resource_allocator, info.get_iterations_in_flight());
     }
 
-    obj_allocator->set_iteration(run.get_in_flight_index());
+    obj_allocator->set_iteration(info.get_in_flight_index());
 
     const auto ep = entry_point.get();
     const auto pipe = pipeline.get();
     const auto params_obj = params.get();
 
     // Reset the persistent guiding state on the first frame of a run.
-    if (run.get_iteration() == 0) {
+    if (info.get_iteration() == 0) {
         irr_cache->reset(cmd);
         mcpg->reset(cmd);
     }
@@ -143,6 +147,7 @@ void RenderMCPG::process(GraphRun& run, const NodeIO& io) {
     ep->bind("params", params_obj, cmd, pipe, obj_allocator);
 
     cmd->trace_rays(sbt.get(), extent);
+    return {};
 }
 
 void RenderMCPG::update_render_constants() {

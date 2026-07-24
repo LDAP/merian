@@ -24,11 +24,13 @@ ColorImage::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     return {{"out", con_out, ConnectorAccess::transfer_dst}};
 }
 
-void ColorImage::process([[maybe_unused]] GraphRun& run, const NodeIO& io) {
+[[nodiscard]] ColorImage::NodeStatusFlags ColorImage::process(
+    const NodeIO& io, [[maybe_unused]] const NodeProcessInfo& info, Submission& submission) {
     if (needs_run) {
-        run.get_cmd()->clear(io[con_out], color);
+        submission.get_cmd()->clear(io[con_out], color);
         needs_run = false;
     }
+    return {};
 }
 
 ColorImage::NodeStatusFlags ColorImage::properties(Properties& config) {

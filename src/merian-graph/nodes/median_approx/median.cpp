@@ -59,8 +59,11 @@ MedianApproxNode::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layou
              ConnectorAccess::compute_read_write | ConnectorAccess::transfer_dst}};
 }
 
-MedianApproxNode::NodeStatusFlags MedianApproxNode::on_connected(const NodeConnectedInfo& info) {
-    const NodeIOLayout& io_layout = info.io_layout;
+MedianApproxNode::NodeStatusFlags
+MedianApproxNode::on_connected(const NodeIOLayout& io_layout,
+                               [[maybe_unused]] const NodeIO& io,
+                               [[maybe_unused]] const NodeConnectionInfo& info,
+                               [[maybe_unused]] Submission& submission) {
     io_layout.register_event_listener(
         "/graph/reload_shaders", [this](const GraphEvent::Info&, const GraphEvent::Data& force) {
             for (auto* kernel : {&histogram_kernel, &reduce_kernel}) {
@@ -72,8 +75,9 @@ MedianApproxNode::NodeStatusFlags MedianApproxNode::on_connected(const NodeConne
     return {};
 }
 
-void MedianApproxNode::process([[maybe_unused]] GraphRun& run, [[maybe_unused]] const NodeIO& io) {
-    const CommandBufferHandle& cmd = run.get_cmd();
+[[nodiscard]] MedianApproxNode::NodeStatusFlags
+MedianApproxNode::process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) {
+    const CommandBufferHandle& cmd = submission.get_cmd();
 
     cmd->fill(io[con_histogram], 0);
     auto bar = io[con_histogram]->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
@@ -82,7 +86,7 @@ void MedianApproxNode::process([[maybe_unused]] GraphRun& run, [[maybe_unused]] 
     cmd->barrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eComputeShader,
                  bar);
 
-    const auto histogram_pipe = histogram_kernel->bind(run, io);
+    const auto histogram_pipe = histogram_kernel->bind(io, info, submission);
     cmd->push_constant(histogram_pipe, pc);
     cmd->dispatch(io[con_src]->get_extent(), local_size_x, local_size_y);
 
@@ -92,9 +96,10 @@ void MedianApproxNode::process([[maybe_unused]] GraphRun& run, [[maybe_unused]] 
     cmd->barrier(vk::PipelineStageFlagBits::eComputeShader,
                  vk::PipelineStageFlagBits::eComputeShader, bar);
 
-    const auto reduce_pipe = reduce_kernel->bind(run, io);
+    const auto reduce_pipe = reduce_kernel->bind(io, info, submission);
     cmd->push_constant(reduce_pipe, pc);
     cmd->dispatch(1, 1, 1);
+    return {};
 }
 
 MedianApproxNode::NodeStatusFlags MedianApproxNode::properties(Properties& config) {

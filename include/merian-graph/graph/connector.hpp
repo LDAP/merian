@@ -3,10 +3,10 @@
 #include <memory>
 
 #include "connector_access.hpp"
-#include "graph_run.hpp"
 
 #include "merian/shader/shader_cursor.hpp"
 #include "merian/utils/properties.hpp"
+#include "merian/vk/command/submission.hpp"
 #include "merian/vk/descriptors/descriptor_set.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 
@@ -60,8 +60,7 @@ class Connector : public std::enable_shared_from_this<Connector> {
     // The graph supplies here the resource for the current iteration (depending on delay and such).
     [[nodiscard]]
     virtual ConnectorStatusFlags
-    on_pre_process([[maybe_unused]] GraphRun& run,
-                   [[maybe_unused]] const CommandBufferHandle& cmd,
+    on_pre_process([[maybe_unused]] Submission& submission,
                    [[maybe_unused]] const GraphResourceHandle& resource,
                    [[maybe_unused]] const NodeHandle& node,
                    [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
@@ -76,8 +75,7 @@ class Connector : public std::enable_shared_from_this<Connector> {
     // The graph supplies here the resource for the current iteration (depending on delay and such).
     [[nodiscard]]
     virtual ConnectorStatusFlags
-    on_post_process([[maybe_unused]] GraphRun& run,
-                    [[maybe_unused]] const CommandBufferHandle& cmd,
+    on_post_process([[maybe_unused]] Submission& submission,
                     [[maybe_unused]] const GraphResourceHandle& resource,
                     [[maybe_unused]] const NodeHandle& node,
                     [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,

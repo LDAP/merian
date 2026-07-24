@@ -3,10 +3,11 @@
 #include "connector_access.hpp"
 #include "connector_input.hpp"
 #include "connector_output.hpp"
-#include "graph_run.hpp"
 #include "node_io.hpp"
+#include "node_process_info.hpp"
 
 #include "merian/utils/properties.hpp"
+#include "merian/vk/command/submission.hpp"
 #include "merian/vk/extension/extension.hpp"
 
 #include <memory>
@@ -44,12 +45,6 @@ struct OutputConnectorDescriptor {
     // How this node accesses the resource. Host-side connectors (Ptr, Any, SpecialStatic) leave
     // it empty.
     ConnectorAccess access{};
-};
-
-struct NodeConnectedInfo {
-    const NodeIOLayout& io_layout;
-    // Record one-time device initialization here; submitted and awaited before the first run.
-    const CommandBufferHandle& cmd;
 };
 
 class Node : public std::enable_shared_from_this<Node> {
@@ -178,7 +173,10 @@ class Node : public std::enable_shared_from_this<Node> {
     //
     // Here also delayed inputs can be accessed from io_layout.
     [[nodiscard]]
-    virtual NodeStatusFlags on_connected([[maybe_unused]] const NodeConnectedInfo& info) {
+    virtual NodeStatusFlags on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
+                                         [[maybe_unused]] const NodeIO& io,
+                                         [[maybe_unused]] const NodeConnectionInfo& info,
+                                         [[maybe_unused]] Submission& submission) {
         return {};
     }
 
@@ -190,8 +188,8 @@ class Node : public std::enable_shared_from_this<Node> {
     //
     // Here you can access the resources for the run or set your own.
     [[nodiscard]]
-    virtual NodeStatusFlags pre_process([[maybe_unused]] const GraphRun& run,
-                                        [[maybe_unused]] const NodeIO& io) {
+    virtual NodeStatusFlags pre_process([[maybe_unused]] const NodeIO& io,
+                                        [[maybe_unused]] const NodeProcessInfo& info) {
         return {};
     }
 
@@ -206,7 +204,13 @@ class Node : public std::enable_shared_from_this<Node> {
     //
     // You can throw node_error and compilation_failed here. The graph then attempts to finish the
     // run and rebuild, however this is not supported and not recommended.
-    virtual void process([[maybe_unused]] GraphRun& run, [[maybe_unused]] const NodeIO& io) {}
+    // Return NEEDS_RECONNECT to reconnect before the next run, REMOVE_NODE to remove the node.
+    [[nodiscard]]
+    virtual NodeStatusFlags process([[maybe_unused]] const NodeIO& io,
+                                    [[maybe_unused]] const NodeProcessInfo& info,
+                                    [[maybe_unused]] Submission& submission) {
+        return {};
+    }
 
     // Declare your configuration options and output status information.
     // This method is not called as part of a run, meaning you cannot rely on it being called!

@@ -107,10 +107,10 @@ class ShaderObjectOut : public OutputConnector, public AccessibleConnector<Shade
             access.is_write() ? ShaderAccess::READ_WRITE : ShaderAccess::READ));
     }
 
-    void on_connected(const CommandBufferHandle& cmd,
+    void on_connected(Submission& submission,
                       const std::vector<GraphResourceHandle>& resources) override {
         for (const GraphResourceHandle& resource : resources) {
-            debugable_ptr_cast<ShaderObjectResource>(resource)->instance->on_connected(cmd);
+            debugable_ptr_cast<ShaderObjectResource>(resource)->instance->on_connected(submission);
         }
     }
 

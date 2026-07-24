@@ -53,7 +53,8 @@ class GBufferObject : public GraphShaderObject {
     // The textures always live in eGeneral: the gbuffer bundles sampled reads and storage
     // writes. Cleared so consumers never see garbage (out-of-bounds ids in a gbuffer hang the
     // GPU).
-    void on_connected(const CommandBufferHandle& cmd) override {
+    void on_connected(Submission& submission) override {
+        const CommandBufferHandle& cmd = submission.get_cmd();
         constexpr vk::AccessFlags2 all_access =
             vk::AccessFlagBits2::eMemoryWrite | vk::AccessFlagBits2::eMemoryRead;
         constexpr vk::PipelineStageFlags2 all_stages = vk::PipelineStageFlagBits2::eAllCommands;

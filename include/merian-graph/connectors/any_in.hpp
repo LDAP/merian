@@ -25,8 +25,7 @@ class AnyIn : public InputConnector,
     void on_connect_output(const OutputConnectorHandle& output) override;
 
     Connector::ConnectorStatusFlags
-    on_post_process(GraphRun& run,
-                    const CommandBufferHandle& cmd,
+    on_post_process(Submission& submission,
                     const GraphResourceHandle& resource,
                     const NodeHandle& node,
                     std::vector<vk::ImageMemoryBarrier2>& image_barriers,

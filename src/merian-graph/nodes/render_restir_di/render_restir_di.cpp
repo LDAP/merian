@@ -53,10 +53,10 @@ void RenderRestirDI::update_render_constants() {
                     "export static const bool merian_restir_visibility_shade = {};\n"
                     "export static const float merian_restir_boiling_filter_strength = {:f};\n"
                     "}}",
-                    emission_on_primary ? "true" : "false",
-                    demodulate_albedo ? "true" : "false", spp, spatial_iterations,
-                    temporal_bias_correction, spatial_bias_correction, apply_mv ? "true" : "false",
-                    visibility_shade ? "true" : "false", boiling_filter_strength));
+                    emission_on_primary ? "true" : "false", demodulate_albedo ? "true" : "false",
+                    spp, spatial_iterations, temporal_bias_correction, spatial_bias_correction,
+                    apply_mv ? "true" : "false", visibility_shade ? "true" : "false",
+                    boiling_filter_strength));
 }
 
 std::vector<InputConnectorDescriptor> RenderRestirDI::describe_inputs() {
@@ -74,8 +74,11 @@ RenderRestirDI::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout)
             {"reservoirs", con_reservoirs, ConnectorAccess::ray_tracing_read_write}};
 }
 
-RenderRestirDI::NodeStatusFlags RenderRestirDI::on_connected(const NodeConnectedInfo& info) {
-    const NodeIOLayout& io_layout = info.io_layout;
+RenderRestirDI::NodeStatusFlags
+RenderRestirDI::on_connected(const NodeIOLayout& io_layout,
+                             [[maybe_unused]] const NodeIO& io,
+                             [[maybe_unused]] const NodeConnectionInfo& info,
+                             [[maybe_unused]] Submission& submission) {
     composition = nullptr;
     obj_allocator = nullptr;
 
@@ -97,13 +100,14 @@ RenderRestirDI::NodeStatusFlags RenderRestirDI::on_connected(const NodeConnected
     return {};
 }
 
-void RenderRestirDI::process(GraphRun& run, const NodeIO& io) {
-    const auto& cmd = run.get_cmd();
+[[nodiscard]] RenderRestirDI::NodeStatusFlags
+RenderRestirDI::process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) {
+    const auto& cmd = submission.get_cmd();
     const auto& scene = io[con_scene];
     const auto gbuf = io[con_gbuffer];
     const auto prev_gbuf = io[con_prev_gbuffer];
     if (!scene || !scene->is_ready())
-        return;
+        return {};
 
     if (!composition) {
         composition = SlangComposition::create();
@@ -136,10 +140,10 @@ void RenderRestirDI::process(GraphRun& run, const NodeIO& io) {
         }
 
         obj_allocator = std::make_shared<FrameCachingShaderObjectAllocator>(
-            resource_allocator, run.get_iterations_in_flight());
+            resource_allocator, info.get_iterations_in_flight());
     }
 
-    obj_allocator->set_iteration(run.get_in_flight_index());
+    obj_allocator->set_iteration(info.get_in_flight_index());
 
     const bool spatial_enabled = spatial_iterations > 0;
     const vk::DeviceAddress scratch = pong_buffer->get_device_address();
@@ -152,7 +156,7 @@ void RenderRestirDI::process(GraphRun& run, const NodeIO& io) {
 
     RestirPushConstant pc{};
     pc.reservoirs_prev = prev;
-    pc.frame = static_cast<uint32_t>(run.get_iteration());
+    pc.frame = static_cast<uint32_t>(info.get_iteration());
     pc.seed = seed;
     pc.temporal_clamp_m = temporal_clamp_m;
     pc.spatial_radius = spatial_radius;
@@ -194,7 +198,7 @@ void RenderRestirDI::process(GraphRun& run, const NodeIO& io) {
     run_pass(Generate, 0, gen_buffer);
     sync(gen_handle);
 
-    if (temporal_enable && run.get_iteration() > 0) {
+    if (temporal_enable && info.get_iteration() > 0) {
         run_pass(Temporal, gen_buffer, gen_buffer);
         sync(gen_handle);
     }
@@ -205,6 +209,7 @@ void RenderRestirDI::process(GraphRun& run, const NodeIO& io) {
     }
 
     run_pass(Shade, out, out);
+    return {};
 }
 
 RenderRestirDI::NodeStatusFlags RenderRestirDI::properties(Properties& config) {

@@ -43,7 +43,7 @@ class Tonemap : public AbstractCompute {
 
     std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
-    const void* get_push_constant(GraphRun& run, const NodeIO& io) override;
+    const void* get_push_constant(const NodeIO& io, const NodeProcessInfo& info) override;
 
     std::tuple<uint32_t, uint32_t, uint32_t>
     get_group_count(const NodeIO& io) const noexcept override;

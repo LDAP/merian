@@ -63,8 +63,11 @@ MeanToBuffer::describe_outputs(const NodeIOLayout& io_layout) {
     return {{"mean", con_mean, ConnectorAccess::compute_read_write}};
 }
 
-MeanToBuffer::NodeStatusFlags MeanToBuffer::on_connected(const NodeConnectedInfo& info) {
-    const NodeIOLayout& io_layout = info.io_layout;
+MeanToBuffer::NodeStatusFlags
+MeanToBuffer::on_connected(const NodeIOLayout& io_layout,
+                           [[maybe_unused]] const NodeIO& io,
+                           [[maybe_unused]] const NodeConnectionInfo& info,
+                           [[maybe_unused]] Submission& submission) {
     io_layout.register_event_listener(
         "/graph/reload_shaders", [this](const GraphEvent::Info&, const GraphEvent::Data& force) {
             for (auto* kernel : {&image_to_buffer_kernel, &reduce_buffer_kernel}) {
@@ -76,16 +79,17 @@ MeanToBuffer::NodeStatusFlags MeanToBuffer::on_connected(const NodeConnectedInfo
     return {};
 }
 
-void MeanToBuffer::process([[maybe_unused]] GraphRun& run, const NodeIO& io) {
-    const CommandBufferHandle& cmd = run.get_cmd();
+[[nodiscard]] MeanToBuffer::NodeStatusFlags
+MeanToBuffer::process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) {
+    const CommandBufferHandle& cmd = submission.get_cmd();
     const auto group_count_x = (io[con_src]->get_extent().width + local_size_x - 1) / local_size_x;
     const auto group_count_y = (io[con_src]->get_extent().height + local_size_y - 1) / local_size_y;
 
     pc.divisor = io[con_src]->get_extent().width * io[con_src]->get_extent().height;
 
     {
-        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "image to buffer");
-        const auto pipe = image_to_buffer_kernel->bind(run, io);
+        MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "image to buffer");
+        const auto pipe = image_to_buffer_kernel->bind(io, info, submission);
         cmd->push_constant(pipe, pc);
         cmd->dispatch(group_count_x, group_count_y, 1);
     }
@@ -96,7 +100,7 @@ void MeanToBuffer::process([[maybe_unused]] GraphRun& run, const NodeIO& io) {
 
     PipelineHandle reduce_pipe;
     while (pc.count > 1) {
-        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd,
+        MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd,
                                  fmt::format("reduce {} elements", pc.count));
         auto bar = io[con_mean]->buffer_barrier(
             vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite,
@@ -105,7 +109,7 @@ void MeanToBuffer::process([[maybe_unused]] GraphRun& run, const NodeIO& io) {
                      vk::PipelineStageFlagBits::eComputeShader, bar);
 
         if (!reduce_pipe) {
-            reduce_pipe = reduce_buffer_kernel->bind(run, io);
+            reduce_pipe = reduce_buffer_kernel->bind(io, info, submission);
         }
         cmd->push_constant(reduce_pipe, pc);
         cmd->dispatch((pc.count + workgroup_size - 1) / workgroup_size, 1, 1);
@@ -113,6 +117,7 @@ void MeanToBuffer::process([[maybe_unused]] GraphRun& run, const NodeIO& io) {
         pc.count = (pc.count + workgroup_size - 1) / workgroup_size;
         pc.offset *= workgroup_size;
     }
+    return {};
 }
 
 } // namespace merian

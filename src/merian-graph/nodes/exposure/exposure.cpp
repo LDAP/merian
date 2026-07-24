@@ -64,8 +64,11 @@ AutoExposure::describe_outputs(const NodeIOLayout& io_layout) {
             {"avg_luminance", con_luminance, ConnectorAccess::compute_read_write}};
 }
 
-AutoExposure::NodeStatusFlags AutoExposure::on_connected(const NodeConnectedInfo& info) {
-    const NodeIOLayout& io_layout = info.io_layout;
+AutoExposure::NodeStatusFlags
+AutoExposure::on_connected(const NodeIOLayout& io_layout,
+                           [[maybe_unused]] const NodeIO& io,
+                           [[maybe_unused]] const NodeConnectionInfo& info,
+                           [[maybe_unused]] Submission& submission) {
     io_layout.register_event_listener(
         "/graph/reload_shaders", [this](const GraphEvent::Info&, const GraphEvent::Data& force) {
             for (auto* kernel : {&histogram_kernel, &luminance_kernel, &exposure_kernel}) {
@@ -77,11 +80,12 @@ AutoExposure::NodeStatusFlags AutoExposure::on_connected(const NodeConnectedInfo
     return {};
 }
 
-void AutoExposure::process(GraphRun& run, const NodeIO& io) {
-    const CommandBufferHandle& cmd = run.get_cmd();
+[[nodiscard]] AutoExposure::NodeStatusFlags
+AutoExposure::process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) {
+    const CommandBufferHandle& cmd = submission.get_cmd();
     if (pc.automatic == VK_TRUE) {
-        pc.reset = run.get_iteration() == 0 ? VK_TRUE : VK_FALSE;
-        pc.timediff = static_cast<float>(run.get_time_delta());
+        pc.reset = info.get_iteration() == 0 ? VK_TRUE : VK_FALSE;
+        pc.timediff = static_cast<float>(info.get_time_delta());
 
         auto bar = io[con_hist]->buffer_barrier(vk::AccessFlagBits::eShaderRead |
                                                     vk::AccessFlagBits::eShaderWrite,
@@ -97,7 +101,7 @@ void AutoExposure::process(GraphRun& run, const NodeIO& io) {
         cmd->barrier(vk::PipelineStageFlagBits::eTransfer,
                      vk::PipelineStageFlagBits::eComputeShader, bar);
 
-        const auto pipe = histogram_kernel->bind(run, io);
+        const auto pipe = histogram_kernel->bind(io, info, submission);
         cmd->push_constant(pipe, pc);
         cmd->dispatch(io[con_out]->get_extent(), LOCAL_SIZE_X, LOCAL_SIZE_Y);
 
@@ -108,7 +112,7 @@ void AutoExposure::process(GraphRun& run, const NodeIO& io) {
                      vk::PipelineStageFlagBits::eComputeShader, bar);
     }
 
-    const auto luminance_pipe = luminance_kernel->bind(run, io);
+    const auto luminance_pipe = luminance_kernel->bind(io, info, submission);
     cmd->push_constant(luminance_pipe, pc);
     cmd->dispatch(1, 1, 1);
 
@@ -118,9 +122,10 @@ void AutoExposure::process(GraphRun& run, const NodeIO& io) {
     cmd->barrier(vk::PipelineStageFlagBits::eComputeShader,
                  vk::PipelineStageFlagBits::eComputeShader, bar);
 
-    const auto exposure_pipe = exposure_kernel->bind(run, io);
+    const auto exposure_pipe = exposure_kernel->bind(io, info, submission);
     cmd->push_constant(exposure_pipe, pc);
     cmd->dispatch(io[con_out]->get_extent(), LOCAL_SIZE_X, LOCAL_SIZE_Y);
+    return {};
 }
 
 AutoExposure::NodeStatusFlags AutoExposure::properties(Properties& config) {

@@ -31,8 +31,11 @@ GBufferDebugNode::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layou
     return {{"image", con_output, ConnectorAccess::compute_write}};
 }
 
-GBufferDebugNode::NodeStatusFlags GBufferDebugNode::on_connected(const NodeConnectedInfo& info) {
-    const NodeIOLayout& io_layout = info.io_layout;
+GBufferDebugNode::NodeStatusFlags
+GBufferDebugNode::on_connected(const NodeIOLayout& io_layout,
+                               [[maybe_unused]] const NodeIO& io,
+                               [[maybe_unused]] const NodeConnectionInfo& info,
+                               [[maybe_unused]] Submission& submission) {
 
     // force the program graph to be rewired next process()
     composition = nullptr;
@@ -53,12 +56,13 @@ GBufferDebugNode::NodeStatusFlags GBufferDebugNode::on_connected(const NodeConne
     return {};
 }
 
-void GBufferDebugNode::process(GraphRun& run, const NodeIO& io) {
-    const auto& cmd = run.get_cmd();
+[[nodiscard]] GBufferDebugNode::NodeStatusFlags
+GBufferDebugNode::process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) {
+    const auto& cmd = submission.get_cmd();
     const auto& scene = io[con_scene];
     const auto gbuf = io[con_gbuffer];
     if (!scene || !scene->is_ready())
-        return;
+        return {};
 
     if (!composition) {
         composition = SlangComposition::create();
@@ -82,10 +86,10 @@ void GBufferDebugNode::process(GraphRun& run, const NodeIO& io) {
         params.depends_on(entry_point);
 
         obj_allocator = std::make_shared<FrameCachingShaderObjectAllocator>(
-            resource_allocator, run.get_iterations_in_flight());
+            resource_allocator, info.get_iterations_in_flight());
     }
 
-    obj_allocator->set_iteration(run.get_in_flight_index());
+    obj_allocator->set_iteration(info.get_in_flight_index());
 
     const auto ep = entry_point.get();
     const auto pipe = pipeline.get();
@@ -101,6 +105,7 @@ void GBufferDebugNode::process(GraphRun& run, const NodeIO& io) {
     cmd->push_constant(pipe, static_cast<int>(selected_field));
 
     cmd->dispatch(extent, 16, 16);
+    return {};
 }
 
 GBufferDebugNode::NodeStatusFlags GBufferDebugNode::properties(Properties& config) {

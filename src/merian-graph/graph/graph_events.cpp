@@ -116,11 +116,13 @@ void Graph::send_event(const GraphEvent::Info& event_info,
     }
 }
 
-void Graph::set_on_run_starting(const std::function<void(GraphRun& graph_run)>& on_run_starting) {
+void Graph::set_on_run_starting(
+    const std::function<void(const NodeProcessInfo& info)>& on_run_starting) {
     this->on_run_starting = on_run_starting;
 }
 
-void Graph::set_on_pre_submit(const std::function<void(GraphRun& graph_run)>& on_pre_submit) {
+void Graph::set_on_pre_submit(
+    const std::function<void(const NodeProcessInfo& info)>& on_pre_submit) {
     this->on_pre_submit = on_pre_submit;
 }
 

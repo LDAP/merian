@@ -27,16 +27,14 @@ class AnyOut : public OutputConnector, public AccessibleConnector<std::any&> {
     std::any& resource(const GraphResourceHandle& resource) override;
 
     Connector::ConnectorStatusFlags on_pre_process(
-        [[maybe_unused]] GraphRun& run,
-        [[maybe_unused]] const CommandBufferHandle& cmd,
+        [[maybe_unused]] Submission& submission,
         const GraphResourceHandle& resource,
         [[maybe_unused]] const NodeHandle& node,
         [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
         [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override;
 
     Connector::ConnectorStatusFlags on_post_process(
-        [[maybe_unused]] GraphRun& run,
-        [[maybe_unused]] const CommandBufferHandle& cmd,
+        [[maybe_unused]] Submission& submission,
         const GraphResourceHandle& resource,
         [[maybe_unused]] const NodeHandle& node,
         [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,

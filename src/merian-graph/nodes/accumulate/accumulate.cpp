@@ -69,8 +69,11 @@ std::vector<OutputConnectorDescriptor> Accumulate::describe_outputs(const NodeIO
     };
 }
 
-Accumulate::NodeStatusFlags Accumulate::on_connected(const NodeConnectedInfo& info) {
-    const NodeIOLayout& io_layout = info.io_layout;
+Accumulate::NodeStatusFlags
+Accumulate::on_connected(const NodeIOLayout& io_layout,
+                         [[maybe_unused]] const NodeIO& io,
+                         [[maybe_unused]] const NodeConnectionInfo& info,
+                         [[maybe_unused]] Submission& submission) {
     io_layout.register_event_listener(
         "/graph/reload_shaders", [this](const GraphEvent::Info&, const GraphEvent::Data& force) {
             for (auto* kernel : {&percentile_kernel, &accumulate_kernel}) {
@@ -117,13 +120,14 @@ Accumulate::NodeStatusFlags Accumulate::on_connected(const NodeConnectedInfo& in
     return {};
 }
 
-void Accumulate::process(GraphRun& run, const NodeIO& io) {
-    const CommandBufferHandle& cmd = run.get_cmd();
-    accumulate_pc.iteration = run.get_total_iteration();
+[[nodiscard]] Accumulate::NodeStatusFlags
+Accumulate::process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) {
+    const CommandBufferHandle& cmd = submission.get_cmd();
+    accumulate_pc.iteration = info.get_total_iteration();
 
     if (accumulate_pc.firefly_filter_enable == VK_TRUE ||
         accumulate_pc.adaptive_alpha_reduction > 0.0f) {
-        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "compute percentiles");
+        MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "compute percentiles");
         const auto bar = percentile_texture->get_image()->barrier(
             vk::ImageLayout::eGeneral, vk::AccessFlagBits::eShaderRead,
             vk::AccessFlagBits::eShaderWrite, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
@@ -133,7 +137,7 @@ void Accumulate::process(GraphRun& run, const NodeIO& io) {
 
         percentile_kernel->globals_cursor()["quartiles"].write(percentile_texture->get_view(),
                                                                vk::ImageLayout::eGeneral);
-        const auto pipe = percentile_kernel->bind(run, io);
+        const auto pipe = percentile_kernel->bind(io, info, submission);
         cmd->push_constant(pipe, percentile_pc);
         cmd->dispatch(percentile_group_count_x, percentile_group_count_y, 1);
     }
@@ -146,7 +150,7 @@ void Accumulate::process(GraphRun& run, const NodeIO& io) {
                  vk::PipelineStageFlagBits::eComputeShader, bar);
 
     {
-        if (run.get_iteration() == 0 || clear) {
+        if (info.get_iteration() == 0 || clear) {
             accumulate_pc.clear = VK_TRUE;
             io.send_event("clear");
             clear = false;
@@ -154,13 +158,14 @@ void Accumulate::process(GraphRun& run, const NodeIO& io) {
             accumulate_pc.clear = VK_FALSE;
         }
 
-        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "accumulate");
+        MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "accumulate");
         accumulate_kernel->globals_cursor()["quartiles"].write(
             percentile_texture, vk::ImageLayout::eShaderReadOnlyOptimal);
-        const auto pipe = accumulate_kernel->bind(run, io);
+        const auto pipe = accumulate_kernel->bind(io, info, submission);
         cmd->push_constant(pipe, accumulate_pc);
         cmd->dispatch(filter_group_count_x, filter_group_count_y);
     }
+    return {};
 }
 
 Accumulate::NodeStatusFlags Accumulate::properties(Properties& config) {

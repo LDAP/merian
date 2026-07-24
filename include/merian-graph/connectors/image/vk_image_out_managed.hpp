@@ -28,8 +28,7 @@ class ManagedVkImageOut : public VkImageOut, public AccessibleConnector<const Im
     const ImageArrayResource& resource(const GraphResourceHandle& resource) override;
 
     ConnectorStatusFlags
-    on_pre_process(GraphRun& run,
-                   const CommandBufferHandle& cmd,
+    on_pre_process(Submission& submission,
                    const GraphResourceHandle& resource,
                    const NodeHandle& node,
                    std::vector<vk::ImageMemoryBarrier2>& image_barriers,

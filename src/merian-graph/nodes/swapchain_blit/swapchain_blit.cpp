@@ -11,11 +11,12 @@ SwapchainBlit::describe_outputs(const NodeIOLayout& /*io_layout*/) {
     return {{"acquire", con_acquire_out}};
 }
 
-void SwapchainBlit::process(GraphRun& run, const NodeIO& io) {
+[[nodiscard]] SwapchainBlit::NodeStatusFlags SwapchainBlit::process(
+    const NodeIO& io, [[maybe_unused]] const NodeProcessInfo& info, Submission& submission) {
     const std::shared_ptr<SwapchainAcquireResult>& acquire = io[con_acquire];
     io[con_acquire_out] = acquire;
     if (!acquire) {
-        return;
+        return {};
     }
 
     ImageHandle src_image;
@@ -30,11 +31,11 @@ void SwapchainBlit::process(GraphRun& run, const NodeIO& io) {
     }
 
     if (!src_image) {
-        return;
+        return {};
     }
 
     // The acquired image's contents are undefined, so discard them on the transfer-dst barrier.
-    const CommandBufferHandle& cmd = run.get_cmd();
+    const CommandBufferHandle& cmd = submission.get_cmd();
     const ImageHandle dst_image = acquire->image_view->get_image();
     cmd->barrier(dst_image->barrier2(vk::ImageLayout::eTransferDstOptimal, true));
 
@@ -45,6 +46,7 @@ void SwapchainBlit::process(GraphRun& run, const NodeIO& io) {
     cmd_blit(mode, cmd, src_image, vk::ImageLayout::eGeneral, src_image->get_extent(), dst_image,
              vk::ImageLayout::eTransferDstOptimal, dst_image->get_extent(), vk::ClearColorValue{},
              filter);
+    return {};
 }
 
 Node::NodeStatusFlags SwapchainBlit::properties(Properties& config) {

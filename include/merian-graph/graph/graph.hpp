@@ -2,13 +2,13 @@
 
 #include "errors.hpp"
 #include "graph_description.hpp"
-#include "graph_run.hpp"
 #include "merian/utils/chrono.hpp"
 #include "merian/utils/concurrent/thread_pool.hpp"
 #include "merian/utils/ring_buffer.hpp"
 #include "merian/utils/vector.hpp"
 #include "merian/vk/utils/cpu_queue.hpp"
 #include "node.hpp"
+#include "node_process_info.hpp"
 #include "resource.hpp"
 
 #include "graph_data.hpp"
@@ -16,7 +16,7 @@
 #include "merian-graph/graph/node_registry.hpp"
 #include "merian/shader/shader_compiler.hpp"
 #include "merian/utils/math.hpp"
-#include "merian/vk/command/caching_command_pool.hpp"
+#include "merian/vk/command/submission.hpp"
 #include "merian/vk/context.hpp"
 #include "merian/vk/extension/extension_vk_debug_utils.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
@@ -62,11 +62,9 @@ class Graph : public std::enable_shared_from_this<Graph> {
     // Data that is stored for every iteration in flight.
     // Created for each iteration in flight in Graph::Graph.
     struct InFlightData {
-        // The command pool for the current iteration.
-        // We do not use RingCommandPool here since we might want to add a more custom
-        // setup later (multi-threaded, multi-queues,...).
-        CommandPoolHandle command_pool;
-        std::shared_ptr<CachingCommandPool> command_buffer_cache;
+        // The submission for the current iteration. One per slot so its command pool is only
+        // reset once the iteration's fence was awaited.
+        SubmissionHandle submission;
         // Query pools for the profiler
         QueryPoolHandle<vk::QueryType::eTimestamp> profiler_query_pool;
         // Tasks that should be run in the current iteration after acquiring the fence.
@@ -237,7 +235,7 @@ class Graph : public std::enable_shared_from_this<Graph> {
 
     // Calls connector callbacks, checks resource states and records as well as applies descriptor
     // set updates.
-    void run_node(GraphRun& run,
+    void run_node(Submission& submission,
                   const NodeHandle& node,
                   NodeData& data,
                   [[maybe_unused]] const ProfilerHandle& profiler);
@@ -314,11 +312,12 @@ class Graph : public std::enable_shared_from_this<Graph> {
 
     // Set a callback that is executed right after nodes are preprocessed and before any node is
     // run.
-    void set_on_run_starting(const std::function<void(GraphRun& graph_run)>& on_run_starting);
+    void
+    set_on_run_starting(const std::function<void(const NodeProcessInfo& info)>& on_run_starting);
 
     // Set a callback that is executed right before the commands for this run are submitted to
     // the GPU.
-    void set_on_pre_submit(const std::function<void(GraphRun& graph_run)>& on_pre_submit);
+    void set_on_pre_submit(const std::function<void(const NodeProcessInfo& info)>& on_pre_submit);
 
     // Set a callback that is executed right after the run was submitted to the queue and the
     // run callbacks were called.
@@ -337,11 +336,9 @@ class Graph : public std::enable_shared_from_this<Graph> {
     NodeRegistry& registry;
 
     // Outside callbacks
-    // clang-format off
-    std::function<void(GraphRun& graph_run)>                                on_run_starting = [](GraphRun&) {};
-    std::function<void(GraphRun& graph_run)>                                on_pre_submit = [](GraphRun&) {};
-    std::function<void()>                                                   on_post_submit = [] {};
-    // clang-format on
+    std::function<void(const NodeProcessInfo&)> on_run_starting = [](const NodeProcessInfo&) {};
+    std::function<void(const NodeProcessInfo&)> on_pre_submit = [](const NodeProcessInfo&) {};
+    std::function<void()> on_post_submit = [] {};
 
     // Per-iteration data management
     uint32_t desired_iterations_in_flight = 2;
@@ -374,9 +371,7 @@ class Graph : public std::enable_shared_from_this<Graph> {
 
     bool flush_thread_pool_at_run_start = true;
 
-    bool low_latency_mode = false;
     std::chrono::duration<double> gpu_wait_time = 0ns;
-    std::chrono::duration<double> external_wait_time = 0ns;
     int32_t limit_fps = 0;
 
     Profiler::Report last_build_report;
@@ -447,7 +442,8 @@ class Graph : public std::enable_shared_from_this<Graph> {
     int add_connection_selected_dst = 0;
     int add_connection_selected_dst_input = 0;
 
-    GraphRun graph_run;
+    NodeProcessInfo run_info;
+    TimelineSemaphoreHandle iteration_semaphore;
 
     std::shared_ptr<MerianGraphExtension> context_extension;
 };

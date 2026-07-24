@@ -2,6 +2,7 @@
 
 #include "connector.hpp"
 
+#include "merian/vk/command/submission.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 
 namespace merian {
@@ -44,9 +45,9 @@ class OutputConnector : public Connector {
     virtual void on_connect_input([[maybe_unused]] const InputConnectorHandle& input) {}
 
     // Called once after the graph is connected with all resources of this output (one per ring
-    // slot). Record one-time device initialization on cmd; it is submitted and awaited before the
-    // first run.
-    virtual void on_connected([[maybe_unused]] const CommandBufferHandle& cmd,
+    // slot). Record one-time device initialization; it is submitted and awaited before the first
+    // run.
+    virtual void on_connected([[maybe_unused]] Submission& submission,
                               [[maybe_unused]] const std::vector<GraphResourceHandle>& resources) {}
 
     virtual void properties(Properties& config) {

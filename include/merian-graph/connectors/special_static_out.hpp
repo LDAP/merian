@@ -42,8 +42,7 @@ class SpecialStaticOut : public OutputConnector,
     }
 
     Connector::ConnectorStatusFlags on_post_process(
-        [[maybe_unused]] GraphRun& run,
-        [[maybe_unused]] const CommandBufferHandle& cmd,
+        [[maybe_unused]] Submission& submission,
         [[maybe_unused]] const GraphResourceHandle& resource,
         [[maybe_unused]] const NodeHandle& node,
         [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,

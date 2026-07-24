@@ -121,8 +121,8 @@ SlangCompositionHandle Shadertoy::create_composition() {
     return composition;
 }
 
-void Shadertoy::write_constants([[maybe_unused]] GraphRun& run,
-                                [[maybe_unused]] const NodeIO& io,
+void Shadertoy::write_constants([[maybe_unused]] const NodeIO& io,
+                                [[maybe_unused]] const NodeProcessInfo& info,
                                 [[maybe_unused]] ShaderCursor& cursor) {
     // hot reload: pick up edits to the shader file; keep the last working shader on error
     if (shader_source_selector != 1 || !std::filesystem::exists(resolved_shader_path)) {
@@ -138,8 +138,7 @@ void Shadertoy::write_constants([[maybe_unused]] GraphRun& run,
     }
 }
 
-const void* Shadertoy::get_push_constant([[maybe_unused]] GraphRun& run,
-                                         [[maybe_unused]] const NodeIO& io) {
+const void* Shadertoy::get_push_constant(const NodeIO& io, const NodeProcessInfo& info) {
     // iMouse from the optional controller (xy: current, zw: click; y measured from the bottom).
     if (io.is_connected(con_controller)) {
         const InputControllerHandle& controller = io[con_controller];
@@ -154,9 +153,9 @@ const void* Shadertoy::get_push_constant([[maybe_unused]] GraphRun& run,
         constant.iMouse.w = (h - mouse_input->click_y) * (mouse_input->down ? 1.0f : -1.0f);
     }
 
-    constant.iTimeDelta = static_cast<float>(run.get_time_delta());
-    constant.iTime = static_cast<float>(run.get_elapsed());
-    constant.iFrame = static_cast<int32_t>(run.get_total_iteration());
+    constant.iTimeDelta = static_cast<float>(info.get_time_delta());
+    constant.iTime = static_cast<float>(info.get_elapsed());
+    constant.iFrame = static_cast<int32_t>(info.get_total_iteration());
 
     const auto now = std::chrono::system_clock::now();
     const auto now_d = std::chrono::floor<std::chrono::days>(now);

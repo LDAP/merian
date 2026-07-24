@@ -33,8 +33,7 @@ class PtrIn : public InputConnector,
     }
 
     Connector::ConnectorStatusFlags on_post_process(
-        [[maybe_unused]] GraphRun& run,
-        [[maybe_unused]] const CommandBufferHandle& cmd,
+        [[maybe_unused]] Submission& submission,
         const GraphResourceHandle& resource,
         [[maybe_unused]] const NodeHandle& node,
         [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,

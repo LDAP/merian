@@ -22,8 +22,7 @@ class VkImageIn : public InputConnector,
 
     // A delayed input reads a ring slot before its producer ever transitioned it.
     ConnectorStatusFlags
-    on_pre_process(GraphRun& run,
-                   const CommandBufferHandle& cmd,
+    on_pre_process(Submission& submission,
                    const GraphResourceHandle& resource,
                    const NodeHandle& node,
                    std::vector<vk::ImageMemoryBarrier2>& image_barriers,

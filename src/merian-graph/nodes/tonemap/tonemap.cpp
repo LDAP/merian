@@ -83,8 +83,8 @@ Tonemap::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     };
 }
 
-const void* Tonemap::get_push_constant([[maybe_unused]] GraphRun& run,
-                                       [[maybe_unused]] const NodeIO& io) {
+const void* Tonemap::get_push_constant([[maybe_unused]] const NodeIO& io,
+                                       [[maybe_unused]] const NodeProcessInfo& info) {
     return &pc;
 }
 

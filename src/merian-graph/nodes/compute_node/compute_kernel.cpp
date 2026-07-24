@@ -44,7 +44,8 @@ ComputeKernel::ComputeKernel(const ContextHandle& context,
           },
           spec) {}
 
-PipelineHandle ComputeKernel::bind(GraphRun& run, const NodeIO& io) {
+PipelineHandle
+ComputeKernel::bind(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) {
     const auto ep = entry_point.get();
     const auto pipe = pipeline.get();
     const auto global = globals.get();
@@ -52,9 +53,9 @@ PipelineHandle ComputeKernel::bind(GraphRun& run, const NodeIO& io) {
     ShaderCursor cursor = global->get_cursor();
     io.bind(cursor);
 
-    const CommandBufferHandle& cmd = run.get_cmd();
+    const CommandBufferHandle& cmd = submission.get_cmd();
     cmd->bind(pipe);
-    ep->bind_global(global, cmd, pipe, run.get_shader_object_allocator());
+    ep->bind_global(global, cmd, pipe, info.get_shader_object_allocator());
     return pipe;
 }
 

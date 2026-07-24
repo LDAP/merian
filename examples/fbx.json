@@ -33,7 +33,6 @@
         "flush thread pool": true,
         "fps limiter": false,
         "iterations in flight": 2,
-        "low latency": false,
         "time overwrite": "None"
     },
     "nodes": {

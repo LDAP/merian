@@ -34,8 +34,7 @@ void ManagedVkImageOut::bind(ShaderCursor& cursor,
 }
 
 Connector::ConnectorStatusFlags ManagedVkImageOut::on_pre_process(
-    [[maybe_unused]] GraphRun& run,
-    [[maybe_unused]] const CommandBufferHandle& cmd,
+    [[maybe_unused]] Submission& submission,
     const GraphResourceHandle& resource,
     [[maybe_unused]] const NodeHandle& node,
     std::vector<vk::ImageMemoryBarrier2>& image_barriers,

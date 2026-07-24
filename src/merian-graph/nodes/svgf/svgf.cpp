@@ -67,7 +67,10 @@ std::vector<OutputConnectorDescriptor> SVGF::describe_outputs(const NodeIOLayout
     return {{"out", con_out, ConnectorAccess::compute_write}};
 }
 
-SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeConnectedInfo& info) {
+SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
+                                         [[maybe_unused]] const NodeIO& io,
+                                         [[maybe_unused]] const NodeConnectionInfo& info,
+                                         [[maybe_unused]] Submission& submission) {
     const uint32_t max_wg_size_vendor = context->get_physical_device()->is_amd() ? 32 : 16;
 
     variance_estimate_local_size = workgroup_size_for_shared_memory_with_halo(
@@ -205,8 +208,9 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeConnectedInf
     return {};
 }
 
-void SVGF::process(GraphRun& run, const NodeIO& io) {
-    const CommandBufferHandle& cmd = run.get_cmd();
+[[nodiscard]] SVGF::NodeStatusFlags
+SVGF::process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) {
+    const CommandBufferHandle& cmd = submission.get_cmd();
 
     // graph resources can change every iteration (ring, delay)
     {
@@ -224,7 +228,7 @@ void SVGF::process(GraphRun& run, const NodeIO& io) {
 
     // PREPARE (VARIANCE ESTIMATE)
     {
-        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "estimate variance");
+        MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "estimate variance");
         // prepare image to write to
         auto bar = ping_pong_res[0].ping_pong->get_image()->barrier(
             vk::ImageLayout::eGeneral, vk::AccessFlagBits::eShaderRead,
@@ -240,7 +244,7 @@ void SVGF::process(GraphRun& run, const NodeIO& io) {
         // run kernel
         cmd->bind(variance_estimate);
         variance_estimate_module->bind_global(variance_estimate_globals, cmd, variance_estimate,
-                                              run.get_shader_object_allocator());
+                                              info.get_shader_object_allocator());
         VarianceEstimatePushConstant precomputed_variance_estimate_pc = variance_estimate_pc;
         precomputed_variance_estimate_pc.depth_accept =
             -10.0f / precomputed_variance_estimate_pc.depth_accept;
@@ -263,7 +267,7 @@ void SVGF::process(GraphRun& run, const NodeIO& io) {
 
     // FILTER
     for (int i = 0; i < svgf_iterations; i++) {
-        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, fmt::format("filter iteration {}", i));
+        MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, fmt::format("filter iteration {}", i));
         EAWRes& write_res = ping_pong_res[!(i & 1)];
 
         // prepare image to write to
@@ -281,7 +285,7 @@ void SVGF::process(GraphRun& run, const NodeIO& io) {
         // run filter; filter_globals[i & 1] reads ping_pong_res[i & 1], writes write_res
         cmd->bind(filters[i]);
         filter_module->bind_global(filter_globals[i & 1], cmd, filters[i],
-                                   run.get_shader_object_allocator());
+                                   info.get_shader_object_allocator());
         FilterPushConstant precomputed_filter_pc = filter_pc;
         precomputed_filter_pc.param_z = -10.0f / precomputed_filter_pc.param_z;
         cmd->push_constant(filters[i], precomputed_filter_pc);
@@ -301,12 +305,13 @@ void SVGF::process(GraphRun& run, const NodeIO& io) {
 
     // TAA
     {
-        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "taa");
+        MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "taa");
         cmd->bind(taa);
-        taa_module->bind_global(taa_globals, cmd, taa, run.get_shader_object_allocator());
+        taa_module->bind_global(taa_globals, cmd, taa, info.get_shader_object_allocator());
         cmd->push_constant(taa, taa_pc);
         cmd->dispatch(io[con_out]->get_extent(), taa_local_size, taa_local_size);
     }
+    return {};
 }
 
 SVGF::NodeStatusFlags SVGF::properties(Properties& config) {

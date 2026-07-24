@@ -19,15 +19,19 @@ class WindowNode : public Node {
     void initialize(const ContextHandle& context,
                     const ResourceAllocatorHandle& allocator) override;
 
-    NodeStatusFlags on_connected(const NodeConnectedInfo& info) override;
+    NodeStatusFlags on_connected(const NodeIOLayout& io_layout,
+                                 const NodeIO& io,
+                                 const NodeConnectionInfo& info,
+                                 Submission& submission) override;
 
     std::vector<InputConnectorDescriptor> describe_inputs() override;
 
     std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
-    NodeStatusFlags pre_process(const GraphRun& run, const NodeIO& io) override;
+    NodeStatusFlags pre_process(const NodeIO& io, const NodeProcessInfo& info) override;
 
-    void process(GraphRun& run, const NodeIO& io) override;
+    [[nodiscard]] NodeStatusFlags
+    process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) override;
 
     NodeStatusFlags properties(Properties& config) override;
 

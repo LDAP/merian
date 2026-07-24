@@ -81,9 +81,13 @@ class ErrorPlot : public Node {
 
     std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
-    NodeStatusFlags on_connected(const NodeConnectedInfo& info) override;
+    NodeStatusFlags on_connected(const NodeIOLayout& io_layout,
+                                 const NodeIO& io,
+                                 const NodeConnectionInfo& info,
+                                 Submission& submission) override;
 
-    void process(GraphRun& run, const NodeIO& io) override;
+    [[nodiscard]] NodeStatusFlags
+    process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) override;
 
     NodeStatusFlags properties(Properties& config) override;
 

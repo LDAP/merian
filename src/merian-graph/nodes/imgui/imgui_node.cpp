@@ -21,11 +21,12 @@ std::vector<OutputConnectorDescriptor> ImGuiNode::describe_outputs(const NodeIOL
     return {{"acquire", con_acquire_out}};
 }
 
-void ImGuiNode::process(GraphRun& run, const NodeIO& io) {
+[[nodiscard]] ImGuiNode::NodeStatusFlags
+ImGuiNode::process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) {
     const std::shared_ptr<SwapchainAcquireResult>& acquire = io[con_acquire];
     io[con_acquire_out] = acquire;
     if (!acquire) {
-        return;
+        return {};
     }
 
     const std::shared_ptr<Window>& window = io[con_window];
@@ -37,10 +38,10 @@ void ImGuiNode::process(GraphRun& run, const NodeIO& io) {
     imgui_backend->new_frame(static_cast<float>(frametime.seconds()));
     frametime.reset();
 
-    const double dt_ms = run.get_time_delta() * 1000.0;
+    const double dt_ms = info.get_time_delta() * 1000.0;
     const std::string title =
         fmt::format("merian ({:.2f} ms, {:.1f} fps) Frame {}###{}", dt_ms,
-                    dt_ms > 0.0 ? 1000.0 / dt_ms : 0.0, run.get_total_iteration(), imgui_event);
+                    dt_ms > 0.0 ? 1000.0 / dt_ms : 0.0, info.get_total_iteration(), imgui_event);
     imgui_ctx->with_context([&] {
         if (ImGui::Begin(title.c_str())) {
             ImGuiProperties props;
@@ -49,7 +50,8 @@ void ImGuiNode::process(GraphRun& run, const NodeIO& io) {
         ImGui::End();
     });
 
-    imgui_renderer->render(run.get_cmd(), acquire->image_view);
+    imgui_renderer->render(submission.get_cmd(), acquire->image_view);
+    return {};
 }
 
 ImGuiNode::NodeStatusFlags ImGuiNode::properties(Properties& config) {
