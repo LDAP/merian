@@ -115,8 +115,9 @@ class SlangSession {
                 {
                     slang::CompilerOptionName::DebugInformation,
                     {slang::CompilerOptionValueKind::Int,
-                     static_cast<int32_t>(shader_compile_context->should_generate_debug_info()), 0,
-                     nullptr, nullptr},
+                     static_cast<int32_t>(
+                         debug_info_level(shader_compile_context->should_generate_debug_info())),
+                     0, nullptr, nullptr},
                 },
             },
         };
@@ -678,6 +679,10 @@ class SlangSession {
     ~SlangSession();
 
   private:
+    static constexpr SlangDebugInfoLevel debug_info_level(const bool generate_debug_info) {
+        return generate_debug_info ? SLANG_DEBUG_INFO_LEVEL_MAXIMAL : SLANG_DEBUG_INFO_LEVEL_NONE;
+    }
+
     static std::string diagnostics_as_string(Slang::ComPtr<slang::IBlob>& diagnostics_blob) {
         if (diagnostics_blob == nullptr) {
             return {};
