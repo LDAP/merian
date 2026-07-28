@@ -223,6 +223,35 @@ TEST(GraphCli, VariantSticky) {
     EXPECT_EQ(config["cli"]["quality"]["selected"], "low");
 }
 
+TEST(GraphCli, VariantCustomFile) {
+    const std::filesystem::path file =
+        std::filesystem::temp_directory_path() / "merian-test-custom-renderer.json";
+    {
+        std::ofstream out(file);
+        out << R"({"nodes": {"render": {"properties": {"samples per pixel": 16}}}})";
+    }
+
+    json config = json::parse(R"({
+        "nodes": {"scene": {}},
+        "cli": {"renderer": {"type": "variant", "default": "pt",
+                             "variants": {"pt": {"set": {"/nodes/scene/properties/x": 1}}}}}
+    })");
+
+    // a path merges the fragment, suppresses the default, and persists as the selection
+    EXPECT_TRUE(GraphDescription::apply_cli(config, {"--renderer", file.string()}));
+    EXPECT_EQ(config["nodes"]["render"]["properties"]["samples per pixel"], 16);
+    EXPECT_EQ(config["cli"]["renderer"]["selected"], file.string());
+    EXPECT_FALSE(config["nodes"]["scene"].contains("properties"));
+
+    json missing = json::parse(R"({
+        "cli": {"renderer": {"type": "variant", "variants": {}}}
+    })");
+    EXPECT_FALSE(GraphDescription::apply_cli(missing, {"--renderer", "does/not/exist.json"}));
+    EXPECT_FALSE(missing["cli"]["renderer"].contains("selected"));
+
+    std::filesystem::remove(file);
+}
+
 TEST(GraphCli, PatchMergeThenSet) {
     const std::filesystem::path file =
         std::filesystem::temp_directory_path() / "merian-test-merge-set.json";

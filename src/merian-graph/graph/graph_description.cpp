@@ -470,7 +470,11 @@ std::optional<Patch> resolve(const Override& o, const std::string& value, const 
         if (const auto it = o.variants.find(value); it != o.variants.end()) {
             return it->second;
         }
-        SPDLOG_ERROR("--{}: unknown '{}', expected one of {}", o.name, value,
+        // a path merges a custom fragment (e.g. --renderer my/renderer.json)
+        if (value.ends_with(".json") || value.find('/') != std::string::npos) {
+            return Patch{.assignments = {}, .merges = {value}};
+        }
+        SPDLOG_ERROR("--{}: unknown '{}', expected one of {} or a .json fragment", o.name, value,
                      join_keys(o.variants, ", "));
         return std::nullopt;
     }
@@ -484,7 +488,7 @@ std::string usage(const Override& o) {
     case Override::Kind::FLAG:
         return fmt::format("--{} <on|off>", o.name);
     case Override::Kind::VARIANT:
-        return fmt::format("--{} <{}>", o.name, join_keys(o.variants, "|"));
+        return fmt::format("--{} <{}|file.json>", o.name, join_keys(o.variants, "|"));
     }
     return {};
 }
@@ -703,8 +707,9 @@ bool GraphDescription::apply_cli(nlohmann::json& config,
             } else {
                 const auto it = std::ranges::find(overrides, name, &Override::name);
                 const std::optional<Patch> patch = resolve(*it, value, config);
-                ok = patch && apply_patch(config, *patch, search_dirs) && ok;
-                if (patch && it->kind == Override::Kind::VARIANT) {
+                const bool applied = patch && apply_patch(config, *patch, search_dirs);
+                ok = applied && ok;
+                if (applied && it->kind == Override::Kind::VARIANT) {
                     config["cli"][name]["selected"] = value;
                 }
             }

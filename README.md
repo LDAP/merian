@@ -30,7 +30,7 @@ Example graphs for `merian-graph-run` are in the [`examples`](https://github.com
 - [`shadertoy.json`](https://github.com/LDAP/merian/tree/main/examples/shadertoy.json): runs a Shadertoy-style shader — `merian-graph-run examples/shadertoy.json <shader.glsl>`.
 - [`gltf.json`](https://github.com/LDAP/merian/tree/main/examples/gltf.json) / [`fbx.json`](https://github.com/LDAP/merian/tree/main/examples/fbx.json): a glTF / FBX scene viewer — `merian-graph-run examples/gltf.json <scene.gltf> [options]`. Options:
     - `<scene>` (required): path to the glTF / FBX scene to load.
-    - `--renderer <pt|mcpg|restir_di>`: renderer, merged from [`examples/renderers`](https://github.com/LDAP/merian/tree/main/examples/renderers) (default: `pt`; the selection persists when the graph is stored).
+    - `--renderer <pt|mcpg|restir_di>`: renderer, merged from [`examples/renderers`](https://github.com/LDAP/merian/tree/main/examples/renderers) (default: `pt`; the selection persists when the graph is stored). Also accepts a path to a custom renderer fragment, e.g. `--renderer my/renderer.json`.
     - `--env-map <path>`: lat-long HDR environment map (sets the env type to `LatLong`).
     - `--max-path-length <n>`: maximum path length (`pt`, `mcpg`).
     - `--spp <n>`: samples per pixel.
