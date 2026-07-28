@@ -25,13 +25,14 @@ If a failure is preexisting, but the fix is quick, then fix instead of just repo
 # Plugins
 
 A plugin is a `shared_library('merian-plugin-<name>', name_prefix: '')` that consumes merian via
-`dependency('merian')` and exports the `extern "C"` ABI hooks. Cloned into `plugins/<name>`, it is
-auto-built as a merian subproject and discovered at runtime without edits to merian's build files.
+`dependency('merian')` and exports the `extern "C"` ABI hooks. Cloned into
+`subprojects/merian-plugin-<name>`, it is auto-built as a merian subproject and discovered at
+runtime without edits to merian's build files.
 
 A plugin shares merian's ABI, so it **must** be built with merian's assertion/optimization config:
 mixing `NDEBUG` / `_GLIBCXX_ASSERTIONS` / optimization across the `.so` boundary is undefined and
 crashes deep in the driver.A plugin therefore must not pin `buildtype`/`b_ndebug` in its
-`project()`. Plugins cloned to `plugins/<name>` inherit merian's config; standalone, pass `--buildtype`.
+`project()`. Plugins cloned into `subprojects/` inherit merian's config; standalone, pass `--buildtype`.
 
 # Coding style
 

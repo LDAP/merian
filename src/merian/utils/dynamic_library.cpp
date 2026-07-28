@@ -15,8 +15,8 @@ namespace merian {
 #if defined(_WIN32)
 
 DynamicLibrary::DynamicLibrary(const std::filesystem::path& path) : path(path) {
-    handle = LoadLibraryExW(path.wstring().c_str(), nullptr,
-                            LOAD_LIBRARY_SEARCH_DEFAULT_DIRS | LOAD_LIBRARY_SEARCH_APPLICATION_DIR);
+    // dependencies resolve from the library's own dir, the exe dir, and PATH (meson devenv)
+    handle = LoadLibraryExW(path.wstring().c_str(), nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
     if (handle == nullptr) {
         throw load_failed{
             fmt::format("could not load '{}' (error {})", path.string(), GetLastError())};

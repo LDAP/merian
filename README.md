@@ -156,10 +156,11 @@ merian reads the following environment variables at startup:
 
 A plugin is a separate repository that builds a `merian-plugin-*` shared library and contributes nodes and/or context extensions, which are discovered automatically at startup by `merian-graph-run` and any merian host. Plugins do not vendor merian — they consume it via `dependency('merian')`.
 
-To build a plugin alongside merian, clone it into the `plugins` folder; `meson compile` then builds it as part of merian (no `PKG_CONFIG_PATH` needed):
+To build a plugin alongside merian, clone it into the `subprojects` folder (the directory must be named `merian-plugin-*`); `meson compile` then builds it as part of merian (no `PKG_CONFIG_PATH` needed):
 
 ```sh
-git clone <plugin-repo> plugins/<name>
+git clone <plugin-repo> subprojects/merian-plugin-<name>
+meson setup build --reconfigure
 meson compile -C build
 ```
 

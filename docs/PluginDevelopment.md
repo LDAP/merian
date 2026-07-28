@@ -71,12 +71,14 @@ merian's loader adds that directory to its resource search paths automatically.
 
 ## Building in-tree
 
-Clone the plugin into merian's `plugins/` folder. `meson compile` then builds it as part of
-merian — it resolves merian in-tree (via `meson.override_dependency`), so no `PKG_CONFIG_PATH` is
-needed and the host picks it up at the next start:
+Clone the plugin into merian's `subprojects/` folder — the directory must be named
+`merian-plugin-*`. `meson compile` then builds it as part of merian — it resolves merian in-tree
+(via `meson.override_dependency`), so no `PKG_CONFIG_PATH` is needed and the host picks it up at
+the next start:
 
 ```sh
-git clone <plugin-repo> plugins/myplugin
+git clone <plugin-repo> subprojects/merian-plugin-myplugin
+meson setup build --reconfigure
 meson compile -C build
 ```
 

@@ -123,15 +123,16 @@ std::vector<std::filesystem::path> Plugins::discover() {
         scan(dir);
     }
 
-    // A plugin cloned into <merian>/plugins/<name> is built as a merian subproject, landing in
-    // <build>/subprojects/<name>/ next to the host binary.
+    // A plugin cloned into <merian>/subprojects/merian-plugin-* is built as a merian subproject,
+    // landing in <build>/subprojects/<name>/ next to the host binary.
     const std::filesystem::path exe_dir = FileLoader::binary_path().parent_path();
-    const std::filesystem::path plugins_src = exe_dir.parent_path() / "plugins";
+    const std::filesystem::path build_subprojects = exe_dir / "subprojects";
     std::error_code ec;
-    if (std::filesystem::is_directory(plugins_src, ec)) {
-        for (const auto& clone : std::filesystem::directory_iterator(plugins_src, ec)) {
-            if (clone.is_directory(ec)) {
-                scan(exe_dir / "subprojects" / clone.path().filename());
+    if (std::filesystem::is_directory(build_subprojects, ec)) {
+        for (const auto& entry : std::filesystem::directory_iterator(build_subprojects, ec)) {
+            if (entry.is_directory(ec) &&
+                entry.path().filename().string().starts_with("merian-plugin-")) {
+                scan(entry.path());
             }
         }
     }
@@ -151,9 +152,9 @@ std::vector<std::filesystem::path> Plugins::resource_search_paths() {
         paths.push_back(dir.parent_path() / "res"); // standalone build: <build>/../res
 
         // Built as a merian subproject (<build>/subprojects/<clone>/...): resources stay in the
-        // source tree at <merian>/plugins/<clone>/res.
+        // source tree at <merian>/subprojects/<clone>/res.
         if (dir.parent_path().filename() == "subprojects") {
-            paths.push_back(dir.parent_path().parent_path().parent_path() / "plugins" /
+            paths.push_back(dir.parent_path().parent_path().parent_path() / "subprojects" /
                             dir.filename() / "res");
         }
     }

@@ -258,24 +258,10 @@ pkgconfig.generate(
 )
 meson.override_dependency('merian', merian_dep)
 
-# Build any plugin cloned into plugins/.
-plugin_names = run_command(find_program('python3'), '-c', '''
-import os, sys
-root, links = sys.argv[1], sys.argv[2]
-out = []
-if os.path.isdir(root):
-    for name in sorted(os.listdir(root)):
-        if not os.path.isfile(os.path.join(root, name, "meson.build")):
-            continue
-        link, target = os.path.join(links, name), os.path.join("..", "plugins", name)
-        if not (os.path.islink(link) and os.readlink(link) == target):
-            if os.path.lexists(link):
-                os.remove(link)
-            os.symlink(target, link)
-        out.append(name)
-print("\\n".join(out))
-''', meson.project_source_root() / 'plugins', meson.project_source_root() / 'subprojects',
-    check: true).stdout().strip()
+# Build any plugin cloned into subprojects/ (merian-plugin-* directories).
+plugin_names = run_command(py, '-c',
+    'import os, sys; d = sys.argv[1]; print(chr(10).join(sorted(n for n in os.listdir(d) if n.startswith("merian-plugin-") and os.path.isfile(os.path.join(d, n, "meson.build")))))',
+    meson.project_source_root() / 'subprojects', check: true).stdout().strip()
 
 foreach name : plugin_names.split('\n')
     if name != ''
