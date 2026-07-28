@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <csignal>
 #include <fstream>
 #include <optional>
@@ -34,6 +35,8 @@ void print_usage() {
         "  --validation=<on|off|ifdebug> Vulkan validation layers (default: ifdebug)\n"
         "  --merge <file.json>           deep-merge a JSON file into the config (repeatable,\n"
         "                                last wins)\n"
+        "  --frames=<N>                  run N iterations, wait for idle, print FPS, then exit\n"
+        "  --warmup=<N>                  frames excluded from the FPS timing (default 32)\n"
         "  --<name> <value>              set an override declared in the graph's \"cli\" block;\n"
         "                                may appear before or after graph.json, in any order\n"
         "                                variant selections persist when the graph is stored;\n"
@@ -47,6 +50,8 @@ struct Options {
     std::optional<std::filesystem::path> config;
     bool validation = merian::Context::IS_DEBUG_BUILD;
     bool help = false;
+    std::optional<uint64_t> frames;
+    uint64_t warmup = 32;
     // Non-runner tokens in command-line order; classified against the graph's cli block once
     // the config is loaded. A pre-config override's value is kept adjacent to its --name.
     std::vector<std::string> graph_args;
@@ -77,6 +82,10 @@ std::optional<Options> parse(const std::vector<std::string>& args) {
         } else if (arg.starts_with("--validation=")) {
             SPDLOG_ERROR("invalid --validation value '{}' (expected on/off/ifdebug)", arg);
             return std::nullopt;
+        } else if (arg.starts_with("--frames=")) {
+            options.frames = std::stoull(arg.substr(arg.find('=') + 1));
+        } else if (arg.starts_with("--warmup=")) {
+            options.warmup = std::stoull(arg.substr(arg.find('=') + 1));
         } else if (arg.starts_with("--loglevel=")) {
             spdlog::set_level(spdlog::level::from_str(arg.substr(arg.find('=') + 1)));
         } else if (arg.starts_with("--plugin-path=")) {
@@ -210,8 +219,29 @@ int main(const int argc, const char** argv) {
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
 
-    while (!stop) {
-        graph->run();
+    if (options->frames) {
+        const uint64_t total = *options->frames;
+        const uint64_t warmup = std::min(options->warmup, total > 0 ? total - 1 : 0);
+        std::chrono::steady_clock::time_point t_start;
+        for (uint64_t i = 0; i < total && !stop; i++) {
+            if (i == warmup) {
+                graph->wait();
+                t_start = std::chrono::steady_clock::now();
+            }
+            graph->run();
+        }
+        graph->wait();
+        const auto elapsed =
+            std::chrono::duration<double>(std::chrono::steady_clock::now() - t_start).count();
+        const uint64_t timed = (stop || total <= warmup) ? 0 : (total - warmup);
+        if (timed > 0 && elapsed > 0.0) {
+            fmt::print("BENCH frames={} warmup={} elapsed_s={:.4f} fps={:.2f} ms_per_frame={:.4f}\n",
+                       timed, warmup, elapsed, timed / elapsed, 1000.0 * elapsed / timed);
+        }
+    } else {
+        while (!stop) {
+            graph->run();
+        }
     }
 
     SPDLOG_INFO("shutting down");
