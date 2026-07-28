@@ -5,7 +5,6 @@
 
 #include <fmt/format.h>
 
-#include <random>
 
 namespace merian {
 
@@ -75,12 +74,6 @@ RenderMCPG::on_connected(const NodeIOLayout& io_layout,
 void RenderMCPG::ensure_pipeline(const SceneHandle& scene) {
     if (composition) {
         return;
-    }
-
-    if (randomize_seed) {
-        std::random_device dev;
-        std::mt19937 rng(dev());
-        seed = std::uniform_int_distribution<uint32_t>{}(rng);
     }
 
     composition = SlangComposition::create();
@@ -172,13 +165,11 @@ void RenderMCPG::update_render_constants() {
                     "export static const uint merian_render_instance_mask = {}u;\n"
                     "export static const bool merian_render_demodulate_albedo = {};\n"
                     "}}\n"
-                    "export static const bool reference_mode = {};\n"
                     "export static const bool use_light_cache_tail = {};\n"
                     "export static const bool missing_light_heuristic = {};\n"
                     "export static const int mc_samples = {};\n"
                     "export static const float p_guiding = {:f};\n"
                     "export static const float dir_guide_prior = {:f};\n"
-                    "export static const uint seed = {}u;\n"
                     "export static const int debug_output_selector = {};\n"
                     "export static const uint lc_buffer_size = {}u;\n"
                     "export static const uint lc_probe_count = {}u;\n"
@@ -189,10 +180,10 @@ void RenderMCPG::update_render_constants() {
                     "export static const uint mc_normal_bits = {}u;\n",
                     emission_on_primary ? "true" : "false", spp, max_path_length, mask,
                     demodulate_albedo ? "true" : "false",
-                    (reference_mode || p_guiding == 0.0f) ? "true" : "false",
                     use_light_cache_tail ? "true" : "false",
-                    missing_light_heuristic ? "true" : "false", mc_samples, p_guiding,
-                    dir_guide_prior, seed, debug_output_selector, lc_buffer_size, lc_probe_count,
+                    missing_light_heuristic ? "true" : "false", mc_samples,
+                    reference_mode ? 0.0f : p_guiding,
+                    dir_guide_prior, debug_output_selector, lc_buffer_size, lc_probe_count,
                     lc_stochastic_interpolation ? "true" : "false", lc_normal_bits, lc_min_pdf,
                     mc_adaptive_buffer_size, mc_normal_bits));
 }
@@ -202,13 +193,6 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
     bool constants_changed = false;
 
     config.st_separate("General");
-    config.config_bool("randomize seed", randomize_seed,
-                       "Randomize the seed on every graph build.");
-    if (randomize_seed) {
-        config.output_text(fmt::format("seed: {}", seed));
-    } else {
-        constants_changed |= config.config_uint("seed", seed);
-    }
     constants_changed |= config.config_bool("reference mode", reference_mode,
                                             "Disable guiding (pure BSDF sampling).");
     constants_changed |=

@@ -20,6 +20,7 @@ extern static const bool merian_render_demodulate_albedo = false;
 
 extern static const int debug_output_selector = 0;
 
+extern static const bool use_light_cache_tail = false;
 extern static const uint lc_buffer_size = 4000000;
 extern static const uint lc_probe_count = 4;
 extern static const bool lc_stochastic_interpolation = false;
@@ -75,7 +76,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         uint selected_level = 0;
         float score_sum = 0.0;
         float scores[mc_samples];
-        Distribution<float3> vmfs[mc_samples];
+        VonMisesFisher3<false> vmfs[mc_samples];
         for (int i = 0; i < mc_samples; i++) {
             uint buffer_index;
             uint level;
@@ -145,14 +146,18 @@ float3 trace_path(const ParameterBlock<Scene> scene,
 
             incident = sp.material.emission;
 
-            lc_incident =
-                any(incident > 0.0) || merian_render_max_path_length == 2
-                    ? incident
-                    : float3(params.irr_cache.get(next_pos, sp.material.shading_frame.get_normal(),
-                                                  cam_pos, prev_cam_pos, rng));
+            lc_incident =select(
+                any(incident > 0.0) ||
+                        (!use_light_cache_tail && merian_render_max_path_length == 2),
+                     incident,
+                     float3(params.irr_cache.get(next_pos, sp.material.shading_frame.get_normal(),
+                                                  cam_pos, prev_cam_pos, rng)));
 
             throughput *= bsdf / wo_p;
-            radiance += throughput * incident;
+            // complete the truncated path with the cached irradiance at the last vertex
+            radiance += throughput *
+                        select(use_light_cache_tail && bounce == merian_render_max_path_length - 1,
+                               lc_incident, incident);
         }
 
         const float mc_f = yuv_luminance(lc_incident * bsdf / wo_p);

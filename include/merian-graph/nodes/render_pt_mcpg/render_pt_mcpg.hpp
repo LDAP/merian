@@ -98,8 +98,6 @@ class RenderMCPG : public Node {
     float lc_min_pdf = 1.0f;
 
     // --- Misc ---
-    uint32_t seed = 0;
-    bool randomize_seed = true;
     int32_t debug_output_selector = 0;
 
     // Slang program + pipeline; rebuilt when the scene composition changes.

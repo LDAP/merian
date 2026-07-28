@@ -4,7 +4,7 @@ import merian_shaders.utils.hash_grid;
 import merian_shaders.utils.frame;
 import merian_shaders.utils.sampling;
 __exported import merian_shaders.distributions.distribution;
-import merian_shaders.distributions.von_mises_fisher;
+__exported import merian_shaders.distributions.von_mises_fisher;
 
 using merian;
 
@@ -75,7 +75,7 @@ struct MCState {
     }
 
     // vmf lobe float4(direction, kappa) for a position
-    Distribution<float3> get_vmf(const float3 pos) {
+    VonMisesFisher3<false> get_vmf(const float3 pos) {
         const float3 dir = get_dir(pos);
         const float k = kappa(pos);
 
