@@ -27,6 +27,10 @@ class ImGuiContext : public std::enable_shared_from_this<ImGuiContext> {
         return ctx->IO;
     }
 
+    ImGuiStyle& get_style() {
+        return ctx->Style;
+    }
+
     // Temporarily sets this as the global Dear ImGui context, runs fn(), then restores previous.
     template <typename Fn> void with_context(Fn&& fn) {
         ::ImGuiContext* prev = ImGui::GetCurrentContext();

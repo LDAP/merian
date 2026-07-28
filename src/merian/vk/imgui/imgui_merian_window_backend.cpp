@@ -68,6 +68,21 @@ ImGuiMerianWindowBackend::~ImGuiMerianWindowBackend() {
 }
 
 void ImGuiMerianWindowBackend::new_frame(const float delta_time) {
+    ImGuiIO& io = ctx->get_io();
+    const vk::Extent2D window_extent = window->window_extent();
+    const vk::Extent2D framebuffer_extent = window->framebuffer_extent();
+    io.DisplaySize =
+        ImVec2(static_cast<float>(window_extent.width), static_cast<float>(window_extent.height));
+    if (window_extent.width > 0 && window_extent.height > 0) {
+        io.DisplayFramebufferScale = ImVec2(static_cast<float>(framebuffer_extent.width) /
+                                                static_cast<float>(window_extent.width),
+                                            static_cast<float>(framebuffer_extent.height) /
+                                                static_cast<float>(window_extent.height));
+    }
+    // window units grow with the pixel density on logical-coordinate systems (Wayland, macOS);
+    // fonts cover only the remaining requested scale (display_scale = density * content scale)
+    ctx->get_style().FontScaleDpi = window->get_display_scale() / window->get_pixel_density();
+
     if (ctx->get_io().WantSetMousePos) {
         const ImVec2 p = ctx->get_io().MousePos;
         window->set_cursor_pos(static_cast<double>(p.x), static_cast<double>(p.y));
