@@ -30,10 +30,6 @@ class HashGrid {
         return buffer_size;
     }
 
-    const BufferHandle& get_buffer() const {
-        return buffer;
-    }
-
   private:
     const uint32_t buffer_size;
 
@@ -41,7 +37,8 @@ class HashGrid {
     float grid_level_bias = 0.0F;
     float grid_distribution_dimension = 2.0F;
 
-    BufferHandle buffer;
+    BufferHandle keys;
+    BufferHandle data;
 };
 
 } // namespace merian

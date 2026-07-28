@@ -189,7 +189,7 @@ struct MCPG<let ADAPTIVE_BUFFER_SIZE : uint, let NORMAL_BITS : uint = 8> {
 
     // Missing-light heuristic: invalidate the exact loaded slot in place.
     void kill(const uint buffer_index) {
-        grid.buffer[buffer_index].data.sum_w = 0.0;
+        grid.data[buffer_index].sum_w = 0.0;
     }
 }
 

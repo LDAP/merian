@@ -14,8 +14,8 @@ HashGrid::HashGrid(const ShaderCompileContextHandle& compile_context,
                    const uint32_t buffer_size)
     : buffer_size(buffer_size) {
 
-    const std::string buffer_type_name = fmt::format(
-        "RWStructuredBuffer<merian::HashGridVertex<{}>, ScalarDataLayout>", data_type_name);
+    const std::string buffer_type_name =
+        fmt::format("RWStructuredBuffer<{}, ScalarDataLayout>", data_type_name);
     const auto reflection =
         SlangSession::get_type_layout(compile_context, composition, buffer_type_name);
     auto* const element_type_layout = reflection.type_layout->getElementTypeLayout();
@@ -27,22 +27,35 @@ HashGrid::HashGrid(const ShaderCompileContextHandle& compile_context,
             fmt::format("failed to reflect element stride for {}", buffer_type_name));
     }
 
-    buffer = allocator->create_buffer(vk::DeviceSize(buffer_size) * stride,
-                                      vk::BufferUsageFlagBits::eStorageBuffer |
-                                          vk::BufferUsageFlagBits::eTransferDst,
-                                      MemoryMappingType::NONE, "HashGrid::buffer");
+    keys = allocator->create_buffer(vk::DeviceSize(buffer_size) * 2 * sizeof(uint32_t),
+                                    vk::BufferUsageFlagBits::eStorageBuffer |
+                                        vk::BufferUsageFlagBits::eTransferDst,
+                                    MemoryMappingType::NONE, "HashGrid::keys");
+    data = allocator->create_buffer(vk::DeviceSize(buffer_size) * stride,
+                                    vk::BufferUsageFlagBits::eStorageBuffer |
+                                        vk::BufferUsageFlagBits::eTransferDst,
+                                    MemoryMappingType::NONE, "HashGrid::data");
 }
 
 void HashGrid::reset(const CommandBufferHandle& cmd) {
-    cmd->fill(buffer);
-    cmd->barrier(buffer->buffer_barrier2(
-        vk::PipelineStageFlagBits2::eTransfer, vk::PipelineStageFlagBits2::eAllCommands,
-        vk::AccessFlagBits2::eTransferWrite,
-        vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite));
+    cmd->fill(keys);
+    cmd->fill(data);
+    const std::array<vk::BufferMemoryBarrier2, 2> barriers = {
+        keys->buffer_barrier2(vk::PipelineStageFlagBits2::eTransfer,
+                              vk::PipelineStageFlagBits2::eAllCommands,
+                              vk::AccessFlagBits2::eTransferWrite,
+                              vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite),
+        data->buffer_barrier2(vk::PipelineStageFlagBits2::eTransfer,
+                              vk::PipelineStageFlagBits2::eAllCommands,
+                              vk::AccessFlagBits2::eTransferWrite,
+                              vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite),
+    };
+    cmd->barrier(barriers);
 }
 
 void HashGrid::write_to(ShaderCursor cursor) const {
-    cursor["buffer"] = buffer;
+    cursor["keys"] = keys;
+    cursor["data"] = data;
     cursor["grid_tan_alpha_half"] = grid_tan_alpha_half;
     cursor["grid_level_bias"] = grid_level_bias;
     cursor["grid_distribution_dimension"] = grid_distribution_dimension;

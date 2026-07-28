@@ -11,12 +11,6 @@ static const uint MERIAN_HASH_GRID_LOCK_BIT = 0x80000000u;
 // cancels out in grid_width_for_level, keeping widths purely angular and scene-scale-free.
 static const float MERIAN_HASH_GRID_LEVEL_OFFSET = 32.0;
 
-struct HashGridVertex<typename T> {
-    uint32_t hash;
-    uint32_t lock;
-    T data;
-};
-
 interface HashGridUpdateFunction<typename T> {
     void update(inout T t);
 }
@@ -32,7 +26,10 @@ struct HashGrid<typename T,
                 let NORMAL_BITS : uint = 0,
                 let GRID_POWER : uint = 2,
                 let GRID_STEPS_PER_UNIT_SIZE : uint = 1> {
-    RWStructuredBuffer<HashGridVertex<T>, ScalarDataLayout> buffer;
+    // Split key/payload layout: probing touches only the 8-byte key words (x = hash,
+    // y = lock/LRU stamp), the payload is fetched once on a key match.
+    RWStructuredBuffer<uint2> keys;
+    RWStructuredBuffer<T, ScalarDataLayout> data;
 
     float grid_tan_alpha_half;
     // SHARC-style LOD bias: shifts the level quantization / near-camera detail (0 = neutral).
@@ -125,10 +122,8 @@ struct HashGrid<typename T,
     // Linear-probe PROBE_COUNT slots starting at buffer_index for a matching hash.
     Optional<T> get(uint buffer_index, const uint hash) {
         for (uint i = 0; i < PROBE_COUNT; i++) {
-            let vtx = buffer[buffer_index];
-
-            if (keys_match(vtx.hash, hash)) {
-                return vtx.data;
+            if (keys_match(keys[buffer_index].x, hash)) {
+                return data[buffer_index];
             }
 
             buffer_index++;
@@ -142,11 +137,9 @@ struct HashGrid<typename T,
     // Linear-probe variant that also reports the matched absolute slot (0xFFFFFFFF if none).
     Optional<T> get(uint buffer_index, const uint hash, out uint matched_index) {
         for (uint i = 0; i < PROBE_COUNT; i++) {
-            let vtx = buffer[buffer_index];
-
-            if (keys_match(vtx.hash, hash)) {
+            if (keys_match(keys[buffer_index].x, hash)) {
                 matched_index = buffer_index;
-                return vtx.data;
+                return data[buffer_index];
             }
 
             buffer_index++;
@@ -169,7 +162,7 @@ struct HashGrid<typename T,
         const uint hash = collision_key(gidx, normal, level);
         uint bi = buffer_index(hash);
         for (uint i = 0; i < PROBE_COUNT; i++) {
-            if (keys_match(buffer[bi].hash, hash))
+            if (keys_match(keys[bi].x, hash))
                 return normal_bin(normal);
             bi++;
             if (bi >= BUFFER_SIZE)
@@ -313,12 +306,12 @@ struct HashGrid<typename T,
             uint idx = base + i;
             if (idx >= BUFFER_SIZE)
                 idx -= BUFFER_SIZE;
-            let probe = buffer[idx];
-            if (keys_match(probe.hash, hash)) {
+            let probe = keys[idx];
+            if (keys_match(probe.x, hash)) {
                 target = idx;
                 break;
             }
-            const uint age = frame - (probe.lock & ~MERIAN_HASH_GRID_LOCK_BIT);
+            const uint age = frame - (probe.y & ~MERIAN_HASH_GRID_LOCK_BIT);
             if (age >= max_age) {
                 max_age = age;
                 target = idx;
@@ -329,15 +322,14 @@ struct HashGrid<typename T,
         // the frame implicitly.
         const uint locked = frame | MERIAN_HASH_GRID_LOCK_BIT;
         uint old;
-        InterlockedExchange(buffer[target].lock, locked, old);
+        InterlockedExchange(keys[target].y, locked, old);
         if (old == locked) {
             return;
         }
 
-        var vtx = buffer[target];
+        var t = data[target];
 
-        if (!keys_match(vtx.hash, hash)) {
-            vtx.hash = hash;
+        if (!keys_match(keys[target].x, hash)) {
             const uint prev_level = target_level_for_pos(pos, prev_cam_pos, rng);
             if (level != prev_level) {
                 Optional<T> r;
@@ -346,14 +338,14 @@ struct HashGrid<typename T,
                 else
                     r = get_level(prev_level, pos, rng);
                 if (let v = r)
-                    vtx.data = v;
+                    t = v;
             }
         }
 
-        update.update(vtx.data);
+        update.update(t);
 
-        vtx.lock = frame & ~MERIAN_HASH_GRID_LOCK_BIT;
-        buffer[target] = vtx;
+        data[target] = t;
+        keys[target] = uint2(hash, frame & ~MERIAN_HASH_GRID_LOCK_BIT);
     }
 
     void update(const float3 pos,
@@ -419,18 +411,16 @@ struct HashGrid<typename T,
         // wraps and is reclaimed first (self-healing).
         uint target = base;
         uint max_age = 0;
-        bool matched = false;
         for (uint i = 0; i < PROBE_COUNT; i++) {
             uint idx = base + i;
             if (idx >= BUFFER_SIZE)
                 idx -= BUFFER_SIZE;
-            let probe = buffer[idx];
-            if (keys_match(probe.hash, hash)) {
+            let probe = keys[idx];
+            if (keys_match(probe.x, hash)) {
                 target = idx;
-                matched = true;
                 break;
             }
-            const uint age = frame - (probe.lock & ~MERIAN_HASH_GRID_LOCK_BIT);
+            const uint age = frame - (probe.y & ~MERIAN_HASH_GRID_LOCK_BIT);
             if (age >= max_age) {
                 max_age = age;
                 target = idx;
@@ -439,18 +429,13 @@ struct HashGrid<typename T,
 
         const uint locked = frame | MERIAN_HASH_GRID_LOCK_BIT;
         uint old;
-        InterlockedExchange(buffer[target].lock, locked, old);
+        InterlockedExchange(keys[target].y, locked, old);
         if (old == locked) {
             return;
         }
 
-        var vtx = buffer[target];
-        // only stamp the key into a freshly-claimed slot
-        if (!matched)
-            vtx.hash = hash;
-        vtx.data = t;
-        vtx.lock = frame & ~MERIAN_HASH_GRID_LOCK_BIT;
-        buffer[target] = vtx;
+        data[target] = t;
+        keys[target] = uint2(hash, frame & ~MERIAN_HASH_GRID_LOCK_BIT);
     }
 
     void set_at_level(const uint level,
