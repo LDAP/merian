@@ -71,7 +71,6 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         const float3 wi_local = frame.to_local(-ray.Direction);
 
         // Resample one guiding lobe from the Markov-chain mixture (using RIS)
-        MCState selected;
         uint selected_buffer_index = MC_INVALID_INDEX;
         uint selected_level = 0;
         float score_sum = 0.0;
@@ -85,7 +84,6 @@ float3 trace_path(const ParameterBlock<Scene> scene,
             score_sum += s.sum_w;
             // comparison with NaN is false (when s.sum_w == 0 and score_sum == 0)
             if (rng.next_float() < s.sum_w / score_sum) {
-                selected = s;
                 selected_buffer_index = buffer_index;
                 selected_level = level;
                 vmfs[i] = vmfs[0];
@@ -108,7 +106,6 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         } else if (let local = m_bsdf.sample(wi_local, rng)) {
             wo_local = local;
             wo_world = frame.to_world(local);
-            selected = MCState();
             selected_buffer_index = MC_INVALID_INDEX;
             selected_level = params.mcpg.grid.target_level_for_pos(cur_pos, cam_pos, rng);
         } else {
@@ -165,6 +162,10 @@ float3 trace_path(const ParameterBlock<Scene> scene,
             params.irr_cache.update(cur_pos, normal,
                                     lc_incident * bsdf / max(wo_p, lc_min_pdf), cam_pos,
                                     prev_cam_pos, scene.frame, rng);
+
+            MCState selected = selected_buffer_index != MC_INVALID_INDEX
+                                   ? params.mcpg.load_by_index(selected_buffer_index, scene.time)
+                                   : MCState();
 
             if (rng.next_float() * score_sum < mc_f * mc_samples) {
                 const half3 target_mv = half3((sp.pos - sp.prev_pos) / scene.time_diff);

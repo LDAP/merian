@@ -187,6 +187,17 @@ struct MCPG<let ADAPTIVE_BUFFER_SIZE : uint, let NORMAL_BITS : uint = 8> {
         grid.set_at_level(level, pos, jitter_normal(shading_frame, rng), frame, s, rng);
     }
 
+    // Re-read a slot found by load() so the state need not stay live across the trace.
+    MCState load_by_index(const uint buffer_index, const float time) {
+        var s = grid.data[buffer_index];
+        if (s.is_valid()) {
+            s.set_w_tgt(s.w_tgt + s.sum_w * (time - s.T) * float3(s.mv));
+        } else {
+            s.sum_w = 0.0;
+        }
+        return s;
+    }
+
     // Missing-light heuristic: invalidate the exact loaded slot in place.
     void kill(const uint buffer_index) {
         grid.data[buffer_index].sum_w = 0.0;
