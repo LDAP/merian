@@ -2,6 +2,7 @@ import merian_shaders.gbuffer;
 import merian_shaders.scene.scene;
 import merian_shaders.utils.random;
 import merian_shaders.utils.hash;
+import merian_shaders.utils.encoding;
 import merian_shaders.utils.textures;
 import merian_shaders.colors.debug;
 import merian_shaders.colors.colorspaces;
@@ -76,12 +77,14 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         uint selected_level = 0;
         float score_sum = 0.0;
         float scores[mc_samples];
-        VonMisesFisher3<false> vmfs[mc_samples];
+        uint2 vmfs[mc_samples];
         for (int i = 0; i < mc_samples; i++) {
             uint buffer_index;
             uint level;
             const MCState s =
                 params.mcpg.load(lookup_pos, frame, cam_pos, scene.time, rng, buffer_index, level);
+            const float4 vmf = s.get_vmf(cur_pos);
+            const uint2 packed = uint2(encode_normal(vmf.xyz), asuint(vmf.w));
             score_sum += s.sum_w;
             // comparison with NaN is false (when s.sum_w == 0 and score_sum == 0)
             if (rng.next_float() < s.sum_w / score_sum) {
@@ -91,10 +94,10 @@ float3 trace_path(const ParameterBlock<Scene> scene,
                 vmfs[i] = vmfs[0];
                 scores[i] = scores[0];
                 scores[0] = s.sum_w;
-                vmfs[0] = s.get_vmf(cur_pos);
+                vmfs[0] = packed;
             } else {
                 scores[i] = s.sum_w;
-                vmfs[i] = s.get_vmf(cur_pos);
+                vmfs[i] = packed;
             }
         }
 
@@ -103,7 +106,8 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         float3 wo_world;
         float3 wo_local;
         if (guide) {
-            wo_world = vmfs[0].sample(rng);
+            wo_world = vmf_sample_tokuyosh(decode_normal(vmfs[0].x), asfloat(vmfs[0].y),
+                                           rng.next_float2());
             wo_local = frame.to_local(wo_world);
         } else if (let local = m_bsdf.sample(wi_local, rng)) {
             wo_local = local;
@@ -119,7 +123,8 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         float wo_p = 0.0;
         if (score_sum > 0) {
             for (int i = 0; i < mc_samples; i++) {
-                wo_p += scores[i] * vmfs[i].pdf(wo_world);
+                wo_p += scores[i] *
+                        vmf_pdf_tokuyoshi(wo_world, decode_normal(vmfs[i].x), asfloat(vmfs[i].y));
             }
             wo_p /= score_sum;
         }

@@ -75,14 +75,14 @@ struct MCState {
     }
 
     // vmf lobe float4(direction, kappa) for a position
-    VonMisesFisher3<false> get_vmf(const float3 pos) {
+    float4 get_vmf(const float3 pos) {
         const float3 dir = get_dir(pos);
         const float k = kappa(pos);
 
         if (isnan(k) || any(isnan(dir)))
-            return VonMisesFisher3<false>(0, float3(0));
+            return float4(0);
 
-        return VonMisesFisher3<false>(k, dir);
+        return float4(dir, k);
     }
 
     [mutating]
