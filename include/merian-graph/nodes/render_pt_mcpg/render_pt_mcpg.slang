@@ -2,6 +2,7 @@ import merian_shaders.gbuffer;
 import merian_shaders.scene.scene;
 import merian_shaders.utils.random;
 import merian_shaders.utils.hash;
+import merian_shaders.utils.encoding;
 import merian_shaders.utils.textures;
 import merian_shaders.colors.debug;
 import merian_shaders.colors.colorspaces;
@@ -71,30 +72,33 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         const float3 wi_local = frame.to_local(-ray.Direction);
 
         // Resample one guiding lobe from the Markov-chain mixture (using RIS)
-        MCState selected;
         uint selected_buffer_index = MC_INVALID_INDEX;
         uint selected_level = 0;
         float score_sum = 0.0;
         float scores[mc_samples];
-        VonMisesFisher3<false> vmfs[mc_samples];
+        // vmf lobes packed as (oct-encoded direction, kappa bits) to keep the RIS reservoir small
+        uint2 vmfs[mc_samples];
+        // one jittered access normal per bounce, shared by every candidate load and the stores
+        const float3 access_normal = params.mcpg.jitter_normal(frame, rng);
         for (int i = 0; i < mc_samples; i++) {
             uint buffer_index;
             uint level;
-            const MCState s =
-                params.mcpg.load(lookup_pos, frame, cam_pos, scene.time, rng, buffer_index, level);
+            const MCState s = params.mcpg.load(lookup_pos, access_normal, cam_pos, scene.time, rng,
+                                               buffer_index, level);
+            const float4 vmf = s.get_vmf(cur_pos);
+            const uint2 packed = uint2(encode_normal(vmf.xyz), asuint(vmf.w));
             score_sum += s.sum_w;
             // comparison with NaN is false (when s.sum_w == 0 and score_sum == 0)
             if (rng.next_float() < s.sum_w / score_sum) {
-                selected = s;
                 selected_buffer_index = buffer_index;
                 selected_level = level;
                 vmfs[i] = vmfs[0];
                 scores[i] = scores[0];
                 scores[0] = s.sum_w;
-                vmfs[0] = s.get_vmf(cur_pos);
+                vmfs[0] = packed;
             } else {
                 scores[i] = s.sum_w;
-                vmfs[i] = s.get_vmf(cur_pos);
+                vmfs[i] = packed;
             }
         }
 
@@ -103,12 +107,12 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         float3 wo_world;
         float3 wo_local;
         if (guide) {
-            wo_world = vmfs[0].sample(rng);
+            wo_world = vmf_sample_tokuyosh(decode_normal(vmfs[0].x), asfloat(vmfs[0].y),
+                                           rng.next_float2());
             wo_local = frame.to_local(wo_world);
         } else if (let local = m_bsdf.sample(wi_local, rng)) {
             wo_local = local;
             wo_world = frame.to_world(local);
-            selected = MCState();
             selected_buffer_index = MC_INVALID_INDEX;
             selected_level = params.mcpg.grid.target_level_for_pos(cur_pos, cam_pos, rng);
         } else {
@@ -119,7 +123,8 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         float wo_p = 0.0;
         if (score_sum > 0) {
             for (int i = 0; i < mc_samples; i++) {
-                wo_p += scores[i] * vmfs[i].pdf(wo_world);
+                wo_p += scores[i] *
+                        vmf_pdf_tokuyoshi(wo_world, decode_normal(vmfs[i].x), asfloat(vmfs[i].y));
             }
             wo_p /= score_sum;
         }
@@ -166,13 +171,18 @@ float3 trace_path(const ParameterBlock<Scene> scene,
                                     lc_incident * bsdf / max(wo_p, lc_min_pdf), cam_pos,
                                     prev_cam_pos, scene.frame, rng);
 
+            // re-read the selected chain here instead of keeping it live across the trace
+            MCState selected = selected_buffer_index != MC_INVALID_INDEX
+                                   ? params.mcpg.load_by_index(selected_buffer_index, scene.time)
+                                   : MCState();
+
             if (rng.next_float() * score_sum < mc_f * mc_samples) {
                 const half3 target_mv = half3((sp.pos - sp.prev_pos) / scene.time_diff);
                 selected.add_sample(cur_pos, mc_f, next_pos, target_mv, scene.time);
                 // sharp update at the queried level, plus a coarse propagation one level up
-                params.mcpg.store(selected, cur_pos, frame, scene.camera.position, scene.frame,
-                                  rng);
-                params.mcpg.store_at_level(selected, cur_pos, frame, selected_level + 1,
+                params.mcpg.store(selected, cur_pos, access_normal, scene.camera.position,
+                                  scene.frame, rng);
+                params.mcpg.store_at_level(selected, cur_pos, access_normal, selected_level + 1,
                                            scene.frame, rng);
             } else if (missing_light_heuristic && selected_buffer_index != MC_INVALID_INDEX &&
                        selected.light_missing_heuristic(mc_f, wo_world, cur_pos, next_pos)) {
@@ -258,7 +268,8 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<RenderBinding> params) {
     }
     case 5: { // mc weight
         const MCState mc_state =
-            params.mcpg.load(primary_sp.pos, primary_sp.material.shading_frame,
+            params.mcpg.load(primary_sp.pos,
+                             params.mcpg.jitter_normal(primary_sp.material.shading_frame, rng),
                              cam_pos, scene.time, rng);
         if (mc_state.is_valid())
             params.debug[pixel] = float4(debug_color(mc_state.sum_w * 0.1), 1);
@@ -268,7 +279,8 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<RenderBinding> params) {
     }
     case 6: { // mc mean direction
         const MCState mc_state =
-            params.mcpg.load(primary_sp.pos, primary_sp.material.shading_frame,
+            params.mcpg.load(primary_sp.pos,
+                             params.mcpg.jitter_normal(primary_sp.material.shading_frame, rng),
                              cam_pos, scene.time, rng);
         if (mc_state.is_valid())
             params.debug[pixel] = float4((mc_state.get_dir(primary_sp.pos) + 1) / 2, 1);
@@ -278,7 +290,8 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<RenderBinding> params) {
     }
     case 7: { // mc cos
         const MCState mc_state =
-            params.mcpg.load(primary_sp.pos, primary_sp.material.shading_frame,
+            params.mcpg.load(primary_sp.pos,
+                             params.mcpg.jitter_normal(primary_sp.material.shading_frame, rng),
                              cam_pos, scene.time, rng);
         if (mc_state.is_valid())
             params.debug[pixel] = float4(debug_color(mc_state.w_cos / mc_state.sum_w), 1);
@@ -288,7 +301,8 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<RenderBinding> params) {
     }
     case 8: { // mc N
         const MCState mc_state =
-            params.mcpg.load(primary_sp.pos, primary_sp.material.shading_frame,
+            params.mcpg.load(primary_sp.pos,
+                             params.mcpg.jitter_normal(primary_sp.material.shading_frame, rng),
                              cam_pos, scene.time, rng);
         if (mc_state.is_valid())
             params.debug[pixel] = float4(float3(float(mc_state.N) / float(ML_MAX_N)), 1);
@@ -298,7 +312,8 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<RenderBinding> params) {
     }
     case 9: { // mc mv
         const MCState mc_state =
-            params.mcpg.load(primary_sp.pos, primary_sp.material.shading_frame,
+            params.mcpg.load(primary_sp.pos,
+                             params.mcpg.jitter_normal(primary_sp.material.shading_frame, rng),
                              cam_pos, scene.time, rng);
         params.debug[pixel] = float4(float3(mc_state.mv), 1);
         break;

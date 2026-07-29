@@ -75,14 +75,14 @@ struct MCState {
     }
 
     // vmf lobe float4(direction, kappa) for a position
-    VonMisesFisher3<false> get_vmf(const float3 pos) {
+    float4 get_vmf(const float3 pos) {
         const float3 dir = get_dir(pos);
         const float k = kappa(pos);
 
         if (isnan(k) || any(isnan(dir)))
-            return VonMisesFisher3<false>(0, float3(0));
+            return float4(0);
 
-        return VonMisesFisher3<false>(k, dir);
+        return float4(dir, k);
     }
 
     [mutating]
@@ -132,13 +132,19 @@ struct MCPG<let ADAPTIVE_BUFFER_SIZE : uint, let NORMAL_BITS : uint = 8> {
         return shading_frame.to_world(sample_cos(rng));
     }
 
+    // cosine jitter is azimuthally symmetric, so a frame built from the normal alone is equivalent
+    float3 jitter_normal(const float3 normal, inout RandomGenerator rng) {
+        return mul(sample_cos(rng), make_frame(normal));
+    }
+
+    // Accessors take an already-jittered access normal so the caller can share one jitter across
+    // a bounce's RIS candidates and its stores.
     MCState load(const float3 pos,
-                 const OrthonormalFrame shading_frame,
+                 const float3 access_normal,
                  const float3 cam_pos,
                  const float time,
                  inout RandomGenerator rng) {
-        // slang defaults initializes none optionals
-        var s = grid.distributed_get(pos, jitter_normal(shading_frame, rng), cam_pos, rng).value;
+        var s = grid.distributed_get(pos, access_normal, cam_pos, rng).value;
         if (s.is_valid()) {
             s.set_w_tgt(s.w_tgt + s.sum_w * (time - s.T) * float3(s.mv));
         } else {
@@ -151,15 +157,13 @@ struct MCPG<let ADAPTIVE_BUFFER_SIZE : uint, let NORMAL_BITS : uint = 8> {
     // Reports the queried level and the exact buffer slot the lobe was read from
     // (MC_INVALID_INDEX if no slot matched).
     MCState load(const float3 pos,
-                 const OrthonormalFrame shading_frame,
+                 const float3 access_normal,
                  const float3 cam_pos,
                  const float time,
                  inout RandomGenerator rng,
                  out uint buffer_index,
                  out uint level) {
-        var s = grid.distributed_get(pos, jitter_normal(shading_frame, rng), cam_pos, rng, level,
-                                     buffer_index)
-                    .value;
+        var s = grid.distributed_get(pos, access_normal, cam_pos, rng, level, buffer_index).value;
         if (s.is_valid()) {
             s.set_w_tgt(s.w_tgt + s.sum_w * (time - s.T) * float3(s.mv));
         } else {
@@ -169,22 +173,33 @@ struct MCPG<let ADAPTIVE_BUFFER_SIZE : uint, let NORMAL_BITS : uint = 8> {
         return s;
     }
 
+    // Re-read a slot found by load() so the state need not stay live across the trace.
+    MCState load_by_index(const uint buffer_index, const float time) {
+        var s = grid.data[buffer_index];
+        if (s.is_valid()) {
+            s.set_w_tgt(s.w_tgt + s.sum_w * (time - s.T) * float3(s.mv));
+        } else {
+            s.sum_w = 0.0;
+        }
+        return s;
+    }
+
     void store(const MCState s,
                const float3 pos,
-               const OrthonormalFrame shading_frame,
+               const float3 access_normal,
                const float3 cam_pos,
                const uint frame,
                inout RandomGenerator rng) {
-        grid.distributed_set(pos, jitter_normal(shading_frame, rng), cam_pos, frame, s, rng);
+        grid.distributed_set(pos, access_normal, cam_pos, frame, s, rng);
     }
 
     void store_at_level(const MCState s,
                         const float3 pos,
-                        const OrthonormalFrame shading_frame,
+                        const float3 access_normal,
                         const uint level,
                         const uint frame,
                         inout RandomGenerator rng) {
-        grid.set_at_level(level, pos, jitter_normal(shading_frame, rng), frame, s, rng);
+        grid.set_at_level(level, pos, access_normal, frame, s, rng);
     }
 
     // Missing-light heuristic: invalidate the exact loaded slot in place.
