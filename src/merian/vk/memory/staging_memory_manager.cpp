@@ -9,6 +9,14 @@ StagingMemoryManager::StagingMemoryManager(const MemoryAllocatorHandle& memory_a
                                            const vk::BufferUsageFlags download_usage)
     : context(memory_allocator->get_context()), allocator(memory_allocator), block_size(block_size),
       upload_usage(upload_usage), download_usage(download_usage) {
+    if (context->get_device()
+            ->get_enabled_features()
+            .get_buffer_device_address_features()
+            .bufferDeviceAddress == VK_TRUE) {
+        this->upload_usage |= vk::BufferUsageFlagBits::eShaderDeviceAddress;
+        this->download_usage |= vk::BufferUsageFlagBits::eShaderDeviceAddress;
+    }
+
     create_upload_block();
 }
 

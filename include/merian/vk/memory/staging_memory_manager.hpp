@@ -182,8 +182,8 @@ class StagingMemoryManager : public std::enable_shared_from_this<StagingMemoryMa
     const ContextHandle context;
     const MemoryAllocatorHandle allocator;
     const vk::DeviceSize block_size;
-    const vk::BufferUsageFlags upload_usage;
-    const vk::BufferUsageFlags download_usage;
+    vk::BufferUsageFlags upload_usage;
+    vk::BufferUsageFlags download_usage;
 
     static constexpr vk::DeviceSize STAGING_ALIGNMENT = 16;
 

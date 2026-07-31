@@ -938,12 +938,8 @@ void Scene::properties_statistics(Properties& props) {
     block_text("shared_vb", shared_vb_suballoc, shared_vb_capacity);
     block_text("shared_prev_vb", shared_prev_vb_suballoc, shared_prev_vb_capacity);
     block_text("shared_ib", shared_ib_suballoc, shared_ib_capacity);
-    if (frame_staging) {
-        props.output_text("{:<14} {} (bump-allocated, persistently mapped)",
-                          "frame_staging:", format_size(frame_staging->get_capacity()));
-    } else {
-        props.output_text("{:<14} <not allocated>", "frame_staging:");
-    }
+    props.output_text("{:<14} {} staged this frame", "upload_staging:",
+                      format_size(frame_stats.upload_bytes));
 }
 
 void Scene::properties(Properties& props) {
@@ -1268,9 +1264,6 @@ constexpr vk::BufferUsageFlags SHARED_VB_USAGE =
 constexpr vk::BufferUsageFlags SHARED_IB_USAGE =
     SHARED_VB_USAGE | vk::BufferUsageFlagBits::eIndexBuffer;
 
-constexpr vk::BufferUsageFlags STAGING_USAGE =
-    vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eShaderDeviceAddress;
-
 constexpr vk::DeviceSize MIN_BUFFER_CAPACITY = vk::DeviceSize(32) * 1024 * 1024;
 constexpr vk::DeviceSize RESIZE_QUANTUM = vk::DeviceSize(32) * 1024 * 1024;
 constexpr vk::DeviceSize MIN_FREE_HEADROOM = vk::DeviceSize(16) * 1024 * 1024;
@@ -1372,13 +1365,6 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                                  SHARED_IB_USAGE, "Scene::shared_ib");
     }
 
-    if (!frame_staging) {
-        frame_staging.emplace(allocator->get_memory_allocator(), STAGING_USAGE, MIN_BUFFER_CAPACITY,
-                              "Scene::frame_staging");
-        frame_stats.buffers_allocated++;
-    }
-    frame_staging->reset();
-
     // No-op if region already matches; reused regions stay where they are.
     const auto ensure_region = [&](MeshBufferRegion& region,
                                    const VMAMemorySubAllocatorHandle& slot,
@@ -1393,22 +1379,26 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
         region.alignment = alignment;
     };
 
-    const auto staging_alloc = [&](const vk::DeviceSize size,
-                                   const vk::DeviceSize align) -> FrameStagingBlock::Slice {
-        if (auto slice = frame_staging->alloc(size, align)) {
-            return *slice;
-        }
-        frame_staging->grow(cmd, size_with_headroom(frame_staging->get_capacity() + size));
-        frame_stats.buffers_allocated++;
-        const auto retried = frame_staging->alloc(size, align);
-        assert(retried.has_value() && "frame_staging grow failed to satisfy alloc");
-        return *retried;
+    static_assert(alignof(PackedVertexData) <= 16 && alignof(PackedPrevVertexData) <= 16,
+                  "StagingMemoryManager aligns every upload to 16");
+    struct StagedRange {
+        vk::DeviceAddress addr;
+        BufferHandle buffer;
+        vk::DeviceSize buffer_offset;
+    };
+    const auto stage = [&](const vk::DeviceSize size, const auto& fill) -> StagedRange {
+        BufferHandle buffer;
+        vk::DeviceSize buffer_offset = 0;
+        const MemoryAllocationHandle memory =
+            allocator->get_staging()->get_upload_staging_space(size, buffer, buffer_offset);
+        cmd->keep_until_pool_reset(buffer);
+        fill(memory->map());
+        memory->unmap();
+        return {buffer->get_device_address() + buffer_offset, buffer, buffer_offset};
     };
 
     // Batch one cmd->copy per distinct source buffer.
     std::unordered_map<Buffer*, std::pair<BufferHandle, std::vector<vk::BufferCopy>>> index_copies;
-
-    bool did_upload_static = false;
 
     {
         MERIAN_PROFILE_SCOPE("fill_staging");
@@ -1432,9 +1422,6 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                     check_node_transform && scene_graph[*info.instances.begin()]->transform_dirty;
                 if (!mesh.is_dirty())
                     continue;
-
-                if (!info.is_dynamic())
-                    did_upload_static = true;
 
                 group.blas_dirty = true;
                 if (mesh.has_variable_topology())
@@ -1482,17 +1469,17 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                             } else if constexpr (std::is_same_v<
                                                      T, Mesh::HostPacked<PackedVertexData>>) {
                                 frame_stats.meshes_uploaded_host_packed++;
-                                const auto slice =
-                                    staging_alloc(vb_size, alignof(PackedVertexData));
-                                vertex_src_addr = slice.addr;
-                                std::memcpy(slice.ptr, src.data, vb_size);
+                                vertex_src_addr =
+                                    stage(vb_size, [&](void* dst) {
+                                        std::memcpy(dst, src.data, vb_size);
+                                    }).addr;
                             } else {
                                 static_assert(std::is_same_v<T, Mesh::HostVertices>);
                                 frame_stats.meshes_uploaded_host_unpacked++;
-                                const auto slice =
-                                    staging_alloc(vb_size, alignof(PackedVertexData));
-                                vertex_src_addr = slice.addr;
-                                src->write(reinterpret_cast<PackedVertexData*>(slice.ptr));
+                                vertex_src_addr =
+                                    stage(vb_size, [&](void* dst) {
+                                        src->write(static_cast<PackedVertexData*>(dst));
+                                    }).addr;
                             }
                         },
                         mesh.get_vertices());
@@ -1510,16 +1497,16 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                                     prev_src_addr = src.data->get_device_address() + src.offset;
                                 } else if constexpr (std::is_same_v<T, Mesh::HostPacked<
                                                                            PackedPrevVertexData>>) {
-                                    const auto slice =
-                                        staging_alloc(prev_vb_size, alignof(PackedPrevVertexData));
-                                    prev_src_addr = slice.addr;
-                                    std::memcpy(slice.ptr, src.data, prev_vb_size);
+                                    prev_src_addr =
+                                        stage(prev_vb_size, [&](void* dst) {
+                                            std::memcpy(dst, src.data, prev_vb_size);
+                                        }).addr;
                                 } else {
                                     static_assert(std::is_same_v<T, Mesh::HostPrevVertices>);
-                                    const auto slice =
-                                        staging_alloc(prev_vb_size, alignof(PackedPrevVertexData));
-                                    prev_src_addr = slice.addr;
-                                    src->write(reinterpret_cast<PackedPrevVertexData*>(slice.ptr));
+                                    prev_src_addr =
+                                        stage(prev_vb_size, [&](void* dst) {
+                                            src->write(static_cast<PackedPrevVertexData*>(dst));
+                                        }).addr;
                                 }
                             },
                             mesh.get_prev_vertices());
@@ -1582,20 +1569,19 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                                 entry.first = src.data;
                                 entry.second.push_back({src.offset, dst_offset, ib_size});
                             } else if constexpr (std::is_same_v<T, Mesh::HostPacked<void>>) {
-                                const auto slice =
-                                    staging_alloc(ib_size, size_for_index_type(mesh.index_type));
-                                std::memcpy(slice.ptr, src.data, ib_size);
-                                auto& entry = index_copies[slice.buffer.get()];
-                                entry.first = slice.buffer;
-                                entry.second.push_back({slice.buffer_offset, dst_offset, ib_size});
+                                const auto staged = stage(ib_size, [&](void* dst) {
+                                    std::memcpy(dst, src.data, ib_size);
+                                });
+                                auto& entry = index_copies[staged.buffer.get()];
+                                entry.first = staged.buffer;
+                                entry.second.push_back({staged.buffer_offset, dst_offset, ib_size});
                             } else {
                                 static_assert(std::is_same_v<T, Mesh::HostIndices>);
-                                const auto slice =
-                                    staging_alloc(ib_size, size_for_index_type(mesh.index_type));
-                                src->write(slice.ptr);
-                                auto& entry = index_copies[slice.buffer.get()];
-                                entry.first = slice.buffer;
-                                entry.second.push_back({slice.buffer_offset, dst_offset, ib_size});
+                                const auto staged =
+                                    stage(ib_size, [&](void* dst) { src->write(dst); });
+                                auto& entry = index_copies[staged.buffer.get()];
+                                entry.first = staged.buffer;
+                                entry.second.push_back({staged.buffer_offset, dst_offset, ib_size});
                             }
                         },
                         mesh.get_indices());
@@ -1627,9 +1613,6 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
         }
     }
 
-    if (did_upload_static && frame_staging->get_capacity() > MIN_BUFFER_CAPACITY) {
-        frame_staging.reset();
-    }
 }
 
 void Scene::build_blas(const CommandBufferHandle& cmd) {

@@ -10,7 +10,6 @@
 #include "merian/utils/free_list.hpp"
 #include "merian/utils/small_set.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout.hpp"
-#include "merian/vk/memory/frame_staging_block.hpp"
 #include "merian/vk/memory/memory_suballocator_vma.hpp"
 #include "merian/vk/memory/staging_memory_manager.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
@@ -828,7 +827,6 @@ class Scene : public std::enable_shared_from_this<Scene> {
     vk::DeviceSize shared_prev_vb_capacity = 0;
     vk::DeviceSize shared_ib_capacity = 0;
 
-    std::optional<FrameStagingBlock> frame_staging;
 
     std::vector<GeometryData> geometries;
     struct BLASGeometry {
