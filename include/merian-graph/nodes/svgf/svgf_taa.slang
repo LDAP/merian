@@ -1,3 +1,4 @@
+#include "merian-graph/nodes/svgf/variance_encoding.slangh"
 
 [vk::constant_id(0)]
 const int workgroup_size_x = 1;
@@ -58,7 +59,8 @@ void main(const int2 ipos: SV_DispatchThreadID) {
         mv = float2(0);
     }
 
-    const float4 filter_result = img_filter_result[ipos];
+    float4 filter_result = img_filter_result[ipos];
+    filter_result.a = svgf_decode_variance(filter_result.a);
 
     if (DEBUG == 1) {
         out_out.Store(ipos, float4(filter_result.rgb, 1));

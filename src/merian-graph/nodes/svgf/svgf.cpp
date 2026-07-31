@@ -135,13 +135,25 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
         }
         compilation_session_desc->add_search_path("merian-graph/nodes/svgf");
 
-        filter_module =
-            SlangProgramEntryPoint::create(compilation_session_desc, "svgf_filter.slang").get();
-        variance_estimate_module =
-            SlangProgramEntryPoint::create(compilation_session_desc, "svgf_variance_estimate.slang")
+        // sigma keeps the variance channel in the same range as the colour it sits next to, which
+        // is what half-precision ping-pong images need
+        const std::string constants = fmt::format(
+            "namespace merian {{\n"
+            "export static const bool svgf_variance_as_sigma = {};\n"
+            "}}",
+            irr_create_info.format == vk::Format::eR16G16B16A16Sfloat ? "true" : "false");
+        const auto entry_point = [&](const std::string& module_path) {
+            const auto composition = SlangComposition::create();
+            composition->add_module_from_path(module_path, true);
+            composition->add_module_from_string("svgf_constants", constants);
+            return SlangProgramEntryPoint::create(
+                       SlangProgram::create(compilation_session_desc, composition), "main")
                 .get();
-        taa_module =
-            SlangProgramEntryPoint::create(compilation_session_desc, "svgf_taa.slang").get();
+        };
+
+        filter_module = entry_point("svgf_filter.slang");
+        variance_estimate_module = entry_point("svgf_variance_estimate.slang");
+        taa_module = entry_point("svgf_taa.slang");
 
         {
             auto spec_builder = SpecializationInfoBuilder();

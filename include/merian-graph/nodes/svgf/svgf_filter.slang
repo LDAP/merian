@@ -1,4 +1,5 @@
 #include "merian-graph/nodes/svgf/config.h"
+#include "merian-graph/nodes/svgf/variance_encoding.slangh"
 
 [vk::constant_id(0)]
 const int workgroup_size_x = 1;
@@ -57,6 +58,12 @@ static int2 ipos_shared;
 #endif // KALEIDOSCOPE_USE_SHMEM
 
 static float4 filter_irr_var;
+
+float4 load_irr_var(const int2 pos) {
+    float4 irr_var = img_filter_in[pos];
+    irr_var.a = svgf_decode_variance(irr_var.a);
+    return irr_var;
+}
 static float filter_w;
 
 static float2 c_grad_z;
@@ -84,7 +91,7 @@ float get_sigma_l(float center, int2 ipos) {
         for (int xx = -r; xx <= r; xx++) {
             if (xx != 0 || yy != 0) {
                 const int2 p = ipos + int2(xx, yy);
-                const float v = img_filter_in[p].a;
+                const float v = svgf_decode_variance(img_filter_in[p].a);
                 const float w = gaussian_kernel[xx + 1][yy + 1];
                 sum += v * w;
             }
@@ -150,14 +157,14 @@ void _tap(const int2 offset, const float kernel_weight) {
     float p_z;
     shmem_read(ipos_shared + offset, p_n, p_z, p_irr_var);
 #else
-    const float4 p_irr_var = img_filter_in[ipos + offset];
+    const float4 p_irr_var = load_irr_var(ipos + offset);
     const float3 p_n = decode_normal(img_gbuf_in[ipos + offset].x);
     const float p_z = asfloat(img_gbuf_in[ipos + offset].y);
 #endif
 
 #define grad_offset (offset * GAP)
 #else
-    const float4 p_irr_var = img_filter_in[ipos + offset];
+    const float4 p_irr_var = load_irr_var(ipos + offset);
     const float3 p_n = in_gbuffer.get_normal(uint2(ipos + offset));
     const float p_z = in_gbuffer.get_linear_z(uint2(ipos + offset));
 #define grad_offset offset
@@ -190,7 +197,7 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
     ipos = int2(dispatch_thread_id);
     ipos_shared = int2(group_thread_id) + SVGF_FILTER_HALO_RADIUS;
 
-    filter_irr_var = img_filter_in[ipos];
+    filter_irr_var = load_irr_var(ipos);
     const uint3 c_gbuf = img_gbuf_in[ipos].rgb;
     c_n = decode_normal(c_gbuf.x);
     c_z = asfloat(c_gbuf.y);
@@ -207,7 +214,7 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
             const int2 global_read =
                 texturewrap_mirror_repeat(global_index, texture_dimensions(img_filter_in, 0));
             const uint3 p_gbuf = img_gbuf_in[global_read].rgb;
-            shmem_write(shared_index, img_filter_in[global_read], decode_normal(p_gbuf.x),
+            shmem_write(shared_index, load_irr_var(global_read), decode_normal(p_gbuf.x),
                         asfloat(p_gbuf.y));
         }
         GroupMemoryBarrierWithGroupSync();
@@ -220,7 +227,7 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
     if (not_on_texture(ipos, img_filter_out))
         return;
 
-    filter_irr_var = img_filter_in[ipos];
+    filter_irr_var = load_irr_var(ipos);
     const uint3 c_gbuf = img_gbuf_in[ipos].rgb;
     c_n = decode_normal(c_gbuf.x);
     c_z = asfloat(c_gbuf.y);
@@ -231,7 +238,7 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
     if (not_on_texture(ipos, img_filter_out))
         return;
 
-    filter_irr_var = img_filter_in[ipos];
+    filter_irr_var = load_irr_var(ipos);
     const SurfaceData c_surf = in_gbuffer.get_surface(uint2(ipos));
     c_n = c_surf.normal;
     c_z = c_surf.linear_z;
@@ -366,5 +373,6 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
     }
 #endif
 
+    filter_irr_var.a = svgf_encode_variance(filter_irr_var.a);
     img_filter_out.Store(ipos, filter_irr_var);
 }
