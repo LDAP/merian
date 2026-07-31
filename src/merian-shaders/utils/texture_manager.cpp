@@ -71,11 +71,14 @@ void TextureManager::update(const CommandBufferHandle& cmd) {
     }
     cmd->barrier(to_transfer_dst);
 
-    // 2. Record copies and generate mip chains.
+    // 2. Record copies, then generate all mip chains with barriers batched per level.
+    std::vector<ImageHandle> mip_images;
+    mip_images.reserve(pending_uploads.size());
     for (const auto& copy : pending_uploads) {
         cmd->copy(copy.src, copy.dst, copy.region);
-        cmd_generate_mipmaps(cmd, copy.dst);
+        mip_images.emplace_back(copy.dst);
     }
+    cmd_generate_mipmaps(cmd, mip_images);
 
     // 3. Transition every pending image to ShaderReadOnlyOptimal (batched).
     // Descriptors were written upfront with this layout already.
