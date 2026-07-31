@@ -126,10 +126,12 @@ struct MCState {
 struct MCPG<let ADAPTIVE_BUFFER_SIZE : uint, let NORMAL_BITS : uint = 8> {
     HashGrid<MCState, ADAPTIVE_BUFFER_SIZE, 2, true, true, NORMAL_BITS> grid;
 
-    // Stochastic normal binning: cosine-jitter the access normal in the shading frame so nearby
-    // normals probabilistically share hash buckets (replaces the removed normal-tolerance probing).
     float3 jitter_normal(const OrthonormalFrame shading_frame, inout RandomGenerator rng) {
         return shading_frame.to_world(sample_cos(rng));
+    }
+
+    float3 jitter_normal(const float3 normal, inout RandomGenerator rng) {
+        return mul(sample_cos(rng), make_frame(normal));
     }
 
     MCState load(const float3 pos,
@@ -151,15 +153,13 @@ struct MCPG<let ADAPTIVE_BUFFER_SIZE : uint, let NORMAL_BITS : uint = 8> {
     // Reports the queried level and the exact buffer slot the lobe was read from
     // (MC_INVALID_INDEX if no slot matched).
     MCState load(const float3 pos,
-                 const OrthonormalFrame shading_frame,
+                 const float3 access_normal,
                  const float3 cam_pos,
                  const float time,
                  inout RandomGenerator rng,
                  out uint buffer_index,
                  out uint level) {
-        var s = grid.distributed_get(pos, jitter_normal(shading_frame, rng), cam_pos, rng, level,
-                                     buffer_index)
-                    .value;
+        var s = grid.distributed_get(pos, access_normal, cam_pos, rng, level, buffer_index).value;
         if (s.is_valid()) {
             s.set_w_tgt(s.w_tgt + s.sum_w * (time - s.T) * float3(s.mv));
         } else {
@@ -171,20 +171,20 @@ struct MCPG<let ADAPTIVE_BUFFER_SIZE : uint, let NORMAL_BITS : uint = 8> {
 
     void store(const MCState s,
                const float3 pos,
-               const OrthonormalFrame shading_frame,
+               const float3 access_normal,
                const float3 cam_pos,
                const uint frame,
                inout RandomGenerator rng) {
-        grid.distributed_set(pos, jitter_normal(shading_frame, rng), cam_pos, frame, s, rng);
+        grid.distributed_set(pos, access_normal, cam_pos, frame, s, rng);
     }
 
     void store_at_level(const MCState s,
                         const float3 pos,
-                        const OrthonormalFrame shading_frame,
+                        const float3 access_normal,
                         const uint level,
                         const uint frame,
                         inout RandomGenerator rng) {
-        grid.set_at_level(level, pos, jitter_normal(shading_frame, rng), frame, s, rng);
+        grid.set_at_level(level, pos, access_normal, frame, s, rng);
     }
 
     // Missing-light heuristic: invalidate the exact loaded slot in place.
