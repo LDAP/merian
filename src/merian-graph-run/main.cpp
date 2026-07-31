@@ -7,15 +7,20 @@
 #include "merian/vk/context.hpp"
 #include "merian/vk/extension/extension_resources.hpp"
 #include "merian/vk/extension/extension_vk_validation_layers.hpp"
+#include "merian/vk/utils/profiler.hpp"
 
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <csignal>
 #include <fstream>
+#include <map>
+#include <numeric>
 #include <optional>
+#include <vector>
 
 namespace {
 
@@ -34,6 +39,10 @@ void print_usage() {
         "  --validation=<on|off|ifdebug> Vulkan validation layers (default: ifdebug)\n"
         "  --merge <file.json>           deep-merge a JSON file into the config (repeatable,\n"
         "                                last wins)\n"
+        "  --frames=<N>                  headless benchmark: run N frames, print per-pass GPU\n"
+        "                                timing distribution, then exit\n"
+        "  --warmup=<N>                  frames excluded from benchmark stats (default 128)\n"
+        "  --bench-csv=<file>            also write one row per sampled frame to <file>\n"
         "  --<name> <value>              set an override declared in the graph's \"cli\" block;\n"
         "                                may appear before or after graph.json, in any order\n"
         "                                variant selections persist when the graph is stored;\n"
@@ -47,6 +56,11 @@ struct Options {
     std::optional<std::filesystem::path> config;
     bool validation = merian::Context::IS_DEBUG_BUILD;
     bool help = false;
+    // Headless benchmark: run N frames, sampling the per-pass GPU profiler, then print a
+    // per-section timing distribution and exit.
+    std::optional<uint64_t> frames;
+    uint64_t warmup = 128;
+    std::optional<std::filesystem::path> bench_csv;
     // Non-runner tokens in command-line order; classified against the graph's cli block once
     // the config is loaded. A pre-config override's value is kept adjacent to its --name.
     std::vector<std::string> graph_args;
@@ -77,6 +91,12 @@ std::optional<Options> parse(const std::vector<std::string>& args) {
         } else if (arg.starts_with("--validation=")) {
             SPDLOG_ERROR("invalid --validation value '{}' (expected on/off/ifdebug)", arg);
             return std::nullopt;
+        } else if (arg.starts_with("--frames=")) {
+            options.frames = std::stoull(arg.substr(arg.find('=') + 1));
+        } else if (arg.starts_with("--warmup=")) {
+            options.warmup = std::stoull(arg.substr(arg.find('=') + 1));
+        } else if (arg.starts_with("--bench-csv=")) {
+            options.bench_csv = arg.substr(arg.find('=') + 1);
         } else if (arg.starts_with("--loglevel=")) {
             spdlog::set_level(spdlog::level::from_str(arg.substr(arg.find('=') + 1)));
         } else if (arg.starts_with("--plugin-path=")) {
@@ -113,6 +133,44 @@ void build_default_graph(const merian::GraphHandle& graph) {
         true, false, false);
     graph->set_store_path("merian-graph.json");
 }
+
+// --- Headless benchmark ---
+
+// Flattens the GPU report tree into "parent/child" paths -> duration (ms), preserving order.
+void flatten_gpu_report(const std::vector<merian::Profiler::ReportEntry>& entries,
+                        const std::string& prefix,
+                        std::vector<std::pair<std::string, double>>& out) {
+    for (const auto& e : entries) {
+        const std::string path = prefix.empty() ? e.name : prefix + "/" + e.name;
+        out.emplace_back(path, e.duration);
+        flatten_gpu_report(e.children, path, out);
+    }
+}
+
+struct SectionStats {
+    std::vector<double> samples;
+
+    void print(const std::string& name) const {
+        if (samples.empty()) {
+            return;
+        }
+        std::vector<double> s = samples;
+        std::ranges::sort(s);
+        const size_t n = s.size();
+        const double sum = std::accumulate(s.begin(), s.end(), 0.0);
+        const double mean = sum / n;
+        double var = 0.0;
+        for (const double v : s) {
+            var += (v - mean) * (v - mean);
+        }
+        const double stddev = std::sqrt(var / n);
+        const auto pct = [&](const double p) { return s[std::min(n - 1, size_t(p * n))]; };
+        fmt::print("{:<34} n={:5} mean={:7.4f} std={:7.4f} min={:7.4f} p50={:7.4f} p95={:7.4f} "
+                   "p99={:7.4f} max={:7.4f}  spread={:5.2f}x\n",
+                   name, n, mean, stddev, s.front(), pct(0.50), pct(0.95), pct(0.99), s.back(),
+                   s.front() > 0.0 ? s.back() / s.front() : 0.0);
+    }
+};
 
 } // namespace
 
@@ -210,8 +268,71 @@ int main(const int argc, const char** argv) {
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
 
-    while (!stop) {
+    if (!options->frames) {
+        while (!stop) {
+            graph->run();
+        }
+        SPDLOG_INFO("shutting down");
+        return 0;
+    }
+
+    // Headless benchmark: sample the per-pass GPU profiler once per new report.
+    graph->set_profiler_report_intervall_ms(0); // per-frame resolution
+    const uint64_t total = *options->frames;
+    const uint64_t warmup = std::min(options->warmup, total);
+    std::map<std::string, SectionStats> stats;
+    std::vector<std::string> order; // stable insertion order for printing
+    uint32_t last_report = graph->get_report_count();
+    std::optional<std::ofstream> csv;
+    std::vector<std::string> csv_columns;
+
+    for (uint64_t i = 0; i < total && !stop; i++) {
         graph->run();
+        if (i < warmup) {
+            continue;
+        }
+        const uint32_t report_count = graph->get_report_count();
+        if (report_count == last_report) {
+            continue; // no fresh GPU results this frame
+        }
+        last_report = report_count;
+
+        std::vector<std::pair<std::string, double>> flat;
+        flatten_gpu_report(graph->get_last_run_report().gpu_report, "", flat);
+        for (const auto& [name, ms] : flat) {
+            auto [it, inserted] = stats.try_emplace(name);
+            if (inserted) {
+                order.push_back(name);
+            }
+            it->second.samples.push_back(ms);
+        }
+
+        if (options->bench_csv) {
+            if (!csv) {
+                csv.emplace(*options->bench_csv);
+                std::string header;
+                for (const auto& [name, ms] : flat) {
+                    csv_columns.push_back(name);
+                    header += (header.empty() ? "" : ",") + name;
+                }
+                *csv << header << "\n";
+            }
+            std::string row;
+            for (const auto& [name, ms] : flat) {
+                row += fmt::format("{}{:.5f}", row.empty() ? "" : ",", ms);
+            }
+            *csv << row << "\n";
+        }
+    }
+
+    graph->wait();
+
+    fmt::print("\n===== GPU per-pass timing distribution (ms) =====\n");
+    for (const std::string& name : order) {
+        stats[name].print(name);
+    }
+    if (options->bench_csv && csv) {
+        fmt::print("wrote per-frame samples to {}\n", options->bench_csv->string());
     }
 
     SPDLOG_INFO("shutting down");

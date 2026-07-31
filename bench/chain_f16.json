@@ -1,0 +1,70 @@
+{
+  "version": 4,
+  "nodes": {
+    "src": {
+      "type": "Color",
+      "enabled": true,
+      "properties": {
+        "format": "R32G32B32A32Sfloat",
+        "extent": [
+          1920,
+          1080,
+          1
+        ]
+      },
+      "outputs": [
+        "out->exposure.src"
+      ]
+    },
+    "ui": {
+      "type": "Color",
+      "enabled": true,
+      "properties": {
+        "format": "R8G8B8A8Unorm",
+        "extent": [
+          1920,
+          1080,
+          1
+        ]
+      },
+      "outputs": [
+        "out->composite.input_1"
+      ]
+    },
+    "exposure": {
+      "type": "Exposure",
+      "enabled": true,
+      "outputs": [
+        "out->tonemap.src"
+      ]
+    },
+    "tonemap": {
+      "type": "Tonemap",
+      "enabled": true,
+      "properties": {
+        "tonemap": "Reinhard Extended",
+        "clamp output": true,
+        "alpha mode": "Perceptual luminance",
+        "output format": "R16G16B16A16Sfloat"
+      },
+      "outputs": [
+        "out->fxaa.src"
+      ]
+    },
+    "fxaa": {
+      "type": "FXAA",
+      "enabled": true,
+      "outputs": [
+        "out->composite.input_0"
+      ]
+    },
+    "composite": {
+      "type": "Reduce",
+      "enabled": true,
+      "properties": {
+        "initial value": "",
+        "reduction": "current_value + float4(accumulator.rgb, 1) * (1.0 - current_value.a)"
+      }
+    }
+  }
+}

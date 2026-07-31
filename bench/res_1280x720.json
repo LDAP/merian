@@ -1,0 +1,43 @@
+{
+  "version": 4,
+  "nodes": {
+    "color_0": {
+      "type": "Color",
+      "enabled": true,
+      "properties": {
+        "format": "R32G32B32A32Sfloat",
+        "extent": [
+          1280,
+          720,
+          1
+        ]
+      },
+      "outputs": [
+        "out->measured.input_0"
+      ]
+    },
+    "color_1": {
+      "type": "Color",
+      "enabled": true,
+      "properties": {
+        "format": "R32G32B32A32Sfloat",
+        "extent": [
+          1280,
+          720,
+          1
+        ]
+      },
+      "outputs": [
+        "out->measured.input_1"
+      ]
+    },
+    "measured": {
+      "type": "Reduce",
+      "enabled": true,
+      "properties": {
+        "initial value": "",
+        "reduction": "accumulator + current_value"
+      }
+    }
+  }
+}

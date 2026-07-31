@@ -210,6 +210,24 @@ class Graph : public std::enable_shared_from_this<Graph> {
 
     void properties(Properties& props);
 
+    // --- Profiling access (for headless benchmarking) ---
+
+    // The most recent per-interval profiling report (mean + std deviation per section).
+    const Profiler::Report& get_last_run_report() const {
+        return last_run_report;
+    }
+
+    // Increments every time a new report becomes available; sample get_last_run_report() when
+    // this changes to avoid double-counting.
+    uint32_t get_report_count() const {
+        return time_history_current;
+    }
+
+    // 0 reports as often as GPU results are ready (per-frame resolution).
+    void set_profiler_report_intervall_ms(const uint32_t ms) {
+        profiler_report_intervall_ms = ms;
+    }
+
   private:
     /*--- Graph Edit --- */
 
