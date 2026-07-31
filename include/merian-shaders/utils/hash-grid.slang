@@ -15,15 +15,13 @@ interface HashGridUpdateFunction<typename T> {
     void update(inout T t);
 }
 
-// NORMAL_BITS: octahedral normal bins hashed into the key (SHARC-style; the normal selects the
-// bucket and is matched exactly, no tolerance). Set to 0 to ignore the normal. 6 => ~22° cells,
-// 8 => ~11° cells.
+// Overloads taking a normal hash its dominant-axis cube face (6 bins, 3 bits) into the key: the
+// face selects the bucket and is matched exactly.
 struct HashGrid<typename T,
                 let BUFFER_SIZE : uint,
                 let PROBE_COUNT : uint = 4,
                 let STOCHASTIC_INTERPOLATION : bool = false,
                 let LEVEL_STOCHASTIC_INTERPOLATION : bool = false,
-                let NORMAL_BITS : uint = 0,
                 let GRID_POWER : uint = 2,
                 let GRID_STEPS_PER_UNIT_SIZE : uint = 1> {
     // Split key/payload layout: probing touches only the 8-byte key words (x = hash,
@@ -74,26 +72,18 @@ struct HashGrid<typename T,
         return grid_idx_lower(staggered, width);
     }
 
-    // Octahedral cell of the normal, packed into NORMAL_BITS (half the bits per oct axis).
-    // Bias off the axes so an axis-aligned normal doesn't sit exactly on a cell edge and flicker.
+    // Dominant-axis cube face of the normal (6 bins).
     uint normal_bin(const float3 normal) {
-        if (NORMAL_BITS == 0)
-            return 0u;
-        const uint per_axis = NORMAL_BITS / 2;
-        const uint res = 1u << per_axis;
-        const float2 oct = octahedral_project(normal + 1e-3) * 0.5 + 0.5; // [0, 1]^2
-        const int2 cell = clamp(int2(floor(oct * res)), int2(0), int2(res - 1));
-        return (uint(cell.x) << per_axis) | uint(cell.y);
+        return cubemap_side(normal);
     }
 
-    // Pack the LOD level and the octahedral normal cell into one word (normal in the low bits), so
-    // the normal is hashed into the key SHARC-style: it selects the bucket and is matched exactly.
+    // Pack the LOD level and the cube face into one word (face in the low 3 bits).
     uint level_normal_word(const uint level, const float3 normal) {
-        return (level << NORMAL_BITS) | normal_bin(normal);
+        return (level << 3) | normal_bin(normal);
     }
 
     uint level_normal_word(const uint level) {
-        return level << NORMAL_BITS;
+        return level << 3;
     }
 
     // Stored/compared key: a hash of (gidx, level, normal).
@@ -302,6 +292,7 @@ struct HashGrid<typename T,
         // wraps and is reclaimed first (self-healing).
         uint target = base;
         uint max_age = 0;
+        bool matched = false;
         for (uint i = 0; i < PROBE_COUNT; i++) {
             uint idx = base + i;
             if (idx >= BUFFER_SIZE)
@@ -309,6 +300,7 @@ struct HashGrid<typename T,
             let probe = keys[idx];
             if (keys_match(probe.x, hash)) {
                 target = idx;
+                matched = true;
                 break;
             }
             const uint age = frame - (probe.y & ~MERIAN_HASH_GRID_LOCK_BIT);
@@ -329,7 +321,7 @@ struct HashGrid<typename T,
 
         var t = data[target];
 
-        if (!keys_match(keys[target].x, hash)) {
+        if (!matched) {
             const uint prev_level = target_level_for_pos(pos, prev_cam_pos, rng);
             if (level != prev_level) {
                 Optional<T> r;
