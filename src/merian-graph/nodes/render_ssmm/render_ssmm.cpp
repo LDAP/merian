@@ -62,7 +62,7 @@ std::vector<InputConnectorDescriptor> RenderSSMM::describe_inputs() {
 
 std::vector<OutputConnectorDescriptor>
 RenderSSMM::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
-    con_irradiance = ManagedVkImageOut::create(vk::Format::eR32G32B32A32Sfloat, extent);
+    con_irradiance = ManagedVkImageOut::create(irradiance_format, extent);
     con_ssmc = ManagedVkBufferOut::create(ssmc_buffer_create_info());
     return {{"irradiance", con_irradiance, ConnectorAccess::ray_tracing_write},
             {"ssmc", con_ssmc,
@@ -213,6 +213,10 @@ RenderSSMM::NodeStatusFlags RenderSSMM::properties(Properties& config) {
     if (constants_changed && composition) {
         update_render_constants();
     }
+
+    config.st_separate();
+    needs_reconnect |=
+        config.config_enum("irradiance format", irradiance_format, Properties::OptionsStyle::COMBO);
 
     if (needs_reconnect) {
         return NEEDS_RECONNECT;

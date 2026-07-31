@@ -32,7 +32,7 @@ std::vector<InputConnectorDescriptor> GBufferRTNode::describe_inputs() {
 std::vector<OutputConnectorDescriptor>
 GBufferRTNode::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     con_gbuffer = ShaderObjectOut<GBufferObject>::create({extent});
-    con_emission = ManagedVkImageOut::create(vk::Format::eR32G32B32A32Sfloat, extent);
+    con_emission = ManagedVkImageOut::create(emission_format, extent);
 
     return {
         {"gbuffer", con_gbuffer, ConnectorAccess::ray_tracing_write},
@@ -167,6 +167,10 @@ GBufferRTNode::NodeStatusFlags GBufferRTNode::properties(Properties& config) {
         if ((bit & 3u) != 3u)
             config.st_no_space();
     }
+
+    config.st_separate();
+    needs_reconnect |=
+        config.config_enum("emission format", emission_format, Properties::OptionsStyle::COMBO);
 
     if (needs_reconnect) {
         return NEEDS_RECONNECT;

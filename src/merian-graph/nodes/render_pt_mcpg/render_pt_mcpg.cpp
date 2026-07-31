@@ -38,7 +38,7 @@ std::vector<InputConnectorDescriptor> RenderMCPG::describe_inputs() {
 
 std::vector<OutputConnectorDescriptor> RenderMCPG::describe_outputs(const NodeIOLayout& io_layout) {
     extent = io_layout[con_gbuffer]->get_create_info().extent;
-    con_irradiance = ManagedVkImageOut::create(vk::Format::eR32G32B32A32Sfloat, extent);
+    con_irradiance = ManagedVkImageOut::create(irradiance_format, extent);
     con_debug = ManagedVkImageOut::create(vk::Format::eR16G16B16A16Sfloat, extent);
     return {{"irradiance", con_irradiance, ConnectorAccess::ray_tracing_write},
             {"debug", con_debug, ConnectorAccess::ray_tracing_write}};
@@ -303,6 +303,10 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
     if (constants_changed && composition) {
         update_render_constants();
     }
+
+    config.st_separate();
+    needs_reconnect |=
+        config.config_enum("irradiance format", irradiance_format, Properties::OptionsStyle::COMBO);
 
     if (needs_reconnect) {
         return NEEDS_RECONNECT;

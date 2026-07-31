@@ -44,10 +44,11 @@ FXAA::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     const vk::ImageCreateInfo create_info = io_layout[con_src]->get_create_info_or_throw();
 
     extent = create_info.extent;
+    const vk::Format format =
+        overwrite_format != vk::Format::eUndefined ? overwrite_format : create_info.format;
 
     return {
-        {"out", ManagedVkImageOut::create(create_info.format, extent),
-         ConnectorAccess::compute_write},
+        {"out", ManagedVkImageOut::create(format, extent), ConnectorAccess::compute_write},
     };
 }
 
@@ -90,6 +91,12 @@ This can effect sharpness.
   0.0312 - visible limit (slower)
 )",
                         0.001f, 0.01f, 0.1f);
+
+    config.st_separate();
+    if (config.config_enum("overwrite format", overwrite_format, Properties::OptionsStyle::COMBO,
+                           "Undefined keeps the format of the input.")) {
+        return NEEDS_RECONNECT;
+    }
 
     return {};
 }

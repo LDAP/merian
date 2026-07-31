@@ -52,8 +52,9 @@ std::vector<InputConnectorDescriptor> Accumulate::describe_inputs() {
 std::vector<OutputConnectorDescriptor> Accumulate::describe_outputs(const NodeIOLayout& io_layout) {
 
     irr_create_info = io_layout[con_src]->get_create_info_or_throw();
-    con_out =
-        ManagedVkImageOut::create(format.value_or(irr_create_info.format), irr_create_info.extent);
+    con_out = ManagedVkImageOut::create(
+        overwrite_format != vk::Format::eUndefined ? overwrite_format : irr_create_info.format,
+        irr_create_info.extent);
     con_history = ManagedVkImageOut::create(vk::Format::eR32Sfloat, irr_create_info.extent);
 
     io_layout.register_event_listener(clear_event_listener_pattern,
@@ -242,6 +243,11 @@ Accumulate::NodeStatusFlags Accumulate::properties(Properties& config) {
                           percentile_pc.adaptive_alpha_percentile_lower);
     config.config_percent("adaptivity percentile upper",
                           percentile_pc.adaptive_alpha_percentile_upper);
+
+    config.st_separate();
+    needs_rebuild |=
+        config.config_enum("overwrite format", overwrite_format, Properties::OptionsStyle::COMBO,
+                           "Undefined keeps the format of the input.");
 
     return needs_rebuild ? NodeStatusFlags{NEEDS_RECONNECT} : NodeStatusFlags{};
 }

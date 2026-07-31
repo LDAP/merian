@@ -63,7 +63,11 @@ class SVGF : public Node {
   private:
     ContextHandle context;
     ResourceAllocatorHandle allocator;
-    std::optional<vk::Format> output_format = std::nullopt;
+    // Undefined: keep the format of the input.
+    vk::Format overwrite_format = vk::Format::eUndefined;
+    // Format of the a-trous ping-pong images. Each iteration reads and writes them, so they
+    // dominate the node's bandwidth and are worth narrowing independently of the output.
+    vk::Format overwrite_filter_format = vk::Format::eUndefined;
 
     // depends on available shared memory
     uint32_t variance_estimate_local_size;

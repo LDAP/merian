@@ -59,10 +59,14 @@ std::vector<InputConnectorDescriptor> SVGF::describe_inputs() {
 
 std::vector<OutputConnectorDescriptor> SVGF::describe_outputs(const NodeIOLayout& io_layout) {
     irr_create_info = io_layout[con_src]->get_create_info_or_throw();
-    if (output_format)
-        irr_create_info.format = output_format.value();
 
-    con_out = ManagedVkImageOut::create(irr_create_info.format, irr_create_info.extent);
+    con_out = ManagedVkImageOut::create(
+        overwrite_format != vk::Format::eUndefined ? overwrite_format : irr_create_info.format,
+        irr_create_info.extent);
+    // from here irr_create_info describes the ping-pong images, which carry their own format
+    if (overwrite_filter_format != vk::Format::eUndefined) {
+        irr_create_info.format = overwrite_filter_format;
+    }
 
     return {{"out", con_out, ConnectorAccess::compute_write}};
 }
@@ -378,6 +382,14 @@ SVGF::NodeStatusFlags SVGF::properties(Properties& config) {
     needs_rebuild |= config.config_options("debug", taa_debug,
                                            {"none", "irradiance", "variance", "normal", "depth",
                                             "albedo", "grad z", "irradiance nan/inf", "mv"});
+
+    config.st_separate("Formats");
+    needs_rebuild |=
+        config.config_enum("overwrite format", overwrite_format, Properties::OptionsStyle::COMBO,
+                           "Undefined keeps the format of the input.");
+    needs_rebuild |= config.config_enum(
+        "overwrite filter format", overwrite_filter_format, Properties::OptionsStyle::COMBO,
+        "Format of the a-trous ping-pong images. Undefined keeps the format of the input.");
 
     config.st_separate();
     config.output_text("local size variance estimate: {}\nlocal size filter: {}",

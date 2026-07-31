@@ -57,7 +57,8 @@ class Tonemap : public AbstractCompute {
 
     void apply_agx_look();
 
-    std::optional<vk::Format> output_format = std::nullopt;
+    // The output is display-referred, so it does not inherit the HDR input format.
+    vk::Format output_format = vk::Format::eR16G16B16A16Sfloat;
 
     VkSampledImageInHandle con_src = VkSampledImageIn::create();
 

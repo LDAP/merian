@@ -36,14 +36,14 @@ std::vector<InputConnectorDescriptor> Reduce::describe_inputs() {
 
     std::vector<InputConnectorDescriptor> descriptors;
     for (uint32_t i = 0; i < number_inputs; i++) {
-        descriptors.push_back(
-            {fmt::format("input_{}", i), input_connectors[i], ConnectorAccess::compute_read, 0, true});
+        descriptors.push_back({fmt::format("input_{}", i), input_connectors[i],
+                               ConnectorAccess::compute_read, 0, true});
     }
     return descriptors;
 }
 
 std::vector<OutputConnectorDescriptor> Reduce::describe_outputs(const NodeIOLayout& io_layout) {
-    vk::Format format = output_format.value_or(vk::Format::eUndefined);
+    vk::Format format = overwrite_format;
     extent = vk::Extent3D{
         std::numeric_limits<uint32_t>::max(),
         std::numeric_limits<uint32_t>::max(),
@@ -175,6 +175,9 @@ Reduce::NodeStatusFlags Reduce::properties(Properties& props) {
     }
 
     needs_reconnect |= props.config_uint("number inputs", number_inputs, "");
+    needs_reconnect |=
+        props.config_enum("overwrite format", overwrite_format, Properties::OptionsStyle::COMBO,
+                          "Undefined keeps the format of the first connected input.");
     props.output_text("output extent: {}x{}x{}", extent.width, extent.height, extent.depth);
 
     if (props.st_begin_child("show_source", "show source")) {

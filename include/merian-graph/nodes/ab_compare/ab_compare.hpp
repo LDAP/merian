@@ -17,8 +17,12 @@ class AbstractABCompare : public Node {
 
     std::vector<InputConnectorDescriptor> describe_inputs() override final;
 
+  public:
+    NodeStatusFlags properties(Properties& props) override;
+
   protected:
-    std::optional<vk::Format> output_format = std::nullopt;
+    // Undefined: keep the format of the input.
+    vk::Format overwrite_format = vk::Format::eUndefined;
     std::optional<vk::Extent2D> output_extent = std::nullopt;
 
     const VkImageInHandle con_in_a = VkImageIn::create();
