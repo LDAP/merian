@@ -1,10 +1,10 @@
 #include "merian-graph/nodes/render_pt_mcpg/render_pt_mcpg.hpp"
 
 #include "merian/shader/shader_compile_context.hpp"
+#include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_ray_tracing_builder.hpp"
 
 #include <fmt/format.h>
-
 
 namespace merian {
 
@@ -17,7 +17,7 @@ DeviceSupportInfo RenderMCPG::query_device_support(const DeviceSupportQueryInfo&
     composition->add_module_from_path("merian-graph/nodes/render_pt_mcpg/render_pt_mcpg.slang",
                                       true);
     const auto program = SlangProgram::create(query_info.compile_context, composition);
-    return DeviceSupportInfo::check(query_info, {"rayTracingPipeline"}, {"rayQuery"}) &
+    return DeviceSupportInfo::check(query_info, {"rayQuery", "rayTracingPipeline"}, {}) &
            program.get()->query_device_support(query_info);
 }
 
@@ -29,6 +29,7 @@ void RenderMCPG::initialize(const ContextHandle& context,
     irr_cache = std::make_shared<HashedIrradianceCache>(
         compile_context, allocator, lc_buffer_size, lc_probe_count, lc_stochastic_interpolation);
     mcpg = std::make_shared<MCPG>(compile_context, allocator, mc_adaptive_buffer_size);
+    use_raygen = !context->get_device()->get_physical_device()->is_amd();
 }
 
 std::vector<InputConnectorDescriptor> RenderMCPG::describe_inputs() {
@@ -85,19 +86,30 @@ void RenderMCPG::ensure_pipeline(const SceneHandle& scene) {
     update_render_constants();
 
     program = SlangProgram::create(compile_context, composition);
-    entry_point = SlangProgramEntryPoint::create(program, "main");
+    entry_point =
+        SlangProgramEntryPoint::create(program, use_raygen ? "main_rgen" : "main_compute");
 
-    pipeline = Versioned<RayTracingPipeline>([this] {
-        const auto ep = entry_point.get();
-        return RayTracingPipelineBuilder()
-            .add_raygen_group(ep->specialize())
-            .build(ep->get_pipeline_layout(context));
-    });
-    pipeline.depends_on(entry_point);
+    if (use_raygen) {
+        pipeline = Versioned<Pipeline>([this] {
+            const auto ep = entry_point.get();
+            return RayTracingPipelineBuilder()
+                .add_raygen_group(ep->specialize())
+                .build(ep->get_pipeline_layout(context));
+        });
+        pipeline.depends_on(entry_point);
 
-    sbt = Versioned<ShaderBindingTable>(
-        [this] { return ShaderBindingTable::create(pipeline.get(), resource_allocator); });
-    sbt.depends_on(pipeline);
+        sbt = Versioned<ShaderBindingTable>([this] {
+            return ShaderBindingTable::create(
+                std::dynamic_pointer_cast<RayTracingPipeline>(pipeline.get()), resource_allocator);
+        });
+        sbt.depends_on(pipeline);
+    } else {
+        pipeline = Versioned<Pipeline>([this] {
+            const auto ep = entry_point.get();
+            return ComputePipeline::create(ep->get_pipeline_layout(context), ep->specialize());
+        });
+        pipeline.depends_on(entry_point);
+    }
 
     params = Versioned<ShaderObject>([this] {
         return entry_point->create_shader_object_for_parameter(context, "params",
@@ -145,7 +157,11 @@ RenderMCPG::process(const NodeIO& io, const NodeProcessInfo& info, Submission& s
     ep->bind("scene", scene->get_shader_object(), cmd, pipe, obj_allocator);
     ep->bind("params", params_obj, cmd, pipe, obj_allocator);
 
-    cmd->trace_rays(sbt.get(), extent);
+    if (use_raygen) {
+        cmd->trace_rays(sbt.get(), extent);
+    } else {
+        cmd->dispatch(extent, 8, 8);
+    }
     return {};
 }
 
@@ -179,13 +195,11 @@ void RenderMCPG::update_render_constants() {
                     "export static const uint mc_adaptive_buffer_size = {}u;\n"
                     "export static const uint mc_normal_bits = {}u;\n",
                     emission_on_primary ? "true" : "false", spp, max_path_length, mask,
-                    demodulate_albedo ? "true" : "false",
-                    use_light_cache_tail ? "true" : "false",
+                    demodulate_albedo ? "true" : "false", use_light_cache_tail ? "true" : "false",
                     missing_light_heuristic ? "true" : "false", mc_samples,
-                    reference_mode ? 0.0f : p_guiding,
-                    dir_guide_prior, debug_output_selector, lc_buffer_size, lc_probe_count,
-                    lc_stochastic_interpolation ? "true" : "false", lc_normal_bits, lc_min_pdf,
-                    mc_adaptive_buffer_size, mc_normal_bits));
+                    reference_mode ? 0.0f : p_guiding, dir_guide_prior, debug_output_selector,
+                    lc_buffer_size, lc_probe_count, lc_stochastic_interpolation ? "true" : "false",
+                    lc_normal_bits, lc_min_pdf, mc_adaptive_buffer_size, mc_normal_bits));
 }
 
 RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
@@ -193,6 +207,10 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
     bool constants_changed = false;
 
     config.st_separate("General");
+    needs_reconnect |=
+        config.config_bool("raygen executor", use_raygen,
+                           "Trace from a ray-tracing pipeline (raygen shader) instead of a compute "
+                           "shader. Necessary for SER support.");
     constants_changed |= config.config_bool("reference mode", reference_mode,
                                             "Disable guiding (pure BSDF sampling).");
     constants_changed |=

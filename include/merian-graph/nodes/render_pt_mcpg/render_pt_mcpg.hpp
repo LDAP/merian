@@ -16,6 +16,7 @@
 #include "merian/shader/slang_composition.hpp"
 #include "merian/shader/slang_entry_point.hpp"
 #include "merian/shader/slang_program.hpp"
+#include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_ray_tracing.hpp"
 #include "merian/vk/raytrace/shader_binding_table.hpp"
 
@@ -104,9 +105,12 @@ class RenderMCPG : public Node {
     SlangCompositionHandle composition;
     Versioned<SlangProgram> program;
     Versioned<SlangProgramEntryPoint> entry_point;
-    Versioned<RayTracingPipeline> pipeline;
-    Versioned<ShaderBindingTable> sbt;
+    Versioned<Pipeline> pipeline;
+    Versioned<ShaderBindingTable> sbt; // only used when use_raygen
     Versioned<ShaderObject> params;
+
+    // Executor: compute (faster, no RT-pipeline VGPR cap) or raygen (enables SER-only experiments).
+    bool use_raygen = false;
 };
 
 } // namespace merian

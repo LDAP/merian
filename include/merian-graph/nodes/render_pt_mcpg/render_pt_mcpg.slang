@@ -188,9 +188,9 @@ float3 trace_path(const ParameterBlock<Scene> scene,
     return radiance;
 }
 
-[shader("raygeneration")]
-void main(ParameterBlock<Scene> scene, ParameterBlock<RenderBinding> params) {
-    const uint2 pixel = DispatchRaysIndex().xy;
+void render_pixel(const uint2 pixel,
+                  ParameterBlock<Scene> scene,
+                  ParameterBlock<RenderBinding> params) {
     if (not_on_texture(pixel, params.irradiance))
         return;
 
@@ -322,3 +322,18 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<RenderBinding> params) {
     }
 }
 
+
+// Two entry points over the same body: compute is faster (no RT-pipeline VGPR cap), while the
+// raygen variant is available for experiments that need ray-tracing-pipeline-only features (SER).
+[shader("compute")]
+[numthreads(8, 8, 1)]
+void main_compute(uint3 thread_id: SV_DispatchThreadID,
+                  ParameterBlock<Scene> scene,
+                  ParameterBlock<RenderBinding> params) {
+    render_pixel(thread_id.xy, scene, params);
+}
+
+[shader("raygeneration")]
+void main_rgen(ParameterBlock<Scene> scene, ParameterBlock<RenderBinding> params) {
+    render_pixel(DispatchRaysIndex().xy, scene, params);
+}
