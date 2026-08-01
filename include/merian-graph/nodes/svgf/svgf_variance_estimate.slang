@@ -24,7 +24,7 @@ const int SVGF_ITERATIONS = 0;
 // graph-bound
 ParameterBlock<GBuffer> in_gbuffer;
 Sampler2D<float4> in_src;
-Sampler2D<float4> in_history;
+Sampler2D<uint2> in_history;
 
 // internal ping-pong (bound by the node)
 RWTexture2D<float4> img_filter_in;
@@ -151,7 +151,8 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
 
     irr_moments /= sum_w;
 
-    const float history = in_history.Load(uint3(mirror_repeat_ipos, 0)).r;
+    // f16 history in the high half of .y (see accumulate.slang)
+    const float history = f16tof32(in_history.Load(uint3(mirror_repeat_ipos, 0)).y >> 16);
     const float alpha = saturate(params.spatial_bias / pow(history, params.spatial_falloff));
 
     irr_moments = lerp(center_irr_moments, irr_moments, alpha);

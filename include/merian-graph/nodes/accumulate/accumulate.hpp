@@ -85,7 +85,6 @@ class Accumulate : public Node {
     VkSampledImageInHandle con_src = VkSampledImageIn::create();
     ShaderObjectInHandle<GBufferObject> con_gbuffer = ShaderObjectIn<GBufferObject>::create();
     VkSampledImageInHandle con_prev_out = VkSampledImageIn::create();
-    ShaderObjectInHandle<GBufferObject> con_prev_gbuffer = ShaderObjectIn<GBufferObject>::create();
     VkSampledImageInHandle con_prev_history = VkSampledImageIn::create();
 
     ManagedVkImageOutHandle con_out;

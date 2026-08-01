@@ -27,6 +27,7 @@ const bool USE_MOTION_VECTORS = true;
 const int GBUFFER_CHECK_MODE = GBUFFER_CHECK_ALWAYS;
 
 import merian_shaders.gbuffer;
+import merian_shaders.utils.encoding;
 import merian_shaders.utils.textures;
 import merian_shaders.utils.interpolation;
 import merian_shaders.utils.random;
@@ -36,14 +37,25 @@ import merian_shaders.colors.colorspaces;
 
 using merian;
 
+// history texel: .x = raw gbuffer enc_normal bits (re-encoding is not bit-stable for
+// degenerate normals), .y = f16 linear_z | f16 history << 16
+uint2 encode_history(uint raw_enc_normal, float linear_z, float history) {
+    return uint2(raw_enc_normal, f32tof16(linear_z) | (f32tof16(history) << 16));
+}
+
+void decode_history(uint2 packed, out float3 normal, out float linear_z, out float history) {
+    normal = merian::decode_normal(packed.x);
+    linear_z = f16tof32(packed.y & 0xffff);
+    history = f16tof32(packed.y >> 16);
+}
+
 // graph io
 Sampler2D<float4> in_src;
 ParameterBlock<GBuffer> in_gbuffer;
 Sampler2D<float4> in_prev_out;
-ParameterBlock<GBuffer> in_prev_gbuffer;
-Sampler2D<float> in_prev_history;
+Sampler2D<uint2> in_prev_history;
 RWTexture2D<float4> out_out;
-RWTexture2D<float> out_history;
+RWTexture2D<uint2> out_history;
 
 // percentile pass result, bound by the node
 Sampler2D<float4> quartiles;
@@ -77,6 +89,8 @@ void main(uint3 ipos: SV_DispatchThreadID) {
         return;
 
     float4 src = in_src.Load(ipos); // contains second moment in a
+    const uint raw_enc_normal = in_gbuffer.tex0[ipos.xy].x;
+    const SurfaceData gbuf = in_gbuffer.get_surface(ipos.xy);
 
     float4 percentiles;
     if (pc.firefly_filter_enable != 0 ||
@@ -104,7 +118,7 @@ void main(uint3 ipos: SV_DispatchThreadID) {
     // CLEAR SHORTCUT
     if (pc.clear == 1 || pc.accum_alpha == 0) {
         out_out.Store(ipos.xy, src);
-        out_history.Store(ipos.xy, 1);
+        out_history.Store(ipos.xy, encode_history(raw_enc_normal, gbuf.linear_z, 1.0));
         return;
     }
 
@@ -140,9 +154,6 @@ void main(uint3 ipos: SV_DispatchThreadID) {
         max_history = pc.accum_max_hist;
     }
 
-    // GET CURRENT PIXEL INFO
-    SurfaceData gbuf = in_gbuffer.get_surface(ipos.xy);
-
     // GET PREVIOUS PIXEL
     float prev_history = 0.0;
     float4 prev_out = float4(0);
@@ -152,17 +163,15 @@ void main(uint3 ipos: SV_DispatchThreadID) {
 
     bool found = false;
     if (is_on_texture(prev_ipos, in_src)) {
-        if (skip_gbuffer_check) {
-            found = true;
-        } else {
-            const SurfaceData prev_gbuf = in_prev_gbuffer.get_surface(prev_ipos);
-            found = reprojection_valid(gbuf.normal, prev_gbuf.normal,
-                                       pc.normal_reject_cos, gbuf.linear_z, gbuf.delta_z,
-                                       prev_gbuf.linear_z, pc.z_reject_percent);
-        }
-
+        float3 prev_normal;
+        float prev_z;
+        float candidate_history;
+        decode_history(in_prev_history[prev_ipos], prev_normal, prev_z, candidate_history);
+        found = skip_gbuffer_check ||
+                reprojection_valid(gbuf.normal, prev_normal, pc.normal_reject_cos, gbuf.linear_z,
+                                   gbuf.delta_z, prev_z, pc.z_reject_percent);
         if (found) {
-            prev_history = in_prev_history[prev_ipos].r;
+            prev_history = candidate_history;
             prev_out = in_prev_out[prev_ipos];
         }
     }
@@ -179,15 +188,18 @@ void main(uint3 ipos: SV_DispatchThreadID) {
                 if (not_on_texture(tc, in_src))
                     continue;
 
-                const SurfaceData prev_gbuf = in_prev_gbuffer.get_surface(tc);
+                float3 tap_normal;
+                float tap_z;
+                float tap_history;
+                decode_history(in_prev_history[tc], tap_normal, tap_z, tap_history);
 
                 const float w = reprojection_weight(
-                    gbuf.normal, prev_gbuf.normal, pc.normal_reject_cos * 0.8,
+                    gbuf.normal, tap_normal, pc.normal_reject_cos * 0.8,
                     gbuf.linear_z, gbuf.delta_z, offset, gbuf.grad_z,
-                    prev_gbuf.linear_z, pc.z_reject_percent * 2.);
+                    tap_z, pc.z_reject_percent * 2.);
 
                 if (w > 0.0001) {
-                    prev_history += w * in_prev_history[tc].r;
+                    prev_history += w * tap_history;
                     prev_out += w * in_prev_out[tc];
                     sum_w += w;
                 }
@@ -223,9 +235,9 @@ void main(uint3 ipos: SV_DispatchThreadID) {
         const float4 result = lerp(prev_out, src, alpha);
 
         out_out.Store(ipos.xy, result);
-        out_history.Store(ipos.xy, new_history);
+        out_history.Store(ipos.xy, encode_history(raw_enc_normal, gbuf.linear_z, new_history));
     } else {
         out_out.Store(ipos.xy, src);
-        out_history.Store(ipos.xy, 1);
+        out_history.Store(ipos.xy, encode_history(raw_enc_normal, gbuf.linear_z, 1.0));
     }
 }
