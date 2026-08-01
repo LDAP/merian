@@ -17,13 +17,17 @@ interface HashGridUpdateFunction<typename T> {
 
 // Overloads taking a normal hash its dominant-axis cube face (6 bins, 3 bits) into the key: the
 // face selects the bucket and is matched exactly.
+// FACE_SNAP_INTERPOLATION restricts the stochastic interpolation of normal-carrying accesses to
+// the 4 cell vertices closest to the tangent plane (the cell face nearest along the dominant
+// normal axis, which is also the axis the key bins on).
 struct HashGrid<typename T,
                 let BUFFER_SIZE : uint,
                 let PROBE_COUNT : uint = 4,
                 let STOCHASTIC_INTERPOLATION : bool = false,
                 let LEVEL_STOCHASTIC_INTERPOLATION : bool = false,
                 let GRID_POWER : uint = 2,
-                let GRID_STEPS_PER_UNIT_SIZE : uint = 1> {
+                let GRID_STEPS_PER_UNIT_SIZE : uint = 1,
+                let FACE_SNAP_INTERPOLATION : bool = false> {
     // Split key/payload layout: probing touches only the 8-byte key words (x = hash,
     // y = lock/LRU stamp), the payload is fetched once on a key match.
     RWStructuredBuffer<uint2> keys;
@@ -69,6 +73,19 @@ struct HashGrid<typename T,
         const float3 staggered = pos + 0.5 * width;
         if (STOCHASTIC_INTERPOLATION)
             return grid_idx_interpolate(staggered, width, rng.next_float());
+        return grid_idx_lower(staggered, width);
+    }
+
+    int3
+    grid_idx(const float3 pos, const float width, const float3 normal, inout RandomGenerator rng) {
+        const float3 staggered = pos + 0.5 * width;
+        if (STOCHASTIC_INTERPOLATION) {
+            if (FACE_SNAP_INTERPOLATION)
+                return grid_idx_interpolate_face(
+                    staggered, width, normal,
+                    float3(rng.next_float(), rng.next_float(), rng.next_float()));
+            return grid_idx_interpolate(staggered, width, rng.next_float());
+        }
         return grid_idx_lower(staggered, width);
     }
 
@@ -148,7 +165,7 @@ struct HashGrid<typename T,
                             const float3 cam_pos,
                             inout RandomGenerator rng) {
         const uint level = target_level_for_pos(pos, cam_pos, rng);
-        const int3 gidx = grid_idx(pos, grid_width_for_level(level), rng);
+        const int3 gidx = grid_idx(pos, grid_width_for_level(level), normal, rng);
         const uint hash = collision_key(gidx, normal, level);
         uint bi = buffer_index(hash);
         for (uint i = 0; i < PROBE_COUNT; i++) {
@@ -201,7 +218,7 @@ struct HashGrid<typename T,
 
     Optional<T>
     get_level(const uint level, const float3 pos, const float3 normal, inout RandomGenerator rng) {
-        const int3 gidx = grid_idx(pos, grid_width_for_level(level), rng);
+        const int3 gidx = grid_idx(pos, grid_width_for_level(level), normal, rng);
         return get_grid_idx_at_level(gidx, level, normal, rng);
     }
 
@@ -210,7 +227,7 @@ struct HashGrid<typename T,
                           const float3 normal,
                           inout RandomGenerator rng,
                           out uint matched_index) {
-        const int3 gidx = grid_idx(pos, grid_width_for_level(level), rng);
+        const int3 gidx = grid_idx(pos, grid_width_for_level(level), normal, rng);
         return get_grid_idx_at_level(gidx, level, normal, rng, matched_index);
     }
 
@@ -278,7 +295,11 @@ struct HashGrid<typename T,
                                                  const uint frame,
                                                  HashGridUpdateFunction<T> update,
                                                  inout RandomGenerator rng) {
-        const int3 gidx = grid_idx(pos, grid_width_for_level(level), rng);
+        int3 gidx;
+        if (has_normal)
+            gidx = grid_idx(pos, grid_width_for_level(level), normal, rng);
+        else
+            gidx = grid_idx(pos, grid_width_for_level(level), rng);
 
         uint hash;
         if (has_normal)
@@ -389,7 +410,11 @@ struct HashGrid<typename T,
                                               const uint frame,
                                               const T t,
                                               inout RandomGenerator rng) {
-        const int3 gidx = grid_idx(pos, grid_width_for_level(level), rng);
+        int3 gidx;
+        if (has_normal)
+            gidx = grid_idx(pos, grid_width_for_level(level), normal, rng);
+        else
+            gidx = grid_idx(pos, grid_width_for_level(level), rng);
 
         uint hash;
         if (has_normal)

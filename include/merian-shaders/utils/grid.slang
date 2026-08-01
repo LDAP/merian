@@ -71,6 +71,29 @@ int3 grid_idx_interpolate(const float3 pos, const float cell_width, const float 
     return grid_idx_lower(pos, cell_width);
 }
 
+// Picks the upper vertex on axis i with probability p_upper[i]. Randoms uniform in [0, 1].
+int3 grid_idx_sample_axes(const int3 lower, const float3 p_upper, const float3 random) {
+    return select(random < p_upper, lower + 1, lower);
+}
+
+// Snaps the dominant-|normal| axis to its nearest lattice plane and interpolates bilinearly on the
+// remaining two: the pick concentrates on the 4 cell vertices closest to the tangent plane.
+int3 grid_idx_interpolate_face(const float3 pos,
+                               const float cell_width,
+                               const float3 normal,
+                               const float3 random) {
+    const float3 f = fract(pos / cell_width);
+    const float3 an = abs(normal);
+    float3 p = f;
+    if (an.x >= an.y && an.x >= an.z)
+        p.x = round(f.x);
+    else if (an.y >= an.z)
+        p.y = round(f.y);
+    else
+        p.z = round(f.z);
+    return grid_idx_sample_axes(grid_idx_lower(pos, cell_width), p, random);
+}
+
 // Same as above for a 2d grid
 int2 grid_idx_interpolate(const float2 pos, const float cell_width, const float random) {
     const float2 grid_pos = fract(pos / cell_width);
@@ -124,4 +147,4 @@ float cell_width_for_level_linear(const float level,
     return lerp(min_width, max_width, level / max_level);
 }
 
-}
+} // namespace merian
