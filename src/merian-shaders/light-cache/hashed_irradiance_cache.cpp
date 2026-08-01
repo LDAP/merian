@@ -16,13 +16,15 @@ HashedIrradianceCache::HashedIrradianceCache(const ShaderCompileContextHandle& c
                                              const ResourceAllocatorHandle& allocator,
                                              const uint32_t buffer_size,
                                              const uint32_t probe_count,
-                                             const bool stochastic_interpolation)
+                                             const bool stochastic_interpolation,
+                                             const bool split_storage)
     : probe_count(probe_count), stochastic_interpolation(stochastic_interpolation),
       composition(make_composition()), grid(compile_context,
                                             allocator,
                                             composition,
                                             "merian::HashedIrradianceCacheData",
-                                            buffer_size) {}
+                                            buffer_size,
+                                            split_storage) {}
 
 SlangCompositionHandle HashedIrradianceCache::query_device_support_composition() {
     return make_composition();

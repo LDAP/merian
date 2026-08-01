@@ -24,19 +24,22 @@ extern static const bool use_light_cache_tail = false;
 extern static const uint lc_buffer_size = 4000000;
 extern static const uint lc_probe_count = 4;
 extern static const bool lc_stochastic_interpolation = false;
+extern static const bool lc_split_storage = true;
 extern static const float lc_min_pdf = 1.0;
 
 extern static const uint mc_adaptive_buffer_size = 32777259;
 extern static const int mc_samples = 5;
 extern static const float p_guiding = 0.9;
 extern static const bool missing_light_heuristic = true;
+extern static const bool mc_split_storage = true;
 
 struct RenderBinding {
     ParameterBlock<GBuffer> gbuffer;
     RWTexture2D<float4> irradiance;
     RWTexture2D<float4> debug;
-    HashedIrradianceCache<lc_buffer_size, lc_probe_count, lc_stochastic_interpolation> irr_cache;
-    MCPG<mc_adaptive_buffer_size> mcpg;
+    HashedIrradianceCache<lc_buffer_size, lc_probe_count, lc_stochastic_interpolation,
+                          lc_split_storage> irr_cache;
+    MCPG<mc_adaptive_buffer_size, mc_split_storage> mcpg;
 };
 
 float3 trace_path(const ParameterBlock<Scene> scene,

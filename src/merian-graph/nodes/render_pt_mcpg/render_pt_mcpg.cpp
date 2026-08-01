@@ -26,9 +26,15 @@ void RenderMCPG::initialize(const ContextHandle& context,
     this->context = context;
     this->resource_allocator = allocator;
     this->compile_context = context->get_shader_compile_context();
-    irr_cache = std::make_shared<HashedIrradianceCache>(
-        compile_context, allocator, lc_buffer_size, lc_probe_count, lc_stochastic_interpolation);
-    mcpg = std::make_shared<MCPG>(compile_context, allocator, mc_adaptive_buffer_size);
+    // Combined records win on AMD (RADV), split buffers on Nvidia; stored properties override.
+    const bool split_storage = !context->get_device()->get_physical_device()->is_amd();
+    mc_split_storage = split_storage;
+    lc_split_storage = split_storage;
+    irr_cache = std::make_shared<HashedIrradianceCache>(compile_context, allocator, lc_buffer_size,
+                                                        lc_probe_count, lc_stochastic_interpolation,
+                                                        lc_split_storage);
+    mcpg = std::make_shared<MCPG>(compile_context, allocator, mc_adaptive_buffer_size,
+                                  mc_split_storage);
     use_raygen = !context->get_device()->get_physical_device()->is_amd();
 }
 
@@ -190,14 +196,17 @@ void RenderMCPG::update_render_constants() {
                     "export static const uint lc_buffer_size = {}u;\n"
                     "export static const uint lc_probe_count = {}u;\n"
                     "export static const bool lc_stochastic_interpolation = {};\n"
+                    "export static const bool lc_split_storage = {};\n"
                     "export static const float lc_min_pdf = {:f};\n"
-                    "export static const uint mc_adaptive_buffer_size = {}u;\n",
+                    "export static const uint mc_adaptive_buffer_size = {}u;\n"
+                    "export static const bool mc_split_storage = {};\n",
                     emission_on_primary ? "true" : "false", spp, max_path_length, mask,
                     demodulate_albedo ? "true" : "false", use_light_cache_tail ? "true" : "false",
                     missing_light_heuristic ? "true" : "false", mc_samples,
                     reference_mode ? 0.0f : p_guiding, dir_guide_prior, debug_output_selector,
                     lc_buffer_size, lc_probe_count, lc_stochastic_interpolation ? "true" : "false",
-                    lc_min_pdf, mc_adaptive_buffer_size));
+                    lc_split_storage ? "true" : "false", lc_min_pdf, mc_adaptive_buffer_size,
+                    mc_split_storage ? "true" : "false"));
 }
 
 RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
@@ -239,14 +248,17 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
         constants_changed |= config.config_bool(
             "missing light heuristic", missing_light_heuristic,
             "Flood the Markov chains with invalidated states when no light is detected.");
-        const bool resize_mcpg =
-            config.config_uint("adaptive grid buf size", mc_adaptive_buffer_size,
-                               "Buffer size backing the hash grid.");
-        needs_reconnect |= resize_mcpg;
+        bool recreate_mcpg = config.config_uint("adaptive grid buf size", mc_adaptive_buffer_size,
+                                                "Buffer size backing the hash grid.");
+        recreate_mcpg |=
+            config.config_bool("split keys/payload", mc_split_storage,
+                               "Store hash+stamp separately from the payload (probe-friendly) "
+                               "instead of one combined record per slot.");
+        needs_reconnect |= recreate_mcpg;
         if (mcpg) {
-            if (resize_mcpg) {
+            if (recreate_mcpg) {
                 mcpg = std::make_shared<MCPG>(compile_context, resource_allocator,
-                                              mc_adaptive_buffer_size);
+                                              mc_adaptive_buffer_size, mc_split_storage);
             }
             mcpg->properties(config);
         }
@@ -267,6 +279,10 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
             config.config_bool("LC stochastic interpolation", lc_stochastic_interpolation,
                                "Jitter the grid cell per sample (smoother but noisier) "
                                "instead of snapping to the nearest cell.");
+        recreate_cache |=
+            config.config_bool("LC split keys/payload", lc_split_storage,
+                               "Store hash+stamp separately from the payload (probe-friendly) "
+                               "instead of one combined record per slot.");
         constants_changed |= config.config_float(
             "LC min pdf", lc_min_pdf,
             "Increase to reduce fireflies in the irradiance cache and bias the guiding towards "
@@ -277,7 +293,7 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
             if (recreate_cache) {
                 irr_cache = std::make_shared<HashedIrradianceCache>(
                     compile_context, resource_allocator, lc_buffer_size, lc_probe_count,
-                    lc_stochastic_interpolation);
+                    lc_stochastic_interpolation, lc_split_storage);
                 if (composition)
                     update_render_constants();
             }
