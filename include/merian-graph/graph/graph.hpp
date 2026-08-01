@@ -278,8 +278,12 @@ class Graph : public std::enable_shared_from_this<Graph> {
     // that does not run eventually. We do this to get the outputs for the GUI.
     //
     // This is used to initialize a topological traversal of the graph to connect the nodes.
-    void search_satisfied_nodes(std::set<NodeHandle>& candidates,
-                                std::priority_queue<NodeHandle>& queue);
+    // (identifier, node), ordered by identifier for a deterministic visit order.
+    using SatisfiedQueue = std::priority_queue<std::pair<std::string, NodeHandle>,
+                                               std::vector<std::pair<std::string, NodeHandle>>,
+                                               std::greater<>>;
+
+    void search_satisfied_nodes(std::set<NodeHandle>& candidates, SatisfiedQueue& queue);
 
     // Attemps to connect the graph from the desired connections.
     // Returns a topological order in which the nodes can be executed, which only includes

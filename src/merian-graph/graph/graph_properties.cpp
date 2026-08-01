@@ -309,6 +309,11 @@ void Graph::properties(Properties& props) {
                 if (props.config_bool("Remove")) {
                     remove_node(identifier);
                 }
+                if (props.config_uint("linearization order", data.linearization_order,
+                                      "Within-layer execution order: lower runs earlier, ties by "
+                                      "identifier. Cannot violate dependencies.")) {
+                    request_reconnect();
+                }
 
                 if (!data.errors.empty()) {
                     props.output_text(

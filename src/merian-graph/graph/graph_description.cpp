@@ -162,6 +162,9 @@ void GraphDescription::dump_graph_v4(nlohmann::json& json) const {
         nlohmann::json node_json;
         node_json["type"] = node_info.node_type;
         node_json["enabled"] = node_info.enabled;
+        if (node_info.linearization_order != 0) {
+            node_json["linearization order"] = node_info.linearization_order;
+        }
 
         if (!node_info.config.empty()) {
             node_json["properties"] = node_info.config;
@@ -283,6 +286,10 @@ void GraphDescription::parse_graph_v4(const nlohmann::json& json, GraphDescripti
 
             description.add_node(node_type, identifier, config);
             description.set_node_enabled(identifier, enabled);
+            if (node_json.contains("linearization order")) {
+                description.set_node_linearization_order(
+                    identifier, node_json["linearization order"].get<uint32_t>());
+            }
 
             if (node_json.contains("metadata")) {
                 description.set_node_metadata(identifier, node_json["metadata"]);
@@ -640,8 +647,8 @@ void GraphDescription::merge_into(nlohmann::json& base, const nlohmann::json& ov
     if (base.is_object() && overwrite.is_object()) {
         static constexpr std::string_view append_prefix = "$+$";
         for (const auto& [key, value] : overwrite.items()) {
-            // "$+$key": [..] appends its (deduplicated) elements to base["key"] instead of replacing
-            // it, so independent variant fragments can each contribute to the same array.
+            // "$+$key": [..] appends its (deduplicated) elements to base["key"] instead of
+            // replacing it, so independent variant fragments can each contribute to the same array.
             if (value.is_array() && key.starts_with(append_prefix)) {
                 nlohmann::json& target = base[key.substr(append_prefix.size())];
                 if (!target.is_array()) {
