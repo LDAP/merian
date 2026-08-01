@@ -190,14 +190,16 @@ void RenderMCPG::update_render_constants() {
                     "export static const uint lc_buffer_size = {}u;\n"
                     "export static const uint lc_probe_count = {}u;\n"
                     "export static const bool lc_stochastic_interpolation = {};\n"
+                    "export static const uint lc_locality_bits = {}u;\n"
                     "export static const float lc_min_pdf = {:f};\n"
-                    "export static const uint mc_adaptive_buffer_size = {}u;\n",
+                    "export static const uint mc_adaptive_buffer_size = {}u;\n"
+                    "export static const uint mc_locality_bits = {}u;\n",
                     emission_on_primary ? "true" : "false", spp, max_path_length, mask,
                     demodulate_albedo ? "true" : "false", use_light_cache_tail ? "true" : "false",
                     missing_light_heuristic ? "true" : "false", mc_samples,
                     reference_mode ? 0.0f : p_guiding, dir_guide_prior, debug_output_selector,
                     lc_buffer_size, lc_probe_count, lc_stochastic_interpolation ? "true" : "false",
-                    lc_min_pdf, mc_adaptive_buffer_size));
+                    lc_locality_bits, lc_min_pdf, mc_adaptive_buffer_size, mc_locality_bits));
 }
 
 RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
@@ -243,6 +245,11 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
             config.config_uint("adaptive grid buf size", mc_adaptive_buffer_size,
                                "Buffer size backing the hash grid.");
         needs_reconnect |= resize_mcpg;
+        constants_changed |= config.config_uint(
+            "locality bits", mc_locality_bits,
+            "Morton-tile the slot placement: 2^n-wide cell tiles occupy contiguous slot "
+            "ranges so nearby cells share cache lines (0 = fully hashed placement).",
+            0u, 5u);
         if (mcpg) {
             if (resize_mcpg) {
                 mcpg = std::make_shared<MCPG>(compile_context, resource_allocator,
@@ -267,6 +274,11 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
             config.config_bool("LC stochastic interpolation", lc_stochastic_interpolation,
                                "Jitter the grid cell per sample (smoother but noisier) "
                                "instead of snapping to the nearest cell.");
+        constants_changed |= config.config_uint(
+            "LC locality bits", lc_locality_bits,
+            "Morton-tile the slot placement: 2^n-wide cell tiles occupy contiguous slot "
+            "ranges so nearby cells share cache lines (0 = fully hashed placement).",
+            0u, 5u);
         constants_changed |= config.config_float(
             "LC min pdf", lc_min_pdf,
             "Increase to reduce fireflies in the irradiance cache and bias the guiding towards "

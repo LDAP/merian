@@ -2,6 +2,7 @@ import merian_shaders.utils.encoding;
 import merian_shaders.utils.envmap;
 import merian_shaders.utils.grid;
 import merian_shaders.utils.hash;
+import merian_shaders.utils.morton;
 import merian_shaders.utils.random;
 
 namespace merian {
@@ -23,7 +24,8 @@ struct HashGrid<typename T,
                 let STOCHASTIC_INTERPOLATION : bool = false,
                 let LEVEL_STOCHASTIC_INTERPOLATION : bool = false,
                 let GRID_POWER : uint = 2,
-                let GRID_STEPS_PER_UNIT_SIZE : uint = 1> {
+                let GRID_STEPS_PER_UNIT_SIZE : uint = 1,
+                let LOCALITY_BITS : uint = 0> {
     // Split key/payload layout: probing touches only the 8-byte key words (x = hash,
     // y = lock/LRU stamp), the payload is fetched once on a key match.
     RWStructuredBuffer<uint2> keys;
@@ -86,23 +88,44 @@ struct HashGrid<typename T,
         return level << 3;
     }
 
-    // Stored/compared key: a hash of (gidx, level, normal).
+    // Stored/compared key: a hash of (gidx, level-normal word).
+    uint collision_key(const int3 gidx, const uint level_normal) {
+        return pcg4d16(uint4(gidx, level_normal));
+    }
+
     uint collision_key(const int3 gidx, const float3 normal, const uint level) {
-        return pcg4d16(uint4(gidx, level_normal_word(level, normal)));
+        return collision_key(gidx, level_normal_word(level, normal));
     }
 
-    uint collision_key(const int3 gidx, const uint level) {
-        return pcg4d16(uint4(gidx, level_normal_word(level)));
-    }
-
-    // Slot from the key, so the hashed-in normal also selects the bucket.
-    uint buffer_index(const uint key) {
-        return key % BUFFER_SIZE;
+    // Slot placement; the stored key alone disambiguates cells, placement only decides which
+    // cache line a cell lives on. Scattering (key % size) touches one line per slot; with
+    // LOCALITY_BITS = L > 0 the cell lattice is tiled into 2^L-wide tiles per (level, normal
+    // bin), each tile owning 8^L contiguous Morton-ordered slots, so nearby cells share lines
+    // and a view's working set stays compact in the buffer. The structure must sit in the low
+    // bits of the slot: the same code placed in the upper bits measures as pure scatter.
+    uint slot_index(const int3 gidx, const uint level_normal, const uint key) {
+        uint slot;
+        if (LOCALITY_BITS == 0) {
+            slot = key % BUFFER_SIZE;
+        } else {
+            const uint tile_slots = 1u << (3u * LOCALITY_BITS);
+            const uint tile_count = BUFFER_SIZE / tile_slots;
+            const int3 tile = gidx >> LOCALITY_BITS;
+            const uint3 cell = uint3(gidx & int3((1u << LOCALITY_BITS) - 1u));
+            slot = (pcg4d16(uint4(tile, level_normal)) % tile_count) * tile_slots +
+                   morton_encode3d(cell);
+        }
+        // keep the probe window inside one cache line (SHARC-style buckets)
+        if ((PROBE_COUNT & (PROBE_COUNT - 1u)) == 0) {
+            slot &= ~(PROBE_COUNT - 1u);
+        }
+        return slot;
     }
 
     // Spatial (normal-less) slot, for debug coloring by cell.
     uint buffer_index(const int3 gidx, const uint level) {
-        return buffer_index(collision_key(gidx, level));
+        const uint lnw = level_normal_word(level);
+        return slot_index(gidx, lnw, collision_key(gidx, lnw));
     }
 
     bool keys_match(const uint stored, const uint query) {
@@ -149,8 +172,9 @@ struct HashGrid<typename T,
                             inout RandomGenerator rng) {
         const uint level = target_level_for_pos(pos, cam_pos, rng);
         const int3 gidx = grid_idx(pos, grid_width_for_level(level), rng);
-        const uint hash = collision_key(gidx, normal, level);
-        uint bi = buffer_index(hash);
+        const uint lnw = level_normal_word(level, normal);
+        const uint hash = collision_key(gidx, lnw);
+        uint bi = slot_index(gidx, lnw, hash);
         for (uint i = 0; i < PROBE_COUNT; i++) {
             if (keys_match(keys[bi].x, hash))
                 return normal_bin(normal);
@@ -163,25 +187,11 @@ struct HashGrid<typename T,
 
     Optional<T> get_grid_idx_at_level(const int3 gidx,
                                       const uint level,
-                                      const uint hash,
-                                      inout RandomGenerator rng) {
-        return get(buffer_index(hash), hash);
-    }
-
-    Optional<T> get_grid_idx_at_level(const int3 gidx,
-                                      const uint level,
-                                      const uint hash,
-                                      inout RandomGenerator rng,
-                                      out uint matched_index) {
-        return get(buffer_index(hash), hash, matched_index);
-    }
-
-    Optional<T> get_grid_idx_at_level(const int3 gidx,
-                                      const uint level,
                                       const float3 normal,
                                       inout RandomGenerator rng) {
-        const uint hash = collision_key(gidx, normal, level);
-        return get_grid_idx_at_level(gidx, level, hash, rng);
+        const uint lnw = level_normal_word(level, normal);
+        const uint hash = collision_key(gidx, lnw);
+        return get(slot_index(gidx, lnw, hash), hash);
     }
 
     Optional<T> get_grid_idx_at_level(const int3 gidx,
@@ -189,14 +199,16 @@ struct HashGrid<typename T,
                                       const float3 normal,
                                       inout RandomGenerator rng,
                                       out uint matched_index) {
-        const uint hash = collision_key(gidx, normal, level);
-        return get_grid_idx_at_level(gidx, level, hash, rng, matched_index);
+        const uint lnw = level_normal_word(level, normal);
+        const uint hash = collision_key(gidx, lnw);
+        return get(slot_index(gidx, lnw, hash), hash, matched_index);
     }
 
     Optional<T>
     get_grid_idx_at_level(const int3 gidx, const uint level, inout RandomGenerator rng) {
-        const uint hash = collision_key(gidx, level);
-        return get(buffer_index(hash), hash);
+        const uint lnw = level_normal_word(level);
+        const uint hash = collision_key(gidx, lnw);
+        return get(slot_index(gidx, lnw, hash), hash);
     }
 
     Optional<T>
@@ -280,12 +292,9 @@ struct HashGrid<typename T,
                                                  inout RandomGenerator rng) {
         const int3 gidx = grid_idx(pos, grid_width_for_level(level), rng);
 
-        uint hash;
-        if (has_normal)
-            hash = collision_key(gidx, normal, level);
-        else
-            hash = collision_key(gidx, level);
-        const uint base = buffer_index(hash);
+        const uint lnw = has_normal ? level_normal_word(level, normal) : level_normal_word(level);
+        const uint hash = collision_key(gidx, lnw);
+        const uint base = slot_index(gidx, lnw, hash);
 
         // Evict least-recently-touched slot.
         // nice: an uninitialized slot might have a timestamp in the future, so its unsigned age
@@ -391,12 +400,9 @@ struct HashGrid<typename T,
                                               inout RandomGenerator rng) {
         const int3 gidx = grid_idx(pos, grid_width_for_level(level), rng);
 
-        uint hash;
-        if (has_normal)
-            hash = collision_key(gidx, normal, level);
-        else
-            hash = collision_key(gidx, level);
-        const uint base = buffer_index(hash);
+        const uint lnw = has_normal ? level_normal_word(level, normal) : level_normal_word(level);
+        const uint hash = collision_key(gidx, lnw);
+        const uint base = slot_index(gidx, lnw, hash);
 
         // Evict least-recently-touched slot.
         // nice: an uninitialized slot might have a timestamp in the future, so its unsigned age
