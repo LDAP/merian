@@ -14,6 +14,7 @@
 #include "merian/vk/memory/staging_memory_manager.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 #include "merian/vk/raytrace/as_builder.hpp"
+#include "merian/vk/utils/query_pool.hpp"
 
 #include <optional>
 #include <variant>
@@ -374,6 +375,14 @@ class Scene : public std::enable_shared_from_this<Scene> {
         uint32_t blas_last_built_frame = 0;
         uint32_t blas_last_updated_frame = 0;
         std::optional<vk::AccelerationStructureBuildSizesInfoKHR> cached_blas_size_info;
+
+        // Compaction of a static BLAS spans frames: the size query is written when the BLAS is
+        // built and polled without blocking until the device has the result.
+        enum class CompactionState : uint8_t { None, SizeQueried, Compacted };
+        CompactionState compaction_state = CompactionState::None;
+        uint32_t compaction_query = UINT32_MAX;
+        // The BLAS the query was written for; a rebuild replaces the handle and voids the query.
+        AccelerationStructureHandle compaction_src;
         // ----------------
 
         const SmallSet<NodeID, 1>& get_instances(const std::vector<MeshInfo>& mesh_infos) const {
@@ -681,6 +690,11 @@ class Scene : public std::enable_shared_from_this<Scene> {
     void build_blas(const CommandBufferHandle& cmd);
     void build_tlas(const CommandBufferHandle& cmd);
 
+    // Writes size queries for freshly built static BLASes and swaps in compacted copies whose
+    // query has landed. Never blocks: a query that is not ready yet is retried next frame.
+    // Must run before build_tlas so a swap is picked up by the TLAS in the same command buffer.
+    void process_blas_compaction(const CommandBufferHandle& cmd);
+
     // Grows one shared buffer: re-suballocates every live region into a new backing buffer and
     // copies the existing data over in a single vkCmdCopyBuffer.
     void reallocate_shared_buffer(const CommandBufferHandle& cmd,
@@ -776,6 +790,9 @@ class Scene : public std::enable_shared_from_this<Scene> {
         uint32_t blas_builds_static = 0;
         uint32_t blas_builds_dynamic = 0;
         uint32_t blas_updates = 0;
+        uint32_t blas_compactions = 0;
+        vk::DeviceSize blas_bytes_before_compaction = 0;
+        vk::DeviceSize blas_bytes_after_compaction = 0;
 
         bool tlas_rebuilt = false;
         uint32_t tlas_instance_count = 0;
@@ -804,6 +821,14 @@ class Scene : public std::enable_shared_from_this<Scene> {
     // cmd->keep_until_pool_reset so in-flight cmds keep them alive.
     std::vector<BufferHandle> pending_buffer_releases;
     std::vector<AccelerationStructureHandle> pending_blas_releases;
+
+    // Static-BLAS compaction. One query slot per mesh group; the pool is only recreated when
+    // the group count grows past it.
+    QueryPoolHandle<vk::QueryType::eAccelerationStructureCompactedSizeKHR> compaction_query_pool;
+    // Slots actually written by the outstanding batch. Reading beyond it would report eNotReady
+    // forever, since the pool can be larger than the batch that reused it.
+    uint32_t compaction_query_batch = 0;
+    bool compact_static_blas = true;
 
     // --- Cached and precomputed ---
 

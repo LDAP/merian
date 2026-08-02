@@ -729,6 +729,11 @@ void Scene::properties_settings(Properties& props) {
         set_pretransform_animated(pretransform);
     }
     props.config_percent("BLAS Rebuild Fraction", blas_rebuild_fraction);
+    if (props.config_bool("Compact Static BLAS", compact_static_blas,
+                          "Shrink static BLASes to their compacted size once the device reports "
+                          "it. Takes effect for BLASes built from now on.")) {
+        needs_regroup = true;
+    }
 
     props.st_separate("Material System");
     float alpha_threshold = material_system->get_alpha_test_threshold();
@@ -895,6 +900,7 @@ void Scene::properties_statistics(Properties& props) {
         "prev vertex xfm: {} jobs ({} vertices)\n"
         "xfm job buffers: {}\n"
         "blas:            {} ops (builds_static: {}, builds_dynamic: {}, updates: {})\n"
+        "blas compaction: {} swapped ({} -> {})\n"
         "tlas:            {} ({} instances)\n"
         "buffers:         allocated: {}, released: {}\n"
         "gpu data:        geometry {}, transforms {}, tlas instances {}",
@@ -906,7 +912,9 @@ void Scene::properties_statistics(Properties& props) {
         frame_stats.gpu_prev_vertex_transforms, frame_stats.gpu_prev_vertex_transform_vertices,
         format_size(frame_stats.gpu_transform_buffer_bytes),
         frame_stats.blas_builds + frame_stats.blas_updates, frame_stats.blas_builds_static,
-        frame_stats.blas_builds_dynamic, frame_stats.blas_updates,
+        frame_stats.blas_builds_dynamic, frame_stats.blas_updates, frame_stats.blas_compactions,
+        format_size(frame_stats.blas_bytes_before_compaction),
+        format_size(frame_stats.blas_bytes_after_compaction),
         frame_stats.tlas_rebuilt ? "rebuilt" : "unchanged", frame_stats.tlas_instance_count,
         frame_stats.buffers_allocated, frame_stats.buffers_released,
         format_size(frame_stats.geometry_data_bytes), format_size(frame_stats.transform_data_bytes),
@@ -1058,6 +1066,10 @@ void Scene::compute_mesh_groups() {
             group.has_morphed_mesh || (group.has_animated_node && pretransform_animated);
         if (!blas_vertices_change) {
             group.blas_build_flags = vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace;
+            if (compact_static_blas) {
+                group.blas_build_flags |=
+                    vk::BuildAccelerationStructureFlagBitsKHR::eAllowCompaction;
+            }
         } else if (!group.has_variable_topology_mesh) {
             group.blas_build_flags = vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace |
                                      vk::BuildAccelerationStructureFlagBitsKHR::eAllowUpdate;
@@ -1074,6 +1086,11 @@ void Scene::compute_mesh_groups() {
                 prev_group.blas_build_flags == group.blas_build_flags) {
                 group.blas = prev_group.blas;
                 group.cached_blas_size_info = prev_group.cached_blas_size_info;
+                // Carry the compaction progress with the BLAS: a compacted structure was not
+                // built with eAllowCompaction, so it must never be size-queried again.
+                group.compaction_state = prev_group.compaction_state;
+                group.compaction_query = prev_group.compaction_query;
+                group.compaction_src = prev_group.compaction_src;
             }
         }
     }
@@ -1687,6 +1704,9 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
 
         as_builder.queue_build(blas_geometry.geometries, blas_geometry.ranges, group.blas,
                                size_info, group.blas_build_flags);
+        // The rebuild invalidates any in-flight or completed compaction of this group.
+        group.compaction_state = MeshGroup::CompactionState::None;
+        group.compaction_src.reset();
         group.blas_dirty = false;
         group.blas_last_built_frame = current_frame;
         group.blas_last_updated_frame = current_frame;
@@ -1745,9 +1765,156 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
 
     as_builder.get_cmds_blas(cmd, as_scratch_buffer);
 
+    process_blas_compaction(cmd);
+
     if (did_build_static && as_scratch_buffer &&
         as_scratch_buffer->get_size() > MIN_BUFFER_CAPACITY) {
         as_scratch_buffer.reset();
+    }
+}
+
+void Scene::process_blas_compaction(const CommandBufferHandle& cmd) {
+    if (!compact_static_blas)
+        return;
+
+    const auto is_compactable = [](const MeshGroup& group) {
+        return group.blas && !group.blas_dirty &&
+               (group.blas_build_flags &
+                vk::BuildAccelerationStructureFlagBitsKHR::eAllowCompaction);
+    };
+
+    // 1. collect: groups awaiting a query slot, and groups whose query may have landed
+    std::vector<MeshGroupID> to_query;
+    std::vector<MeshGroupID> to_resolve;
+    for (MeshGroupID group_id = 0; group_id < mesh_groups.size(); group_id++) {
+        MeshGroup& group = mesh_groups[group_id];
+        switch (group.compaction_state) {
+        case MeshGroup::CompactionState::None:
+            if (is_compactable(group))
+                to_query.push_back(group_id);
+            break;
+        case MeshGroup::CompactionState::SizeQueried:
+            // A rebuild between query and resolve swapped the handle out; start over.
+            if (group.blas != group.compaction_src) {
+                group.compaction_state = MeshGroup::CompactionState::None;
+                group.compaction_src.reset();
+            } else {
+                to_resolve.push_back(group_id);
+            }
+            break;
+        case MeshGroup::CompactionState::Compacted:
+            break;
+        }
+    }
+
+    // Opened only when there is work: an always-on scope costs a timestamp pair every frame.
+    if (to_query.empty() && to_resolve.empty())
+        return;
+
+    MERIAN_PROFILE_SCOPE_GPU(cmd, "Scene::compact_blas");
+
+    bool did_compact = false;
+    uint32_t outstanding = static_cast<uint32_t>(to_resolve.size());
+
+    // 2. resolve: poll without waiting; the device may not have written the sizes yet
+    if (!to_resolve.empty() && compaction_query_pool && compaction_query_batch > 0) {
+        std::vector<vk::DeviceSize> sizes(compaction_query_batch);
+        const vk::Result result =
+            context->get_device()->get_device().getQueryPoolResults(
+                **compaction_query_pool, 0, compaction_query_batch,
+                sizes.size() * sizeof(vk::DeviceSize), sizes.data(), sizeof(vk::DeviceSize),
+                vk::QueryResultFlagBits::e64);
+
+        if (result == vk::Result::eSuccess) {
+            outstanding = 0;
+            for (const MeshGroupID group_id : to_resolve) {
+                MeshGroup& group = mesh_groups[group_id];
+                const vk::DeviceSize compacted_size = sizes[group.compaction_query];
+                // 0 means the device reported nothing usable; leave the BLAS as it is.
+                if (compacted_size == 0 || compacted_size >= group.blas->get_size()) {
+                    group.compaction_state = MeshGroup::CompactionState::Compacted;
+                    group.compaction_src.reset();
+                    continue;
+                }
+
+                vk::AccelerationStructureBuildSizesInfoKHR size_info{};
+                size_info.accelerationStructureSize = compacted_size;
+                const AccelerationStructureHandle compacted =
+                    allocator->create_acceleration_structure(
+                        vk::AccelerationStructureTypeKHR::eBottomLevel, size_info,
+                        fmt::format("Scene::blas[{}] (compacted)", group_id));
+
+                cmd->copy_acceleration_structure(group.blas, compacted,
+                                                 vk::CopyAccelerationStructureModeKHR::eCompact);
+
+                SPDLOG_DEBUG("Scene: compacted blas[{}] {} -> {}", group_id,
+                             format_size(group.blas->get_size()), format_size(compacted_size));
+                did_compact = true;
+                frame_stats.blas_compactions++;
+                frame_stats.blas_bytes_before_compaction += group.blas->get_size();
+                frame_stats.blas_bytes_after_compaction += compacted_size;
+
+                // Keep the source alive until in-flight frames that reference it retire.
+                pending_blas_releases.push_back(std::move(group.blas));
+                group.blas = compacted;
+                group.compaction_state = MeshGroup::CompactionState::Compacted;
+                group.compaction_src.reset();
+                // The TLAS references BLAS addresses, which just changed.
+                tlas_dirty = true;
+            }
+
+            if (did_compact) {
+                // The copies must land before the TLAS build reads the compacted structures.
+                // Copy commands run in the build stage unless VK_KHR_ray_tracing_maintenance1
+                // provides the dedicated copy stage.
+                cmd->barrier(vk::MemoryBarrier2{
+                    vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
+                    vk::AccessFlagBits2::eAccelerationStructureWriteKHR,
+                    vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
+                    vk::AccessFlagBits2::eAccelerationStructureReadKHR,
+                });
+            }
+        } else if (result != vk::Result::eNotReady) {
+            check_result(result, "could not read BLAS compaction sizes");
+        }
+        // eNotReady: retry next frame, nothing to do.
+    }
+
+    // 3. query: one batch at a time. Writing a new batch would reuse slot 0 and overwrite the
+    // results an unresolved batch is still waiting on, so defer until the pool is free.
+    if (!to_query.empty() && outstanding == 0) {
+        const uint32_t needed = static_cast<uint32_t>(to_query.size());
+        if (!compaction_query_pool || compaction_query_pool->get_query_count() < needed) {
+            compaction_query_pool =
+                QueryPool<vk::QueryType::eAccelerationStructureCompactedSizeKHR>::create(context,
+                                                                                        needed);
+        }
+
+        std::vector<AccelerationStructureHandle> sources;
+        sources.reserve(to_query.size());
+        for (const MeshGroupID group_id : to_query) {
+            MeshGroup& group = mesh_groups[group_id];
+            group.compaction_query = static_cast<uint32_t>(sources.size());
+            sources.push_back(group.blas);
+        }
+
+        // Sizes are only valid once the builds this frame have completed.
+        cmd->barrier(vk::MemoryBarrier2{
+            vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
+            vk::AccessFlagBits2::eAccelerationStructureWriteKHR,
+            vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
+            vk::AccessFlagBits2::eAccelerationStructureReadKHR,
+        });
+
+        cmd->reset(compaction_query_pool, 0, static_cast<uint32_t>(sources.size()));
+        cmd->write_acceleration_structures_properties(compaction_query_pool, sources);
+        compaction_query_batch = static_cast<uint32_t>(sources.size());
+
+        for (const MeshGroupID group_id : to_query) {
+            MeshGroup& group = mesh_groups[group_id];
+            group.compaction_state = MeshGroup::CompactionState::SizeQueried;
+            group.compaction_src = group.blas;
+        }
     }
 }
 
