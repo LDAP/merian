@@ -134,8 +134,9 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         if (any(bsdf > 0.0))
             next_ray = sp.make_ray(-ray.Direction, wo_world, transmission);
 
-        float3 incident = float3(0);
-        float3 lc_incident = float3(0);
+        // fp16 like the old renderer's incident/contribution
+        half3 incident = half3(0);
+        half3 lc_incident = half3(0);
         float3 next_pos = cur_pos;
 
         if (let next = next_ray) {
@@ -146,26 +147,27 @@ float3 trace_path(const ParameterBlock<Scene> scene,
                                                    RenderContext(bounce, current_ior));
             next_pos = sp.pos;
 
-            incident = sp.material.emission;
+            incident = half3(sp.material.emission);
 
-            lc_incident =select(
-                any(incident > 0.0) ||
+            lc_incident = select(
+                any(incident > half3(0.0)) ||
                         (!use_light_cache_tail && merian_render_max_path_length == 2),
                      incident,
-                     float3(params.irr_cache.get(next_pos, sp.material.shading_frame.get_normal(),
-                                                  cam_pos, prev_cam_pos, rng)));
+                     params.irr_cache.get(next_pos, sp.material.shading_frame.get_normal(),
+                                          cam_pos, prev_cam_pos, rng));
 
             throughput *= bsdf / wo_p;
             // complete the truncated path with the cached irradiance at the last vertex
             radiance += throughput *
-                        select(use_light_cache_tail && bounce == merian_render_max_path_length - 1,
-                               lc_incident, incident);
+                        float3(select(use_light_cache_tail &&
+                                          bounce == merian_render_max_path_length - 1,
+                                      lc_incident, incident));
         }
 
-        const float mc_f = yuv_luminance(lc_incident * bsdf / wo_p);
+        const float mc_f = yuv_luminance(float3(lc_incident) * bsdf / wo_p);
         if (!isinf(mc_f) && !isnan(mc_f)) {
             params.irr_cache.update(cur_pos, normal,
-                                    lc_incident * bsdf / max(wo_p, lc_min_pdf), cam_pos,
+                                    float3(lc_incident) * bsdf / max(wo_p, lc_min_pdf), cam_pos,
                                     prev_cam_pos, scene.frame, rng);
 
             if (rng.next_float() * score_sum < mc_f * mc_samples) {
