@@ -1,12 +1,16 @@
 import merian_shaders.scene.scene;
 import merian_shaders.gbuffer;
 import merian_shaders.utils.textures;
+import merian_shaders.utils.encoding;
 import merian_shaders.utils.ray_differential;
 import merian_shaders.colors.debug;
 
 namespace merian {
 
 RWTexture2D<float4> emission;
+// Packed primary ShadingPoint, 3x uint4 per pixel: {pos, enc_face_normal},
+// {prev_pos, enc_shading_normal}, {enc_tangent, pack_bsdf(), 0}. Emission is not stored.
+RWStructuredBuffer<uint4> primary_samples;
 // 8-bit TLAS instance cull mask used by the primary ray query. Per-frame from the host.
 struct GBufferParams {
     uint instance_mask;
@@ -14,6 +18,20 @@ struct GBufferParams {
 ConstantBuffer<GBufferParams> params;
 
 extern static const bool merian_gbuffer_write_emission = true;
+extern static const bool merian_gbuffer_write_primary = false;
+
+void store_primary_sample(const uint2 pixel, const uint2 dim, const float3 pos,
+                          const float3 prev_pos, const uint enc_face_normal,
+                          const MaterialSample mat) {
+    const OrthonormalFrame frame = mat.shading_frame;
+    const float3 t = frame.get_tangent();
+    const float hand =
+        dot(cross(frame.get_normal(), t), frame.get_bitangent()) < 0.f ? -1.f : 1.f;
+    const uint base = 3 * (pixel.x + pixel.y * dim.x);
+    primary_samples[base + 0] = uint4(asuint(pos), enc_face_normal);
+    primary_samples[base + 1] = uint4(asuint(prev_pos), encode_normal(frame.get_normal()));
+    primary_samples[base + 2] = uint4(encode_tangent(float4(t, hand)), mat.pack_bsdf(), 0);
+}
 
 [shader("raygeneration")]
 void main(ParameterBlock<Scene> scene, ParameterBlock<WGBuffer> gbuffer) {
@@ -72,6 +90,9 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<WGBuffer> gbuffer) {
                 pixel, mat.get_bsdf().get_albedo(mat.shading_frame.to_local(-ray.Direction)));
             if (merian_gbuffer_write_emission)
                 emission[pixel] = float4(mat.emission, 0);
+            if (merian_gbuffer_write_primary)
+                store_primary_sample(pixel, dim, surface.pos, prev_pos,
+                                     encode_normal(surface.face_normal), mat);
             return;
         }
     }
@@ -87,6 +108,8 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<WGBuffer> gbuffer) {
     gbuffer.store_albedo(pixel, Albedo(sp.material.emission));
     if (merian_gbuffer_write_emission)
         emission[pixel] = float4(sp.material.emission, 0);
+    if (merian_gbuffer_write_primary)
+        store_primary_sample(pixel, dim, sp.pos, sp.prev_pos, sp.enc_face_normal, sp.material);
 }
 
 } // namespace merian

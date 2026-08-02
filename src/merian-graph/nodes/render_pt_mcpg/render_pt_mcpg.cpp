@@ -39,7 +39,9 @@ void RenderMCPG::initialize(const ContextHandle& context,
 }
 
 std::vector<InputConnectorDescriptor> RenderMCPG::describe_inputs() {
-    return {{"scene", con_scene}, {"gbuffer", con_gbuffer, ConnectorAccess::ray_tracing_read}};
+    return {{"scene", con_scene},
+            {"gbuffer", con_gbuffer, ConnectorAccess::ray_tracing_read},
+            {"primary_samples", con_primary_samples, ConnectorAccess::ray_tracing_read, 0, true}};
 }
 
 std::vector<OutputConnectorDescriptor> RenderMCPG::describe_outputs(const NodeIOLayout& io_layout) {
@@ -58,6 +60,8 @@ RenderMCPG::on_connected(const NodeIOLayout& io_layout,
 
     // force the program graph to be rewired next process()
     composition = nullptr;
+
+    primary_samples_connected = io_layout.is_connected(con_primary_samples);
 
     io_layout.register_event_listener(
         "/graph/reload_shaders", [this](const GraphEvent::Info&, const GraphEvent::Data& force) {
@@ -153,6 +157,8 @@ RenderMCPG::process(const NodeIO& io, const NodeProcessInfo& info, Submission& s
 
     auto cursor = params_obj->get_cursor();
     cursor["gbuffer"] = gbuf.r();
+    if (primary_samples_connected)
+        cursor["primary_samples"] = BufferHandle(io[con_primary_samples]);
     cursor["irradiance"] = io[con_irradiance].get_texture();
     if (auto debug = cursor["debug"]; debug.is_valid())
         debug = io[con_debug].get_texture();
@@ -193,6 +199,7 @@ void RenderMCPG::update_render_constants() {
                     "export static const float p_guiding = {:f};\n"
                     "export static const float dir_guide_prior = {:f};\n"
                     "export static const int debug_output_selector = {};\n"
+                    "export static const bool use_primary_samples = {};\n"
                     "export static const uint lc_buffer_size = {}u;\n"
                     "export static const uint lc_probe_count = {}u;\n"
                     "export static const bool lc_stochastic_interpolation = {};\n"
@@ -207,10 +214,11 @@ void RenderMCPG::update_render_constants() {
                     demodulate_albedo ? "true" : "false", use_light_cache_tail ? "true" : "false",
                     missing_light_heuristic ? "true" : "false", mc_samples,
                     reference_mode ? 0.0f : p_guiding, dir_guide_prior, debug_output_selector,
-                    lc_buffer_size, lc_probe_count, lc_stochastic_interpolation ? "true" : "false",
+                    primary_samples_connected ? "true" : "false", lc_buffer_size, lc_probe_count,
+                    lc_stochastic_interpolation ? "true" : "false",
                     lc_split_storage ? "true" : "false", lc_locality_bits, lc_min_pdf,
-                    mc_adaptive_buffer_size, mc_probe_count,
-                    mc_split_storage ? "true" : "false", mc_locality_bits));
+                    mc_adaptive_buffer_size, mc_probe_count, mc_split_storage ? "true" : "false",
+                    mc_locality_bits));
 }
 
 RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {

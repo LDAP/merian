@@ -33,10 +33,14 @@ std::vector<OutputConnectorDescriptor>
 GBufferRTNode::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     con_gbuffer = ShaderObjectOut<GBufferObject>::create({extent});
     con_emission = ManagedVkImageOut::create(vk::Format::eR32G32B32A32Sfloat, extent);
+    con_primary_samples = ManagedVkBufferOut::create(
+        vk::BufferCreateInfo({}, extent.width * extent.height * 3 * sizeof(uint32_t) * 4,
+                             vk::BufferUsageFlagBits::eStorageBuffer));
 
     return {
         {"gbuffer", con_gbuffer, ConnectorAccess::ray_tracing_write},
         {"emission", con_emission, ConnectorAccess::ray_tracing_write},
+        {"primary_samples", con_primary_samples, ConnectorAccess::ray_tracing_write},
     };
 }
 
@@ -62,6 +66,7 @@ GBufferRTNode::on_connected(const NodeIOLayout& io_layout,
         });
 
     emission_connected = io_layout.is_connected(con_emission);
+    primary_connected = io_layout.is_connected(con_primary_samples);
 
     if (const SceneHandle& scene = io[con_scene]; scene && scene->is_ready()) {
         ensure_pipeline(scene);
@@ -127,6 +132,8 @@ GBufferRTNode::process(const NodeIO& io, const NodeProcessInfo& info, Submission
 
     if (emission_connected)
         globals->get_cursor()["emission"] = io[con_emission].get_texture();
+    if (primary_connected)
+        globals->get_cursor()["primary_samples"] = BufferHandle(io[con_primary_samples]);
 
     uint32_t mask = 0u;
     for (uint32_t bit = 0; bit < 8; ++bit) {
@@ -146,10 +153,13 @@ GBufferRTNode::process(const NodeIO& io, const NodeProcessInfo& info, Submission
 }
 
 void GBufferRTNode::update_gbuffer_constants() {
-    composition->add_module_from_string("gbuffer_constants",
-                                        fmt::format("namespace merian {{ export static const bool "
-                                                    "merian_gbuffer_write_emission = {}; }}",
-                                                    emission_connected ? "true" : "false"));
+    composition->add_module_from_string(
+        "gbuffer_constants",
+        fmt::format("namespace merian {{\n"
+                    "export static const bool merian_gbuffer_write_emission = {};\n"
+                    "export static const bool merian_gbuffer_write_primary = {};\n"
+                    "}}",
+                    emission_connected ? "true" : "false", primary_connected ? "true" : "false"));
 }
 
 GBufferRTNode::NodeStatusFlags GBufferRTNode::properties(Properties& config) {

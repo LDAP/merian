@@ -1,5 +1,6 @@
 #pragma once
 
+#include "merian-graph/connectors/buffer/vk_buffer_out_managed.hpp"
 #include "merian-graph/connectors/image/vk_image_out_managed.hpp"
 #include "merian-graph/connectors/ptr_in.hpp"
 #include "merian-graph/connectors/shader_object_out.hpp"
@@ -59,6 +60,7 @@ class GBufferRTNode : public Node {
     PtrInHandle<Scene> con_scene = PtrIn<Scene>::create();
     ShaderObjectOutHandle<GBufferObject> con_gbuffer;
     ManagedVkImageOutHandle con_emission;
+    ManagedVkBufferOutHandle con_primary_samples;
 
     // Resolution; the connected scene overrides it to match its camera aspect.
     vk::Extent3D extent = vk::Extent3D{1920, 1080, 1};
@@ -67,6 +69,7 @@ class GBufferRTNode : public Node {
     std::array<bool, 8> mask_enabled{true, true, true, true, true, true, true, true};
 
     bool emission_connected = true;
+    bool primary_connected = false;
 
     // Slang program + pipeline; rebuilt when the scene composition changes.
     SlangCompositionHandle composition;

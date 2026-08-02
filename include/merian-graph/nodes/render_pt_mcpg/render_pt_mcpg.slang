@@ -3,9 +3,11 @@ import merian_shaders.scene.scene;
 import merian_shaders.utils.random;
 import merian_shaders.utils.hash;
 import merian_shaders.utils.textures;
+import merian_shaders.utils.encoding;
 import merian_shaders.colors.debug;
 import merian_shaders.colors.colorspaces;
 import merian_shaders.light_cache.hashed_irradiance_cache;
+import scene_material_workaround;
 import mc;
 
 using merian;
@@ -19,6 +21,14 @@ extern static const bool merian_render_demodulate_albedo = false;
 } // namespace merian
 
 extern static const int debug_output_selector = 0;
+// Reconstruct the primary ShadingPoint from the gbuffer's packed primary samples instead of
+// re-deriving it (camera ray, vertex fetch, material textures). Requires the packed BSDF
+// round trip (single material model) and the pinhole camera; primary emission is not stored.
+extern static const bool use_primary_samples = false;
+static const bool primary_from_gbuffer = use_primary_samples &&
+                                         merian::scene_material_static_dispatch &&
+                                         !merian::merian_render_emission_on_primary &&
+                                         !merian::merian_hint_enable_thin_lens;
 
 extern static const bool use_light_cache_tail = false;
 extern static const uint lc_buffer_size = 4000000;
@@ -38,6 +48,7 @@ extern static const bool mc_split_storage = true;
 
 struct RenderBinding {
     ParameterBlock<GBuffer> gbuffer;
+    StructuredBuffer<uint4> primary_samples;
     RWTexture2D<float4> irradiance;
     RWTexture2D<float4> debug;
     HashedIrradianceCache<lc_buffer_size, lc_probe_count, lc_stochastic_interpolation,
@@ -229,9 +240,28 @@ void render_pixel(const uint2 pixel,
 
     RandomGenerator rng = PCG(pcg3d16(uint3(pixel, scene.frame)));
 
-    const RayDesc primary_ray = scene.generate_camera_ray(pixel, params.gbuffer.get_dimensions());
-    const ShadingPoint primary_sp =
-        scene.get_shading_point(primary_ray, params.gbuffer.get_hit(pixel));
+    RayDesc primary_ray;
+    ShadingPoint primary_sp;
+    if (primary_from_gbuffer) {
+        const uint base = 3 * (pixel.x + pixel.y * params.gbuffer.get_dimensions().x);
+        const uint4 a = params.primary_samples[base + 0];
+        const uint4 b = params.primary_samples[base + 1];
+        const uint4 c = params.primary_samples[base + 2];
+        primary_sp.pos = asfloat(a.xyz);
+        primary_sp.prev_pos = asfloat(b.xyz);
+        primary_sp.enc_face_normal = a.w;
+        const float4 tangent = decode_tangent(c.x);
+        const OrthonormalFrame frame =
+            OrthonormalFrame(decode_normal(b.w), tangent.xyz, tangent.w);
+        primary_sp.material = scene_material_unpack_bsdf(c.yz, float3(0), frame);
+        primary_ray.Origin = scene.camera.position;
+        primary_ray.Direction = normalize(primary_sp.pos - scene.camera.position);
+        primary_ray.TMin = SCENE_RAY_TMIN;
+        primary_ray.TMax = SCENE_RAY_TMAX;
+    } else {
+        primary_ray = scene.generate_camera_ray(pixel, params.gbuffer.get_dimensions());
+        primary_sp = scene.get_shading_point(primary_ray, params.gbuffer.get_hit(pixel));
+    }
 
     // demodulate per sample so the second moment stays consistent with the stored radiance
     const float3 demod_albedo = merian_render_demodulate_albedo

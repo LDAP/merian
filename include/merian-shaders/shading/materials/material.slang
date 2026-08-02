@@ -80,6 +80,14 @@ interface MaterialSample {
     float3 get_absorption() {
         return float3(0.0f);
     }
+
+    // BSDF-parameter snapshot for gbuffer storage; reversed by the model's
+    // `static MaterialSampleImpl unpack_bsdf(const uint2 packed, const float3 emission, const
+    // OrthonormalFrame frame)` (see scene_material_workaround). Emission and shading frame are
+    // stored separately. Models that never pass through a gbuffer keep the zero default.
+    uint2 pack_bsdf() {
+        return uint2(0);
+    }
 }
 
 } // namespace merian

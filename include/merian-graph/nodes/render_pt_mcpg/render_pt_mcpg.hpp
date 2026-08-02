@@ -1,5 +1,6 @@
 #pragma once
 
+#include "merian-graph/connectors/buffer/vk_buffer_in.hpp"
 #include "merian-graph/connectors/image/vk_image_out_managed.hpp"
 #include "merian-graph/connectors/ptr_in.hpp"
 #include "merian-graph/connectors/shader_object_in.hpp"
@@ -63,8 +64,10 @@ class RenderMCPG : public Node {
     // Connectors
     PtrInHandle<Scene> con_scene = PtrIn<Scene>::create();
     ShaderObjectInHandle<GBufferObject> con_gbuffer = ShaderObjectIn<GBufferObject>::create();
+    VkBufferInHandle con_primary_samples = VkBufferIn::create();
     ManagedVkImageOutHandle con_irradiance;
     ManagedVkImageOutHandle con_debug;
+    bool primary_samples_connected = false;
 
     // Owns its own persistent buffer + shader binding (composed into this node's program).
     HashedIrradianceCacheHandle irr_cache;

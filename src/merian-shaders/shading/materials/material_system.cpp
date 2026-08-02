@@ -21,10 +21,16 @@ static std::string env_material_workaround_module() {
     return "module scene_material_workaround;\n"
            "import merian_shaders.shading.materials.material;\n"
            "import merian_shaders.scene.environment_map;\n"
+           "import merian_shaders.utils.frame;\n"
            "namespace merian {\n"
+           "public static const bool scene_material_static_dispatch = false;\n"
            "public MaterialSample scene_material_make_emissive(const float3 emission,\n"
            "                                                   const float3 normal) {\n"
            "    return EnvMaterialSample(emission, -normal);\n"
+           "}\n"
+           "public MaterialSample scene_material_unpack_bsdf(\n"
+           "    const uint2 packed, const float3 emission, const OrthonormalFrame frame) {\n"
+           "    return EnvMaterialSample(emission, -frame.get_normal());\n"
            "}\n"
            "}\n";
 }
@@ -57,7 +63,8 @@ SlangCompositionHandle MaterialSystem::query_device_support_composition() {
                                         "merian_material_system_payload_max_size = 1; }");
     composition->add_module_from_path("merian-shaders/shading/materials/diffuse-material.slang");
     composition->add_type_conformance("merian::MaterialModel", "merian::DiffuseMaterial", 0);
-    composition->add_module_from_string("scene_material_workaround", env_material_workaround_module());
+    composition->add_module_from_string("scene_material_workaround",
+                                        env_material_workaround_module());
     return composition;
 }
 
@@ -82,18 +89,26 @@ void MaterialSystem::update_static_dispatch() {
         std::ranges::replace(import_name, '-', '_');
         composition->add_module_from_string(
             "scene_material_workaround",
-            fmt::format("module scene_material_workaround;\n"
-                        "import {path};\n"
-                        "import merian_shaders.shading.materials.material;\n"
-                        "namespace merian {{\n"
-                        "public MaterialSample scene_material_make_emissive(\n"
-                        "    const float3 emission, const float3 normal) {{\n"
-                        "    return {type}.make_emissive(emission, normal);\n"
-                        "}}\n"
-                        "}}\n",
-                        fmt::arg("path", import_name), fmt::arg("type", type_name)));
+            fmt::format(
+                "module scene_material_workaround;\n"
+                "import {path};\n"
+                "import merian_shaders.shading.materials.material;\n"
+                "import merian_shaders.utils.frame;\n"
+                "namespace merian {{\n"
+                "public static const bool scene_material_static_dispatch = true;\n"
+                "public MaterialSample scene_material_make_emissive(\n"
+                "    const float3 emission, const float3 normal) {{\n"
+                "    return {type}.make_emissive(emission, normal);\n"
+                "}}\n"
+                "public MaterialSample scene_material_unpack_bsdf(\n"
+                "    const uint2 packed, const float3 emission, const OrthonormalFrame frame) {{\n"
+                "    return {type}.unpack_bsdf(packed, emission, frame);\n"
+                "}}\n"
+                "}}\n",
+                fmt::arg("path", import_name), fmt::arg("type", type_name)));
     } else {
-        composition->add_module_from_string("scene_material_workaround", env_material_workaround_module());
+        composition->add_module_from_string("scene_material_workaround",
+                                            env_material_workaround_module());
     }
 }
 
