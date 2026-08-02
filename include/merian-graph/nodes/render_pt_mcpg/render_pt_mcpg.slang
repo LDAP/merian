@@ -76,6 +76,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         float scores[mc_samples];
         VonMisesFisher3<false> vmfs[mc_samples];
         const float3 access_normal = params.mcpg.jitter_normal(frame, rng);
+        [loop]
         for (int i = 0; i < mc_samples; i++) {
             uint buffer_index;
             uint level;
