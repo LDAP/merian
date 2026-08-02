@@ -67,7 +67,6 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         const OrthonormalFrame frame = sp.material.shading_frame;
         const float3 normal = frame.get_normal();
         let m_bsdf = sp.material.get_bsdf();
-        const float3 wi_local = frame.to_local(-ray.Direction);
 
         // Resample one guiding lobe from the Markov-chain mixture (using RIS)
         MCState selected;
@@ -105,7 +104,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         if (guide) {
             wo_world = vmfs[0].sample(rng);
             wo_local = frame.to_local(wo_world);
-        } else if (let local = m_bsdf.sample(wi_local, rng)) {
+        } else if (let local = m_bsdf.sample(frame.to_local(-ray.Direction), rng)) {
             wo_local = local;
             wo_world = frame.to_world(local);
             selected = MCState();
@@ -114,6 +113,9 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         } else {
             break;
         }
+
+        // computed after the sampling branch so it is not live through it (register pressure)
+        const float3 wi_local = frame.to_local(-ray.Direction);
 
         // Stochastic MIS
         float wo_p = 0.0;
