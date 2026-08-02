@@ -78,14 +78,41 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         float scores[mc_samples];
         VonMisesFisher3<false> vmfs[mc_samples];
         const float3 access_normal = params.mcpg.jitter_normal(frame, rng);
+        // Software-pipelined lookups: the next slot's key is fetched one iteration ahead so
+        // the record line is already in cache when it is resolved (the rng draw order is
+        // identical to the plain loop). Only exact with a single probe.
+        uint slot_next;
+        uint hash_next;
+        uint level_next;
+        params.mcpg.prepare(lookup_pos, access_normal, cam_pos, rng, slot_next, hash_next,
+                            level_next);
+        float sel_next = rng.next_float();
+        uint key_next = mc_probe_count == 1 ? params.mcpg.grid.load_hash(slot_next) : 0;
         for (int i = 0; i < mc_samples; i++) {
+            const uint slot = slot_next;
+            const uint hash = hash_next;
+            const uint level = level_next;
+            const float sel = sel_next;
+            const uint key = key_next;
+            if (i + 1 < mc_samples) {
+                params.mcpg.prepare(lookup_pos, access_normal, cam_pos, rng, slot_next,
+                                    hash_next, level_next);
+                sel_next = rng.next_float();
+                if (mc_probe_count == 1)
+                    key_next = params.mcpg.grid.load_hash(slot_next);
+            }
+
             uint buffer_index;
-            uint level;
-            const MCState s =
-                params.mcpg.load(lookup_pos, access_normal, cam_pos, scene.time, rng, buffer_index, level);
+            MCState s;
+            if (mc_probe_count == 1) {
+                buffer_index = key == hash ? slot : 0xFFFFFFFFu;
+                s = params.mcpg.resolve_matched(slot, key == hash, scene.time);
+            } else {
+                s = params.mcpg.resolve(slot, hash, scene.time, buffer_index);
+            }
             score_sum += s.sum_w;
             // comparison with NaN is false (when s.sum_w == 0 and score_sum == 0)
-            if (rng.next_float() < s.sum_w / score_sum) {
+            if (sel < s.sum_w / score_sum) {
                 selected = s;
                 selected_buffer_index = buffer_index;
                 selected_level = level;

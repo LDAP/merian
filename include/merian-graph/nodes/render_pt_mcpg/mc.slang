@@ -173,6 +173,48 @@ struct MCPG<let ADAPTIVE_BUFFER_SIZE : uint,
         return s;
     }
 
+    // Split lookup for software pipelining: prepare() consumes the same rng draws as load()
+    // and yields the slot address, resolve() turns the fetched slot into the state. Between
+    // the two the record load can overlap independent work.
+    void prepare(const float3 pos,
+                 const float3 access_normal,
+                 const float3 cam_pos,
+                 inout RandomGenerator rng,
+                 out uint slot,
+                 out uint hash,
+                 out uint level) {
+        level = grid.distributed_level_for_pos(pos, cam_pos, rng);
+        const int3 gidx = grid.grid_idx(pos, grid.grid_width_for_level(level), rng);
+        const uint lnw = grid.level_normal_word(level, access_normal);
+        hash = grid.collision_key(gidx, lnw);
+        slot = grid.slot_index(gidx, lnw, hash);
+    }
+
+    // Probe-1 fast path: the caller already compared the prefetched key.
+    MCState resolve_matched(const uint slot, const bool matched, const float time) {
+        MCState s;
+        if (matched) {
+            s = grid.load_payload(slot);
+        }
+        if (matched && s.is_valid()) {
+            s.set_w_tgt(s.w_tgt + s.sum_w * (time - s.T) * float3(s.mv));
+        } else {
+            s = MCState();
+        }
+        return s;
+    }
+
+    MCState resolve(const uint slot, const uint hash, const float time, out uint buffer_index) {
+        var s = grid.get(slot, hash, buffer_index).value;
+        if (s.is_valid()) {
+            s.set_w_tgt(s.w_tgt + s.sum_w * (time - s.T) * float3(s.mv));
+        } else {
+            s.sum_w = 0.0;
+        }
+
+        return s;
+    }
+
     void store(const MCState s,
                const float3 pos,
                const float3 access_normal,
