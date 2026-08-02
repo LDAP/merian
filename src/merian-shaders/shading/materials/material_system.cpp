@@ -14,6 +14,21 @@ static uint32_t payload_size_in_uints(uint32_t byte_size) {
     return (byte_size + 3) / 4;
 }
 
+// Environment-map hits construct their shading-point material through this injected function:
+// with a single registered model the MaterialSample existential stays single-typed and Slang
+// devirtualizes it entirely (see the note on MaterialModel in material.slang).
+static std::string env_material_workaround_module() {
+    return "module scene_material_workaround;\n"
+           "import merian_shaders.shading.materials.material;\n"
+           "import merian_shaders.scene.environment_map;\n"
+           "namespace merian {\n"
+           "public MaterialSample scene_material_make_emissive(const float3 emission,\n"
+           "                                                   const float3 normal) {\n"
+           "    return EnvMaterialSample(emission, -normal);\n"
+           "}\n"
+           "}\n";
+}
+
 MaterialSystem::MaterialSystem(const ShaderCompileContextHandle& compile_context,
                                const ContextHandle& context,
                                const ResourceAllocatorHandle& allocator,
@@ -26,6 +41,7 @@ MaterialSystem::MaterialSystem(const ShaderCompileContextHandle& compile_context
     composition->add_composition(texture_manager->get_composition());
     composition->add_module_from_path("merian-shaders/shading/materials/material-system.slang");
     update_composition_constants();
+    update_static_dispatch();
 
     layout_program = SlangProgram::create(compile_context, composition);
     shader_object = Versioned<ShaderObject>([this] { return build_shader_object(); });
@@ -41,6 +57,7 @@ SlangCompositionHandle MaterialSystem::query_device_support_composition() {
                                         "merian_material_system_payload_max_size = 1; }");
     composition->add_module_from_path("merian-shaders/shading/materials/diffuse-material.slang");
     composition->add_type_conformance("merian::MaterialModel", "merian::DiffuseMaterial", 0);
+    composition->add_module_from_string("scene_material_workaround", env_material_workaround_module());
     return composition;
 }
 
@@ -50,6 +67,34 @@ void MaterialSystem::update_composition_constants() {
         "material_system_constants", fmt::format("namespace merian {{ export static const int "
                                                  "merian_material_system_payload_max_size = {}; }}",
                                                  payload_uints));
+}
+
+void MaterialSystem::update_static_dispatch() {
+    if (material_types.size() == 1) {
+        const auto& [type_name, info] = *material_types.begin();
+        // dotted import so the module identity matches the path-based adds used in
+        // multi-model mode (a quoted path import would load a duplicate instance)
+        std::string import_name = info.slang_module_path;
+        if (import_name.ends_with(".slang")) {
+            import_name.resize(import_name.size() - 6);
+        }
+        std::ranges::replace(import_name, '/', '.');
+        std::ranges::replace(import_name, '-', '_');
+        composition->add_module_from_string(
+            "scene_material_workaround",
+            fmt::format("module scene_material_workaround;\n"
+                        "import {path};\n"
+                        "import merian_shaders.shading.materials.material;\n"
+                        "namespace merian {{\n"
+                        "public MaterialSample scene_material_make_emissive(\n"
+                        "    const float3 emission, const float3 normal) {{\n"
+                        "    return {type}.make_emissive(emission, normal);\n"
+                        "}}\n"
+                        "}}\n",
+                        fmt::arg("path", import_name), fmt::arg("type", type_name)));
+    } else {
+        composition->add_module_from_string("scene_material_workaround", env_material_workaround_module());
+    }
 }
 
 void MaterialSystem::set_alpha_test_threshold(const float threshold) {
@@ -131,9 +176,17 @@ MaterialModelID MaterialSystem::register_material_type(const std::string& slang_
     const auto dispatch_id = static_cast<MaterialModelID>(material_types.size());
     material_types.emplace(slang_type_name, MaterialTypeInfo{slang_module_path, dispatch_id});
 
-    // triggers program rebuild via listener
-    composition->add_module_from_path(slang_module_path);
+    // With a single registered model the module enters the composition solely through the
+    // scene_material_workaround import — a second path-loaded instance would make the
+    // conformance's type lookup ambiguous. Adds are name-keyed, so re-adding on the flip to
+    // multi-model is idempotent. Triggers program rebuild via listener.
+    if (material_types.size() > 1) {
+        for (const auto& [name, info] : material_types) {
+            composition->add_module_from_path(info.slang_module_path);
+        }
+    }
     composition->add_type_conformance("merian::MaterialModel", slang_type_name, dispatch_id);
+    update_static_dispatch();
     return dispatch_id;
 }
 

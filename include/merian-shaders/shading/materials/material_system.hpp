@@ -1,7 +1,7 @@
 #pragma once
 
-#include "merian-shaders/utils/texture_manager.hpp"
 #include "merian-shaders/shading/materials/material-system-data.slangh"
+#include "merian-shaders/utils/texture_manager.hpp"
 #include "merian/shader/shader_object.hpp"
 #include "merian/shader/slang_composition.hpp"
 #include "merian/shader/slang_program.hpp"
@@ -126,6 +126,7 @@ class MaterialSystem : public std::enable_shared_from_this<MaterialSystem> {
 
   private:
     void update_composition_constants();
+    void update_static_dispatch();
     ShaderObjectHandle build_shader_object() const;
     void repack_host_buffer();
     uint32_t get_entry_size() const;

@@ -20,6 +20,15 @@ struct DiffuseMaterial : MaterialModel {
         DiffuseMaterialSample s;
         s.brdf = LambertDiffuseBRDF(albedo);
         s.frame = sd.frame.apply_normal_map(float3(0, 0, 1));
+        s.emission = float3(0);
+        return s;
+    }
+
+    static DiffuseMaterialSample make_emissive(const float3 emission, const float3 normal) {
+        DiffuseMaterialSample s;
+        s.brdf = LambertDiffuseBRDF(float3(0));
+        s.frame = OrthonormalFrame(normal);
+        s.emission = emission;
         return s;
     }
 }
@@ -28,10 +37,10 @@ struct DiffuseMaterialSample : MaterialSample {
     typealias BSDFImpl = LambertDiffuseBRDF;
     LambertDiffuseBRDF brdf;
     OrthonormalFrame frame;
+    float3 emission;
     BSDFImpl get_bsdf() {
         return brdf;
     }
-    property float3 emission { get { return float3(0); } }
     property OrthonormalFrame shading_frame { get { return frame; } }
     property float3 shading_normal { get { return frame.get_normal(); } }
 }

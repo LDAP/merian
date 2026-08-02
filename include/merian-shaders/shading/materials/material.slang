@@ -29,6 +29,12 @@ extern static const float merian_hint_min_roughness = 0.0316f;
 //
 // Materials must ALWAYS have MaterialHeader as first member variable. The CPU side material system
 // checks for this requirement.
+//
+// When a scene registers exactly ONE material model, Slang devirtualizes the MaterialSample
+// existential — but only if no second type is ever boxed into it. Environment-map hits therefore
+// construct the sample via the model's `static MaterialSampleImpl make_emissive(const float3
+// emission, const float3 normal)` (see scene_material_workaround): an emission-only sample whose
+// BSDF evaluates to zero.
 interface MaterialModel {
     associatedtype MaterialSampleImpl : MaterialSample;
 

@@ -14,6 +14,12 @@ import merian_shaders.utils.random;
 __exported import scene_as_workaround;
 __exported import scene_env_map_workaround;
 
+// Injected by the CPU MaterialSystem: constructs the emission-only shading-point material for
+// environment-map hits. With a single registered material model it returns that model's sample,
+// keeping the MaterialSample existential single-typed so Slang devirtualizes it entirely
+// (register pressure); otherwise it returns an EnvMaterialSample.
+import scene_material_workaround;
+
 namespace merian {
 
 // Once https://github.com/shader-slang/slang/pull/10769 lands these can replace the workaround
@@ -464,7 +470,8 @@ struct Scene {
         sp.pos = pos;
         sp.prev_pos = pos;
         sp.enc_face_normal = encode_normal(-ray.Direction);
-        sp.material = env_map.get_sample(sd, material_system.texture_manager, lod);
+        sp.material = scene_material_make_emissive(
+            env_map.eval(sd, material_system.texture_manager, lod), -ray.Direction);
         return sp;
     }
 
