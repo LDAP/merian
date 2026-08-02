@@ -191,13 +191,14 @@ void RenderMCPG::update_render_constants() {
                     "export static const uint lc_probe_count = {}u;\n"
                     "export static const bool lc_stochastic_interpolation = {};\n"
                     "export static const float lc_min_pdf = {:f};\n"
-                    "export static const uint mc_adaptive_buffer_size = {}u;\n",
+                    "export static const uint mc_adaptive_buffer_size = {}u;\n"
+                    "export static const uint mc_probe_count = {}u;\n",
                     emission_on_primary ? "true" : "false", spp, max_path_length, mask,
                     demodulate_albedo ? "true" : "false", use_light_cache_tail ? "true" : "false",
                     missing_light_heuristic ? "true" : "false", mc_samples,
                     reference_mode ? 0.0f : p_guiding, dir_guide_prior, debug_output_selector,
                     lc_buffer_size, lc_probe_count, lc_stochastic_interpolation ? "true" : "false",
-                    lc_min_pdf, mc_adaptive_buffer_size));
+                    lc_min_pdf, mc_adaptive_buffer_size, mc_probe_count));
 }
 
 RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
@@ -242,6 +243,9 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
         const bool resize_mcpg =
             config.config_uint("adaptive grid buf size", mc_adaptive_buffer_size,
                                "Buffer size backing the hash grid.");
+        constants_changed |=
+            config.config_uint("MC probe count", mc_probe_count,
+                               "Slots probed before evicting (open addressing).", 1u, 16u);
         needs_reconnect |= resize_mcpg;
         if (mcpg) {
             if (resize_mcpg) {
