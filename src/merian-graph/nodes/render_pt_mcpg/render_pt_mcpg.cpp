@@ -200,14 +200,16 @@ void RenderMCPG::update_render_constants() {
                     "export static const float lc_min_pdf = {:f};\n"
                     "export static const uint mc_adaptive_buffer_size = {}u;\n"
                     "export static const uint mc_probe_count = {}u;\n"
-                    "export static const bool mc_split_storage = {};\n",
+                    "export static const bool mc_split_storage = {};\n"
+                    "export static const bool mc_coarse_store = {};\n",
                     emission_on_primary ? "true" : "false", spp, max_path_length, mask,
                     demodulate_albedo ? "true" : "false", use_light_cache_tail ? "true" : "false",
                     missing_light_heuristic ? "true" : "false", mc_samples,
                     reference_mode ? 0.0f : p_guiding, dir_guide_prior, debug_output_selector,
                     lc_buffer_size, lc_probe_count, lc_stochastic_interpolation ? "true" : "false",
                     lc_split_storage ? "true" : "false", lc_min_pdf, mc_adaptive_buffer_size,
-                    mc_probe_count, mc_split_storage ? "true" : "false"));
+                    mc_probe_count, mc_split_storage ? "true" : "false",
+                    mc_coarse_store ? "true" : "false"));
 }
 
 RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
@@ -254,6 +256,10 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
         constants_changed |=
             config.config_uint("MC probe count", mc_probe_count,
                                "Slots probed before evicting (open addressing).", 1u, 16u);
+        constants_changed |= config.config_bool(
+            "MC coarse store", mc_coarse_store,
+            "Propagate accepted samples one level coarser as well (faster adaptation "
+            "across LODs, costs a second store).");
         recreate_mcpg |=
             config.config_bool("split keys/payload", mc_split_storage,
                                "Store hash+stamp separately from the payload (probe-friendly) "

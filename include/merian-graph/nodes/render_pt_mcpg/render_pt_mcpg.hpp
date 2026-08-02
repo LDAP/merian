@@ -89,6 +89,7 @@ class RenderMCPG : public Node {
 
     uint32_t mc_adaptive_buffer_size = 32777259;
     uint32_t mc_probe_count = 2;
+    bool mc_coarse_store = true;
     bool mc_split_storage = true;
 
     // --- Light cache ---

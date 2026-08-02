@@ -29,6 +29,7 @@ extern static const float lc_min_pdf = 1.0;
 
 extern static const uint mc_adaptive_buffer_size = 32777259;
 extern static const uint mc_probe_count = 2;
+extern static const bool mc_coarse_store = true;
 extern static const int mc_samples = 5;
 extern static const float p_guiding = 0.9;
 extern static const bool missing_light_heuristic = true;
@@ -174,8 +175,10 @@ float3 trace_path(const ParameterBlock<Scene> scene,
                 // sharp update at the queried level, plus a coarse propagation one level up
                 params.mcpg.store(selected, cur_pos, access_normal, scene.camera.position,
                                   scene.frame, rng);
-                params.mcpg.store_at_level(selected, cur_pos, access_normal, selected_level + 1,
-                                           scene.frame, rng);
+                if (mc_coarse_store) {
+                    params.mcpg.store_at_level(selected, cur_pos, access_normal,
+                                               selected_level + 1, scene.frame, rng);
+                }
             } else if (missing_light_heuristic && selected_buffer_index != MC_INVALID_INDEX &&
                        selected.light_missing_heuristic(mc_f, wo_world, cur_pos, next_pos)) {
 
