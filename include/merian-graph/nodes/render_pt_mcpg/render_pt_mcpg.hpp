@@ -90,6 +90,7 @@ class RenderMCPG : public Node {
     uint32_t mc_adaptive_buffer_size = 32777259;
     uint32_t mc_probe_count = 2;
     bool mc_split_storage = true;
+    uint32_t mc_locality_bits = 3;
 
     // --- Light cache ---
     bool use_light_cache_tail = false;
@@ -97,6 +98,7 @@ class RenderMCPG : public Node {
     uint32_t lc_probe_count = 4;
     bool lc_stochastic_interpolation = false;
     bool lc_split_storage = true;
+    uint32_t lc_locality_bits = 3;
     float lc_min_pdf = 1.0f;
 
     // --- Misc ---
