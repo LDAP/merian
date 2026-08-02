@@ -14,9 +14,10 @@ SlangCompositionHandle make_composition() {
 
 MCPG::MCPG(const ShaderCompileContextHandle& compile_context,
            const ResourceAllocatorHandle& allocator,
-           const uint32_t buffer_size)
+           const uint32_t buffer_size,
+           const bool split_storage)
     : composition(make_composition()),
-      grid(compile_context, allocator, composition, "MCState", buffer_size) {}
+      grid(compile_context, allocator, composition, "MCState", buffer_size, split_storage) {}
 
 SlangCompositionHandle MCPG::query_device_support_composition() {
     return make_composition();

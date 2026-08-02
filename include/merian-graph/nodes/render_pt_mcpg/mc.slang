@@ -123,8 +123,10 @@ struct MCState {
     }
 };
 
-struct MCPG<let ADAPTIVE_BUFFER_SIZE : uint, let PROBE_COUNT : uint = 2> {
-    HashGrid<MCState, ADAPTIVE_BUFFER_SIZE, PROBE_COUNT, true, true> grid;
+struct MCPG<let ADAPTIVE_BUFFER_SIZE : uint,
+            let PROBE_COUNT : uint = 2,
+            let SPLIT_STORAGE : bool = true> {
+    HashGrid<MCState, ADAPTIVE_BUFFER_SIZE, PROBE_COUNT, true, true, SPLIT_STORAGE> grid;
 
     float3 jitter_normal(const OrthonormalFrame shading_frame, inout RandomGenerator rng) {
         return shading_frame.to_world(sample_cos(rng));
@@ -189,7 +191,10 @@ struct MCPG<let ADAPTIVE_BUFFER_SIZE : uint, let PROBE_COUNT : uint = 2> {
 
     // Missing-light heuristic: invalidate the exact loaded slot in place.
     void kill(const uint buffer_index) {
-        grid.data[buffer_index].sum_w = 0.0;
+        if (SPLIT_STORAGE)
+            grid.data[buffer_index].sum_w = 0.0;
+        else
+            grid.records[buffer_index].t.sum_w = 0.0;
     }
 }
 

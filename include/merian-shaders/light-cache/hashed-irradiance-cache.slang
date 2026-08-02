@@ -26,8 +26,10 @@ struct HashedIrradianceCacheUpdate : HashGridUpdateFunction<HashedIrradianceCach
 
 struct HashedIrradianceCache<let BUFFER_SIZE : uint,
                              let PROBE_COUNT : uint = 4,
-                             let STOCHASTIC_INTERPOLATION : bool = false> {
-    HashGrid<HashedIrradianceCacheData, BUFFER_SIZE, PROBE_COUNT, STOCHASTIC_INTERPOLATION, false>
+                             let STOCHASTIC_INTERPOLATION : bool = false,
+                             let SPLIT_STORAGE : bool = true> {
+    HashGrid<HashedIrradianceCacheData, BUFFER_SIZE, PROBE_COUNT, STOCHASTIC_INTERPOLATION, false,
+             SPLIT_STORAGE>
         grid;
 
     half3

@@ -15,6 +15,11 @@ interface HashGridUpdateFunction<typename T> {
     void update(inout T t);
 }
 
+struct HashGridRecord<typename T> {
+    uint2 key;
+    T t;
+}
+
 // Overloads taking a normal hash its dominant-axis cube face (6 bins, 3 bits) into the key: the
 // face selects the bucket and is matched exactly.
 struct HashGrid<typename T,
@@ -22,12 +27,52 @@ struct HashGrid<typename T,
                 let PROBE_COUNT : uint = 4,
                 let STOCHASTIC_INTERPOLATION : bool = false,
                 let LEVEL_STOCHASTIC_INTERPOLATION : bool = false,
+                let SPLIT_STORAGE : bool = true,
                 let GRID_POWER : uint = 2,
                 let GRID_STEPS_PER_UNIT_SIZE : uint = 1> {
-    // Split key/payload layout: probing touches only the 8-byte key words (x = hash,
-    // y = lock/LRU stamp), the payload is fetched once on a key match.
+    // Split layout: probing touches only the 8-byte key words (x = hash, y = lock/LRU stamp),
+    // the payload is fetched once on a key match. Combined layout: one record per slot, a
+    // matching probe finds the payload in the same cache line. The host binds only the
+    // active layout's buffers; the others are dummies.
     RWStructuredBuffer<uint2> keys;
     RWStructuredBuffer<T, ScalarDataLayout> data;
+    RWStructuredBuffer<HashGridRecord<T>, ScalarDataLayout> records;
+
+    uint load_hash(const uint index) {
+        if (SPLIT_STORAGE)
+            return keys[index].x;
+        return records[index].key.x;
+    }
+
+    uint2 load_key(const uint index) {
+        if (SPLIT_STORAGE)
+            return keys[index];
+        return records[index].key;
+    }
+
+    T load_payload(const uint index) {
+        if (SPLIT_STORAGE)
+            return data[index];
+        return records[index].t;
+    }
+
+    // Payload before key so a concurrent probe never matches an unwritten payload.
+    void store_slot(const uint index, const uint2 key, const T t) {
+        if (SPLIT_STORAGE) {
+            data[index] = t;
+            keys[index] = key;
+        } else {
+            records[index].t = t;
+            records[index].key = key;
+        }
+    }
+
+    void lock_exchange(const uint index, const uint locked, out uint old) {
+        if (SPLIT_STORAGE)
+            InterlockedExchange(keys[index].y, locked, old);
+        else
+            InterlockedExchange(records[index].key.y, locked, old);
+    }
 
     float grid_tan_alpha_half;
     // SHARC-style LOD bias: shifts the level quantization / near-camera detail (0 = neutral).
@@ -112,8 +157,8 @@ struct HashGrid<typename T,
     // Linear-probe PROBE_COUNT slots starting at buffer_index for a matching hash.
     Optional<T> get(uint buffer_index, const uint hash) {
         for (uint i = 0; i < PROBE_COUNT; i++) {
-            if (keys_match(keys[buffer_index].x, hash)) {
-                return data[buffer_index];
+            if (keys_match(load_hash(buffer_index), hash)) {
+                return load_payload(buffer_index);
             }
 
             buffer_index++;
@@ -127,9 +172,9 @@ struct HashGrid<typename T,
     // Linear-probe variant that also reports the matched absolute slot (0xFFFFFFFF if none).
     Optional<T> get(uint buffer_index, const uint hash, out uint matched_index) {
         for (uint i = 0; i < PROBE_COUNT; i++) {
-            if (keys_match(keys[buffer_index].x, hash)) {
+            if (keys_match(load_hash(buffer_index), hash)) {
                 matched_index = buffer_index;
-                return data[buffer_index];
+                return load_payload(buffer_index);
             }
 
             buffer_index++;
@@ -152,7 +197,7 @@ struct HashGrid<typename T,
         const uint hash = collision_key(gidx, normal, level);
         uint bi = buffer_index(hash);
         for (uint i = 0; i < PROBE_COUNT; i++) {
-            if (keys_match(keys[bi].x, hash))
+            if (keys_match(load_hash(bi), hash))
                 return normal_bin(normal);
             bi++;
             if (bi >= BUFFER_SIZE)
@@ -297,7 +342,7 @@ struct HashGrid<typename T,
             uint idx = base + i;
             if (idx >= BUFFER_SIZE)
                 idx -= BUFFER_SIZE;
-            let probe = keys[idx];
+            let probe = load_key(idx);
             if (keys_match(probe.x, hash)) {
                 target = idx;
                 matched = true;
@@ -314,12 +359,12 @@ struct HashGrid<typename T,
         // the frame implicitly.
         const uint locked = frame | MERIAN_HASH_GRID_LOCK_BIT;
         uint old;
-        InterlockedExchange(keys[target].y, locked, old);
+        lock_exchange(target, locked, old);
         if (old == locked) {
             return;
         }
 
-        var t = data[target];
+        var t = load_payload(target);
 
         if (!matched) {
             const uint prev_level = target_level_for_pos(pos, prev_cam_pos, rng);
@@ -336,8 +381,7 @@ struct HashGrid<typename T,
 
         update.update(t);
 
-        data[target] = t;
-        keys[target] = uint2(hash, frame & ~MERIAN_HASH_GRID_LOCK_BIT);
+        store_slot(target, uint2(hash, frame & ~MERIAN_HASH_GRID_LOCK_BIT), t);
     }
 
     void update(const float3 pos,
@@ -407,7 +451,7 @@ struct HashGrid<typename T,
             uint idx = base + i;
             if (idx >= BUFFER_SIZE)
                 idx -= BUFFER_SIZE;
-            let probe = keys[idx];
+            let probe = load_key(idx);
             if (keys_match(probe.x, hash)) {
                 target = idx;
                 break;
@@ -421,13 +465,12 @@ struct HashGrid<typename T,
 
         const uint locked = frame | MERIAN_HASH_GRID_LOCK_BIT;
         uint old;
-        InterlockedExchange(keys[target].y, locked, old);
+        lock_exchange(target, locked, old);
         if (old == locked) {
             return;
         }
 
-        data[target] = t;
-        keys[target] = uint2(hash, frame & ~MERIAN_HASH_GRID_LOCK_BIT);
+        store_slot(target, uint2(hash, frame & ~MERIAN_HASH_GRID_LOCK_BIT), t);
     }
 
     void set_at_level(const uint level,
