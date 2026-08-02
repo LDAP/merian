@@ -120,6 +120,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         // Stochastic MIS
         float wo_p = 0.0;
         if (score_sum > 0) {
+            [loop]
             for (int i = 0; i < mc_samples; i++) {
                 wo_p += scores[i] * vmfs[i].pdf(wo_world);
             }
