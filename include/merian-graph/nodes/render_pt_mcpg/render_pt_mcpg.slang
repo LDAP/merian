@@ -27,6 +27,7 @@ extern static const bool lc_stochastic_interpolation = false;
 extern static const float lc_min_pdf = 1.0;
 
 extern static const uint mc_adaptive_buffer_size = 32777259;
+extern static const uint mc_probe_count = 2;
 extern static const int mc_samples = 5;
 extern static const float p_guiding = 0.9;
 extern static const bool missing_light_heuristic = true;
@@ -36,7 +37,7 @@ struct RenderBinding {
     RWTexture2D<float4> irradiance;
     RWTexture2D<float4> debug;
     HashedIrradianceCache<lc_buffer_size, lc_probe_count, lc_stochastic_interpolation> irr_cache;
-    MCPG<mc_adaptive_buffer_size> mcpg;
+    MCPG<mc_adaptive_buffer_size, mc_probe_count> mcpg;
 };
 
 float3 trace_path(const ParameterBlock<Scene> scene,
