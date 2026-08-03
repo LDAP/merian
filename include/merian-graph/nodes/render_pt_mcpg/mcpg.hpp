@@ -16,7 +16,8 @@ class MCPG {
   public:
     MCPG(const ShaderCompileContextHandle& compile_context,
          const ResourceAllocatorHandle& allocator,
-         uint32_t buffer_size);
+         uint32_t buffer_size,
+         bool split_storage = true);
 
     static SlangCompositionHandle query_device_support_composition();
 

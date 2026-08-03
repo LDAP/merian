@@ -18,7 +18,8 @@ class HashedIrradianceCache {
                           const ResourceAllocatorHandle& allocator,
                           uint32_t buffer_size,
                           uint32_t probe_count = 4,
-                          bool stochastic_interpolation = false);
+                          bool stochastic_interpolation = false,
+                          bool split_storage = true);
 
     static SlangCompositionHandle query_device_support_composition();
 

@@ -18,7 +18,8 @@ class HashGrid {
              const ResourceAllocatorHandle& allocator,
              const SlangCompositionHandle& composition,
              const std::string& data_type_name,
-             uint32_t buffer_size);
+             uint32_t buffer_size,
+             bool split_storage = true);
 
     void reset(const CommandBufferHandle& cmd);
 
@@ -30,8 +31,13 @@ class HashGrid {
         return buffer_size;
     }
 
+    bool get_split_storage() const {
+        return split_storage;
+    }
+
   private:
     const uint32_t buffer_size;
+    const bool split_storage;
 
     float grid_tan_alpha_half = 0.006F;
     float grid_level_bias = 0.0F;
