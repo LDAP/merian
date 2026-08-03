@@ -5,6 +5,7 @@
 #include "merian/shader/glsl_compiler_provider.hpp"
 
 #include "merian/vk/extension/extension_compatibility.hpp"
+#include "merian/vk/extension/extension_device_fault.hpp"
 #include "merian/vk/extension/extension_glslang_compiler.hpp"
 #include "merian/vk/extension/extension_glslangvalidator_compiler.hpp"
 #include "merian/vk/extension/extension_glslc_compiler.hpp"
@@ -64,6 +65,7 @@ ExtensionRegistry::ExtensionRegistry() {
     register_extension<ExtensionResources>(ExtensionResources::name, true);
     register_extension<ExtensionVkLayerSettings>(ExtensionVkLayerSettings::name, true);
     register_extension<ExtensionVkValidationLayers>(ExtensionVkValidationLayers::name, false);
+    register_extension<ExtensionDeviceFault>(ExtensionDeviceFault::name, false);
     register_extension<ExtensionImGui>(ExtensionImGui::name, true);
 }
 

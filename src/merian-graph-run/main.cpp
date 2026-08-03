@@ -5,6 +5,7 @@
 #include "merian/io/file_loader.hpp"
 #include "merian/plugin/plugins.hpp"
 #include "merian/vk/context.hpp"
+#include "merian/vk/extension/extension_device_fault.hpp"
 #include "merian/vk/extension/extension_resources.hpp"
 #include "merian/vk/extension/extension_vk_validation_layers.hpp"
 
@@ -181,7 +182,8 @@ int main(const int argc, const char** argv) {
         }
     }
 
-    std::vector<std::string> context_extensions = {merian::MerianGraphExtension::name};
+    std::vector<std::string> context_extensions = {merian::MerianGraphExtension::name,
+                                                   merian::ExtensionDeviceFault::name};
     if (options->validation) {
         context_extensions.emplace_back(merian::ExtensionVkValidationLayers::name);
     }
@@ -210,8 +212,17 @@ int main(const int argc, const char** argv) {
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
 
-    while (!stop) {
-        graph->run();
+    try {
+        while (!stop) {
+            graph->run();
+        }
+    } catch (const merian::VulkanException& e) {
+        SPDLOG_ERROR("aborting on Vulkan error: {}", e.what());
+        auto fault_ext = context->get_context_extension<merian::ExtensionDeviceFault>(true);
+        if (fault_ext) {
+            fault_ext->dump();
+        }
+        return 1;
     }
 
     SPDLOG_INFO("shutting down");
