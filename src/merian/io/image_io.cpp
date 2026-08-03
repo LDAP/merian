@@ -10,6 +10,7 @@
 #include <fstream>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace merian {
 
@@ -139,19 +140,36 @@ void save_pfm(const std::filesystem::path& path,
               const int width,
               const int height,
               const int channels) {
-    if (channels != 1 && channels != 3) {
-        throw std::runtime_error{"image_io: PFM supports only 1 or 3 channels"};
+    if (channels != 1 && channels != 3 && channels != 4) {
+        throw std::runtime_error{"image_io: PFM supports only 1, 3 or 4 channels"};
     }
     std::ofstream file(path, std::ios::binary);
     if (!file) {
         throw std::runtime_error{"image_io: cannot open " + path.string() + " for write"};
     }
-    file << (channels == 3 ? "PF\n" : "Pf\n") << width << ' ' << height << '\n' << -1.0f << '\n';
+    // PFM has no alpha channel, RGBA is written as RGB.
+    const int out_channels = channels == 1 ? 1 : 3;
+    file << (out_channels == 3 ? "PF\n" : "Pf\n") << width << ' ' << height << '\n'
+         << -1.0f << '\n';
     // PFM is bottom-up.
     const std::size_t row_floats = static_cast<std::size_t>(width) * channels;
+    if (channels == out_channels) {
+        for (int y = height - 1; y >= 0; --y) {
+            file.write(
+                reinterpret_cast<const char*>(data + (static_cast<std::size_t>(y) * row_floats)),
+                static_cast<std::streamsize>(row_floats * sizeof(float)));
+        }
+        return;
+    }
+    std::vector<float> row(static_cast<std::size_t>(width) * out_channels);
     for (int y = height - 1; y >= 0; --y) {
-        file.write(reinterpret_cast<const char*>(data + (static_cast<std::size_t>(y) * row_floats)),
-                   static_cast<std::streamsize>(row_floats * sizeof(float)));
+        const float* src = data + (static_cast<std::size_t>(y) * row_floats);
+        for (int x = 0; x < width; ++x) {
+            std::copy_n(src + (static_cast<std::size_t>(x) * channels), out_channels,
+                        row.data() + (static_cast<std::size_t>(x) * out_channels));
+        }
+        file.write(reinterpret_cast<const char*>(row.data()),
+                   static_cast<std::streamsize>(row.size() * sizeof(float)));
     }
 }
 
