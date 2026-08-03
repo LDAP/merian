@@ -1268,6 +1268,9 @@ constexpr vk::DeviceSize MIN_BUFFER_CAPACITY = vk::DeviceSize(32) * 1024 * 1024;
 constexpr vk::DeviceSize RESIZE_QUANTUM = vk::DeviceSize(32) * 1024 * 1024;
 constexpr vk::DeviceSize MIN_FREE_HEADROOM = vk::DeviceSize(16) * 1024 * 1024;
 
+// RDNA cache line. Per-mesh regions start here so a mesh's data never begins mid-line.
+constexpr vk::DeviceSize CACHE_LINE_SIZE = 64;
+
 constexpr vk::DeviceSize size_with_headroom(const vk::DeviceSize required) {
     const vk::DeviceSize free_space = std::max(MIN_FREE_HEADROOM, required / 4);
     const vk::DeviceSize target = std::max(MIN_BUFFER_CAPACITY, required + free_space);
@@ -1445,12 +1448,11 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                 const bool pretransform_prev =
                     needs_prev && !mesh.is_morphed() && !mesh.has_variable_topology();
 
-                ensure_region(info.vertex_buffer, shared_vb_suballoc, vb_size,
-                              alignof(PackedVertexData));
+                ensure_region(info.vertex_buffer, shared_vb_suballoc, vb_size, CACHE_LINE_SIZE);
 
                 if (needs_prev) {
                     ensure_region(info.prev_vertex_buffer, shared_prev_vb_suballoc, prev_vb_size,
-                                  alignof(PackedPrevVertexData));
+                                  CACHE_LINE_SIZE);
                 } else if (info.prev_vertex_buffer) {
                     info.prev_vertex_buffer = MeshBufferRegion{};
                 }
@@ -1552,7 +1554,7 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
 
                 if (mesh.indices_dirty && mesh.has_indices()) {
                     ensure_region(info.index_buffer, shared_ib_suballoc, ib_size,
-                                  size_for_index_type(mesh.index_type));
+                                  CACHE_LINE_SIZE);
                     const vk::DeviceSize dst_offset = info.index_buffer.get_offset();
 
                     std::visit(
