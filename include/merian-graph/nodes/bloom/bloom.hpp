@@ -14,6 +14,9 @@ namespace merian {
 
 class Bloom : public Node {
   private:
+    // Undefined: keep the format of the input.
+    vk::Format overwrite_format = vk::Format::eUndefined;
+
     static constexpr uint32_t local_size_x = 16;
     static constexpr uint32_t local_size_y = 16;
 

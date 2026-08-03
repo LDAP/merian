@@ -10,10 +10,19 @@ std::vector<InputConnectorDescriptor> AbstractABCompare::describe_inputs() {
             {"b", con_in_b, ConnectorAccess::transfer_src}};
 }
 
+AbstractABCompare::NodeStatusFlags AbstractABCompare::properties(Properties& props) {
+    if (props.config_enum("overwrite format", overwrite_format, Properties::OptionsStyle::COMBO,
+                          "Undefined keeps the format of input a.")) {
+        return NEEDS_RECONNECT;
+    }
+    return {};
+}
+
 std::vector<OutputConnectorDescriptor> ABSplit::describe_outputs(const NodeIOLayout& io_layout) {
     const vk::ImageCreateInfo create_info = io_layout[con_in_a]->get_create_info_or_throw();
 
-    vk::Format format = output_format.has_value() ? output_format.value() : create_info.format;
+    vk::Format format =
+        overwrite_format != vk::Format::eUndefined ? overwrite_format : create_info.format;
     vk::Extent3D extent =
         output_extent.has_value() ? vk::Extent3D(output_extent.value(), 1) : create_info.extent;
 
@@ -50,7 +59,8 @@ std::vector<OutputConnectorDescriptor>
 ABSideBySide::describe_outputs(const NodeIOLayout& io_layout) {
     const vk::ImageCreateInfo create_info = io_layout[con_in_a]->get_create_info_or_throw();
 
-    vk::Format format = output_format.has_value() ? output_format.value() : create_info.format;
+    vk::Format format =
+        overwrite_format != vk::Format::eUndefined ? overwrite_format : create_info.format;
 
     vk::Extent3D extent;
     if (output_extent.has_value()) {

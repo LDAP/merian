@@ -41,7 +41,8 @@ class VKDTFilmcurv : public TypedPCAbstractCompute<VKDTFilmcurvePushConstant> {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
-    std::optional<vk::Format> output_format = std::nullopt;
+    // Undefined: keep the format of the input.
+    vk::Format overwrite_format = vk::Format::eUndefined;
 
     VkSampledImageInHandle con_src = VkSampledImageIn::create();
     vk::Extent3D extent;

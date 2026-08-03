@@ -44,7 +44,8 @@ VKDTFilmcurv::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     const vk::ImageCreateInfo create_info = io_layout[con_src]->get_create_info_or_throw();
 
     extent = create_info.extent;
-    const vk::Format format = output_format.value_or(create_info.format);
+    const vk::Format format =
+        overwrite_format != vk::Format::eUndefined ? overwrite_format : create_info.format;
 
     return {
         {"out", ManagedVkImageOut::create(format, extent), ConnectorAccess::compute_write},
@@ -69,6 +70,12 @@ AbstractCompute::NodeStatusFlags VKDTFilmcurv::properties(Properties& config) {
     config.config_float("bias", pc.bias, "", .01);
     config.config_options("colormode", pc.colourmode,
                           {"darktable ucs", "per channel", "munsell", "hsl"});
+
+    config.st_separate();
+    if (config.config_enum("overwrite format", overwrite_format, Properties::OptionsStyle::COMBO,
+                           "Undefined keeps the format of the input.")) {
+        return NEEDS_RECONNECT;
+    }
 
     return {};
 }

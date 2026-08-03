@@ -50,11 +50,12 @@ TAA::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     const vk::ImageCreateInfo create_info = io_layout[con_src]->get_create_info_or_throw();
     width = create_info.extent.width;
     height = create_info.extent.height;
+    const vk::Format format =
+        overwrite_format != vk::Format::eUndefined ? overwrite_format : create_info.format;
 
     pc.enable_mv = static_cast<VkBool32>(io_layout.is_connected(con_mv));
     return {
-        {"out", ManagedVkImageOut::create(create_info.format, width, height),
-         ConnectorAccess::compute_write},
+        {"out", ManagedVkImageOut::create(format, width, height), ConnectorAccess::compute_write},
     };
 }
 
@@ -82,6 +83,12 @@ AbstractCompute::NodeStatusFlags TAA::properties(Properties& config) {
     std::string text;
     text += fmt::format("inverse motion: {}", inverse_motion);
     config.output_text(text);
+
+    config.st_separate();
+    if (config.config_enum("overwrite format", overwrite_format, Properties::OptionsStyle::COMBO,
+                           "Undefined keeps the format of the input.")) {
+        return NEEDS_RECONNECT;
+    }
 
     return {};
 }

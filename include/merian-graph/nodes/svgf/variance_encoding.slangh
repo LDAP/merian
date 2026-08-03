@@ -1,0 +1,15 @@
+// Variance is a squared quantity and therefore needs twice the exponent range of the luminance it
+// derives from, which caps a half-precision ping-pong at a usable luminance of sqrt(65504) ~ 256.
+// Storing sigma instead keeps the channel within the range its colour neighbours already occupy.
+// Filtering stays linear in the variance itself: decode on load, encode on store.
+namespace merian {
+extern static const bool svgf_variance_as_sigma = false;
+}
+
+float svgf_decode_variance(const float stored) {
+    return select(merian::svgf_variance_as_sigma, stored * stored, stored);
+}
+
+float svgf_encode_variance(const float variance) {
+    return select(merian::svgf_variance_as_sigma, sqrt(max(variance, 0.0)), variance);
+}

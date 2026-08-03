@@ -3,11 +3,16 @@
 #include "merian-graph/connectors/image/vk_image_in_sampled.hpp"
 #include "merian-graph/nodes/compute_node/compute_node.hpp"
 
+#include <optional>
+
 namespace merian {
 
 class TAA : public AbstractCompute {
 
   private:
+    // Undefined: keep the format of the input.
+    vk::Format overwrite_format = vk::Format::eUndefined;
+
     static constexpr uint32_t local_size_x = 16;
     static constexpr uint32_t local_size_y = 16;
 

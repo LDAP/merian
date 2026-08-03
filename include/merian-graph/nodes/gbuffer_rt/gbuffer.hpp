@@ -67,6 +67,7 @@ class GBufferRTNode : public Node {
     std::array<bool, 8> mask_enabled{true, true, true, true, true, true, true, true};
 
     bool emission_connected = true;
+    vk::Format emission_format = vk::Format::eR32G32B32A32Sfloat;
 
     // Slang program + pipeline; rebuilt when the scene composition changes.
     SlangCompositionHandle composition;

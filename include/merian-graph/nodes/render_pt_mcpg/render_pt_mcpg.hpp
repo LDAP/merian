@@ -21,6 +21,7 @@
 #include "merian/vk/raytrace/shader_binding_table.hpp"
 
 #include <array>
+#include <optional>
 
 namespace merian {
 
@@ -53,6 +54,8 @@ class RenderMCPG : public Node {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
+    vk::Format irradiance_format = vk::Format::eR32G32B32A32Sfloat;
+
     void ensure_pipeline(const SceneHandle& scene);
     void update_render_constants();
 

@@ -17,6 +17,7 @@
 #include "merian/shader/slang_program.hpp"
 #include "merian/vk/pipeline/pipeline_ray_tracing.hpp"
 #include "merian/vk/raytrace/shader_binding_table.hpp"
+#include <optional>
 
 namespace merian {
 
@@ -48,6 +49,8 @@ class RenderSSMM : public Node {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
+    vk::Format irradiance_format = vk::Format::eR32G32B32A32Sfloat;
+
     vk::BufferCreateInfo ssmc_buffer_create_info() const;
     void update_render_constants();
 

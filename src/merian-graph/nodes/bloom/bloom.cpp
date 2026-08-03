@@ -44,7 +44,8 @@ std::vector<InputConnectorDescriptor> Bloom::describe_inputs() {
 
 std::vector<OutputConnectorDescriptor> Bloom::describe_outputs(const NodeIOLayout& io_layout) {
     const vk::ImageCreateInfo create_info = io_layout[con_src]->get_create_info_or_throw();
-    const vk::Format format = create_info.format;
+    const vk::Format format =
+        overwrite_format != vk::Format::eUndefined ? overwrite_format : create_info.format;
     const vk::Extent3D extent = create_info.extent;
 
     con_out = ManagedVkImageOut::create(format, extent);
@@ -104,6 +105,13 @@ Bloom::NodeStatusFlags Bloom::properties(Properties& config) {
         spec_builder.add_entry(local_size_x, local_size_y, mode);
         spec_info.set(spec_builder.build());
     }
+
+    config.st_separate();
+    if (config.config_enum("overwrite format", overwrite_format, Properties::OptionsStyle::COMBO,
+                           "Undefined keeps the format of the input.")) {
+        return NEEDS_RECONNECT;
+    }
+
     return {};
 }
 

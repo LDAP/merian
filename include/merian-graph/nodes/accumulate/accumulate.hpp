@@ -74,7 +74,8 @@ class Accumulate : public Node {
     ContextHandle context;
     ResourceAllocatorHandle allocator;
     ShaderCompileContextHandle compile_context;
-    std::optional<vk::Format> format = vk::Format::eR32G32B32A32Sfloat;
+    // Undefined: keep the format of the input.
+    vk::Format overwrite_format = vk::Format::eUndefined;
 
     static constexpr uint32_t PERCENTILE_LOCAL_SIZE_X = 8;
     static constexpr uint32_t PERCENTILE_LOCAL_SIZE_Y = 8;

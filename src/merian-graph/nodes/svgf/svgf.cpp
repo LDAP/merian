@@ -59,10 +59,13 @@ std::vector<InputConnectorDescriptor> SVGF::describe_inputs() {
 
 std::vector<OutputConnectorDescriptor> SVGF::describe_outputs(const NodeIOLayout& io_layout) {
     irr_create_info = io_layout[con_src]->get_create_info_or_throw();
-    if (output_format)
-        irr_create_info.format = output_format.value();
 
-    con_out = ManagedVkImageOut::create(irr_create_info.format, irr_create_info.extent);
+    con_out = ManagedVkImageOut::create(
+        overwrite_format != vk::Format::eUndefined ? overwrite_format : irr_create_info.format,
+        irr_create_info.extent);
+    if (overwrite_format != vk::Format::eUndefined) {
+        irr_create_info.format = overwrite_format;
+    }
 
     return {{"out", con_out, ConnectorAccess::compute_write}};
 }
@@ -131,13 +134,25 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
         }
         compilation_session_desc->add_search_path("merian-graph/nodes/svgf");
 
-        filter_module =
-            SlangProgramEntryPoint::create(compilation_session_desc, "svgf_filter.slang").get();
-        variance_estimate_module =
-            SlangProgramEntryPoint::create(compilation_session_desc, "svgf_variance_estimate.slang")
+        // sigma keeps the variance channel in the same range as the colour it sits next to, which
+        // is what half-precision ping-pong images need
+        const std::string constants = fmt::format(
+            "namespace merian {{\n"
+            "export static const bool svgf_variance_as_sigma = {};\n"
+            "}}",
+            irr_create_info.format == vk::Format::eR16G16B16A16Sfloat ? "true" : "false");
+        const auto entry_point = [&](const std::string& module_path) {
+            const auto composition = SlangComposition::create();
+            composition->add_module_from_path(module_path, true);
+            composition->add_module_from_string("svgf_constants", constants);
+            return SlangProgramEntryPoint::create(
+                       SlangProgram::create(compilation_session_desc, composition), "main")
                 .get();
-        taa_module =
-            SlangProgramEntryPoint::create(compilation_session_desc, "svgf_taa.slang").get();
+        };
+
+        filter_module = entry_point("svgf_filter.slang");
+        variance_estimate_module = entry_point("svgf_variance_estimate.slang");
+        taa_module = entry_point("svgf_taa.slang");
 
         {
             auto spec_builder = SpecializationInfoBuilder();
@@ -378,6 +393,11 @@ SVGF::NodeStatusFlags SVGF::properties(Properties& config) {
     needs_rebuild |= config.config_options("debug", taa_debug,
                                            {"none", "irradiance", "variance", "normal", "depth",
                                             "albedo", "grad z", "irradiance nan/inf", "mv"});
+
+    config.st_separate("Formats");
+    needs_rebuild |=
+        config.config_enum("overwrite format", overwrite_format, Properties::OptionsStyle::COMBO,
+                           "Undefined keeps the format of the input.");
 
     config.st_separate();
     config.output_text("local size variance estimate: {}\nlocal size filter: {}",

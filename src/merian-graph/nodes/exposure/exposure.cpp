@@ -48,7 +48,8 @@ std::vector<InputConnectorDescriptor> AutoExposure::describe_inputs() {
 std::vector<OutputConnectorDescriptor>
 AutoExposure::describe_outputs(const NodeIOLayout& io_layout) {
     const vk::ImageCreateInfo create_info = io_layout[con_src]->get_create_info_or_throw();
-    const vk::Format format = create_info.format;
+    const vk::Format format =
+        overwrite_format != vk::Format::eUndefined ? overwrite_format : create_info.format;
     const vk::Extent3D extent = create_info.extent;
 
     con_out = ManagedVkImageOut::create(format, extent);
@@ -154,6 +155,12 @@ AutoExposure::NodeStatusFlags AutoExposure::properties(Properties& config) {
     config.config_float("shutter time (ms)", shutter_time);
     pc.shutter_time = std::max(0.f, shutter_time / 1000);
     config.config_float("aperature", pc.aperature, "", .01);
+
+    config.st_separate();
+    if (config.config_enum("overwrite format", overwrite_format, Properties::OptionsStyle::COMBO,
+                           "Undefined keeps the format of the input.")) {
+        return NEEDS_RECONNECT;
+    }
 
     return {};
 }

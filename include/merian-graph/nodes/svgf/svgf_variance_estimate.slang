@@ -1,5 +1,6 @@
 
 #include "merian-graph/nodes/svgf/config.h"
+#include "merian-graph/nodes/svgf/variance_encoding.slangh"
 
 [vk::constant_id(0)]
 const int workgroup_size_x = 1;
@@ -157,5 +158,5 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
     irr_moments = lerp(center_irr_moments, irr_moments, alpha);
 
     const float variance = max(0.0, irr_moments.a - irr_moments.r * irr_moments.r);
-    img_filter_in.Store(dispatch_thread_id, float4(irr_moments.rgb, variance));
+    img_filter_in.Store(dispatch_thread_id, float4(irr_moments.rgb, svgf_encode_variance(variance)));
 }

@@ -76,10 +76,9 @@ Tonemap::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     const vk::ImageCreateInfo create_info = io_layout[con_src]->get_create_info_or_throw();
 
     extent = create_info.extent;
-    const vk::Format format = output_format.value_or(create_info.format);
 
     return {
-        {"out", ManagedVkImageOut::create(format, extent), ConnectorAccess::compute_write},
+        {"out", ManagedVkImageOut::create(output_format, extent), ConnectorAccess::compute_write},
     };
 }
 
@@ -194,6 +193,11 @@ AbstractCompute::NodeStatusFlags Tonemap::properties(Properties& config) {
 
     if (needs_rebuild) {
         make_spec_info();
+    }
+
+    config.st_separate();
+    if (config.config_enum("output format", output_format, Properties::OptionsStyle::COMBO)) {
+        return NEEDS_RECONNECT;
     }
 
     return {};
