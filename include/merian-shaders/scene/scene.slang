@@ -427,7 +427,10 @@ struct Scene {
         sp.pos = surface.pos;
         sp.prev_pos = prev_pos;
         sp.enc_face_normal = encode_normal(surface.face_normal);
-        sp.material = material_system.get_material_sample(surface.material_id, sd, lod);
+        const MaterialSample sample =
+            material_system.get_material_sample(surface.material_id, sd, lod);
+        sp.emission = sample.emission;
+        sp.material = sample;
         return sp;
     }
 
@@ -464,7 +467,8 @@ struct Scene {
         sp.pos = pos;
         sp.prev_pos = pos;
         sp.enc_face_normal = encode_normal(-ray.Direction);
-        sp.material = env_map.get_sample(sd, material_system.texture_manager, lod);
+        sp.emission = env_map.eval(sd, material_system.texture_manager, lod);
+        sp.material = none;
         return sp;
     }
 

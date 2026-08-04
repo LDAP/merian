@@ -51,7 +51,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
     const float3 cam_pos = scene.camera.position;
     const float3 prev_cam_pos = scene.prev_camera.position;
 
-    float3 radiance = merian_render_emission_on_primary ? sp.material.emission : float3(0);
+    float3 radiance = merian_render_emission_on_primary ? sp.emission : float3(0);
     float3 throughput = float3(1);
     float current_ior = 1.0f;
 
@@ -59,13 +59,17 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         if (all(throughput < SCENE_THROUGHPUT_THRESHOLD))
             break;
 
+        if (!sp.material.hasValue)
+            break;
+        let material = sp.material.value;
+
         const float3 cur_pos = sp.pos;
         // temporally reproject the cache lookup for the first sample so the lobe written last
         // frame is found despite geometry motion
         const float3 lookup_pos = select(sample_i == 0, sp.prev_pos, cur_pos);
-        const OrthonormalFrame frame = sp.material.shading_frame;
+        const OrthonormalFrame frame = material.shading_frame;
         const float3 normal = frame.get_normal();
-        let m_bsdf = sp.material.get_bsdf();
+        let m_bsdf = material.get_bsdf();
         const float3 wi_local = frame.to_local(-ray.Direction);
 
         // Resample one guiding lobe from the Markov-chain mixture (using RIS)
@@ -137,19 +141,19 @@ float3 trace_path(const ParameterBlock<Scene> scene,
 
         if (let next = next_ray) {
             if (transmission)
-                current_ior /= sp.material.get_eta();
+                current_ior /= material.get_eta();
             ray = next;
             sp = scene.trace_and_get_shading_point(ray, merian_render_instance_mask,
                                                    RenderContext(bounce, current_ior));
             next_pos = sp.pos;
 
-            incident = sp.material.emission;
+            incident = sp.emission;
 
             lc_incident =select(
                 any(incident > 0.0) ||
                         (!use_light_cache_tail && merian_render_max_path_length == 2),
                      incident,
-                     float3(params.irr_cache.get(next_pos, sp.material.shading_frame.get_normal(),
+                     float3(params.irr_cache.get(next_pos, sp.shading_normal,
                                                   cam_pos, prev_cam_pos, rng)));
 
             throughput *= bsdf / wo_p;
@@ -234,7 +238,7 @@ void render_pixel(const uint2 pixel,
     }
     case 2: { // light cache
         if (let l = params.irr_cache.grid.get(primary_sp.pos,
-                                              primary_sp.material.shading_frame.get_normal(),
+                                              primary_sp.shading_normal,
                                               cam_pos, prev_cam_pos, rng)) {
             params.debug[pixel] = float4(l.irr, 1);
         } else {
@@ -257,7 +261,7 @@ void render_pixel(const uint2 pixel,
     }
     case 5: { // mc weight
         const MCState mc_state =
-            params.mcpg.load(primary_sp.pos, primary_sp.material.shading_frame,
+            params.mcpg.load(primary_sp.pos, primary_sp.shading_frame,
                              cam_pos, scene.time, rng);
         if (mc_state.is_valid())
             params.debug[pixel] = float4(debug_color(mc_state.sum_w * 0.1), 1);
@@ -267,7 +271,7 @@ void render_pixel(const uint2 pixel,
     }
     case 6: { // mc mean direction
         const MCState mc_state =
-            params.mcpg.load(primary_sp.pos, primary_sp.material.shading_frame,
+            params.mcpg.load(primary_sp.pos, primary_sp.shading_frame,
                              cam_pos, scene.time, rng);
         if (mc_state.is_valid())
             params.debug[pixel] = float4((mc_state.get_dir(primary_sp.pos) + 1) / 2, 1);
@@ -277,7 +281,7 @@ void render_pixel(const uint2 pixel,
     }
     case 7: { // mc cos
         const MCState mc_state =
-            params.mcpg.load(primary_sp.pos, primary_sp.material.shading_frame,
+            params.mcpg.load(primary_sp.pos, primary_sp.shading_frame,
                              cam_pos, scene.time, rng);
         if (mc_state.is_valid())
             params.debug[pixel] = float4(debug_color(mc_state.w_cos / mc_state.sum_w), 1);
@@ -287,7 +291,7 @@ void render_pixel(const uint2 pixel,
     }
     case 8: { // mc N
         const MCState mc_state =
-            params.mcpg.load(primary_sp.pos, primary_sp.material.shading_frame,
+            params.mcpg.load(primary_sp.pos, primary_sp.shading_frame,
                              cam_pos, scene.time, rng);
         if (mc_state.is_valid())
             params.debug[pixel] = float4(float3(float(mc_state.N) / float(ML_MAX_N)), 1);
@@ -297,18 +301,18 @@ void render_pixel(const uint2 pixel,
     }
     case 9: { // mc mv
         const MCState mc_state =
-            params.mcpg.load(primary_sp.pos, primary_sp.material.shading_frame,
+            params.mcpg.load(primary_sp.pos, primary_sp.shading_frame,
                              cam_pos, scene.time, rng);
         params.debug[pixel] = float4(float3(mc_state.mv), 1);
         break;
     }
     case 10: { // lc normal bin (actual)
-        const float3 n = primary_sp.material.shading_frame.get_normal();
+        const float3 n = primary_sp.shading_normal;
         params.debug[pixel] = float4(random_color(params.irr_cache.grid.normal_bin(n)), 1);
         break;
     }
     case 11: { // lc normal bin (selected)
-        const float3 n = primary_sp.material.shading_frame.get_normal();
+        const float3 n = primary_sp.shading_normal;
         const uint bin = params.irr_cache.grid.debug_selected_bin(primary_sp.pos, n, cam_pos, rng);
         params.debug[pixel] =
             bin == 0xFFFFFFFFu ? float4(0, 0, 0, 1) : float4(random_color(bin), 1);

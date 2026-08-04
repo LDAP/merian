@@ -157,103 +157,106 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<SSMMBinding> params) {
     if (first_hit.is_valid() && any(params.gbuffer.get_albedo(pixel).reflection > float3(0))) {
         const RayDesc primary_ray = scene.generate_camera_ray(pixel, resolution);
         const ShadingPoint sp = scene.get_shading_point(primary_ray, first_hit);
-        const OrthonormalFrame frame = sp.material.shading_frame;
-        let bsdf = sp.material.get_bsdf();
-        const float3 wi = -primary_ray.Direction;
-        const float3 wi_local = frame.to_local(wi);
-        const float3 normal = frame.to_world(float3(0, 0, 1));
-        const float3 geonormal = sp.get_face_normal();
 
-        for (int s = 0; s < merian_ssmm_spp; s++) {
-            mc_state_shuffle(tent, (WaveGetLaneIndex() + 1) % WaveGetLaneCount());
-            sample_dirs[s] = float3(0);
-            sample_weights[s] = float3(0);
+        if (let material = sp.material) {
+            const OrthonormalFrame frame = material.shading_frame;
+            let bsdf = material.get_bsdf();
+            const float3 wi = -primary_ray.Direction;
+            const float3 wi_local = frame.to_local(wi);
+            const float3 normal = frame.to_world(float3(0, 0, 1));
+            const float3 geonormal = sp.get_face_normal();
 
-            read_neighbour_state(params.gbuffer, scene.camera.position, resolution, tent, sp.pos,
-                                 normal, int2(pixel), mv, rng);
+            for (int s = 0; s < merian_ssmm_spp; s++) {
+                mc_state_shuffle(tent, (WaveGetLaneIndex() + 1) % WaveGetLaneCount());
+                sample_dirs[s] = float3(0);
+                sample_weights[s] = float3(0);
 
-            vmfs[s] = float4(0);
-            if (mc_state_valid(tent))
-                vmfs[s] = mc_state_vmf(tent, sp.pos);
+                read_neighbour_state(params.gbuffer, scene.camera.position, resolution, tent, sp.pos,
+                                     normal, int2(pixel), mv, rng);
 
-            float pdf = 0;
-            float3 directContrib = float3(0);
-            float3 direction = float3(0);
-            float3 position = float3(0);
-            bool bsdf_sample = false;
-            do {
-                if (vmfs[s].w == 0 || rng.next_float() < merian_ssmm_bsdf_p) {
-                    let wo_local = bsdf.sample(wi_local, rng);
-                    if (!wo_local.hasValue)
-                        break;
-                    direction = frame.to_world(wo_local.value);
-                    if (dot(direction, normal) <= 1e-3 || dot(direction, geonormal) <= 1e-3)
-                        break;
+                vmfs[s] = float4(0);
+                if (mc_state_valid(tent))
+                    vmfs[s] = mc_state_vmf(tent, sp.pos);
 
-                    pdf = bsdf.pdf(wi_local, wo_local.value);
-                    bsdf_sample = true;
-                } else {
-                    direction = vmf_sample_tokuyosh(vmfs[s].xyz, vmfs[s].w, rng.next_float2());
-                    pdf = vmf_pdf_tokuyoshi(direction, vmfs[s].xyz, vmfs[s].w);
-                }
+                float pdf = 0;
+                float3 directContrib = float3(0);
+                float3 direction = float3(0);
+                float3 position = float3(0);
+                bool bsdf_sample = false;
+                do {
+                    if (vmfs[s].w == 0 || rng.next_float() < merian_ssmm_bsdf_p) {
+                        let wo_local = bsdf.sample(wi_local, rng);
+                        if (!wo_local.hasValue)
+                            break;
+                        direction = frame.to_world(wo_local.value);
+                        if (dot(direction, normal) <= 1e-3 || dot(direction, geonormal) <= 1e-3)
+                            break;
 
-                const float3 throughput = bsdf.eval(wi_local, frame.to_local(direction), rng);
+                        pdf = bsdf.pdf(wi_local, wo_local.value);
+                        bsdf_sample = true;
+                    } else {
+                        direction = vmf_sample_tokuyosh(vmfs[s].xyz, vmfs[s].w, rng.next_float2());
+                        pdf = vmf_pdf_tokuyoshi(direction, vmfs[s].xyz, vmfs[s].w);
+                    }
 
-                RayDesc ray;
-                // Pull back the ray such that it cannot excape through corners (and to prevent self collision)
-                ray.Origin = sp.pos + wi * 1e-3;
-                ray.Direction = direction;
-                ray.TMin = SCENE_RAY_TMIN;
-                ray.TMax = SCENE_RAY_TMAX;
-                const ShadingPoint next_sp =
-                    scene.trace_and_get_shading_point(ray, 0xffu, RenderContext(uint16_t(1), 1.0f));
+                    const float3 throughput = bsdf.eval(wi_local, frame.to_local(direction), rng);
 
-                position = next_sp.pos;
-                directContrib = throughput * next_sp.material.emission / pdf;
+                    RayDesc ray;
+                    // Pull back the ray such that it cannot excape through corners (and to prevent self collision)
+                    ray.Origin = sp.pos + wi * 1e-3;
+                    ray.Direction = direction;
+                    ray.TMin = SCENE_RAY_TMIN;
+                    ray.TMax = SCENE_RAY_TMAX;
+                    const ShadingPoint next_sp =
+                        scene.trace_and_get_shading_point(ray, 0xffu, RenderContext(uint16_t(1), 1.0f));
 
-                sample_dirs[s] = direction;
-                sample_weights[s] = throughput * next_sp.material.emission;
-            } while (false);
+                    position = next_sp.pos;
+                    directContrib = throughput * next_sp.emission / pdf;
 
-            const float tent_f = yuv_luminance(directContrib);
-            if (curr.f == 0 || rng.next_float() < tent_f / curr.f) {
-                if (bsdf_sample)
-                    tent = mc_state_new();
-                tent.f = tent_f;
-                mc_state_add(tent, sp.pos, tent_f, direction, position);
-                //tent.add(sd.posW, tent_f, direction, position);
-                curr = tent;
-            } else if (!bsdf_sample) {
-                mc_state_add(tent, sp.pos, tent_f, direction, position);
-                // tent.add(sd.posW, tent_f, direction, position);
-            }
-        }
+                    sample_dirs[s] = direction;
+                    sample_weights[s] = throughput * next_sp.emission;
+                } while (false);
 
-        for (int s = 0; s < merian_ssmm_spp; s++) {
-            if (all(sample_weights[s] == float3(0)))
-                continue;
-
-            const float bsdf_pdf = bsdf.pdf(wi_local, frame.to_local(sample_dirs[s]));
-            float sum_pdf = 0;
-            for (int t = 0; t < merian_ssmm_spp; t++) {
-                sum_pdf += vmfs[t].w > 0 ? vmf_pdf_tokuyoshi(sample_dirs[s], vmfs[t].xyz, vmfs[t].w)
-                                         : bsdf_pdf;
-            }
-
-            sum_pdf = merian_ssmm_bsdf_p * merian_ssmm_smis_group_size * bsdf_pdf +
-                      (1 - merian_ssmm_bsdf_p) * sum_pdf;
-
-            if (sum_pdf > 0) {
-                const float3 con = sample_weights[s] / sum_pdf;
-                if (!any(isinf(con)) && !any(isnan(con))) {
-                    irr += con;
-                    const float l = yuv_luminance(con);
-                    moments += float2(l, l * l);
+                const float tent_f = yuv_luminance(directContrib);
+                if (curr.f == 0 || rng.next_float() < tent_f / curr.f) {
+                    if (bsdf_sample)
+                        tent = mc_state_new();
+                    tent.f = tent_f;
+                    mc_state_add(tent, sp.pos, tent_f, direction, position);
+                    //tent.add(sd.posW, tent_f, direction, position);
+                    curr = tent;
+                } else if (!bsdf_sample) {
+                    mc_state_add(tent, sp.pos, tent_f, direction, position);
+                    // tent.add(sd.posW, tent_f, direction, position);
                 }
             }
-        }
 
-        pc.ssmc_out[ssmm_index(int2(pixel), resolution)] = curr;
+            for (int s = 0; s < merian_ssmm_spp; s++) {
+                if (all(sample_weights[s] == float3(0)))
+                    continue;
+
+                const float bsdf_pdf = bsdf.pdf(wi_local, frame.to_local(sample_dirs[s]));
+                float sum_pdf = 0;
+                for (int t = 0; t < merian_ssmm_spp; t++) {
+                    sum_pdf += vmfs[t].w > 0 ? vmf_pdf_tokuyoshi(sample_dirs[s], vmfs[t].xyz, vmfs[t].w)
+                                             : bsdf_pdf;
+                }
+
+                sum_pdf = merian_ssmm_bsdf_p * merian_ssmm_smis_group_size * bsdf_pdf +
+                          (1 - merian_ssmm_bsdf_p) * sum_pdf;
+
+                if (sum_pdf > 0) {
+                    const float3 con = sample_weights[s] / sum_pdf;
+                    if (!any(isinf(con)) && !any(isnan(con))) {
+                        irr += con;
+                        const float l = yuv_luminance(con);
+                        moments += float2(l, l * l);
+                    }
+                }
+            }
+
+            pc.ssmc_out[ssmm_index(int2(pixel), resolution)] = curr;
+        }
     }
 
     params.irradiance[pixel] =

@@ -50,11 +50,15 @@ void main(uint3 tid: SV_DispatchThreadID,
         const RayDesc ray = scene.generate_camera_ray(pixel, dim);
         const ShadingPoint sp = scene.get_shading_point(ray, params.gbuffer.get_hit(pixel));
         const float3 l = normalize(float3(0.4, 0.8, 0.6));
-        const float ndotl = saturate(dot(normalize(sp.material.shading_normal), l));
+        const float ndotl = saturate(dot(normalize(sp.shading_normal), l));
         const float ambient = 0.1f;
-        const float3 albedo =
-            sp.material.get_bsdf().get_albedo(sp.material.shading_frame.to_local(-ray.Direction)).reflection;
-        color = float4(albedo * (ambient + (1.f - ambient) * ndotl) + sp.material.emission, 1);
+        float3 albedo = float3(0);
+        if (let material = sp.material) {
+            albedo = material.get_bsdf()
+                         .get_albedo(material.shading_frame.to_local(-ray.Direction))
+                         .reflection;
+        }
+        color = float4(albedo * (ambient + (1.f - ambient) * ndotl) + sp.emission, 1);
         break;
     }
     case 2: { // Albedo
@@ -147,7 +151,7 @@ void main(uint3 tid: SV_DispatchThreadID,
         if (let gd = scene.get_geometry_data(hit)) {
             const RayDesc ray = scene.generate_camera_ray(pixel, dim);
             const ShadingPoint sp = scene.get_shading_point(ray, hit, gd);
-            color = float4(sp.material.emission, 1);
+            color = float4(sp.emission, 1);
         } else {
             color = float4(MISS, 1);
         }

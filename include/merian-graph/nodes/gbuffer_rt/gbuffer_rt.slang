@@ -81,12 +81,12 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<WGBuffer> gbuffer) {
     const float linear_z = length(sp.pos - ray.Origin);
     const float2 mv = scene.compute_motion_vector(sp.pos, sp.pos, pixel, dim);
 
-    gbuffer.store_surface(pixel, sp.material.shading_normal, linear_z, half2(0), 0);
+    gbuffer.store_surface(pixel, sp.shading_normal, linear_z, half2(0), 0);
     gbuffer.store_hit(pixel, hit);
     gbuffer.store_motion_vectors(pixel, mv);
-    gbuffer.store_albedo(pixel, Albedo(sp.material.emission));
+    gbuffer.store_albedo(pixel, Albedo(sp.emission));
     if (merian_gbuffer_write_emission)
-        emission[pixel] = float4(sp.material.emission, 0);
+        emission[pixel] = float4(sp.emission, 0);
 }
 
 } // namespace merian

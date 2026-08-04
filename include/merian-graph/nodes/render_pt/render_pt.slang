@@ -25,7 +25,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
                   RayDesc ray,
                   ShadingPoint sp,
                   inout RandomGenerator rng) {
-    float3 radiance = merian_render_emission_on_primary ? sp.material.emission : float3(0);
+    float3 radiance = merian_render_emission_on_primary ? sp.emission : float3(0);
     float3 throughput = float3(1);
     // Medium the ray is travelling through; updated on transmission events.
     float current_ior = 1.0f;
@@ -36,8 +36,13 @@ float3 trace_path(const ParameterBlock<Scene> scene,
             break;
         }
 
-        const OrthonormalFrame frame = sp.material.shading_frame;
-        let bsdf = sp.material.get_bsdf();
+        if (!sp.material.hasValue) {
+            break;
+        }
+        let material = sp.material.value;
+
+        const OrthonormalFrame frame = material.shading_frame;
+        let bsdf = material.get_bsdf();
         const float3 wi_local = frame.to_local(-ray.Direction);
         let sample = bsdf.sample_eval(wi_local, rng);
         if (!sample.hasValue) {
@@ -57,8 +62,8 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         // A transmission event crosses the surface; update the medium we are now in.
         const bool transmission = wi_local.z * bs.wo.z < 0.f;
         if (transmission) {
-            current_ior /= sp.material.get_eta();
-            current_absorption = sp.material.get_absorption();
+            current_ior /= material.get_eta();
+            current_absorption = material.get_absorption();
         }
 
         if (let next = sp.make_ray(-ray.Direction, wo, transmission)) {
@@ -75,7 +80,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
             throughput *= exp(-current_absorption * distance(ray.Origin, sp.pos));
         }
 
-        radiance += throughput * sp.material.emission;
+        radiance += throughput * sp.emission;
     }
 
     return radiance;

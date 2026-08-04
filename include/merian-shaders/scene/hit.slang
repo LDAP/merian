@@ -107,11 +107,30 @@ struct ShadingPoint {
     float3 pos;      // in worldspace
     float3 prev_pos; // in worldspace, mcpg only — see Scene::get_prev_world_position
     uint enc_face_normal;
-    MaterialSample material;
+    float3 emission;
+    // none where the ray left the scene: there is no surface and no BSDF to scatter from.
+    Optional<MaterialSample> material;
 
     // in worldspace
     float3 get_face_normal() {
         return decode_normal(enc_face_normal);
+    }
+
+    // Without a surface the face normal already faces the viewer, so it spans the frame.
+    property OrthonormalFrame shading_frame {
+        get {
+            if (let m = material)
+                return m.shading_frame;
+            return OrthonormalFrame(get_face_normal());
+        }
+    }
+
+    property float3 shading_normal {
+        get {
+            if (let m = material)
+                return m.shading_normal;
+            return get_face_normal();
+        }
     }
 
     // Continuation ray for a scatter event; transmission is the shading-frame classification
