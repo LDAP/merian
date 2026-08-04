@@ -140,8 +140,10 @@ struct GltfMaterial<let TRANSMISSION : bool = false,
         return roughness;
     }
 
-    GltfMaterialSample
-    get_sample(const ShadingData sd, const TextureManager tm, const LODSampler2D lod) {
+    GltfMaterialSample get_sample(const ShadingData sd,
+                                 const TextureManager tm,
+                                 const LODSampler2D lod,
+                                 out float3 out_emission) {
         const LOD0Sampler lod0;
 
         float4 base = base_color_factor;
@@ -287,7 +289,7 @@ struct GltfMaterial<let TRANSMISSION : bool = false,
             GltfBSDF(sheened, GltfCoated(SpecularBRDF(coat_alpha), sheened, GLTF_DIELECTRIC_IOR_F0),
                      coat_weight);
         s.shading_frame = shading_frame;
-        s.emission = emission;
+        out_emission = emission;
         s.eta = eta;
         s.absorption = absorb;
         return s;
@@ -299,7 +301,6 @@ struct GltfMaterialSample : MaterialSample {
 
     GltfBSDF brdf;
     OrthonormalFrame shading_frame;
-    float3 emission;
     float eta;
     float3 absorption;
 

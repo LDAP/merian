@@ -32,8 +32,10 @@ extern static const float merian_hint_min_roughness = 0.0316f;
 interface MaterialModel {
     associatedtype MaterialSampleImpl : MaterialSample;
 
+    // Emission is returned separately because it belongs to the shading point, not to the
+    // scattering behaviour — points without a surface (env map) carry emission but no sample.
     MaterialSampleImpl get_sample(const ShadingData sd, const TextureManager texture_manager,
-                                  const LODSampler2D lod_sampler);
+                                  const LODSampler2D lod_sampler, out float3 emission);
 }
 
 // This represents the evaluated material at a point on a surface or in a volume — normals,
@@ -41,10 +43,6 @@ interface MaterialModel {
 interface MaterialSample {
 
     associatedtype BSDFImpl : BSDF;
-
-    property float3 emission {
-        get;
-    }
 
     // The local shading frame (for surfaces).
     property OrthonormalFrame shading_frame {

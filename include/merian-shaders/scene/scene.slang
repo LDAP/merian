@@ -427,10 +427,8 @@ struct Scene {
         sp.pos = surface.pos;
         sp.prev_pos = prev_pos;
         sp.enc_face_normal = encode_normal(surface.face_normal);
-        const MaterialSample sample =
-            material_system.get_material_sample(surface.material_id, sd, lod);
-        sp.emission = sample.emission;
-        sp.material = sample;
+        sp.material =
+            material_system.get_material_sample(surface.material_id, sd, sp.emission, lod);
         return sp;
     }
 

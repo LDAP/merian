@@ -57,9 +57,10 @@ struct MaterialSystem {
 
     MaterialSample get_material_sample(const MaterialID material_id,
                                        const ShadingData sd,
+                                       out float3 emission,
                                        const LODSampler2D lod_sampler = DefaultLODSampler()) {
         const MaterialModel material_model = get_material(material_id);
-        return material_model.get_sample(sd, texture_manager, lod_sampler);
+        return material_model.get_sample(sd, texture_manager, lod_sampler, emission);
     }
 }
 

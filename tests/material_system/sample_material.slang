@@ -20,7 +20,8 @@ struct Params {
     // Get sample using LOD0 (works in compute, no implicit derivatives)
     merian::LOD0Sampler lod;
     // texture_manager is a ParameterBlock<TextureManager> nested inside MaterialSystem
-    merian::MaterialSample sample = mat.get_sample(sd, params.ms.texture_manager, lod);
+    float3 emission;
+    merian::MaterialSample sample = mat.get_sample(sd, params.ms.texture_manager, lod, emission);
 
     // Evaluate the BSDF: wi and wo pointing straight up in local tangent space
     float3 wi = float3(0, 0, 1);

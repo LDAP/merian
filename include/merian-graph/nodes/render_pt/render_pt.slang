@@ -32,11 +32,8 @@ float3 trace_path(const ParameterBlock<Scene> scene,
     float3 current_absorption = float3(0.0f);
 
     for (int bounce = 1; bounce < merian_render_max_path_length; bounce++) {
-        if (all(throughput < SCENE_THROUGHPUT_THRESHOLD)) {
-            break;
-        }
-
-        if (!sp.material.hasValue) {
+        // no material: the ray left the scene, its emission is already accumulated
+        if (!sp.material.hasValue || all(throughput < SCENE_THROUGHPUT_THRESHOLD)) {
             break;
         }
         let material = sp.material.value;
