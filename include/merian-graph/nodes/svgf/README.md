@@ -22,7 +22,7 @@ But modifies the original code in that:
 | Image  | prev_out     | feedback last `out`                                         | 1     |
 |        |
 | Image  | src          | (accumulated) noisy irradiance, second moment in `a`        | no    |
-| Image  | history      | (accumulated) history length as float in `r`                | no    |
+| Image  | history      | packed history: f16 history length in high half of `g` (see accumulate) | no    |
 |        |
 | Image  | albedo       | the demodulated albedo                                      | no    |
 | Image  | mv           | motion vectors in `r` and `g` channel                       | no    |

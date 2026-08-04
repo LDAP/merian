@@ -44,7 +44,6 @@ std::vector<InputConnectorDescriptor> Accumulate::describe_inputs() {
         {"src", con_src, ConnectorAccess::compute_read},
         {"gbuffer", con_gbuffer, ConnectorAccess::compute_read},
         {"prev_out", con_prev_out, ConnectorAccess::compute_read, 1},
-        {"prev_gbuffer", con_prev_gbuffer, ConnectorAccess::compute_read, 1},
         {"prev_history", con_prev_history, ConnectorAccess::compute_read, 1},
     };
 }
@@ -55,7 +54,7 @@ std::vector<OutputConnectorDescriptor> Accumulate::describe_outputs(const NodeIO
     con_out = ManagedVkImageOut::create(
         overwrite_format != vk::Format::eUndefined ? overwrite_format : irr_create_info.format,
         irr_create_info.extent);
-    con_history = ManagedVkImageOut::create(vk::Format::eR32Sfloat, irr_create_info.extent);
+    con_history = ManagedVkImageOut::create(vk::Format::eR32G32Uint, irr_create_info.extent);
 
     io_layout.register_event_listener(clear_event_listener_pattern,
                                       [this](const GraphEvent::Info&, const GraphEvent::Data&) {
@@ -66,7 +65,6 @@ std::vector<OutputConnectorDescriptor> Accumulate::describe_outputs(const NodeIO
     return {
         {"out", con_out, ConnectorAccess::compute_write},
         {"history", con_history, ConnectorAccess::compute_write},
-
     };
 }
 

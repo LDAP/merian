@@ -115,7 +115,6 @@
             "enabled": true,
             "outputs": [
                 "gbuffer->accumulate.gbuffer",
-                "gbuffer->accumulate.prev_gbuffer",
                 "gbuffer->render.gbuffer"
             ],
             "properties": {

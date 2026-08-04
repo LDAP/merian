@@ -68,6 +68,10 @@ extension __GBuffer<0> {
     float3 get_normal(uint2 pixel) {
         return decode_normal(tex0[pixel].x);
     }
+    // Raw bits: a decode/encode round trip is not bit-stable for degenerate normals.
+    uint get_encoded_normal(uint2 pixel) {
+        return tex0[pixel].x;
+    }
     float get_linear_z(uint2 pixel) {
         return asfloat(tex0[pixel].y);
     }
