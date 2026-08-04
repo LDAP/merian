@@ -53,8 +53,8 @@ void main(uint3 tid: SV_DispatchThreadID,
         const float ndotl = saturate(dot(normalize(sp.shading_normal), l));
         const float ambient = 0.1f;
         float3 albedo = float3(0);
-        if (let material = sp.material) {
-            albedo = material.get_bsdf()
+        if (sp.has_surface) {
+            albedo = sp.material.get_bsdf()
                          .get_albedo(sp.shading_frame.to_local(-ray.Direction))
                          .reflection;
         }

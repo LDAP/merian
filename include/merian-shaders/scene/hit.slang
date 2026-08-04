@@ -110,8 +110,9 @@ struct ShadingPoint {
     float3 emission;
     // Where the ray left the scene this is view-facing; the BSDF-local axes stay meaningful.
     OrthonormalFrame shading_frame;
-    // none where the ray left the scene: there is no surface and no BSDF to scatter from.
-    Optional<MaterialSample> material;
+    // false where the ray left the scene: `material` is then unset and must not be read.
+    bool has_surface;
+    MaterialSample material;
 
     // in worldspace
     float3 get_face_normal() {

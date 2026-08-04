@@ -427,6 +427,7 @@ struct Scene {
         sp.pos = surface.pos;
         sp.prev_pos = prev_pos;
         sp.enc_face_normal = encode_normal(surface.face_normal);
+        sp.has_surface = true;
         sp.material = material_system.get_material_sample(surface.material_id, sd, sp.emission,
                                                           sp.shading_frame, lod);
         return sp;
@@ -467,7 +468,7 @@ struct Scene {
         sp.enc_face_normal = encode_normal(-ray.Direction);
         sp.emission = env_map.eval(sd, material_system.texture_manager, lod);
         sp.shading_frame = OrthonormalFrame(-ray.Direction);
-        sp.material = none;
+        sp.has_surface = false;
         return sp;
     }
 

@@ -158,7 +158,8 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<SSMMBinding> params) {
         const RayDesc primary_ray = scene.generate_camera_ray(pixel, resolution);
         const ShadingPoint sp = scene.get_shading_point(primary_ray, first_hit);
 
-        if (let material = sp.material) {
+        if (sp.has_surface) {
+            let material = sp.material;
             const OrthonormalFrame frame = sp.shading_frame;
             let bsdf = material.get_bsdf();
             const float3 wi = -primary_ray.Direction;

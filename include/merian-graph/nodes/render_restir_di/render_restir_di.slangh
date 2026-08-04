@@ -186,9 +186,9 @@ RestirSurface restir_surface(const ParameterBlock<Scene> scene,
 float restir_target_pdf(const RestirSample y,
                         const RestirSurface surface,
                         inout RandomGenerator rng) {
-    if (!surface.valid || !surface.sp.material.hasValue)
+    if (!surface.valid || !surface.sp.has_surface)
         return 0;
-    let material = surface.sp.material.value;
+    let material = surface.sp.material;
 
     const float3 to_light = y.pos - surface.sp.pos;
     const float dist2 = dot(to_light, to_light);

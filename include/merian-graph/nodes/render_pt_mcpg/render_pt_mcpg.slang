@@ -57,9 +57,9 @@ float3 trace_path(const ParameterBlock<Scene> scene,
 
     for (uint16_t bounce = 1; bounce < merian_render_max_path_length; bounce++) {
         // no material: the ray left the scene, its emission is already accumulated
-        if (!sp.material.hasValue || all(throughput < SCENE_THROUGHPUT_THRESHOLD))
+        if (!sp.has_surface || all(throughput < SCENE_THROUGHPUT_THRESHOLD))
             break;
-        let material = sp.material.value;
+        let material = sp.material;
 
         const float3 cur_pos = sp.pos;
         // temporally reproject the cache lookup for the first sample so the lobe written last
