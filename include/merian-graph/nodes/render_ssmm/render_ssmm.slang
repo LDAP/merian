@@ -158,10 +158,9 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<SSMMBinding> params) {
         const RayDesc primary_ray = scene.generate_camera_ray(pixel, resolution);
         const ShadingPoint sp = scene.get_shading_point(primary_ray, first_hit);
 
-        if (sp.has_surface) {
-            let material = sp.material;
+        if (sp.has_surface_material) {
             const OrthonormalFrame frame = sp.shading_frame;
-            let bsdf = material.get_bsdf();
+            let bsdf = sp.surface_material.get_bsdf();
             const float3 wi = -primary_ray.Direction;
             const float3 wi_local = frame.to_local(wi);
             const float3 normal = frame.to_world(float3(0, 0, 1));
@@ -172,8 +171,8 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<SSMMBinding> params) {
                 sample_dirs[s] = float3(0);
                 sample_weights[s] = float3(0);
 
-                read_neighbour_state(params.gbuffer, scene.camera.position, resolution, tent, sp.pos,
-                                     normal, int2(pixel), mv, rng);
+                read_neighbour_state(params.gbuffer, scene.camera.position, resolution, tent,
+                                     sp.pos, normal, int2(pixel), mv, rng);
 
                 vmfs[s] = float4(0);
                 if (mc_state_valid(tent))
@@ -203,13 +202,14 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<SSMMBinding> params) {
                     const float3 throughput = bsdf.eval(wi_local, frame.to_local(direction), rng);
 
                     RayDesc ray;
-                    // Pull back the ray such that it cannot excape through corners (and to prevent self collision)
+                    // Pull back the ray such that it cannot excape through corners (and to
+                    // prevent self collision)
                     ray.Origin = sp.pos + wi * 1e-3;
                     ray.Direction = direction;
                     ray.TMin = SCENE_RAY_TMIN;
                     ray.TMax = SCENE_RAY_TMAX;
-                    const ShadingPoint next_sp =
-                        scene.trace_and_get_shading_point(ray, 0xffu, RenderContext(uint16_t(1), 1.0f));
+                    const ShadingPoint next_sp = scene.trace_and_get_shading_point(
+                        ray, 0xffu, RenderContext(uint16_t(1), 1.0f));
 
                     position = next_sp.pos;
                     directContrib = throughput * next_sp.emission / pdf;
@@ -239,8 +239,9 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<SSMMBinding> params) {
                 const float bsdf_pdf = bsdf.pdf(wi_local, frame.to_local(sample_dirs[s]));
                 float sum_pdf = 0;
                 for (int t = 0; t < merian_ssmm_spp; t++) {
-                    sum_pdf += vmfs[t].w > 0 ? vmf_pdf_tokuyoshi(sample_dirs[s], vmfs[t].xyz, vmfs[t].w)
-                                             : bsdf_pdf;
+                    sum_pdf += vmfs[t].w > 0
+                                   ? vmf_pdf_tokuyoshi(sample_dirs[s], vmfs[t].xyz, vmfs[t].w)
+                                   : bsdf_pdf;
                 }
 
                 sum_pdf = merian_ssmm_bsdf_p * merian_ssmm_smis_group_size * bsdf_pdf +

@@ -32,11 +32,11 @@ extern static const float merian_hint_min_roughness = 0.0316f;
 interface MaterialModel {
     associatedtype MaterialSampleImpl : MaterialSample;
 
-    // Emission and the shading frame are returned separately: they describe the shading point,
-    // which exists with or without a surface, while the sample describes only how it scatters.
+    // Emission and the shading frame describe the shading point, which exists with or without a
+    // surface, so they are returned separately from the sample, which only describes scattering.
     MaterialSampleImpl get_sample(const ShadingData sd, const TextureManager texture_manager,
-                                  const LODSampler2D lod_sampler, out float3 emission,
-                                  out OrthonormalFrame shading_frame);
+                                  const LODSampler2D lod_sampler, out float3 out_emission,
+                                  out OrthonormalFrame out_shading_frame);
 }
 
 // This represents how the evaluated material at a point on a surface or in a volume scatters.

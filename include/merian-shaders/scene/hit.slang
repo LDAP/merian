@@ -108,11 +108,12 @@ struct ShadingPoint {
     float3 prev_pos; // in worldspace, mcpg only — see Scene::get_prev_world_position
     uint enc_face_normal;
     float3 emission;
-    // Where the ray left the scene this is view-facing; the BSDF-local axes stay meaningful.
+    // view-facing where the ray left the scene
     OrthonormalFrame shading_frame;
-    // false where the ray left the scene: `material` is then unset and must not be read.
-    bool has_surface;
-    MaterialSample material;
+    // false where the ray left the scene; surface_material is then unset and must not be read.
+    // Optional<MaterialSample> does not compile as efficiently.
+    bool has_surface_material;
+    MaterialSample surface_material;
 
     // in worldspace
     float3 get_face_normal() {

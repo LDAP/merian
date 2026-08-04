@@ -32,14 +32,13 @@ float3 trace_path(const ParameterBlock<Scene> scene,
     float3 current_absorption = float3(0.0f);
 
     for (int bounce = 1; bounce < merian_render_max_path_length; bounce++) {
-        // no material: the ray left the scene, its emission is already accumulated
-        if (!sp.has_surface || all(throughput < SCENE_THROUGHPUT_THRESHOLD)) {
+        // the ray left the scene: nothing to scatter from, emission is already accumulated
+        if (!sp.has_surface_material || all(throughput < SCENE_THROUGHPUT_THRESHOLD)) {
             break;
         }
-        let material = sp.material;
 
         const OrthonormalFrame frame = sp.shading_frame;
-        let bsdf = material.get_bsdf();
+        let bsdf = sp.surface_material.get_bsdf();
         const float3 wi_local = frame.to_local(-ray.Direction);
         let sample = bsdf.sample_eval(wi_local, rng);
         if (!sample.hasValue) {
@@ -59,8 +58,8 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         // A transmission event crosses the surface; update the medium we are now in.
         const bool transmission = wi_local.z * bs.wo.z < 0.f;
         if (transmission) {
-            current_ior /= material.get_eta();
-            current_absorption = material.get_absorption();
+            current_ior /= sp.surface_material.get_eta();
+            current_absorption = sp.surface_material.get_absorption();
         }
 
         if (let next = sp.make_ray(-ray.Direction, wo, transmission)) {

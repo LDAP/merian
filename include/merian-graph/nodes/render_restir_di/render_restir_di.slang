@@ -25,10 +25,9 @@ void generate(ParameterBlock<Scene> scene, ParameterBlock<RestirBinding> params)
     RestirReservoir reservoir = restir_reservoir_init();
 
     const RestirSurface surface = restir_surface(scene, params.gbuffer, pixel, dim);
-    if (surface.valid && surface.sp.has_surface) {
-        let material = surface.sp.material;
+    if (surface.valid && surface.sp.has_surface_material) {
         const OrthonormalFrame frame = surface.sp.shading_frame;
-        let bsdf = material.get_bsdf();
+        let bsdf = surface.sp.surface_material.get_bsdf();
         const float3 wi_local = frame.to_local(surface.wi);
 
         for (int s = 0; s < merian_restir_spp; s++) {
@@ -227,9 +226,8 @@ void shade(ParameterBlock<Scene> scene, ParameterBlock<RestirBinding> params) {
     const RestirReservoir reservoir = pc.reservoirs_in[restir_index(pixel, dim)];
 
     float3 irradiance = float3(0);
-    if (surface.valid && surface.sp.has_surface && restir_sample_valid(reservoir.y) &&
+    if (surface.valid && surface.sp.has_surface_material && restir_sample_valid(reservoir.y) &&
         !isnan(reservoir.w_sum_or_W) && !isinf(reservoir.w_sum_or_W)) {
-        let material = surface.sp.material;
         const float3 to_light = reservoir.y.pos - surface.sp.pos;
         const float dist2 = dot(to_light, to_light);
         const float3 wo = to_light * rsqrt(dist2);
@@ -242,7 +240,8 @@ void shade(ParameterBlock<Scene> scene, ParameterBlock<RestirBinding> params) {
 
         if (wo_local.z > 0 && wi_local.z > 0 && visible) {
             RandomGenerator rng = restir_rng(pixel);
-            const float3 f_cos = material.get_bsdf().eval(wi_local, wo_local, rng);
+            const float3 f_cos =
+                surface.sp.surface_material.get_bsdf().eval(wi_local, wo_local, rng);
             const float geo = (reservoir.y.flags & RestirSampleFlags::RestirSampleDistant) != 0
                                   ? 1.0f
                                   : max(dot(reservoir.y.normal, -wo), 0.0f) / dist2;

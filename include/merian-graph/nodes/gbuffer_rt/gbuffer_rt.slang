@@ -63,15 +63,15 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<WGBuffer> gbuffer) {
             const ShadingData sd = ShadingData(-ray.Direction, surface.pos, surface.uv, scene.time,
                                                frame, face_normal, uint16_t(0), 1.0f, front_facing);
             float3 mat_emission;
-            OrthonormalFrame mat_frame;
+            OrthonormalFrame mat_shading_frame;
             let mat = scene.material_system.get_material_sample(
-                surface.material_id, sd, mat_emission, mat_frame, GradLODSampler(ddx, ddy));
+                surface.material_id, sd, mat_emission, mat_shading_frame, GradLODSampler(ddx, ddy));
 
-            gbuffer.store_surface(pixel, mat_frame.get_normal(), linear_z, grad_z, delta_z);
+            gbuffer.store_surface(pixel, mat_shading_frame.get_normal(), linear_z, grad_z, delta_z);
             gbuffer.store_hit(pixel, hit);
             gbuffer.store_motion_vectors(pixel, mv);
             gbuffer.store_albedo(
-                pixel, mat.get_bsdf().get_albedo(mat_frame.to_local(-ray.Direction)));
+                pixel, mat.get_bsdf().get_albedo(mat_shading_frame.to_local(-ray.Direction)));
             if (merian_gbuffer_write_emission)
                 emission[pixel] = float4(mat_emission, 0);
             return;
