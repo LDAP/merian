@@ -108,6 +108,8 @@ struct ShadingPoint {
     float3 prev_pos; // in worldspace, mcpg only — see Scene::get_prev_world_position
     uint enc_face_normal;
     float3 emission;
+    // Where the ray left the scene this is view-facing; the BSDF-local axes stay meaningful.
+    OrthonormalFrame shading_frame;
     // none where the ray left the scene: there is no surface and no BSDF to scatter from.
     Optional<MaterialSample> material;
 
@@ -116,20 +118,10 @@ struct ShadingPoint {
         return decode_normal(enc_face_normal);
     }
 
-    // Without a surface the face normal already faces the viewer, so it spans the frame.
-    property OrthonormalFrame shading_frame {
-        get {
-            if (let m = material)
-                return m.shading_frame;
-            return OrthonormalFrame(get_face_normal());
-        }
-    }
-
+    // the (representative) shading normal in world space. I.e. to guide a denoiser.
     property float3 shading_normal {
         get {
-            if (let m = material)
-                return m.shading_normal;
-            return get_face_normal();
+            return shading_frame.get_normal();
         }
     }
 

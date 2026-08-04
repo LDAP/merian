@@ -159,7 +159,7 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<SSMMBinding> params) {
         const ShadingPoint sp = scene.get_shading_point(primary_ray, first_hit);
 
         if (let material = sp.material) {
-            const OrthonormalFrame frame = material.shading_frame;
+            const OrthonormalFrame frame = sp.shading_frame;
             let bsdf = material.get_bsdf();
             const float3 wi = -primary_ray.Direction;
             const float3 wi_local = frame.to_local(wi);

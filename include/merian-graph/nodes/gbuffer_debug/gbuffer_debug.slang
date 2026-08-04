@@ -55,7 +55,7 @@ void main(uint3 tid: SV_DispatchThreadID,
         float3 albedo = float3(0);
         if (let material = sp.material) {
             albedo = material.get_bsdf()
-                         .get_albedo(material.shading_frame.to_local(-ray.Direction))
+                         .get_albedo(sp.shading_frame.to_local(-ray.Direction))
                          .reflection;
         }
         color = float4(albedo * (ambient + (1.f - ambient) * ndotl) + sp.emission, 1);

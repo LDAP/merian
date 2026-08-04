@@ -38,7 +38,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         }
         let material = sp.material.value;
 
-        const OrthonormalFrame frame = material.shading_frame;
+        const OrthonormalFrame frame = sp.shading_frame;
         let bsdf = material.get_bsdf();
         const float3 wi_local = frame.to_local(-ray.Direction);
         let sample = bsdf.sample_eval(wi_local, rng);

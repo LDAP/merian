@@ -65,7 +65,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         // temporally reproject the cache lookup for the first sample so the lobe written last
         // frame is found despite geometry motion
         const float3 lookup_pos = select(sample_i == 0, sp.prev_pos, cur_pos);
-        const OrthonormalFrame frame = material.shading_frame;
+        const OrthonormalFrame frame = sp.shading_frame;
         const float3 normal = frame.get_normal();
         let m_bsdf = material.get_bsdf();
         const float3 wi_local = frame.to_local(-ray.Direction);

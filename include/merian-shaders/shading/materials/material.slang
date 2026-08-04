@@ -32,22 +32,17 @@ extern static const float merian_hint_min_roughness = 0.0316f;
 interface MaterialModel {
     associatedtype MaterialSampleImpl : MaterialSample;
 
-    // Emission is returned separately because it belongs to the shading point, not to the
-    // scattering behaviour — points without a surface (env map) carry emission but no sample.
+    // Emission and the shading frame are returned separately: they describe the shading point,
+    // which exists with or without a surface, while the sample describes only how it scatters.
     MaterialSampleImpl get_sample(const ShadingData sd, const TextureManager texture_manager,
-                                  const LODSampler2D lod_sampler, out float3 emission);
+                                  const LODSampler2D lod_sampler, out float3 emission,
+                                  out OrthonormalFrame shading_frame);
 }
 
-// This represents the evaluated material at a point on a surface or in a volume — normals,
-// textures, etc. are resolved here.
+// This represents how the evaluated material at a point on a surface or in a volume scatters.
 interface MaterialSample {
 
     associatedtype BSDFImpl : BSDF;
-
-    // The local shading frame (for surfaces).
-    property OrthonormalFrame shading_frame {
-        get;
-    }
 
     // The BSDF for this Material. BSDFs assume a local tangent space with n = (0,
     // 0, 1), t = (1, 0, 0), b = (0, 1, 0). The incident and outgoing direction point away from the
@@ -55,11 +50,6 @@ interface MaterialSample {
     BSDFImpl get_bsdf();
 
     // ------------------------------------------
-
-    // the (representative) shading normal in world space. I.e. to guide a denoiser.
-    property float3 shading_normal {
-        get;
-    }
 
     // Relative IOR (incident / transmitted) at this surface; 1.0 for opaque materials. The
     // integrator multiplies the medium IOR by 1/eta after a transmission event.

@@ -75,7 +75,8 @@ struct PBRTMaterial<let TRANSMISSION : bool = false,
     PBRTMaterialSample get_sample(const ShadingData sd,
                                  const TextureManager tm,
                                  const LODSampler2D lod,
-                                 out float3 out_emission) {
+                                 out float3 out_emission,
+                                 out OrthonormalFrame out_shading_frame) {
         const LOD0Sampler lod0;
 
         float3 base = base_color;
@@ -156,7 +157,7 @@ struct PBRTMaterial<let TRANSMISSION : bool = false,
 
         PBRTMaterialSample s;
         s.brdf = PBRTBSDF(with_coat, SheenBRDF(sheen_col, sheen_rough), sw);
-        s.shading_frame = shading_frame;
+        out_shading_frame = shading_frame;
         out_emission = emission_out;
         s.eta = eta;
         return s;
@@ -167,15 +168,10 @@ struct PBRTMaterialSample : MaterialSample {
     typealias BSDFImpl = PBRTBSDF;
 
     PBRTBSDF brdf;
-    OrthonormalFrame shading_frame;
     float eta;
 
     BSDFImpl get_bsdf() {
         return brdf;
-    }
-
-    property float3 shading_normal {
-        get { return shading_frame.get_normal(); }
     }
 
     override float get_eta() {

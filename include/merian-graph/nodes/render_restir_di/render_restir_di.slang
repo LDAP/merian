@@ -27,7 +27,7 @@ void generate(ParameterBlock<Scene> scene, ParameterBlock<RestirBinding> params)
     const RestirSurface surface = restir_surface(scene, params.gbuffer, pixel, dim);
     if (surface.valid && surface.sp.material.hasValue) {
         let material = surface.sp.material.value;
-        const OrthonormalFrame frame = material.shading_frame;
+        const OrthonormalFrame frame = surface.sp.shading_frame;
         let bsdf = material.get_bsdf();
         const float3 wi_local = frame.to_local(surface.wi);
 
@@ -233,7 +233,7 @@ void shade(ParameterBlock<Scene> scene, ParameterBlock<RestirBinding> params) {
         const float3 to_light = reservoir.y.pos - surface.sp.pos;
         const float dist2 = dot(to_light, to_light);
         const float3 wo = to_light * rsqrt(dist2);
-        const OrthonormalFrame frame = material.shading_frame;
+        const OrthonormalFrame frame = surface.sp.shading_frame;
         const float3 wi_local = frame.to_local(surface.wi);
         const float3 wo_local = frame.to_local(wo);
 

@@ -196,7 +196,7 @@ float restir_target_pdf(const RestirSample y,
         return 0;
     const float3 wo = to_light * rsqrt(dist2);
 
-    const OrthonormalFrame frame = material.shading_frame;
+    const OrthonormalFrame frame = surface.sp.shading_frame;
     const float3 wo_local = frame.to_local(wo);
     if (wo_local.z <= 0)
         return 0;
