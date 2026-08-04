@@ -19,10 +19,10 @@ class GBufferObject : public GraphShaderObject {
 
     void allocate(const ShaderObjectAllocateInfo& info) override {
         constexpr std::array<vk::Format, tex_count> formats = {
-            vk::Format::eR32G32B32A32Uint,   // surface
-            vk::Format::eR32G32B32A32Uint,   // hit info
-            vk::Format::eR16G16Sfloat,       // motion vectors
-            vk::Format::eR32G32B32A32Sfloat, // albedo
+            vk::Format::eR32G32Uint,          // surface: normal, grad_z
+            vk::Format::eR32G32B32A32Uint,    // hit info
+            vk::Format::eR16G16B16A16Sfloat,  // motion vectors, linear_z, delta_z
+            vk::Format::eR32G32B32A32Sfloat,  // albedo
         };
 
         gbuffer =

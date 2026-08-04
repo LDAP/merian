@@ -67,9 +67,9 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<WGBuffer> gbuffer) {
             let mat = scene.material_system.get_material_sample(
                 surface.material_id, sd, mat_emission, mat_shading_frame, GradLODSampler(ddx, ddy));
 
-            gbuffer.store_surface(pixel, mat_shading_frame.get_normal(), linear_z, grad_z, delta_z);
+            gbuffer.store_surface(pixel, mat_shading_frame.get_normal(), linear_z, grad_z, delta_z,
+                                  mv);
             gbuffer.store_hit(pixel, hit);
-            gbuffer.store_motion_vectors(pixel, mv);
             gbuffer.store_albedo(
                 pixel, mat.get_bsdf().get_albedo(mat_shading_frame.to_local(-ray.Direction)));
             if (merian_gbuffer_write_emission)
@@ -83,9 +83,8 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<WGBuffer> gbuffer) {
     const float linear_z = length(sp.pos - ray.Origin);
     const float2 mv = scene.compute_motion_vector(sp.pos, sp.pos, pixel, dim);
 
-    gbuffer.store_surface(pixel, sp.shading_normal, linear_z, half2(0), 0);
+    gbuffer.store_surface(pixel, sp.shading_normal, linear_z, half2(0), 0, mv);
     gbuffer.store_hit(pixel, hit);
-    gbuffer.store_motion_vectors(pixel, mv);
     gbuffer.store_albedo(pixel, Albedo(sp.emission));
     if (merian_gbuffer_write_emission)
         emission[pixel] = float4(sp.emission, 0);
