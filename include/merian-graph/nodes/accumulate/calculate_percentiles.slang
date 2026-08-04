@@ -22,8 +22,7 @@ Sampler2D<float4> in_src;
 // percentile pass result, bound by the node
 RWTexture2D<float4> quartiles;
 
-groupshared float luminance[workgroup_size_x * workgroup_size_y];
-groupshared float percentile[4];
+groupshared float sort[workgroup_size_x * workgroup_size_y];
 
 [numthreads(workgroup_size_x, workgroup_size_y, 1)]
 [shader("compute")]
@@ -31,40 +30,40 @@ void main(uint3 gl_WorkGroupID: SV_GroupID,
           uint3 gl_GlobalInvocationID: SV_DispatchThreadID,
           uint group_index: SV_GroupIndex) {
 
-    const uint workgroup_size = uint(workgroup_size_x * workgroup_size_y);
+    const uint n = uint(workgroup_size_x * workgroup_size_y);
     const int2 pixel = min(gl_GlobalInvocationID.xy, int2(merian::texture_dimensions(in_src)) - 1);
-
-    const float own = merian::yuv_luminance(in_src[pixel].rgb);
-    luminance[group_index] = own;
-    if (group_index < 4)
-        percentile[group_index] = 0.0; // a NaN input leaves its rank unclaimed
+    sort[group_index] = merian::yuv_luminance(in_src[pixel].rgb);
     GroupMemoryBarrierWithGroupSync();
 
-    // Only four order statistics are needed, so each thread ranks its own value rather than the
-    // group sorting itself.
-    uint rank = 0;
-    for (uint i = 0; i < workgroup_size; i++) {
-        const float other = luminance[i];
-        rank += uint(other < own || (other == own && i < group_index));
+    // Bitonic sorting network; n must be a power of two. Only the lower thread of each compared
+    // pair (ixj > group_index) writes both slots, so a stage has no intra-slot race.
+    for (uint k = 2; k <= n; k <<= 1) {
+        for (uint j = k >> 1; j > 0; j >>= 1) {
+            const uint ixj = group_index ^ j;
+            if (ixj > group_index) {
+                const float a = sort[group_index];
+                const float b = sort[ixj];
+                const bool ascending = (group_index & k) == 0;
+                if ((a > b) == ascending) {
+                    sort[group_index] = b;
+                    sort[ixj] = a;
+                }
+            }
+            GroupMemoryBarrierWithGroupSync();
+        }
     }
 
-    const float4 requested = float4(pc.firefly_percentile_lower, pc.firefly_percentile_upper,
-                                    pc.adaptive_alpha_percentile_lower,
-                                    pc.adaptive_alpha_percentile_upper);
-    const uint4 target = uint4(clamp(round(requested * workgroup_size), 0, workgroup_size - 1));
-
-    if (rank == target.x)
-        percentile[0] = own;
-    if (rank == target.y)
-        percentile[1] = own;
-    if (rank == target.z)
-        percentile[2] = own;
-    if (rank == target.w)
-        percentile[3] = own;
-    GroupMemoryBarrierWithGroupSync();
-
     if (group_index == 0) {
-        quartiles.Store(gl_WorkGroupID.xy,
-                        float4(percentile[0], percentile[1], percentile[2], percentile[3]));
+        const float firefly_lower =
+            sort[uint(clamp(round(pc.firefly_percentile_lower * n), 0, n - 1))];
+        const float firefly_upper =
+            sort[uint(clamp(round(pc.firefly_percentile_upper * n), 0, n - 1))];
+        const float adaptive_alpha_lower =
+            sort[uint(clamp(round(pc.adaptive_alpha_percentile_lower * n), 0, n - 1))];
+        const float adaptive_alpha_upper =
+            sort[uint(clamp(round(pc.adaptive_alpha_percentile_upper * n), 0, n - 1))];
+
+        quartiles.Store(gl_WorkGroupID.xy, float4(firefly_lower, firefly_upper,
+                                                  adaptive_alpha_lower, adaptive_alpha_upper));
     }
 }
