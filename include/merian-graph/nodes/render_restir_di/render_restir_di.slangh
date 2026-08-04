@@ -186,7 +186,7 @@ RestirSurface restir_surface(const ParameterBlock<Scene> scene,
 float restir_target_pdf(const RestirSample y,
                         const RestirSurface surface,
                         inout RandomGenerator rng) {
-    if (!surface.valid)
+    if (!surface.valid || !surface.sp.has_surface_material)
         return 0;
 
     const float3 to_light = y.pos - surface.sp.pos;
@@ -195,13 +195,13 @@ float restir_target_pdf(const RestirSample y,
         return 0;
     const float3 wo = to_light * rsqrt(dist2);
 
-    const OrthonormalFrame frame = surface.sp.material.shading_frame;
+    const OrthonormalFrame frame = surface.sp.shading_frame;
     const float3 wo_local = frame.to_local(wo);
     if (wo_local.z <= 0)
         return 0;
 
     const float3 f_cos =
-        surface.sp.material.get_bsdf().eval(frame.to_local(surface.wi), wo_local, rng);
+        surface.sp.surface_material.get_bsdf().eval(frame.to_local(surface.wi), wo_local, rng);
     const float geo = (y.flags & RestirSampleFlags::RestirSampleDistant) != 0
                           ? 1.0f
                           : max(dot(y.normal, -wo), 0.0f) / dist2;

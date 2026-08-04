@@ -70,41 +70,4 @@ struct CubeMap : IEnvMap {
     }
 }
 
-struct EnvMaterialSample : MaterialSample {
-    typealias BSDFImpl = NullBSDF;
-
-    float3 _emission;
-    OrthonormalFrame _frame;
-
-    property float3 emission {
-        get { return _emission; }
-    }
-    property OrthonormalFrame shading_frame {
-        get { return _frame; }
-    }
-    property float3 shading_normal {
-        get { return _frame.get_normal(); }
-    }
-
-    BSDFImpl get_bsdf() {
-        return NullBSDF();
-    }
-
-    __init(const float3 env_emission, const float3 ray_direction) {
-        _emission = env_emission;
-        _frame = OrthonormalFrame(-ray_direction);
-    }
-}
-
-__generic<E : IEnvMap>
-extension E : merian::MaterialModel {
-    typealias MaterialSampleImpl = EnvMaterialSample;
-
-    EnvMaterialSample get_sample(const ShadingData sd,
-                                 const TextureManager tm,
-                                 const LODSampler2D lod) {
-        return EnvMaterialSample(eval(sd, tm, lod), -sd.wi);
-    }
-}
-
 }

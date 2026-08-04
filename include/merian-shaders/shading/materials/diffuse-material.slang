@@ -10,8 +10,13 @@ struct DiffuseMaterial : MaterialModel {
     MaterialHeader header;
     float4 base_color_factor;
 
-    DiffuseMaterialSample
-    get_sample(const ShadingData sd, const TextureManager tm, const LODSampler2D lod) {
+    DiffuseMaterialSample get_sample(const ShadingData sd,
+                                     const TextureManager tm,
+                                     const LODSampler2D lod,
+                                     out float3 out_emission,
+                                     out OrthonormalFrame out_shading_frame) {
+        out_emission = float3(0);
+        out_shading_frame = sd.frame.apply_normal_map(float3(0, 0, 1));
         float3 albedo = base_color_factor.rgb;
         if (let tex_id = header.get_alpha_texture_id()) {
             float4 tex_color = lod.sample(tm.get_sampler2D(tex_id), sd.uv);
@@ -19,7 +24,6 @@ struct DiffuseMaterial : MaterialModel {
         }
         DiffuseMaterialSample s;
         s.brdf = LambertDiffuseBRDF(albedo);
-        s.frame = sd.frame.apply_normal_map(float3(0, 0, 1));
         return s;
     }
 }
@@ -27,13 +31,9 @@ struct DiffuseMaterial : MaterialModel {
 struct DiffuseMaterialSample : MaterialSample {
     typealias BSDFImpl = LambertDiffuseBRDF;
     LambertDiffuseBRDF brdf;
-    OrthonormalFrame frame;
     BSDFImpl get_bsdf() {
         return brdf;
     }
-    property float3 emission { get { return float3(0); } }
-    property OrthonormalFrame shading_frame { get { return frame; } }
-    property float3 shading_normal { get { return frame.get_normal(); } }
 }
 
 }

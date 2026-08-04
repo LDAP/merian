@@ -62,16 +62,18 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<WGBuffer> gbuffer) {
 
             const ShadingData sd = ShadingData(-ray.Direction, surface.pos, surface.uv, scene.time,
                                                frame, face_normal, uint16_t(0), 1.0f, front_facing);
-            let mat = scene.material_system.get_material_sample(surface.material_id, sd,
-                                                                GradLODSampler(ddx, ddy));
+            float3 mat_emission;
+            OrthonormalFrame mat_shading_frame;
+            let mat = scene.material_system.get_material_sample(
+                surface.material_id, sd, mat_emission, mat_shading_frame, GradLODSampler(ddx, ddy));
 
-            gbuffer.store_surface(pixel, mat.shading_normal, linear_z, grad_z, delta_z);
+            gbuffer.store_surface(pixel, mat_shading_frame.get_normal(), linear_z, grad_z, delta_z);
             gbuffer.store_hit(pixel, hit);
             gbuffer.store_motion_vectors(pixel, mv);
             gbuffer.store_albedo(
-                pixel, mat.get_bsdf().get_albedo(mat.shading_frame.to_local(-ray.Direction)));
+                pixel, mat.get_bsdf().get_albedo(mat_shading_frame.to_local(-ray.Direction)));
             if (merian_gbuffer_write_emission)
-                emission[pixel] = float4(mat.emission, 0);
+                emission[pixel] = float4(mat_emission, 0);
             return;
         }
     }
@@ -81,12 +83,12 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<WGBuffer> gbuffer) {
     const float linear_z = length(sp.pos - ray.Origin);
     const float2 mv = scene.compute_motion_vector(sp.pos, sp.pos, pixel, dim);
 
-    gbuffer.store_surface(pixel, sp.material.shading_normal, linear_z, half2(0), 0);
+    gbuffer.store_surface(pixel, sp.shading_normal, linear_z, half2(0), 0);
     gbuffer.store_hit(pixel, hit);
     gbuffer.store_motion_vectors(pixel, mv);
-    gbuffer.store_albedo(pixel, Albedo(sp.material.emission));
+    gbuffer.store_albedo(pixel, Albedo(sp.emission));
     if (merian_gbuffer_write_emission)
-        emission[pixel] = float4(sp.material.emission, 0);
+        emission[pixel] = float4(sp.emission, 0);
 }
 
 } // namespace merian
