@@ -91,6 +91,7 @@ class RenderMCPG : public Node {
     bool missing_light_heuristic = true;
 
     uint32_t mc_adaptive_buffer_size = 32777259;
+    uint32_t mc_probe_count = 2;
     bool mc_split_hash_payload_storage = true;
     uint32_t mc_locality_bits = 3;
 
