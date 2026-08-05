@@ -201,6 +201,7 @@ void RenderMCPG::update_render_constants() {
                     "export static const uint lc_locality_bits = {}u;\n"
                     "export static const float lc_min_pdf = {:f};\n"
                     "export static const uint mc_adaptive_buffer_size = {}u;\n"
+                    "export static const uint mc_probe_count = {}u;\n"
                     "export static const bool mc_split_storage = {};\n"
                     "export static const uint mc_locality_bits = {}u;\n",
                     emission_on_primary ? "true" : "false", spp, max_path_length, mask,
@@ -209,8 +210,8 @@ void RenderMCPG::update_render_constants() {
                     reference_mode ? 0.0f : p_guiding, dir_guide_prior, debug_output_selector,
                     lc_buffer_size, lc_probe_count, lc_stochastic_interpolation ? "true" : "false",
                     lc_split_hash_payload_storage ? "true" : "false", lc_locality_bits, lc_min_pdf,
-                    mc_adaptive_buffer_size, mc_split_hash_payload_storage ? "true" : "false",
-                    mc_locality_bits));
+                    mc_adaptive_buffer_size, mc_probe_count,
+                    mc_split_hash_payload_storage ? "true" : "false", mc_locality_bits));
 }
 
 RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
@@ -254,6 +255,9 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
             "Flood the Markov chains with invalidated states when no light is detected.");
         bool recreate_mcpg = config.config_uint("adaptive grid buf size", mc_adaptive_buffer_size,
                                                 "Buffer size backing the hash grid.");
+        constants_changed |=
+            config.config_uint("MC probe count", mc_probe_count,
+                               "Slots probed before evicting (open addressing).", 1u, 32u);
         recreate_mcpg |=
             config.config_bool("split keys/payload", mc_split_hash_payload_storage,
                                "Store hash+stamp separately from the payload (probe-friendly) "
