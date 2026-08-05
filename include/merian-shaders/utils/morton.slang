@@ -20,6 +20,17 @@ uint morton_encode2d(in uint2 p) {
     return p.x | (p.y << 1);
 }
 
+// Interleaves the low 10 bits of each component.
+uint morton_encode3d(in uint3 p) {
+    p = p & 0x000003ff;
+    p = (p ^ (p << 16)) & 0x030000ff;
+    p = (p ^ (p <<  8)) & 0x0300f00f;
+    p = (p ^ (p <<  4)) & 0x030c30c3;
+    p = (p ^ (p <<  2)) & 0x09249249;
+
+    return p.x | (p.y << 1) | (p.z << 2);
+}
+
 uint morton_encode2d(const uint2 p, in uint width, in uint height) {
     width = next_power_of_two(width);
     height = next_power_of_two(height);

@@ -123,8 +123,10 @@ struct MCState {
     }
 };
 
-struct MCPG<let ADAPTIVE_BUFFER_SIZE : uint, let SPLIT_STORAGE : bool = true> {
-    HashGrid<MCState, ADAPTIVE_BUFFER_SIZE, 2, true, true, SPLIT_STORAGE> grid;
+struct MCPG<let ADAPTIVE_BUFFER_SIZE : uint,
+            let SPLIT_STORAGE : bool = true,
+            let LOCALITY_BITS : uint = 0> {
+    HashGrid<MCState, ADAPTIVE_BUFFER_SIZE, 2, true, true, SPLIT_STORAGE, 2, 1, LOCALITY_BITS> grid;
 
     float3 jitter_normal(const OrthonormalFrame shading_frame, inout RandomGenerator rng) {
         return shading_frame.to_world(sample_cos(rng));
