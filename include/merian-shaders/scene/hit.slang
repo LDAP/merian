@@ -112,6 +112,7 @@ struct ShadingPoint {
     OrthonormalFrame shading_frame;
     // false where the ray left the scene; surface_material is then unset and must not be read.
     // Optional<MaterialSample> does not compile as efficiently.
+    // see https://github.com/shader-slang/slang/issues/12338
     bool has_surface_material;
     MaterialSample surface_material;
 
