@@ -41,7 +41,21 @@ uint percentile_index(const float requested, const uint n) {
 // ! For rank-select, packed key we delete 6 bits of the mantissa -> can pick a different value only among luminances
 // within 2^-17 relative.
 
-#if 1 // rank-select, packed key
+#define PERCENTILE_RANK_PACKED_KEY 0
+#define PERCENTILE_RANK_EXACT 1
+#define PERCENTILE_BITONIC_WAVE 2
+#define PERCENTILE_BITONIC_SHARED 3
+
+// Define PERCENTILE_STRATEGY to benchmark another one.
+#ifndef PERCENTILE_STRATEGY
+#ifdef MERIAN_TARGET_VENDOR_AMD
+#define PERCENTILE_STRATEGY PERCENTILE_BITONIC_SHARED
+#else
+#define PERCENTILE_STRATEGY PERCENTILE_RANK_PACKED_KEY
+#endif
+#endif
+
+#if PERCENTILE_STRATEGY == PERCENTILE_RANK_PACKED_KEY
 
 groupshared uint key[workgroup_size_x * workgroup_size_y];
 groupshared float percentile[4];
@@ -74,7 +88,7 @@ float4 compute_percentiles(const float own, const uint group_index, const uint n
 
 #endif
 
-#if 0 // rank-select, float compare
+#if PERCENTILE_STRATEGY == PERCENTILE_RANK_EXACT
 
 groupshared float luminance[workgroup_size_x * workgroup_size_y];
 groupshared float percentile[4];
@@ -108,44 +122,57 @@ float4 compute_percentiles(const float own, const uint group_index, const uint n
 
 #endif
 
-#if 0 // bitonic, wave-shuffle
+#if PERCENTILE_STRATEGY == PERCENTILE_BITONIC_WAVE
 
 groupshared float exchange[workgroup_size_x * workgroup_size_y];
 groupshared float percentile[4];
+groupshared uint wave_counter;
 
 float4 compute_percentiles(const float own_in, const uint group_index, const uint n) {
+    // Which sorted position a thread ends up holding is arbitrary, so take it from the wave and
+    // lane the thread runs on rather than from the group index - nothing ties the two together.
+    // The partner of a stage that stays inside the wave is then in this wave by construction.
+    if (group_index == 0)
+        wave_counter = 0;
+    GroupMemoryBarrierWithGroupSync();
+
+    uint wave = 0;
+    if (WaveIsFirstLane())
+        InterlockedAdd(wave_counter, 1, wave);
+    wave = WaveReadLaneFirst(wave);
+
     const uint lane = WaveGetLaneIndex();
     const uint lane_count = WaveGetLaneCount();
+    const uint position = wave * lane_count + lane;
 
-    // A stage whose partner lies inside the wave exchanges through the register file; only strides
-    // at or above the wave width need shared memory and a barrier (one of the 21 stages at wave32,
-    // none at wave64). Assumes lanes carry contiguous group indices.
+    // Only strides at or above the wave width need shared memory and a barrier (one of the 21
+    // stages at wave32, none at wave64).
     float own = own_in;
     for (uint k = 2; k <= n; k <<= 1) {
         for (uint j = k >> 1; j > 0; j >>= 1) {
             float other;
             if (j >= lane_count) {
                 GroupMemoryBarrierWithGroupSync();
-                exchange[group_index] = own;
+                exchange[position] = own;
                 GroupMemoryBarrierWithGroupSync();
-                other = exchange[group_index ^ j];
+                other = exchange[position ^ j];
             } else {
                 other = WaveShuffle(own, lane ^ j);
             }
-            const bool ascending = (group_index & k) == 0;
-            const bool keep_min = ((group_index & j) == 0) == ascending;
+            const bool ascending = (position & k) == 0;
+            const bool keep_min = ((position & j) == 0) == ascending;
             own = keep_min ? min(own, other) : max(own, other);
         }
     }
 
-    // Each thread now holds the value at sorted position group_index.
-    if (group_index == percentile_index(pc.firefly_percentile_lower, n))
+    // Each thread now holds the value at its own sorted position.
+    if (position == percentile_index(pc.firefly_percentile_lower, n))
         percentile[0] = own;
-    if (group_index == percentile_index(pc.firefly_percentile_upper, n))
+    if (position == percentile_index(pc.firefly_percentile_upper, n))
         percentile[1] = own;
-    if (group_index == percentile_index(pc.adaptive_alpha_percentile_lower, n))
+    if (position == percentile_index(pc.adaptive_alpha_percentile_lower, n))
         percentile[2] = own;
-    if (group_index == percentile_index(pc.adaptive_alpha_percentile_upper, n))
+    if (position == percentile_index(pc.adaptive_alpha_percentile_upper, n))
         percentile[3] = own;
     GroupMemoryBarrierWithGroupSync();
 
@@ -154,7 +181,7 @@ float4 compute_percentiles(const float own_in, const uint group_index, const uin
 
 #endif
 
-#if 0 // bitonic, shared memory
+#if PERCENTILE_STRATEGY == PERCENTILE_BITONIC_SHARED
 
 groupshared float sort[workgroup_size_x * workgroup_size_y];
 

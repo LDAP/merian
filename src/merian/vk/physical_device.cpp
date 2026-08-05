@@ -210,6 +210,11 @@ PhysicalDevice::PhysicalDevice(const InstanceHandle& instance,
     for (const auto& cap : supported_spirv_capabilities) {
         shader_defines.emplace(std::string(SHADER_DEFINE_PREFIX_SPIRV_CAP) + cap, "1");
     }
+    // For shaders that choose between implementations with equal results but different
+    // architectural tradeoffs.
+    if (const char* vendor = get_vendor_name(); vendor != nullptr) {
+        shader_defines.emplace(std::string(SHADER_DEFINE_PREFIX_TARGET_VENDOR) + vendor, "1");
+    }
 }
 
 PhysicalDeviceHandle PhysicalDevice::create(const InstanceHandle& instance,

@@ -111,6 +111,12 @@ Device::Device(
         shader_defines.emplace(std::string(SHADER_DEFINE_PREFIX_SPIRV_CAP) + cap, "1");
     }
 
+    // For shaders that choose between implementations with equal results but different
+    // architectural tradeoffs.
+    if (const char* vendor = physical_device->get_vendor_name(); vendor != nullptr) {
+        shader_defines.emplace(std::string(SHADER_DEFINE_PREFIX_TARGET_VENDOR) + vendor, "1");
+    }
+
     vk_get_device_proc_addr =
         PFN_vkGetDeviceProcAddr(vkGetDeviceProcAddr(device, "vkGetDeviceProcAddr"));
 }
