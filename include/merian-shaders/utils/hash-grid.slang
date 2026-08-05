@@ -127,8 +127,12 @@ struct HashGrid<typename T,
     }
 
     // Slot from the key, so the hashed-in normal also selects the bucket.
+    // Makes blocks of PROBE_COUNT slots compute the same starting index into the buffer for coalescing memory accesses.
     uint buffer_index(const uint key) {
-        return key % BUFFER_SIZE;
+        const uint slot = key % BUFFER_SIZE;
+        if ((PROBE_COUNT & (PROBE_COUNT - 1u)) != 0)
+            return slot;
+        return slot & ~(PROBE_COUNT - 1u);
     }
 
     // Spatial (normal-less) slot, for debug coloring by cell.
