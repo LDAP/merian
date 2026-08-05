@@ -29,20 +29,23 @@ uint percentile_index(const float requested, const uint n) {
 }
 
 // Four interchangeable implementations of the same four order statistics; enable exactly one.
-// The tile is 8x8 = 64 values, so both vendors run it as two wave32 groups.
+// The tile is 8x8 = 64 values: NVIDIA runs it as two wave32 groups, RDNA3 as one wave64 group.
 //
-// Percentile pass at 1080p, quake mcpg, NVIDIA 5070 Laptop (n=3), against the RDNA3 numbers from
-// abl/percentile-bitonic:
+// Percentile pass, quake mcpg. NVIDIA 5070 Laptop at 1080p (n=3); RX 7900 XTX (RADV) at wave64:
 //
 //                                     5070 Laptop      RX 7900 XTX
-//   rank-select, packed key             0.1067 ms        ?
+//   rank-select, packed key             0.1067 ms        0.0310 ms
 //   rank-select, float compare          0.1550 ms        0.0451 ms
-//   bitonic, wave-shuffle               0.2078 ms        ?
+//   bitonic, wave-shuffle               0.2078 ms        0.0333 ms
 //   bitonic, shared memory              0.3288 ms        0.0256 ms
 //
-// 0.1067 ms is what reading the input and writing one texel per tile costs on its own, so on
-// NVIDIA the selection is free. All four agree with a full sort; the packed key can pick a
-// different value only among luminances within 2^-17 relative (worst case 6.7e-6 over 1e5 tiles).
+// The order inverts across vendors: shared-memory bitonic is fastest on RDNA3 yet slowest on
+// NVIDIA, and it leads on RDNA3 only at wave64 (0.0395 ms at wave32). The packed key is
+// wave-size-insensitive (0.0296 ms at wave32) and on NVIDIA costs no more than reading the input
+// and writing one texel, so selection is free there; it is the default for that robustness.
+//
+// All four agree with a full sort; the packed key can pick a different value only among luminances
+// within 2^-17 relative (worst case 6.7e-6 over 1e5 tiles).
 
 #if 1 // rank-select, packed key
 
@@ -56,8 +59,6 @@ float4 compute_percentiles(const float own, const uint group_index, const uint n
     // compare per value.
     const uint own_key = (asuint(max(own, 0.0)) & ~(n - 1)) | group_index;
     key[group_index] = own_key;
-    if (group_index < 4)
-        percentile[group_index] = 0.0; // a NaN input leaves its rank unclaimed
     GroupMemoryBarrierWithGroupSync();
 
     uint rank = 0;
@@ -123,9 +124,9 @@ float4 compute_percentiles(const float own_in, const uint group_index, const uin
     const uint lane = WaveGetLaneIndex();
     const uint lane_count = WaveGetLaneCount();
 
-    // A stage whose partner lies inside the wave exchanges through the register file, so only
-    // strides at or above the wave width need shared memory and a barrier - one of the 21 stages
-    // for a 64-value tile. Assumes lanes carry contiguous group indices.
+    // A stage whose partner lies inside the wave exchanges through the register file; only strides
+    // at or above the wave width need shared memory and a barrier (one of the 21 stages at wave32,
+    // none at wave64). Assumes lanes carry contiguous group indices.
     float own = own_in;
     for (uint k = 2; k <= n; k <<= 1) {
         for (uint j = k >> 1; j > 0; j >>= 1) {
