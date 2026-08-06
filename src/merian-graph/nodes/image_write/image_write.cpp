@@ -151,7 +151,7 @@ ImageWrite::process(const NodeIO& io, const NodeProcessInfo& info, Submission& s
 
     // CHECK PATH
     const ImageHandle src = io[con_src];
-    vk::Extent3D scaled = max(src->get_extent() * scale, {1, 1, 1});
+    const vk::Extent3D scaled = max(src->get_extent() * scale, {1, 1, 1});
     fmt::dynamic_format_arg_store<fmt::format_context> arg_store;
     get_format_args([&](const auto& arg) { arg_store.push_back(arg); }, src->get_extent(), scaled,
                     info.get_iteration(), graph_time_since_record, graph_time,
@@ -181,10 +181,8 @@ ImageWrite::process(const NodeIO& io, const NodeProcessInfo& info, Submission& s
 
     const vk::Format format =
         format_is_float(this->format) ? vk::Format::eR32G32B32A32Sfloat : vk::Format::eR8G8B8A8Srgb;
-    const vk::FormatProperties format_properties =
-        context->get_physical_device()->get_physical_device().getFormatProperties(format);
 
-    vk::ImageCreateInfo linear_info{
+    const vk::ImageCreateInfo intermediate_info{
         {},
         vk::ImageType::e2D,
         format,
@@ -192,84 +190,63 @@ ImageWrite::process(const NodeIO& io, const NodeProcessInfo& info, Submission& s
         1,
         1,
         vk::SampleCountFlagBits::e1,
-        vk::ImageTiling::eLinear,
-        vk::ImageUsageFlagBits::eTransferDst,
+        vk::ImageTiling::eOptimal,
+        vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc,
         vk::SharingMode::eExclusive,
         {},
         {},
         vk::ImageLayout::eUndefined,
     };
-    ImageHandle linear_image =
-        allocator->create_image(linear_info, MemoryMappingType::HOST_ACCESS_RANDOM);
-    cmd->barrier(vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eTransfer,
-                 linear_image->barrier(vk::ImageLayout::eTransferDstOptimal, {},
-                                       vk::AccessFlagBits::eTransferWrite));
+    const ImageHandle intermediate_image = allocator->create_image(intermediate_info);
+    const BufferHandle staging_buffer = allocator->create_buffer(
+        Image::format_size(format) * scaled.width * scaled.height,
+        vk::BufferUsageFlagBits::eTransferDst, MemoryMappingType::HOST_ACCESS_RANDOM);
 
-    if (format_properties.linearTilingFeatures & vk::FormatFeatureFlagBits::eBlitDst) {
-        // blit directly onto the linear image
-        MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "blit to linear image");
-        cmd_blit_stretch(cmd, src, src->get_current_layout(), src->get_extent(), linear_image,
-                         vk::ImageLayout::eTransferDstOptimal, linear_image->get_extent());
+    {
+        MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "blit to intermediate image");
 
-    } else {
-        // cannot blit directly to the linear image with the desired format
-        // therefore blit first onto a optimal tiled image and then copy to linear tiled image.
-        vk::ImageCreateInfo intermediate_info{
-            {},
-            vk::ImageType::e2D,
-            format,
-            scaled,
-            1,
-            1,
-            vk::SampleCountFlagBits::e1,
-            vk::ImageTiling::eOptimal,
-            vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc,
-            vk::SharingMode::eExclusive,
-            {},
-            {},
-            vk::ImageLayout::eUndefined,
-        };
-        ImageHandle intermediate_image = allocator->create_image(intermediate_info);
-
-        {
-            MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "blit to optimal tiled image");
-
-            cmd->barrier(vk::PipelineStageFlagBits::eTopOfPipe,
-                         vk::PipelineStageFlagBits::eTransfer,
-                         intermediate_image->barrier(vk::ImageLayout::eTransferDstOptimal, {},
-                                                     vk::AccessFlagBits::eTransferWrite));
-            cmd_blit_stretch(cmd, src, src->get_current_layout(), src->get_extent(),
-                             intermediate_image, vk::ImageLayout::eTransferDstOptimal,
-                             intermediate_image->get_extent());
-            cmd->barrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer,
-                         intermediate_image->barrier(vk::ImageLayout::eTransferSrcOptimal,
-                                                     vk::AccessFlagBits::eTransferWrite,
-                                                     vk::AccessFlagBits::eTransferRead));
-        }
-        {
-            MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "copy to linear image");
-            cmd->copy(intermediate_image, linear_image);
-        }
+        cmd->barrier(vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eTransfer,
+                     intermediate_image->barrier(vk::ImageLayout::eTransferDstOptimal, {},
+                                                 vk::AccessFlagBits::eTransferWrite));
+        cmd_blit_stretch(cmd, src, src->get_current_layout(), src->get_extent(), intermediate_image,
+                         vk::ImageLayout::eTransferDstOptimal, intermediate_image->get_extent());
+        cmd->barrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer,
+                     intermediate_image->barrier(vk::ImageLayout::eTransferSrcOptimal,
+                                                 vk::AccessFlagBits::eTransferWrite,
+                                                 vk::AccessFlagBits::eTransferRead));
+    }
+    {
+        MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "copy to buffer");
+        // zero row length / image height: rows are tightly packed, unlike a linear image which
+        // carries a driver-defined row pitch.
+        cmd->copy(intermediate_image, staging_buffer,
+                  vk::BufferImageCopy{0, 0, 0, first_layer(), {}, scaled});
     }
     cmd->barrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost,
-                 linear_image->barrier(vk::ImageLayout::eGeneral,
-                                       vk::AccessFlagBits::eTransferWrite,
-                                       vk::AccessFlagBits::eHostRead));
+                 staging_buffer->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
+                                                vk::AccessFlagBits::eHostRead));
 
     std::filesystem::create_directories(path.parent_path());
     const std::string tmp_filename =
         (path.parent_path() / (".interm_" + path.filename().string())).string();
 
-    std::function<void()> write_task = ([this, linear_image, path, tmp_filename]() {
-        const int w = static_cast<int>(linear_image->get_extent().width);
-        const int h = static_cast<int>(linear_image->get_extent().height);
+    std::function<void()> write_task = ([this, staging_buffer, path, tmp_filename, scaled]() {
+        const int w = static_cast<int>(scaled.width);
+        const int h = static_cast<int>(scaled.height);
 
-        if (format_is_float(this->format)) {
-            float* mem = linear_image->get_memory()->map_as<float>();
-            image_save_f32(tmp_filename, mem, w, h, 4);
-        } else {
-            uint8_t* mem = linear_image->get_memory()->map_as<uint8_t>();
-            image_save_u8(tmp_filename, mem, w, h, 4);
+        // the thread pool discards exceptions, report here or the capture fails silently
+        try {
+            if (format_is_float(this->format)) {
+                float* mem = staging_buffer->get_memory()->map_as<float>();
+                image_save_f32(tmp_filename, mem, w, h, 4);
+            } else {
+                uint8_t* mem = staging_buffer->get_memory()->map_as<uint8_t>();
+                image_save_u8(tmp_filename, mem, w, h, 4);
+            }
+        } catch (const std::exception& e) {
+            SPDLOG_ERROR("could not write {}: {}", path.string(), e.what());
+            staging_buffer->get_memory()->unmap();
+            return;
         }
 
         try {
@@ -282,7 +259,7 @@ ImageWrite::process(const NodeIO& io, const NodeProcessInfo& info, Submission& s
 
         SPDLOG_INFO("wrote image to {}", path.string());
 
-        linear_image->get_memory()->unmap();
+        staging_buffer->get_memory()->unmap();
         return;
     });
 
