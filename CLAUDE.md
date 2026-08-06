@@ -92,6 +92,18 @@ Expect the code to be read only by experienced (graphics) programmers.
 - In `properties()`, render each control inside the method that owns it; don't wrap a node's
   config at the call site. Group nested settings with `st_begin_child(id, label)`.
 
+## Commits
+
+- Subject: `<lib>: <component>: <summary>` (`merian-graph: accumulate: ...`, `merian-shaders: hash
+  grid: ...`, `chore: ...`, `build: ...`). Most changes need nothing else.
+- The body carries **only what the code cannot**: the symptom that motivated the change, measured
+  numbers, a bare citation. Never restate the mechanism — that is what the comment at the code is
+  for, and a body that duplicates it is noise.
+- Quote measurements with the setup that produced them: `Quake mcpg 1280x720, RTX 5070 Laptop,
+  timedemo demo1 over 500 frames render 12.27 -> 11.20 ms (-8.7 %)`.
+- No verification narration, no provenance ("port of \<sha\>", "rebased onto"), no alternatives
+  considered, no trailers of any kind (`Co-Authored-By`, session links).
+
 ## Process
 
 Use clang-format on the modified files. Before a non-trivial design decision (replacing a
