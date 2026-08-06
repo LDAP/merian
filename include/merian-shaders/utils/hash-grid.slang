@@ -20,6 +20,7 @@ struct HashGridSlot<typename T, let SPLIT_STORAGE : bool> {
     T t;
 }
 
+// LOCK_FREE: writers skip the slot lock
 struct HashGrid<typename T,
                 let BUFFER_SIZE : uint,
                 let PROBE_COUNT : uint = 4,
@@ -28,7 +29,8 @@ struct HashGrid<typename T,
                 let SPLIT_STORAGE : bool = true,
                 let GRID_POWER : uint = 2,
                 let GRID_STEPS_PER_UNIT_SIZE : uint = 1,
-                let LOCALITY_BITS : uint = 0> {
+                let LOCALITY_BITS : uint = 0,
+                let LOCK_FREE : bool = false> {
 
     // If SPLIT_STORAGE == true
     RWStructuredBuffer<uint2> keys;
@@ -348,11 +350,13 @@ struct HashGrid<typename T,
 
         // we use frame so we have it to evict the reast recently once and also to unlock all after
         // the frame implicitly.
-        const uint locked = frame | MERIAN_HASH_GRID_LOCK_BIT;
-        uint old;
-        lock_exchange(target, locked, old);
-        if (old == locked) {
-            return;
+        if (!LOCK_FREE) {
+            const uint locked = frame | MERIAN_HASH_GRID_LOCK_BIT;
+            uint old;
+            lock_exchange(target, locked, old);
+            if (old == locked) {
+                return;
+            }
         }
 
         var t = data[target].t;
@@ -452,11 +456,13 @@ struct HashGrid<typename T,
             }
         }
 
-        const uint locked = frame | MERIAN_HASH_GRID_LOCK_BIT;
-        uint old;
-        lock_exchange(target, locked, old);
-        if (old == locked) {
-            return;
+        if (!LOCK_FREE) {
+            const uint locked = frame | MERIAN_HASH_GRID_LOCK_BIT;
+            uint old;
+            lock_exchange(target, locked, old);
+            if (old == locked) {
+                return;
+            }
         }
 
         store_slot(target, uint2(hash, frame & ~MERIAN_HASH_GRID_LOCK_BIT), t);
