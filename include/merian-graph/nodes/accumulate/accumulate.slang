@@ -25,6 +25,10 @@ const bool REUSE_BORDER = false;
 const bool USE_MOTION_VECTORS = true;
 [vk::constant_id(8)]
 const int GBUFFER_CHECK_MODE = GBUFFER_CHECK_ALWAYS;
+// Take the motion vectors from in_mv instead of the gbuffer. For signals that do not live on the
+// first opaque surface, such as a participating medium.
+[vk::constant_id(9)]
+const bool MV_OVERRIDE = false;
 
 import merian_shaders.gbuffer;
 import merian_shaders.utils.encoding;
@@ -63,6 +67,7 @@ History decode_history(uint2 packed) {
 // graph io
 Sampler2D<float4> in_src;
 ParameterBlock<GBuffer> in_gbuffer;
+Sampler2D<float2> in_mv; // only read when MV_OVERRIDE
 Sampler2D<float4> in_prev_out;
 Sampler2D<uint2> in_prev_history;
 RWTexture2D<float4> out_out;
@@ -146,7 +151,7 @@ void main(uint3 ipos: SV_DispatchThreadID) {
     bool is_static; // the surface did not move on screen (motion vector ~0)
     RandomGenerator rng = XorShift32(pcg3d16(uint3(ipos.xy, pc.iteration)));
     if (USE_MOTION_VECTORS) {
-        const float2 mv = in_gbuffer.get_motion_vectors(ipos.xy);
+        const float2 mv = MV_OVERRIDE ? in_mv[ipos.xy] : in_gbuffer.get_motion_vectors(ipos.xy);
         is_static = dot(mv, mv) < 1e-3 * 1e-3;
         float2 prev_pos = ipos.xy + mv;
 

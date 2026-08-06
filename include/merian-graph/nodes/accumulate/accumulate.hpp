@@ -85,6 +85,8 @@ class Accumulate : public Node {
     // Graph IO
     VkSampledImageInHandle con_src = VkSampledImageIn::create();
     ShaderObjectInHandle<GBufferObject> con_gbuffer = ShaderObjectIn<GBufferObject>::create();
+    // Optional: overrides the gbuffer motion vectors, for signals that are not on the first hit.
+    VkSampledImageInHandle con_mv = VkSampledImageIn::create();
     VkSampledImageInHandle con_prev_out = VkSampledImageIn::create();
     VkSampledImageInHandle con_prev_history = VkSampledImageIn::create();
 

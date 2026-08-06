@@ -43,6 +43,7 @@ std::vector<InputConnectorDescriptor> Accumulate::describe_inputs() {
     return {
         {"src", con_src, ConnectorAccess::compute_read},
         {"gbuffer", con_gbuffer, ConnectorAccess::compute_read},
+        {"mv", con_mv, ConnectorAccess::compute_read, 0, true},
         {"prev_out", con_prev_out, ConnectorAccess::compute_read, 1},
         {"prev_history", con_prev_history, ConnectorAccess::compute_read, 1},
     };
@@ -70,7 +71,7 @@ std::vector<OutputConnectorDescriptor> Accumulate::describe_outputs(const NodeIO
 
 Accumulate::NodeStatusFlags
 Accumulate::on_connected(const NodeIOLayout& io_layout,
-                         [[maybe_unused]] const NodeIO& io,
+                         const NodeIO& io,
                          [[maybe_unused]] const NodeConnectionInfo& info,
                          [[maybe_unused]] Submission& submission) {
     io_layout.register_event_listener(
@@ -113,7 +114,8 @@ Accumulate::on_connected(const NodeIOLayout& io_layout,
     const uint32_t wg_rounded_irr_size_y = percentile_group_count_y * PERCENTILE_LOCAL_SIZE_Y;
     accum_spec_builder.add_entry(FILTER_LOCAL_SIZE_X, FILTER_LOCAL_SIZE_Y, wg_rounded_irr_size_x,
                                  wg_rounded_irr_size_y, filter_mode, extended_search, reuse_border,
-                                 enable_mv, gbuffer_check_mode);
+                                 enable_mv, gbuffer_check_mode,
+                                 static_cast<VkBool32>(io.is_connected(con_mv)));
     accumulate_spec_info.set(accum_spec_builder.build());
 
     return {};

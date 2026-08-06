@@ -12,6 +12,7 @@ using merian;
 
 // graph-bound
 ParameterBlock<GBuffer> in_gbuffer;
+Sampler2D<float2> in_mv; // only read when MV_OVERRIDE
 Sampler2D<float4> in_prev_out;
 RWTexture2D<float4> out_out;
 
@@ -30,6 +31,10 @@ const int MV_SAMPLING = 0;
 const bool USE_MOTION_VECTORS = true;
 [vk::constant_id(7)]
 const bool MODULATE_ALBEDO = true;
+// Take the motion vectors from in_mv instead of the gbuffer. For signals that do not live on the
+// first opaque surface, such as a participating medium.
+[vk::constant_id(8)]
+const bool MV_OVERRIDE = false;
 
 struct PushConstant {
     float blend_alpha;
@@ -52,9 +57,10 @@ void main(const int2 ipos: SV_DispatchThreadID) {
     float2 mv;
     if (USE_MOTION_VECTORS) {
         if (MV_SAMPLING == 0)
-            mv = in_gbuffer.get_motion_vectors(uint2(ipos));
+            mv = MV_OVERRIDE ? in_mv[uint2(ipos)] : in_gbuffer.get_motion_vectors(uint2(ipos));
         else if (MV_SAMPLING == 1)
-            mv = in_gbuffer.get_motion_vectors_dilated(ipos, 1);
+            mv = MV_OVERRIDE ? dilate_motion_vectors(in_mv, ipos, 1)
+                             : in_gbuffer.get_motion_vectors_dilated(ipos, 1);
     } else {
         mv = float2(0);
     }

@@ -13,8 +13,29 @@ struct PackedSurfaceInfo {
     half2 grad_z;
 }
 
-// f16 saturates above this; 
+// f16 saturates above this;
 static const float MAX_LINEAR_Z = 65504.0;
+
+// The longest motion vector in a (2 * radius + 1)^2 neighbourhood, so a reprojection follows the
+// fastest thing covering the pixel rather than whatever the center happens to hit. Takes the
+// vectors from the first two channels of any 2D texture, sampled or storage.
+float2 dilate_motion_vectors<let N : int, int sampleCount, int isCombined, int format>(
+    const _Texture<vector<float, N>, __Shape2D, 0, 0, sampleCount, 0, 0, isCombined, format> mv,
+    const int2 pixel,
+    const int radius) {
+    const int2 tex_size = int2(texture_dimensions(mv));
+    float2 longest = float2(0);
+    for (int j = -radius; j <= radius; j++) {
+        for (int i = -radius; i <= radius; i++) {
+            const vector<float, N> texel =
+                mv[uint2(clamp(pixel + int2(i, j), int2(0), tex_size - 1))];
+            const float2 v = float2(texel[0], texel[1]);
+            if (dot(v, v) > dot(longest, longest))
+                longest = v;
+        }
+    }
+    return longest;
+}
 
 struct PackedHitInfo {
     uint instance_id;
@@ -87,16 +108,7 @@ extension __GBuffer<0> {
         return tex2[pixel].xy;
     }
     float2 get_motion_vectors_dilated(int2 pixel, int radius) {
-        int2 tex_size = int2(texture_dimensions(tex2));
-        float2 longest = float2(0);
-        for (int j = -radius; j <= radius; j++) {
-            for (int i = -radius; i <= radius; i++) {
-                float2 mv = tex2[uint2(clamp(pixel + int2(i, j), int2(0), tex_size - 1))].xy;
-                if (dot(mv, mv) > dot(longest, longest))
-                    longest = mv;
-            }
-        }
-        return longest;
+        return dilate_motion_vectors(tex2, pixel, radius);
     }
 
     Hit get_hit(uint2 pixel) {
