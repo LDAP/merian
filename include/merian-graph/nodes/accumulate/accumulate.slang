@@ -119,11 +119,17 @@ void main(uint3 ipos: SV_DispatchThreadID) {
                                    pc.firefly_ipr_factor * (percentiles.y - percentiles.x));
         }
 
-        const float l = yuv_luminance(src.rgb);
-        if (l > max_l) {
-            const float factor = max_l / l;
-            src.rgb *= factor;
-            src.a *= factor * factor;
+        // Scaling a non-finite sample would turn it into NaN (inf * (max_l / inf) == inf * 0), and
+        // that NaN then spreads through the history and the denoiser.
+        if (any(isnan(src)) || any(isinf(src))) {
+            src = float4(0);
+        } else {
+            const float l = yuv_luminance(src.rgb);
+            if (l > max_l) {
+                const float factor = max_l / l;
+                src.rgb *= factor;
+                src.a *= factor * factor;
+            }
         }
     }
 
