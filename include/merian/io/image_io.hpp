@@ -49,6 +49,7 @@ void image_save_u8(const std::filesystem::path& path,
                    ImageFormat format = ImageFormat::AUTO);
 
 // Write 32-bit-float-per-channel data. format=AUTO infers from path. Must be HDR/PFM.
+// Neither format stores alpha, a 4-channel source is written as RGB.
 // Throws std::runtime_error on failure.
 void image_save_f32(const std::filesystem::path& path,
                     const float* data,
