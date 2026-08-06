@@ -53,8 +53,9 @@ Scene::Scene(const ShaderCompileContextHandle& compile_context,
                        "NullAccelerationStructure; }");
     set_env(std::make_shared<EmptyEnvMap>());
 
-    // register the hint module up front so a runtime toggle replaces it instead of adding it
+    // register the hint modules up front so a runtime toggle replaces them instead of adding them
     set_enable_thin_lens(false);
+    set_enable_exterior_medium(false);
 
     composition->add_module_from_path("merian-shaders/scene/scene.slang");
 
@@ -124,6 +125,21 @@ void Scene::set_enable_thin_lens(const bool enable) {
                                         fmt::format("namespace merian {{ export static const bool "
                                                     "merian_hint_enable_thin_lens = {}; }}",
                                                     enable ? "true" : "false"));
+}
+
+void Scene::set_enable_exterior_medium(const bool enable) {
+    exterior_medium_enabled = enable;
+    composition->add_module_from_string("scene_exterior_medium",
+                                        fmt::format("namespace merian {{ export static const bool "
+                                                    "merian_hint_exterior_medium = {}; }}",
+                                                    enable ? "true" : "false"));
+}
+
+void Scene::set_exterior_medium(const HomogeneousVolume& medium) {
+    exterior_medium = medium;
+    if (const bool enable = !medium.is_vacuum(); enable != exterior_medium_enabled) {
+        set_enable_exterior_medium(enable);
+    }
 }
 
 ShaderObjectHandle Scene::build_shader_object() const {
@@ -938,8 +954,8 @@ void Scene::properties_statistics(Properties& props) {
     block_text("shared_vb", shared_vb_suballoc, shared_vb_capacity);
     block_text("shared_prev_vb", shared_prev_vb_suballoc, shared_prev_vb_capacity);
     block_text("shared_ib", shared_ib_suballoc, shared_ib_capacity);
-    props.output_text("{:<14} {} staged this frame", "upload_staging:",
-                      format_size(frame_stats.upload_bytes));
+    props.output_text("{:<14} {} staged this frame",
+                      "upload_staging:", format_size(frame_stats.upload_bytes));
 }
 
 void Scene::properties(Properties& props) {
@@ -1469,10 +1485,9 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                             } else if constexpr (std::is_same_v<
                                                      T, Mesh::HostPacked<PackedVertexData>>) {
                                 frame_stats.meshes_uploaded_host_packed++;
-                                vertex_src_addr =
-                                    stage(vb_size, [&](void* dst) {
-                                        std::memcpy(dst, src.data, vb_size);
-                                    }).addr;
+                                vertex_src_addr = stage(vb_size, [&](void* dst) {
+                                                      std::memcpy(dst, src.data, vb_size);
+                                                  }).addr;
                             } else {
                                 static_assert(std::is_same_v<T, Mesh::HostVertices>);
                                 frame_stats.meshes_uploaded_host_unpacked++;
@@ -1497,10 +1512,9 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                                     prev_src_addr = src.data->get_device_address() + src.offset;
                                 } else if constexpr (std::is_same_v<T, Mesh::HostPacked<
                                                                            PackedPrevVertexData>>) {
-                                    prev_src_addr =
-                                        stage(prev_vb_size, [&](void* dst) {
-                                            std::memcpy(dst, src.data, prev_vb_size);
-                                        }).addr;
+                                    prev_src_addr = stage(prev_vb_size, [&](void* dst) {
+                                                        std::memcpy(dst, src.data, prev_vb_size);
+                                                    }).addr;
                                 } else {
                                     static_assert(std::is_same_v<T, Mesh::HostPrevVertices>);
                                     prev_src_addr =
@@ -1612,7 +1626,6 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
             cmd->copy(entry.first, dst, entry.second);
         }
     }
-
 }
 
 void Scene::build_blas(const CommandBufferHandle& cmd) {
@@ -1971,6 +1984,7 @@ void Scene::update(const CommandBufferHandle& cmd,
     c["frame"] = frame;
     c["time"] = get_time(time);
     c["time_diff"] = time_diff;
+    exterior_medium.write_to(c["_exterior_medium"]);
 
     // prev_active_camera still holds last frame's pose here (updated below).
     last_update_changes.camera_changed = !(*cam == prev_active_camera);

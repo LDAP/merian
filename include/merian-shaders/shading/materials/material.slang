@@ -3,6 +3,7 @@ __exported import merian_shaders.utils.textures;
 __exported import merian_shaders.utils.texture_manager;
 __exported import merian_shaders.utils.random;
 __exported import merian_shaders.shading.shading_data;
+__exported import merian_shaders.shading.homogeneous_volume;
 __exported import merian_shaders.shading.bsdfs.bsdf;
 __exported import merian_shaders.shading.materials.material_system_data;
 
@@ -51,16 +52,11 @@ interface MaterialSample {
 
     // ------------------------------------------
 
-    // Relative IOR (incident / transmitted) at this surface; 1.0 for opaque materials. The
-    // integrator multiplies the medium IOR by 1/eta after a transmission event.
-    float get_eta() {
-        return 1.0f;
-    }
-
-    // Volume absorption coefficient (per channel) of the medium entered on a transmission event;
-    // 0 outside / for opaque materials. The integrator applies Beer-Lambert exp(-sigma * distance).
-    float3 get_absorption() {
-        return float3(0.0f);
+    // The medium on the far side of a transmission event, including the relative IOR of the
+    // boundary. Vacuum for opaque materials; a vacuum result on the way out means the integrator
+    // returns to the enclosing (exterior) medium.
+    HomogeneousVolume get_interior_volume() {
+        return HomogeneousVolume();
     }
 }
 

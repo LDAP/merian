@@ -25,11 +25,13 @@ float3 trace_path(const ParameterBlock<Scene> scene,
                   RayDesc ray,
                   ShadingPoint sp,
                   inout RandomGenerator rng) {
-    float3 radiance = merian_render_emission_on_primary ? sp.emission : float3(0);
-    float3 throughput = float3(1);
     // Medium the ray is travelling through; updated on transmission events.
+    HomogeneousVolume medium = scene.get_exterior_medium();
     float current_ior = 1.0f;
-    float3 current_absorption = float3(0.0f);
+
+    float3 throughput = medium.is_vacuum() ? float3(1)
+                                           : medium.transmittance(distance(ray.Origin, sp.pos));
+    float3 radiance = merian_render_emission_on_primary ? throughput * sp.emission : float3(0);
 
     for (int bounce = 1; bounce < merian_render_max_path_length; bounce++) {
         // the ray left the scene: nothing to scatter from, emission is already accumulated
@@ -58,8 +60,11 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         // A transmission event crosses the surface; update the medium we are now in.
         const bool transmission = wi_local.z * bs.wo.z < 0.f;
         if (transmission) {
-            current_ior /= sp.surface_material.get_eta();
-            current_absorption = sp.surface_material.get_absorption();
+            const HomogeneousVolume interior = sp.surface_material.get_interior_volume();
+            current_ior /= interior.eta;
+            // leaving a surface puts the ray back into the medium enclosing the scene
+            medium = dot(-ray.Direction, sp.get_face_normal()) >= 0.f ? interior
+                                                                     : scene.get_exterior_medium();
         }
 
         if (let next = sp.make_ray(-ray.Direction, wo, transmission)) {
@@ -71,9 +76,10 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         sp = scene.trace_and_get_shading_point(ray, merian_render_instance_mask,
                                                RenderContext(uint16_t(bounce), current_ior));
 
-        // Beer-Lambert absorption over the segment just travelled inside the medium.
-        if (any(current_absorption != float3(0.f))) {
-            throughput *= exp(-current_absorption * distance(ray.Origin, sp.pos));
+        // Beer-Lambert attenuation over the segment just travelled inside the medium. In-scattering
+        // is not accounted for here; that is the volume renderer's job.
+        if (!medium.is_vacuum()) {
+            throughput *= medium.transmittance(distance(ray.Origin, sp.pos));
         }
 
         radiance += throughput * sp.emission;

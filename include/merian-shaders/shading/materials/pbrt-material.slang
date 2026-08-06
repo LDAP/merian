@@ -174,8 +174,8 @@ struct PBRTMaterialSample : MaterialSample {
         return brdf;
     }
 
-    override float get_eta() {
-        return eta;
+    override HomogeneousVolume get_interior_volume() {
+        return HomogeneousVolume(float3(0.0f), eta);
     }
 }
 
