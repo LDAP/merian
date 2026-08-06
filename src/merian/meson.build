@@ -66,6 +66,7 @@ merian_src = files(
     'vk/utils/cpu_queue.cpp',
     'vk/utils/profiler.cpp',
     'vk/utils/vk_enums.cpp',
+    'vk/window/low_latency.cpp',
     'vk/window/swapchain.cpp',
     'vk/window/window.cpp',
 )

@@ -21,6 +21,7 @@
 #include "merian/vk/extension/extension_vk_debug_utils.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/sync/ring_fences.hpp"
+#include "merian/vk/window/low_latency.hpp"
 
 #include <cstdint>
 #include <queue>
@@ -206,6 +207,11 @@ class Graph : public std::enable_shared_from_this<Graph> {
     // Create description from current graph state
     GraphDescription to_description();
 
+    // --- Time ---
+
+    // Advances the graph time by a fixed delta per iteration instead of following the wall clock.
+    void set_time_delta_overwrite(const float delta_ms);
+
     // --- Properties / Graph UI ---
 
     void properties(Properties& props);
@@ -361,7 +367,14 @@ class Graph : public std::enable_shared_from_this<Graph> {
     std::chrono::high_resolution_clock::time_point time_connect_reference;
     std::chrono::nanoseconds duration_elapsed_since_connect;
     std::chrono::nanoseconds duration_elapsed;
-    int time_overwrite = 0; // NONE, TIME, DIFFERENCE
+    // Kept as an int for config_options.
+    enum TimeOverwrite {
+        TIME_OVERWRITE_NONE,
+        TIME_OVERWRITE_TIME,
+        TIME_OVERWRITE_DELTA,
+        TIME_OVERWRITE_COUNT,
+    };
+    int time_overwrite = TIME_OVERWRITE_NONE;
     // this is also used for overwrite time. In this case this should only be applied once and
     // then reset.
     float time_delta_overwrite_ms = 0.;
@@ -373,6 +386,7 @@ class Graph : public std::enable_shared_from_this<Graph> {
 
     std::chrono::duration<double> gpu_wait_time = 0ns;
     int32_t limit_fps = 0;
+    LowLatency low_latency;
 
     Profiler::Report last_build_report;
     Profiler::Report last_run_report;

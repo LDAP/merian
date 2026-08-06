@@ -8,6 +8,19 @@
 
 namespace merian {
 
+DeviceSupportInfo WindowNode::query_device_support(const DeviceSupportQueryInfo& query_info) {
+    // Optional: LowLatency uses whichever of these the device supports.
+    std::vector<const char*> optional_features = {"antiLag"};
+    if (query_info.physical_device->extension_supported(VK_NV_LOW_LATENCY_2_EXTENSION_NAME)) {
+        // Reflex identifies a frame by the present id of its present.
+        optional_features.emplace_back("presentId");
+    }
+
+    return DeviceSupportInfo::check(
+        query_info, {}, optional_features, {},
+        {VK_NV_LOW_LATENCY_2_EXTENSION_NAME, VK_AMD_ANTI_LAG_EXTENSION_NAME});
+}
+
 void WindowNode::initialize(const ContextHandle& context,
                             const ResourceAllocatorHandle& /*allocator*/) {
     this->context = context;
@@ -46,6 +59,12 @@ std::vector<OutputConnectorDescriptor> WindowNode::describe_outputs(const NodeIO
 
 WindowNode::NodeStatusFlags WindowNode::pre_process([[maybe_unused]] const NodeIO& io,
                                                     [[maybe_unused]] const NodeProcessInfo& info) {
+    // Before the acquire that creates it, so listeners can still influence its creation.
+    if (swapchain_manager && published_swapchain.lock() != get_swapchain()) {
+        published_swapchain = get_swapchain();
+        io.send_event("swapchain", get_swapchain());
+    }
+
     if (window) {
         window->poll_events();
         if (on_should_close_remove_node && window->should_close()) {

@@ -39,7 +39,8 @@ Graph::Graph(const GraphCreateInfo& create_info)
                               context, 1024, true);
                       return in_flight_data;
                   }),
-      run_profiler(std::make_shared<merian::Profiler>(context)), run_info(resource_allocator) {
+      low_latency(context), run_profiler(std::make_shared<merian::Profiler>(context)),
+      run_info(resource_allocator) {
 
     debug_utils = context->get_context_extension<ExtensionVkDebugUtils>(true);
     time_connect_reference = time_reference = std::chrono::high_resolution_clock::now();
@@ -56,6 +57,15 @@ Graph::Graph(const GraphCreateInfo& create_info)
                 if (Properties* const* props = std::any_cast<Properties*>(&data)) {
                     properties(**props);
                 }
+            }
+            return false;
+        });
+
+    // A node that presents publishes its swapchain, which is what low latency paces against.
+    register_event_listener(
+        "//swapchain", [this](const GraphEvent::Info& /*info*/, const GraphEvent::Data& data) {
+            if (const SwapchainHandle* const swapchain = std::any_cast<SwapchainHandle>(&data)) {
+                low_latency.set_swapchain(*swapchain);
             }
             return false;
         });
@@ -111,18 +121,20 @@ void Graph::run() {
         std::this_thread::sleep_for(in_flight_data.cpu_sleep_time);
     }
 
+    low_latency.begin_frame();
+
     in_flight_data.submission->reset();
 
     // Compute time stuff
-    assert(time_overwrite < 3);
+    assert(time_overwrite < TIME_OVERWRITE_COUNT);
     const std::chrono::nanoseconds last_elapsed_ns = duration_elapsed;
-    if (time_overwrite == 1) {
+    if (time_overwrite == TIME_OVERWRITE_TIME) {
         const auto delta = std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::duration<double>(time_delta_overwrite_ms / 1000.));
         duration_elapsed += delta;
         duration_elapsed_since_connect += delta;
         time_delta_overwrite_ms = 0;
-    } else if (time_overwrite == 2) {
+    } else if (time_overwrite == TIME_OVERWRITE_DELTA) {
         const auto delta = std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::duration<double>(time_delta_overwrite_ms / 1000.));
         duration_elapsed += delta;
@@ -189,6 +201,8 @@ void Graph::run() {
     } while (needs_reconnect);
 
     // RUN
+    low_latency.begin_render();
+
     Submission& submission = *in_flight_data.submission;
     {
         MERIAN_PROFILE_SCOPE(profiler, "on_run_starting");
@@ -274,6 +288,11 @@ void Graph::reset() {
 
 void Graph::request_reconnect() {
     needs_reconnect = true;
+}
+
+void Graph::set_time_delta_overwrite(const float delta_ms) {
+    time_overwrite = TIME_OVERWRITE_DELTA;
+    time_delta_overwrite_ms = delta_ms;
 }
 
 bool Graph::get_needs_reconnect() const {

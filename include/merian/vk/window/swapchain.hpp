@@ -5,12 +5,26 @@
 #include "merian/vk/sync/semaphore_binary.hpp"
 #include "merian/vk/window/surface.hpp"
 
+#include <functional>
 #include <optional>
 
 namespace merian {
 
 class Swapchain;
 using SwapchainHandle = std::shared_ptr<Swapchain>;
+
+// Lets a feature that is implemented outside of the swapchain (e.g. LowLatency) participate in
+// swapchain creation and present. Inherited by swapchains created from an existing one.
+struct SwapchainHooks {
+    // Set pNext of your struct to the supplied pointer, then return a pointer to your struct.
+    // If nothing should be appended, return the supplied pointer.
+    std::function<void*(void* p_next)> pnext_create_info;
+    std::function<void*(void* p_next)> pnext_present_info;
+
+    // Called immediately before and after vkQueuePresentKHR.
+    std::function<void()> on_present_begin;
+    std::function<void()> on_present_end;
+};
 
 class SwapchainImage : public Image {
   public:
@@ -28,7 +42,8 @@ class SwapchainImage : public Image {
 /**
  * @brief      This class describes a swapchain.
  *
- * Can only be used in a loop with get_max_image_count() >= num_swapchain_images >= frames_in_flight.
+ * Can only be used in a loop with get_max_image_count() >= num_swapchain_images >=
+ * frames_in_flight.
  */
 class Swapchain : public std::enable_shared_from_this<Swapchain> {
     static constexpr uint32_t MAX_OLD_SWAPCHAIN_CHAIN_LENGTH = 5;
@@ -114,6 +129,16 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
         return info;
     }
 
+    // VK_NULL_HANDLE until the first successful acquire.
+    const vk::SwapchainKHR& get_swapchain() const {
+        return swapchain;
+    }
+
+    // Must be set before the first acquire to affect swapchain creation.
+    void set_hooks(const SwapchainHooks& hooks) {
+        this->hooks = hooks;
+    }
+
     const ContextHandle& get_context() const {
         return context;
     }
@@ -159,6 +184,8 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
     uint32_t new_min_images;
 
     vk::SwapchainKHR swapchain = VK_NULL_HANDLE;
+
+    SwapchainHooks hooks;
 
     // ---------------------------------------------------------------------------
 

@@ -35,6 +35,9 @@ void print_usage() {
         "  --validation=<on|off|ifdebug> Vulkan validation layers (default: ifdebug)\n"
         "  --merge <file.json>           deep-merge a JSON file into the config (repeatable,\n"
         "                                last wins)\n"
+        "  --max-iterations=<N>          quit after N graph iterations\n"
+        "  --time-delta=<ms>             advance the graph time by a fixed delta per iteration\n"
+        "                                instead of following the wall clock\n"
         "  --<name> <value>              set an override declared in the graph's \"cli\" block;\n"
         "                                may appear before or after graph.json, in any order\n"
         "                                variant selections persist when the graph is stored;\n"
@@ -48,6 +51,8 @@ struct Options {
     std::optional<std::filesystem::path> config;
     bool validation = merian::Context::IS_DEBUG_BUILD;
     bool help = false;
+    std::optional<uint64_t> max_iterations;
+    std::optional<float> time_delta_ms;
     // Non-runner tokens in command-line order; classified against the graph's cli block once
     // the config is loaded. A pre-config override's value is kept adjacent to its --name.
     std::vector<std::string> graph_args;
@@ -78,6 +83,10 @@ std::optional<Options> parse(const std::vector<std::string>& args) {
         } else if (arg.starts_with("--validation=")) {
             SPDLOG_ERROR("invalid --validation value '{}' (expected on/off/ifdebug)", arg);
             return std::nullopt;
+        } else if (arg.starts_with("--max-iterations=")) {
+            options.max_iterations = std::stoull(arg.substr(arg.find('=') + 1));
+        } else if (arg.starts_with("--time-delta=")) {
+            options.time_delta_ms = std::stof(arg.substr(arg.find('=') + 1));
         } else if (arg.starts_with("--loglevel=")) {
             spdlog::set_level(spdlog::level::from_str(arg.substr(arg.find('=') + 1)));
         } else if (arg.starts_with("--plugin-path=")) {
@@ -209,13 +218,20 @@ int main(const int argc, const char** argv) {
         build_default_graph(graph);
     }
 
+    if (options->time_delta_ms) {
+        graph->set_time_delta_overwrite(*options->time_delta_ms);
+    }
+
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
 
     try {
-        while (!stop) {
+        for (uint64_t iteration = 0;
+             !stop && (!options->max_iterations || iteration < *options->max_iterations);
+             iteration++) {
             graph->run();
         }
+        graph->wait();
     } catch (const merian::VulkanException& e) {
         SPDLOG_ERROR("aborting on Vulkan error: {}", e.what());
         auto fault_ext = context->get_context_extension<merian::ExtensionDeviceFault>(true);

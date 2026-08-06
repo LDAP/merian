@@ -106,7 +106,7 @@ Swapchain::Swapchain(const SwapchainHandle& swapchain)
       supported_surface_formats(swapchain->supported_surface_formats),
       new_surface_format(swapchain->new_surface_format),
       new_present_mode(swapchain->new_present_mode), new_min_images(swapchain->new_min_images),
-      old_swapchain(swapchain),
+      hooks(swapchain->hooks), old_swapchain(swapchain),
       old_swapchain_chain_length(
           swapchain->old_swapchain ? (swapchain->old_swapchain_chain_length + 1) : 1) {}
 
@@ -263,6 +263,10 @@ vk::Extent2D Swapchain::create_swapchain(const uint32_t width, const uint32_t he
         old,
     };
 
+    if (hooks.pnext_create_info) {
+        create_info.pNext = hooks.pnext_create_info(nullptr);
+    }
+
     swapchain = context->get_device()->get_device().createSwapchainKHR(create_info, nullptr);
 
     info->cur_width = info->extent.width;
@@ -375,11 +379,22 @@ void Swapchain::present(const QueueHandle& queue, const uint32_t image_idx) {
     SPDLOG_TRACE("swapchain {} presenting image index {} ({})", fmt::ptr(VkSwapchainKHR(swapchain)),
                  image_idx, fmt::ptr(VkImage(info->images[image_idx])));
 
-    vk::Result result = queue->present(vk::PresentInfoKHR{
+    vk::PresentInfoKHR present_info{
         **sync_groups[image_idx].written_semaphore,
         swapchain,
         image_idx,
-    });
+    };
+    if (hooks.pnext_present_info) {
+        present_info.pNext = hooks.pnext_present_info(nullptr);
+    }
+
+    if (hooks.on_present_begin) {
+        hooks.on_present_begin();
+    }
+    vk::Result result = queue->present(present_info);
+    if (hooks.on_present_end) {
+        hooks.on_present_end();
+    }
 
     if (result == vk::Result::eSuccess || result == vk::Result::eSuboptimalKHR) {
         return;

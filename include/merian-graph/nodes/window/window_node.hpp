@@ -16,6 +16,8 @@ namespace merian {
 // Presents to a window from a WindowProvider extension (configurable via properties()).
 class WindowNode : public Node {
   public:
+    DeviceSupportInfo query_device_support(const DeviceSupportQueryInfo& query_info) override;
+
     void initialize(const ContextHandle& context,
                     const ResourceAllocatorHandle& allocator) override;
 
@@ -63,6 +65,7 @@ class WindowNode : public Node {
     WindowCreateInfo create_info;
     WindowHandle window;
     std::optional<SwapchainManager> swapchain_manager = std::nullopt;
+    std::weak_ptr<Swapchain> published_swapchain;
 
     BlitMode mode = FIT;
 
