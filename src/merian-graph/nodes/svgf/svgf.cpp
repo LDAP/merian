@@ -54,6 +54,7 @@ std::vector<InputConnectorDescriptor> SVGF::describe_inputs() {
         {"src", con_src, ConnectorAccess::compute_read},
         {"history", con_history, ConnectorAccess::compute_read},
         {"gbuffer", con_gbuffer, ConnectorAccess::compute_read},
+        {"mv", con_mv, ConnectorAccess::compute_read, 0, true},
     };
 }
 
@@ -71,7 +72,7 @@ std::vector<OutputConnectorDescriptor> SVGF::describe_outputs(const NodeIOLayout
 }
 
 SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
-                                         [[maybe_unused]] const NodeIO& io,
+                                         const NodeIO& io,
                                          [[maybe_unused]] const NodeConnectionInfo& info,
                                          [[maybe_unused]] Submission& submission) {
     const uint32_t max_wg_size_vendor = context->get_physical_device()->is_amd() ? 32 : 16;
@@ -179,7 +180,8 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
         {
             auto spec_builder = SpecializationInfoBuilder();
             spec_builder.add_entry(taa_local_size, taa_local_size, taa_debug, taa_filter_prev,
-                                   taa_clamping, taa_mv_sampling, enable_mv, taa_modulate_albedo);
+                                   taa_clamping, taa_mv_sampling, enable_mv, taa_modulate_albedo,
+                                   static_cast<VkBool32>(io.is_connected(con_mv)));
             SpecializationInfoHandle taa_spec = spec_builder.build();
             taa = ComputePipeline::create(taa_module->get_pipeline_layout(context),
                                           taa_module->specialize(taa_spec));
