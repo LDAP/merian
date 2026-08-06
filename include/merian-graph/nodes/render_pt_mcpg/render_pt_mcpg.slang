@@ -5,8 +5,7 @@ import merian_shaders.utils.hash;
 import merian_shaders.utils.textures;
 import merian_shaders.colors.debug;
 import merian_shaders.colors.colorspaces;
-import merian_shaders.light_cache.hashed_irradiance_cache;
-import mc;
+import mcpg_common;
 
 using merian;
 
@@ -14,35 +13,22 @@ namespace merian {
 extern static const bool merian_render_emission_on_primary = true;
 extern static const int merian_render_spp = 1;
 extern static const int merian_render_max_path_length = 8;
-extern static const uint merian_render_instance_mask = 0xFFu;
 extern static const bool merian_render_demodulate_albedo = false;
 } // namespace merian
 
 extern static const int debug_output_selector = 0;
 
 extern static const bool use_light_cache_tail = false;
-extern static const uint lc_buffer_size = 4000000;
-extern static const uint lc_probe_count = 4;
-extern static const bool lc_stochastic_interpolation = false;
-extern static const bool lc_split_storage = true;
-extern static const uint lc_locality_bits = 3;
 extern static const float lc_min_pdf = 1.0;
 
-extern static const uint mc_adaptive_buffer_size = 32777259;
-extern static const uint mc_probe_count = 2;
-extern static const int mc_samples = 5;
 extern static const float p_guiding = 0.9;
-extern static const bool missing_light_heuristic = true;
-extern static const bool mc_split_storage = true;
-extern static const uint mc_locality_bits = 3;
 
 struct RenderBinding {
     ParameterBlock<GBuffer> gbuffer;
     RWTexture2D<float4> irradiance;
     RWTexture2D<float4> debug;
-    HashedIrradianceCache<lc_buffer_size, lc_probe_count, lc_stochastic_interpolation,
-                          lc_split_storage, lc_locality_bits> irr_cache;
-    MCPG<mc_adaptive_buffer_size, mc_probe_count, mc_split_storage, mc_locality_bits> mcpg;
+    RenderIrradianceCache irr_cache;
+    RenderMCPG mcpg;
 };
 
 float3 trace_path(const ParameterBlock<Scene> scene,

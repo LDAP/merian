@@ -1,5 +1,6 @@
 #pragma once
 
+#include "merian-graph/connectors/image/vk_image_in_sampled.hpp"
 #include "merian-graph/connectors/image/vk_image_out_managed.hpp"
 #include "merian-graph/connectors/ptr_in.hpp"
 #include "merian-graph/connectors/shader_object_in.hpp"
@@ -58,6 +59,13 @@ class RenderMCPG : public Node {
 
     void ensure_pipeline(const SceneHandle& scene);
     void update_render_constants();
+    // Number of DistanceMCVertex the per-pixel distance chains need at the current extent.
+    uint32_t distance_mc_vertex_count() const;
+    void process_volume(const NodeIO& io,
+                        const NodeProcessInfo& info,
+                        Submission& submission,
+                        const SceneHandle& scene,
+                        const ShaderObjectAccess<GBufferObject>& gbuf);
 
     ContextHandle context;
     ResourceAllocatorHandle resource_allocator;
@@ -68,6 +76,10 @@ class RenderMCPG : public Node {
     ShaderObjectInHandle<GBufferObject> con_gbuffer = ShaderObjectIn<GBufferObject>::create();
     ManagedVkImageOutHandle con_irradiance;
     ManagedVkImageOutHandle con_debug;
+    ManagedVkImageOutHandle con_volume;
+    ManagedVkImageOutHandle con_volume_depth;
+    ManagedVkImageOutHandle con_volume_mv;
+    VkSampledImageInHandle con_prev_volume_depth = VkSampledImageIn::create();
 
     // Owns its own persistent buffer + shader binding (composed into this node's program).
     HashedIrradianceCacheHandle irr_cache;
@@ -104,6 +116,23 @@ class RenderMCPG : public Node {
     uint32_t lc_locality_bits = 3;
     float lc_min_pdf = 1.0f;
 
+    // --- Volume transport ---
+    // Single scattering along the primary ray, guided by a per-pixel distance chain and the same
+    // world-space direction chains the surface pass builds. Runs only while the scene declares an
+    // exterior medium.
+    vk::Format volume_depth_format = vk::Format::eR16Sfloat;
+    int32_t volume_spp = 1;
+    bool volume_use_light_cache = true;
+    float volume_p_guiding = 0.7f;
+    float volume_p_dist_guiding = 0.0f;
+    int32_t distance_mc_samples = 3;
+    int32_t distance_mc_grid_width = 25;
+    uint32_t distance_mc_vertex_state_count = 10;
+    bool volume_forward_project = true;
+    float volume_forward_project_min_z = 50.0f;
+
+    BufferHandle distance_mc;
+
     // --- Misc ---
     int32_t debug_output_selector = 0;
 
@@ -114,6 +143,15 @@ class RenderMCPG : public Node {
     Versioned<Pipeline> pipeline;
     Versioned<ShaderBindingTable> sbt; // only used when use_raygen
     Versioned<ShaderObject> params;
+
+    struct VolumePass {
+        Versioned<SlangProgramEntryPoint> entry_point;
+        Versioned<Pipeline> pipeline;
+        Versioned<ShaderObject> params;
+    };
+    VolumePass volume;
+    VolumePass volume_mv_init;
+    VolumePass volume_project;
 
     // Executor: compute (faster, no RT-pipeline VGPR cap) or raygen (enables SER-only experiments).
     bool use_raygen = false;

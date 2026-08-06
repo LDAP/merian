@@ -8,14 +8,21 @@
 
 namespace merian {
 
+// DistanceMCVertex in mc_distance.slang: MAX_DISTANCE_MC_VERTEX_STATE_COUNT states of
+// { float sum_w; uint N; float2 moments; }.
+static constexpr vk::DeviceSize DISTANCE_MC_VERTEX_SIZE = 10 * 16;
+
 RenderMCPG::RenderMCPG() = default;
 
 DeviceSupportInfo RenderMCPG::query_device_support(const DeviceSupportQueryInfo& query_info) {
     const auto composition = Scene::query_device_support_composition(query_info);
     composition->add_composition(HashedIrradianceCache::query_device_support_composition());
     composition->add_composition(MCPG::query_device_support_composition());
+    composition->add_module_from_path("merian-graph/nodes/render_pt_mcpg/mcpg_common.slang");
+    composition->add_module_from_path("merian-graph/nodes/render_pt_mcpg/mc_distance.slang");
     composition->add_module_from_path("merian-graph/nodes/render_pt_mcpg/render_pt_mcpg.slang",
                                       true);
+    composition->add_module_from_path("merian-graph/nodes/render_pt_mcpg/volume.slang", true);
     const auto program = SlangProgram::create(query_info.compile_context, composition);
     return DeviceSupportInfo::check(query_info, {"rayQuery", "rayTracingPipeline"}, {}) &
            program.get()->query_device_support(query_info);
@@ -40,15 +47,35 @@ void RenderMCPG::initialize(const ContextHandle& context,
 }
 
 std::vector<InputConnectorDescriptor> RenderMCPG::describe_inputs() {
-    return {{"scene", con_scene}, {"gbuffer", con_gbuffer, ConnectorAccess::ray_tracing_read}};
+    return {{"scene", con_scene},
+            {"gbuffer", con_gbuffer, ConnectorAccess::ray_tracing_read},
+            {"prev_volume_depth", con_prev_volume_depth, ConnectorAccess::compute_read, 1, true}};
+}
+
+uint32_t RenderMCPG::distance_mc_vertex_count() const {
+    // one vertex per distance_mc_grid_width pixels, plus a border for the jittered lookup
+    return (extent.width / distance_mc_grid_width + 2) *
+           (extent.height / distance_mc_grid_width + 2);
 }
 
 std::vector<OutputConnectorDescriptor> RenderMCPG::describe_outputs(const NodeIOLayout& io_layout) {
     extent = io_layout[con_gbuffer]->get_create_info().extent;
     con_irradiance = ManagedVkImageOut::create(irradiance_format, extent);
     con_debug = ManagedVkImageOut::create(vk::Format::eR16G16B16A16Sfloat, extent);
+    con_volume = ManagedVkImageOut::create(irradiance_format, extent);
+    con_volume_depth = ManagedVkImageOut::create(volume_depth_format, extent);
+    con_volume_mv = ManagedVkImageOut::create(vk::Format::eR16G16Sfloat, extent);
+
+    distance_mc = resource_allocator->create_buffer(
+        vk::DeviceSize(distance_mc_vertex_count()) * DISTANCE_MC_VERTEX_SIZE,
+        vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
+        MemoryMappingType::NONE, "RenderMCPG::distance_mc");
+
     return {{"irradiance", con_irradiance, ConnectorAccess::ray_tracing_write},
-            {"debug", con_debug, ConnectorAccess::ray_tracing_write}};
+            {"debug", con_debug, ConnectorAccess::ray_tracing_write},
+            {"volume", con_volume, ConnectorAccess::compute_write},
+            {"volume_depth", con_volume_depth, ConnectorAccess::compute_write},
+            {"volume_mv", con_volume_mv, ConnectorAccess::compute_read_write}};
 }
 
 RenderMCPG::NodeStatusFlags
@@ -88,8 +115,11 @@ void RenderMCPG::ensure_pipeline(const SceneHandle& scene) {
     composition->add_composition(scene->get_composition());
     composition->add_composition(irr_cache->get_composition());
     composition->add_composition(mcpg->get_composition());
+    composition->add_module_from_path("merian-graph/nodes/render_pt_mcpg/mcpg_common.slang");
+    composition->add_module_from_path("merian-graph/nodes/render_pt_mcpg/mc_distance.slang");
     composition->add_module_from_path("merian-graph/nodes/render_pt_mcpg/render_pt_mcpg.slang",
                                       true);
+    composition->add_module_from_path("merian-graph/nodes/render_pt_mcpg/volume.slang", true);
     update_render_constants();
 
     program = SlangProgram::create(compile_context, composition);
@@ -123,6 +153,23 @@ void RenderMCPG::ensure_pipeline(const SceneHandle& scene) {
                                                                resource_allocator);
     });
     params.depends_on(entry_point);
+
+    const auto build_volume_pass = [this](VolumePass& pass, const std::string& name) {
+        pass.entry_point = SlangProgramEntryPoint::create(program, name);
+        pass.pipeline = Versioned<Pipeline>([&pass, this] {
+            const auto ep = pass.entry_point.get();
+            return ComputePipeline::create(ep->get_pipeline_layout(context), ep->specialize());
+        });
+        pass.pipeline.depends_on(pass.entry_point);
+        pass.params = Versioned<ShaderObject>([&pass, this] {
+            return pass.entry_point->create_shader_object_for_parameter(context, "params",
+                                                                        resource_allocator);
+        });
+        pass.params.depends_on(pass.entry_point);
+    };
+    build_volume_pass(volume, "volume_main");
+    build_volume_pass(volume_mv_init, "volume_mv_init");
+    build_volume_pass(volume_project, "volume_forward_project");
 }
 
 [[nodiscard]] RenderMCPG::NodeStatusFlags
@@ -150,6 +197,11 @@ RenderMCPG::process(const NodeIO& io, const NodeProcessInfo& info, Submission& s
     if (info.get_iteration() == 0) {
         irr_cache->reset(cmd);
         mcpg->reset(cmd);
+        cmd->fill(distance_mc);
+        cmd->barrier(distance_mc->buffer_barrier2(
+            vk::PipelineStageFlagBits2::eTransfer, vk::PipelineStageFlagBits2::eAllCommands,
+            vk::AccessFlagBits2::eTransferWrite,
+            vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite));
     }
 
     auto cursor = params_obj->get_cursor();
@@ -169,7 +221,83 @@ RenderMCPG::process(const NodeIO& io, const NodeProcessInfo& info, Submission& s
     } else {
         cmd->dispatch(extent, 8, 8);
     }
+
+    if (io.is_connected(con_volume)) {
+        process_volume(io, info, submission, scene, gbuf);
+    }
+
     return {};
+}
+
+void RenderMCPG::process_volume(const NodeIO& io,
+                                const NodeProcessInfo& info,
+                                Submission& submission,
+                                const SceneHandle& scene,
+                                const ShaderObjectAccess<GBufferObject>& gbuf) {
+    const auto& cmd = submission.get_cmd();
+
+    // Nothing scatters without a medium, and the pass would only burn bandwidth writing zeros.
+    if (volume_spp <= 0 || scene->get_exterior_medium().is_vacuum()) {
+        cmd->clear(io[con_volume], vk::ImageLayout::eGeneral);
+        cmd->clear(io[con_volume_depth], vk::ImageLayout::eGeneral);
+        cmd->clear(io[con_volume_mv], vk::ImageLayout::eGeneral);
+        return;
+    }
+
+    const ShaderObjectAllocatorHandle& obj_allocator = info.get_shader_object_allocator();
+
+    // The three passes share the binding struct, but specialization drops what an entry point does
+    // not touch, so every field is written conditionally.
+    const auto write_binding = [&](const VolumePass& pass) {
+        const auto obj = pass.params.get();
+        auto cursor = obj->get_cursor();
+        const auto write = [&](const char* name, const auto& value) {
+            if (auto field = cursor[name]; field.is_valid())
+                field = value;
+        };
+        write("gbuffer", gbuf.r());
+        write("volume", io[con_volume].get_texture());
+        write("volume_depth", io[con_volume_depth].get_texture());
+        write("volume_mv", io[con_volume_mv].get_texture());
+        write("distance_mc", distance_mc);
+        if (auto field = cursor["prev_volume_depth"]; field.is_valid())
+            field = io[con_prev_volume_depth];
+        if (auto field = cursor["irr_cache"]; field.is_valid())
+            irr_cache->write_to(field);
+        if (auto field = cursor["mcpg"]; field.is_valid())
+            mcpg->write_to(field);
+        return obj;
+    };
+
+    const auto dispatch = [&](const VolumePass& pass, const bool bind_scene) {
+        const auto ep = pass.entry_point.get();
+        const auto pipe = pass.pipeline.get();
+        cmd->bind(pipe);
+        if (bind_scene)
+            ep->bind("scene", scene->get_shader_object(), cmd, pipe, obj_allocator);
+        ep->bind("params", write_binding(pass), cmd, pipe, obj_allocator);
+        cmd->dispatch(extent, 8, 8);
+    };
+
+    const auto barrier_volume_mv = [&] {
+        cmd->barrier(io[con_volume_mv]->barrier2(
+            vk::ImageLayout::eGeneral, vk::AccessFlagBits2::eShaderWrite,
+            vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
+            vk::PipelineStageFlagBits2::eComputeShader,
+            vk::PipelineStageFlagBits2::eComputeShader));
+    };
+
+    dispatch(volume_mv_init, false);
+    barrier_volume_mv();
+
+    // the ping-pong is only valid from the second iteration on
+    if (volume_forward_project && io.is_connected(con_prev_volume_depth) &&
+        info.get_iteration() != 0) {
+        dispatch(volume_project, true);
+        barrier_volume_mv();
+    }
+
+    dispatch(volume, true);
 }
 
 void RenderMCPG::update_render_constants() {
@@ -203,7 +331,15 @@ void RenderMCPG::update_render_constants() {
                     "export static const uint mc_adaptive_buffer_size = {}u;\n"
                     "export static const uint mc_probe_count = {}u;\n"
                     "export static const bool mc_split_storage = {};\n"
-                    "export static const uint mc_locality_bits = {}u;\n",
+                    "export static const uint mc_locality_bits = {}u;\n"
+                    "export static const int volume_spp = {};\n"
+                    "export static const bool volume_use_light_cache = {};\n"
+                    "export static const float volume_p_guiding = {:f};\n"
+                    "export static const float volume_p_dist_guiding = {:f};\n"
+                    "export static const float volume_forward_project_min_z = {:f};\n"
+                    "export static const int distance_mc_samples = {};\n"
+                    "export static const int distance_mc_grid_width = {};\n"
+                    "export static const uint distance_mc_vertex_state_count = {}u;\n",
                     emission_on_primary ? "true" : "false", spp, max_path_length, mask,
                     demodulate_albedo ? "true" : "false", use_light_cache_tail ? "true" : "false",
                     missing_light_heuristic ? "true" : "false", mc_samples,
@@ -211,7 +347,11 @@ void RenderMCPG::update_render_constants() {
                     lc_buffer_size, lc_probe_count, lc_stochastic_interpolation ? "true" : "false",
                     lc_split_hash_payload_storage ? "true" : "false", lc_locality_bits, lc_min_pdf,
                     mc_adaptive_buffer_size, mc_probe_count,
-                    mc_split_hash_payload_storage ? "true" : "false", mc_locality_bits));
+                    mc_split_hash_payload_storage ? "true" : "false", mc_locality_bits, volume_spp,
+                    volume_use_light_cache ? "true" : "false",
+                    reference_mode ? 0.0f : volume_p_guiding,
+                    reference_mode ? 0.0f : volume_p_dist_guiding, volume_forward_project_min_z,
+                    distance_mc_samples, distance_mc_grid_width, distance_mc_vertex_state_count));
 }
 
 RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
@@ -245,6 +385,36 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
         config.config_percent("guiding prob", p_guiding,
                               "Probability to sample the guiding distribution instead of "
                               "the BSDF.");
+
+    config.st_separate("RT Volume");
+    constants_changed |= config.config_int("volume samples per pixel", volume_spp,
+                                           "Number of single-scattering events per pixel. Only "
+                                           "runs while the scene declares an exterior medium.",
+                                           0, 16);
+    constants_changed |=
+        config.config_percent("volume guiding prob", volume_p_guiding,
+                              "Probability to sample the guiding distribution instead of the "
+                              "phase function.");
+    constants_changed |=
+        config.config_percent("distance guiding prob", volume_p_dist_guiding,
+                              "Probability to sample the scattering distance from the per-pixel "
+                              "chain instead of the transmittance.");
+    constants_changed |=
+        config.config_bool("volume: use LC", volume_use_light_cache,
+                           "Query the light cache for non-emitting surfaces behind the "
+                           "scattering event.");
+    constants_changed |= config.config_int("distance MC samples", distance_mc_samples, "", 0, 30);
+    needs_reconnect |= config.config_int("distance MC grid width", distance_mc_grid_width,
+                                         "Side length of a distance chain cell, in pixels.", 1, 64);
+    constants_changed |=
+        config.config_uint("distance MC states per vertex", distance_mc_vertex_state_count,
+                           "Number of chains per cell.", 1u, 10u);
+    config.config_bool("volume forward project", volume_forward_project,
+                       "Reproject last frame's mean scattering distance into the volume motion "
+                       "vectors instead of using the surface ones.");
+    constants_changed |= config.config_float(
+        "volume forward project min z", volume_forward_project_min_z,
+        "Below this scattering distance the surface motion vector is kept.", 1.f, 0.f);
 
     if (config.st_begin_child("mc", "Markov Chain Path Guiding",
                               Properties::ChildFlagBits::DEFAULT_OPEN)) {
