@@ -135,6 +135,26 @@ class PhysicalDevice : public std::enable_shared_from_this<PhysicalDevice> {
         return properties.get_properties().vendorID == 0x5143;
     }
 
+    // Suffix of the MERIAN_TARGET_VENDOR_ shader define, nullptr for an unrecognized vendor.
+    const char* get_vendor_name() const {
+        if (is_amd()) {
+            return "AMD";
+        }
+        if (is_nvidia()) {
+            return "NVIDIA";
+        }
+        if (is_intel()) {
+            return "INTEL";
+        }
+        if (is_arm()) {
+            return "ARM";
+        }
+        if (is_qualcomm()) {
+            return "QUALCOMM";
+        }
+        return nullptr;
+    }
+
     // ----------------------------------------
 
   private:
