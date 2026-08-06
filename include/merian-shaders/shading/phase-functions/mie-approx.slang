@@ -85,9 +85,11 @@ struct MieApproxPhaseFunction : PhaseFunction {
         return sample(rng, wi, hg_g, d_g, d_a, w_d);
     }
 
-    override Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
-        const float wo = sample(rng, wi, hg_g, d_g, d_a, w_d);
-        return ShadingFunctionSample(wo, pdf(wi, wo), 1.0f);
+    override Optional<ShadingFunctionSample> sample_eval(const float3 wi,
+                                                         inout RandomGenerator rng) {
+        // sampled proportionally to the mixture, so the weight is exactly 1
+        const float cos_theta = sample(rng.next_float2(), hg_g, d_g, d_a, w_d);
+        return ShadingFunctionSample(sample_cone2(wi, cos_theta, rng), eval(cos_theta), 1.0f);
     }
 
     float pdf(const float3 wi, const float3 wo) {
