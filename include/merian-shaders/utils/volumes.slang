@@ -52,7 +52,7 @@ float transmittance_sample(float mu_t, float random, float max_t) {
 }
 
 float transmittance_pdf(float t, float mu_t, float max_t) {
-    transmittance_pdf2(t, mu_t, transmittance_xi_max(max_t, mu_t));
+    return transmittance_pdf2(t, mu_t, transmittance_xi_max(max_t, mu_t));
 }
 
 }
