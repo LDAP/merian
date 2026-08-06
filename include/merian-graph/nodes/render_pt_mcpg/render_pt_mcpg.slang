@@ -54,9 +54,13 @@ float3 trace_path(const ParameterBlock<Scene> scene,
     const float3 cam_pos = scene.camera.position;
     const float3 prev_cam_pos = scene.prev_camera.position;
 
-    float3 radiance = merian_render_emission_on_primary ? sp.emission : float3(0);
-    float3 throughput = float3(1);
+    // Medium the ray is travelling through; updated on transmission events.
+    HomogeneousVolume medium = scene.get_exterior_medium();
     float current_ior = 1.0f;
+
+    float3 throughput = medium.is_vacuum() ? float3(1)
+                                           : medium.transmittance(distance(ray.Origin, sp.pos));
+    float3 radiance = merian_render_emission_on_primary ? throughput * sp.emission : float3(0);
 
     // where this vertex was already looked up in the light cache, one bounce earlier
     HashGridPos lc_grid_pos = HashGridPos();
@@ -146,8 +150,14 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         float3 next_pos = cur_pos;
 
         if (let next = next_ray) {
-            if (transmission)
-                current_ior /= sp.surface_material.get_eta();
+            if (transmission) {
+                const HomogeneousVolume interior = sp.surface_material.get_interior_volume();
+                current_ior /= interior.eta;
+                // leaving a surface puts the ray back into the medium enclosing the scene
+                medium = dot(-ray.Direction, sp.get_face_normal()) >= 0.f
+                             ? interior
+                             : scene.get_exterior_medium();
+            }
             ray = next;
             // the last vertex is never scattered from, so its material sample would be dead
             sp = scene.trace_and_get_shading_point(
@@ -163,6 +173,15 @@ float3 trace_path(const ParameterBlock<Scene> scene,
                      incident,
                      float3(params.irr_cache.get(next_pos, sp.shading_normal, cam_pos,
                                                  prev_cam_pos, rng, lc_grid_pos)));
+
+            // Beer-Lambert attenuation over the segment just travelled; in-scattering is the
+            // volume renderer's job. Folded into the incident radiance so that the guiding and the
+            // irradiance cache see the attenuated signal.
+            if (!medium.is_vacuum()) {
+                const float3 segment_t = medium.transmittance(distance(ray.Origin, next_pos));
+                incident *= segment_t;
+                lc_incident *= segment_t;
+            }
 
             throughput *= bsdf / wo_p;
             // complete the truncated path with the cached irradiance at the last vertex

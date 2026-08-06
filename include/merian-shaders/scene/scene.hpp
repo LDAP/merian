@@ -2,6 +2,7 @@
 
 #include "merian-shaders/scene/env_map.hpp"
 #include "merian-shaders/scene/scene-data.slangh"
+#include "merian-shaders/shading/homogeneous_volume.hpp"
 #include "merian-shaders/shading/materials/material_system.hpp"
 #include "merian/shader/shader_object.hpp"
 #include "merian/shader/slang_composition.hpp"
@@ -579,6 +580,14 @@ class Scene : public std::enable_shared_from_this<Scene> {
     // Removes meshes, nodes, cameras and resets the AABB. Not: env map, materials and textures.
     void clear_geometry();
 
+    // The medium filling the scene outside of any surface. Switching between vacuum and a medium
+    // recompiles the shaders, so renderers without a medium keep the volumetric code paths out.
+    void set_exterior_medium(const HomogeneousVolume& medium);
+
+    const HomogeneousVolume& get_exterior_medium() const {
+        return exterior_medium;
+    }
+
     // A the scenes up direction
     virtual float3 get_up() {
         return float3(0, 0, 1);
@@ -725,6 +734,11 @@ class Scene : public std::enable_shared_from_this<Scene> {
     bool thin_lens_enabled = false;
     void set_enable_thin_lens(const bool enable);
 
+    // Tracks the merian_hint_exterior_medium composition constant; toggling recompiles shaders.
+    HomogeneousVolume exterior_medium;
+    bool exterior_medium_enabled = false;
+    void set_enable_exterior_medium(const bool enable);
+
     ASBuilder as_builder;
     bool as_supported = false;
 
@@ -826,7 +840,6 @@ class Scene : public std::enable_shared_from_this<Scene> {
     vk::DeviceSize shared_vb_capacity = 0;
     vk::DeviceSize shared_prev_vb_capacity = 0;
     vk::DeviceSize shared_ib_capacity = 0;
-
 
     std::vector<GeometryData> geometries;
     struct BLASGeometry {

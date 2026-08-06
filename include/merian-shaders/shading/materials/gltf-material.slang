@@ -318,12 +318,8 @@ struct GltfMaterialSample : MaterialSample {
         return brdf;
     }
 
-    override float get_eta() {
-        return eta;
-    }
-
-    override float3 get_absorption() {
-        return absorption;
+    override HomogeneousVolume get_interior_volume() {
+        return HomogeneousVolume(absorption, eta);
     }
 }
 
