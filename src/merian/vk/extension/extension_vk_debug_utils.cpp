@@ -1,10 +1,16 @@
 #include "merian/vk/extension/extension_vk_debug_utils.hpp"
 
+#include <cstdlib>
 #include <spdlog/spdlog.h>
 #include <string_view>
 #include <vulkan/vulkan.hpp>
 
 namespace {
+bool assert_message_default() {
+    const char* env = std::getenv("MERIAN_DEBUG_UTILS_ASSERT_ERROR");
+    return env == nullptr || !(std::string_view(env) == "false");
+}
+
 spdlog::level::level_enum get_severity(vk::DebugUtilsMessageSeverityFlagBitsEXT messageSeverity) {
     if (messageSeverity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eError) {
         return spdlog::level::level_enum::err;
@@ -24,6 +30,11 @@ spdlog::level::level_enum get_severity(vk::DebugUtilsMessageSeverityFlagBitsEXT 
 
 namespace merian {
 
+ExtensionVkDebugUtils::UserData& ExtensionVkDebugUtils::user_data() {
+    static UserData data{{648835635, 767975156}, assert_message_default()};
+    return data;
+}
+
 /*
     This is the function in which errors will go through to be displayed.
 */
@@ -33,7 +44,7 @@ VKAPI_ATTR vk::Bool32 VKAPI_CALL ExtensionVkDebugUtils::messenger_callback(
     vk::DebugUtilsMessengerCallbackDataEXT const* pCallbackData,
     void* pUserData) {
 
-    UserData* user_data = static_cast<UserData*>(pUserData);
+    const UserData* user_data = static_cast<const UserData*>(pUserData);
     if (user_data->ignore_message_ids.contains(pCallbackData->messageIdNumber)) {
         return VK_FALSE;
     }

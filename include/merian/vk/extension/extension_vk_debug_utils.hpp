@@ -15,24 +15,13 @@ class ExtensionVkDebugUtils : public ContextExtension {
   public:
     static constexpr const char* name = "merian-debug-utils";
 
-  private:
-    static bool assert_message_default() {
-        const char* env = std::getenv("MERIAN_DEBUG_UTILS_ASSERT_ERROR");
-        return env == nullptr || !(std::string_view(env) == "false");
-    }
-
-  public:
-    // Set assert_message to true to throw if an message with severity error is emitted.
-    ExtensionVkDebugUtils(bool assert_message = assert_message_default(),
-                          const std::unordered_set<int32_t>& ignore_message_ids = {648835635,
-                                                                                   767975156})
-        : ContextExtension(), user_data(ignore_message_ids, assert_message) {
+    ExtensionVkDebugUtils() : ContextExtension() {
         create_info = {
             {},
             SEVERITY::eError | SEVERITY::eWarning | SEVERITY::eInfo | SEVERITY::eVerbose,
             MESSAGE::eGeneral | MESSAGE::ePerformance | MESSAGE::eValidation,
             &ExtensionVkDebugUtils::messenger_callback,
-            &this->user_data,
+            &user_data(),
         };
     }
 
@@ -83,11 +72,15 @@ class ExtensionVkDebugUtils : public ContextExtension {
 
   private:
     struct UserData {
-        std::unordered_set<int32_t> ignore_message_ids;
-        bool assert_message;
+        // Set assert_message to true to abort on a message with severity error.
+        const std::unordered_set<int32_t> ignore_message_ids;
+        const bool assert_message;
     };
 
-    UserData user_data;
+    // The messenger chained into VkInstanceCreateInfo has no handle to destroy: the loader reports
+    // through it until vkDestroyInstance returns, which outlives this extension.
+    static UserData& user_data();
+
     InstanceHandle instance;
 
     vk::DebugUtilsMessengerCreateInfoEXT create_info;
