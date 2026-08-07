@@ -289,14 +289,7 @@ void Graph::properties(Properties& props) {
             NodeHandle node = node_for_identifier.at(identifier);
             NodeData& data = node_data.at(node);
 
-            std::string state = "OK";
-            if (data.unsupported) {
-                state = "UNSUPPORTED";
-            } else if (!data.enabled) {
-                state = "DISABLED";
-            } else if (!data.errors.empty()) {
-                state = "ERROR";
-            }
+            const std::string state{data.state_name()};
 
             std::string node_label =
                 fmt::format("[{}] {} ({})", state, data.identifier, registry.node_type_name(node));
@@ -316,6 +309,9 @@ void Graph::properties(Properties& props) {
                 }
                 if (data.unsupported) {
                     props.output_text("Unsupported: {}", data.unsupported_reason);
+                }
+                if (data.force_disabled) {
+                    props.output_text("Force disabled: {}", data.force_disabled_reason);
                 }
 
                 props.st_separate();

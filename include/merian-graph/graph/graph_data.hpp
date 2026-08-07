@@ -36,6 +36,10 @@ struct NodeData {
     // Device does not support this node
     bool unsupported{};
     std::string unsupported_reason{};
+    // A required input cannot be connected because the node feeding it is not contributing.
+    // Names the node that caused it, so the origin stays visible down a chain.
+    bool force_disabled{};
+    std::string force_disabled_reason{};
     // Errors during build / connect
     std::vector<std::string> errors{};
     // Errors in on_connected and while run.
@@ -47,6 +51,9 @@ struct NodeData {
     // Wiring declared by the input descriptors. (on cache_node_input_connectors)
     std::unordered_map<InputConnectorHandle, uint32_t> input_delay;
     std::unordered_map<InputConnectorHandle, bool> input_optional;
+
+    // Outputs the node declared as carrying nothing. (on cache_node_output_connectors)
+    std::unordered_set<OutputConnectorHandle> disabled_outputs;
 
     // Shader cursor field name NodeIO::bind writes each connector to: in_<name> / out_<name>.
     // (on cache_node_input_connectors / cache_node_output_connectors)
@@ -127,8 +134,51 @@ struct NodeData {
         output_connections.clear();
 
         resource_maps.clear();
+        disabled_outputs.clear();
 
         errors.clear();
+        force_disabled = false;
+        force_disabled_reason.clear();
+    }
+
+    // What the graph made of this node in the last connect.
+    enum class State {
+        ENABLED,
+        DISABLED,       // switched off by the user
+        UNSUPPORTED,    // the device cannot run it
+        FORCE_DISABLED, // a node it depends on contributes nothing
+        ERRORED,
+    };
+
+    State state() const {
+        if (unsupported) {
+            return State::UNSUPPORTED;
+        }
+        if (!enabled) {
+            return State::DISABLED;
+        }
+        if (!errors.empty()) {
+            return State::ERRORED;
+        }
+        if (force_disabled) {
+            return State::FORCE_DISABLED;
+        }
+        return State::ENABLED;
+    }
+
+    std::string_view state_name() const {
+        switch (state()) {
+        case State::DISABLED:
+            return "DISABLED";
+        case State::UNSUPPORTED:
+            return "UNSUPPORTED";
+        case State::FORCE_DISABLED:
+            return "F-DISABLED";
+        case State::ERRORED:
+            return "ERROR";
+        default:
+            return "OK";
+        }
     }
 
     uint32_t set_index(const uint64_t run_iteration) const {

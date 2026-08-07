@@ -251,6 +251,9 @@ void Graph::cache_node_output_connectors(const NodeHandle& node, NodeData& data)
             data.output_connections.try_emplace(desc.connector);
             data.connector_access[desc.connector] = desc.access;
             data.bind_field_name[desc.connector] = "out_" + desc.name;
+            if (desc.disabled) {
+                data.disabled_outputs.insert(desc.connector);
+            }
         }
     } catch (const graph_errors::node_error& e) {
         data.errors.emplace_back(fmt::format("node error: {}", e.what()));
@@ -280,8 +283,13 @@ bool Graph::connect_node(const NodeHandle& node,
         }
         const OutputConnectorHandle src_output =
             data.output_connector_for_name[connection.src_output];
+        if (data.disabled_outputs.contains(src_output)) {
+            SPDLOG_DEBUG("skipping disabled output {} of node {}", connection.src_output,
+                         data.identifier);
+            continue;
+        }
         NodeData& dst_data = node_data.at(connection.dst);
-        if (!dst_data.enabled || dst_data.unsupported) {
+        if (!dst_data.enabled || dst_data.unsupported || dst_data.force_disabled) {
             SPDLOG_DEBUG("skipping connection to disabled node {}, {} ({})", connection.dst_input,
                          dst_data.identifier, registry.node_type_name(connection.dst));
             continue;
@@ -335,6 +343,21 @@ bool Graph::connect_node(const NodeHandle& node,
     return true;
 }
 
+namespace {
+// True when the output wired to this input was declared disabled by the node producing it.
+bool feeds_from_disabled_output(const graph_internal::NodeData& dst_data,
+                                const std::string& input_name,
+                                const graph_internal::NodeData& src_data) {
+    const auto connection = dst_data.desired_incoming_connections.find(input_name);
+    if (connection == dst_data.desired_incoming_connections.end()) {
+        return false;
+    }
+    const auto output = src_data.output_connector_for_name.find(connection->second.second);
+    return output != src_data.output_connector_for_name.end() &&
+           src_data.disabled_outputs.contains(output->second);
+}
+} // namespace
+
 void Graph::search_satisfied_nodes(std::set<NodeHandle>& candidates,
                                    std::priority_queue<NodeHandle>& queue) {
     std::vector<NodeHandle> to_erase;
@@ -342,7 +365,7 @@ void Graph::search_satisfied_nodes(std::set<NodeHandle>& candidates,
     for (const NodeHandle& node : candidates) {
         NodeData& data = node_data.at(node);
 
-        if (!data.enabled || data.unsupported) {
+        if (!data.enabled || data.unsupported || data.force_disabled) {
             SPDLOG_DEBUG("node {} ({}) is disabled, skipping...", data.identifier,
                          registry.node_type_name(node));
             to_erase.push_back(node);
@@ -364,6 +387,9 @@ void Graph::search_satisfied_nodes(std::set<NodeHandle>& candidates,
         for (const auto& input : data.input_connectors) {
             // is there a connection to this input possible?
             bool will_not_connect = false;
+            // set when a producer exists but is not contributing: the consumer is then force
+            // disabled rather than blamed for an unconnected input.
+            std::string not_contributing;
 
             if (!maybe_connected_inputs.contains(input)) {
                 will_not_connect = true;
@@ -371,10 +397,24 @@ void Graph::search_satisfied_nodes(std::set<NodeHandle>& candidates,
                 const NodeHandle& connecting_node = maybe_connected_inputs[input];
                 const NodeData& connecting_node_data = node_data.at(connecting_node);
 
-                if (!connecting_node_data.enabled || connecting_node_data.unsupported ||
-                    !connecting_node_data.errors.empty()) {
-                    will_not_connect = true;
+                if (!connecting_node_data.enabled) {
+                    not_contributing =
+                        fmt::format("{} is disabled", connecting_node_data.identifier);
+                } else if (connecting_node_data.unsupported) {
+                    not_contributing =
+                        fmt::format("{} is unsupported", connecting_node_data.identifier);
+                } else if (connecting_node_data.force_disabled) {
+                    not_contributing = connecting_node_data.force_disabled_reason;
+                } else if (!connecting_node_data.errors.empty()) {
+                    not_contributing =
+                        fmt::format("{} has an error", connecting_node_data.identifier);
+                } else if (feeds_from_disabled_output(data, data.input_name_for_connector.at(input),
+                                                      connecting_node_data)) {
+                    not_contributing = fmt::format("{} disabled the output feeding {}",
+                                                   connecting_node_data.identifier,
+                                                   data.input_name_for_connector.at(input));
                 }
+                will_not_connect = !not_contributing.empty();
             }
 
             if (will_not_connect) {
@@ -386,11 +426,19 @@ void Graph::search_satisfied_nodes(std::set<NodeHandle>& candidates,
                     // Note: We cannot set the error here since that would lead to other nodes
                     // not connecting other inputs.
                 } else if (!data.input_optional.at(input)) {
-                    // This is bad. No node will connect to this input and the input is not
-                    // optional...
-                    std::string error = make_error_input_not_connected(input, node, data);
-                    SPDLOG_WARN(error);
-                    data.errors.emplace_back(std::move(error));
+                    if (!not_contributing.empty()) {
+                        // A producer exists but contributes nothing, so this node cannot run
+                        // either. Carry the origin along so a chain still names the first cause.
+                        data.force_disabled = true;
+                        data.force_disabled_reason = std::move(not_contributing);
+                        SPDLOG_INFO("node {} ({}) force disabled: {}", data.identifier,
+                                    registry.node_type_name(node), data.force_disabled_reason);
+                    } else {
+                        // No node will connect to this input and the input is not optional...
+                        std::string error = make_error_input_not_connected(input, node, data);
+                        SPDLOG_WARN(error);
+                        data.errors.emplace_back(std::move(error));
+                    }
 
                     // We can't even call describe_outputs... Kill the node.
                     to_erase.push_back(node);
