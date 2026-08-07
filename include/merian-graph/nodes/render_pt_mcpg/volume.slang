@@ -33,9 +33,9 @@ struct VolumeBinding {
     RenderMCPG mcpg;
 };
 
-// Single-scattering along the primary ray. The scattering distance comes from a per-pixel Markov
-// chain mixed with transmittance sampling, the outgoing direction from the same world-space chains
-// the surface pass builds, mixed with the phase function.
+// Single scattering along the primary ray. The distance comes from a per-pixel Markov chain mixed
+// with transmittance sampling, the direction from the world-space chains the surface pass builds
+// mixed with the phase function.
 void render_pixel(const uint2 pixel,
                   ParameterBlock<Scene> scene,
                   ParameterBlock<VolumeBinding> params) {

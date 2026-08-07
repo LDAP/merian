@@ -9,21 +9,18 @@ namespace merian {
 interface HomogeneousVolume {
     associatedtype PhaseFunctionImpl : PhaseFunction;
 
-    // Beer-Lambert attenuation over a segment of length t.
     float3 transmittance(const float t);
 
-    // Scattering coefficient per unit distance.
     float3 get_mu_s();
 
-    // Scalar extinction driving distance sampling. The estimator divides by the pdf built from
-    // this, so a colored extinction stays unbiased.
+    // The estimator divides by a pdf built from this, so a colored extinction stays unbiased.
     float sampling_mu_t();
 
-    // Optical depth saturates beyond this distance, so an unbounded medium cannot extinguish the
+    // Optical depth saturates beyond this, so an unbounded medium cannot extinguish the
     // environment.
     float get_max_distance();
 
-    // Relative index of refraction (incident / transmitted) of the boundary enclosing this volume.
+    // Relative index of refraction (incident / transmitted) of the enclosing boundary.
     float get_eta();
 
     PhaseFunctionImpl get_phase_function();
@@ -52,8 +49,6 @@ struct Vacuum : HomogeneousVolume {
     }
 }
 
-// Scattering medium with the Mie phase function fit. The fit coefficients are precomputed on the
-// host from the droplet diameter.
 struct Fog : HomogeneousVolume {
     typealias PhaseFunctionImpl = MieApproxPhaseFunction;
 
@@ -82,7 +77,7 @@ struct Fog : HomogeneousVolume {
     }
 }
 
-// Medium behind a refractive boundary. Materials that only absorb leave mu_s at 0.
+// Materials that only absorb leave mu_s at 0.
 struct IsotropicVolume : HomogeneousVolume {
     typealias PhaseFunctionImpl = IsotropicPhaseFunction;
 
