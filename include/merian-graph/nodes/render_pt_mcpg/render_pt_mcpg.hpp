@@ -149,9 +149,9 @@ class RenderMCPG : public Node {
         Versioned<Pipeline> pipeline;
         Versioned<ShaderObject> params;
     };
-    VolumePass volume;
-    VolumePass volume_mv_init;
-    VolumePass volume_project;
+    VolumePass single_scattering;
+    VolumePass project_seed;
+    VolumePass project;
 
     // Executor: compute (faster, no RT-pipeline VGPR cap) or raygen (enables SER-only experiments).
     bool use_raygen = false;

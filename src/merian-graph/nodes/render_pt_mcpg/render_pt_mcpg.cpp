@@ -3,6 +3,7 @@
 #include "merian/shader/shader_compile_context.hpp"
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_ray_tracing_builder.hpp"
+#include "merian/vk/utils/profiler.hpp"
 
 #include <fmt/format.h>
 
@@ -167,9 +168,9 @@ void RenderMCPG::ensure_pipeline(const SceneHandle& scene) {
         });
         pass.params.depends_on(pass.entry_point);
     };
-    build_volume_pass(volume, "volume_main");
-    build_volume_pass(volume_mv_init, "volume_mv_init");
-    build_volume_pass(volume_project, "volume_forward_project");
+    build_volume_pass(single_scattering, "single_scattering");
+    build_volume_pass(project_seed, "volume_project_seed");
+    build_volume_pass(project, "volume_project");
 }
 
 [[nodiscard]] RenderMCPG::NodeStatusFlags
@@ -212,14 +213,17 @@ RenderMCPG::process(const NodeIO& io, const NodeProcessInfo& info, Submission& s
     irr_cache->write_to(cursor["irr_cache"]);
     mcpg->write_to(cursor["mcpg"]);
 
-    cmd->bind(pipe);
-    ep->bind("scene", scene->get_shader_object(), cmd, pipe, obj_allocator);
-    ep->bind("params", params_obj, cmd, pipe, obj_allocator);
+    {
+        MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "surface");
+        cmd->bind(pipe);
+        ep->bind("scene", scene->get_shader_object(), cmd, pipe, obj_allocator);
+        ep->bind("params", params_obj, cmd, pipe, obj_allocator);
 
-    if (use_raygen) {
-        cmd->trace_rays(sbt.get(), extent);
-    } else {
-        cmd->dispatch(extent, 8, 8);
+        if (use_raygen) {
+            cmd->trace_rays(sbt.get(), extent);
+        } else {
+            cmd->dispatch(extent, 8, 8);
+        }
     }
 
     if (io.is_connected(con_volume)) {
@@ -287,17 +291,23 @@ void RenderMCPG::process_volume(const NodeIO& io,
             vk::PipelineStageFlagBits2::eComputeShader));
     };
 
-    dispatch(volume_mv_init, false);
-    barrier_volume_mv();
-
-    // the ping-pong is only valid from the second iteration on
-    if (volume_forward_project && io.is_connected(con_prev_volume_depth) &&
-        info.get_iteration() != 0) {
-        dispatch(volume_project, true);
+    {
+        MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "volume project");
+        dispatch(project_seed, false);
         barrier_volume_mv();
+
+        // the ping-pong is only valid from the second iteration on
+        if (volume_forward_project && io.is_connected(con_prev_volume_depth) &&
+            info.get_iteration() != 0) {
+            dispatch(project, true);
+            barrier_volume_mv();
+        }
     }
 
-    dispatch(volume, true);
+    {
+        MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "single scattering");
+        dispatch(single_scattering, true);
+    }
 }
 
 void RenderMCPG::update_render_constants() {
