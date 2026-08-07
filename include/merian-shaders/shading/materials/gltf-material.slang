@@ -308,8 +308,8 @@ struct GltfMaterialSample : MaterialSample {
         return brdf;
     }
 
-    override HomogeneousVolume get_interior_volume() {
-        return HomogeneousVolume(absorption, eta);
+    override IsotropicVolume get_interior_volume() {
+        return IsotropicVolume(absorption, float3(0.0f), eta);
     }
 }
 

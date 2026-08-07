@@ -55,7 +55,7 @@ Scene::Scene(const ShaderCompileContextHandle& compile_context,
 
     // register the hint modules up front so a runtime toggle replaces them instead of adding them
     set_enable_thin_lens(false);
-    set_enable_exterior_medium(false);
+    set_exterior_volume(std::make_shared<VacuumVolume>());
 
     composition->add_module_from_path("merian-shaders/scene/scene.slang");
 
@@ -96,6 +96,11 @@ Scene::query_device_support_composition(const DeviceSupportQueryInfo& query_info
         "module scene_env_map_workaround;\n"
         "import \"merian-shaders/scene/environment-map.slang\";\n"
         "namespace merian { public typealias SceneEnvMap = merian::EmptyEnv; }");
+    composition->add_module_from_string(
+        "scene_volume_workaround",
+        "module scene_volume_workaround;\n"
+        "import \"merian-shaders/shading/homogeneous-volume.slang\";\n"
+        "namespace merian { public typealias SceneHomogeneousVolume = merian::Vacuum; }");
     composition->add_module_from_path("merian-shaders/scene/scene.slang");
     return composition;
 }
@@ -127,19 +132,23 @@ void Scene::set_enable_thin_lens(const bool enable) {
                                                     enable ? "true" : "false"));
 }
 
-void Scene::set_enable_exterior_medium(const bool enable) {
-    exterior_medium_enabled = enable;
-    composition->add_module_from_string("scene_exterior_medium",
-                                        fmt::format("namespace merian {{ export static const bool "
-                                                    "merian_hint_exterior_medium = {}; }}",
-                                                    enable ? "true" : "false"));
-}
-
-void Scene::set_exterior_medium(const HomogeneousVolume& medium) {
-    exterior_medium = medium;
-    if (const bool enable = !medium.is_vacuum(); enable != exterior_medium_enabled) {
-        set_enable_exterior_medium(enable);
+void Scene::set_exterior_volume(const HomogeneousVolumeHandle& volume) {
+    const bool needs_composition_update =
+        !exterior_volume || exterior_volume->get_type_name() != volume->get_type_name();
+    exterior_volume = volume;
+    if (!needs_composition_update) {
+        return;
     }
+
+    composition->add_module(exterior_volume->get_slang_module());
+    composition->add_module_from_string(
+        "scene_volume_workaround",
+        fmt::format("module scene_volume_workaround;\n"
+                    "import \"{}\";\n"
+                    "namespace merian {{ public typealias SceneHomogeneousVolume = {}; }}",
+                    exterior_volume->get_slang_module().get_import_path().value_or(
+                        exterior_volume->get_slang_module().get_name()),
+                    exterior_volume->get_type_name()));
 }
 
 ShaderObjectHandle Scene::build_shader_object() const {
@@ -1984,7 +1993,7 @@ void Scene::update(const CommandBufferHandle& cmd,
     c["frame"] = frame;
     c["time"] = get_time(time);
     c["time_diff"] = time_diff;
-    exterior_medium.write_to(c["_exterior_medium"]);
+    exterior_volume->write_to(c["exterior_volume"]);
 
     // prev_active_camera still holds last frame's pose here (updated below).
     last_update_changes.camera_changed = !(*cam == prev_active_camera);

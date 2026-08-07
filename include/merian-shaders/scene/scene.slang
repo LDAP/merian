@@ -13,6 +13,7 @@ import merian_shaders.utils.random;
 // Workaround for https://github.com/shader-slang/slang/pull/10769; scene.cpp injects replacements.
 __exported import scene_as_workaround;
 __exported import scene_env_map_workaround;
+__exported import scene_volume_workaround;
 
 namespace merian {
 
@@ -24,10 +25,6 @@ static const float SCENE_THROUGHPUT_THRESHOLD = 1e-5;
 
 // Enables thin lens depth of field in generate_camera_ray. Set via Scene from the active camera.
 extern static const bool merian_hint_enable_thin_lens = false;
-
-// Enables the global exterior medium. Set via Scene when the medium turns non-vacuum, so renderers
-// that do not need it keep the medium out of their inner loop entirely.
-extern static const bool merian_hint_exterior_medium = false;
 
 // See scene.hpp for details.
 struct Scene {
@@ -52,26 +49,9 @@ struct Scene {
     float time;
     float time_diff;
 
-    // The medium filling the scene outside of any surface. Only meaningful when
-    // merian_hint_exterior_medium is set; read it through get_exterior_medium().
-    HomogeneousVolume _exterior_medium;
-
-    // -----------------------------------------
-
-    // Vacuum unless the scene declares a global exterior medium.
-    HomogeneousVolume get_exterior_medium() {
-        if (merian_hint_exterior_medium)
-            return _exterior_medium;
-        return HomogeneousVolume();
-    }
-
-    // Beer-Lambert attenuation of the exterior medium over a segment of length t. Compiles away
-    // when the scene has no exterior medium.
-    float3 exterior_transmittance(const float t) {
-        if (merian_hint_exterior_medium)
-            return _exterior_medium.transmittance(t);
-        return float3(1.0f);
-    }
+    // The medium filling the scene outside of any surface. Vacuum unless the scene sets one, in
+    // which case the type itself removes the medium from every renderer that reads it.
+    SceneHomogeneousVolume exterior_volume;
 
     // -----------------------------------------
 

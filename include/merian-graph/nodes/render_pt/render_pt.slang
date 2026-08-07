@@ -26,11 +26,10 @@ float3 trace_path(const ParameterBlock<Scene> scene,
                   ShadingPoint sp,
                   inout RandomGenerator rng) {
     // Medium the ray is travelling through; updated on transmission events.
-    HomogeneousVolume medium = scene.get_exterior_medium();
+    HomogeneousVolume medium = scene.exterior_volume;
     float current_ior = 1.0f;
 
-    float3 throughput = medium.is_vacuum() ? float3(1)
-                                           : medium.transmittance(distance(ray.Origin, sp.pos));
+    float3 throughput = medium.transmittance(distance(ray.Origin, sp.pos));
     float3 radiance = merian_render_emission_on_primary ? throughput * sp.emission : float3(0);
 
     for (int bounce = 1; bounce < merian_render_max_path_length; bounce++) {
@@ -60,11 +59,13 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         // A transmission event crosses the surface; update the medium we are now in.
         const bool transmission = wi_local.z * bs.wo.z < 0.f;
         if (transmission) {
-            const HomogeneousVolume interior = sp.surface_material.get_interior_volume();
-            current_ior /= interior.eta;
+            const IsotropicVolume interior = sp.surface_material.get_interior_volume();
+            current_ior /= interior.get_eta();
             // leaving a surface puts the ray back into the medium enclosing the scene
-            medium = dot(-ray.Direction, sp.get_face_normal()) >= 0.f ? interior
-                                                                     : scene.get_exterior_medium();
+            if (dot(-ray.Direction, sp.get_face_normal()) >= 0.f)
+                medium = interior;
+            else
+                medium = scene.exterior_volume;
         }
 
         if (let next = sp.make_ray(-ray.Direction, wo, transmission)) {
@@ -78,9 +79,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
 
         // Beer-Lambert attenuation over the segment just travelled inside the medium. In-scattering
         // is not accounted for here; that is the volume renderer's job.
-        if (!medium.is_vacuum()) {
-            throughput *= medium.transmittance(distance(ray.Origin, sp.pos));
-        }
+        throughput *= medium.transmittance(distance(ray.Origin, sp.pos));
 
         radiance += throughput * sp.emission;
     }

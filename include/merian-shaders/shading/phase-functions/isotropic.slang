@@ -20,6 +20,10 @@ float3 phase_isotropic_eval() {
 
 struct IsotropicPhaseFunction : PhaseFunction {
 
+    float eval(const float cos_theta) {
+        return MERIAN_INV_FOUR_PI;
+    }
+
     float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) {
         return MERIAN_INV_FOUR_PI;
     }

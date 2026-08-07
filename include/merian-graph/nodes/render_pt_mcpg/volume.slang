@@ -43,7 +43,7 @@ void render_pixel(const uint2 pixel,
         return;
 
     const uint2 dim = params.gbuffer.get_dimensions();
-    const HomogeneousVolume medium = scene.get_exterior_medium();
+    let medium = scene.exterior_volume;
     const float mu_t = medium.sampling_mu_t();
     let phase = medium.get_phase_function();
 
@@ -56,7 +56,7 @@ void render_pixel(const uint2 pixel,
     const float2 mv = params.volume_mv[pixel];
 
     const uint grid_max_x = dim.x / distance_mc_grid_width + 1;
-    const float max_t = min(linear_z, medium.max_distance);
+    const float max_t = min(linear_z, medium.get_max_distance());
     const float xi_max = transmittance_xi_max(max_t, mu_t);
 
     float3 irradiance = float3(0);
@@ -179,7 +179,7 @@ void render_pixel(const uint2 pixel,
         }
         incident *= medium.transmittance(distance(scatter_pos, sp.pos));
 
-        const float3 contrib = incident * phase_value * medium.mu_s * medium.transmittance(t) / p;
+        const float3 contrib = incident * phase_value * medium.get_mu_s() * medium.transmittance(t) / p;
         if (any(isnan(contrib)) || any(isinf(contrib)))
             continue;
 

@@ -76,7 +76,7 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<WGBuffer> gbuffer) {
             // primary segment itself. The albedo stays a pure material property.
             if (merian_gbuffer_write_emission)
                 emission[pixel] =
-                    float4(mat_emission * scene.exterior_transmittance(linear_z), 0);
+                    float4(mat_emission * scene.exterior_volume.transmittance(linear_z), 0);
             return;
         }
     }
@@ -90,7 +90,7 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<WGBuffer> gbuffer) {
     gbuffer.store_hit(pixel, hit);
     gbuffer.store_albedo(pixel, Albedo(sp.emission));
     if (merian_gbuffer_write_emission)
-        emission[pixel] = float4(sp.emission * scene.exterior_transmittance(linear_z), 0);
+        emission[pixel] = float4(sp.emission * scene.exterior_volume.transmittance(linear_z), 0);
 }
 
 } // namespace merian

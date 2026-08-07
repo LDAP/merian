@@ -53,10 +53,10 @@ interface MaterialSample {
     // ------------------------------------------
 
     // The medium on the far side of a transmission event, including the relative IOR of the
-    // boundary. Vacuum for opaque materials; a vacuum result on the way out means the integrator
-    // returns to the enclosing (exterior) medium.
-    HomogeneousVolume get_interior_volume() {
-        return HomogeneousVolume();
+    // boundary. Opaque materials leave it at vacuum; the integrator returns to the enclosing
+    // (exterior) medium when the ray leaves the surface.
+    IsotropicVolume get_interior_volume() {
+        return IsotropicVolume(float3(0.0f), float3(0.0f), 1.0f);
     }
 }
 
