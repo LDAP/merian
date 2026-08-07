@@ -21,20 +21,20 @@ void Graph::graph_properties(Properties& props) {
     }
     if (props.config_options("time overwrite", time_overwrite, {"None", "Time", "Delta"},
                              Properties::OptionsStyle::COMBO)) {
-        if (time_overwrite == 0) {
+        if (time_overwrite == TIME_OVERWRITE_NONE) {
             // move reference to prevent jump
             const auto now = std::chrono::high_resolution_clock::now();
             time_reference = now - duration_elapsed;
             time_connect_reference = now - duration_elapsed_since_connect;
         }
     }
-    if (time_overwrite == 1) {
+    if (time_overwrite == TIME_OVERWRITE_TIME) {
         float time_s = to_seconds(duration_elapsed);
         props.config_float("time (s)", time_s, "", 0.1);
         float delta_s = time_s - to_seconds(duration_elapsed);
         props.config_float("offset (s)", delta_s, "", 0.01);
         time_delta_overwrite_ms += delta_s * 1000.;
-    } else if (time_overwrite == 2) {
+    } else if (time_overwrite == TIME_OVERWRITE_DELTA) {
         props.config_float("delta (ms)", time_delta_overwrite_ms, "", 0.001);
         float fps = 1000. / time_delta_overwrite_ms;
         props.config_float("fps", fps, "", 0.01);

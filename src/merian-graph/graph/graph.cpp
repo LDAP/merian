@@ -114,15 +114,15 @@ void Graph::run() {
     in_flight_data.submission->reset();
 
     // Compute time stuff
-    assert(time_overwrite < 3);
+    assert(time_overwrite < TIME_OVERWRITE_COUNT);
     const std::chrono::nanoseconds last_elapsed_ns = duration_elapsed;
-    if (time_overwrite == 1) {
+    if (time_overwrite == TIME_OVERWRITE_TIME) {
         const auto delta = std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::duration<double>(time_delta_overwrite_ms / 1000.));
         duration_elapsed += delta;
         duration_elapsed_since_connect += delta;
         time_delta_overwrite_ms = 0;
-    } else if (time_overwrite == 2) {
+    } else if (time_overwrite == TIME_OVERWRITE_DELTA) {
         const auto delta = std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::duration<double>(time_delta_overwrite_ms / 1000.));
         duration_elapsed += delta;
@@ -274,6 +274,22 @@ void Graph::reset() {
 
 void Graph::request_reconnect() {
     needs_reconnect = true;
+}
+
+void Graph::set_time_delta_overwrite(const float delta_ms) {
+    time_overwrite = TIME_OVERWRITE_DELTA;
+    time_delta_overwrite_ms = delta_ms;
+}
+
+void Graph::set_profiler_report_interval(const uint32_t millis) {
+    profiler_report_intervall_ms = millis;
+}
+
+Profiler::Report Graph::get_run_report() {
+    if (!profiler_enable) {
+        return {};
+    }
+    return run_profiler->get_report();
 }
 
 bool Graph::get_needs_reconnect() const {
