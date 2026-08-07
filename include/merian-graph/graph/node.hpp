@@ -45,6 +45,9 @@ struct OutputConnectorDescriptor {
     // How this node accesses the resource. Host-side connectors (Ptr, Any) leave
     // it empty.
     ConnectorAccess access{};
+    // The output exists but carries nothing this build. Consumers that require it are force
+    // disabled instead of erroring; changing this needs a reconnect.
+    bool disabled = false;
 };
 
 class Node : public std::enable_shared_from_this<Node> {
