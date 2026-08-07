@@ -29,7 +29,7 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<WGBuffer> gbuffer) {
         if ((gd.flags & GeometryDataFlags::UseEnvMap) == 0) {
             const TriangleHit tri = scene.get_triangle_hit(hit, gd);
             const Surface surface = scene.get_surface(hit, tri);
-            const float3 prev_pos = scene.get_prev_world_position(hit, gd);
+            const float3 prev_pos = scene.get_prev_world_position(hit, tri);
 
             const float linear_z = length(surface.pos - ray.Origin);
             const float3 r_x = scene.camera.get_pinhole_direction(pixel + uint2(1, 0), dim);

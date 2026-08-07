@@ -380,10 +380,23 @@ struct Scene {
         return s;
     }
 
+    // prefer get_prev_world_position(const Hit hit, const TriangleHit tri) which reuses the triangle data if possible
     float3 get_prev_world_position(const Hit hit, const GeometryData gd) {
         const float3 prev_obj =
             get_interpolated_prev_object_position(gd, hit.primitive_id, hit.get_barycentrics3());
         return to_prev_world_position(gd, hit.instance_index, prev_obj);
+    }
+
+    // reuses the vertex positions of the triangle if possible
+    float3 get_prev_world_position(const Hit hit, const TriangleHit tri) {
+        float3 prev_obj;
+        if ((tri.gd.flags & GeometryDataFlags::HasPrevVertices) == 0) {
+            prev_obj = tri.get_position(hit);
+        } else {
+            prev_obj = get_interpolated_prev_object_position(tri.gd, hit.primitive_id,
+                                                             hit.get_barycentrics3());
+        }
+        return to_prev_world_position(tri.gd, hit.instance_index, prev_obj);
     }
 
     // Pixel-space delta of the surface point between the previous and the current projection.
@@ -407,7 +420,7 @@ struct Scene {
         const TriangleHit tri = get_triangle_hit(hit, gd);
         const Surface surface = get_surface(hit, tri);
 
-        const float3 prev_pos = get_prev_world_position(hit, gd);
+        const float3 prev_pos = get_prev_world_position(hit, tri);
 
         OrthonormalFrame frame = surface.frame;
         float3 face_normal = surface.face_normal;
