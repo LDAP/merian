@@ -26,7 +26,7 @@
                 "guiding prob": 0.9,
                 "lc": {
                     "LC buffer size": 8000009,
-                    "LC probe count": 8,
+                    "LC probe count": 2,
                     "LC stochastic interpolation": false,
                     "grid distribution dimension": 2.0,
                     "grid level bias": 0.0,

@@ -172,11 +172,11 @@ float3 trace_path(const ParameterBlock<Scene> scene,
             if (rng.next_float() * score_sum < mc_f * mc_samples) {
                 const half3 target_mv = half3((sp.pos - sp.prev_pos) / scene.time_diff);
                 selected.add_sample(cur_pos, mc_f, next_pos, target_mv, scene.time);
-                // sharp update at the queried level, plus a coarse propagation one level up
                 params.mcpg.store(selected, cur_pos, access_normal, scene.camera.position,
                                   scene.frame, rng);
-                params.mcpg.store_at_level(selected, cur_pos, access_normal, selected_level + 1,
-                                           scene.frame, rng);
+
+                // params.mcpg.store_at_level(selected, cur_pos, access_normal, selected_level + 1,
+                //                            scene.frame, rng);
             } else if (missing_light_heuristic && selected_buffer_index != MC_INVALID_INDEX &&
                        selected.light_missing_heuristic(mc_f, wo_world, cur_pos, next_pos)) {
 
