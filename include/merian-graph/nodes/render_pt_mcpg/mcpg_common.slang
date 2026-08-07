@@ -18,6 +18,7 @@ extern static const uint mc_probe_count = 2;
 extern static const bool mc_split_storage = true;
 extern static const uint mc_locality_bits = 3;
 
+extern static const int debug_output_selector = 0;
 extern static const int mc_samples = 5;
 extern static const bool missing_light_heuristic = true;
 

@@ -16,8 +16,6 @@ extern static const int merian_render_max_path_length = 8;
 extern static const bool merian_render_demodulate_albedo = false;
 } // namespace merian
 
-extern static const int debug_output_selector = 0;
-
 extern static const bool use_light_cache_tail = false;
 extern static const float lc_min_pdf = 1.0;
 
