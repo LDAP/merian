@@ -225,7 +225,7 @@ void render_pixel(const uint2 pixel,
 
 [shader("compute")]
 [numthreads(8, 8, 1)]
-void volume_main(uint3 thread_id: SV_DispatchThreadID,
+void single_scattering(uint3 thread_id: SV_DispatchThreadID,
                  ParameterBlock<Scene> scene,
                  ParameterBlock<VolumeBinding> params) {
     render_pixel(thread_id.xy, scene, params);
@@ -235,7 +235,7 @@ void volume_main(uint3 thread_id: SV_DispatchThreadID,
 // which scatters its writes and would otherwise race with the seeding.
 [shader("compute")]
 [numthreads(8, 8, 1)]
-void volume_mv_init(uint3 thread_id: SV_DispatchThreadID, ParameterBlock<VolumeBinding> params) {
+void volume_project_seed(uint3 thread_id: SV_DispatchThreadID, ParameterBlock<VolumeBinding> params) {
     const uint2 pixel = thread_id.xy;
     if (any(pixel >= params.gbuffer.get_dimensions()))
         return;
@@ -248,7 +248,7 @@ void volume_mv_init(uint3 thread_id: SV_DispatchThreadID, ParameterBlock<VolumeB
 // on. Concurrent writes to the same target pixel are benign: either is a valid estimate.
 [shader("compute")]
 [numthreads(8, 8, 1)]
-void volume_forward_project(uint3 thread_id: SV_DispatchThreadID,
+void volume_project(uint3 thread_id: SV_DispatchThreadID,
                             ParameterBlock<Scene> scene,
                             ParameterBlock<VolumeBinding> params) {
     const uint2 pixel = thread_id.xy;
