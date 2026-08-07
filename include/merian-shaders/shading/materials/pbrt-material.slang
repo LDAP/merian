@@ -184,8 +184,8 @@ struct PBRTMaterialSample : MaterialSample {
         return brdf;
     }
 
-    override HomogeneousVolume get_interior_volume() {
-        return HomogeneousVolume(float3(0.0f), eta);
+    override IsotropicVolume get_interior_volume() {
+        return IsotropicVolume(float3(0.0f), float3(0.0f), eta);
     }
 }
 

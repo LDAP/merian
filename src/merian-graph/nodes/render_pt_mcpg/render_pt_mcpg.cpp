@@ -237,7 +237,7 @@ void RenderMCPG::process_volume(const NodeIO& io,
     const auto& cmd = submission.get_cmd();
 
     // Nothing scatters without a medium, and the pass would only burn bandwidth writing zeros.
-    if (volume_spp <= 0 || scene->get_exterior_medium().is_vacuum()) {
+    if (volume_spp <= 0 || !scene->has_exterior_volume()) {
         cmd->clear(io[con_volume], vk::ImageLayout::eGeneral);
         cmd->clear(io[con_volume_depth], vk::ImageLayout::eGeneral);
         cmd->clear(io[con_volume_mv], vk::ImageLayout::eGeneral);

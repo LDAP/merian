@@ -580,12 +580,17 @@ class Scene : public std::enable_shared_from_this<Scene> {
     // Removes meshes, nodes, cameras and resets the AABB. Not: env map, materials and textures.
     void clear_geometry();
 
-    // The medium filling the scene outside of any surface. Switching between vacuum and a medium
-    // recompiles the shaders, so renderers without a medium keep the volumetric code paths out.
-    void set_exterior_medium(const HomogeneousVolume& medium);
+    // The medium filling the scene outside of any surface. Swapping the implementation swaps the
+    // type the renderers compile against, so Vacuum removes the medium rather than branching it.
+    void set_exterior_volume(const HomogeneousVolumeHandle& volume);
 
-    const HomogeneousVolume& get_exterior_medium() const {
-        return exterior_medium;
+    const HomogeneousVolumeHandle& get_exterior_volume() const {
+        return exterior_volume;
+    }
+
+    // False while the scene is vacuum, i.e. while the medium is compiled out of the renderers.
+    bool has_exterior_volume() const {
+        return exterior_volume && exterior_volume->get_type_name() != "merian::Vacuum";
     }
 
     // A the scenes up direction
@@ -734,10 +739,8 @@ class Scene : public std::enable_shared_from_this<Scene> {
     bool thin_lens_enabled = false;
     void set_enable_thin_lens(const bool enable);
 
-    // Tracks the merian_hint_exterior_medium composition constant; toggling recompiles shaders.
-    HomogeneousVolume exterior_medium;
-    bool exterior_medium_enabled = false;
-    void set_enable_exterior_medium(const bool enable);
+    // Selects the SceneHomogeneousVolume type; swapping it recompiles the shaders.
+    HomogeneousVolumeHandle exterior_volume;
 
     ASBuilder as_builder;
     bool as_supported = false;
