@@ -446,6 +446,12 @@ class Graph : public std::enable_shared_from_this<Graph> {
     TimelineSemaphoreHandle iteration_semaphore;
 
     std::shared_ptr<MerianGraphExtension> context_extension;
+
+    // VK_EXT_frame_boundary: when enabled, each run's submission is tagged with the graph index
+    // (total_iteration) so tools can delimit frames even without a swapchain present. Reused across
+    // runs; only frameID changes.
+    bool frame_boundary_enabled = false;
+    vk::FrameBoundaryEXT frame_boundary{vk::FrameBoundaryFlagBitsEXT::eFrameEnd};
 };
 
 using GraphHandle = std::shared_ptr<Graph>;

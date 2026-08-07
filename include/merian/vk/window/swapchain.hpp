@@ -28,7 +28,8 @@ class SwapchainImage : public Image {
 /**
  * @brief      This class describes a swapchain.
  *
- * Can only be used in a loop with get_max_image_count() >= num_swapchain_images >= frames_in_flight.
+ * Can only be used in a loop with get_max_image_count() >= num_swapchain_images >=
+ * frames_in_flight.
  */
 class Swapchain : public std::enable_shared_from_this<Swapchain> {
     static constexpr uint32_t MAX_OLD_SWAPCHAIN_CHAIN_LENGTH = 5;
@@ -101,10 +102,15 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
 
     /* Transfers ownership of the image image_idx to the presentation engine for present.
      *
+     * If frame_boundary_frame_id is set and VK_EXT_frame_boundary is enabled, the present is
+     * tagged with that frame id so tools can associate it with the producing frame.
+     *
      * May throw Swapchain::needs_recreate.
      * For that you can use the Swapchains copy constructor.
      */
-    void present(const QueueHandle& queue, const uint32_t image_idx);
+    void present(const QueueHandle& queue,
+                 const uint32_t image_idx,
+                 const std::optional<uint64_t> frame_boundary_frame_id = std::nullopt);
 
     // ---------------------------------------------------------------------------
 

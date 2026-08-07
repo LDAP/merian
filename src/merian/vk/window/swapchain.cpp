@@ -367,7 +367,9 @@ Swapchain::acquire(const vk::Extent2D extent, const uint64_t timeout) {
     return std::nullopt;
 }
 
-void Swapchain::present(const QueueHandle& queue, const uint32_t image_idx) {
+void Swapchain::present(const QueueHandle& queue,
+                        const uint32_t image_idx,
+                        const std::optional<uint64_t> frame_boundary_frame_id) {
     if (!info.has_value()) {
         throw needs_recreate{"previous acquire or present failed."};
     }
@@ -375,11 +377,23 @@ void Swapchain::present(const QueueHandle& queue, const uint32_t image_idx) {
     SPDLOG_TRACE("swapchain {} presenting image index {} ({})", fmt::ptr(VkSwapchainKHR(swapchain)),
                  image_idx, fmt::ptr(VkImage(info->images[image_idx])));
 
-    vk::Result result = queue->present(vk::PresentInfoKHR{
+    vk::PresentInfoKHR present_info{
         **sync_groups[image_idx].written_semaphore,
         swapchain,
         image_idx,
-    });
+    };
+
+    // No FRAME_END flag: the graph submission that produced this image already ends the frame; the
+    // present only carries the same id so tools correlate it with that frame.
+    const vk::FrameBoundaryEXT frame_boundary{{}, frame_boundary_frame_id.value_or(0)};
+    if (frame_boundary_frame_id && context->get_device()
+                                           ->get_enabled_features()
+                                           .get_frame_boundary_features_ext()
+                                           .frameBoundary == VK_TRUE) {
+        present_info.pNext = &frame_boundary;
+    }
+
+    vk::Result result = queue->present(present_info);
 
     if (result == vk::Result::eSuccess || result == vk::Result::eSuboptimalKHR) {
         return;

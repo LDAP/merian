@@ -123,15 +123,16 @@ WindowNode::process(const NodeIO& io, const NodeProcessInfo& info, Submission& s
 
         uint32_t index = acquire->index;
         SwapchainHandle swapchain = get_swapchain();
-        submission.add_submit_callback(
-            [index, swapchain, &info](const QueueHandle& queue, Submission& /*submission*/) {
-                try {
-                    MERIAN_PROFILE_SCOPE(info.get_profiler(), "present");
-                    swapchain->present(queue, index);
-                } catch (const Swapchain::needs_recreate&) {
-                    return;
-                }
-            });
+        const uint64_t frame_id = info.get_total_iteration();
+        submission.add_submit_callback([index, swapchain, frame_id, &info](
+                                           const QueueHandle& queue, Submission& /*submission*/) {
+            try {
+                MERIAN_PROFILE_SCOPE(info.get_profiler(), "present");
+                swapchain->present(queue, index, frame_id);
+            } catch (const Swapchain::needs_recreate&) {
+                return;
+            }
+        });
 
         if (request_rebuild_on_recreate && acquire->did_recreate)
             flags |= NodeStatusFlagBits::NEEDS_RECONNECT;

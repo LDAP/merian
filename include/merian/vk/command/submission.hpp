@@ -88,6 +88,12 @@ class Submission {
         pre_submit_callbacks.push_back(callback);
     }
 
+    // Chains an extension struct into the pNext of the next VkSubmitInfo. The pointee must stay
+    // valid until that submit; consumed (reset) on submit, like the semaphores.
+    void set_submit_info_pnext(const void* p_next) noexcept {
+        submit_info_p_next = p_next;
+    }
+
     // ------------------------------------------------------------------------------------
 
     // Queues the callback to be called when the commands recorded until this point have finished
@@ -119,8 +125,10 @@ class Submission {
     // a fresh command buffer.
     void submit(const vk::Fence& fence = VK_NULL_HANDLE) {
         get_cmd()->end();
+        vk::TimelineSemaphoreSubmitInfo timeline_submit_info{wait_values, signal_values};
+        timeline_submit_info.pNext = submit_info_p_next;
         queue->submit(cmd, fence, signal_semaphores, wait_semaphores, wait_stages,
-                      vk::TimelineSemaphoreSubmitInfo{wait_values, signal_values});
+                      timeline_submit_info);
         cmd.reset();
 
         for (const auto& callback : submit_callbacks) {
@@ -133,6 +141,7 @@ class Submission {
         signal_semaphores.clear();
         signal_values.clear();
         submit_callbacks.clear();
+        submit_info_p_next = nullptr;
     }
 
     // Runs the pre-submit callbacks and submits the final batch.
@@ -162,6 +171,8 @@ class Submission {
     std::vector<std::function<void(const QueueHandle& queue, Submission& submission)>>
         submit_callbacks;
     std::vector<std::function<void(Submission& submission)>> pre_submit_callbacks;
+
+    const void* submit_info_p_next = nullptr;
 };
 
 } // namespace merian

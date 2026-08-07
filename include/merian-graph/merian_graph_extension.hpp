@@ -61,13 +61,16 @@ class MerianGraphExtension : public ContextExtension {
     }
 
     DeviceSupportInfo query_device_support(const DeviceSupportQueryInfo& query_info) override {
-        DeviceSupportInfo aggregated = DeviceSupportInfo::check(query_info,
-                                                                {
-                                                                    "timelineSemaphore",
-                                                                    "hostQueryReset",
-                                                                    "unifiedImageLayouts",
-                                                                },
-                                                                {}, {}, {});
+        DeviceSupportInfo aggregated =
+            DeviceSupportInfo::check(query_info,
+                                     {
+                                         "timelineSemaphore",
+                                         "hostQueryReset",
+                                         "unifiedImageLayouts",
+                                     },
+                                     // optional: lets the graph tag
+                                     // submissions/presents with a frame id
+                                     {"frameBoundary"}, {}, {});
 
         if (!aggregated.supported) {
             return aggregated;

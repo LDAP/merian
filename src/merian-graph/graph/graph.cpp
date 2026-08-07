@@ -46,6 +46,11 @@ Graph::Graph(const GraphCreateInfo& create_info)
     duration_elapsed = 0ns;
     context_extension = context->get_context_extension<MerianGraphExtension>();
 
+    frame_boundary_enabled = context->get_device()
+                                 ->get_enabled_features()
+                                 .get_frame_boundary_features_ext()
+                                 .frameBoundary == VK_TRUE;
+
     // An ImGui node sends imgui_event each frame with a Properties to render into.
     register_event_listener(
         "//", [this](const GraphEvent::Info& info, const GraphEvent::Data& data) {
@@ -231,6 +236,10 @@ void Graph::run() {
 
         MERIAN_PROFILE_SCOPE(profiler, "end run");
         submission.add_signal_semaphore(iteration_semaphore, run_iteration + 1);
+        if (frame_boundary_enabled) {
+            frame_boundary.frameID = total_iteration;
+            submission.set_submit_info_pnext(&frame_boundary);
+        }
         submission.finish(ring_fences.reset());
     }
     {
