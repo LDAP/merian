@@ -64,14 +64,6 @@ struct MieApproxPhaseFunction : PhaseFunction {
         this.w_d = w_d;
     }
 
-    // fit suitable for 5 < d < 50 micrometer.
-    __init(const float particle_size_um) {
-        this.hg_g = exp(-0.0990567 / (particle_size_um - 1.67154));
-        this.d_g = exp(-2.20679 / (particle_size_um + 3.91029) - 0.428934);
-        this.d_a = exp(3.62489 - 8.29288 / (particle_size_um + 5.52825));
-        this.w_d = exp(-0.599085 / (particle_size_um - 0.641583) - 0.665888);
-    }
-
     // cos_theta = dot(prev_dir, new_dir) = dot(-wi, wo)
     float eval(float cos_theta) {
         return eval(cos_theta, hg_g, d_g, d_a, w_d);
