@@ -55,12 +55,14 @@ class RenderMCPG : public Node {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
+    // Bounds the storage view array the distance chains bind; mirrored by the shader default.
+    static constexpr uint32_t DISTANCE_MC_MAX_LEVELS = 8;
+
     vk::Format irradiance_format = vk::Format::eR32G32B32A32Sfloat;
 
     void ensure_pipeline(const SceneHandle& scene);
     void update_render_constants();
-    // Number of DistanceMCVertex the per-pixel distance chains need at the current extent.
-    uint32_t distance_mc_vertex_count() const;
+    void create_distance_mc();
     void process_volume(const NodeIO& io,
                         const NodeProcessInfo& info,
                         Submission& submission,
@@ -126,12 +128,17 @@ class RenderMCPG : public Node {
     float volume_p_guiding = 0.7f;
     float volume_p_dist_guiding = 0.0f;
     int32_t distance_mc_samples = 3;
-    int32_t distance_mc_grid_width = 25;
-    uint32_t distance_mc_vertex_state_count = 10;
+    float distance_mc_base_width = 4.f;
+    float distance_mc_max_width = 128.f;
+    float distance_mc_distribution_dimension = 2.f;
     bool volume_forward_project = true;
     float volume_forward_project_min_z = 50.0f;
 
-    BufferHandle distance_mc;
+    // One mip per level: a level is a plain lookup instead of a hash. Storage views address a
+    // single mip each, so the shader binds them as an array.
+    ImageHandle distance_mc;
+    std::vector<TextureHandle> distance_mc_levels;
+    uint32_t distance_mc_level_count = 0;
     // Tracks whether the scene had a medium at the last connect. The volume outputs are declared
     // disabled while it has none, which force disables the volume denoise chain.
     bool volume_available = false;

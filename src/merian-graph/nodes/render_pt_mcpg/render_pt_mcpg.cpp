@@ -7,11 +7,9 @@
 
 #include <fmt/format.h>
 
-namespace merian {
+#include <cmath>
 
-// DistanceMCVertex in mc_distance.slang: MAX_DISTANCE_MC_VERTEX_STATE_COUNT states of
-// { float sum_w; uint N; float2 moments; }.
-static constexpr vk::DeviceSize DISTANCE_MC_VERTEX_SIZE = 10 * 16;
+namespace merian {
 
 RenderMCPG::RenderMCPG() = default;
 
@@ -53,12 +51,6 @@ std::vector<InputConnectorDescriptor> RenderMCPG::describe_inputs() {
             {"prev_volume_depth", con_prev_volume_depth, ConnectorAccess::compute_read, 1, true}};
 }
 
-uint32_t RenderMCPG::distance_mc_vertex_count() const {
-    // one vertex per distance_mc_grid_width pixels, plus a border for the jittered lookup
-    return (extent.width / distance_mc_grid_width + 2) *
-           (extent.height / distance_mc_grid_width + 2);
-}
-
 std::vector<OutputConnectorDescriptor> RenderMCPG::describe_outputs(const NodeIOLayout& io_layout) {
     extent = io_layout[con_gbuffer]->get_create_info().extent;
     con_irradiance = ManagedVkImageOut::create(irradiance_format, extent);
@@ -67,10 +59,7 @@ std::vector<OutputConnectorDescriptor> RenderMCPG::describe_outputs(const NodeIO
     con_volume_depth = ManagedVkImageOut::create(volume_depth_format, extent);
     con_volume_mv = ManagedVkImageOut::create(vk::Format::eR16G16Sfloat, extent);
 
-    distance_mc = resource_allocator->create_buffer(
-        vk::DeviceSize(distance_mc_vertex_count()) * DISTANCE_MC_VERTEX_SIZE,
-        vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
-        MemoryMappingType::NONE, "RenderMCPG::distance_mc");
+    create_distance_mc();
 
     const bool no_volume = !volume_available;
     return {{"irradiance", con_irradiance, ConnectorAccess::ray_tracing_write},
@@ -78,6 +67,47 @@ std::vector<OutputConnectorDescriptor> RenderMCPG::describe_outputs(const NodeIO
             {"volume", con_volume, ConnectorAccess::compute_write, no_volume},
             {"volume_depth", con_volume_depth, ConnectorAccess::compute_write, no_volume},
             {"volume_mv", con_volume_mv, ConnectorAccess::compute_read_write, no_volume}};
+}
+
+void RenderMCPG::create_distance_mc() {
+    const uint32_t cells_x = uint32_t(std::ceil(extent.width / distance_mc_base_width)) + 2;
+    const uint32_t cells_y = uint32_t(std::ceil(extent.height / distance_mc_base_width)) + 2;
+    // Coarser than the configured cell width buys nothing, and a level past the image is empty.
+    const uint32_t levels_to_max_width =
+        uint32_t(std::floor(std::log2(std::max(distance_mc_max_width / distance_mc_base_width,
+                                               1.f)))) +
+        1;
+    const uint32_t levels_in_image =
+        uint32_t(std::floor(std::log2(float(std::max(cells_x, cells_y))))) + 1;
+    distance_mc_level_count =
+        std::min({levels_to_max_width, levels_in_image, DISTANCE_MC_MAX_LEVELS});
+
+    vk::ImageCreateInfo info{{},
+                             vk::ImageType::e2D,
+                             vk::Format::eR32G32B32A32Sfloat,
+                             {cells_x, cells_y, 1},
+                             distance_mc_level_count,
+                             1,
+                             vk::SampleCountFlagBits::e1,
+                             vk::ImageTiling::eOptimal,
+                             vk::ImageUsageFlagBits::eStorage |
+                                 vk::ImageUsageFlagBits::eTransferDst,
+                             vk::SharingMode::eExclusive};
+    distance_mc =
+        resource_allocator->create_image(info, MemoryMappingType::NONE, "RenderMCPG::distance_mc");
+
+    // A storage view addresses one mip, so each level gets its own.
+    distance_mc_levels.clear();
+    for (uint32_t level = 0; level < distance_mc_level_count; level++) {
+        const vk::ImageViewCreateInfo view{
+            {},
+            *distance_mc,
+            vk::ImageViewType::e2D,
+            distance_mc->get_format(),
+            {},
+            vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, level, 1, 0, 1}};
+        distance_mc_levels.emplace_back(resource_allocator->create_texture(distance_mc, view));
+    }
 }
 
 RenderMCPG::NodeStatusFlags
@@ -205,11 +235,15 @@ RenderMCPG::process(const NodeIO& io, const NodeProcessInfo& info, Submission& s
     if (info.get_iteration() == 0) {
         irr_cache->reset(cmd);
         mcpg->reset(cmd);
-        cmd->fill(distance_mc);
-        cmd->barrier(distance_mc->buffer_barrier2(
-            vk::PipelineStageFlagBits2::eTransfer, vk::PipelineStageFlagBits2::eAllCommands,
-            vk::AccessFlagBits2::eTransferWrite,
-            vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite));
+        cmd->barrier(distance_mc->barrier2(
+            vk::ImageLayout::eTransferDstOptimal, vk::AccessFlagBits2::eNone,
+            vk::AccessFlagBits2::eTransferWrite, vk::PipelineStageFlagBits2::eTopOfPipe,
+            vk::PipelineStageFlagBits2::eTransfer, {}, {}, all_levels_and_layers(), true));
+        cmd->clear(distance_mc, vk::ImageLayout::eTransferDstOptimal);
+        cmd->barrier(distance_mc->barrier2(
+            vk::ImageLayout::eGeneral, vk::AccessFlagBits2::eTransferWrite,
+            vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
+            vk::PipelineStageFlagBits2::eTransfer, vk::PipelineStageFlagBits2::eAllCommands));
     }
 
     auto cursor = params_obj->get_cursor();
@@ -260,10 +294,16 @@ void RenderMCPG::process_volume(const NodeIO& io,
         };
         write("gbuffer", gbuf.r());
         write("volume", io[con_volume].get_texture());
+        if (io.is_connected(con_debug))
+            write("debug", io[con_debug].get_texture());
         write("volume_depth", io[con_volume_depth].get_texture());
         write("volume_mv", io[con_volume_mv].get_texture());
-        write("debug", io[con_debug].get_texture());
-        write("distance_mc", distance_mc);
+        if (auto field = cursor["distance_mc"]; field.is_valid()) {
+            auto levels = field["levels"];
+            for (uint32_t level = 0; level < distance_mc_level_count; level++) {
+                levels[level] = distance_mc_levels[level];
+            }
+        }
         if (auto field = cursor["prev_volume_depth"]; field.is_valid())
             field = io[con_prev_volume_depth];
         if (auto field = cursor["irr_cache"]; field.is_valid())
@@ -348,8 +388,9 @@ void RenderMCPG::update_render_constants() {
                     "export static const float volume_p_dist_guiding = {:f};\n"
                     "export static const float volume_forward_project_min_z = {:f};\n"
                     "export static const int distance_mc_samples = {};\n"
-                    "export static const int distance_mc_grid_width = {};\n"
-                    "export static const uint distance_mc_vertex_state_count = {}u;\n",
+                    "export static const float distance_mc_base_width = {:f};\n"
+                    "export static const uint distance_mc_level_count = {}u;\n"
+                    "export static const float distance_mc_distribution_dimension = {:f};\n",
                     emission_on_primary ? "true" : "false", spp, max_path_length, mask,
                     demodulate_albedo ? "true" : "false", use_light_cache_tail ? "true" : "false",
                     missing_light_heuristic ? "true" : "false", mc_samples,
@@ -361,7 +402,8 @@ void RenderMCPG::update_render_constants() {
                     volume_use_light_cache ? "true" : "false",
                     reference_mode ? 0.0f : volume_p_guiding,
                     reference_mode ? 0.0f : volume_p_dist_guiding, volume_forward_project_min_z,
-                    distance_mc_samples, distance_mc_grid_width, distance_mc_vertex_state_count));
+                    distance_mc_samples, distance_mc_base_width,
+                    std::max(distance_mc_level_count, 1u), distance_mc_distribution_dimension));
 }
 
 RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
@@ -414,11 +456,21 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
                            "Query the light cache for non-emitting surfaces behind the "
                            "scattering event.");
     constants_changed |= config.config_int("distance MC samples", distance_mc_samples, "", 0, 30);
-    needs_reconnect |= config.config_int("distance MC grid width", distance_mc_grid_width,
-                                         "Side length of a distance chain cell, in pixels.", 1, 64);
-    constants_changed |=
-        config.config_uint("distance MC states per vertex", distance_mc_vertex_state_count,
-                           "Number of chains per cell.", 1u, 10u);
+    needs_reconnect |= config.config_float("distance MC base width", distance_mc_base_width,
+                                           "Side length of a level 0 distance chain cell, in "
+                                           "pixels. Every further level doubles it.",
+                                           1.f, 1.f, 256.f);
+    needs_reconnect |= config.config_float("distance MC max width", distance_mc_max_width,
+                                           "Side length the coarsest level may reach, in pixels. "
+                                           "Caps the level count together with the image size.",
+                                           1.f, 1.f, 4096.f);
+    config.output_text("distance MC levels: {} (coarsest {:.0f} px)", distance_mc_level_count,
+                       distance_mc_base_width * float(1u << (distance_mc_level_count - 1)));
+    constants_changed |= config.config_float(
+        "distance MC level spread", distance_mc_distribution_dimension,
+        "Effective dimensionality the levels are spread over; smaller reaches coarser levels more "
+        "often.",
+        0.1f, 0.1f, 8.f);
     config.config_bool("volume forward project", volume_forward_project,
                        "Reproject last frame's mean scattering distance into the volume motion "
                        "vectors instead of using the surface ones.");
@@ -511,12 +563,11 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
     }
 
     config.st_separate("Debug");
-    constants_changed |=
-        config.config_options("debug output", debug_output_selector,
-                              {"irradiance", "moments", "light cache", "mc grid", "mc lod",
-                               "mc weight", "mc mean direction", "mc cos", "mc N", "mc mv",
-                               "lc normal bin (actual)", "lc normal bin (selected)",
-                               "distance mc mean", "distance mc sigma"});
+    constants_changed |= config.config_options(
+        "debug output", debug_output_selector,
+        {"irradiance", "moments", "light cache", "mc grid", "mc lod", "mc weight",
+         "mc mean direction", "mc cos", "mc N", "mc mv", "lc normal bin (actual)",
+         "lc normal bin (selected)", "distance mc mean", "distance mc sigma"});
 
     if (constants_changed && composition) {
         update_render_constants();

@@ -1,25 +1,73 @@
 import merian_shaders.utils.grid;
+import merian_shaders.utils.textures;
 import merian_shaders.utils.random;
 
 using merian;
 
-static const uint MAX_DISTANCE_MC_VERTEX_STATE_COUNT = 10;
+static const uint DISTANCE_ML_MAX_N = 1024;
+static const float DISTANCE_ML_MIN_ALPHA = 0.01;
+
+// Cell width in pixels at level 0; every further level doubles it, which is exactly one mip.
+extern static const float distance_mc_base_width = 4.0;
+// The host exports the exact count of views it binds.
+extern static const uint distance_mc_level_count = 8;
+// Effective dimensionality the levels are spread over. Keeps the expected number of threads per
+// cell roughly constant; smaller widens the spread.
+extern static const float distance_mc_distribution_dimension = 2.0;
 
 struct DistanceMCState {
     float sum_w;
     uint N;
     float2 moments;
+
+    // Packed one state per texel: N is small enough to survive the float round trip exactly.
+    static DistanceMCState unpack(const float4 texel) {
+        DistanceMCState s;
+        s.sum_w = texel.x;
+        s.N = uint(texel.y);
+        s.moments = texel.zw;
+        return s;
+    }
+
+    float4 pack() {
+        return float4(sum_w, float(N), moments.x, moments.y);
+    }
 };
 
-struct DistanceMCVertex {
-    DistanceMCState states[MAX_DISTANCE_MC_VERTEX_STATE_COUNT];
-};
+// One image per level, so a level is a plain mip lookup rather than a hash.
+struct DistanceMCGrid {
+    RWTexture2D<float4> levels[distance_mc_level_count];
 
-static const uint DISTANCE_ML_MAX_N = 1024;
-static const float DISTANCE_ML_MIN_ALPHA = 0.01;
+    // Screen-space analogue of the world-space grid's distributed level: the projection already
+    // keeps a cell's screen size constant, so only the geometric spread over levels remains.
+    uint distributed_level(inout RandomGenerator rng) {
+        const float level =
+            -log2(1.0 - rng.next_float()) / distance_mc_distribution_dimension;
+        return min(uint(round(level)), distance_mc_level_count - 1);
+    }
 
-extern static const int distance_mc_grid_width = 25;
-extern static const uint distance_mc_vertex_state_count = MAX_DISTANCE_MC_VERTEX_STATE_COUNT;
+    // The staggering pushes the index half a cell past the mip, so clamp rather than let the
+    // border cells read zero and drop out of the resampling.
+    uint2 cell(const float2 pixel, const uint level, inout RandomGenerator rng) {
+        const float width = float(1u << level);
+        // Offset by half a cell so levels of different width do not share vertices
+        // (Mueller et al., "Instant Neural Graphics Primitives", Appendix A.)
+        const float2 staggered = pixel / distance_mc_base_width + 0.5 * width;
+        const int2 idx = grid_idx_interpolate(staggered, width, rng.next_float());
+        return uint2(clamp(idx, int2(0), int2(texture_dimensions(levels[level])) - 1));
+    }
+
+    DistanceMCState load(const float2 pixel, const uint level, inout RandomGenerator rng) {
+        return DistanceMCState::unpack(levels[level][cell(pixel, level, rng)]);
+    }
+
+    void store(const DistanceMCState s,
+               const float2 pixel,
+               const uint level,
+               inout RandomGenerator rng) {
+        levels[level][cell(pixel, level, rng)] = s.pack();
+    }
+}
 
 DistanceMCState distance_mc_state_new() {
     DistanceMCState r = {0.0, 0, float2(0)};
@@ -41,30 +89,4 @@ void distance_mc_state_add_sample(inout DistanceMCState s, const float distance,
 
     s.sum_w = lerp(s.sum_w, w, alpha);
     s.moments = lerp(s.moments, w * float2(distance, distance * distance), alpha);
-}
-
-uint distance_mc_buf_idx(const int2 index, const uint grid_max_x) {
-    return uint(index.x) + (grid_max_x + 1) * uint(index.y);
-}
-
-void distance_mc_load(RWStructuredBuffer<DistanceMCVertex> distance_mc_states,
-                      out DistanceMCState s,
-                      const float2 pixel,
-                      const uint grid_max_x,
-                      inout RandomGenerator rng) {
-    const int2 grid_idx = grid_idx_interpolate(pixel, float(distance_mc_grid_width), rng.next_float());
-    const uint state_idx = uint(rng.next_float() * distance_mc_vertex_state_count);
-
-    s = distance_mc_states[distance_mc_buf_idx(grid_idx, grid_max_x)].states[state_idx];
-}
-
-void distance_mc_save(RWStructuredBuffer<DistanceMCVertex> distance_mc_states,
-                      const DistanceMCState s,
-                      const float2 pixel,
-                      const uint grid_max_x,
-                      inout RandomGenerator rng) {
-    const int2 grid_idx = grid_idx_interpolate(pixel, float(distance_mc_grid_width), rng.next_float());
-    const uint state_idx = uint(rng.next_float() * distance_mc_vertex_state_count);
-
-    distance_mc_states[distance_mc_buf_idx(grid_idx, grid_max_x)].states[state_idx] = s;
 }

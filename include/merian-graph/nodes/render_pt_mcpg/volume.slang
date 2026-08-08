@@ -26,11 +26,11 @@ extern static const float volume_forward_project_min_z = 50.0;
 struct VolumeBinding {
     ParameterBlock<GBuffer> gbuffer;
     RWTexture2D<float4> volume;
+    RWTexture2D<float4> debug;
     RWTexture2D<float> volume_depth;
     RWTexture2D<float2> volume_mv;
-    RWTexture2D<float4> debug;
     Sampler2D<float> prev_volume_depth;
-    RWStructuredBuffer<DistanceMCVertex> distance_mc;
+    DistanceMCGrid distance_mc;
     RenderIrradianceCache irr_cache;
     RenderMCPG mcpg;
 };
@@ -57,7 +57,6 @@ void render_pixel(const uint2 pixel,
     const float linear_z = params.gbuffer.get_linear_z(pixel);
     const float2 mv = params.volume_mv[pixel];
 
-    const uint grid_max_x = dim.x / distance_mc_grid_width + 1;
     const float max_t = min(linear_z, medium.get_max_distance());
     const float xi_max = transmittance_xi_max(max_t, mu_t);
 
@@ -72,13 +71,15 @@ void render_pixel(const uint2 pixel,
         float2 normal_dists[distance_mc_samples];
         float dist_score_sum = 0.0;
         float t = 0.0;
+        // the level the winning candidate came from, so the update lands where it was read
+        uint dist_level = 0;
         for (int i = 0; i < distance_mc_samples; i++) {
             // the first sample follows the motion vector, the rest stay on this pixel
             const float2 lookup = select(sample_i == 0,
                                          clamp(float2(pixel) + mv, float2(0), float2(dim) - 1.f),
                                          float2(pixel));
-            DistanceMCState s;
-            distance_mc_load(params.distance_mc, s, lookup, grid_max_x, rng);
+            const uint level = params.distance_mc.distributed_level(rng);
+            const DistanceMCState s = params.distance_mc.load(lookup, level, rng);
             normal_dists[i] = distance_mc_state_get_normal_dist(s);
             // the reprojected chain holds distances measured from the previous camera
             if (sample_i == 0)
@@ -89,6 +90,7 @@ void render_pixel(const uint2 pixel,
             // comparison with NaN is false (when dist_scores[i] == 0 and dist_score_sum == 0)
             if (rng.next_float() < dist_scores[i] / dist_score_sum) {
                 dist_mc = s;
+                dist_level = level;
                 t = sample_normal_box_muller(normal_dists[i].x, normal_dists[i].y, rng).x;
             }
         }
@@ -194,8 +196,12 @@ void render_pixel(const uint2 pixel,
 
         // 5. update the distance chain and the direction chain
         distance_mc_state_add_sample(dist_mc, t, l);
-        if (rng.next_float() * dist_score_sum < l * distance_mc_samples)
-            distance_mc_save(params.distance_mc, dist_mc, float2(pixel), grid_max_x, rng);
+        if (rng.next_float() * dist_score_sum < l * distance_mc_samples) {
+            // sharp update at the level it was read from, plus a coarse propagation one level up
+            params.distance_mc.store(dist_mc, float2(pixel), dist_level, rng);
+            params.distance_mc.store(dist_mc, float2(pixel),
+                                     min(dist_level + 1, distance_mc_level_count - 1), rng);
+        }
 
         const float mc_f = yuv_luminance(incident * phase_value / wo_p);
         if (isinf(mc_f) || isnan(mc_f))
@@ -221,12 +227,11 @@ void render_pixel(const uint2 pixel,
 
     params.volume[pixel] = float4(irradiance, second_moment);
 
-    // the stored chain at this pixel, at a fixed scale so the field stays comparable across
-    // pixels (dividing by linear_z would imprint the geometry into the view)
+    // the stored chain at the finest level, at a fixed scale so the field stays comparable
+    // across pixels (dividing by linear_z would imprint the geometry into the view)
     if (debug_output_selector == 12 || debug_output_selector == 13) {
-        DistanceMCState s;
-        distance_mc_load(params.distance_mc, s, float2(pixel), grid_max_x, rng);
-        const float2 nd = distance_mc_state_get_normal_dist(s);
+        const float2 nd =
+            distance_mc_state_get_normal_dist(params.distance_mc.load(float2(pixel), 0, rng));
         const float v = select(debug_output_selector == 12, nd.x, nd.y);
         params.debug[pixel] = float4(debug_color(v / medium.get_max_distance()), 1);
     }
