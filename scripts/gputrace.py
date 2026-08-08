@@ -11,12 +11,14 @@ GPU clock is not stable enough for raw milliseconds to be meaningful.
 node; the metric set and the 60 / 80 % triage boundaries are from NVIDIA's "The
 Peak-Performance-Percentage Analysis Method for Optimizing Any GPU Workload".
 --shaders splits each node by shader stage (raygen, closest_hit, compute, ...),
-which is the only per-shader granularity the export carries.
+which is the only per-shader granularity the export carries. --stalls gives the
+resident warps per TPC and what they are waiting on, which is what separates a
+node that is latency bound from one that is simply under-fed.
 
 Examples:
   scripts/gputrace.py subprojects/merian-plugin-quake/quake.json --frame 300 \\
       -- --renderer mcpg "-basedir C:/Users/me/.quakespasm -game ad +map ad_tears -nosound"
-  scripts/gputrace.py graph.json --sol --shaders
+  scripts/gputrace.py graph.json --sol --stalls
   scripts/gputrace.py graph.json --filter render --filter "*svgf*" --sol
   scripts/gputrace.py graph.json --filter raygen --shaders
   scripts/gputrace.py graph.json --json before.json
@@ -26,12 +28,16 @@ Examples:
 Only top-level profiler scopes reach the export, so the rows are exactly the
 graph's per-node labels; scopes a node opens inside its own process() do not
 appear.
+
+--start-after-frames counts *presented* frames, so a graph with its window,
+blit and imgui nodes disabled never reaches it and the capture comes back empty.
 """
 
 import argparse
 import fnmatch
 import glob
 import json
+import re
 import shutil
 import statistics
 import subprocess
@@ -69,9 +75,15 @@ HIT_RATES = (
     ("L1 hit", "Top_Level_Triage.l1tex__t_sector_hit_rate.pct"),
     ("L2 hit", "Top_Level_Triage.lts__average_t_sector_hit_rate_srcnode_gpc_realtime.pct"),
 )
-# Warps active per shader stage, which is what splits a node into its shaders.
-SHADER_PREFIX = "GPUTrace.PCSampler.tpc__warps_active_shader_"
-SHADER_SUFFIX = ".avg.pct_of_peak_sustained_elapsed"
+# Active warps per shader stage, which is what splits a node into its shaders. The percentage
+# form measures occupancy, the per-cycle form counts the warps themselves.
+WARPS_PREFIX = "GPUTrace.PCSampler.tpc__warps_active_shader_"
+OCCUPANCY_SUFFIX = ".avg.pct_of_peak_sustained_elapsed"
+COUNT_SUFFIX = ".avg.per_cycle_elapsed"
+# Why the resident warps are not issuing. "selected" is the one that is not a stall.
+STALL_PREFIX = "GPUTrace.PCSampler.tpc__warps_issue_stalled_"
+STALL_SUFFIX = ".avg.per_cycle_elapsed"
+STALL_NOT_A_STALL = "selected"
 # Triage boundaries: above the first, take work off the unit; below the second, feed it more.
 SOL_BOUND_HIGH = 80.0
 SOL_BOUND_LOW = 60.0
@@ -95,13 +107,17 @@ def quote(token):
     return f'"{token}"' if " " in token else token
 
 
+def runner_name(build):
+    for name in ("merian-graph-run.exe", "merian-graph-run"):
+        if (Path(build).resolve() / name).exists():
+            return name
+    sys.exit(f"no merian-graph-run in {build}; pass --build")
+
+
 def build_command(args, out_dir, graph):
     exe = Path(args.exe or shutil.which("meson") or sys.exit("meson not on PATH; pass --exe"))
     build = Path(args.build).resolve()
-    runner_exe = next((build / n for n in ("merian-graph-run.exe", "merian-graph-run")
-                       if (build / n).exists()), None)
-    if runner_exe is None:
-        sys.exit(f"no merian-graph-run in {build}; pass --build")
+    runner_exe = build / runner_name(build)
 
     runner = ["devenv", f"./{runner_exe.name}", graph.as_posix()] + args.graph_args
     return [
@@ -133,13 +149,31 @@ def prepare_inputs(args, out_dir):
         overlay = out_dir / "serialize.json"
         overlay.write_text(json.dumps({"graph_properties": {"iterations in flight": 1}}))
         args.graph_args = ["--merge", str(overlay)] + args.graph_args
+    overlays = []
     for merge in args.merge:
-        args.graph_args = ["--merge", str(Path(merge).resolve())] + args.graph_args
+        overlays += ["--merge", str(Path(merge).resolve())]
+    args.graph_args = overlays + args.graph_args
     return graph
 
 
-def kill_stray():
-    subprocess.run(["taskkill", "/F", "/IM", "ngfx.exe"], capture_output=True, check=False)
+def running_pids(names):
+    pids = {}
+    for name in names:
+        # tasklist output is not decodable as the locale codepage
+        out = subprocess.run(["tasklist", "/FI", f"IMAGENAME eq {name}", "/FO", "CSV", "/NH"],
+                             capture_output=True, text=True, encoding="utf-8",
+                             errors="replace", check=False).stdout or ""
+        pids[name] = set(re.findall(r'^"[^"]+","(\d+)"', out, re.MULTILINE))
+    return pids
+
+
+def kill_ours(before, names):
+    """Only processes that appeared after we started. A failed session leaves the runner behind
+    pinning the GPU, but killing by image name would take down instances the user is running."""
+    now = running_pids(names)
+    for name in names:
+        for pid in now[name] - before.get(name, set()):
+            subprocess.run(["taskkill", "/F", "/PID", pid], capture_output=True, check=False)
 
 
 def read_table(path):
@@ -203,7 +237,13 @@ def read_regimes(path):
     return regimes
 
 
-def sol_stats(regimes):
+def by_suffix(metrics, prefix, suffix):
+    """The PCSampler metrics all share a prefix and differ by the thing they measure."""
+    return {m[len(prefix):-len(suffix)]: v for m, v in metrics.items()
+            if m.startswith(prefix) and m.endswith(suffix) and v > 0}
+
+
+def sol_stats(regimes, shaders):
     stats = {}
     for name, metrics in regimes.items():
         units = {unit: metrics[metric] for unit, metric in SOL_UNITS if metric in metrics}
@@ -215,29 +255,49 @@ def sol_stats(regimes):
             "units": units,
             "top": top,
             "top_pct": limiters[top],
+            # Active warps decide the verdict when no unit is saturated: a kernel can only be
+            # latency bound if it has too few warps in flight to hide it.
+            "warps": sum(shaders.get(name, {}).values()),
             "hit_rates": {label: metrics[m] for label, m in HIT_RATES if m in metrics},
         }
     return stats
 
 
-def shader_stats(regimes):
+def stall_stats(regimes):
+    """Per node: warps resident per TPC and where they go, as a share of those warps."""
     stats = {}
     for name, metrics in regimes.items():
-        stages = {}
-        for metric, value in metrics.items():
-            if metric.startswith(SHADER_PREFIX) and metric.endswith(SHADER_SUFFIX) and value > 0:
-                stages[metric[len(SHADER_PREFIX):-len(SHADER_SUFFIX)]] = value
-        if stages:
-            stats[name] = stages
+        resident = sum(by_suffix(metrics, WARPS_PREFIX, COUNT_SUFFIX).values())
+        reasons = by_suffix(metrics, STALL_PREFIX, STALL_SUFFIX)
+        if resident > 0 and reasons:
+            stats[name] = {"resident": resident, "reasons": reasons}
     return stats
 
 
-def verdict(top_pct):
+def shader_stats(regimes):
+    return {name: stages for name, metrics in regimes.items()
+            if (stages := by_suffix(metrics, WARPS_PREFIX, OCCUPANCY_SUFFIX))}
+
+
+def top_stall(stalls):
+    """The reason most of the resident warps are waiting, ignoring the one that is not a wait."""
+    reasons = {r: v for r, v in stalls["reasons"].items() if r != STALL_NOT_A_STALL}
+    if not reasons:
+        return None, 0.0
+    top = max(reasons, key=reasons.get)
+    return top, reasons[top] / stalls["resident"]
+
+
+def verdict(top_pct, stalls):
     if top_pct > SOL_BOUND_HIGH:
         return "take work off it"
-    if top_pct < SOL_BOUND_LOW:
+    if top_pct >= SOL_BOUND_LOW:
+        return "both: less work and more throughput"
+    # Nothing is saturated, so the answer is what the warps are waiting on.
+    reason, share = top_stall(stalls) if stalls else (None, 0.0)
+    if reason is None:
         return "under-utilized, latency/occupancy bound"
-    return "both: less work and more throughput"
+    return f"latency bound on {reason} ({100 * share:.0f}% of resident warps)"
 
 
 def collect(out_dir):
@@ -252,14 +312,16 @@ def collect(out_dir):
     clock = statistics.median(clocks)
     frame = read_table(base / "FRAME.xls").get("GPU frame time", [])
     regimes = read_regimes(base / "GPUTRACE_REGIMES.xls")
+    shaders = shader_stats(regimes)
     return {
         "clock_mhz": clock,
         "clock_spread": (max(clocks) - min(clocks)) / clock,
         "frames": len(next(iter(events.values()))),
         "frame_time": summarize(frame, clock) if frame else None,
         "nodes": {name: summarize(values, clock) for name, values in events.items()},
-        "sol": sol_stats(regimes),
-        "shaders": shader_stats(regimes),
+        "shaders": shaders,
+        "sol": sol_stats(regimes, shaders),
+        "stalls": stall_stats(regimes),
     }
 
 
@@ -275,8 +337,10 @@ def capture(args):
         print(" ".join(quote(c) for c in command))
         return None
 
+    watched = ["ngfx.exe", runner_name(args.build)]
+    pre_existing = running_pids(watched)
     for attempt in range(1, args.retries + 2):
-        kill_stray()
+        kill_ours(pre_existing, watched)
         if attempt > 1:
             time.sleep(RETRY_BACKOFF_S)
         shutil.rmtree(out_dir / "BASE", ignore_errors=True)
@@ -286,13 +350,14 @@ def capture(args):
                            capture_output=not args.verbose)
         except subprocess.TimeoutExpired:
             print(f"attempt {attempt}: ngfx timed out after {args.timeout}s", file=sys.stderr)
+        kill_ours(pre_existing, watched)
         result = collect(out_dir)
         if result:
             result["out_dir"] = str(out_dir)
             result["frame"] = args.frame
             return result
         print(f"attempt {attempt}: no usable tables in {out_dir}", file=sys.stderr)
-    kill_stray()
+    kill_ours(pre_existing, watched)
     sys.exit("capture failed; check that the app runs standalone and the GPU is idle")
 
 
@@ -325,13 +390,14 @@ def print_sol(result, names):
 
     header = "".join(f"{u:>8}" for u in units)
     rates = [label for label, _ in HIT_RATES]
-    print(f"{'node':<{width}}{header}{''.join(f'{r:>8}' for r in rates)}   top SOL")
+    print(f"{'node':<{width}}{header}{''.join(f'{r:>8}' for r in rates)}{'warps':>8}   top SOL")
     for name in sorted(rows, key=lambda n: -result["sol"][n]["top_pct"]):
         s = result["sol"][name]
         cells = "".join(f"{s['units'].get(u, 0.0):>8.1f}" for u in units)
         hits = "".join(f"{s['hit_rates'].get(r, float('nan')):>8.1f}" for r in rates)
-        print(f"{name:<{width}}{cells}{hits}   {s['top']} {s['top_pct']:.0f}% "
-              f"-> {verdict(s['top_pct'])}")
+        print(f"{name:<{width}}{cells}{hits}{s.get('warps', 0.0):>8.1f}   {s['top']} "
+              f"{s['top_pct']:.0f}% -> {verdict(s['top_pct'], result.get('stalls', {}).get(name))}")
+    print("\nwarps = active warps summed over the node's shader stages, % of peak sustained.")
     if any(u in units for u in SOL_NOT_A_LIMITER):
         print(f"\n{'/'.join(SOL_NOT_A_LIMITER)} are shown but excluded from the top unit: inside "
               "compute regimes they mostly carry the profiler's own counter streaming.")
@@ -349,6 +415,25 @@ def print_shaders(result, names):
         listed = "  ".join(f"{stage}={value:.1f}"
                            for stage, value in sorted(stages.items(), key=lambda kv: -kv[1]))
         print(f"{name:<{width}}  {listed}")
+
+
+def print_stalls(result, names, top_reasons=5):
+    rows = [n for n in names if result.get("stalls", {}).get(n)]
+    if not rows:
+        print("no stall metrics in this capture")
+        return
+    width = max(len(n) for n in rows)
+    print(f"{'node':<{width}}  {'warps/TPC':>9}  {'issuing':>7}   top stall reasons "
+          "(share of resident warps)")
+    for name in rows:
+        s = result["stalls"][name]
+        issuing = s["reasons"].get(STALL_NOT_A_STALL, 0.0) / s["resident"]
+        listed = "  ".join(
+            f"{reason}={100 * value / s['resident']:.0f}%"
+            for reason, value in sorted(s["reasons"].items(), key=lambda kv: -kv[1])
+            if reason != STALL_NOT_A_STALL)
+        print(f"{name:<{width}}  {s['resident']:>9.2f}  {100 * issuing:>6.1f}%   "
+              f"{' '.join(listed.split()[:top_reasons])}")
 
 
 def print_report(result, names, top):
@@ -381,7 +466,11 @@ def print_comparison(before, after, patterns, top):
 
     names = [n for n in set(before["nodes"]) | set(after["nodes"])
              if matches(n, patterns, after.get("shaders", {}).get(n, {}))]
-    names = sorted(names, key=lambda n: -after["nodes"].get(n, before["nodes"][n])["mcyc"])[:top]
+    def cost(name):
+        entry = after["nodes"].get(name) or before["nodes"][name]
+        return -entry["mcyc"]
+
+    names = sorted(names, key=cost)[:top]
     width = max((len(n) for n in names), default=4)
     print(f"{'node':<{width}}  {'before':>10}  {'after':>10}  {'delta':>8}")
     for name in names:
@@ -425,6 +514,9 @@ def main():
                         help="per-unit speed-of-light and the limiting unit per node")
     parser.add_argument("--shaders", action="store_true",
                         help="warps active per shader stage, per node")
+    parser.add_argument("--stalls", action="store_true",
+                        help="resident warps per TPC and why they are not issuing; this is what "
+                             "separates a latency-bound node from an under-fed one")
     parser.add_argument("--no-copy-config", dest="copy_config", action="store_false",
                         help="run the config in place, letting the runner rewrite it")
     parser.add_argument("--json", metavar="FILE", help="write the parsed stats")
@@ -458,6 +550,9 @@ def main():
     if args.shaders:
         print()
         print_shaders(result, names)
+    if args.stalls:
+        print()
+        print_stalls(result, names)
     if args.baseline:
         print()
         print_comparison(json.loads(Path(args.baseline).read_text()), result,
