@@ -84,6 +84,7 @@ void Graph::from_description(const GraphDescription& description) {
 
             // Set enabled state
             node_data.at(node).enabled = enabled;
+            node_data.at(node).linearization_order = node_info.linearization_order;
 
             SPDLOG_DEBUG("Loaded node '{}' of type '{}'", identifier, node_type);
         } catch (const std::exception& e) {
@@ -143,6 +144,8 @@ GraphDescription Graph::to_description() {
 
         description.add_node(node_type, identifier, config);
         description.set_node_enabled(identifier, enabled);
+        description.set_node_linearization_order(identifier,
+                                                 node_data.at(node).linearization_order);
         // metadata only lives in the loaded description, not in live node state
         if (loaded_description.has_node(identifier)) {
             description.set_node_metadata(identifier,

@@ -33,6 +33,8 @@ struct NodeData {
 
     // User enabled
     bool enabled{true};
+    // Within-layer execution order (lower runs earlier, ties by identifier)
+    uint32_t linearization_order{0};
     // Device does not support this node
     bool unsupported{};
     std::string unsupported_reason{};

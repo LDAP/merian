@@ -2,6 +2,9 @@
 
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
+#include <tuple>
+
 namespace merian {
 
 void Graph::connect() {
@@ -335,8 +338,7 @@ bool Graph::connect_node(const NodeHandle& node,
     return true;
 }
 
-void Graph::search_satisfied_nodes(std::set<NodeHandle>& candidates,
-                                   std::priority_queue<NodeHandle>& queue) {
+void Graph::search_satisfied_nodes(std::set<NodeHandle>& candidates, SatisfiedQueue& queue) {
     std::vector<NodeHandle> to_erase;
     // find nodes with all inputs conencted, delayed, or optional and will not be connected
     for (const NodeHandle& node : candidates) {
@@ -411,7 +413,7 @@ void Graph::search_satisfied_nodes(std::set<NodeHandle>& candidates,
         }
 
         if (satisfied) {
-            queue.push(node);
+            queue.emplace(data.identifier, node);
             to_erase.push_back(node);
         }
     }
@@ -440,13 +442,13 @@ bool Graph::connect_nodes(std::vector<NodeHandle>& topology) {
         candidates.insert(node);
     }
 
-    std::priority_queue<NodeHandle> queue;
+    SatisfiedQueue queue;
     while (!candidates.empty()) {
 
         search_satisfied_nodes(candidates, queue);
 
         while (!queue.empty()) {
-            const NodeHandle node = queue.top();
+            const NodeHandle node = queue.top().second;
             queue.pop();
 
             visited.insert(node);
@@ -693,6 +695,17 @@ void Graph::build_layers(const std::vector<NodeHandle>& topology) {
     layers.assign(layer_count, {});
     for (const NodeHandle& node : topology) {
         layers[node_data.at(node).level].nodes.push_back(node);
+    }
+
+    // deterministic within-layer order: user linearization_order, ties by identifier
+    for (auto& layer : layers) {
+        std::sort(layer.nodes.begin(), layer.nodes.end(),
+                  [&](const NodeHandle& a, const NodeHandle& b) {
+                      const NodeData& data_a = node_data.at(a);
+                      const NodeData& data_b = node_data.at(b);
+                      return std::tie(data_a.linearization_order, data_a.identifier) <
+                             std::tie(data_b.linearization_order, data_b.identifier);
+                  });
     }
 
     struct Masks {
