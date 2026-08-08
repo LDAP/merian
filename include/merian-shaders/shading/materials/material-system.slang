@@ -55,6 +55,12 @@ struct MaterialSystem {
         return createDynamicObject<MaterialModel>(material_model_type_id, materials[material_id]);
     }
 
+    float3 get_emission(const MaterialID material_id,
+                        const ShadingData sd,
+                        const LODSampler2D lod_sampler = DefaultLODSampler()) {
+        return get_material(material_id).get_emission(sd, texture_manager, lod_sampler);
+    }
+
     MaterialSample get_material_sample(const MaterialID material_id,
                                        const ShadingData sd,
                                        out float3 out_emission,

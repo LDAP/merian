@@ -58,10 +58,16 @@ float3 trace_path(const ParameterBlock<Scene> scene,
     float3 throughput = float3(1);
     float current_ior = 1.0f;
 
+    // where this vertex was already looked up in the light cache, one bounce earlier
+    HashGridPos lc_grid_pos = HashGridPos();
+
     for (uint16_t bounce = 1; bounce < merian_render_max_path_length; bounce++) {
         // the ray left the scene: nothing to scatter from, emission is already accumulated
         if (!sp.has_surface_material || all(throughput < SCENE_THROUGHPUT_THRESHOLD))
             break;
+
+        const HashGridPos cur_lc_grid_pos = lc_grid_pos;
+        lc_grid_pos = HashGridPos();
 
         const float3 cur_pos = sp.pos;
         // temporally reproject the cache lookup for the first sample so the lobe written last
@@ -74,22 +80,22 @@ float3 trace_path(const ParameterBlock<Scene> scene,
 
         // Resample one guiding lobe from the Markov-chain mixture (using RIS)
         MCState selected;
-        uint selected_buffer_index = MC_INVALID_INDEX;
+        HashGridPos selected_pos;
         uint selected_level = 0;
         float score_sum = 0.0;
         float scores[mc_samples];
         VonMisesFisher3<false> vmfs[mc_samples];
         const float3 access_normal = params.mcpg.jitter_normal(frame, rng);
         for (int i = 0; i < mc_samples; i++) {
-            uint buffer_index;
+            HashGridPos grid_pos;
             uint level;
             const MCState s =
-                params.mcpg.load(lookup_pos, access_normal, cam_pos, scene.time, rng, buffer_index, level);
+                params.mcpg.load(lookup_pos, access_normal, cam_pos, scene.time, rng, grid_pos, level);
             score_sum += s.sum_w;
             // comparison with NaN is false (when s.sum_w == 0 and score_sum == 0)
             if (rng.next_float() < s.sum_w / score_sum) {
                 selected = s;
-                selected_buffer_index = buffer_index;
+                selected_pos = grid_pos;
                 selected_level = level;
                 vmfs[i] = vmfs[0];
                 scores[i] = scores[0];
@@ -112,7 +118,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
             wo_local = local;
             wo_world = frame.to_world(local);
             selected = MCState();
-            selected_buffer_index = MC_INVALID_INDEX;
+            selected_pos = HashGridPos();
             selected_level = params.mcpg.grid.target_level_for_pos(cur_pos, cam_pos, rng);
         } else {
             break;
@@ -143,8 +149,10 @@ float3 trace_path(const ParameterBlock<Scene> scene,
             if (transmission)
                 current_ior /= sp.surface_material.get_eta();
             ray = next;
-            sp = scene.trace_and_get_shading_point(ray, merian_render_instance_mask,
-                                                   RenderContext(bounce, current_ior));
+            // the last vertex is never scattered from, so its material sample would be dead
+            sp = scene.trace_and_get_shading_point(
+                ray, merian_render_instance_mask, RenderContext(bounce, current_ior),
+                DefaultLODSampler(), bounce + 1 < merian_render_max_path_length);
             next_pos = sp.pos;
 
             incident = sp.emission;
@@ -154,7 +162,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
                         (!use_light_cache_tail && merian_render_max_path_length == 2),
                      incident,
                      float3(params.irr_cache.get(next_pos, sp.shading_normal, cam_pos,
-                                                 prev_cam_pos, rng)));
+                                                 prev_cam_pos, rng, lc_grid_pos)));
 
             throughput *= bsdf / wo_p;
             // complete the truncated path with the cached irradiance at the last vertex
@@ -165,9 +173,8 @@ float3 trace_path(const ParameterBlock<Scene> scene,
 
         const float mc_f = yuv_luminance(lc_incident * bsdf / wo_p);
         if (!isinf(mc_f) && !isnan(mc_f)) {
-            params.irr_cache.update(cur_pos, normal,
-                                    lc_incident * bsdf / max(wo_p, lc_min_pdf), cam_pos,
-                                    prev_cam_pos, scene.frame, rng);
+            params.irr_cache.update(cur_pos, normal, lc_incident * bsdf / max(wo_p, lc_min_pdf),
+                                    cam_pos, prev_cam_pos, scene.frame, rng, cur_lc_grid_pos);
 
             if (rng.next_float() * score_sum < mc_f * mc_samples) {
                 const half3 target_mv = half3((sp.pos - sp.prev_pos) / scene.time_diff);
@@ -177,10 +184,10 @@ float3 trace_path(const ParameterBlock<Scene> scene,
 
                 // params.mcpg.store_at_level(selected, cur_pos, access_normal, selected_level + 1,
                 //                            scene.frame, rng);
-            } else if (missing_light_heuristic && selected_buffer_index != MC_INVALID_INDEX &&
+            } else if (missing_light_heuristic && selected_pos.is_valid() &&
                        selected.light_missing_heuristic(mc_f, wo_world, cur_pos, next_pos)) {
 
-                params.mcpg.kill(selected_buffer_index);
+                params.mcpg.kill(selected_pos);
             }
         }
 
@@ -249,7 +256,7 @@ void render_pixel(const uint2 pixel,
     case 3: { // mc grid
         const uint level = params.mcpg.grid.distributed_level_for_pos(primary_sp.pos, cam_pos, rng);
         const int3 gidx = params.mcpg.grid.grid_idx(
-            primary_sp.pos, params.mcpg.grid.grid_width_for_level(level), rng);
+            primary_sp.pos, params.mcpg.grid.grid_inv_width_for_level(level), rng);
         params.debug[pixel] = float4(random_color(params.mcpg.grid.buffer_index(gidx, level)), 1);
         break;
     }

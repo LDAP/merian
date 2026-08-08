@@ -11,8 +11,6 @@ using merian;
 static const uint16_t ML_MAX_N = 1024;
 static const float ML_MIN_ALPHA = 0.01;
 
-static const uint MC_INVALID_INDEX = 0xFFFFFFFFu;
-
 extern static const float dir_guide_prior = 0.2;
 
 struct MCState {
@@ -44,8 +42,8 @@ struct MCState {
     }
 
     float prior(const float3 pos) {
-        const float d = distance(pos, get_target());
-        return max(0.0001, dir_guide_prior / (d * d));
+        const float3 d = get_target() - pos;
+        return max(0.0001, dir_guide_prior / dot(d, d));
     }
 
     float mean_cos(const float3 pos) {
@@ -156,16 +154,16 @@ struct MCPG<let ADAPTIVE_BUFFER_SIZE : uint,
         return s;
     }
 
-    // Reports the queried level and the exact buffer slot the lobe was read from
-    // (MC_INVALID_INDEX if no slot matched).
+    // Reports the queried level and where the lobe was read from, invalid if no cell matched.
     MCState load(const float3 pos,
                  const float3 access_normal,
                  const float3 cam_pos,
                  const float time,
                  inout RandomGenerator rng,
-                 out uint buffer_index,
+                 out HashGridPos grid_pos,
                  out uint level) {
-        var s = grid.distributed_get(pos, access_normal, cam_pos, rng, level, buffer_index).value;
+        grid_pos = grid.distributed_find(pos, access_normal, cam_pos, rng, level);
+        var s = grid.load(grid_pos).value;
         if (s.is_valid()) {
             s.set_w_tgt(s.w_tgt + s.sum_w * (time - s.T) * float3(s.mv));
         } else {
@@ -193,9 +191,9 @@ struct MCPG<let ADAPTIVE_BUFFER_SIZE : uint,
         grid.set_at_level(level, pos, access_normal, frame, s, rng);
     }
 
-    // Missing-light heuristic: invalidate the exact loaded slot in place.
-    void kill(const uint buffer_index) {
-        grid.data[buffer_index].t.sum_w = 0.0;
+    // Missing-light heuristic: invalidate the loaded cell in place.
+    void kill(const HashGridPos grid_pos) {
+        grid.data[grid_pos.slot].t.sum_w = 0.0;
     }
 }
 

@@ -41,26 +41,34 @@ struct HashedIrradianceCache<let BUFFER_SIZE : uint,
         return half3(0);
     }
 
+    // grid_pos is invalid unless the queried level matched.
     half3 get(const float3 pos,
               const float3 normal,
               const float3 cam_pos,
               const float3 prev_cam_pos,
-              inout RandomGenerator rng) {
-        if (let r = grid.get(pos, normal, cam_pos, prev_cam_pos, rng)) {
+              inout RandomGenerator rng,
+              out HashGridPos grid_pos) {
+        if (let r = grid.get(pos, normal, cam_pos, prev_cam_pos, rng, grid_pos)) {
             return r.irr;
         }
         return half3(0);
     }
 
+    // A valid grid_pos skips the probe, so it must locate the same cell.
     void update(const float3 pos,
                 const float3 normal,
                 const float3 irr,
                 const float3 cam_pos,
                 const float3 prev_cam_pos,
                 const uint frame,
-                inout RandomGenerator rng) {
+                inout RandomGenerator rng,
+                const HashGridPos grid_pos = HashGridPos()) {
         HashedIrradianceCacheUpdate fn = { irr };
-        grid.update(pos, normal, cam_pos, prev_cam_pos, frame, fn, rng);
+        if (grid_pos.is_valid()) {
+            grid.update_at(grid_pos, frame, fn);
+        } else {
+            grid.update(pos, normal, cam_pos, prev_cam_pos, frame, fn, rng);
+        }
     }
 }
 

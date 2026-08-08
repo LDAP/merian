@@ -10,6 +10,12 @@ struct DiffuseMaterial : MaterialModel {
     MaterialHeader header;
     float4 base_color_factor;
 
+    override float3 get_emission(const ShadingData sd,
+                                 const TextureManager tm,
+                                 const LODSampler2D lod) {
+        return float3(0);
+    }
+
     DiffuseMaterialSample get_sample(const ShadingData sd,
                                      const TextureManager tm,
                                      const LODSampler2D lod,

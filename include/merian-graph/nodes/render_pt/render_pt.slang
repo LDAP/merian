@@ -68,8 +68,10 @@ float3 trace_path(const ParameterBlock<Scene> scene,
             break;
         }
 
-        sp = scene.trace_and_get_shading_point(ray, merian_render_instance_mask,
-                                               RenderContext(uint16_t(bounce), current_ior));
+        // the last vertex is never scattered from, so its material sample would be dead
+        sp = scene.trace_and_get_shading_point(
+            ray, merian_render_instance_mask, RenderContext(uint16_t(bounce), current_ior),
+            DefaultLODSampler(), bounce + 1 < merian_render_max_path_length);
 
         // Beer-Lambert absorption over the segment just travelled inside the medium.
         if (any(current_absorption != float3(0.f))) {

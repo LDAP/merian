@@ -10,9 +10,30 @@ namespace merian {
 static const uint MERIAN_HASH_GRID_LOCK_BIT = 0x80000000u;
 // Shifts the base level for a unit, allows resuolution up to ~2^-31 units
 static const float MERIAN_HASH_GRID_LEVEL_OFFSET = 32.0;
+static const uint MERIAN_HASH_GRID_INVALID_SLOT = 0xFFFFFFFFu;
 
 interface HashGridUpdateFunction<typename T> {
     void update(inout T t);
+}
+
+// Where a cell lives: the slot it occupies and the key stored there.
+struct HashGridPos {
+    uint slot;
+    uint key;
+
+    __init() {
+        slot = MERIAN_HASH_GRID_INVALID_SLOT;
+        key = 0;
+    }
+
+    __init(const uint slot, const uint key) {
+        this.slot = slot;
+        this.key = key;
+    }
+
+    bool is_valid() {
+        return slot != MERIAN_HASH_GRID_INVALID_SLOT;
+    }
 }
 
 struct HashGridSlot<typename T, let SPLIT_STORAGE : bool> {
@@ -92,19 +113,21 @@ struct HashGrid<typename T,
         return uint(round(level));
     }
 
-    float grid_width_for_level(const uint level) {
-        return 2 * grid_tan_alpha_half *
-               pow(GRID_POWER, (float(level) - grid_level_bias) / float(GRID_STEPS_PER_UNIT_SIZE) -
-                                   MERIAN_HASH_GRID_LEVEL_OFFSET);
+    // The lattice math only needs pos in cell widths, so no access has to divide.
+    float grid_inv_width_for_level(const uint level) {
+        return (0.5 / grid_tan_alpha_half) *
+               pow(GRID_POWER, MERIAN_HASH_GRID_LEVEL_OFFSET -
+                                   (float(level) - grid_level_bias) /
+                                       float(GRID_STEPS_PER_UNIT_SIZE));
     }
 
-    int3 grid_idx(const float3 pos, const float width, inout RandomGenerator rng) {
+    int3 grid_idx(const float3 pos, const float inv_width, inout RandomGenerator rng) {
         // Offset the lattice by half a cell so that levels of different width don't share vertices
         // (Müller et al., "Instant Neural Graphics Primitives", Appendix A.)
-        const float3 staggered = pos + 0.5 * width;
+        const float3 staggered = pos * inv_width + 0.5;
         if (STOCHASTIC_INTERPOLATION)
-            return grid_idx_interpolate(staggered, width, rng.next_float());
-        return grid_idx_lower(staggered, width);
+            return grid_idx_interpolate_scaled(staggered, rng.next_float());
+        return grid_idx_lower_scaled(staggered);
     }
 
     // Dominant-axis cube face of the normal (6 bins).
@@ -121,164 +144,125 @@ struct HashGrid<typename T,
         return level << 3;
     }
 
-    // Stored/compared key: a hash of (gidx, level-normal word).
-    uint collision_key(const int3 gidx, const uint level_normal) {
-        return pcg4d16(uint4(gidx, level_normal));
-    }
-
-    uint collision_key(const int3 gidx, const float3 normal, const uint level) {
-        return collision_key(gidx, level_normal_word(level, normal));
-    }
-
-    uint slot_index(const int3 gidx, const uint level_normal, const uint key) {
+    // The slot a cell probes from and the key stored there to detect collisions.
+    HashGridPos get_hash_grid_pos(const int3 gidx, const uint level_normal) {
         const uint tile_count = BUFFER_SIZE >> (3u * LOCALITY_BITS);
         uint slot;
+        uint key;
         if (LOCALITY_BITS == 0 || tile_count == 0) {
+            key = pcg4d16(uint4(gidx, level_normal));
             slot = key % BUFFER_SIZE;
         } else {
             // LOCALITY_BITS = L gives each 2^L-wide lattice tile (per level and normal bin)
             // 8^L contiguous slots in Morton order, so neighbouring cells share
             // cache lines instead of scattering onto one line each.
             const uint cell_mask = (1u << LOCALITY_BITS) - 1u;
-            const uint tile = pcg4d16(uint4(gidx >> LOCALITY_BITS, level_normal)) % tile_count;
-            slot = (tile << (3u * LOCALITY_BITS)) + morton_encode3d(uint3(gidx) & cell_mask);
+            const uint tile_hash = pcg4d16(uint4(gidx >> LOCALITY_BITS, level_normal));
+            const uint cell = morton_encode3d(uint3(gidx) & cell_mask);
+            // The odd multiplier is injective, so cells within a tile never share a key.
+            key = tile_hash ^ (cell * 0x9E3779B9u);
+            slot = ((tile_hash % tile_count) << (3u * LOCALITY_BITS)) + cell;
         }
-        // Make blocks of PROBE_COUNT slots compute the same starting index into the buffer 
+        // Make blocks of PROBE_COUNT slots compute the same starting index into the buffer
         // for coalescing memory accesses, i.e. coherent probing accross the warp.
-        if ((PROBE_COUNT & (PROBE_COUNT - 1u)) != 0)
-            return slot;
-        return slot & ~(PROBE_COUNT - 1u);
+        if ((PROBE_COUNT & (PROBE_COUNT - 1u)) == 0)
+            slot &= ~(PROBE_COUNT - 1u);
+        return HashGridPos(slot, key);
+    }
+
+    HashGridPos get_hash_grid_pos(const int3 gidx, const uint level, const float3 normal) {
+        return get_hash_grid_pos(gidx, level_normal_word(level, normal));
     }
 
     // Spatial (normal-less) slot, for debug coloring by cell.
     uint buffer_index(const int3 gidx, const uint level) {
-        const uint level_normal = level_normal_word(level);
-        return slot_index(gidx, level_normal, collision_key(gidx, level_normal));
+        return get_hash_grid_pos(gidx, level_normal_word(level)).slot;
     }
 
     bool keys_match(const uint stored, const uint query) {
         return stored == query;
     }
 
-    // Linear-probe PROBE_COUNT slots starting at buffer_index for a matching hash.
-    Optional<T> get(uint buffer_index, const uint hash) {
+    // Linear-probes PROBE_COUNT slots from pos for its key. The result names the slot the cell
+    // occupies, or is invalid if the grid does not hold it.
+    HashGridPos find(const HashGridPos pos) {
+        uint slot = pos.slot;
         for (uint i = 0; i < PROBE_COUNT; i++) {
-            if (keys_match(load_hash(buffer_index), hash)) {
-                return data[buffer_index].t;
+            if (keys_match(load_hash(slot), pos.key)) {
+                return HashGridPos(slot, pos.key);
             }
 
-            buffer_index++;
-            if (buffer_index >= BUFFER_SIZE)
-                buffer_index -= BUFFER_SIZE;
+            slot++;
+            if (slot >= BUFFER_SIZE)
+                slot -= BUFFER_SIZE;
         }
 
+        return HashGridPos();
+    }
+
+    Optional<T> load(const HashGridPos pos) {
+        if (pos.is_valid())
+            return data[pos.slot].t;
         return none;
     }
 
-    // Linear-probe variant that also reports the matched absolute slot (0xFFFFFFFF if none).
-    Optional<T> get(uint buffer_index, const uint hash, out uint matched_index) {
-        for (uint i = 0; i < PROBE_COUNT; i++) {
-            if (keys_match(load_hash(buffer_index), hash)) {
-                matched_index = buffer_index;
-                return data[buffer_index].t;
-            }
-
-            buffer_index++;
-            if (buffer_index >= BUFFER_SIZE)
-                buffer_index -= BUFFER_SIZE;
-        }
-
-        matched_index = 0xFFFFFFFFu;
-        return none;
-    }
-
-    // Debug only: octahedral bin of the normal if an exact slot matches at the target level, else
-    // 0xFFFFFFFF.
+    // Debug only: octahedral bin of the normal if an exact slot matches at the target level.
     uint debug_selected_bin(const float3 pos,
                             const float3 normal,
                             const float3 cam_pos,
                             inout RandomGenerator rng) {
         const uint level = target_level_for_pos(pos, cam_pos, rng);
-        const int3 gidx = grid_idx(pos, grid_width_for_level(level), rng);
-        const uint level_normal = level_normal_word(level, normal);
-        const uint hash = collision_key(gidx, level_normal);
-        uint bi = slot_index(gidx, level_normal, hash);
-        for (uint i = 0; i < PROBE_COUNT; i++) {
-            if (keys_match(load_hash(bi), hash))
-                return normal_bin(normal);
-            bi++;
-            if (bi >= BUFFER_SIZE)
-                bi -= BUFFER_SIZE;
-        }
-        return 0xFFFFFFFFu;
+        const int3 gidx = grid_idx(pos, grid_inv_width_for_level(level), rng);
+        if (find(get_hash_grid_pos(gidx, level, normal)).is_valid())
+            return normal_bin(normal);
+        return MERIAN_HASH_GRID_INVALID_SLOT;
     }
 
-    Optional<T> get_grid_idx_at_level(const int3 gidx,
-                                      const uint level,
-                                      const float3 normal,
-                                      inout RandomGenerator rng) {
-        const uint level_normal = level_normal_word(level, normal);
-        const uint hash = collision_key(gidx, level_normal);
-        return get(slot_index(gidx, level_normal, hash), hash);
+    HashGridPos
+    find_level(const uint level, const float3 pos, const float3 normal, inout RandomGenerator rng) {
+        const int3 gidx = grid_idx(pos, grid_inv_width_for_level(level), rng);
+        return find(get_hash_grid_pos(gidx, level, normal));
     }
 
-    Optional<T> get_grid_idx_at_level(const int3 gidx,
-                                      const uint level,
-                                      const float3 normal,
-                                      inout RandomGenerator rng,
-                                      out uint matched_index) {
-        const uint level_normal = level_normal_word(level, normal);
-        const uint hash = collision_key(gidx, level_normal);
-        return get(slot_index(gidx, level_normal, hash), hash, matched_index);
-    }
-
-    Optional<T>
-    get_grid_idx_at_level(const int3 gidx, const uint level, inout RandomGenerator rng) {
-        const uint level_normal = level_normal_word(level);
-        const uint hash = collision_key(gidx, level_normal);
-        return get(slot_index(gidx, level_normal, hash), hash);
+    HashGridPos find_level(const uint level, const float3 pos, inout RandomGenerator rng) {
+        const int3 gidx = grid_idx(pos, grid_inv_width_for_level(level), rng);
+        return find(get_hash_grid_pos(gidx, level_normal_word(level)));
     }
 
     Optional<T>
     get_level(const uint level, const float3 pos, const float3 normal, inout RandomGenerator rng) {
-        const int3 gidx = grid_idx(pos, grid_width_for_level(level), rng);
-        return get_grid_idx_at_level(gidx, level, normal, rng);
+        return load(find_level(level, pos, normal, rng));
     }
 
-    Optional<T> get_level(const uint level,
-                          const float3 pos,
-                          const float3 normal,
-                          inout RandomGenerator rng,
-                          out uint matched_index) {
-        const int3 gidx = grid_idx(pos, grid_width_for_level(level), rng);
-        return get_grid_idx_at_level(gidx, level, normal, rng, matched_index);
+    Optional<T> get_level(const uint level, const float3 pos, inout RandomGenerator rng) {
+        return load(find_level(level, pos, rng));
     }
 
     Optional<T>
     get(const float3 pos, const float3 normal, const float3 cam_pos, inout RandomGenerator rng) {
-        const uint level = target_level_for_pos(pos, cam_pos, rng);
-        return get_level(level, pos, normal, rng);
-    }
-
-    Optional<T> get_level(const uint level, const float3 pos, inout RandomGenerator rng) {
-        const int3 gidx = grid_idx(pos, grid_width_for_level(level), rng);
-        return get_grid_idx_at_level(gidx, level, rng);
+        return get_level(target_level_for_pos(pos, cam_pos, rng), pos, normal, rng);
     }
 
     Optional<T> get(const float3 pos, const float3 cam_pos, inout RandomGenerator rng) {
-        const uint level = target_level_for_pos(pos, cam_pos, rng);
-        return get_level(level, pos, rng);
+        return get_level(target_level_for_pos(pos, cam_pos, rng), pos, rng);
     }
 
+    // found is the cell at the level the current camera implies, so an update may reuse it. It is
+    // invalid when the value came from the previous camera's level instead, which an update at
+    // this camera must not write to.
     Optional<T> get(const float3 pos,
                     const float3 normal,
                     const float3 cam_pos,
                     const float3 prev_cam_pos,
-                    inout RandomGenerator rng) {
+                    inout RandomGenerator rng,
+                    out HashGridPos found) {
         const uint level = target_level_for_pos(pos, cam_pos, rng);
-        if (let r = get_level(level, pos, normal, rng)) {
-            return r;
-        } else if (any(cam_pos != prev_cam_pos)) {
+        found = find_level(level, pos, normal, rng);
+        if (found.is_valid()) {
+            return load(found);
+        }
+
+        if (any(cam_pos != prev_cam_pos)) {
             const uint prev_level = target_level_for_pos(pos, prev_cam_pos, rng);
             if (level != prev_level) {
                 return get_level(prev_level, pos, normal, rng);
@@ -288,27 +272,33 @@ struct HashGrid<typename T,
         return none;
     }
 
+    Optional<T> get(const float3 pos,
+                    const float3 normal,
+                    const float3 cam_pos,
+                    const float3 prev_cam_pos,
+                    inout RandomGenerator rng) {
+        HashGridPos found;
+        return get(pos, normal, cam_pos, prev_cam_pos, rng, found);
+    }
+
+    HashGridPos distributed_find(const float3 pos,
+                                 const float3 normal,
+                                 const float3 cam_pos,
+                                 inout RandomGenerator rng,
+                                 out uint level) {
+        level = distributed_level_for_pos(pos, cam_pos, rng);
+        return find_level(level, pos, normal, rng);
+    }
+
     Optional<T> distributed_get(const float3 pos,
                                 const float3 normal,
                                 const float3 cam_pos,
                                 inout RandomGenerator rng) {
-        const uint level = distributed_level_for_pos(pos, cam_pos, rng);
-        return get_level(level, pos, normal, rng);
-    }
-
-    Optional<T> distributed_get(const float3 pos,
-                                const float3 normal,
-                                const float3 cam_pos,
-                                inout RandomGenerator rng,
-                                out uint level,
-                                out uint matched_index) {
-        level = distributed_level_for_pos(pos, cam_pos, rng);
-        return get_level(level, pos, normal, rng, matched_index);
+        return get_level(distributed_level_for_pos(pos, cam_pos, rng), pos, normal, rng);
     }
 
     Optional<T> distributed_get(const float3 pos, const float3 cam_pos, inout RandomGenerator rng) {
-        const uint level = distributed_level_for_pos(pos, cam_pos, rng);
-        return get_level(level, pos, rng);
+        return get_level(distributed_level_for_pos(pos, cam_pos, rng), pos, rng);
     }
 
     void _update_at_level<let has_normal : bool>(const uint level,
@@ -318,12 +308,13 @@ struct HashGrid<typename T,
                                                  const uint frame,
                                                  HashGridUpdateFunction<T> update,
                                                  inout RandomGenerator rng) {
-        const int3 gidx = grid_idx(pos, grid_width_for_level(level), rng);
+        const int3 gidx = grid_idx(pos, grid_inv_width_for_level(level), rng);
 
         const uint level_normal =
             has_normal ? level_normal_word(level, normal) : level_normal_word(level);
-        const uint hash = collision_key(gidx, level_normal);
-        const uint base = slot_index(gidx, level_normal, hash);
+        const HashGridPos cell = get_hash_grid_pos(gidx, level_normal);
+        const uint base = cell.slot;
+        const uint hash = cell.key;
 
         // Evict least-recently-touched slot.
         // nice: an uninitialized slot might have a timestamp in the future, so its unsigned age
@@ -379,6 +370,24 @@ struct HashGrid<typename T,
         store_slot(target, uint2(hash, frame & ~MERIAN_HASH_GRID_LOCK_BIT), t);
     }
 
+    // Does not probe, so grid_pos must still locate the cell.
+    void update_at(const HashGridPos grid_pos,
+                      const uint frame,
+                      HashGridUpdateFunction<T> update) {
+        if (!LOCK_FREE) {
+            const uint locked = frame | MERIAN_HASH_GRID_LOCK_BIT;
+            uint old;
+            lock_exchange(grid_pos.slot, locked, old);
+            if (old == locked) {
+                return;
+            }
+        }
+
+        var t = data[grid_pos.slot].t;
+        update.update(t);
+        store_slot(grid_pos.slot, uint2(grid_pos.key, frame & ~MERIAN_HASH_GRID_LOCK_BIT), t);
+    }
+
     void update(const float3 pos,
                 const float3 normal,
                 const float3 cam_pos,
@@ -428,12 +437,13 @@ struct HashGrid<typename T,
                                               const uint frame,
                                               const T t,
                                               inout RandomGenerator rng) {
-        const int3 gidx = grid_idx(pos, grid_width_for_level(level), rng);
+        const int3 gidx = grid_idx(pos, grid_inv_width_for_level(level), rng);
 
         const uint level_normal =
             has_normal ? level_normal_word(level, normal) : level_normal_word(level);
-        const uint hash = collision_key(gidx, level_normal);
-        const uint base = slot_index(gidx, level_normal, hash);
+        const HashGridPos cell = get_hash_grid_pos(gidx, level_normal);
+        const uint base = cell.slot;
+        const uint hash = cell.key;
 
         // Evict least-recently-touched slot.
         // nice: an uninitialized slot might have a timestamp in the future, so its unsigned age

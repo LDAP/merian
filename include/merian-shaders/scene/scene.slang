@@ -412,11 +412,14 @@ struct Scene {
         return prev_camera.project_pinhole(prev_pos, dim) - float2(pixel) - camera.jitter;
     }
 
+    // with_material = false => does not load surface material and keeps the interpolated frame
+    // (no normal map)
     ShadingPoint get_shading_point(const RayDesc ray,
                                    const Hit hit,
                                    const GeometryData gd,
                                    const RenderContext ctx = RenderContext(),
-                                   const LODSampler2D lod = DefaultLODSampler()) {
+                                   const LODSampler2D lod = DefaultLODSampler(),
+                                   const bool with_material = true) {
         const TriangleHit tri = get_triangle_hit(hit, gd);
         const Surface surface = get_surface(hit, tri);
 
@@ -440,19 +443,25 @@ struct Scene {
         sp.pos = surface.pos;
         sp.prev_pos = prev_pos;
         sp.enc_face_normal = encode_normal(surface.face_normal);
-        sp.has_surface_material = true;
-        sp.surface_material = material_system.get_material_sample(
-            surface.material_id, sd, sp.emission, sp.shading_frame, lod);
+        sp.has_surface_material = with_material;
+        if (with_material) {
+            sp.surface_material = material_system.get_material_sample(
+                surface.material_id, sd, sp.emission, sp.shading_frame, lod);
+        } else {
+            sp.emission = material_system.get_emission(surface.material_id, sd, lod);
+            sp.shading_frame = frame;
+        }
         return sp;
     }
 
     ShadingPoint get_shading_point(const RayDesc ray,
                                    const Hit hit,
                                    const RenderContext ctx = RenderContext(),
-                                   const LODSampler2D lod = DefaultLODSampler()) {
+                                   const LODSampler2D lod = DefaultLODSampler(),
+                                   const bool with_material = true) {
         if (let gd = get_geometry_data(hit)) {
             if ((gd.flags & GeometryDataFlags::UseEnvMap) == 0) {
-                return get_shading_point(ray, hit, gd, ctx, lod);
+                return get_shading_point(ray, hit, gd, ctx, lod, with_material);
             }
         }
         return _make_environment_map_shading_point(ray, ctx, lod);
@@ -461,8 +470,10 @@ struct Scene {
     ShadingPoint trace_and_get_shading_point(const RayDesc ray,
                                              const uint instance_mask = 0xff,
                                              const RenderContext ctx = RenderContext(),
-                                             const LODSampler2D lod = DefaultLODSampler()) {
-        return get_shading_point(ray, trace_ray(ray, RAY_FLAG_NONE, instance_mask), ctx, lod);
+                                             const LODSampler2D lod = DefaultLODSampler(),
+                                             const bool with_material = true) {
+        return get_shading_point(ray, trace_ray(ray, RAY_FLAG_NONE, instance_mask), ctx, lod,
+                                 with_material);
     }
 
     // -----------------------------------------

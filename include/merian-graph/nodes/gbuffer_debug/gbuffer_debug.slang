@@ -150,7 +150,8 @@ void main(uint3 tid: SV_DispatchThreadID,
         const Hit hit = params.gbuffer.get_hit(pixel);
         if (let gd = scene.get_geometry_data(hit)) {
             const RayDesc ray = scene.generate_camera_ray(pixel, dim);
-            const ShadingPoint sp = scene.get_shading_point(ray, hit, gd);
+            const ShadingPoint sp = scene.get_shading_point(ray, hit, gd, RenderContext(),
+                                                            DefaultLODSampler(), false);
             color = float4(sp.emission, 1);
         } else {
             color = float4(MISS, 1);

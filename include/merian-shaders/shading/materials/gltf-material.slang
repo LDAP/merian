@@ -140,6 +140,16 @@ struct GltfMaterial<let TRANSMISSION : bool = false,
         return roughness;
     }
 
+    override float3 get_emission(const ShadingData sd,
+                                 const TextureManager tm,
+                                 const LODSampler2D lod) {
+        float3 emission = emissive_factor;
+        if (emissive_texture != TextureID(-1)) {
+            emission *= lod.sample(tm.get_sampler2D(emissive_texture), sd.uv).rgb;
+        }
+        return emission;
+    }
+
     GltfMaterialSample get_sample(const ShadingData sd,
                                  const TextureManager tm,
                                  const LODSampler2D lod,

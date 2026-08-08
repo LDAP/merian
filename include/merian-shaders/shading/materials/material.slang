@@ -32,11 +32,17 @@ extern static const float merian_hint_min_roughness = 0.0316f;
 interface MaterialModel {
     associatedtype MaterialSampleImpl : MaterialSample;
 
-    // Emission and the shading frame describe the shading point, which exists with or without a
-    // surface, so they are returned separately from the sample, which only describes scattering.
     MaterialSampleImpl get_sample(const ShadingData sd, const TextureManager texture_manager,
                                   const LODSampler2D lod_sampler, out float3 out_emission,
                                   out OrthonormalFrame out_shading_frame);
+
+    float3 get_emission(const ShadingData sd, const TextureManager texture_manager,
+                        const LODSampler2D lod_sampler) {
+        float3 emission;
+        OrthonormalFrame shading_frame;
+        get_sample(sd, texture_manager, lod_sampler, emission, shading_frame);
+        return emission;
+    }
 }
 
 // This represents how the evaluated material at a point on a surface or in a volume scatters.
@@ -51,14 +57,13 @@ interface MaterialSample {
 
     // ------------------------------------------
 
-    // Relative IOR (incident / transmitted) at this surface; 1.0 for opaque materials. The
-    // integrator multiplies the medium IOR by 1/eta after a transmission event.
+    // Relative IOR (incident / transmitted) at this surface; 1.0 for opaque materials.
     float get_eta() {
         return 1.0f;
     }
 
     // Volume absorption coefficient (per channel) of the medium entered on a transmission event;
-    // 0 outside / for opaque materials. The integrator applies Beer-Lambert exp(-sigma * distance).
+    // 0 outside / for opaque materials.
     float3 get_absorption() {
         return float3(0.0f);
     }

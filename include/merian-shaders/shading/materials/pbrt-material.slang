@@ -72,6 +72,16 @@ struct PBRTMaterial<let TRANSMISSION : bool = false,
         get { return sheen; }
     }
 
+    override float3 get_emission(const ShadingData sd,
+                                 const TextureManager tm,
+                                 const LODSampler2D lod) {
+        float3 emission_out = emission;
+        if (emission_texture != TextureID(-1)) {
+            emission_out *= lod.sample(tm.get_sampler2D(emission_texture), sd.uv).rgb;
+        }
+        return emission_out;
+    }
+
     PBRTMaterialSample get_sample(const ShadingData sd,
                                  const TextureManager tm,
                                  const LODSampler2D lod,
