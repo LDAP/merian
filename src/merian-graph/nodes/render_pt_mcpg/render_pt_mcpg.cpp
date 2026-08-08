@@ -72,11 +72,12 @@ std::vector<OutputConnectorDescriptor> RenderMCPG::describe_outputs(const NodeIO
         vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
         MemoryMappingType::NONE, "RenderMCPG::distance_mc");
 
+    const bool no_volume = !volume_available;
     return {{"irradiance", con_irradiance, ConnectorAccess::ray_tracing_write},
             {"debug", con_debug, ConnectorAccess::ray_tracing_write},
-            {"volume", con_volume, ConnectorAccess::compute_write},
-            {"volume_depth", con_volume_depth, ConnectorAccess::compute_write},
-            {"volume_mv", con_volume_mv, ConnectorAccess::compute_read_write}};
+            {"volume", con_volume, ConnectorAccess::compute_write, no_volume},
+            {"volume_depth", con_volume_depth, ConnectorAccess::compute_write, no_volume},
+            {"volume_mv", con_volume_mv, ConnectorAccess::compute_read_write, no_volume}};
 }
 
 RenderMCPG::NodeStatusFlags
@@ -186,6 +187,12 @@ RenderMCPG::process(const NodeIO& io, const NodeProcessInfo& info, Submission& s
         io.send_event("bounces_changed");
     }
 
+    if (const bool available = volume_spp > 0 && scene->has_exterior_volume();
+        available != volume_available) {
+        volume_available = available;
+        return NodeStatusFlagBits::NEEDS_RECONNECT;
+    }
+
     ensure_pipeline(scene);
 
     const ShaderObjectAllocatorHandle& obj_allocator = info.get_shader_object_allocator();
@@ -239,14 +246,6 @@ void RenderMCPG::process_volume(const NodeIO& io,
                                 const SceneHandle& scene,
                                 const ShaderObjectAccess<GBufferObject>& gbuf) {
     const auto& cmd = submission.get_cmd();
-
-    // Nothing scatters without a medium, and the pass would only burn bandwidth writing zeros.
-    if (volume_spp <= 0 || !scene->has_exterior_volume()) {
-        cmd->clear(io[con_volume], vk::ImageLayout::eGeneral);
-        cmd->clear(io[con_volume_depth], vk::ImageLayout::eGeneral);
-        cmd->clear(io[con_volume_mv], vk::ImageLayout::eGeneral);
-        return;
-    }
 
     const ShaderObjectAllocatorHandle& obj_allocator = info.get_shader_object_allocator();
 

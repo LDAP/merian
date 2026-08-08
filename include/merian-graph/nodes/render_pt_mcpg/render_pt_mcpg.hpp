@@ -132,6 +132,9 @@ class RenderMCPG : public Node {
     float volume_forward_project_min_z = 50.0f;
 
     BufferHandle distance_mc;
+    // Tracks whether the scene had a medium at the last connect. The volume outputs are declared
+    // disabled while it has none, which force disables the volume denoise chain.
+    bool volume_available = false;
 
     // --- Misc ---
     int32_t debug_output_selector = 0;
