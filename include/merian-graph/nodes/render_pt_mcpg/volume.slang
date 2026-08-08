@@ -6,6 +6,7 @@ import merian_shaders.utils.sampling;
 import merian_shaders.utils.textures;
 import merian_shaders.utils.volumes;
 import merian_shaders.colors.colorspaces;
+import merian_shaders.colors.debug;
 import mcpg_common;
 import mc_distance;
 
@@ -27,6 +28,7 @@ struct VolumeBinding {
     RWTexture2D<float4> volume;
     RWTexture2D<float> volume_depth;
     RWTexture2D<float2> volume_mv;
+    RWTexture2D<float4> debug;
     Sampler2D<float> prev_volume_depth;
     RWStructuredBuffer<DistanceMCVertex> distance_mc;
     RenderIrradianceCache irr_cache;
@@ -218,6 +220,16 @@ void render_pixel(const uint2 pixel,
     }
 
     params.volume[pixel] = float4(irradiance, second_moment);
+
+    // the stored chain at this pixel, at a fixed scale so the field stays comparable across
+    // pixels (dividing by linear_z would imprint the geometry into the view)
+    if (debug_output_selector == 12 || debug_output_selector == 13) {
+        DistanceMCState s;
+        distance_mc_load(params.distance_mc, s, float2(pixel), grid_max_x, rng);
+        const float2 nd = distance_mc_state_get_normal_dist(s);
+        const float v = select(debug_output_selector == 12, nd.x, nd.y);
+        params.debug[pixel] = float4(debug_color(v / medium.get_max_distance()), 1);
+    }
     // the mean scattering distance is where the volume signal lives; it drives the reprojection
     params.volume_depth[pixel] =
         dist_mc.sum_w > 0.0 ? dist_mc.moments.x / dist_mc.sum_w : linear_z;

@@ -262,6 +262,7 @@ void RenderMCPG::process_volume(const NodeIO& io,
         write("volume", io[con_volume].get_texture());
         write("volume_depth", io[con_volume_depth].get_texture());
         write("volume_mv", io[con_volume_mv].get_texture());
+        write("debug", io[con_debug].get_texture());
         write("distance_mc", distance_mc);
         if (auto field = cursor["prev_volume_depth"]; field.is_valid())
             field = io[con_prev_volume_depth];
@@ -514,7 +515,8 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
         config.config_options("debug output", debug_output_selector,
                               {"irradiance", "moments", "light cache", "mc grid", "mc lod",
                                "mc weight", "mc mean direction", "mc cos", "mc N", "mc mv",
-                               "lc normal bin (actual)", "lc normal bin (selected)"});
+                               "lc normal bin (actual)", "lc normal bin (selected)",
+                               "distance mc mean", "distance mc sigma"});
 
     if (constants_changed && composition) {
         update_render_constants();

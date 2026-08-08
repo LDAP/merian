@@ -20,6 +20,7 @@ extern static const uint mc_locality_bits = 3;
 
 extern static const int mc_samples = 5;
 extern static const bool missing_light_heuristic = true;
+extern static const int debug_output_selector = 0;
 
 // The surface and the volume pass share both grids, so they must agree on the instantiation.
 typealias RenderIrradianceCache =
