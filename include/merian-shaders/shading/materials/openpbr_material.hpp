@@ -10,22 +10,22 @@
 
 namespace merian {
 
-struct PBRTTransmissionData {
+struct OpenPBRTransmissionData {
     float weight{0.0f};
     float3 color{1, 1, 1};
 };
-struct PBRTClearcoatData {
+struct OpenPBRClearcoatData {
     float weight{0.0f};
     float roughness{0.0f};
     float ior{1.6f};
 };
-struct PBRTSheenData {
+struct OpenPBRSheenData {
     float weight{0.0f};
     float3 color{1, 1, 1};
     float roughness{0.3f};
 };
 
-struct PBRTMaterial : Material {
+struct OpenPBRMaterial : Material {
     float3 base_color{1, 1, 1};
     float opacity{1.0f};
     float metalness{0.0f};
@@ -39,17 +39,17 @@ struct PBRTMaterial : Material {
     TextureID emission_texture{TextureID(-1)};
     TextureID normal_texture{TextureID(-1)};
 
-    std::optional<PBRTTransmissionData> transmission;
-    std::optional<PBRTClearcoatData> clearcoat;
-    std::optional<PBRTSheenData> sheen;
+    std::optional<OpenPBRTransmissionData> transmission;
+    std::optional<OpenPBRClearcoatData> clearcoat;
+    std::optional<OpenPBRSheenData> sheen;
 
-    PBRTMaterial() {
+    OpenPBRMaterial() {
         header.alpha_texture_id = TextureID(-1);
     }
 
     std::string variant_type_name() const {
         const auto b = [](bool v) { return v ? "true" : "false"; };
-        return fmt::format("merian::PBRTMaterial<{}, {}, {}>", b(transmission.has_value()),
+        return fmt::format("merian::OpenPBRMaterial<{}, {}, {}>", b(transmission.has_value()),
                            b(clearcoat.has_value()), b(sheen.has_value()));
     }
 
@@ -102,7 +102,7 @@ struct PBRTMaterial : Material {
     }
 };
 
-inline constexpr const char* PBRT_MATERIAL_SLANG_MODULE_PATH =
-    "merian-shaders/shading/materials/pbrt-material.slang";
+inline constexpr const char* OPENPBR_MATERIAL_SLANG_MODULE_PATH =
+    "merian-shaders/shading/materials/openpbr-material.slang";
 
 } // namespace merian
