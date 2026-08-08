@@ -1,6 +1,6 @@
 #include "merian-shaders/scene/fbx_scene.hpp"
 
-#include "merian-shaders/shading/materials/pbrt_material.hpp"
+#include "merian-shaders/shading/materials/openpbr_material.hpp"
 #include "merian/utils/normal_encoding.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 
@@ -112,7 +112,7 @@ void FBXScene::load_materials(const CommandBufferHandle& cmd) {
                                 fmat->shader_type != UFBX_SHADER_FBX_LAMBERT;
         const float transmission = pbr_shader ? map_real(pbr.transmission_factor, 0.f) : 0.f;
 
-        PBRTMaterial mat;
+        OpenPBRMaterial mat;
 
         const auto load = [&](const ufbx_material_map& m, const bool linear) -> TextureID {
             return m.texture != nullptr ? get_or_load_texture(cmd, m.texture, linear)
@@ -154,28 +154,28 @@ void FBXScene::load_materials(const CommandBufferHandle& cmd) {
         mat.normal_texture = load(pbr.normal_map, true);
 
         if (const float coat_weight = map_real(pbr.coat_factor, 0.f); coat_weight > 0.f) {
-            mat.clearcoat = PBRTClearcoatData{coat_weight, map_real(pbr.coat_roughness, 0.f),
-                                              map_real(pbr.coat_ior, 1.6f)};
+            mat.clearcoat = OpenPBRClearcoatData{coat_weight, map_real(pbr.coat_roughness, 0.f),
+                                                 map_real(pbr.coat_ior, 1.6f)};
         }
         if (const float sheen_weight = map_real(pbr.sheen_factor, 0.f); sheen_weight > 0.f) {
-            mat.sheen = PBRTSheenData{sheen_weight, map_vec3(pbr.sheen_color, float3(1)),
-                                      map_real(pbr.sheen_roughness, 0.3f)};
+            mat.sheen = OpenPBRSheenData{sheen_weight, map_vec3(pbr.sheen_color, float3(1)),
+                                         map_real(pbr.sheen_roughness, 0.3f)};
         }
         if (transmission > 0.f) {
             mat.transmission =
-                PBRTTransmissionData{transmission, map_vec3(pbr.transmission_color, float3(1))};
+                OpenPBRTransmissionData{transmission, map_vec3(pbr.transmission_color, float3(1))};
         }
 
         const auto type_id = get_material_system()->register_material_type(
-            mat.variant_type_name(), PBRT_MATERIAL_SLANG_MODULE_PATH);
+            mat.variant_type_name(), OPENPBR_MATERIAL_SLANG_MODULE_PATH);
         material_map[i] = get_material_system()->add_material(type_id, mat);
     }
 
     // Default material for mesh parts without an assigned material.
-    const PBRTMaterial default_mat;
+    const OpenPBRMaterial default_mat;
     default_material_id = get_material_system()->add_material(
         get_material_system()->register_material_type(default_mat.variant_type_name(),
-                                                      PBRT_MATERIAL_SLANG_MODULE_PATH),
+                                                      OPENPBR_MATERIAL_SLANG_MODULE_PATH),
         default_mat);
 }
 

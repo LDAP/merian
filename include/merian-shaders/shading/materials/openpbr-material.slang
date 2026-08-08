@@ -16,33 +16,33 @@ namespace merian {
 
 // Opaque part: specular reflection over diffuse. Transmissive part: a coupled rough dielectric.
 // Mixed by the transmission weight.
-typealias PBRTOpaqueDielectric = FresnelMixBSDF<SpecularBRDF, LambertDiffuseBRDF>;
-typealias PBRTDielectric = MixBSDF<PBRTOpaqueDielectric, RoughDielectricBSDF>;
-typealias PBRTMetal = ConductorFresnelBSDF<SpecularBRDF>;
-typealias PBRTSubstrate = MixBSDF<PBRTDielectric, PBRTMetal>; // by metalness
-typealias PBRTCoated = FresnelMixBSDF<SpecularBRDF, PBRTSubstrate>;
-typealias PBRTWithCoat = MixBSDF<PBRTSubstrate, PBRTCoated>; // by coat weight
-typealias PBRTBSDF = MixBSDF<PBRTWithCoat, SheenBRDF>;       // by sheen weight
+typealias OpenPBROpaqueDielectric = FresnelMixBSDF<SpecularBRDF, LambertDiffuseBRDF>;
+typealias OpenPBRDielectric = MixBSDF<OpenPBROpaqueDielectric, RoughDielectricBSDF>;
+typealias OpenPBRMetal = ConductorFresnelBSDF<SpecularBRDF>;
+typealias OpenPBRSubstrate = MixBSDF<OpenPBRDielectric, OpenPBRMetal>; // by metalness
+typealias OpenPBRCoated = FresnelMixBSDF<SpecularBRDF, OpenPBRSubstrate>;
+typealias OpenPBRWithCoat = MixBSDF<OpenPBRSubstrate, OpenPBRCoated>; // by coat weight
+typealias OpenPBRBSDF = MixBSDF<OpenPBRWithCoat, SheenBRDF>; // by sheen weight
 
-struct PBRTTransmission {
+struct OpenPBRTransmission {
     float weight;
     float3 color;
 };
-struct PBRTClearcoat {
+struct OpenPBRClearcoat {
     float weight;
     float roughness;
     float ior;
 };
-struct PBRTSheen {
+struct OpenPBRSheen {
     float weight;
     float3 color;
     float roughness;
 };
 
-struct PBRTMaterial<let TRANSMISSION : bool = false,
-                    let CLEARCOAT : bool = false,
-                    let SHEEN : bool = false> : MaterialModel {
-    typealias MaterialSampleImpl = PBRTMaterialSample;
+struct OpenPBRMaterial<let TRANSMISSION : bool = false,
+                       let CLEARCOAT : bool = false,
+                       let SHEEN : bool = false> : MaterialModel {
+    typealias MaterialSampleImpl = OpenPBRMaterialSample;
 
     MaterialHeader header; // alpha_texture_id = base color texture
     float3 base_color;
@@ -58,25 +58,25 @@ struct PBRTMaterial<let TRANSMISSION : bool = false,
     TextureID emission_texture;
     TextureID normal_texture;
 
-    Conditional<PBRTTransmission, TRANSMISSION> transmission;
-    Conditional<PBRTClearcoat, CLEARCOAT> clearcoat;
-    Conditional<PBRTSheen, SHEEN> sheen;
+    Conditional<OpenPBRTransmission, TRANSMISSION> transmission;
+    Conditional<OpenPBRClearcoat, CLEARCOAT> clearcoat;
+    Conditional<OpenPBRSheen, SHEEN> sheen;
 
-    property Optional<PBRTTransmission> transmission_opt {
+    property Optional<OpenPBRTransmission> transmission_opt {
         get { return transmission; }
     }
-    property Optional<PBRTClearcoat> clearcoat_opt {
+    property Optional<OpenPBRClearcoat> clearcoat_opt {
         get { return clearcoat; }
     }
-    property Optional<PBRTSheen> sheen_opt {
+    property Optional<OpenPBRSheen> sheen_opt {
         get { return sheen; }
     }
 
-    PBRTMaterialSample get_sample(const ShadingData sd,
-                                 const TextureManager tm,
-                                 const LODSampler2D lod,
-                                 out float3 out_emission,
-                                 out OrthonormalFrame out_shading_frame) {
+    OpenPBRMaterialSample get_sample(const ShadingData sd,
+                                    const TextureManager tm,
+                                    const LODSampler2D lod,
+                                    out float3 out_emission,
+                                    out OrthonormalFrame out_shading_frame) {
         const LOD0Sampler lod0;
 
         float3 base = base_color;
@@ -128,11 +128,11 @@ struct PBRTMaterial<let TRANSMISSION : bool = false,
             transmission_color = trans.color;
         }
 
-        const PBRTDielectric dielectric = PBRTDielectric(
-            PBRTOpaqueDielectric(SpecularBRDF(alpha), LambertDiffuseBRDF(base), dielectric_f0),
+        const OpenPBRDielectric dielectric = OpenPBRDielectric(
+            OpenPBROpaqueDielectric(SpecularBRDF(alpha), LambertDiffuseBRDF(base), dielectric_f0),
             RoughDielectricBSDF(alpha, eta, transmission_color), tw);
-        const PBRTSubstrate substrate =
-            PBRTSubstrate(dielectric, PBRTMetal(SpecularBRDF(alpha), base), metal);
+        const OpenPBRSubstrate substrate =
+            OpenPBRSubstrate(dielectric, OpenPBRMetal(SpecularBRDF(alpha), base), metal);
 
         float cw = 0.0f;
         float coat_alpha = ggx_roughness_to_alpha(merian_hint_min_roughness);
@@ -143,8 +143,8 @@ struct PBRTMaterial<let TRANSMISSION : bool = false,
             const float coat_t = (coat.ior - 1.0f) / (coat.ior + 1.0f);
             coat_f0 = coat_t * coat_t;
         }
-        const PBRTWithCoat with_coat =
-            PBRTWithCoat(substrate, PBRTCoated(SpecularBRDF(coat_alpha), substrate, coat_f0), cw);
+        const OpenPBRWithCoat with_coat = OpenPBRWithCoat(
+            substrate, OpenPBRCoated(SpecularBRDF(coat_alpha), substrate, coat_f0), cw);
 
         float sw = 0.0f;
         float3 sheen_col = float3(0.0f);
@@ -155,8 +155,8 @@ struct PBRTMaterial<let TRANSMISSION : bool = false,
             sheen_rough = sh.roughness;
         }
 
-        PBRTMaterialSample s;
-        s.brdf = PBRTBSDF(with_coat, SheenBRDF(sheen_col, sheen_rough), sw);
+        OpenPBRMaterialSample s;
+        s.brdf = OpenPBRBSDF(with_coat, SheenBRDF(sheen_col, sheen_rough), sw);
         out_shading_frame = shading_frame;
         out_emission = emission_out;
         s.eta = eta;
@@ -164,10 +164,10 @@ struct PBRTMaterial<let TRANSMISSION : bool = false,
     }
 }
 
-struct PBRTMaterialSample : MaterialSample {
-    typealias BSDFImpl = PBRTBSDF;
+struct OpenPBRMaterialSample : MaterialSample {
+    typealias BSDFImpl = OpenPBRBSDF;
 
-    PBRTBSDF brdf;
+    OpenPBRBSDF brdf;
     float eta;
 
     BSDFImpl get_bsdf() {
