@@ -22,6 +22,14 @@ if ufbx.found()
     merian_shaders_src += 'scene/fbx_scene.cpp'
 endif
 
+if pbrt_enabled
+    merian_shaders_src += [
+        'scene/pbrt/pbrt_gzip.cpp',
+        'scene/pbrt/pbrt_parser.cpp',
+        'scene/pbrt/pbrt_spectrum.cpp',
+    ]
+endif
+
 merian_shaders_deps = [
     fmt,
     glm,
@@ -35,6 +43,10 @@ merian_shaders_deps = [
     vma,
     vulkan,
 ]
+
+if pbrt_enabled
+    merian_shaders_deps += [miniply, zlib]
+endif
 
 if is_msvc
     merian_shaders_objs = static_library('merian-shaders-objs', merian_shaders_src,
