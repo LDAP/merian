@@ -6,6 +6,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 namespace merian {
@@ -69,6 +70,10 @@ class ShaderCursor {
     ShaderCursor& write(const AccelerationStructureHandle& as);
     ShaderCursor& write(const void* data, std::size_t size);
     template <class T> ShaderCursor& write(const T& data) {
+        // A handle or resource landing here would byte-copy instead of writing a descriptor.
+        static_assert(std::is_trivially_copyable_v<T> && !std::is_pointer_v<T>,
+                      "byte-copy is only allowed for plain values; resources and handles have "
+                      "their own overloads");
         write(&data, sizeof(T));
         return *this;
     }
