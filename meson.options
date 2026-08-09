@@ -47,6 +47,12 @@ option(
     description: 'Build with ufbx (FBX) support.'
 )
 option(
+    'pbrt',
+    type: 'feature',
+    value: 'auto',
+    description: 'Build with pbrt-v4 scene support (needs miniply and zlib).'
+)
+option(
     'tinybvh',
     type: 'feature',
     value: 'auto',

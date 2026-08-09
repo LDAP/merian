@@ -107,6 +107,12 @@ ufbx = dependency('ufbx', required: get_option('ufbx'), fallback: ['ufbx', 'ufbx
 if get_option('ufbx').enable_auto_if(ufbx.found()).enabled()
     global_args += ['-DMERIAN_UFBX_ENABLED']
 endif
+miniply = dependency('miniply', required: get_option('pbrt'), fallback: ['miniply', 'miniply_dep'])
+zlib = dependency('zlib', required: get_option('pbrt'), fallback: ['zlib', 'zlib_dep'])
+pbrt_enabled = get_option('pbrt').enable_auto_if(miniply.found() and zlib.found()).enabled()
+if pbrt_enabled
+    global_args += ['-DMERIAN_PBRT_ENABLED']
+endif
 imgui = dependency('imgui', version: ['>=1.92.6'], fallback: ['imgui', 'imgui_dep'], static: true)
 nlohmann_json = dependency('nlohmann_json', version: ['>=3.11.3'], fallback: ['nlohmann_json', 'nlohmann_json_dep'])
 vma = dependency('VulkanMemoryAllocator', version: ['>=3.3.0'], fallback: ['VulkanMemoryAllocator', 'VulkanMemoryAllocator_dep'], default_options : ['static_functions=false', 'dynamic_functions=true'])

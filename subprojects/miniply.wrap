@@ -1,0 +1,11 @@
+[wrap-git]
+directory = miniply
+
+url = https://github.com/vilya/miniply
+revision = 1a235c70390fadf789695c9ccbf285ae712416b3
+depth = 1
+
+patch_directory = miniply
+
+[provide]
+miniply = miniply_dep
