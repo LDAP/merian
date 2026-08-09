@@ -191,17 +191,7 @@
             "properties": {
                 "alpha mode": "Perceptual luminance",
                 "clamp output": true,
-                "look": "Default",
-                "offset": 0.0,
-                "perceptual exponent": 2.200000047683716,
-                "power": 1.0,
-                "saturation": 1.0,
-                "slope": [
-                    1.0,
-                    1.0,
-                    1.0
-                ],
-                "tonemap": "AgX"
+                "perceptual exponent": 2.200000047683716
             },
             "type": "Tonemap"
         }

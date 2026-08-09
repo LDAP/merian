@@ -2,6 +2,7 @@
 
 #include "merian-graph/connectors/image/vk_image_in_sampled.hpp"
 #include "merian-graph/nodes/compute_node/compute_node.hpp"
+#include "merian-graph/nodes/tonemap/config.h"
 
 namespace merian {
 
@@ -65,7 +66,7 @@ class Tonemap : public AbstractCompute {
     vk::Extent3D extent;
     PushConstant pc;
 
-    int32_t tonemap = 0;
+    int32_t tonemap = TONEMAP_AGX;
     int32_t alpha_mode = 0;
     int32_t clamp_output = 1;
     int32_t agx_look = 0;

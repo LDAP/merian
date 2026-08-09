@@ -175,12 +175,9 @@
                 "out->blit.src"
             ],
             "properties": {
-                "W": 11.199999809265137,
                 "alpha mode": "Perceptual luminance",
                 "clamp output": true,
-                "exposure bias": 2.0,
-                "perceptual exponent": 2.200000047683716,
-                "tonemap": "Uncharted 2"
+                "perceptual exponent": 2.200000047683716
             },
             "type": "Tonemap"
         }
