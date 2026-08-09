@@ -129,6 +129,38 @@ class LatLongEnvMap : public EnvMap {
     TextureHandle texture;
 };
 
+// Square equal-area octahedral image (pbrt-v4 infinite-light parameterization).
+class EqualAreaOctEnvMap : public EnvMap {
+  public:
+    explicit EqualAreaOctEnvMap(TextureHandle texture) : texture(std::move(texture)) {}
+
+    SlangComposition::SlangModule get_slang_module() const override {
+        return SlangComposition::SlangModule::from_path(
+            "merian-shaders/scene/environment-map.slang", false);
+    }
+
+    std::string get_type_name() const override {
+        return "merian::EqualAreaOctMap";
+    }
+
+    void write_to(ShaderCursor cursor) const override {
+        cursor["env_map"] = texture;
+        cursor["to_local"] = to_local;
+        cursor["intensity"] = intensity;
+    }
+
+    const TextureHandle& get_texture() const {
+        return texture;
+    }
+
+    void set_texture(TextureHandle t) {
+        texture = std::move(t);
+    }
+
+  private:
+    TextureHandle texture;
+};
+
 class CubeMapEnvMap : public EnvMap {
   public:
     explicit CubeMapEnvMap(std::array<TextureHandle, 6> faces) : faces(std::move(faces)) {}

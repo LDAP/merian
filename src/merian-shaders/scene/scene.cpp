@@ -797,6 +797,12 @@ void Scene::process_pending_env_load(const CommandBufferHandle& cmd) {
             if (auto e = std::dynamic_pointer_cast<LatLongEnvMap>(env_map)) {
                 e->set_texture(tex);
             }
+        } else if (pending_env_load->kind == 3) {
+            const TextureHandle tex = load_texture(pending_env_load->latlong_path, "env_oct");
+            cmd->barrier(tex->get_image()->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal));
+            if (auto e = std::dynamic_pointer_cast<EqualAreaOctEnvMap>(env_map)) {
+                e->set_texture(tex);
+            }
         } else if (pending_env_load->kind == 2) {
             std::array<TextureHandle, 6> faces;
             for (int i = 0; i < 6; ++i) {
@@ -816,11 +822,11 @@ void Scene::process_pending_env_load(const CommandBufferHandle& cmd) {
 }
 
 void Scene::properties_env(Properties& props) {
-    static const std::vector<std::string> kinds = {"Empty", "LatLong", "CubeMap"};
+    static const std::vector<std::string> kinds = {"Empty", "LatLong", "CubeMap", "EqualAreaOct"};
     const bool selection_changed = props.config_options("Type", env_ui.selection, kinds);
 
     bool paths_changed = false;
-    if (env_ui.selection == 1) {
+    if (env_ui.selection == 1 || env_ui.selection == 3) {
         paths_changed |= props.config_text("Path", env_ui.latlong_path, props.is_ui());
     } else if (env_ui.selection == 2) {
         static constexpr std::array<const char*, 6> face_labels = {"rt (+X)", "bk (+Y)", "lf (-X)",
@@ -842,6 +848,8 @@ void Scene::properties_env(Properties& props) {
         } else if (env_ui.selection == 2) {
             next = std::make_shared<CubeMapEnvMap>(
                 std::array<TextureHandle, 6>{dummy, dummy, dummy, dummy, dummy, dummy});
+        } else if (env_ui.selection == 3) {
+            next = std::make_shared<EqualAreaOctEnvMap>(dummy);
         } else {
             next = std::make_shared<EmptyEnvMap>();
         }
