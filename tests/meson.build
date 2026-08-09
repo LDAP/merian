@@ -96,3 +96,13 @@ if tgltf.found()
     )
     test('gltf_scene', test_gltf_scene, timeout: 120)
 endif
+
+if pbrt_enabled
+    test_pbrt_scene = executable(
+        'test-pbrt-scene',
+        'test_pbrt_scene.cpp',
+        dependencies: [merian_dep, gtest_main_dep],
+        cpp_args: [test_shader_dir_arg],
+    )
+    test('pbrt_scene', test_pbrt_scene, timeout: 120)
+endif
