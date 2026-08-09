@@ -51,7 +51,10 @@ class PBRTSceneTest : public ::testing::Test {
     static void SetUpTestSuite() {
         spdlog::set_level(spdlog::level::debug);
         ContextCreateInfo info{
-            .features = VulkanFeatures({"scalarBlockLayout", "shaderInt64", "shaderFloat16"}),
+            .features =
+                VulkanFeatures({"scalarBlockLayout", "shaderInt64", "shaderFloat16",
+                                "accelerationStructure", "storageBuffer16BitAccess",
+                                "storageBuffer8BitAccess", "uniformAndStorageBuffer8BitAccess"}),
             .context_extensions = {ExtensionVkValidationLayers::name, ExtensionResources::name},
             .application_name = "test-pbrt-scene",
         };
@@ -93,7 +96,10 @@ TEST_F(PBRTSceneTest, LoadMiniScene) {
     }
 
     auto scene = std::make_shared<PBRTScene>(compile_context, context, allocator, material_system);
-    queue->submit_wait([&](const CommandBufferHandle& cmd) { scene->load(cmd, path); });
+    queue->submit_wait([&](const CommandBufferHandle& cmd) {
+        scene->load(cmd, path);
+        scene->update(cmd, 0.0f, 0.0f, 0);
+    });
     std::filesystem::remove(path);
 
     ASSERT_TRUE(scene->is_ready());
