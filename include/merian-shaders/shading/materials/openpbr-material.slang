@@ -38,10 +38,14 @@ struct OpenPBRSheen {
     float3 color;
     float roughness;
 };
+struct OpenPBRVolume {
+    float3 absorption; // sigma_a (Beer-Lambert)
+};
 
 struct OpenPBRMaterial<let TRANSMISSION : bool = false,
                        let CLEARCOAT : bool = false,
-                       let SHEEN : bool = false> : MaterialModel {
+                       let SHEEN : bool = false,
+                       let VOLUME : bool = false> : MaterialModel {
     typealias MaterialSampleImpl = OpenPBRMaterialSample;
 
     MaterialHeader header; // alpha_texture_id = base color texture
@@ -61,6 +65,7 @@ struct OpenPBRMaterial<let TRANSMISSION : bool = false,
     Conditional<OpenPBRTransmission, TRANSMISSION> transmission;
     Conditional<OpenPBRClearcoat, CLEARCOAT> clearcoat;
     Conditional<OpenPBRSheen, SHEEN> sheen;
+    Conditional<OpenPBRVolume, VOLUME> volume;
 
     property Optional<OpenPBRTransmission> transmission_opt {
         get { return transmission; }
@@ -70,6 +75,9 @@ struct OpenPBRMaterial<let TRANSMISSION : bool = false,
     }
     property Optional<OpenPBRSheen> sheen_opt {
         get { return sheen; }
+    }
+    property Optional<OpenPBRVolume> volume_opt {
+        get { return volume; }
     }
 
     override float3 get_emission(const ShadingData sd,
@@ -165,11 +173,20 @@ struct OpenPBRMaterial<let TRANSMISSION : bool = false,
             sheen_rough = sh.roughness;
         }
 
+        // volume absorption, entered on a front-face transmission.
+        float3 absorb = float3(0.0f);
+        if (sd.front_facing) {
+            if (let vol = volume_opt) {
+                absorb = vol.absorption;
+            }
+        }
+
         OpenPBRMaterialSample s;
         s.brdf = OpenPBRBSDF(with_coat, SheenBRDF(sheen_col, sheen_rough), sw);
         out_shading_frame = shading_frame;
         out_emission = emission_out;
         s.eta = eta;
+        s.absorption = absorb;
         return s;
     }
 }
@@ -179,13 +196,14 @@ struct OpenPBRMaterialSample : MaterialSample {
 
     OpenPBRBSDF brdf;
     float eta;
+    float3 absorption;
 
     BSDFImpl get_bsdf() {
         return brdf;
     }
 
     override IsotropicVolume get_interior_volume() {
-        return IsotropicVolume(float3(0.0f), float3(0.0f), eta);
+        return IsotropicVolume(absorption, float3(0.0f), eta);
     }
 }
 

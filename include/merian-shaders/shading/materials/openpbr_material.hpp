@@ -24,6 +24,9 @@ struct OpenPBRSheenData {
     float3 color{1, 1, 1};
     float roughness{0.3f};
 };
+struct OpenPBRVolumeData {
+    float3 absorption{0, 0, 0};
+};
 
 struct OpenPBRMaterial : Material {
     float3 base_color{1, 1, 1};
@@ -42,6 +45,7 @@ struct OpenPBRMaterial : Material {
     std::optional<OpenPBRTransmissionData> transmission;
     std::optional<OpenPBRClearcoatData> clearcoat;
     std::optional<OpenPBRSheenData> sheen;
+    std::optional<OpenPBRVolumeData> volume;
 
     OpenPBRMaterial() {
         header.alpha_texture_id = TextureID(-1);
@@ -49,8 +53,8 @@ struct OpenPBRMaterial : Material {
 
     std::string variant_type_name() const {
         const auto b = [](bool v) { return v ? "true" : "false"; };
-        return fmt::format("merian::OpenPBRMaterial<{}, {}, {}>", b(transmission.has_value()),
-                           b(clearcoat.has_value()), b(sheen.has_value()));
+        return fmt::format("merian::OpenPBRMaterial<{}, {}, {}, {}>", b(transmission.has_value()),
+                           b(clearcoat.has_value()), b(sheen.has_value()), b(volume.has_value()));
     }
 
     uint32_t get_payload_size() const override {
@@ -97,6 +101,9 @@ struct OpenPBRMaterial : Material {
             put(sheen->weight);
             put(sheen->color);
             put(sheen->roughness);
+        }
+        if (volume) {
+            put(volume->absorption);
         }
         return off;
     }
