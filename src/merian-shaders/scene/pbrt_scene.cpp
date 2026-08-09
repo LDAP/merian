@@ -469,7 +469,8 @@ MaterialID PBRTScene::material_for_shape(const CommandBufferHandle& cmd,
                                          MeshFlags& out_flags) {
     const float3 emission = shape.area_light ? shape.area_light->radiance : float3(0);
     const bool twosided = shape.area_light && shape.area_light->twosided;
-    const auto key = std::make_tuple(shape.material, emission.x, emission.y, emission.z, twosided);
+    const auto key = std::make_tuple(shape.material, emission.x, emission.y, emission.z, twosided,
+                                     shape.inside_medium);
     if (const auto it = material_cache.find(key); it != material_cache.end()) {
         out_flags = it->second.flags;
         return it->second.id;
@@ -479,6 +480,12 @@ MaterialID PBRTScene::material_for_shape(const CommandBufferHandle& cmd,
     build.material.emission = emission;
     if (twosided) {
         build.flags = build.flags | MeshFlags::TwoSided;
+    }
+    if (shape.inside_medium >= 0) {
+        const float3 sigma_a = desc->media[shape.inside_medium].sigma_a;
+        if (sigma_a.x > 0.f || sigma_a.y > 0.f || sigma_a.z > 0.f) {
+            build.material.volume = OpenPBRVolumeData{sigma_a};
+        }
     }
 
     const auto type_id = get_material_system()->register_material_type(
@@ -807,7 +814,6 @@ void PBRTScene::build_scene(const CommandBufferHandle& cmd) {
     root.name = "pbrt";
     const NodeID root_id = add_node(root);
 
-    // Meshes of uninstanced objects are never placed; skip building them.
     std::vector<uint32_t> object_use(desc->objects.size(), 0);
     for (const pbrt::InstanceDesc& instance : desc->instances) {
         object_use[instance.object]++;

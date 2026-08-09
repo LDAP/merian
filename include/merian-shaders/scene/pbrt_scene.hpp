@@ -99,13 +99,13 @@ class PBRTScene : public Scene {
     std::unordered_map<std::string, TextureSlot> texture_slots;
     // named pbrt texture (+ color space) -> resolved factor/texture
     std::unordered_map<std::string, Resolved> resolved_textures;
-    // (material index, area-light emission) -> registered material; emission is baked into the
-    // material, so emissive uses of a shared named material become copies.
+    // emission is baked into the material, so emissive uses of a shared named material copy
     struct CachedMaterial {
         MaterialID id;
         MeshFlags flags;
     };
-    std::map<std::tuple<int32_t, float, float, float, bool>, CachedMaterial> material_cache;
+    std::map<std::tuple<int32_t, float, float, float, bool, int32_t>, CachedMaterial>
+        material_cache;
 
     std::vector<std::optional<MeshID>> shape_meshes;
     std::vector<AABB> shape_aabbs;

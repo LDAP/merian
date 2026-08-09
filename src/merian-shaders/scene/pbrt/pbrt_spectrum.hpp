@@ -8,9 +8,8 @@
 
 namespace merian::pbrt {
 
-// RGB of a spectrum-typed parameter: inline (lambda, value) pairs, .spd file, blackbody
-// temperature, or a named standard illuminant. Named material spectra (metal-*, glass-*)
-// return nullopt; use the dedicated lookups below.
+// RGB of a spectrum-typed parameter; named material spectra (metal-*, glass-*) return nullopt,
+// use the dedicated lookups below.
 std::optional<float3> spectrum_param_rgb(const ParsedParameter& param,
                                          const std::filesystem::path& base_dir);
 

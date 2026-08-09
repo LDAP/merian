@@ -31,6 +31,11 @@ struct MaterialDesc {
     ParamDict params;
 };
 
+struct MediumDesc {
+    std::string name;
+    float3 sigma_a{1, 1, 1}; // scale applied
+};
+
 struct ShapeDesc {
     enum MaterialRef : int32_t { MATERIAL_DEFAULT = -1, MATERIAL_INTERFACE = -2 };
 
@@ -40,7 +45,8 @@ struct ShapeDesc {
     bool reverse_orientation = false;
     int32_t material = MATERIAL_DEFAULT; // index into PBRTSceneDesc::materials
     std::optional<AreaLightDesc> area_light;
-    int32_t object = -1; // index into PBRTSceneDesc::objects, -1 = placed directly
+    int32_t inside_medium = -1; // index into PBRTSceneDesc::media
+    int32_t object = -1;        // index into PBRTSceneDesc::objects, -1 = placed directly
 };
 
 struct ObjectDesc {
@@ -73,6 +79,8 @@ struct PBRTSceneDesc {
     std::unordered_map<std::string, int32_t> texture_index;
     std::vector<MaterialDesc> materials;
     std::unordered_map<std::string, int32_t> named_material_index;
+    std::vector<MediumDesc> media;
+    std::unordered_map<std::string, int32_t> medium_index;
     std::vector<ShapeDesc> shapes;
     std::vector<ObjectDesc> objects;
     std::vector<InstanceDesc> instances;

@@ -14,7 +14,6 @@ namespace merian::pbrt {
 struct ParsedParameter {
     std::string type;
     std::string name;
-    // Filled by token kind: numbers land in floats (integer type additionally in ints).
     std::vector<float> floats;
     std::vector<int32_t> ints;
     std::vector<std::string> strings;
@@ -52,7 +51,6 @@ class ParamDict {
         return param != nullptr && !param->strings.empty() ? param->strings[0] : fallback;
     }
 
-    // point3 / vector3 / normal triples.
     std::vector<float3> get_vec3_list(const std::string_view name) const {
         const ParsedParameter* param = find(name);
         std::vector<float3> result;

@@ -44,10 +44,9 @@ class Parser {
         float4x4 ctm = identity();
         int32_t material = ShapeDesc::MATERIAL_DEFAULT;
         std::optional<AreaLightDesc> area_light;
+        int32_t inside_medium = -1;
         bool reverse_orientation = false;
     };
-
-    // --- token helpers ---
 
     float parse_number(const std::string_view text) {
         float value{};
@@ -158,8 +157,6 @@ class Parser {
         }
     }
 
-    // --- transforms ---
-
     void apply(const float4x4& m) {
         state.ctm = mul(state.ctm, m);
     }
@@ -204,8 +201,6 @@ class Parser {
         apply(inverse(camera_to_world));
     }
 
-    // --- parameter resolution ---
-
     std::optional<float3> param_to_rgb(const ParsedParameter& param) {
         if (param.type == "rgb" || param.type == "color") {
             if (param.floats.size() >= 3) {
@@ -219,8 +214,6 @@ class Parser {
         return spectrum_param_rgb(param, desc->base_dir);
     }
 
-    // --- directives ---
-
     void handle_shape() {
         ShapeDesc shape;
         shape.type = next_quoted();
@@ -229,6 +222,7 @@ class Parser {
         shape.reverse_orientation = state.reverse_orientation;
         shape.material = state.material;
         shape.area_light = state.area_light;
+        shape.inside_medium = state.inside_medium;
         shape.object = current_object;
         if (current_object >= 0) {
             desc->objects[current_object].shape_indices.push_back(
@@ -386,6 +380,52 @@ class Parser {
         desc->instances.emplace_back(InstanceDesc{it->second, state.ctm});
     }
 
+    void handle_make_named_medium() {
+        const std::string name = next_quoted();
+        const ParamDict params = parse_params();
+        const std::string type = params.get_string("type", "homogeneous");
+
+        MediumDesc medium;
+        medium.name = name;
+        if (type == "homogeneous") {
+            if (const ParsedParameter* sigma_a = params.find("sigma_a")) {
+                medium.sigma_a = param_to_rgb(*sigma_a).value_or(medium.sigma_a);
+            }
+            medium.sigma_a *= params.get_float("scale", 1.0f);
+            const ParsedParameter* sigma_s = params.find("sigma_s");
+            const float3 s =
+                sigma_s != nullptr ? param_to_rgb(*sigma_s).value_or(float3(1)) : float3(1);
+            if (s.x != 0.f || s.y != 0.f || s.z != 0.f) {
+                warn_once("media_scatter", "media scattering is ignored, absorption only");
+            }
+        } else {
+            medium.sigma_a = float3(0);
+            warn_once("media_" + type, fmt::format("medium '{}' unsupported", type));
+        }
+        const int32_t index = static_cast<int32_t>(desc->media.size());
+        desc->media.emplace_back(std::move(medium));
+        desc->medium_index[name] = index;
+    }
+
+    void handle_medium_interface() {
+        std::string names[2];
+        for (int i = 0; i < 2 && tokenizer.peek().kind == Kind::String &&
+                        tokenizer.peek().text.find(' ') == std::string_view::npos;
+             i++) {
+            names[i] = std::string(tokenizer.next().text);
+        }
+        // only the interior medium maps to material absorption
+        state.inside_medium = -1;
+        if (!names[0].empty()) {
+            const auto it = desc->medium_index.find(names[0]);
+            if (it == desc->medium_index.end()) {
+                SPDLOG_WARN("pbrt: unknown medium '{}'", names[0]);
+            } else {
+                state.inside_medium = it->second;
+            }
+        }
+    }
+
     void skip_unknown_arguments() {
         for (;;) {
             const Kind kind = tokenizer.peek().kind;
@@ -506,16 +546,9 @@ class Parser {
                 warn_once("colorspace", fmt::format("color space '{}' treated as srgb", space));
             }
         } else if (name == "MakeNamedMedium") {
-            next_quoted();
-            parse_params();
-            warn_once("media", "participating media are unsupported");
+            handle_make_named_medium();
         } else if (name == "MediumInterface") {
-            for (int i = 0; i < 2 && tokenizer.peek().kind == Kind::String &&
-                            tokenizer.peek().text.find(' ') == std::string_view::npos;
-                 i++) {
-                tokenizer.next();
-            }
-            warn_once("media", "participating media are unsupported");
+            handle_medium_interface();
         } else if (name == "Attribute") {
             next_quoted();
             parse_params();
