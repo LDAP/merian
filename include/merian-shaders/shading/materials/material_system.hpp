@@ -85,6 +85,12 @@ class MaterialSystem : public std::enable_shared_from_this<MaterialSystem> {
     }
     void set_alpha_test_threshold(float threshold);
 
+    // Channel of the alpha texture read by the alpha test / get_alpha (0=r,1=g,2=b,3=a).
+    int get_alpha_test_channel() const {
+        return alpha_test_channel;
+    }
+    void set_alpha_test_channel(int channel);
+
     bool get_clamp_normals() const {
         return clamp_normals;
     }
@@ -150,6 +156,7 @@ class MaterialSystem : public std::enable_shared_from_this<MaterialSystem> {
     uint32_t dirty_begin = UINT32_MAX;
     uint32_t dirty_end = 0;
     float alpha_test_threshold = 0.5F;
+    int alpha_test_channel = 3;
     bool clamp_normals = true;
     float min_roughness = 0.0316F;
     SlangCompositionHandle composition;

@@ -63,6 +63,17 @@ void MaterialSystem::set_alpha_test_threshold(const float threshold) {
                                                     threshold));
 }
 
+void MaterialSystem::set_alpha_test_channel(const int channel) {
+    if (channel == alpha_test_channel) {
+        return;
+    }
+    alpha_test_channel = channel;
+    composition->add_module_from_string("material_system_alpha_channel",
+                                        fmt::format("namespace merian {{ export static const int "
+                                                    "merian_alpha_test_channel = {}; }}",
+                                                    channel));
+}
+
 void MaterialSystem::set_clamp_normals(const bool clamp) {
     if (clamp == clamp_normals) {
         return;

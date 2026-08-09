@@ -5,6 +5,18 @@ namespace merian {
 extern static const int merian_material_system_payload_max_size;
 // alpha values less than the threshold are considered transparent.
 extern static const float merian_alpha_test_threshold = 0.5;
+// Channel of the alpha texture read by the alpha test / get_alpha (0=r,1=g,2=b,3=a). Some engines
+// store the opacity mask in red (e.g. single-channel masks), not alpha.
+extern static const int merian_alpha_test_channel = 3;
+
+// Selects the channel by the (link-time constant) index; the ternary folds to a static swizzle,
+// avoiding a dynamic vector subscript.
+static float select_alpha_channel(const float4 v) {
+    return merian_alpha_test_channel == 0   ? v.x
+           : merian_alpha_test_channel == 1 ? v.y
+           : merian_alpha_test_channel == 2 ? v.z
+                                            : v.w;
+}
 
 struct MaterialPayload {
     uint blob[merian_material_system_payload_max_size];
@@ -30,7 +42,8 @@ struct MaterialSystem {
                     const LODSampler2D lod_sampler = DefaultLODSampler()) {
         const MaterialHeader header = materials[material_id].header;
         if (let texture_id = header.get_alpha_texture_id()) {
-            const float alpha = lod_sampler.sample(texture_manager.get_sampler2D(texture_id), uv).a;
+            const float alpha =
+                select_alpha_channel(lod_sampler.sample(texture_manager.get_sampler2D(texture_id), uv));
             return alpha < merian_alpha_test_threshold;
         }
 
@@ -43,7 +56,8 @@ struct MaterialSystem {
                     const LODSampler2D lod_sampler = DefaultLODSampler()) {
         const MaterialHeader header = materials[material_id].header;
         if (let texture_id = header.get_alpha_texture_id()) {
-            return lod_sampler.sample(texture_manager.get_sampler2D(texture_id), uv).a;
+            return select_alpha_channel(
+                lod_sampler.sample(texture_manager.get_sampler2D(texture_id), uv));
         }
         return 1.f;
     }
