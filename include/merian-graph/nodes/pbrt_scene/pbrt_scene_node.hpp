@@ -1,0 +1,64 @@
+#pragma once
+
+#include "merian-graph/connectors/ptr_in.hpp"
+#include "merian-graph/connectors/ptr_out.hpp"
+#include "merian-graph/graph/node.hpp"
+#include "merian-shaders/scene/scene.hpp"
+#include "merian/utils/camera/camera_controller.hpp"
+#include "merian/utils/input_controller.hpp"
+
+#ifdef MERIAN_PBRT_ENABLED
+#include "merian-shaders/scene/pbrt_scene.hpp"
+#include "merian/shader/shader_compile_context.hpp"
+#include <filesystem>
+#endif
+
+namespace merian {
+
+class PBRTSceneNode : public Node {
+
+  public:
+    PBRTSceneNode();
+
+    ~PBRTSceneNode() override = default;
+
+    DeviceSupportInfo query_device_support(const DeviceSupportQueryInfo& query_info) override;
+
+    void initialize(const ContextHandle& context,
+                    const ResourceAllocatorHandle& allocator) override;
+
+    std::vector<InputConnectorDescriptor> describe_inputs() override;
+
+    std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
+
+    [[nodiscard]] NodeStatusFlags on_connected(const NodeIOLayout& io_layout,
+                                               const NodeIO& io,
+                                               const NodeConnectionInfo& info,
+                                               Submission& submission) override;
+
+    [[nodiscard]] NodeStatusFlags
+    process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) override;
+
+    NodeStatusFlags properties(Properties& config) override;
+
+  private:
+#ifdef MERIAN_PBRT_ENABLED
+    ContextHandle context;
+    ResourceAllocatorHandle allocator;
+    ShaderCompileContextHandle compile_context;
+    TextureManagerHandle texture_manager;
+    MaterialSystemHandle material_system;
+
+    PBRTSceneHandle scene;
+    std::filesystem::path file_path;
+
+#endif
+
+    PtrOutHandle<Scene> con_scene = PtrOut<Scene>::create(true);
+
+    PtrInHandle<InputController> con_controller = PtrIn<InputController>::create();
+    std::shared_ptr<CameraController> cam_controller = std::make_shared<CameraController>();
+    std::weak_ptr<InputController> registered_controller;
+};
+
+} // namespace merian

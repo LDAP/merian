@@ -22,6 +22,7 @@
 #include "merian-graph/nodes/imgui/imgui_node.hpp"
 #include "merian-graph/nodes/mean/mean.hpp"
 #include "merian-graph/nodes/median_approx/median.hpp"
+#include "merian-graph/nodes/pbrt_scene/pbrt_scene_node.hpp"
 #include "merian-graph/nodes/reduce/reduce.hpp"
 #include "merian-graph/nodes/render_pt/render_pt.hpp"
 #include "merian-graph/nodes/render_pt_mcpg/render_pt_mcpg.hpp"
@@ -77,6 +78,7 @@ NodeRegistry::NodeRegistry() {
         "GBuffer (Raytraced)", "Creates a GBuffer for the Merian scene format using Raytracing.");
     register_node_type<GLTFSceneNode>("GLTF Scene", "Loads a glTF/GLB scene file.");
     register_node_type<FBXSceneNode>("FBX Scene", "Loads an FBX scene file.");
+    register_node_type<PBRTSceneNode>("PBRT Scene", "Loads a pbrt-v4 scene file.");
     register_node_type<WindowNode>("Window", "Outputs to a window.");
     register_node_type<HDRImageRead>("HDR Image", "Loads an HDR image.");
     register_node_type<LDRImageRead>("LDR Image", "Loads a LDR image.");
