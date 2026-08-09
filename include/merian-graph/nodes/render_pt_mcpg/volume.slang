@@ -31,6 +31,8 @@ struct VolumeBinding {
     RWTexture2D<float2> volume_mv;
     Sampler2D<float> prev_volume_depth;
     DistanceMCGrid distance_mc;
+    Sampler2D<float4> prev_distance_mc;
+    uint distance_project_level;
     RenderIrradianceCache irr_cache;
     RenderMCPG mcpg;
 };
@@ -55,7 +57,6 @@ void render_pixel(const uint2 pixel,
     const float3 prev_cam_pos = scene.prev_camera.position;
     const RayDesc primary_ray = scene.generate_camera_ray(pixel, dim);
     const float linear_z = params.gbuffer.get_linear_z(pixel);
-    const float2 mv = params.volume_mv[pixel];
 
     const float max_t = min(linear_z, medium.get_max_distance());
     const float xi_max = transmittance_xi_max(max_t, mu_t);
@@ -74,16 +75,10 @@ void render_pixel(const uint2 pixel,
         // the level the winning candidate came from, so the update lands where it was read
         uint dist_level = 0;
         for (int i = 0; i < distance_mc_samples; i++) {
-            // the first sample follows the motion vector, the rest stay on this pixel
-            const float2 lookup = select(sample_i == 0,
-                                         clamp(float2(pixel) + mv, float2(0), float2(dim) - 1.f),
-                                         float2(pixel));
+            // the projection pass already moved the grid to the current camera
             const uint level = params.distance_mc.distributed_level(rng);
-            const DistanceMCState s = params.distance_mc.load(lookup, level, rng);
+            const DistanceMCState s = params.distance_mc.load(float2(pixel), level, rng);
             normal_dists[i] = distance_mc_state_get_normal_dist(s);
-            // the reprojected chain holds distances measured from the previous camera
-            if (sample_i == 0)
-                normal_dists[i].x -= dot(cam_pos - prev_cam_pos, primary_ray.Direction);
 
             dist_scores[i] = s.sum_w * float(s.sum_w > 0) * float(normal_dists[i].x < linear_z);
             dist_score_sum += dist_scores[i];
@@ -284,4 +279,52 @@ void volume_project(uint3 thread_id: SV_DispatchThreadID,
         return;
 
     params.volume_mv[uint2(new_pixel)] = float2(int2(pixel) - new_pixel);
+}
+
+// The grid image is transient: the projection below rebuilds it every frame.
+[shader("compute")]
+[numthreads(8, 8, 1)]
+void distance_clear(uint3 thread_id: SV_DispatchThreadID, ParameterBlock<VolumeBinding> params) {
+    for (uint level = 0; level < distance_mc_level_count; level++) {
+        if (all(thread_id.xy < texture_dimensions(params.distance_mc.levels[level])))
+            params.distance_mc.levels[level][thread_id.xy] = float4(0);
+    }
+}
+
+// Carries one level of the distance chains across frames: scatters each vertex of the previous
+// grid to where its mean scattering point lands this frame, with all stored distances moved to
+// the new camera. The tracer then reads the grid at the current pixel with no motion handling.
+// Concurrent writes to the same target vertex are benign: either state is a valid estimate.
+[shader("compute")]
+[numthreads(8, 8, 1)]
+void distance_project(uint3 thread_id: SV_DispatchThreadID,
+                      ParameterBlock<Scene> scene,
+                      ParameterBlock<VolumeBinding> params) {
+    const uint level = params.distance_project_level;
+    const uint2 idx = thread_id.xy;
+    const uint2 cells = texture_dimensions(params.distance_mc.levels[level]);
+    if (any(idx >= cells))
+        return;
+
+    const DistanceMCState s =
+        DistanceMCState::unpack(params.prev_distance_mc.Load(int3(idx, level)));
+    if (!(s.sum_w > 0.0))
+        return;
+
+    const uint2 dim = params.gbuffer.get_dimensions();
+    const float2 pixel = params.distance_mc.vertex_pixel(idx, level);
+    const float mean = s.moments.x / s.sum_w;
+    const float3 pos = scene.prev_camera.position +
+                       scene.prev_camera.get_pinhole_direction_unjittered(pixel, dim) * mean;
+    const float2 new_pixel = scene.camera.project_pinhole(pos, dim);
+
+    const float width = distance_mc_base_width * float(1u << level);
+    const int2 target = int2(round(new_pixel / width + 0.5));
+    if (any(target < 0) || any(target >= int2(cells)))
+        return;
+
+    DistanceMCState moved = s;
+    // moving toward the mean scattering point shortens every stored distance
+    distance_mc_state_shift(moved, distance(pos, scene.camera.position) - mean);
+    params.distance_mc.levels[level][uint2(target)] = moved.pack();
 }

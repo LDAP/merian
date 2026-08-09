@@ -7,6 +7,7 @@
         },
         "render": {
             "$+$outputs": [
+                "distance_mc->render.prev_distance_mc",
                 "volume->volume_accumulate.src",
                 "volume_depth->render.prev_volume_depth",
                 "volume_mv->volume_accumulate.mv",

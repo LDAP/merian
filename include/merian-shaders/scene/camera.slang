@@ -36,6 +36,12 @@ struct Camera {
         return normalize(ndc.x * U + ndc.y * V + W);
     }
 
+    float3 get_pinhole_direction_unjittered(const float2 pixel, const uint2 frame_dimensions) {
+        const float2 p = (pixel + float2(0.5f, 0.5f)) / frame_dimensions;
+        const float2 ndc = float2(2, -2) * p + float2(-1, 1);
+        return normalize(ndc.x * U + ndc.y * V + W);
+    }
+
     RayDesc generate_ray_pinhole(const uint2 pixel, const uint2 frame_dimensions) {
         RayDesc ray;
         ray.Origin = position;

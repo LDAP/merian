@@ -48,7 +48,8 @@ void RenderMCPG::initialize(const ContextHandle& context,
 std::vector<InputConnectorDescriptor> RenderMCPG::describe_inputs() {
     return {{"scene", con_scene},
             {"gbuffer", con_gbuffer, ConnectorAccess::ray_tracing_read},
-            {"prev_volume_depth", con_prev_volume_depth, ConnectorAccess::compute_read, 1, true}};
+            {"prev_volume_depth", con_prev_volume_depth, ConnectorAccess::compute_read, 1, true},
+            {"prev_distance_mc", con_prev_distance_mc, ConnectorAccess::compute_read, 1, true}};
 }
 
 std::vector<OutputConnectorDescriptor> RenderMCPG::describe_outputs(const NodeIOLayout& io_layout) {
@@ -66,7 +67,8 @@ std::vector<OutputConnectorDescriptor> RenderMCPG::describe_outputs(const NodeIO
             {"debug", con_debug, ConnectorAccess::ray_tracing_write},
             {"volume", con_volume, ConnectorAccess::compute_write, no_volume},
             {"volume_depth", con_volume_depth, ConnectorAccess::compute_write, no_volume},
-            {"volume_mv", con_volume_mv, ConnectorAccess::compute_read_write, no_volume}};
+            {"volume_mv", con_volume_mv, ConnectorAccess::compute_read_write, no_volume},
+            {"distance_mc", con_distance_mc, ConnectorAccess::compute_read_write, no_volume}};
 }
 
 void RenderMCPG::create_distance_mc() {
@@ -82,32 +84,18 @@ void RenderMCPG::create_distance_mc() {
     distance_mc_level_count =
         std::min({levels_to_max_width, levels_in_image, DISTANCE_MC_MAX_LEVELS});
 
-    vk::ImageCreateInfo info{{},
-                             vk::ImageType::e2D,
-                             vk::Format::eR32G32B32A32Sfloat,
-                             {cells_x, cells_y, 1},
-                             distance_mc_level_count,
-                             1,
-                             vk::SampleCountFlagBits::e1,
-                             vk::ImageTiling::eOptimal,
-                             vk::ImageUsageFlagBits::eStorage |
-                                 vk::ImageUsageFlagBits::eTransferDst,
-                             vk::SharingMode::eExclusive};
-    distance_mc =
-        resource_allocator->create_image(info, MemoryMappingType::NONE, "RenderMCPG::distance_mc");
-
-    // A storage view addresses one mip, so each level gets its own.
+    const vk::ImageCreateInfo info{{},
+                                   vk::ImageType::e2D,
+                                   vk::Format::eR32G32B32A32Sfloat,
+                                   {cells_x, cells_y, 1},
+                                   distance_mc_level_count,
+                                   1,
+                                   vk::SampleCountFlagBits::e1,
+                                   vk::ImageTiling::eOptimal,
+                                   vk::ImageUsageFlagBits::eStorage,
+                                   vk::SharingMode::eExclusive};
+    con_distance_mc = ManagedVkImageOut::create(info);
     distance_mc_levels.clear();
-    for (uint32_t level = 0; level < distance_mc_level_count; level++) {
-        const vk::ImageViewCreateInfo view{
-            {},
-            *distance_mc,
-            vk::ImageViewType::e2D,
-            distance_mc->get_format(),
-            {},
-            vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, level, 1, 0, 1}};
-        distance_mc_levels.emplace_back(resource_allocator->create_texture(distance_mc, view));
-    }
 }
 
 RenderMCPG::NodeStatusFlags
@@ -202,6 +190,15 @@ void RenderMCPG::ensure_pipeline(const SceneHandle& scene) {
     build_volume_pass(single_scattering, "single_scattering");
     build_volume_pass(project_seed, "volume_project_seed");
     build_volume_pass(project, "volume_project");
+    build_volume_pass(distance_clear, "distance_clear");
+    build_volume_pass(distance_project, "distance_project");
+    for (auto& level_params : distance_project_params) {
+        level_params = Versioned<ShaderObject>([this] {
+            return distance_project.entry_point->create_shader_object_for_parameter(
+                context, "params", resource_allocator);
+        });
+        level_params.depends_on(distance_project.entry_point);
+    }
 }
 
 [[nodiscard]] RenderMCPG::NodeStatusFlags
@@ -235,15 +232,6 @@ RenderMCPG::process(const NodeIO& io, const NodeProcessInfo& info, Submission& s
     if (info.get_iteration() == 0) {
         irr_cache->reset(cmd);
         mcpg->reset(cmd);
-        cmd->barrier(distance_mc->barrier2(
-            vk::ImageLayout::eTransferDstOptimal, vk::AccessFlagBits2::eNone,
-            vk::AccessFlagBits2::eTransferWrite, vk::PipelineStageFlagBits2::eTopOfPipe,
-            vk::PipelineStageFlagBits2::eTransfer, {}, {}, all_levels_and_layers(), true));
-        cmd->clear(distance_mc, vk::ImageLayout::eTransferDstOptimal);
-        cmd->barrier(distance_mc->barrier2(
-            vk::ImageLayout::eGeneral, vk::AccessFlagBits2::eTransferWrite,
-            vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
-            vk::PipelineStageFlagBits2::eTransfer, vk::PipelineStageFlagBits2::eAllCommands));
     }
 
     auto cursor = params_obj->get_cursor();
@@ -283,10 +271,26 @@ void RenderMCPG::process_volume(const NodeIO& io,
 
     const ShaderObjectAllocatorHandle& obj_allocator = info.get_shader_object_allocator();
 
-    // The three passes share the binding struct, but specialization drops what an entry point does
+    // Per-mip storage views of the grid image; the graph rings the image for the delayed
+    // self-connection, so each ring image gets its own set.
+    const ImageHandle& grid_image = io[con_distance_mc].get_image();
+    auto& grid_levels = distance_mc_levels[grid_image.get()];
+    if (grid_levels.empty()) {
+        for (uint32_t level = 0; level < distance_mc_level_count; level++) {
+            const vk::ImageViewCreateInfo view{
+                {},
+                *grid_image,
+                vk::ImageViewType::e2D,
+                grid_image->get_format(),
+                {},
+                vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, level, 1, 0, 1}};
+            grid_levels.emplace_back(resource_allocator->create_texture(grid_image, view));
+        }
+    }
+
+    // The passes share the binding struct, but specialization drops what an entry point does
     // not touch, so every field is written conditionally.
-    const auto write_binding = [&](const VolumePass& pass) {
-        const auto obj = pass.params.get();
+    const auto write_binding = [&](const ShaderObjectHandle& obj) {
         auto cursor = obj->get_cursor();
         const auto write = [&](const char* name, const auto& value) {
             if (auto field = cursor[name]; field.is_valid())
@@ -301,11 +305,15 @@ void RenderMCPG::process_volume(const NodeIO& io,
         if (auto field = cursor["distance_mc"]; field.is_valid()) {
             auto levels = field["levels"];
             for (uint32_t level = 0; level < distance_mc_level_count; level++) {
-                levels[level] = distance_mc_levels[level];
+                levels[level] = grid_levels[level];
             }
         }
+        // resources do not convert to descriptors: assigning them falls into the byte-copy
+        // overload, so bind the texture explicitly
+        if (auto field = cursor["prev_distance_mc"]; field.is_valid())
+            field.write(io[con_prev_distance_mc].get_texture(), vk::ImageLayout::eGeneral);
         if (auto field = cursor["prev_volume_depth"]; field.is_valid())
-            field = io[con_prev_volume_depth];
+            field.write(io[con_prev_volume_depth].get_texture(), vk::ImageLayout::eGeneral);
         if (auto field = cursor["irr_cache"]; field.is_valid())
             irr_cache->write_to(field);
         if (auto field = cursor["mcpg"]; field.is_valid())
@@ -319,7 +327,7 @@ void RenderMCPG::process_volume(const NodeIO& io,
         cmd->bind(pipe);
         if (bind_scene)
             ep->bind("scene", scene->get_shader_object(), cmd, pipe, obj_allocator);
-        ep->bind("params", write_binding(pass), cmd, pipe, obj_allocator);
+        ep->bind("params", write_binding(pass.params.get()), cmd, pipe, obj_allocator);
         cmd->dispatch(extent, 8, 8);
     };
 
@@ -341,6 +349,47 @@ void RenderMCPG::process_volume(const NodeIO& io,
             info.get_iteration() != 0) {
             dispatch(project, true);
             barrier_volume_mv();
+        }
+    }
+
+    {
+        MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "distance project");
+        const auto barrier_grid = [&] {
+            cmd->barrier(grid_image->barrier2(
+                vk::ImageLayout::eGeneral, vk::AccessFlagBits2::eShaderWrite,
+                vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
+                vk::PipelineStageFlagBits2::eComputeShader,
+                vk::PipelineStageFlagBits2::eComputeShader));
+        };
+        const vk::Extent3D cells = grid_image->get_extent();
+
+        {
+            MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "clear");
+            const auto ep = distance_clear.entry_point.get();
+            const auto pipe = distance_clear.pipeline.get();
+            cmd->bind(pipe);
+            ep->bind("params", write_binding(distance_clear.params.get()), cmd, pipe,
+                     obj_allocator);
+            cmd->dispatch(cells, 8, 8);
+        }
+        barrier_grid();
+
+        // the ping-pong is only valid from the second iteration on
+        if (io.is_connected(con_prev_distance_mc) && info.get_iteration() != 0) {
+            const auto ep = distance_project.entry_point.get();
+            const auto pipe = distance_project.pipeline.get();
+            cmd->bind(pipe);
+            ep->bind("scene", scene->get_shader_object(), cmd, pipe, obj_allocator);
+            for (uint32_t level = 0; level < distance_mc_level_count; level++) {
+                MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, fmt::format("level {}", level));
+                const auto obj = write_binding(distance_project_params[level].get());
+                obj->get_cursor()["distance_project_level"] = level;
+                ep->bind("params", obj, cmd, pipe, obj_allocator);
+                const vk::Extent3D level_extent{std::max(1u, cells.width >> level),
+                                                std::max(1u, cells.height >> level), 1};
+                cmd->dispatch(level_extent, 8, 8);
+            }
+            barrier_grid();
         }
     }
 

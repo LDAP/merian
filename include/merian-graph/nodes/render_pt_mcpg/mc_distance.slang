@@ -57,6 +57,12 @@ struct DistanceMCGrid {
         return uint2(clamp(idx, int2(0), int2(texture_dimensions(levels[level])) - 1));
     }
 
+    // Center of the pixel footprint a vertex represents; cell() without the jitter.
+    float2 vertex_pixel(const uint2 idx, const uint level) {
+        const float width = float(1u << level);
+        return (float2(idx) - 0.5) * (distance_mc_base_width * width);
+    }
+
     DistanceMCState load(const float2 pixel, const uint level, inout RandomGenerator rng) {
         return DistanceMCState::unpack(levels[level][cell(pixel, level, rng)]);
     }
@@ -80,6 +86,12 @@ float2 distance_mc_state_get_normal_dist(const DistanceMCState s) {
     float sigma = sqrt(max(moments.y - moments.x * moments.x, 0.0));
     sigma = (s.N * s.N * sigma + 0.2) / (s.N * s.N + 0.2);
     return float2(moments.x, sigma);
+}
+
+// Shift every stored distance by delta (the ray origin moved along the view direction).
+void distance_mc_state_shift(inout DistanceMCState s, const float delta) {
+    s.moments = float2(s.moments.x + delta * s.sum_w,
+                       s.moments.y + delta * (2.0 * s.moments.x + delta * s.sum_w));
 }
 
 // add sample to lobe via maximum likelihood estimator and exponentially weighted average

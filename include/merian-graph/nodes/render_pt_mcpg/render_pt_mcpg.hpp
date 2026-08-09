@@ -23,6 +23,7 @@
 
 #include <array>
 #include <optional>
+#include <unordered_map>
 
 namespace merian {
 
@@ -81,7 +82,9 @@ class RenderMCPG : public Node {
     ManagedVkImageOutHandle con_volume;
     ManagedVkImageOutHandle con_volume_depth;
     ManagedVkImageOutHandle con_volume_mv;
+    ManagedVkImageOutHandle con_distance_mc;
     VkSampledImageInHandle con_prev_volume_depth = VkSampledImageIn::create();
+    VkSampledImageInHandle con_prev_distance_mc = VkSampledImageIn::create();
 
     // Owns its own persistent buffer + shader binding (composed into this node's program).
     HashedIrradianceCacheHandle irr_cache;
@@ -135,9 +138,9 @@ class RenderMCPG : public Node {
     float volume_forward_project_min_z = 50.0f;
 
     // One mip per level: a level is a plain lookup instead of a hash. Storage views address a
-    // single mip each, so the shader binds them as an array.
-    ImageHandle distance_mc;
-    std::vector<TextureHandle> distance_mc_levels;
+    // single mip each, so the shader binds them as an array; the graph rings the image for the
+    // delayed self-connection, so the views are cached per ring image.
+    std::unordered_map<Image*, std::vector<TextureHandle>> distance_mc_levels;
     uint32_t distance_mc_level_count = 0;
     // Tracks whether the scene had a medium at the last connect. The volume outputs are declared
     // disabled while it has none, which force disables the volume denoise chain.
@@ -162,6 +165,10 @@ class RenderMCPG : public Node {
     VolumePass single_scattering;
     VolumePass project_seed;
     VolumePass project;
+    VolumePass distance_clear;
+    VolumePass distance_project;
+    // One object per level: a shader object must not be rewritten within a submission.
+    std::array<Versioned<ShaderObject>, DISTANCE_MC_MAX_LEVELS> distance_project_params;
 
     // Executor: compute (faster, no RT-pipeline VGPR cap) or raygen (enables SER-only experiments).
     bool use_raygen = false;
