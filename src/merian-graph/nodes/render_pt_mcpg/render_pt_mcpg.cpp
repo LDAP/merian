@@ -505,14 +505,21 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
                            "Query the light cache for non-emitting surfaces behind the "
                            "scattering event.");
     constants_changed |= config.config_int("distance MC samples", distance_mc_samples, "", 0, 30);
-    needs_reconnect |= config.config_float("distance MC base width", distance_mc_base_width,
-                                           "Side length of a level 0 distance chain cell, in "
-                                           "pixels. Every further level doubles it.",
-                                           1.f, 1.f, 256.f);
-    needs_reconnect |= config.config_float("distance MC max width", distance_mc_max_width,
-                                           "Side length the coarsest level may reach, in pixels. "
-                                           "Caps the level count together with the image size.",
-                                           1.f, 1.f, 4096.f);
+    bool recreate_distance_mc = false;
+    recreate_distance_mc |= config.config_float("distance MC base width", distance_mc_base_width,
+                                                "Side length of a level 0 distance chain cell, in "
+                                                "pixels. Every further level doubles it.",
+                                                1.f, 1.f, 256.f);
+    recreate_distance_mc |= config.config_float("distance MC max width", distance_mc_max_width,
+                                                "Side length the coarsest level may reach, in "
+                                                "pixels. Caps the level count together with the "
+                                                "image size.",
+                                                1.f, 1.f, 4096.f);
+    needs_reconnect |= recreate_distance_mc;
+    // Retires the slang session like the buffer sizes below: the reconnect rebuilds the
+    // composition from scratch, which on its own would reuse the stale constants module.
+    if (recreate_distance_mc && composition)
+        update_render_constants();
     config.output_text("distance MC levels: {} (coarsest {:.0f} px)", distance_mc_level_count,
                        distance_mc_base_width * float(1u << (distance_mc_level_count - 1)));
     constants_changed |= config.config_float(
