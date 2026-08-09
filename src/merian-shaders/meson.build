@@ -24,6 +24,7 @@ endif
 
 if pbrt_enabled
     merian_shaders_src += [
+        'scene/pbrt_scene.cpp',
         'scene/pbrt/pbrt_gzip.cpp',
         'scene/pbrt/pbrt_parser.cpp',
         'scene/pbrt/pbrt_spectrum.cpp',

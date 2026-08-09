@@ -72,6 +72,7 @@ struct PBRTSceneDesc {
     std::vector<TextureDesc> textures;
     std::unordered_map<std::string, int32_t> texture_index;
     std::vector<MaterialDesc> materials;
+    std::unordered_map<std::string, int32_t> named_material_index;
     std::vector<ShapeDesc> shapes;
     std::vector<ObjectDesc> objects;
     std::vector<InstanceDesc> instances;

@@ -254,7 +254,7 @@ class Parser {
         const std::string type = params.get_string("type", "diffuse");
         const int32_t index = static_cast<int32_t>(desc->materials.size());
         desc->materials.emplace_back(MaterialDesc{name, type, std::move(params)});
-        const auto [it, inserted] = named_materials.try_emplace(name, index);
+        const auto [it, inserted] = desc->named_material_index.try_emplace(name, index);
         if (!inserted) {
             SPDLOG_WARN("pbrt: material '{}' redefined", name);
             it->second = index;
@@ -263,8 +263,8 @@ class Parser {
 
     void handle_named_material() {
         const std::string name = next_quoted();
-        const auto it = named_materials.find(name);
-        if (it == named_materials.end()) {
+        const auto it = desc->named_material_index.find(name);
+        if (it == desc->named_material_index.end()) {
             SPDLOG_WARN("pbrt: unknown material '{}' at {}", name, tokenizer.location());
             state.material = ShapeDesc::MATERIAL_DEFAULT;
             return;
@@ -540,7 +540,6 @@ class Parser {
     GraphicsState state;
     std::vector<GraphicsState> state_stack;
     std::unordered_map<std::string, float4x4> named_ctms;
-    std::unordered_map<std::string, int32_t> named_materials;
     std::unordered_map<std::string, int32_t> object_index;
     int32_t current_object = -1;
     std::set<std::string> warned;
