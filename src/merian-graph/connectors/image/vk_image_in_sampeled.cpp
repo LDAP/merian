@@ -16,7 +16,8 @@ void VkSampledImageIn::bind(ShaderCursor& cursor,
         if (tex && overwrite_sampler) {
             tex = Texture::create(tex->get_view(), *overwrite_sampler);
         }
-        field.write(tex ? tex : allocator->get_dummy_texture(), vk::ImageLayout::eGeneral);
+        field.write(tex ? tex : allocator->get_dummy_texture(),
+                    tex ? vk::ImageLayout::eGeneral : vk::ImageLayout::eShaderReadOnlyOptimal);
     };
     if (get_array_size() == 1) {
         write(cursor, 0);
