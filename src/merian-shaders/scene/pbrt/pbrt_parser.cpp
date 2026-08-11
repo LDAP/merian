@@ -488,11 +488,17 @@ class Parser {
             state = GraphicsState{};
         } else if (name == "WorldEnd") {
             // removed in v4, accepted for compatibility
-        } else if (name == "AttributeBegin") {
+        } else if (name == "AttributeBegin" || name == "TransformBegin") {
+            // Transform* was removed in v4 but converters still emit it; like pbrt-v4, treat it
+            // as Attribute* (which saves a superset of the v3 transform-only state).
+            if (name == "TransformBegin") {
+                warn_once("transform_begin",
+                          "TransformBegin/End are deprecated, treated as AttributeBegin/End");
+            }
             state_stack.push_back(state);
-        } else if (name == "AttributeEnd") {
+        } else if (name == "AttributeEnd" || name == "TransformEnd") {
             if (state_stack.empty()) {
-                SPDLOG_WARN("pbrt: unmatched AttributeEnd at {}", tokenizer.location());
+                SPDLOG_WARN("pbrt: unmatched {} at {}", name, tokenizer.location());
             } else {
                 state = state_stack.back();
                 state_stack.pop_back();
