@@ -25,6 +25,8 @@ ccx = meson.get_compiler('cpp')
 # export all objects on windows
 is_msvc = ccx.get_argument_syntax() == 'msvc'
 gen_def_py = files('scripts/gen_def.py')
+# gen_def.py reads the COFF symbol table, which /GL (LTCG) objects do not carry
+no_lto = ['b_lto=false']
 
 if get_option('loglevel') == 'auto'
     if get_option('buildtype').startswith('debug')
@@ -260,7 +262,7 @@ pkgconfig.generate(
     filebase: 'merian',
     description: 'Merian Vulkan development framework',
     extra_cflags: global_args,
-    requires: [vulkan, fmt, spdlog, nlohmann_json],
+    requires: ['vulkan', fmt, spdlog, nlohmann_json],
 )
 meson.override_dependency('merian', merian_dep)
 

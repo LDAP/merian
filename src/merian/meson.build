@@ -116,7 +116,7 @@ merian_deps = [
 
 if is_msvc
     merian_objs = static_library('merian-objs', [merian_src],
-        cpp_args: ['-DVULKAN_HPP_STORAGE_SHARED_EXPORT'],
+        cpp_args: ['-DVULKAN_HPP_STORAGE_SHARED_EXPORT'], override_options: no_lto,
         dependencies: merian_deps, include_directories: inc_dirs)
     merian_def = custom_target('merian-def',
         input: merian_objs, output: 'merian.def',

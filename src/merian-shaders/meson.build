@@ -51,6 +51,7 @@ endif
 
 if is_msvc
     merian_shaders_objs = static_library('merian-shaders-objs', merian_shaders_src,
+        override_options: no_lto,
         dependencies: merian_shaders_deps, include_directories: inc_dirs)
     merian_shaders_def = custom_target('merian-shaders-def',
         input: merian_shaders_objs, output: 'merian-shaders.def',

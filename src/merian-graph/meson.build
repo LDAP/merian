@@ -22,6 +22,7 @@ merian_graph_deps = [
 
 if is_msvc
     merian_graph_objs = static_library('merian-graph-objs', merian_graph_src,
+        override_options: no_lto,
         dependencies: merian_graph_deps, include_directories: inc_dirs)
     merian_graph_def = custom_target('merian-graph-def',
         input: merian_graph_objs, output: 'merian-graph.def',
