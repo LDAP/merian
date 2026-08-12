@@ -35,6 +35,9 @@ class WindowNode : public Node {
 
     NodeStatusFlags properties(Properties& config) override;
 
+    // The optional input that is blitted to the swapchain.
+    static constexpr std::string_view DISPLAY_INPUT = "src";
+
     const SwapchainHandle& get_swapchain();
 
     const WindowHandle& get_window() const {

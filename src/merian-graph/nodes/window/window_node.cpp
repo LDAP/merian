@@ -37,7 +37,7 @@ std::vector<InputConnectorDescriptor> WindowNode::describe_inputs() {
     if (providers.empty()) {
         throw graph_errors::node_error{"WindowNode requires at least one WindowProvider"};
     }
-    return {{"src", image_in, ConnectorAccess::transfer_src, 0, true}};
+    return {{std::string{DISPLAY_INPUT}, image_in, ConnectorAccess::transfer_src, 0, true}};
 }
 
 std::vector<OutputConnectorDescriptor> WindowNode::describe_outputs(const NodeIOLayout& /*io*/) {

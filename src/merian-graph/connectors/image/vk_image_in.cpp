@@ -41,6 +41,10 @@ void VkImageIn::on_connect_output(const OutputConnectorHandle& output) {
     array_size = casted_output->get_array_size();
 }
 
+bool VkImageIn::can_receive_from(const OutputConnectorHandle& output) const {
+    return std::dynamic_pointer_cast<VkImageOut>(output) != nullptr;
+}
+
 const ImageArrayResource& VkImageIn::resource(const GraphResourceHandle& resource) {
     return *debugable_ptr_cast<const ImageArrayResource>(resource);
 }

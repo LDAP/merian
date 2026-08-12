@@ -1,5 +1,8 @@
 #include "merian-graph/graph/graph.hpp"
 
+#include "merian-graph/connectors/image/vk_image_in.hpp"
+#include "merian-graph/nodes/window/window_node.hpp"
+
 #include <algorithm>
 #include <spdlog/spdlog.h>
 
@@ -340,12 +343,26 @@ void Graph::properties(Properties& props) {
     }
 }
 
+// Probes which outputs a WindowNode could display. can_receive_from is side-effect free, so one
+// instance serves all queries.
+static const VkImageInHandle window_display_input = VkImageIn::create();
+
 void Graph::io_props_for_node(Properties& config, NodeHandle& node, NodeData& data) {
     if (!needs_reconnect && !data.output_connections.empty() &&
         config.st_begin_child("outputs", "Outputs")) {
         for (auto& [output, per_output_info] : data.output_connections) {
             const std::string& output_name = data.output_name_for_connector.at(output);
-            if (config.st_begin_child(output_name, output_name)) {
+
+            if (config.st_begin_child(output_name, output_name,
+                                      Properties::ChildFlagBits::DEFAULT_OPEN)) {
+                if (config.is_ui() && window_display_input->can_receive_from(output) &&
+                    config.config_bool("Show in Window")) {
+                    const std::string window =
+                        add_node(registry.node_type_info<WindowNode>().node_type_name);
+                    add_connection(data.identifier, window, output_name,
+                                   std::string{WindowNode::DISPLAY_INPUT});
+                }
+
                 std::vector<std::string> receivers;
                 receivers.reserve(per_output_info.inputs.size());
                 for (auto& [node, input] : per_output_info.inputs) {
@@ -368,15 +385,19 @@ void Graph::io_props_for_node(Properties& config, NodeHandle& node, NodeData& da
                                 per_output_info.resources.size(), current_resource_index,
                                 fmt::join(receivers, ", ")));
 
-                config.st_separate("Connector Properties");
-                output->properties(config);
-                config.st_separate("Resource Properties");
-                for (uint32_t i = 0; i < per_output_info.resources.size(); i++) {
-                    if (config.st_begin_child(fmt::format("resource_{}", i),
-                                              fmt::format("Resource {:02}", i))) {
-                        per_output_info.resources[i].resource->properties(config);
-                        config.st_end_child();
+                if (config.st_begin_child("connector", "Connector Properties")) {
+                    output->properties(config);
+                    config.st_end_child();
+                }
+                if (config.st_begin_child("resources", "Resource Properties")) {
+                    for (uint32_t i = 0; i < per_output_info.resources.size(); i++) {
+                        if (config.st_begin_child(fmt::format("resource_{}", i),
+                                                  fmt::format("Resource {:02}", i))) {
+                            per_output_info.resources[i].resource->properties(config);
+                            config.st_end_child();
+                        }
                     }
+                    config.st_end_child();
                 }
 
                 config.st_end_child();

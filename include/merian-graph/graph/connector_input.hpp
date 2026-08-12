@@ -14,6 +14,12 @@ class InputConnector : public Connector {
     // dynamic cast or use merian::test_shared_ptr_types). Can also be used to pre-compute barriers
     // or similar.
     virtual void on_connect_output([[maybe_unused]] const OutputConnectorHandle& output) {}
+
+    // Side-effect free variant of on_connect_output for probing a connection before offering it.
+    // on_connect_output must throw exactly when this returns false.
+    virtual bool can_receive_from([[maybe_unused]] const OutputConnectorHandle& output) const {
+        return true;
+    }
 };
 
 using InputConnectorHandle = std::shared_ptr<InputConnector>;

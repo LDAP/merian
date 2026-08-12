@@ -20,6 +20,8 @@ class VkImageIn : public InputConnector,
 
     void on_connect_output(const OutputConnectorHandle& output) override;
 
+    bool can_receive_from(const OutputConnectorHandle& output) const override;
+
     // A delayed input reads a ring slot before its producer ever transitioned it.
     ConnectorStatusFlags
     on_pre_process(Submission& submission,
