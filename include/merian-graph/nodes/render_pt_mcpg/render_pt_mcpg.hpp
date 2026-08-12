@@ -27,8 +27,36 @@
 
 namespace merian {
 
-// Markov-chain path-guiding renderer. Currently a plain BSDF-sampled path tracer; the guiding is
-// WIP.
+enum class GuidingDirectionalSamplingType : uint32_t {
+    // Guide with the configured probability wherever the lobe is guidable at all.
+    MIS,
+    // Additionally scale that probability by the BSDF roughness.
+    MIS_ROUGHNESS,
+};
+
+static constexpr std::array<GuidingDirectionalSamplingType, 2>
+    GUIDING_DIRECTIONAL_SAMPLING_TYPE_VALUES = {GuidingDirectionalSamplingType::MIS,
+                                                GuidingDirectionalSamplingType::MIS_ROUGHNESS};
+
+template <> inline uint32_t enum_size<GuidingDirectionalSamplingType>() {
+    return GUIDING_DIRECTIONAL_SAMPLING_TYPE_VALUES.size();
+}
+template <>
+inline const GuidingDirectionalSamplingType* enum_values<GuidingDirectionalSamplingType>() {
+    return GUIDING_DIRECTIONAL_SAMPLING_TYPE_VALUES.data();
+}
+template <>
+inline std::string
+enum_to_string<GuidingDirectionalSamplingType>(const GuidingDirectionalSamplingType value) {
+    switch (value) {
+    case GuidingDirectionalSamplingType::MIS:
+        return "MIS";
+    case GuidingDirectionalSamplingType::MIS_ROUGHNESS:
+        return "MIS+Roughness";
+    }
+    return "unknown";
+}
+
 class RenderMCPG : public Node {
 
   public:
@@ -111,6 +139,11 @@ class RenderMCPG : public Node {
     uint32_t mc_probe_count = 2;
     bool mc_split_hash_payload_storage = true;
     uint32_t mc_locality_bits = 3;
+
+    GuidingDirectionalSamplingType guiding_directional_sampling_type =
+        GuidingDirectionalSamplingType::MIS;
+    // Guiding is skipped below this roughness, where the vMF mixture cannot represent the lobe.
+    float guiding_roughness_threshold = 0.05f;
 
     // --- Light cache ---
     bool use_light_cache_tail = false;

@@ -1,4 +1,5 @@
 import bsdf;
+import merian_shaders.utils.math;
 
 namespace merian {
 
@@ -57,8 +58,9 @@ struct MixBSDF<B0 : BSDF, B1 : BSDF> : BSDF {
                     bsdf1.get_preintegrated_specular(F0, wi), weight);
     }
 
+    // Weighted RMS
     property float roughness {
-        get { return min(bsdf0.roughness, bsdf1.roughness); }
+        get { return sqrt(lerp(pow2(bsdf0.roughness), pow2(bsdf1.roughness), weight)); }
     }
 }
 

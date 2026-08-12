@@ -76,8 +76,8 @@ void RenderMCPG::create_distance_mc() {
     const uint32_t cells_y = uint32_t(std::ceil(extent.height / distance_mc_base_width)) + 2;
     // Coarser than the configured cell width buys nothing, and a level past the image is empty.
     const uint32_t levels_to_max_width =
-        uint32_t(std::floor(std::log2(std::max(distance_mc_max_width / distance_mc_base_width,
-                                               1.f)))) +
+        uint32_t(
+            std::floor(std::log2(std::max(distance_mc_max_width / distance_mc_base_width, 1.f)))) +
         1;
     const uint32_t levels_in_image =
         uint32_t(std::floor(std::log2(float(std::max(cells_x, cells_y))))) + 1;
@@ -419,6 +419,8 @@ void RenderMCPG::update_render_constants() {
                     "export static const bool missing_light_heuristic = {};\n"
                     "export static const int mc_samples = {};\n"
                     "export static const float p_guiding = {:f};\n"
+                    "export static const int guiding_directional_sampling_type = {};\n"
+                    "export static const float guiding_roughness_threshold = {:f};\n"
                     "export static const float dir_guide_prior = {:f};\n"
                     "export static const int debug_output_selector = {};\n"
                     "export static const uint lc_buffer_size = {}u;\n"
@@ -443,7 +445,9 @@ void RenderMCPG::update_render_constants() {
                     emission_on_primary ? "true" : "false", spp, max_path_length, mask,
                     demodulate_albedo ? "true" : "false", use_light_cache_tail ? "true" : "false",
                     missing_light_heuristic ? "true" : "false", mc_samples,
-                    reference_mode ? 0.0f : p_guiding, dir_guide_prior, debug_output_selector,
+                    reference_mode ? 0.0f : p_guiding,
+                    static_cast<uint32_t>(guiding_directional_sampling_type),
+                    guiding_roughness_threshold, dir_guide_prior, debug_output_selector,
                     lc_buffer_size, lc_probe_count, lc_stochastic_interpolation ? "true" : "false",
                     lc_split_hash_payload_storage ? "true" : "false", lc_locality_bits, lc_min_pdf,
                     mc_adaptive_buffer_size, mc_probe_count,
@@ -486,6 +490,14 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
         config.config_percent("guiding prob", p_guiding,
                               "Probability to sample the guiding distribution instead of "
                               "the BSDF.");
+    constants_changed |= config.config_enum<GuidingDirectionalSamplingType>(
+        "directional sampling type", guiding_directional_sampling_type,
+        Properties::OptionsStyle::COMBO,
+        "How the guiding probability is derived. Roughness additionally scales it by the BSDF "
+        "roughness.");
+    constants_changed |=
+        config.config_float("roughness threshold", guiding_roughness_threshold,
+                            "only use guiding with roughness >= this value", 0.001f);
 
     config.st_separate("RT Volume");
     constants_changed |= config.config_int("volume samples per pixel", volume_spp,

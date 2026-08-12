@@ -21,6 +21,13 @@ extern static const float lc_min_pdf = 1.0;
 
 extern static const float p_guiding = 0.9;
 
+static const int GUIDING_DIRECTIONAL_SAMPLING_MIS = 0;
+static const int GUIDING_DIRECTIONAL_SAMPLING_MIS_ROUGHNESS = 1;
+extern static const int guiding_directional_sampling_type = GUIDING_DIRECTIONAL_SAMPLING_MIS_ROUGHNESS;
+
+// use guiding with roughness >= this
+extern static const float guiding_roughness_threshold = 0.05;
+
 struct RenderBinding {
     ParameterBlock<GBuffer> gbuffer;
     RWTexture2D<float4> irradiance;
@@ -94,8 +101,13 @@ float3 trace_path(const ParameterBlock<Scene> scene,
             }
         }
 
+        const bool can_guide = score_sum > 0.0 && m_bsdf.roughness >= guiding_roughness_threshold;
+        const float p_guide =
+            select(guiding_directional_sampling_type == GUIDING_DIRECTIONAL_SAMPLING_MIS_ROUGHNESS,
+                   p_guiding * m_bsdf.roughness, p_guiding);
+
         // Sample wo from the BSDF or the selected lobe
-        const bool guide = score_sum > 0.0 && rng.next_float() < p_guiding;
+        const bool guide = can_guide && rng.next_float() < p_guide;
         float3 wo_world;
         float3 wo_local;
         if (guide) {
@@ -113,14 +125,14 @@ float3 trace_path(const ParameterBlock<Scene> scene,
 
         // Stochastic MIS
         float wo_p = 0.0;
-        if (score_sum > 0) {
+        if (can_guide) {
             for (int i = 0; i < mc_samples; i++) {
                 wo_p += scores[i] * vmfs[i].pdf(wo_world);
             }
             wo_p /= score_sum;
         }
-        const float bsdf_w = score_sum > 0.0 ? (1.0 - p_guiding) : 1.0;
-        wo_p = bsdf_w * m_bsdf.pdf(wi_local, wo_local) + p_guiding * wo_p;
+        const float bsdf_w = can_guide ? (1.0 - p_guide) : 1.0;
+        wo_p = bsdf_w * m_bsdf.pdf(wi_local, wo_local) + select(can_guide, p_guide, 0.0) * wo_p;
 
         const float3 bsdf = m_bsdf.eval(wi_local, wo_local, rng);
         const bool transmission = wi_local.z * wo_local.z < 0.f;

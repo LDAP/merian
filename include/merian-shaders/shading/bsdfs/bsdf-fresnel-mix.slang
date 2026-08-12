@@ -1,5 +1,6 @@
 import bsdf;
 import merian_shaders.utils.fresnel;
+import merian_shaders.utils.math;
 
 namespace merian {
 
@@ -56,7 +57,7 @@ struct FresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
     }
 
     property float roughness {
-        get { return min(layer.roughness, base.roughness); }
+        get { return sqrt(lerp(pow2(base.roughness), pow2(layer.roughness), ior_f0)); }
     }
 }
 
