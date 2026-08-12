@@ -5,6 +5,12 @@
                 "number inputs": 3
             }
         },
+        "gbuffer": {
+            "$+$outputs": [
+                "gbuffer->volume_accumulate.gbuffer",
+                "gbuffer->volume_svgf.gbuffer"
+            ]
+        },
         "render": {
             "$+$outputs": [
                 "distance_mc->render.prev_distance_mc",

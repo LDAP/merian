@@ -721,6 +721,7 @@ class Scene : public std::enable_shared_from_this<Scene> {
     void properties_settings(Properties& props);
     void properties_statistics(Properties& props);
     void properties_env(Properties& props);
+    void properties_volume(Properties& props);
 
     void process_pending_env_load(const CommandBufferHandle& cmd);
 

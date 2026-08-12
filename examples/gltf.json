@@ -19,24 +19,6 @@
             "set": {
                 "/nodes/scene/properties/env/Type": "LatLong"
             }
-        },
-        "renderer": {
-            "default": "pt",
-            "type": "variant",
-            "variants": {
-                "mcpg": {
-                    "merge": "renderers/mcpg.json"
-                },
-                "pt": {
-                    "merge": "renderers/pt.json"
-                },
-                "restir_di": {
-                    "merge": "renderers/restir_di.json"
-                },
-                "ssmm": {
-                    "merge": "renderers/ssmm.json"
-                }
-            }
         }
     },
     "graph_properties": {
@@ -46,6 +28,9 @@
         "iterations in flight": 2,
         "time overwrite": "None"
     },
+    "include": [
+        "renderers.json"
+    ],
     "nodes": {
         "accumulate": {
             "enabled": true,

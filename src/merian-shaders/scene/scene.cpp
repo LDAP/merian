@@ -724,6 +724,10 @@ void Scene::properties_explorer(Properties& props) {
         properties_cameras(props);
         props.st_end_child();
     }
+    if (props.st_begin_child("volume", "Exterior Volume")) {
+        properties_volume(props);
+        props.st_end_child();
+    }
     if (!props.is_ui())
         return;
     if (props.st_begin_child("meshes", fmt::format("Meshes ({})", mesh_ids.count()))) {
@@ -866,6 +870,26 @@ void Scene::properties_env(Properties& props) {
     if (env_map) {
         env_map->properties(props);
     }
+}
+
+void Scene::properties_volume(Properties& props) {
+    static const std::vector<std::string> kinds = {"Vacuum", "Fog"};
+    // the volume can also be set by the scene implementation, so the current type is the state
+    int selection = exterior_volume->get_type_name() == "merian::Fog" ? 1 : 0;
+
+    if (props.config_options("Type", selection, kinds)) {
+        if (selection == 1) {
+            const auto fog = std::make_shared<FogVolume>();
+            // optical depth of about one across the scene, so the fog shows at any scene scale
+            const float extent = aabb.is_valid() ? length(aabb.get_max() - aabb.get_min()) : 0.f;
+            fog->mu_t = float3(extent > 0.f ? 1.f / extent : 1.f);
+            set_exterior_volume(fog);
+        } else {
+            set_exterior_volume(std::make_shared<VacuumVolume>());
+        }
+    }
+
+    exterior_volume->properties(props);
 }
 
 void Scene::properties_statistics(Properties& props) {

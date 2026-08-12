@@ -642,7 +642,67 @@ bool settle_variants(json& config,
     }
 }
 
+std::vector<std::string> as_file_list(const json& value) {
+    if (value.is_array()) {
+        std::vector<std::string> files;
+        for (const json& file : value) {
+            files.push_back(file.get<std::string>());
+        }
+        return files;
+    }
+    return {value.get<std::string>()};
+}
+
+bool resolve_includes_rec(json& config,
+                          const std::vector<std::filesystem::path>& search_dirs,
+                          std::set<std::filesystem::path>& in_progress) {
+    const auto it = config.find("include");
+    if (it == config.end()) {
+        return true;
+    }
+
+    bool ok = true;
+    json base = json::object();
+    for (const std::string& file : as_file_list(*it)) {
+        const auto path = resolve_file(file, search_dirs);
+        if (!path) {
+            SPDLOG_ERROR("include file '{}' not found", file);
+            ok = false;
+            continue;
+        }
+        const std::filesystem::path key = std::filesystem::weakly_canonical(*path);
+        const auto [_, inserted] = in_progress.emplace(key);
+        if (!inserted) {
+            SPDLOG_ERROR("include cycle at '{}'", path->string());
+            ok = false;
+            continue;
+        }
+        std::ifstream stream(path->string());
+        json included = json::parse(stream, nullptr, false);
+        if (included.is_discarded()) {
+            SPDLOG_ERROR("include file '{}' is not valid JSON", path->string());
+            ok = false;
+        } else {
+            std::vector<std::filesystem::path> nested_dirs = {path->parent_path()};
+            nested_dirs.insert(nested_dirs.end(), search_dirs.begin(), search_dirs.end());
+            ok = resolve_includes_rec(included, nested_dirs, in_progress) && ok;
+            GraphDescription::merge_into(base, included);
+        }
+        in_progress.erase(key);
+    }
+
+    GraphDescription::merge_into(base, config);
+    config = std::move(base);
+    return ok;
+}
+
 } // namespace
+
+bool GraphDescription::resolve_includes(nlohmann::json& config,
+                                        const std::vector<std::filesystem::path>& search_dirs) {
+    std::set<std::filesystem::path> in_progress;
+    return resolve_includes_rec(config, search_dirs, in_progress);
+}
 
 void GraphDescription::merge_into(nlohmann::json& base, const nlohmann::json& overwrite) {
     if (base.is_object() && overwrite.is_object()) {

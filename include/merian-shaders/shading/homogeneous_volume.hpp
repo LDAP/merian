@@ -93,7 +93,7 @@ class FogVolume : public HomogeneousVolume {
 
     void write_to(ShaderCursor cursor) const override {
         cursor["mu_t"] = mu_t;
-        cursor["mu_s"] = mu_s;
+        cursor["mu_s"] = mu_t * albedo;
         cursor["max_distance"] = max_distance;
 
         const MieApproxFit fit = MieApproxFit::for_diameter(particle_size_um);
@@ -105,6 +105,28 @@ class FogVolume : public HomogeneousVolume {
     }
 
     void properties(Properties& props) override {
+        // an editing aid, a stored configuration always holds the three channels
+        bool lock = false;
+        if (props.is_ui()) {
+            props.config_bool("lock channels", lock_channels,
+                              "Apply an edit of any channel to all three.");
+            lock = lock_channels;
+        }
+
+        const float3 old_mu_t = mu_t;
+        if (props.config_vec("extinction", mu_t, "Extinction coefficient per scene unit.", 0.001f,
+                             0.f) &&
+            lock) {
+            mu_t = broadcast_edit(old_mu_t, mu_t);
+        }
+        const float3 old_albedo = albedo;
+        if (props.config_vec("scattering albedo", albedo,
+                             "Scattered fraction of the extinction, the rest is absorbed.", 0.01f,
+                             0.f, 1.f) &&
+            lock) {
+            albedo = broadcast_edit(old_albedo, albedo);
+        }
+
         props.config_float("particle size", particle_size_um,
                            "Water droplet diameter in micrometer. Fog is roughly 5 - 15, cloud "
                            "droplets reach 50; below 0.1 the phase function tends to Rayleigh.",
@@ -114,9 +136,20 @@ class FogVolume : public HomogeneousVolume {
     }
 
     float3 mu_t{0.f};
-    float3 mu_s{0.f};
+    float3 albedo{1.f};
     float max_distance = 1e7f;
     float particle_size_um = 7.f;
+    bool lock_channels = true;
+
+  private:
+    static float3 broadcast_edit(const float3& old_value, const float3& new_value) {
+        for (int c = 0; c < 3; c++) {
+            if (new_value[c] != old_value[c]) {
+                return float3(new_value[c]);
+            }
+        }
+        return new_value;
+    }
 };
 
 } // namespace merian

@@ -122,7 +122,7 @@ class RenderMCPG : public Node {
 
     // --- Surface transport (link-time constants) ---
     int32_t spp = 1;
-    int32_t max_path_length = 8;
+    int32_t max_path_length = 5;
     int32_t emitted_max_path_length = max_path_length;
     bool emission_on_primary = true;
     bool demodulate_albedo = false;

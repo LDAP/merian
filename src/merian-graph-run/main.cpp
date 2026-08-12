@@ -182,6 +182,10 @@ int main(const int argc, const char** argv) {
         cli_search_dirs.insert(cli_search_dirs.end(), search_paths.begin(), search_paths.end());
     }
 
+    if (config_path && !merian::GraphDescription::resolve_includes(config, cli_search_dirs)) {
+        return 1;
+    }
+
     if (options->help) {
         print_usage();
         if (config_path) {

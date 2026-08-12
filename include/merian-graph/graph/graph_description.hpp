@@ -215,6 +215,11 @@ class GraphDescription {
     // CLI overrides (context-free; the reserved name "merge" deep-merges a JSON file)
     // -----------------------------------------------------------------
 
+    // Resolves the top-level "include": <file|[files]> key, which pulls in other configs
+    // (recursively). The including config wins over the included content.
+    static bool resolve_includes(nlohmann::json& config,
+                                 const std::vector<std::filesystem::path>& search_dirs = {});
+
     static bool apply_cli(nlohmann::json& config,
                           const std::vector<std::string>& args,
                           const std::vector<std::filesystem::path>& search_dirs = {});

@@ -1,0 +1,27 @@
+{
+    "nodes": {
+        "accumulate": {
+            "outputs": [
+                "history->accumulate.prev_history",
+                "out->accumulate.prev_out",
+                "out->add.input_0"
+            ]
+        },
+        "add": {
+            "enabled": true,
+            "outputs": [
+                "out->exposure.src"
+            ],
+            "properties": {
+                "number inputs": 2
+            },
+            "type": "Reduce"
+        },
+        "volume_svgf": {
+            "outputs": [
+                "out->add.input_1",
+                "out->volume_svgf.prev_out"
+            ]
+        }
+    }
+}
