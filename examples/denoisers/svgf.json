@@ -6,7 +6,17 @@
                 "history->svgf.history",
                 "out->accumulate.prev_out",
                 "out->svgf.src"
-            ]
+            ],
+            "properties": {
+                "gbuffer check": "always",
+                "normal threshold": 35.0,
+                "depth threshold": 0.05,
+                "alpha": 0.95,
+                "clear event pattern": "/user/clear",
+                "filter mode": "stochastic bilinear",
+                "firefly filter enable": true,
+                "adaptivity": 0.95
+            }
         },
         "gbuffer": {
             "$+$outputs": [
@@ -25,7 +35,7 @@
             ],
             "properties": {
                 "SVGF iterations": 5,
-                "TAA alpha": 0.5
+                "TAA alpha": 0.9
             },
             "type": "Denoiser (SVGF)"
         }
