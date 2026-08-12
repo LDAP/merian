@@ -1,4 +1,5 @@
 #include "merian-graph/graph/graph_description.hpp"
+#include "merian/utils/string.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -729,22 +730,29 @@ bool GraphDescription::apply_cli(nlohmann::json& config,
         }
     }
 
-    // Remaining tokens are positional and feed the "--" override, joined in order.
-    std::string joined;
-    bool positional = false;
+    // Remaining tokens are positional and feed the "--" override, joined in order. A lone token is
+    // taken verbatim (it usually is a path); several are quoted so their boundaries survive the
+    // join into one string.
+    std::vector<std::string> positionals;
     for (size_t i = 0; i < cli_args.size(); i++) {
-        if (consumed[i]) {
-            continue;
+        if (!consumed[i]) {
+            positionals.push_back(cli_args[i]);
         }
-        if (positional) {
-            joined += ' ';
+    }
+    std::string joined;
+    if (positionals.size() == 1) {
+        joined = positionals.front();
+    } else {
+        for (const std::string& arg : positionals) {
+            if (!joined.empty()) {
+                joined += ' ';
+            }
+            joined += quote_arg(arg);
         }
-        joined += cli_args[i];
-        positional = true;
     }
 
     const std::vector<Override> overrides = parse_overrides(config);
-    if (positional) {
+    if (!positionals.empty()) {
         given.insert("--");
         const auto it = std::ranges::find(overrides, "--", &Override::name);
         if (it == overrides.end()) {

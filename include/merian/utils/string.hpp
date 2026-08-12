@@ -2,6 +2,7 @@
 
 #include "merian/shader/spirv_utils.hpp"
 #include "spdlog/spdlog.h"
+#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <fmt/format.h>
@@ -73,6 +74,55 @@ inline uint32_t parse_vk_api_version(const char* version_str) {
                                    std::stoul(m[4]));
     return VK_MAKE_API_VERSION(0, std::stoul(m[1]), std::stoul(m[2]),
                                std::stoul(m[3])); // major.minor.patch (no variant)
+}
+
+// Tokenizes on whitespace, honoring double quotes. A quote inside a quoted token is written as two
+// quotes; a backslash is never an escape, so Windows paths survive verbatim.
+[[nodiscard]] inline std::vector<std::string> split_args(const std::string& value) {
+    std::vector<std::string> args;
+    std::string current;
+    bool in_quotes = false;
+    bool has_token = false;
+    for (std::size_t i = 0; i < value.size(); i++) {
+        const char c = value[i];
+        if (c == '"') {
+            if (in_quotes && i + 1 < value.size() && value[i + 1] == '"') {
+                current += '"';
+                i++;
+            } else {
+                in_quotes = !in_quotes;
+            }
+            has_token = true;
+        } else if (!in_quotes && std::isspace(static_cast<unsigned char>(c)) != 0) {
+            if (has_token) {
+                args.emplace_back(std::move(current));
+                current.clear();
+                has_token = false;
+            }
+        } else {
+            current += c;
+            has_token = true;
+        }
+    }
+    if (has_token) {
+        args.emplace_back(std::move(current));
+    }
+    return args;
+}
+
+// Inverse of split_args for a single token.
+[[nodiscard]] inline std::string quote_arg(const std::string& value) {
+    if (!value.empty() && value.find_first_of(" \t\n\v\f\r\"") == std::string::npos) {
+        return value;
+    }
+    std::string quoted = "\"";
+    for (const char c : value) {
+        if (c == '"') {
+            quoted += '"';
+        }
+        quoted += c;
+    }
+    return quoted + '"';
 }
 
 inline void split(const std::string& value,
