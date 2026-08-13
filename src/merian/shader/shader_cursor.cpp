@@ -43,13 +43,24 @@ ShaderCursor ShaderCursor::field(const std::string& name) {
         return dereference().field(name);
     }
 
-    const SlangInt field_index = type_layout->findFieldIndexByName(name.c_str());
-    if (field_index < 0) {
-        SPDLOG_ERROR("Field '{}' not found in type {}", name, type_layout->getName());
+    const ShaderCursor found = find(name);
+    if (!found.is_valid()) {
+        const char* const type_name = type_layout->getName();
+        SPDLOG_ERROR("Field '{}' not found in type {}", name,
+                     type_name != nullptr ? type_name : "<unnamed>");
+    }
+    return found;
+}
+
+ShaderCursor ShaderCursor::find(const std::string& name) {
+    if (!is_valid()) {
         return ShaderCursor();
     }
-
-    return field(static_cast<uint32_t>(field_index));
+    if (is_parameter_block() || is_constant_buffer()) {
+        return dereference().find(name);
+    }
+    const SlangInt field_index = type_layout->findFieldIndexByName(name.c_str());
+    return field_index < 0 ? ShaderCursor() : field(static_cast<uint32_t>(field_index));
 }
 
 ShaderCursor ShaderCursor::field(uint32_t index) {

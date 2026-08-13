@@ -41,6 +41,13 @@ class ShaderCursor {
     ShaderCursor field(const std::string& name);
 
     /**
+     * @brief Navigate to a struct field by name, or return an invalid cursor if it does not
+     * exist. Unlike field(), an absent field is not an error, for bindings a shader may or may
+     * not declare.
+     */
+    ShaderCursor find(const std::string& name);
+
+    /**
      * @brief Navigate to a struct field by name.
      */
     ShaderCursor operator[](const std::string& name) {
