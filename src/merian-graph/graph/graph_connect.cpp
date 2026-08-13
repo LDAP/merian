@@ -140,6 +140,33 @@ void Graph::connect() {
         }
     }
 
+    // one prominent summary: the per-node messages above scroll away in the connect log
+    std::vector<std::string> dead_nodes;
+    for (const auto& [node, data] : node_data) {
+        if (!data.enabled) {
+            continue;
+        }
+        if (!data.errors.empty() || !data.errors_queued.empty()) {
+            std::vector<std::string> errors = data.errors;
+            errors.insert(errors.end(), data.errors_queued.begin(), data.errors_queued.end());
+            dead_nodes.push_back(fmt::format("{} ({}): {}", data.identifier,
+                                             registry.node_type_name(node),
+                                             fmt::join(errors, "; ")));
+        } else if (data.force_disabled) {
+            dead_nodes.push_back(fmt::format("{} ({}): {}", data.identifier,
+                                             registry.node_type_name(node),
+                                             data.force_disabled_reason));
+        } else if (data.unsupported) {
+            dead_nodes.push_back(fmt::format("{} ({}): {}", data.identifier,
+                                             registry.node_type_name(node),
+                                             data.unsupported_reason));
+        }
+    }
+    if (!dead_nodes.empty()) {
+        SPDLOG_WARN("{} node(s) are NOT running:\n - {}", dead_nodes.size(),
+                    fmt::join(dead_nodes, "\n - "));
+    }
+
     run_iteration = 0;
     last_build_report = profiler->get_report();
     time_connect_reference = std::chrono::high_resolution_clock::now();
@@ -154,6 +181,7 @@ void Graph::reset_connections() {
     for (auto& [node, data] : node_data) {
         data.reset();
     }
+    run_metadata_dirty = true;
     event_listeners.clear();
 }
 
