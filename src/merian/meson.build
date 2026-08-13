@@ -12,6 +12,7 @@ merian_src = files(
     'utils/concurrent/thread_pool.cpp',
     'utils/imgui_spdlog_sink.cpp',
     'utils/input_controller.cpp',
+    'vk/window/viewport_picker.cpp',
     'utils/input_controller_dummy.cpp',
     'utils/normal_encoding.cpp',
     'utils/properties_imgui.cpp',
