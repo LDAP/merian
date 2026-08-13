@@ -2,6 +2,8 @@
 
 #include "merian/io/dds.hpp"
 
+#include <fmt/format.h>
+#include <spdlog/spdlog.h>
 #include <stb_image.h>
 #include <stb_image_write.h>
 
@@ -111,15 +113,12 @@ BlobHandle load_pfm(const std::filesystem::path& path, ImageInfo& info, int desi
         } else {
             for (int x = 0; x < width; ++x) {
                 const float r = row[static_cast<std::size_t>(x) * src_channels];
-                const float g = src_channels >= 2
-                                    ? row[(static_cast<std::size_t>(x) * src_channels) + 1]
-                                    : r;
-                const float b = src_channels >= 3
-                                    ? row[(static_cast<std::size_t>(x) * src_channels) + 2]
-                                    : r;
-                const float a = src_channels >= 4
-                                    ? row[(static_cast<std::size_t>(x) * src_channels) + 3]
-                                    : 1.f;
+                const float g =
+                    src_channels >= 2 ? row[(static_cast<std::size_t>(x) * src_channels) + 1] : r;
+                const float b =
+                    src_channels >= 3 ? row[(static_cast<std::size_t>(x) * src_channels) + 2] : r;
+                const float a =
+                    src_channels >= 4 ? row[(static_cast<std::size_t>(x) * src_channels) + 3] : 1.f;
                 float* px = dst + (static_cast<std::size_t>(x) * out_channels);
                 if (out_channels >= 1)
                     px[0] = r;
@@ -133,6 +132,131 @@ BlobHandle load_pfm(const std::filesystem::path& path, ImageInfo& info, int desi
         }
     }
     return std::make_shared<VectorBlob<float>>(std::move(out));
+}
+
+void append_be32(std::vector<uint8_t>& out, const uint32_t v) {
+    out.push_back(static_cast<uint8_t>(v >> 24));
+    out.push_back(static_cast<uint8_t>(v >> 16));
+    out.push_back(static_cast<uint8_t>(v >> 8));
+    out.push_back(static_cast<uint8_t>(v));
+}
+
+uint32_t crc32(const uint8_t* data, const std::size_t size) {
+    uint32_t crc = 0xFFFFFFFFu;
+    for (std::size_t i = 0; i < size; i++) {
+        crc ^= data[i];
+        for (int k = 0; k < 8; k++) {
+            crc = (crc >> 1) ^ (0xEDB88320u & (0u - (crc & 1u)));
+        }
+    }
+    return ~crc;
+}
+
+// A tEXt keyword is 1 to 79 printable latin-1 bytes without leading, trailing or repeated spaces.
+std::string png_keyword(const std::string& key) {
+    std::string keyword;
+    for (const unsigned char c : key) {
+        const bool printable = (c >= 32 && c <= 126) || (c >= 161 && c <= 255);
+        if (!printable || (c == ' ' && (keyword.empty() || keyword.back() == ' '))) {
+            continue;
+        }
+        keyword += static_cast<char>(c);
+        if (keyword.size() == 79) {
+            break;
+        }
+    }
+    while (!keyword.empty() && keyword.back() == ' ') {
+        keyword.pop_back();
+    }
+    return keyword;
+}
+
+// tEXt chunks inserted directly after IHDR (always the fixed 25-byte chunk after the signature)
+void png_insert_metadata(std::vector<uint8_t>& file, const ImageMetadata& metadata) {
+    std::vector<uint8_t> chunks;
+    for (const auto& [key, value] : metadata) {
+        const std::string keyword = png_keyword(key);
+        if (keyword.empty()) {
+            SPDLOG_WARN("image_io: dropping metadata with an unusable keyword '{}'", key);
+            continue;
+        }
+        append_be32(chunks, static_cast<uint32_t>(keyword.size() + 1 + value.size()));
+        const std::size_t crc_begin = chunks.size();
+        chunks.insert(chunks.end(), {'t', 'E', 'X', 't'});
+        chunks.insert(chunks.end(), keyword.begin(), keyword.end());
+        chunks.push_back(0);
+        chunks.insert(chunks.end(), value.begin(), value.end());
+        append_be32(chunks, crc32(chunks.data() + crc_begin, chunks.size() - crc_begin));
+    }
+    file.insert(file.begin() + 8 + 25, chunks.begin(), chunks.end());
+}
+
+// COM markers after SOI and the APPn segments (JFIF requires APP0 directly after SOI);
+// oversized values split across markers (payload limit 65533 bytes)
+void jpg_insert_metadata(std::vector<uint8_t>& file, const ImageMetadata& metadata) {
+    constexpr std::size_t MAX_PAYLOAD = 65533;
+    std::vector<uint8_t> markers;
+    for (const auto& [key, value] : metadata) {
+        // every segment repeats the key, so a value longer than one marker stays attributable
+        const std::size_t segments = 1 + (key.size() + 2 + value.size()) / MAX_PAYLOAD;
+        std::size_t segment = 0;
+        for (std::size_t at = 0; at < value.size() || segment == 0; segment++) {
+            std::string payload = key;
+            if (segments > 1) {
+                payload += fmt::format("({}/{})", segment + 1, segments);
+            }
+            payload += ": ";
+            const std::size_t take = std::min(MAX_PAYLOAD - payload.size(), value.size() - at);
+            payload += value.substr(at, take);
+            at += take;
+            const std::size_t n = payload.size();
+            markers.push_back(0xFF);
+            markers.push_back(0xFE);
+            markers.push_back(static_cast<uint8_t>((n + 2) >> 8));
+            markers.push_back(static_cast<uint8_t>((n + 2) & 0xFF));
+            markers.insert(markers.end(), payload.begin(), payload.end());
+        }
+    }
+    std::size_t pos = 2;
+    while (pos + 4 <= file.size() && file[pos] == 0xFF && (file[pos + 1] & 0xF0) == 0xE0) {
+        pos += 2 + ((static_cast<std::size_t>(file[pos + 2]) << 8) | file[pos + 3]);
+    }
+    file.insert(file.begin() + static_cast<std::ptrdiff_t>(pos), markers.begin(), markers.end());
+}
+
+// KEY=value lines inserted before the blank line that terminates the Radiance header
+void hdr_insert_metadata(std::vector<uint8_t>& file, const ImageMetadata& metadata) {
+    std::string vars;
+    for (const auto& [key, value] : metadata) {
+        std::string line = key + "=" + value;
+        std::ranges::replace(line, '\n', ' ');
+        vars += line + '\n';
+    }
+    for (std::size_t i = 0; i + 1 < std::min<std::size_t>(file.size(), 512); i++) {
+        if (file[i] == '\n' && file[i + 1] == '\n') {
+            file.insert(file.begin() + static_cast<std::ptrdiff_t>(i + 1), vars.begin(),
+                        vars.end());
+            return;
+        }
+    }
+}
+
+void stbi_vector_write(void* context, void* data, int size) {
+    auto* const out = static_cast<std::vector<uint8_t>*>(context);
+    const uint8_t* const bytes = static_cast<const uint8_t*>(data);
+    out->insert(out->end(), bytes, bytes + size);
+}
+
+void write_file(const std::filesystem::path& path, const std::vector<uint8_t>& data) {
+    std::ofstream file(path, std::ios::binary);
+    if (!file) {
+        throw std::runtime_error{"image_io: cannot open " + path.string() + " for write"};
+    }
+    file.write(reinterpret_cast<const char*>(data.data()),
+               static_cast<std::streamsize>(data.size()));
+    if (!file) {
+        throw std::runtime_error{"image_io: write failed for " + path.string()};
+    }
 }
 
 void save_pfm(const std::filesystem::path& path,
@@ -175,10 +299,29 @@ void save_pfm(const std::filesystem::path& path,
 
 } // namespace
 
+const char* image_format_extension(const ImageFormat format) noexcept {
+    switch (format) {
+    case ImageFormat::PNG:
+        return ".png";
+    case ImageFormat::JPG:
+        return ".jpg";
+    case ImageFormat::BMP:
+        return ".bmp";
+    case ImageFormat::TGA:
+        return ".tga";
+    case ImageFormat::HDR:
+        return ".hdr";
+    case ImageFormat::PFM:
+        return ".pfm";
+    case ImageFormat::AUTO:
+        break;
+    }
+    return "";
+}
+
 ImageFormat image_format_from_extension(const std::filesystem::path& path) noexcept {
     std::string ext = path.extension().string();
-    std::ranges::transform(ext, ext.begin(),
-                           [](const unsigned char c) { return std::tolower(c); });
+    std::ranges::transform(ext, ext.begin(), [](const unsigned char c) { return std::tolower(c); });
     if (ext == ".png")
         return ImageFormat::PNG;
     if (ext == ".jpg" || ext == ".jpeg")
@@ -194,9 +337,8 @@ ImageFormat image_format_from_extension(const std::filesystem::path& path) noexc
     return ImageFormat::AUTO;
 }
 
-BlobHandle image_load_u8(const std::filesystem::path& path,
-                         ImageInfo& info,
-                         const int desired_channels) {
+BlobHandle
+image_load_u8(const std::filesystem::path& path, ImageInfo& info, const int desired_channels) {
     // BCn-compressed DDS files are not handled by stb; decode them to RGBA8 here so every consumer
     // (e.g. the Image Read node) can load them. srgb-ness is irrelevant for the raw decoded bytes.
     if (is_dds(path)) {
@@ -213,13 +355,11 @@ BlobHandle image_load_u8(const std::filesystem::path& path,
     }
     const int out_channels = desired_channels == 0 ? native : desired_channels;
     info = {.width = w, .height = h, .channels = out_channels, .source_channels = native};
-    return std::make_shared<StbiBlob>(pixels,
-                                      static_cast<std::size_t>(w) * h * out_channels);
+    return std::make_shared<StbiBlob>(pixels, static_cast<std::size_t>(w) * h * out_channels);
 }
 
-BlobHandle image_load_f32(const std::filesystem::path& path,
-                          ImageInfo& info,
-                          const int desired_channels) {
+BlobHandle
+image_load_f32(const std::filesystem::path& path, ImageInfo& info, const int desired_channels) {
     if (image_format_from_extension(path) == ImageFormat::PFM) {
         return load_pfm(path, info, desired_channels);
     }
@@ -242,21 +382,24 @@ void image_save_u8(const std::filesystem::path& path,
                    const int width,
                    const int height,
                    const int channels,
-                   const ImageFormat format) {
-    const std::string p = path.string();
+                   const ImageFormat format,
+                   const ImageMetadata& metadata) {
+    const ImageFormat resolved = resolve_format(path, format);
+    std::vector<uint8_t> file;
     int ok = 0;
-    switch (resolve_format(path, format)) {
+    switch (resolved) {
     case ImageFormat::PNG:
-        ok = stbi_write_png(p.c_str(), width, height, channels, data, width * channels);
+        ok = stbi_write_png_to_func(stbi_vector_write, &file, width, height, channels, data,
+                                    width * channels);
         break;
     case ImageFormat::JPG:
-        ok = stbi_write_jpg(p.c_str(), width, height, channels, data, 95);
+        ok = stbi_write_jpg_to_func(stbi_vector_write, &file, width, height, channels, data, 95);
         break;
     case ImageFormat::BMP:
-        ok = stbi_write_bmp(p.c_str(), width, height, channels, data);
+        ok = stbi_write_bmp_to_func(stbi_vector_write, &file, width, height, channels, data);
         break;
     case ImageFormat::TGA:
-        ok = stbi_write_tga(p.c_str(), width, height, channels, data);
+        ok = stbi_write_tga_to_func(stbi_vector_write, &file, width, height, channels, data);
         break;
     case ImageFormat::HDR:
     case ImageFormat::PFM:
@@ -265,8 +408,16 @@ void image_save_u8(const std::filesystem::path& path,
         break;
     }
     if (ok == 0) {
-        throw std::runtime_error{"image_io: write failed for " + p};
+        throw std::runtime_error{"image_io: encode failed for " + path.string()};
     }
+    if (!metadata.empty()) {
+        if (resolved == ImageFormat::PNG) {
+            png_insert_metadata(file, metadata);
+        } else if (resolved == ImageFormat::JPG) {
+            jpg_insert_metadata(file, metadata);
+        }
+    }
+    write_file(path, file);
 }
 
 void image_save_f32(const std::filesystem::path& path,
@@ -274,13 +425,20 @@ void image_save_f32(const std::filesystem::path& path,
                     const int width,
                     const int height,
                     const int channels,
-                    const ImageFormat format) {
+                    const ImageFormat format,
+                    const ImageMetadata& metadata) {
     switch (resolve_format(path, format)) {
-    case ImageFormat::HDR:
-        if (stbi_write_hdr(path.string().c_str(), width, height, channels, data) == 0) {
+    case ImageFormat::HDR: {
+        std::vector<uint8_t> file;
+        if (stbi_write_hdr_to_func(stbi_vector_write, &file, width, height, channels, data) == 0) {
             throw std::runtime_error{"image_io: stbi_write_hdr failed for " + path.string()};
         }
+        if (!metadata.empty()) {
+            hdr_insert_metadata(file, metadata);
+        }
+        write_file(path, file);
         return;
+    }
     case ImageFormat::PFM:
         save_pfm(path, data, width, height, channels);
         return;

@@ -196,6 +196,10 @@ class Graph : public std::enable_shared_from_this<Graph> {
     void store_to_file(const std::filesystem::path& path);
     nlohmann::json store_to_json();
 
+    // Key/value description of this run — merian version and the current config — for embedding
+    // into files a node writes. Rebuilt when the graph changes.
+    const std::vector<std::pair<std::string, std::string>>& metadata();
+
     // Sets the default path for the load/store controls in the graph properties. load_from_file
     // sets this automatically; a host that loads via load_from_json should set it explicitly.
     void set_store_path(const std::filesystem::path& path);
@@ -467,6 +471,8 @@ class Graph : public std::enable_shared_from_this<Graph> {
     int add_connection_selected_dst_input = 0;
 
     NodeProcessInfo run_info;
+    std::vector<std::pair<std::string, std::string>> run_metadata;
+    bool run_metadata_dirty = true;
     TimelineSemaphoreHandle iteration_semaphore;
 
     std::shared_ptr<MerianGraphExtension> context_extension;

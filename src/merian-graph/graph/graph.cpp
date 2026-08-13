@@ -59,6 +59,8 @@ Graph::Graph(const GraphCreateInfo& create_info)
             }
             return false;
         });
+
+    run_info.metadata = &metadata();
 }
 
 Graph::~Graph() {

@@ -2,7 +2,7 @@
 
 #include "merian/io/image_io.hpp"
 #include "merian/utils/defer.hpp"
-#include "merian/vk/utils/blits.hpp"
+#include "merian/vk/utils/image_export.hpp"
 
 #include <csignal>
 #include <filesystem>
@@ -12,24 +12,6 @@
 namespace merian {
 
 using namespace std::literals::chrono_literals;
-
-#define FORMAT_PNG 0
-#define FORMAT_JPG 1
-#define FORMAT_HDR 2
-#define FORMAT_PFM 3
-
-namespace {
-const std::unordered_map<uint32_t, std::string> FILE_EXTENSIONS = {
-    {FORMAT_PNG, ".png"},
-    {FORMAT_JPG, ".jpg"},
-    {FORMAT_HDR, ".hdr"},
-    {FORMAT_PFM, ".pfm"},
-};
-
-bool format_is_float(const uint32_t format) {
-    return format == FORMAT_HDR || format == FORMAT_PFM;
-}
-} // namespace
 
 ImageWrite::ImageWrite() {}
 
@@ -113,8 +95,6 @@ ImageWrite::process(const NodeIO& io, const NodeProcessInfo& info, Submission& s
         iteration++;
     };
 
-    const CommandBufferHandle& cmd = submission.get_cmd();
-
     const std::chrono::nanoseconds system_time_since_record = record_time_point.duration();
     const std::chrono::nanoseconds& graph_time = info.get_elapsed_duration();
     const std::chrono::nanoseconds graph_time_since_record = graph_time - record_graph_time_point;
@@ -161,8 +141,9 @@ ImageWrite::process(const NodeIO& io, const NodeProcessInfo& info, Submission& s
         if (filename_format.empty()) {
             throw fmt::format_error{"empty filename"};
         }
-        path = std::filesystem::absolute(fmt::vformat(this->filename_format, arg_store) +
-                                         FILE_EXTENSIONS.at(this->format));
+        path = std::filesystem::absolute(
+            fmt::vformat(this->filename_format, arg_store) +
+            image_format_extension(IMAGE_EXPORT_FORMATS.at(this->format)));
     } catch (const std::exception& e) {
         // catch std::filesystem::filesystem_error and fmt::format_error
         record_enable = false;
@@ -178,92 +159,10 @@ ImageWrite::process(const NodeIO& io, const NodeProcessInfo& info, Submission& s
     last_record_time_millis = std::max(time_millis, optimal_timing);
 
     // RECORD FRAME
-
-    const vk::Format format =
-        format_is_float(this->format) ? vk::Format::eR32G32B32A32Sfloat : vk::Format::eR8G8B8A8Srgb;
-
-    const vk::ImageCreateInfo intermediate_info{
-        {},
-        vk::ImageType::e2D,
-        format,
-        scaled,
-        1,
-        1,
-        vk::SampleCountFlagBits::e1,
-        vk::ImageTiling::eOptimal,
-        vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc,
-        vk::SharingMode::eExclusive,
-        {},
-        {},
-        vk::ImageLayout::eUndefined,
-    };
-    const ImageHandle intermediate_image = allocator->create_image(intermediate_info);
-    const BufferHandle staging_buffer = allocator->create_buffer(
-        Image::format_size(format) * scaled.width * scaled.height,
-        vk::BufferUsageFlagBits::eTransferDst, MemoryMappingType::HOST_ACCESS_RANDOM);
-
-    {
-        MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "blit to intermediate image");
-
-        cmd->barrier(vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eTransfer,
-                     intermediate_image->barrier(vk::ImageLayout::eTransferDstOptimal, {},
-                                                 vk::AccessFlagBits::eTransferWrite));
-        cmd_blit_stretch(cmd, src, src->get_current_layout(), src->get_extent(), intermediate_image,
-                         vk::ImageLayout::eTransferDstOptimal, intermediate_image->get_extent());
-        cmd->barrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer,
-                     intermediate_image->barrier(vk::ImageLayout::eTransferSrcOptimal,
-                                                 vk::AccessFlagBits::eTransferWrite,
-                                                 vk::AccessFlagBits::eTransferRead));
-    }
-    {
-        MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "copy to buffer");
-        // zero row length / image height: rows are tightly packed, unlike a linear image which
-        // carries a driver-defined row pitch.
-        cmd->copy(intermediate_image, staging_buffer,
-                  vk::BufferImageCopy{0, 0, 0, first_layer(), {}, scaled});
-    }
-    cmd->barrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost,
-                 staging_buffer->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
-                                                vk::AccessFlagBits::eHostRead));
-
-    std::filesystem::create_directories(path.parent_path());
-    const std::string tmp_filename =
-        (path.parent_path() / (".interm_" + path.filename().string())).string();
-
-    std::function<void()> write_task = ([this, staging_buffer, path, tmp_filename, scaled]() {
-        const int w = static_cast<int>(scaled.width);
-        const int h = static_cast<int>(scaled.height);
-
-        // the thread pool discards exceptions, report here or the capture fails silently
-        try {
-            if (format_is_float(this->format)) {
-                float* mem = staging_buffer->get_memory()->map_as<float>();
-                image_save_f32(tmp_filename, mem, w, h, 4);
-            } else {
-                uint8_t* mem = staging_buffer->get_memory()->map_as<uint8_t>();
-                image_save_u8(tmp_filename, mem, w, h, 4);
-            }
-        } catch (const std::exception& e) {
-            SPDLOG_ERROR("could not write {}: {}", path.string(), e.what());
-            staging_buffer->get_memory()->unmap();
-            return;
-        }
-
-        try {
-            std::filesystem::rename(tmp_filename, path);
-        } catch (std::filesystem::filesystem_error const&) {
-            SPDLOG_WARN("rename failed! Falling back to copy...");
-            std::filesystem::copy(tmp_filename, path);
-            std::filesystem::remove(tmp_filename);
-        }
-
-        SPDLOG_INFO("wrote image to {}", path.string());
-
-        staging_buffer->get_memory()->unmap();
-        return;
-    });
-
-    submission.sync_to_cpu(std::move(write_task));
+    image_export(allocator, submission, info.get_profiler(), src,
+                 vk::Extent2D{scaled.width, scaled.height}, path,
+                 IMAGE_EXPORT_FORMATS.at(this->format),
+                 embed_metadata ? info.get_metadata() : ImageMetadata{});
 
     NodeStatusFlags flags{};
     if (rebuild_after_capture)
@@ -282,7 +181,7 @@ ImageWrite::process(const NodeIO& io, const NodeProcessInfo& info, Submission& s
 
 ImageWrite::NodeStatusFlags ImageWrite::properties([[maybe_unused]] Properties& config) {
     config.st_separate("General");
-    config.config_options("format", format, {"PNG", "JPG", "HDR", "PFM"},
+    config.config_options("format", format, image_export_format_names(),
                           Properties::OptionsStyle::COMBO);
     std::ignore = config.config_text("filename", filename_format, false,
                                      "Provide a format string for the path.");
@@ -344,6 +243,9 @@ ImageWrite::NodeStatusFlags ImageWrite::properties([[maybe_unused]] Properties& 
     config.st_separate();
     if (config.st_begin_child("advanced", "Advanced")) {
         config.config_percent("scale", scale);
+        config.config_bool("embed metadata", embed_metadata,
+                           "embeds the merian version and the graph config into the file (PNG, "
+                           "JPG, HDR)");
         config.st_separate();
 
         config.config_bool("rebuild after capture", rebuild_after_capture,

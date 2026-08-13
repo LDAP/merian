@@ -84,6 +84,7 @@ class ImageWrite : public Node {
 
     bool start_stop_record = false;
     int format = 0;
+    bool embed_metadata = true;
 
     bool record_enable = false;
     int start_at_run = -1;

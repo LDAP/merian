@@ -63,6 +63,7 @@ merian_src = files(
     'vk/sampler/sampler_pool.cpp',
     'vk/sync/semaphore_timeline.cpp',
     'vk/utils/barriers.cpp',
+    'vk/utils/image_export.cpp',
     'vk/utils/cpu_queue.cpp',
     'vk/utils/profiler.cpp',
     'vk/utils/vk_enums.cpp',

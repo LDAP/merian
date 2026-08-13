@@ -10,6 +10,9 @@
 #include "merian/vk/utils/profiler.hpp"
 
 #include <cstdint>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace merian {
 
@@ -103,8 +106,16 @@ class NodeProcessInfo {
         return iteration_semaphore;
     }
 
+    // Describes this run — merian version and the current graph config — for nodes that embed it
+    // into what they write. Built once per connect.
+    const std::vector<std::pair<std::string, std::string>>& get_metadata() const noexcept {
+        return *metadata;
+    }
+
   private:
     const ResourceAllocatorHandle allocator;
+
+    const std::vector<std::pair<std::string, std::string>>* metadata = nullptr;
 
     TimelineSemaphoreHandle iteration_semaphore;
     ShaderObjectAllocatorHandle shader_object_allocator;
