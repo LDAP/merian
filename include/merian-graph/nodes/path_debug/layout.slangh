@@ -1,0 +1,530 @@
+// Layout shared between the path debugger node and its kernels: the constants, the buffer
+// regions and the parameter block are defined once so the two sides cannot drift.
+// Kernels import merian_shaders.scene.camera, merian_shaders.debug.path_record and
+// merian_shaders.utils.hash and open `using merian;` before including this.
+#pragma once
+
+#ifdef __cplusplus
+#include "merian-shaders/debug/path_record.hpp"
+#include "merian-shaders/types.slang.h"
+#endif
+
+namespace merian {
+
+static const uint32_t PATH_DEBUG_WG = 256;
+
+static const uint32_t PATH_DEBUG_HIST_BINS = 128;
+static const float PATH_DEBUG_HIST_MIN_LOG = -20.f;
+static const float PATH_DEBUG_HIST_MAX_LOG = 20.f;
+
+// state buffer layout (uints), cleared every frame
+static const uint32_t PATH_DEBUG_STATE_DRAW_COUNT = 0;
+static const uint32_t PATH_DEBUG_STATE_THRESHOLD = 1; // float bits
+static const uint32_t PATH_DEBUG_STATE_SELECTED = 2;  // paths matching the predicate, before the cap
+static const uint32_t PATH_DEBUG_STATE_HEAT_MAX = 3;  // float bits, max grid weight (from decay pass)
+// capture snapshot for host readback, written by finalize
+static const uint32_t PATH_DEBUG_STATE_STAT_PATHS = 4;
+static const uint32_t PATH_DEBUG_STATE_STAT_VERTICES = 5;
+static const uint32_t PATH_DEBUG_STATE_STAT_FRAME = 6; // the frame that seeded the records
+// float bits: the keep probability the counters above were produced with, so the host can steer
+// absolutely — a relative correction compounds over the readback latency and oscillates
+static const uint32_t PATH_DEBUG_STATE_STAT_KEEP = 7;
+// cursor probe, written by finalize: [0] flags (1 = pixel, 2 = panel bin), [1..3] float values,
+// [4] count, [5..7] selected-pixel mean / relative error / count for the convergence plot
+static const uint32_t PATH_DEBUG_STATE_PROBE = 8;
+static const uint32_t PATH_DEBUG_STATE_HIST = 16;
+static const uint32_t PATH_DEBUG_STATE_DRAW_LIST = PATH_DEBUG_STATE_HIST + PATH_DEBUG_HIST_BINS;
+
+static const uint32_t PATH_DEBUG_MAX_DRAW = 4096;
+static const uint32_t PATH_DEBUG_MAX_SEGMENTS = 32;
+
+// focus path dump for the host inspector, written by finalize:
+// [0] valid, [1] pixel, [2] sample | vertex count << 16, [3] luminance, then the raw vertex words
+static const uint32_t PATH_DEBUG_STATE_FOCUS = PATH_DEBUG_STATE_DRAW_LIST + PATH_DEBUG_MAX_DRAW;
+static const uint32_t PATH_DEBUG_FOCUS_HEADER = 4;
+static const uint32_t PATH_DEBUG_FOCUS_UINTS =
+    PATH_DEBUG_FOCUS_HEADER + PATH_DEBUG_MAX_SEGMENTS * PATH_RECORD_VERTEX_UINTS;
+static const uint32_t PATH_DEBUG_NO_FOCUS = 0xFFFFFFFFu;
+
+// candidates for the host path list: [0] record index, [1] pixel, [2] luminance,
+// [3] sample | scatter count, [4] the first 8 event classes as nibbles
+static const uint32_t PATH_DEBUG_STATE_TOP = PATH_DEBUG_STATE_FOCUS + PATH_DEBUG_FOCUS_UINTS;
+static const uint32_t PATH_DEBUG_TOP_COUNT = 32;
+static const uint32_t PATH_DEBUG_STATE_UINTS = PATH_DEBUG_STATE_TOP + 5 * PATH_DEBUG_TOP_COUNT;
+
+// selection modes
+static const uint32_t PATH_DEBUG_MODE_TOP_K = 0;
+static const uint32_t PATH_DEBUG_MODE_SELECTED_PIXEL = 1;
+static const uint32_t PATH_DEBUG_MODE_FIREFLIES = 2;
+
+// stats buffer (uints): counters + 1D histograms, accumulated over frames
+static const uint32_t PATH_DEBUG_STATS_COUNT = 0;        // paths accumulated
+static const uint32_t PATH_DEBUG_STATS_SAMPLES = 1;      // directions accumulated into the maps
+static const uint32_t PATH_DEBUG_STATS_MAX_DENSITY = 2;  // float bits, from map_reduce
+static const uint32_t PATH_DEBUG_STATS_MAX_CONTRIB = 3;  // float bits, per-sr luminance
+static const uint32_t PATH_DEBUG_STATS_MAX_MEAN = 4;     // float bits, per-sample luminance
+static const uint32_t PATH_DEBUG_STATS_MAX_PDF = 5;      // float bits
+static const uint32_t PATH_DEBUG_STATS_PDF_INTEGRAL = 6; // float bits, sum pdf * dOmega
+static const uint32_t PATH_DEBUG_STATS_CHI2 = 7;         // float bits, sum (count-E)^2 / E
+static const uint32_t PATH_DEBUG_STATS_CHI2_DOF = 8;     // bins with expectation >= 5
+static const uint32_t PATH_DEBUG_STATS_OMEGA = 9;        // float bits, sum of bin solid angles
+// pdf mass the map covered last frame (float bits); conditions the chi-square expectation, so a
+// map that sees only part of the sampler's support (hemisphere on a transmissive BSDF) does not
+// read as a uniform excess
+static const uint32_t PATH_DEBUG_STATS_PDF_NORM = 10;
+// samples inside the bins the chi-square actually tested (spikes and under-resolved excluded)
+static const uint32_t PATH_DEBUG_STATS_TESTED = 11;
+// continuous-density scatter draws considered for map binning, in-domain or not: the
+// denominator of the reciprocal-pdf identity E[sum 1/pdf over a bin] = draws * omega_bin
+static const uint32_t PATH_DEBUG_STATS_DRAWS = 12;
+// quasi-delta lobes: sample() mass in bins whose needle the pdf sub-sampling cannot see;
+// excluded from the chi-square instead of reading as bias
+static const uint32_t PATH_DEBUG_STATS_SPIKE_MASS = 13; // float bits, fraction of samples
+static const uint32_t PATH_DEBUG_STATS_SPIKE_BINS = 14;
+static const uint32_t PATH_DEBUG_STATS_LUM = 16;          // 64 bins, log2 path luminance
+static const uint32_t PATH_DEBUG_STATS_PDF = 16 + 64;     // 64 bins, log2 sample pdf
+static const uint32_t PATH_DEBUG_STATS_BOUNCE = 16 + 128; // 32 bins, scatter events per path
+// polar profile for the overlaid density-vs-pdf curves: per theta band (angle to the map pole)
+// [0] record count, [1] pdf * dOmega (float, CAS), [2] dOmega (float, CAS)
+static const uint32_t PATH_DEBUG_STATS_THETA = 16 + 128 + 32;
+static const uint32_t PATH_DEBUG_THETA_BANDS = 32;
+// contribution (float, CAS) summed per scatter-event count, next to the PATH_DEBUG_STATS_BOUNCE
+// path counts: their ratio is the mean contribution of a path of that length
+static const uint32_t PATH_DEBUG_STATS_LEN_CONTRIB = 16 + 128 + 32 + 3 * PATH_DEBUG_THETA_BANDS;
+// per-frame image metrics against the loaded reference (float, CAS): sum of per-pixel relative
+// squared error, sum of signed luminance difference, pixel count
+static const uint32_t PATH_DEBUG_STATS_AB_RELSQ = PATH_DEBUG_STATS_LEN_CONTRIB + 32;
+static const uint32_t PATH_DEBUG_STATS_AB_SIGNED = PATH_DEBUG_STATS_AB_RELSQ + 1;
+static const uint32_t PATH_DEBUG_STATS_AB_N = PATH_DEBUG_STATS_AB_RELSQ + 2;
+static const uint32_t PATH_DEBUG_STATS_UINTS = PATH_DEBUG_STATS_AB_RELSQ + 3;
+
+// Path expression filter, in the spirit of light path expressions (Heckbert 1990; OSL LPE):
+// a sequence of event classes with regex repetition, matched against the scatter events of a
+// path. Each token is a scattering mask (S G D U), a side mask (R T) and a repeat range;
+// tokens are packed 16 bits each into params.filter_tokens_0..3.
+static const uint32_t PATH_DEBUG_REFERENCE_BSDF = 0;     // pdf evaluated at the primary hit
+static const uint32_t PATH_DEBUG_REFERENCE_RECORDED = 1; // per-sample pdf claimed by the sampler
+
+static const uint32_t PATH_DEBUG_CLS_DELTA = 1;   // BSDFLobe::Delta
+static const uint32_t PATH_DEBUG_CLS_GLOSSY = 2;  // BSDFLobe::Glossy
+static const uint32_t PATH_DEBUG_CLS_DIFFUSE = 4; // BSDFLobe::Diffuse
+static const uint32_t PATH_DEBUG_CLS_UNKNOWN = 8; // producer did not classify the event
+static const uint32_t PATH_DEBUG_LOBE_TRANSMISSION = 8; // BSDFLobe::Transmission
+static const uint32_t PATH_DEBUG_SIDE_SHIFT = 4;
+static const uint32_t PATH_DEBUG_SIDE_REFLECT = 1;
+static const uint32_t PATH_DEBUG_SIDE_TRANSMIT = 2;
+static const uint32_t PATH_DEBUG_MIN_SHIFT = 6;  // 3 bits
+static const uint32_t PATH_DEBUG_MAX_SHIFT = 9;  // 4 bits, 15 = unbounded
+static const uint32_t PATH_DEBUG_REPEAT_INF = 15;
+static const uint32_t PATH_DEBUG_MAX_TOKENS = 8;
+
+// map panel contents
+static const uint32_t PATH_DEBUG_VIEW_DENSITY = 0;       // samples / (total * sr)
+static const uint32_t PATH_DEBUG_VIEW_CONTRIB = 1;       // contribution luminance / (total * sr)
+static const uint32_t PATH_DEBUG_VIEW_CONTRIB_COLOR = 2; // mean per sample, RGB; throughput-weighted
+static const uint32_t PATH_DEBUG_VIEW_MEAN = 3;          // contribution luminance / samples
+static const uint32_t PATH_DEBUG_VIEW_PDF = 4;           // BSDF pdf reference
+static const uint32_t PATH_DEBUG_VIEW_RATIO = 5;         // sampled density / BSDF pdf, diverging
+static const uint32_t PATH_DEBUG_VIEW_ZSCORE = 6;        // (count - E) / sqrt(E), diverging sigmas
+static const uint32_t PATH_DEBUG_VIEW_COUNT = 7;
+
+static const uint32_t PATH_DEBUG_ALL_BOUNCES = 0xFFFFFFFFu;
+
+static const float PATH_DEBUG_PDF_MIN_LOG = -10.f;
+static const float PATH_DEBUG_PDF_MAX_LOG = 30.f;
+
+// heat modes
+static const uint32_t PATH_DEBUG_HEAT_OFF = 0;
+static const uint32_t PATH_DEBUG_HEAT_DENSITY = 1;
+static const uint32_t PATH_DEBUG_HEAT_CONTRIBUTION = 2;
+static const uint32_t PATH_DEBUG_HEAT_THROUGHPUT = 3;
+
+// World-space heat grid: open addressing, no eviction — the decay pass recycles dead cells.
+// Layout: [0, slots) cell keys (0 = empty), [slots, 2*slots) weights (float bits, CAS add).
+static const uint32_t PATH_DEBUG_GRID_PROBES = 8;
+static const uint32_t PATH_DEBUG_GRID_INVALID = 0xFFFFFFFFu;
+
+// color modes
+static const uint32_t PATH_DEBUG_COLOR_LUMINANCE = 0;
+static const uint32_t PATH_DEBUG_COLOR_BOUNCES = 1;
+static const uint32_t PATH_DEBUG_COLOR_RANDOM = 2;
+
+struct PathDebugParams {
+    // scalars throughout: a vector is padded to its 8 byte alignment and would let the two
+    // sides of this struct drift apart
+    uint32_t dim_x;
+    uint32_t dim_y;
+    uint32_t selected_x;
+    uint32_t selected_y;
+    uint32_t mode;
+    uint32_t k;
+    float firefly_fraction; // of the selected paths, e.g. 1e-4
+    float overlay_alpha;
+    float color_scale; // maps log2 path luminance into the colormap
+    uint32_t color_mode;
+    uint32_t freeze;
+    float keep_prob;
+    uint32_t pixel_filter;
+    uint32_t max_draw;
+    uint32_t map_res;
+    uint32_t map_transform; // PATH_DEBUG_MAP_*
+    uint32_t map_frame;     // 0 = world (y-up pole), 1 = local shading frame
+    uint32_t map_scope;     // 0 = selected pixel, 1 = whole image
+    uint32_t map_reference; // z-score/ratio/chi2 reference: 0 = BSDF pdf, 1 = recorded pdf
+    uint32_t map_bounce;    // vertex index or PATH_DEBUG_ALL_BOUNCES
+    uint32_t map_view;      // content of the current map_view/sphere dispatch
+    uint32_t map_panel_size;
+    float map_exposure;
+    uint32_t sphere_view; // PATH_DEBUG_VIEW_* + 1, 0 = off
+    float sphere_radius;
+    uint32_t heat_mode;
+    uint32_t heat_scope; // 0 = all pixels, 1 = selected pixel
+    uint32_t heat_bounce_min;
+    uint32_t heat_bounce_max;
+    float heat_decay; // per-frame cell factor: 1 = keep all, (1 - alpha) = EMA
+    float heat_cell_size;
+    float heat_exposure;
+    float heat_opacity;
+    uint32_t heat_smooth;
+    uint32_t grid_slots;
+    uint32_t accumulate_moments; // 0 while frozen after the first pass
+    uint32_t moments_scope;      // statistics source: 0 = all paths, 1 = filtered paths
+    uint32_t ab_metrics;         // 1 while a reference image is loaded
+    uint32_t error_view;         // 0 off, 1 relative error, 2 variance, 3 mean
+    float error_scale;
+    // image pixel under the mouse, or PATH_DEBUG_NO_CURSOR
+    uint32_t cursor_x;
+    uint32_t cursor_y;
+    uint32_t probe_view;    // panel view under the cursor + 1, 0 = probe the pixel
+    uint32_t probe_bin;     // map bin under the cursor
+    uint32_t filter_tokens_0; // 8 expression tokens, 16 bits each
+    uint32_t filter_tokens_1;
+    uint32_t filter_tokens_2;
+    uint32_t filter_tokens_3;
+    uint32_t filter_count;   // tokens in use; 0 = accept any class sequence
+    uint32_t filter_len_min; // scatter events per path
+    uint32_t filter_len_max;
+    uint32_t filter_method_mask; // bit per PATH_RECORD_METHOD_*; 0 = any method
+    uint32_t filter_method_all;  // 1 = every scatter vertex must match the mask
+    uint32_t filter_material;    // packed material id; PATH_RECORD_MATERIAL_NONE = off
+    // second expression slot, sharing the constraints above; feeds the filtered_b output
+    uint32_t filter2_tokens_0;
+    uint32_t filter2_tokens_1;
+    uint32_t filter2_tokens_2;
+    uint32_t filter2_tokens_3;
+    uint32_t filter2_count;
+    uint32_t render_mode; // PATH_DEBUG_RENDER_*
+    float ab_split;   // x position of the A|B split in [0, 1]; >= 1 shows A everywhere
+    float ab_scale;   // amplification of the difference view
+    uint32_t focus_path;  // record index drawn and dumped exclusively, or PATH_DEBUG_NO_FOCUS
+};
+
+// what the compose pass puts under the overlays
+static const uint32_t PATH_DEBUG_RENDER_SRC = 0;      // the input image
+static const uint32_t PATH_DEBUG_RENDER_FILTERED = 1; // paths matching the filter, re-accumulated
+static const uint32_t PATH_DEBUG_RENDER_REFERENCE = 2;
+static const uint32_t PATH_DEBUG_RENDER_DIFF = 3; // |A - B| amplified
+static const uint32_t PATH_DEBUG_RENDER_SPLIT = 4;
+static const uint32_t PATH_DEBUG_RENDER_FILTERED_B = 5;
+static const uint32_t PATH_DEBUG_RENDER_SPLIT_FILTERS = 6; // filter A left, filter B right
+
+static const uint32_t PATH_DEBUG_NO_CURSOR = 0xFFFFFFFFu;
+
+} // namespace merian
+
+#ifndef __cplusplus
+
+// exported by the node when the gbuffer input is connected
+extern static const bool merian_path_debug_gbuffer = false;
+
+RWStructuredBuffer<uint, ScalarDataLayout> in_records;
+Sampler2D<float4> in_src;
+RWTexture2D<float4> out_out;
+// per-frame radiance of the matching paths, for a downstream accumulate/tonemap chain
+RWTexture2D<float4> out_filtered;
+RWTexture2D<float4> out_filtered_b;
+
+// node-internal
+RWStructuredBuffer<uint, ScalarDataLayout> state;
+RWStructuredBuffer<uint, ScalarDataLayout> overlay;
+RWStructuredBuffer<uint, ScalarDataLayout> stats;
+RWStructuredBuffer<uint, ScalarDataLayout> maps;
+RWStructuredBuffer<uint, ScalarDataLayout> grid;
+// per-pixel luminance moments: [6 * pixel] sum (float, CAS), [+1] sum of squares, [+2] count;
+// the triple at [+3..+5] accumulates only paths matching the filter
+RWStructuredBuffer<uint, ScalarDataLayout> moments;
+// re-render of the paths matching the filter: [4 * pixel] rgb of matching paths (float, CAS);
+// [+3] is unused, kept so the region stride stays a power of four; one region per filter slot
+RWStructuredBuffer<uint, ScalarDataLayout> filtered;
+// one bit per recorded path and expression slot, set by the select pass: each expression is
+// matched once per frame and every later pass reads the bit instead of walking the vertices
+RWStructuredBuffer<uint, ScalarDataLayout> matches;
+merian::Camera camera;
+
+// Per-frame parameters, as ordinary uniform data next to the other globals: they do not fit in
+// the 128 bytes of push constants Vulkan guarantees.
+PathDebugParams params;
+
+uint2 path_debug_dim() {
+    return uint2(params.dim_x, params.dim_y);
+}
+
+uint2 path_debug_selected_pixel() {
+    return uint2(params.selected_x, params.selected_y);
+}
+
+// moments triple selected by the statistics scope
+uint path_debug_moments_at(const uint2 pixel) {
+    return 6 * (pixel.y * params.dim_x + pixel.x) + (params.moments_scope != 0 ? 3 : 0);
+}
+
+// maps buffer (uints), region offsets scale with params.map_res^2 (= N):
+// [0, N)      direction sample count (uint)
+// [N, 4N)     contribution RGB (float bits, CAS add)
+// [4N, 5N)    BSDF pdf at the primary hit (float, written by bsdf_map; negative = under-resolved)
+// [5N, 6N)    sum of 1/pdf over landed continuous-density samples (float, CAS)
+// [6N, 7N)    sum of 1/pdf^2, the variance estimate for the sum above
+uint path_debug_map_count_at(const uint index) {
+    return index;
+}
+uint path_debug_map_contrib_at(const uint index) {
+    return params.map_res * params.map_res + 3 * index;
+}
+uint path_debug_map_pdf_at(const uint index) {
+    return 4 * params.map_res * params.map_res + index;
+}
+uint path_debug_map_recip_at(const uint index) {
+    return 5 * params.map_res * params.map_res + index;
+}
+uint path_debug_map_recip2_at(const uint index) {
+    return 6 * params.map_res * params.map_res + index;
+}
+
+uint path_debug_cell_key(const int3 cell) {
+    const uint h = merian::pcg(merian::pcg(merian::pcg(asuint(cell.x)) ^ asuint(cell.y)) ^
+                               asuint(cell.z));
+    return max(h, 1u); // 0 marks empty slots
+}
+
+uint path_debug_grid_find(const uint key, const bool insert) {
+    uint slot = key % params.grid_slots;
+    for (uint p = 0; p < PATH_DEBUG_GRID_PROBES; p++) {
+        const uint stored = grid[slot];
+        if (stored == key) {
+            return slot;
+        }
+        if (stored == 0) {
+            if (!insert) {
+                return PATH_DEBUG_GRID_INVALID;
+            }
+            uint orig;
+            InterlockedCompareExchange(grid[slot], 0, key, orig);
+            if (orig == 0 || orig == key) {
+                return slot;
+            }
+        }
+        slot = (slot + 1) % params.grid_slots;
+    }
+    return PATH_DEBUG_GRID_INVALID;
+}
+
+float path_debug_grid_weight_at(const float3 pos) {
+    const int3 cell = int3(floor(pos / params.heat_cell_size));
+    const uint slot = path_debug_grid_find(path_debug_cell_key(cell), false);
+    return slot == PATH_DEBUG_GRID_INVALID ? 0.f : asfloat(grid[params.grid_slots + slot]);
+}
+
+uint path_debug_token(const uint slot, const uint index) {
+    uint word = slot == 0 ? params.filter_tokens_0 : params.filter2_tokens_0;
+    if (index >= 6) {
+        word = slot == 0 ? params.filter_tokens_3 : params.filter2_tokens_3;
+    } else if (index >= 4) {
+        word = slot == 0 ? params.filter_tokens_2 : params.filter2_tokens_2;
+    } else if (index >= 2) {
+        word = slot == 0 ? params.filter_tokens_1 : params.filter2_tokens_1;
+    }
+    return (word >> (16 * (index & 1))) & 0xFFFFu;
+}
+
+bool path_debug_token_matches(const uint token, const uint meta) {
+    const uint lobe = (meta >> PATH_RECORD_LOBE_SHIFT) & PATH_RECORD_LOBE_MASK;
+    const uint smoothness = lobe & (PATH_DEBUG_CLS_DELTA | PATH_DEBUG_CLS_GLOSSY |
+                                    PATH_DEBUG_CLS_DIFFUSE);
+    const uint cls = smoothness != 0 ? smoothness : PATH_DEBUG_CLS_UNKNOWN;
+    const uint side = (lobe & PATH_DEBUG_LOBE_TRANSMISSION) != 0 ? PATH_DEBUG_SIDE_TRANSMIT
+                                                                 : PATH_DEBUG_SIDE_REFLECT;
+    return (cls & (token & 0xFu)) != 0 &&
+           (side & ((token >> PATH_DEBUG_SIDE_SHIFT) & 0x3u)) != 0;
+}
+
+// Number of scatter events, i.e. vertices that sampled a direction.
+uint path_debug_scatter_count(const PathRecordPath p, const uint vro) {
+    if (p.vertex_count == 0) {
+        return 0;
+    }
+    const uint last = path_record_load_vertex_meta(in_records, vro,
+                                                   p.vertex_offset + p.vertex_count - 1);
+    return (last & PATH_RECORD_FLAG_TERMINAL) != 0 ? p.vertex_count - 1 : p.vertex_count;
+}
+
+// Length, method and material limits shared by both expression slots.
+bool path_debug_filter_constraints(const PathRecordPath p, const uint vro, const uint scatter) {
+    if (scatter < params.filter_len_min || scatter > params.filter_len_max) {
+        return false;
+    }
+    if (params.filter_method_mask != 0 || params.filter_material != PATH_RECORD_MATERIAL_NONE) {
+        bool any_method = false;
+        bool all_methods = scatter > 0;
+        bool any_material = false;
+        for (uint v = 0; v < scatter; v++) {
+            const uint meta = path_record_load_vertex_meta(in_records, vro, p.vertex_offset + v);
+            const uint method = (meta >> PATH_RECORD_METHOD_SHIFT) & PATH_RECORD_METHOD_MASK;
+            const bool in_mask = (params.filter_method_mask & (1u << method)) != 0;
+            any_method |= in_mask;
+            all_methods &= in_mask;
+            any_material |= ((meta >> PATH_RECORD_MATERIAL_SHIFT) & PATH_RECORD_MATERIAL_MASK) ==
+                            params.filter_material;
+        }
+        if (params.filter_method_mask != 0 &&
+            !(params.filter_method_all != 0 ? all_methods : any_method)) {
+            return false;
+        }
+        if (params.filter_material != PATH_RECORD_MATERIAL_NONE && !any_material) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Greedy match with backtracking: each token consumes as many events as it can, and gives them
+// back one at a time when the rest of the expression cannot be satisfied. Backtracking over
+// several unbounded repeats is exponential, so the search is capped and an expression that hits
+// the cap simply does not match.
+static const uint32_t PATH_DEBUG_MATCH_STEPS = 4096;
+bool path_debug_expression_matches(const uint slot,
+                                   const PathRecordPath p,
+                                   const uint vro,
+                                   const uint scatter) {
+    const uint tokens = slot == 0 ? params.filter_count : params.filter2_count;
+    if (tokens == 0) {
+        return true;
+    }
+
+    uint taken[PATH_DEBUG_MAX_TOKENS];
+    uint start[PATH_DEBUG_MAX_TOKENS];
+    int t = 0;
+    uint v = 0;
+    for (uint step = 0; step < PATH_DEBUG_MATCH_STEPS; step++) {
+        bool matched = false;
+        if (uint(t) == tokens) {
+            matched = v == scatter; // the expression describes the whole path
+        } else {
+            const uint token = path_debug_token(slot, uint(t));
+            const uint repeat_min = (token >> PATH_DEBUG_MIN_SHIFT) & 0x7u;
+            const uint repeat_max = (token >> PATH_DEBUG_MAX_SHIFT) & 0xFu;
+            const uint limit = repeat_max == PATH_DEBUG_REPEAT_INF ? scatter : repeat_max;
+            start[t] = v;
+            uint count = 0;
+            while (count < limit && v < scatter &&
+                   path_debug_token_matches(
+                       token, path_record_load_vertex_meta(in_records, vro, p.vertex_offset + v))) {
+                v++;
+                count++;
+            }
+            taken[t] = count;
+            if (count >= repeat_min) {
+                t++;
+                continue;
+            }
+        }
+        if (matched) {
+            return true;
+        }
+
+        // give one event back to the last token that can spare it, then re-match the rest
+        bool resumed = false;
+        for (int b = t - 1; b >= 0; b--) {
+            const uint token = path_debug_token(slot, uint(b));
+            if (taken[b] > ((token >> PATH_DEBUG_MIN_SHIFT) & 0x7u)) {
+                taken[b]--;
+                v = start[b] + taken[b];
+                t = b + 1;
+                resumed = true;
+                break;
+            }
+        }
+        if (!resumed) {
+            return false;
+        }
+    }
+    return false;
+}
+
+uint path_debug_match_stride() {
+    return (path_record_path_capacity(in_records) + 31) >> 5;
+}
+
+void path_debug_set_match(const uint path_index, const uint slot) {
+    InterlockedOr(matches[slot * path_debug_match_stride() + (path_index >> 5)],
+                  1u << (path_index & 31u));
+}
+
+bool path_debug_matched(const uint path_index, const uint slot) {
+    return (matches[slot * path_debug_match_stride() + (path_index >> 5)] &
+            (1u << (path_index & 31u))) != 0;
+}
+
+uint path_debug_lum_bin(const float lum) {
+    // a non-finite path is the most interesting one there is; the top bin guarantees the
+    // firefly threshold selects it first
+    if (isnan(lum) || isinf(lum)) {
+        return PATH_DEBUG_HIST_BINS - 1;
+    }
+    if (!(lum > 0.f)) {
+        return 0;
+    }
+    const float normalized = (log2(lum) - PATH_DEBUG_HIST_MIN_LOG) /
+                             (PATH_DEBUG_HIST_MAX_LOG - PATH_DEBUG_HIST_MIN_LOG);
+    return clamp(uint(normalized * (PATH_DEBUG_HIST_BINS - 2) + 1), 1, PATH_DEBUG_HIST_BINS - 1);
+}
+
+float path_debug_bin_lum_lower(const uint bin) {
+    if (bin == 0) {
+        return 0.f;
+    }
+    const float normalized = float(bin - 1) / float(PATH_DEBUG_HIST_BINS - 2);
+    return exp2(normalized * (PATH_DEBUG_HIST_MAX_LOG - PATH_DEBUG_HIST_MIN_LOG) +
+                PATH_DEBUG_HIST_MIN_LOG);
+}
+
+void path_debug_atomic_add_float(RWStructuredBuffer<uint, ScalarDataLayout> buf,
+                                 const uint index,
+                                 const float value) {
+    uint expected = buf[index];
+    for (;;) {
+        uint orig;
+        InterlockedCompareExchange(buf[index], expected, asuint(asfloat(expected) + value), orig);
+        if (orig == expected) {
+            break;
+        }
+        expected = orig;
+    }
+}
+
+void path_debug_atomic_max_float(RWStructuredBuffer<uint, ScalarDataLayout> buf,
+                                 const uint index,
+                                 const float value) {
+    InterlockedMax(buf[index], asuint(max(value, 0.f))); // positive floats order as uints
+}
+
+// overlay word: priority in the top 8 bits, rgb888 below; composed by InterlockedMax
+uint path_debug_pack_overlay(const uint priority, const float3 color) {
+    const uint3 c = uint3(saturate(color) * 255.f + 0.5f);
+    return (min(priority, 255u) << 24) | (c.r << 16) | (c.g << 8) | c.b;
+}
+
+float3 path_debug_unpack_overlay(const uint packed) {
+    return float3((packed >> 16) & 0xFFu, (packed >> 8) & 0xFFu, packed & 0xFFu) / 255.f;
+}
+
+#endif

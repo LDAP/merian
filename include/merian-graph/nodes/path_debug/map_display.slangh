@@ -1,0 +1,129 @@
+// Display shading for the directional-map views, shared by the panel renderer and the sphere
+// view. Include after layout.slangh and dir_map.slangh; the includer imports
+// merian_shaders.colors.colorspaces and merian_shaders.colors.colormaps.
+
+// heat values normalize to their map maximum over three log decades (exposure shifts)
+float3 path_debug_view_heat(const float value, const float vmax) {
+    if (!(value > 0.f) || !(vmax > 0.f)) {
+        return float3(0.04f);
+    }
+    const float t = log(1.f + params.map_exposure * 999.f * value / vmax) / log(1000.f);
+    return merian::colormap_turbo(saturate(t));
+}
+
+float3 path_debug_view_display(const uint view, const uint2 cell) {
+    const uint bin = cell.y * params.map_res + cell.x;
+    const float solid_angle = dir_map_bin_solid_angle(params.map_transform, cell, params.map_res);
+    if (solid_angle <= 0.f) {
+        return float3(0.02f); // outside the mapped domain (hemisphere corners)
+    }
+    const uint total = max(stats[PATH_DEBUG_STATS_SAMPLES], 1u);
+    const uint count = maps[path_debug_map_count_at(bin)];
+    const uint c = path_debug_map_contrib_at(bin);
+    const float3 contrib =
+        float3(asfloat(maps[c + 0]), asfloat(maps[c + 1]), asfloat(maps[c + 2]));
+    const float pdf_raw = asfloat(maps[path_debug_map_pdf_at(bin)]);
+    const float pdf = abs(pdf_raw); // negative marks bins the pdf sub-sampling cannot resolve
+
+    // the density view and the pdf share one scale: agreeing distributions render as
+    // identical images
+    const float shared_max = max(asfloat(stats[PATH_DEBUG_STATS_MAX_DENSITY]),
+                                 asfloat(stats[PATH_DEBUG_STATS_MAX_PDF]));
+
+    switch (view) {
+    case PATH_DEBUG_VIEW_DENSITY:
+        return path_debug_view_heat(float(count) / (float(total) * solid_angle), shared_max);
+    case PATH_DEBUG_VIEW_CONTRIB:
+        return path_debug_view_heat(merian::yuv_luminance(contrib) /
+                                        (float(total) * solid_angle),
+                                    asfloat(stats[PATH_DEBUG_STATS_MAX_CONTRIB]));
+    case PATH_DEBUG_VIEW_CONTRIB_COLOR: {
+        // mean radiance per sample: roughly the scene as seen from the shading point
+        if (count == 0) {
+            return float3(0.f);
+        }
+        const float3 mean = contrib * (params.map_exposure / float(count));
+        return pow(mean / (1.f + mean), 1.f / 2.2f);
+    }
+    case PATH_DEBUG_VIEW_MEAN:
+        return path_debug_view_heat(count > 0 ? merian::yuv_luminance(contrib) / float(count)
+                                              : 0.f,
+                                    asfloat(stats[PATH_DEBUG_STATS_MAX_MEAN]));
+    case PATH_DEBUG_VIEW_PDF:
+        return path_debug_view_heat(pdf, shared_max);
+    case PATH_DEBUG_VIEW_RATIO: {
+        if (params.map_reference == PATH_DEBUG_REFERENCE_RECORDED) {
+            // mean of true/claimed density over the bin: E[sum 1/pdf] / (draws * omega) is 1
+            // for a sampler that draws from the density it records; +-2 stops. Only defined
+            // where every draw shares one support (one surface).
+            if (params.map_scope != 0 || params.map_bounce != 0) {
+                return float3(0.12f);
+            }
+            const float sum_recip = asfloat(maps[path_debug_map_recip_at(bin)]);
+            const float expected = float(stats[PATH_DEBUG_STATS_DRAWS]) * solid_angle;
+            if (!(sum_recip > 0.f) || !(expected > 0.f)) {
+                return float3(0.02f);
+            }
+            const float stops = clamp(log2(sum_recip / expected), -2.f, 2.f);
+            return merian::colormap_diverging(stops / 4.f + 0.5f);
+        }
+        // sampled density vs. BSDF pdf: correct importance sampling is white (ratio 1),
+        // blue = undersampled, red = oversampled; +-2 stops
+        // conditioned on the map-covered pdf mass, matching the chi-square in map_reduce
+        const float norm = max(asfloat(stats[PATH_DEBUG_STATS_PDF_NORM]), 1e-6f);
+        const float density = float(count) / (float(total) * solid_angle);
+        if (!(pdf > 0.f) || !(density > 0.f)) {
+            return float3(0.02f);
+        }
+        const float stops = clamp(log2(density * norm / pdf), -2.f, 2.f);
+        return merian::colormap_diverging(stops / 4.f + 0.5f);
+    }
+    case PATH_DEBUG_VIEW_ZSCORE:
+    default: {
+        if (params.map_reference == PATH_DEBUG_REFERENCE_RECORDED) {
+            // reciprocal-pdf z-score, matching the chi-square in map_reduce; gray bins hold
+            // no continuous-density samples (empty or delta-only)
+            if (params.map_scope != 0 || params.map_bounce != 0) {
+                return float3(0.12f);
+            }
+            const float sum_recip = asfloat(maps[path_debug_map_recip_at(bin)]);
+            const float sum_recip2 = asfloat(maps[path_debug_map_recip2_at(bin)]);
+            const float expected = float(stats[PATH_DEBUG_STATS_DRAWS]) * solid_angle;
+            if (!(sum_recip2 > 0.f)) {
+                return float3(0.12f);
+            }
+            const float z = (sum_recip - expected) / sqrt(sum_recip2);
+            return merian::colormap_diverging(clamp(z, -4.f, 4.f) / 8.f + 0.5f);
+        }
+        // Poisson z-score of the count against the pdf: calibrated bias detector, persistent
+        // structure beyond +-2 sigma with many samples means sampling and pdf disagree.
+        // Orange marks quasi-delta spikes (excluded from the chi-square); gray bins carry no
+        // statement (pdf under-resolved by the sub-sampling).
+        const float norm = max(asfloat(stats[PATH_DEBUG_STATS_PDF_NORM]), 1e-6f);
+        const float expected = float(total) * pdf * solid_angle / norm;
+        if (float(count) >= 16.f && float(count) > 10.f * expected) {
+            return float3(0.45f, 0.25f, 0.05f);
+        }
+        if (pdf_raw < 0.f) {
+            return float3(0.12f);
+        }
+        if (expected < 1e-3f) {
+            return float3(0.02f);
+        }
+        const float z = (float(count) - expected) / sqrt(expected);
+        return merian::colormap_diverging(clamp(z, -4.f, 4.f) / 8.f + 0.5f);
+    }
+    }
+}
+
+float3 path_debug_view_display_uv(const uint view, const float2 uv) {
+    return path_debug_view_display(view, min(uint2(uv * params.map_res), params.map_res - 1));
+}
+
+float3 path_debug_view_display_dir(const uint view, const float3 map_dir) {
+    const float3 uvw = dir_map_uv(params.map_transform, map_dir);
+    if (uvw.z == 0.f) {
+        return float3(0.05f);
+    }
+    return path_debug_view_display_uv(view, uvw.xy);
+}
