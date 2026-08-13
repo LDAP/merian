@@ -28,6 +28,10 @@ class ViewportPicker : public InputListener {
     bool on_mouse_button(InputController& controller,
                          InputController::MouseButton button,
                          InputController::KeyStatus status) override;
+    bool on_scroll(InputController& controller, double xoffset, double yoffset) override;
+
+    // Scroll steps accumulated while the modifier was held; clears the accumulator.
+    double take_scroll();
 
     // The armed click mapped to image pixels, or nullopt; clears the click.
     std::optional<int2> take_click(const vk::Extent2D& image_extent, const WindowHandle& window);
@@ -47,6 +51,7 @@ class ViewportPicker : public InputListener {
     double click_x = 0.;
     double click_y = 0.;
     bool modifier_down = false;
+    double scroll_accum = 0.;
     bool clicked = false;
     bool swallow_release = false;
 };

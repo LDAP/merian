@@ -50,12 +50,21 @@ static const uint32_t PATH_DEBUG_NO_FOCUS = 0xFFFFFFFFu;
 // [3] sample | scatter count, [4] the first 8 event classes as nibbles
 static const uint32_t PATH_DEBUG_STATE_TOP = PATH_DEBUG_STATE_FOCUS + PATH_DEBUG_FOCUS_UINTS;
 static const uint32_t PATH_DEBUG_TOP_COUNT = 32;
-static const uint32_t PATH_DEBUG_STATE_UINTS = PATH_DEBUG_STATE_TOP + 5 * PATH_DEBUG_TOP_COUNT;
+// pick resolved from the records: [0] packed pixel + 1 (0 = none), [1..3] float position of
+// the clicked pixel's primary hit
+static const uint32_t PATH_DEBUG_STATE_PICK = PATH_DEBUG_STATE_TOP + 5 * PATH_DEBUG_TOP_COUNT;
+static const uint32_t PATH_DEBUG_STATE_UINTS = PATH_DEBUG_STATE_PICK + 4;
 
 // selection modes
 static const uint32_t PATH_DEBUG_MODE_TOP_K = 0;
 static const uint32_t PATH_DEBUG_MODE_SELECTED_PIXEL = 1;
 static const uint32_t PATH_DEBUG_MODE_FIREFLIES = 2;
+static const uint32_t PATH_DEBUG_MODE_WORLD = 3;
+
+// which part of a path must lie inside the world query sphere
+static const uint32_t PATH_DEBUG_ANCHOR_THROUGH = 0;
+static const uint32_t PATH_DEBUG_ANCHOR_START = 1;
+static const uint32_t PATH_DEBUG_ANCHOR_END = 2;
 
 // stats buffer (uints): counters + 1D histograms, accumulated over frames
 static const uint32_t PATH_DEBUG_STATS_COUNT = 0;        // paths accumulated
@@ -213,6 +222,14 @@ struct PathDebugParams {
     uint32_t filter2_tokens_2;
     uint32_t filter2_tokens_3;
     uint32_t filter2_count;
+    // world query: paths whose start/end/any segment lies within query_radius of the point
+    float query_x;
+    float query_y;
+    float query_z;
+    float query_radius_scale; // >= 1, in units of the projected pixel footprint
+    uint32_t query_anchor;     // PATH_DEBUG_ANCHOR_*
+    uint32_t pick_x;       // pixel whose primary hit resolves the next query, or NO_CURSOR
+    uint32_t pick_y;
     uint32_t render_mode; // PATH_DEBUG_RENDER_*
     float ab_split;   // x position of the A|B split in [0, 1]; >= 1 shows A everywhere
     float ab_scale;   // amplification of the difference view
@@ -365,6 +382,52 @@ uint path_debug_scatter_count(const PathRecordPath p, const uint vro) {
     const uint last = path_record_load_vertex_meta(in_records, vro,
                                                    p.vertex_offset + p.vertex_count - 1);
     return (last & PATH_RECORD_FLAG_TERMINAL) != 0 ? p.vertex_count - 1 : p.vertex_count;
+}
+
+// Effective world query radius: the footprint one pixel projects to at the query point's
+// distance, scaled by the user factor - so a click never selects less than the cursor covers,
+// and the radius follows the camera.
+float path_debug_query_radius() {
+    const uint2 dim = path_debug_dim();
+    const uint2 center = dim / 2;
+    const float3 d0 = normalize(camera.get_pinhole_direction(center, dim));
+    const float3 d1 = normalize(camera.get_pinhole_direction(center + uint2(1, 0), dim));
+    const float3 q = float3(params.query_x, params.query_y, params.query_z);
+    const float footprint = max(distance(camera.position, q) * distance(d0, d1), 1e-6f);
+    return footprint * params.query_radius_scale;
+}
+
+// True where the path touches the world query sphere: its first or last vertex, or - so a
+// path crossing between two vertices still counts - the nearest point of any segment.
+bool path_debug_query_hit(const PathRecordPath p, const uint vro) {
+    const float3 q = float3(params.query_x, params.query_y, params.query_z);
+    const float r = path_debug_query_radius();
+    const float r2 = r * r;
+    if (params.query_anchor == PATH_DEBUG_ANCHOR_START) {
+        const float3 pos = path_record_load_vertex(in_records, vro, p.vertex_offset).pos;
+        return dot(pos - q, pos - q) <= r2;
+    }
+    if (params.query_anchor == PATH_DEBUG_ANCHOR_END) {
+        const float3 pos =
+            path_record_load_vertex(in_records, vro, p.vertex_offset + p.vertex_count - 1).pos;
+        return dot(pos - q, pos - q) <= r2;
+    }
+    float3 prev = path_record_load_vertex(in_records, vro, p.vertex_offset).pos;
+    if (dot(prev - q, prev - q) <= r2) {
+        return true;
+    }
+    for (uint v = 1; v < p.vertex_count; v++) {
+        const float3 pos = path_record_load_vertex(in_records, vro, p.vertex_offset + v).pos;
+        const float3 edge = pos - prev;
+        const float len2 = dot(edge, edge);
+        const float t = len2 > 0.f ? clamp(dot(q - prev, edge) / len2, 0.f, 1.f) : 0.f;
+        const float3 nearest = prev + t * edge;
+        if (dot(nearest - q, nearest - q) <= r2) {
+            return true;
+        }
+        prev = pos;
+    }
+    return false;
 }
 
 // Length, method and material limits shared by both expression slots.

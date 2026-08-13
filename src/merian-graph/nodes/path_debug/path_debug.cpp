@@ -362,11 +362,21 @@ void PathDebugNode::handle_pick(const NodeIO& io) {
     const WindowHandle window = io.is_connected(con_window) ? io[con_window] : nullptr;
     const vk::Extent2D image{extent.width, extent.height};
 
+    if (const double scroll = picker->take_scroll();
+        scroll != 0. && selection_mode == static_cast<int32_t>(PATH_DEBUG_MODE_WORLD)) {
+        query_radius_scale =
+            std::max(1.f, query_radius_scale * std::pow(1.15f, static_cast<float>(scroll)));
+    }
     if (const auto click = picker->take_click(image, window)) {
-        selected_pixel = *click;
-        selection_mode = static_cast<int32_t>(PATH_DEBUG_MODE_SELECTED_PIXEL);
-        map_scope = 0;
-        maps_dirty = true;
+        if (selection_mode == static_cast<int32_t>(PATH_DEBUG_MODE_WORLD)) {
+            pick_pixel = *click;
+            pick_pending = true;
+        } else {
+            selected_pixel = *click;
+            selection_mode = static_cast<int32_t>(PATH_DEBUG_MODE_SELECTED_PIXEL);
+            map_scope = 0;
+            maps_dirty = true;
+        }
     }
 
     // hover state for the probe readout: panel bin when over a panel, image pixel otherwise
@@ -537,6 +547,21 @@ PathDebugNode::process(const NodeIO& io, const NodeProcessInfo& info, Submission
                               ? ((params.selected_y << 16) | params.selected_x)
                               : PATH_RECORD_ALL_PIXELS;
     params.max_draw = MAX_DRAW;
+    if (pick_pending && readback_valid &&
+        latest_readback.pick.pixel_plus_one == 1 + ((static_cast<uint32_t>(pick_pixel.y) << 16) |
+                                                    static_cast<uint32_t>(pick_pixel.x))) {
+        query_pos = float3(std::bit_cast<float>(latest_readback.pick.x),
+                           std::bit_cast<float>(latest_readback.pick.y),
+                           std::bit_cast<float>(latest_readback.pick.z));
+        pick_pending = false;
+    }
+    params.query_x = query_pos.x;
+    params.query_y = query_pos.y;
+    params.query_z = query_pos.z;
+    params.query_radius_scale = query_radius_scale;
+    params.query_anchor = static_cast<uint32_t>(query_anchor);
+    params.pick_x = pick_pending ? static_cast<uint32_t>(pick_pixel.x) : PATH_DEBUG_NO_CURSOR;
+    params.pick_y = pick_pending ? static_cast<uint32_t>(pick_pixel.y) : PATH_DEBUG_NO_CURSOR;
     map_res_log2 = std::clamp(map_res_log2, 3, 10);
     grid_slots_log2 = std::clamp(grid_slots_log2, 8, 26);
     params.map_res = 1u << static_cast<uint32_t>(map_res_log2);
@@ -777,7 +802,9 @@ PathDebugNode::process(const NodeIO& io, const NodeProcessInfo& info, Submission
                    vk::BufferCopy{sizeof(uint32_t) * PATH_DEBUG_STATE_FOCUS,
                                   offsetof(Readback, focus), sizeof(FocusPath)},
                    vk::BufferCopy{sizeof(uint32_t) * PATH_DEBUG_STATE_TOP, offsetof(Readback, top),
-                                  sizeof(TopPath) * TOP_COUNT}});
+                                  sizeof(TopPath) * TOP_COUNT},
+                   vk::BufferCopy{sizeof(uint32_t) * PATH_DEBUG_STATE_PICK,
+                                  offsetof(Readback, pick), sizeof(Pick)}});
 
         cmd->barrier(readback->buffer_barrier2(
             vk::PipelineStageFlagBits2::eTransfer, vk::PipelineStageFlagBits2::eHost,
@@ -1453,10 +1480,12 @@ void PathDebugNode::load_reference(Submission& submission) {
 PathDebugNode::NodeStatusFlags PathDebugNode::properties(Properties& config) {
     NodeStatusFlags flags{};
 
-    config.config_options("mode", selection_mode, {"top-k (image)", "selected pixel", "fireflies"},
+    config.config_options("mode", selection_mode,
+                          {"top-k (image)", "selected pixel", "fireflies", "world position"},
                           Properties::OptionsStyle::COMBO,
                           "Draw the k most contributing paths of the frame, every captured path "
-                          "of one pixel, or the brightest fraction of all paths.");
+                          "of one pixel, the brightest fraction of all paths, or the paths "
+                          "touching a point in the scene.");
     config.config_int("isolate path", focus_path,
                       "Draws and dissects a single recorded path; -1 draws all. Freeze first, the "
                       "indices only survive while the stream is not rewritten.",
@@ -1466,6 +1495,21 @@ PathDebugNode::NodeStatusFlags PathDebugNode::properties(Properties& config) {
                           static_cast<int32_t>(MAX_DRAW));
     } else if (selection_mode == static_cast<int32_t>(PATH_DEBUG_MODE_SELECTED_PIXEL)) {
         config.config_vec("selected pixel", selected_pixel);
+    } else if (selection_mode == static_cast<int32_t>(PATH_DEBUG_MODE_WORLD)) {
+        config.config_vec("position", query_pos,
+                          "World-space query point; ctrl+click the image to move it onto the "
+                          "surface under the cursor.");
+        if (config.config_float("radius scale", query_radius_scale,
+                                "Query sphere radius in projected-pixel footprints; ctrl+scroll "
+                                "over the image adjusts it. 1 covers what the cursor covers.",
+                                0.05f)) {
+            query_radius_scale = std::max(1.f, query_radius_scale);
+        }
+        config.config_options("anchor", query_anchor,
+                              {"through (any segment)", "starts near", "ends near"},
+                              Properties::OptionsStyle::COMBO,
+                              "Which part of a path must touch the sphere: any segment, the "
+                              "first vertex, or the last.");
     } else {
         config.config_float("firefly fraction", params.firefly_fraction,
                             "Brightest fraction of the captured paths.", 1e-5f);

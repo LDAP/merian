@@ -2,6 +2,8 @@
 
 #include "merian/vk/utils/math.hpp"
 
+#include <utility>
+
 namespace merian {
 
 bool ViewportPicker::on_cursor([[maybe_unused]] InputController& controller,
@@ -83,6 +85,20 @@ std::optional<int2> ViewportPicker::map_to_image(const double x,
     }
     return int2(static_cast<int32_t>(u * static_cast<float>(image_extent.width)),
                 static_cast<int32_t>(v * static_cast<float>(image_extent.height)));
+}
+
+bool ViewportPicker::on_scroll([[maybe_unused]] InputController& controller,
+                               [[maybe_unused]] const double xoffset,
+                               const double yoffset) {
+    if (!modifier_down) {
+        return false;
+    }
+    scroll_accum += yoffset;
+    return true;
+}
+
+double ViewportPicker::take_scroll() {
+    return std::exchange(scroll_accum, 0.);
 }
 
 std::optional<int2> ViewportPicker::take_click(const vk::Extent2D& image_extent,

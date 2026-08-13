@@ -80,6 +80,13 @@ class PathDebugNode : public Node {
         uint32_t classes; // the first 8 scatter events, 4 bits each
     };
 
+    struct Pick {
+        uint32_t pixel_plus_one; // packed pixel + 1; 0 while unresolved
+        uint32_t x;              // float bits
+        uint32_t y;
+        uint32_t z;
+    };
+
     struct SelectStats {
         uint32_t draw_count;
         uint32_t threshold_bits;
@@ -107,6 +114,7 @@ class PathDebugNode : public Node {
         Probe probe;
         FocusPath focus;
         std::array<TopPath, TOP_COUNT> top;
+        Pick pick;
         std::array<uint32_t, STATS_UINTS> stats;
     };
 
@@ -255,6 +263,11 @@ class PathDebugNode : public Node {
     uint32_t filter_token_count_b = 0;
     std::array<uint32_t, 4> filter_words_b{};
     int32_t moments_scope = 0;
+    float3 query_pos = float3(0.f);
+    float query_radius_scale = 1.f;
+    int32_t query_anchor = 0;
+    bool pick_pending = false;
+    int2 pick_pixel = int2(0);
 
     // A/B
     int32_t render_mode = 0;

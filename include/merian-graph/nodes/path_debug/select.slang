@@ -23,6 +23,18 @@ void main(uint3 gid: SV_DispatchThreadID) {
     if (p.vertex_count == 0 || any(p.pixel >= path_debug_dim())) {
         return;
     }
+    const uint vro = path_record_vertex_region_offset(in_records);
+
+    // a pending pick resolves to the clicked pixel's own primary hit; racing paths of the same
+    // pixel store the same surface
+    if (params.pick_x != PATH_DEBUG_NO_CURSOR &&
+        all(p.pixel == uint2(params.pick_x, params.pick_y))) {
+        const float3 pos = path_record_load_vertex(in_records, vro, p.vertex_offset).pos;
+        state[PATH_DEBUG_STATE_PICK + 1] = asuint(pos.x);
+        state[PATH_DEBUG_STATE_PICK + 2] = asuint(pos.y);
+        state[PATH_DEBUG_STATE_PICK + 3] = asuint(pos.z);
+        state[PATH_DEBUG_STATE_PICK] = 1 + ((params.pick_y << 16) | params.pick_x);
+    }
 
     const uint m = 6 * (p.pixel.y * params.dim_x + p.pixel.x);
     if (params.accumulate_moments != 0) {
@@ -31,7 +43,6 @@ void main(uint3 gid: SV_DispatchThreadID) {
         InterlockedAdd(moments[m + 2], 1);
     }
 
-    const uint vro = path_record_vertex_region_offset(in_records);
     const uint scatter = path_debug_scatter_count(p, vro);
     if (!path_debug_filter_constraints(p, vro, scatter)) {
         return;
@@ -48,6 +59,19 @@ void main(uint3 gid: SV_DispatchThreadID) {
         path_debug_atomic_add_float(moments, m + 3, p.luminance);
         path_debug_atomic_add_float(moments, m + 4, p.luminance * p.luminance);
         InterlockedAdd(moments[m + 5], 1);
+    }
+
+    if (params.mode == PATH_DEBUG_MODE_WORLD) {
+        if (!path_debug_query_hit(p, vro)) {
+            return;
+        }
+        InterlockedAdd(state[PATH_DEBUG_STATE_SELECTED], 1);
+        uint slot;
+        InterlockedAdd(state[PATH_DEBUG_STATE_DRAW_COUNT], 1, slot);
+        if (slot < params.max_draw) {
+            state[PATH_DEBUG_STATE_DRAW_LIST + slot] = i;
+        }
+        return;
     }
 
     if (params.mode == PATH_DEBUG_MODE_SELECTED_PIXEL) {

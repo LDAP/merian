@@ -165,6 +165,18 @@ void main(uint3 gid: SV_DispatchThreadID) {
         color = lerp(color, path_debug_unpack_overlay(packed), params.overlay_alpha);
     }
 
+    if (params.mode == PATH_DEBUG_MODE_WORLD) {
+        // outline of the query sphere: pixels whose view ray grazes it
+        const float3 dir = normalize(camera.get_pinhole_direction(pixel, path_debug_dim()));
+        const float3 to_query =
+            float3(params.query_x, params.query_y, params.query_z) - camera.position;
+        const float along = dot(to_query, dir);
+        const float radius = path_debug_query_radius();
+        if (along > 0.f && abs(length(to_query - along * dir) - radius) < 0.12f * radius) {
+            color = lerp(color, float3(1.f, 1.f, 0.1f), 0.6f);
+        }
+    }
+
     if (params.mode == PATH_DEBUG_MODE_SELECTED_PIXEL) {
         const int2 d = abs(int2(pixel) - int2(path_debug_selected_pixel()));
         const bool crosshair = (d.x == 0 && d.y > 2 && d.y < 12) ||
