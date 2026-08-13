@@ -4,6 +4,7 @@
 #include "merian-shaders/types.slang.h"
 #include <vulkan/vulkan.hpp>
 #else
+import merian_shaders.debug.path_record;
 import merian_shaders.gbuffer;
 import merian_shaders.scene.scene;
 import merian_shaders.utils.random;
@@ -157,6 +158,7 @@ struct RestirBinding {
     ParameterBlock<GBuffer> gbuffer;
     ParameterBlock<GBuffer> prev_gbuffer;
     RWTexture2D<float4> irradiance;
+    RWStructuredBuffer<uint, ScalarDataLayout> path_records;
 };
 
 struct RestirSurface {

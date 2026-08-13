@@ -1,3 +1,4 @@
+import merian_shaders.debug.path_record;
 import merian_shaders.gbuffer;
 import merian_shaders.scene.scene;
 import merian_shaders.utils.random;
@@ -19,18 +20,22 @@ extern static const bool merian_render_demodulate_albedo = false;
 struct RenderBinding {
     ParameterBlock<GBuffer> gbuffer;
     RWTexture2D<float4> irradiance;
+    RWStructuredBuffer<uint, ScalarDataLayout> path_records;
 };
 
 float3 trace_path(const ParameterBlock<Scene> scene,
+                  PathRecordStream records,
                   RayDesc ray,
                   ShadingPoint sp,
-                  inout RandomGenerator rng) {
+                  inout RandomGenerator rng,
+                  inout PathRecorder rec) {
     // Medium the ray is travelling through; updated on transmission events.
     HomogeneousVolume medium = scene.exterior_volume;
     float current_ior = 1.0f;
 
     float3 throughput = medium.transmittance(distance(ray.Origin, sp.pos));
     float3 radiance = merian_render_emission_on_primary ? throughput * sp.emission : float3(0);
+    rec.emission(radiance);
 
     for (int bounce = 1; bounce < merian_render_max_path_length; bounce++) {
         // the ray left the scene: nothing to scatter from, emission is already accumulated
@@ -55,6 +60,8 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         const ShadingFunctionSample bs = sample.value;
         const float3 wo = frame.to_world(bs.wo);
         throughput *= bs.weight;
+        rec.vertex(records, sp.pos, wo, bs.pdf, throughput, uint(bounce - 1), uint(bs.lobe),
+                   PATH_RECORD_METHOD_BSDF, path_record_pack_material(sp.material_id));
 
         // A transmission event crosses the surface; update the medium we are now in.
         const bool transmission = wi_local.z * bs.wo.z < 0.f;
@@ -84,8 +91,10 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         throughput *= medium.transmittance(distance(ray.Origin, sp.pos));
 
         radiance += throughput * sp.emission;
+        rec.emission(throughput * sp.emission);
     }
 
+    rec.end(records, sp.pos);
     return radiance;
 }
 
@@ -113,7 +122,11 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<RenderBinding> params) {
     for (int s = 0; s < merian_render_spp; s++) {
         RandomGenerator rng = PCG(pcg4d16(uint4(pixel, scene.frame, s)));
 
-        const float3 contrib = trace_path(scene, primary_ray, primary_sp, rng) / demod_albedo;
+        var rec = PathRecorder::begin(params.path_records, pixel, uint(s), scene.frame,
+                                      uint(merian_render_max_path_length) + 1);
+        const float3 contrib =
+            trace_path(scene, params.path_records, primary_ray, primary_sp, rng, rec) /
+            demod_albedo;
         if (!any(isnan(contrib)) && !any(isinf(contrib))) {
             irradiance += contrib;
             const float l = yuv_luminance(contrib);

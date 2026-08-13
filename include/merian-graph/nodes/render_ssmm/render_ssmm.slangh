@@ -4,6 +4,7 @@
 #include "merian-shaders/types.slang.h"
 #include <vulkan/vulkan.hpp>
 #else
+import merian_shaders.debug.path_record;
 import merian_shaders.gbuffer;
 import merian_shaders.scene.scene;
 import merian_shaders.utils.random;

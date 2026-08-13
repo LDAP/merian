@@ -30,7 +30,10 @@ std::vector<InputConnectorDescriptor> RenderPT::describe_inputs() {
 std::vector<OutputConnectorDescriptor> RenderPT::describe_outputs(const NodeIOLayout& io_layout) {
     extent = io_layout[con_gbuffer]->get_create_info().extent;
     con_irradiance = ManagedVkImageOut::create(irradiance_format, extent);
-    return {{"irradiance", con_irradiance, ConnectorAccess::ray_tracing_write}};
+    return {{"irradiance", con_irradiance, ConnectorAccess::ray_tracing_write},
+            path_records.describe_output(
+                extent, static_cast<uint32_t>(spp), static_cast<uint32_t>(max_path_length),
+                context->get_physical_device()->get_device_limits().maxStorageBufferRange)};
 }
 
 RenderPT::NodeStatusFlags RenderPT::on_connected(const NodeIOLayout& io_layout,
@@ -40,6 +43,10 @@ RenderPT::NodeStatusFlags RenderPT::on_connected(const NodeIOLayout& io_layout,
 
     // force the program graph to be rewired next process()
     composition = nullptr;
+
+    if (path_records.update_connected(io_layout)) {
+        return NEEDS_RECONNECT;
+    }
 
     io_layout.register_event_listener(
         "/graph/reload_shaders", [this](const GraphEvent::Info&, const GraphEvent::Data& force) {
@@ -114,6 +121,8 @@ RenderPT::process(const NodeIO& io, const NodeProcessInfo& info, Submission& sub
     auto cursor = params_obj->get_cursor();
     cursor["gbuffer"] = gbuf.r();
     cursor["irradiance"] = io[con_irradiance].get_texture();
+    path_records.begin_frame(cmd, io, info.get_iteration());
+    path_records.bind(cursor.find("path_records"), io);
 
     cmd->bind(pipe);
     ep->bind("scene", scene->get_shader_object(), cmd, pipe, obj_allocator);
@@ -142,6 +151,7 @@ void RenderPT::update_render_constants() {
                     "}}",
                     emission_on_primary ? "true" : "false", spp, max_path_length, mask,
                     enable_ser ? "true" : "false", demodulate_albedo ? "true" : "false"));
+    composition->add_module_from_string("path_record_constants", path_records.export_line());
 }
 
 RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
@@ -171,6 +181,10 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
         if ((bit & 3u) != 3u)
             config.st_no_space();
     }
+
+    needs_reconnect |= path_records.properties(config) ||
+                       path_records.needs_resize(static_cast<uint32_t>(spp),
+                                                 static_cast<uint32_t>(max_path_length));
 
     if (constants_changed && composition) {
         update_render_constants();

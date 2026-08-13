@@ -5,6 +5,7 @@
 #include "merian-graph/connectors/shader_object_in.hpp"
 #include "merian-graph/graph/node.hpp"
 #include "merian-graph/objects/gbuffer_object.hpp"
+#include "merian-graph/objects/path_record_sink.hpp"
 #include "merian-shaders/gbuffer.hpp"
 #include "merian-shaders/scene/scene.hpp"
 
@@ -63,6 +64,7 @@ class RenderPT : public Node {
     PtrInHandle<Scene> con_scene = PtrIn<Scene>::create();
     ShaderObjectInHandle<GBufferObject> con_gbuffer = ShaderObjectIn<GBufferObject>::create();
     ManagedVkImageOutHandle con_irradiance;
+    PathRecordSink path_records;
 
     vk::Extent3D extent = vk::Extent3D{1920, 1080, 1};
     int32_t spp = 1;

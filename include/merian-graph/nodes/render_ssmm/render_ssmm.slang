@@ -16,6 +16,7 @@ static const int SSMM_MAX_SPP = 16;
 struct SSMMBinding {
     ParameterBlock<GBuffer> gbuffer;
     RWTexture2D<float4> irradiance;
+    RWStructuredBuffer<uint, ScalarDataLayout> path_records;
 };
 
 typealias mc_state_t = SSMCState;
@@ -147,6 +148,11 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<SSMMBinding> params) {
     float3 sample_dirs[SSMM_MAX_SPP];
     float3 sample_weights[SSMM_MAX_SPP];
     float4 vmfs[SSMM_MAX_SPP];
+    // carried into the MIS loop only while a debugger records; folds away otherwise
+    float record_dist[SSMM_MAX_SPP];
+    float record_tp[SSMM_MAX_SPP];
+    uint record_bsdf_bits = 0;
+    uint2 record_lobes = uint2(0);
 
     mc_state_t curr = mc_state_new(); // zero current state
     mc_state_t tent = mc_state_new(); // tentative new state
@@ -170,6 +176,10 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<SSMMBinding> params) {
                 mc_state_shuffle(tent, (WaveGetLaneIndex() + 1) % WaveGetLaneCount());
                 sample_dirs[s] = float3(0);
                 sample_weights[s] = float3(0);
+                if (merian_path_record) {
+                    record_dist[s] = 0.f;
+                    record_tp[s] = 0.f;
+                }
 
                 read_neighbour_state(params.gbuffer, scene.camera.position, resolution, tent,
                                      sp.pos, normal, int2(pixel), mv, rng);
@@ -187,10 +197,26 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<SSMMBinding> params) {
                 // for the early exit (spirv-val rejects it, Nvidia crashes on it)
                 bool sample_ok = true;
                 if (vmfs[s].w == 0 || rng.next_float() < merian_ssmm_bsdf_p) {
-                    let wo_local = bsdf.sample(wi_local, rng);
-                    const float3 wo = wo_local.hasValue ? wo_local.value : float3(0, 0, 1);
+                    // only sample_eval reports the lobe; without a debugger attached this folds
+                    // back to the plain sample()
+                    bool has_wo = false;
+                    float3 wo = float3(0, 0, 1);
+                    if (merian_path_record) {
+                        const var bs = bsdf.sample_eval(wi_local, rng);
+                        if (bs.hasValue) {
+                            has_wo = true;
+                            wo = bs.value.wo;
+                            record_lobes[s / 8] |= (uint(bs.value.lobe) & 0xFu) << (4 * (s & 7));
+                        }
+                    } else {
+                        const var wo_local = bsdf.sample(wi_local, rng);
+                        if (wo_local.hasValue) {
+                            has_wo = true;
+                            wo = wo_local.value;
+                        }
+                    }
                     direction = frame.to_world(wo);
-                    sample_ok = wo_local.hasValue && dot(direction, normal) > 1e-3 &&
+                    sample_ok = has_wo && dot(direction, normal) > 1e-3 &&
                                 dot(direction, geonormal) > 1e-3;
                     pdf = sample_ok ? bsdf.pdf(wi_local, wo) : 0.f;
                     bsdf_sample = sample_ok;
@@ -199,6 +225,9 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<SSMMBinding> params) {
                     pdf = vmf_pdf_tokuyoshi(direction, vmfs[s].xyz, vmfs[s].w);
                 }
 
+                if (merian_path_record) {
+                    sample_dirs[s] = direction;
+                }
                 if (sample_ok) {
                     const float3 throughput = bsdf.eval(wi_local, frame.to_local(direction), rng);
 
@@ -217,6 +246,11 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<SSMMBinding> params) {
 
                     sample_dirs[s] = direction;
                     sample_weights[s] = throughput * next_sp.emission;
+                    if (merian_path_record) {
+                        record_dist[s] = distance(position, sp.pos);
+                        record_tp[s] = yuv_luminance(throughput);
+                        record_bsdf_bits |= bsdf_sample ? (1u << s) : 0u;
+                    }
                 }
 
                 const float tent_f = yuv_luminance(directContrib);
@@ -234,7 +268,10 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<SSMMBinding> params) {
             }
 
             for (int s = 0; s < merian_ssmm_spp; s++) {
-                if (all(sample_weights[s] == float3(0)))
+                // zero-contribution samples are still draws the consistency test must count
+                if (all(sample_dirs[s] == float3(0)))
+                    continue;
+                if (!merian_path_record && all(sample_weights[s] == float3(0)))
                     continue;
 
                 const float bsdf_pdf = bsdf.pdf(wi_local, frame.to_local(sample_dirs[s]));
@@ -248,13 +285,37 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<SSMMBinding> params) {
                 sum_pdf = merian_ssmm_bsdf_p * merian_ssmm_smis_group_size * bsdf_pdf +
                           (1 - merian_ssmm_bsdf_p) * sum_pdf;
 
+                float3 con = float3(0);
                 if (sum_pdf > 0) {
-                    const float3 con = sample_weights[s] / sum_pdf;
-                    if (!any(isinf(con)) && !any(isnan(con))) {
-                        irr += con;
-                        const float l = yuv_luminance(con);
-                        moments += float2(l, l * l);
+                    con = sample_weights[s] / sum_pdf;
+                    if (any(isinf(con)) || any(isnan(con))) {
+                        con = float3(0);
                     }
+                    irr += con;
+                    const float l = yuv_luminance(con);
+                    moments += float2(l, l * l);
+                }
+
+                if (merian_path_record) {
+                    // the recorded pdf is the density this draw was taken from, not the SMIS
+                    // group denominator the estimator divides by
+                    const float draw_pdf =
+                        vmfs[s].w > 0
+                            ? merian_ssmm_bsdf_p * bsdf_pdf +
+                                  (1.f - merian_ssmm_bsdf_p) *
+                                      vmf_pdf_tokuyoshi(sample_dirs[s], vmfs[s].xyz, vmfs[s].w)
+                            : bsdf_pdf;
+                    var rec =
+                        PathRecorder::begin(params.path_records, pixel, uint(s), pc.frame, 2);
+                    const bool from_bsdf = (record_bsdf_bits & (1u << s)) != 0;
+                    const uint lobe = (record_lobes[s / 8] >> (4 * (s & 7))) & 0xFu;
+                    rec.vertex(params.path_records, sp.pos, sample_dirs[s], draw_pdf,
+                               sum_pdf > 0.f ? float3(record_tp[s] / sum_pdf) : float3(0.f), 0,
+                               from_bsdf ? lobe : 0,
+                               from_bsdf ? PATH_RECORD_METHOD_BSDF : PATH_RECORD_METHOD_SSMM,
+                               path_record_pack_material(sp.material_id));
+                    rec.emission(con);
+                    rec.end(params.path_records, sp.pos + sample_dirs[s] * record_dist[s]);
                 }
             }
 

@@ -1,3 +1,4 @@
+import merian_shaders.debug.path_record;
 import merian_shaders.gbuffer;
 import merian_shaders.scene.scene;
 import merian_shaders.utils.random;
@@ -34,6 +35,7 @@ struct RenderBinding {
     RWTexture2D<float4> debug;
     RenderIrradianceCache irr_cache;
     RenderMCPG mcpg;
+    RWStructuredBuffer<uint, ScalarDataLayout> path_records;
 };
 
 float3 trace_path(const ParameterBlock<Scene> scene,
@@ -41,7 +43,8 @@ float3 trace_path(const ParameterBlock<Scene> scene,
                   RayDesc ray,
                   ShadingPoint sp,
                   const int sample_i,
-                  inout RandomGenerator rng) {
+                  inout RandomGenerator rng,
+                  inout PathRecorder rec) {
     const float3 cam_pos = scene.camera.position;
     const float3 prev_cam_pos = scene.prev_camera.position;
 
@@ -51,6 +54,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
 
     float3 throughput = medium.transmittance(distance(ray.Origin, sp.pos));
     float3 radiance = merian_render_emission_on_primary ? throughput * sp.emission : float3(0);
+    rec.emission(radiance);
 
     // where this vertex was already looked up in the light cache, one bounce earlier
     HashGridPos lc_grid_pos = HashGridPos();
@@ -64,6 +68,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         lc_grid_pos = HashGridPos();
 
         const float3 cur_pos = sp.pos;
+        const uint cur_material = sp.material_id;
         // temporally reproject the cache lookup for the first sample so the lobe written last
         // frame is found despite geometry motion
         const float3 lookup_pos = select(sample_i == 0, sp.prev_pos, cur_pos);
@@ -110,17 +115,33 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         const bool guide = can_guide && rng.next_float() < p_guide;
         float3 wo_world;
         float3 wo_local;
+        // Smoothness class of the scatter event; a guided direction was not drawn from the BSDF,
+        // so no lobe can be attributed to it.
+        uint smoothness = 0;
         if (guide) {
             wo_world = vmfs[0].sample(rng);
             wo_local = frame.to_local(wo_world);
-        } else if (let local = m_bsdf.sample(wi_local, rng)) {
-            wo_local = local;
-            wo_world = frame.to_world(local);
-            selected = MCState();
-            selected_pos = HashGridPos();
-            selected_level = params.mcpg.grid.target_level_for_pos(cur_pos, cam_pos, rng);
         } else {
-            break;
+            // only sample_eval reports the lobe, and it evaluates the weight we do not need;
+            // without a debugger attached this folds back to the plain sample()
+            Optional<float3> local = none;
+            if (merian_path_record) {
+                if (let bs = m_bsdf.sample_eval(wi_local, rng)) {
+                    local = bs.wo;
+                    smoothness = uint(bs.lobe);
+                }
+            } else {
+                local = m_bsdf.sample(wi_local, rng);
+            }
+            if (let wo = local) {
+                wo_local = wo;
+                wo_world = frame.to_world(wo);
+                selected = MCState();
+                selected_pos = HashGridPos();
+                selected_level = params.mcpg.grid.target_level_for_pos(cur_pos, cam_pos, rng);
+            } else {
+                break;
+            }
         }
 
         // Stochastic MIS
@@ -178,10 +199,20 @@ float3 trace_path(const ParameterBlock<Scene> scene,
             lc_incident *= segment_t;
 
             throughput *= bsdf / wo_p;
+            // wo_p is the effective solid-angle pdf after stochastic MIS. Which side of the
+            // surface the ray left on is geometric, so it holds however the direction was drawn.
+            const uint side = transmission ? uint(BSDFLobe::Transmission) : 0u;
+            rec.vertex(params.path_records, cur_pos, wo_world, wo_p, throughput, uint(bounce - 1),
+                       smoothness | side,
+                       guide ? PATH_RECORD_METHOD_MCPG : PATH_RECORD_METHOD_BSDF,
+                       path_record_pack_material(cur_material));
+            const float3 gathered =
+                throughput *
+                select(use_light_cache_tail && bounce == merian_render_max_path_length - 1,
+                       lc_incident, incident);
             // complete the truncated path with the cached irradiance at the last vertex
-            radiance += throughput *
-                        select(use_light_cache_tail && bounce == merian_render_max_path_length - 1,
-                               lc_incident, incident);
+            radiance += gathered;
+            rec.emission(gathered);
         }
 
         const float mc_f = yuv_luminance(lc_incident * bsdf / wo_p);
@@ -208,6 +239,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
             break;
     }
 
+    rec.end(params.path_records, sp.pos);
     return radiance;
 }
 
@@ -232,8 +264,10 @@ void render_pixel(const uint2 pixel,
     float second_moment = 0.f;
 
     for (int sample_i = 0; sample_i < merian_render_spp; sample_i++) {
+        var rec = PathRecorder::begin(params.path_records, pixel, uint(sample_i), scene.frame,
+                                      uint(merian_render_max_path_length) + 1);
         const float3 contrib =
-            trace_path(scene, params, primary_ray, primary_sp, sample_i, rng) / demod_albedo;
+            trace_path(scene, params, primary_ray, primary_sp, sample_i, rng, rec) / demod_albedo;
 
         if (!any(isnan(contrib)) && !any(isinf(contrib))) {
             irradiance += contrib;

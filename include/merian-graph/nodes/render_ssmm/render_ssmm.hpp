@@ -7,6 +7,7 @@
 #include "merian-graph/connectors/shader_object_in.hpp"
 #include "merian-graph/graph/node.hpp"
 #include "merian-graph/objects/gbuffer_object.hpp"
+#include "merian-graph/objects/path_record_sink.hpp"
 #include "merian-shaders/scene/scene.hpp"
 
 #include "merian/shader/shader_compile_context.hpp"
@@ -63,6 +64,7 @@ class RenderSSMM : public Node {
     ShaderObjectInHandle<GBufferObject> con_gbuffer = ShaderObjectIn<GBufferObject>::create();
     VkBufferInHandle con_prev_ssmc = VkBufferIn::create();
     ManagedVkImageOutHandle con_irradiance;
+    PathRecordSink path_records;
     ManagedVkBufferOutHandle con_ssmc;
 
     vk::Extent3D extent = vk::Extent3D{1920, 1080, 1};

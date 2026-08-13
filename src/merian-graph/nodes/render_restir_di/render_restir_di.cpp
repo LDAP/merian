@@ -57,6 +57,7 @@ void RenderRestirDI::update_render_constants() {
                     spp, spatial_iterations, temporal_bias_correction, spatial_bias_correction,
                     apply_mv ? "true" : "false", visibility_shade ? "true" : "false",
                     boiling_filter_strength));
+    composition->add_module_from_string("path_record_constants", path_records.export_line());
 }
 
 std::vector<InputConnectorDescriptor> RenderRestirDI::describe_inputs() {
@@ -72,7 +73,10 @@ RenderRestirDI::describe_outputs(const NodeIOLayout& io_layout) {
     con_irradiance = ManagedVkImageOut::create(irradiance_format, extent);
     con_reservoirs = ManagedVkBufferOut::create(reservoir_buffer_create_info());
     return {{"irradiance", con_irradiance, ConnectorAccess::ray_tracing_write},
-            {"reservoirs", con_reservoirs, ConnectorAccess::ray_tracing_read_write}};
+            {"reservoirs", con_reservoirs, ConnectorAccess::ray_tracing_read_write},
+            path_records.describe_output(
+                extent, 1, 1,
+                context->get_physical_device()->get_device_limits().maxStorageBufferRange)};
 }
 
 RenderRestirDI::NodeStatusFlags
@@ -81,6 +85,9 @@ RenderRestirDI::on_connected(const NodeIOLayout& io_layout,
                              [[maybe_unused]] const NodeConnectionInfo& info,
                              Submission& submission) {
     composition = nullptr;
+    if (path_records.update_connected(io_layout)) {
+        return NEEDS_RECONNECT;
+    }
 
     io_layout.register_event_listener(
         "/graph/reload_shaders", [this](const GraphEvent::Info&, const GraphEvent::Data& force) {
@@ -182,6 +189,8 @@ RenderRestirDI::process(const NodeIO& io, const NodeProcessInfo& info, Submissio
         cursor["gbuffer"] = gbuf.r();
         cursor["prev_gbuffer"] = prev_gbuf.r();
         cursor["irradiance"] = io[con_irradiance].get_texture();
+        path_records.begin_frame(cmd, io, info.get_iteration());
+        path_records.bind(cursor.find("path_records"), io);
         return obj;
     };
 
@@ -282,6 +291,7 @@ RenderRestirDI::NodeStatusFlags RenderRestirDI::properties(Properties& config) {
     }
 
     config.st_separate();
+    needs_reconnect |= path_records.properties(config) || path_records.needs_resize(1, 1);
     needs_reconnect |=
         config.config_enum("irradiance format", irradiance_format, Properties::OptionsStyle::COMBO);
 

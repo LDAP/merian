@@ -226,6 +226,18 @@ void shade(ParameterBlock<Scene> scene, ParameterBlock<RestirBinding> params) {
     const RestirReservoir reservoir = pc.reservoirs_in[restir_index(pixel, dim)];
 
     float3 irradiance = float3(0);
+    var rec = PathRecorder::begin(params.path_records, pixel, 0, scene.frame, 2);
+    float3 end_pos = surface.valid ? surface.sp.pos : float3(0);
+
+    // primary emission first so the recorder attributes it to the primary vertex
+    if (merian_render_emission_on_primary) {
+        const RayDesc ray = scene.generate_camera_ray(pixel, dim);
+        const ShadingPoint primary = scene.get_shading_point(ray, params.gbuffer.get_hit(pixel));
+        irradiance += primary.emission;
+        rec.emission(primary.emission);
+        end_pos = primary.pos;
+    }
+
     if (surface.valid && surface.sp.has_surface_material && restir_sample_valid(reservoir.y) &&
         !isnan(reservoir.w_sum_or_W) && !isinf(reservoir.w_sum_or_W)) {
         const float3 to_light = reservoir.y.pos - surface.sp.pos;
@@ -238,22 +250,28 @@ void shade(ParameterBlock<Scene> scene, ParameterBlock<RestirBinding> params) {
         const bool visible = !merian_restir_visibility_shade ||
                              restir_trace_visibility(scene, surface, reservoir.y);
 
+        const float geo = (reservoir.y.flags & RestirSampleFlags::RestirSampleDistant) != 0
+                              ? 1.0f
+                              : max(dot(reservoir.y.normal, -wo), 0.0f) / dist2;
+        float3 f_cos = float3(0);
         if (wo_local.z > 0 && wi_local.z > 0 && visible) {
             RandomGenerator rng = restir_rng(pixel);
-            const float3 f_cos =
-                surface.sp.surface_material.get_bsdf().eval(wi_local, wo_local, rng);
-            const float geo = (reservoir.y.flags & RestirSampleFlags::RestirSampleDistant) != 0
-                                  ? 1.0f
-                                  : max(dot(reservoir.y.normal, -wo), 0.0f) / dist2;
-            irradiance = f_cos * reservoir.y.radiance * reservoir.w_sum_or_W * geo;
+            f_cos = surface.sp.surface_material.get_bsdf().eval(wi_local, wo_local, rng);
+            irradiance += f_cos * reservoir.y.radiance * reservoir.w_sum_or_W * geo;
         }
-    }
 
-    if (merian_render_emission_on_primary) {
-        const RayDesc ray = scene.generate_camera_ray(pixel, dim);
-        const ShadingPoint primary = scene.get_shading_point(ray, params.gbuffer.get_hit(pixel));
-        irradiance += primary.emission;
+        // a shadowed or backfacing connection is still a draw the consistency test must count;
+        // its zero throughput marks the blocked path. Attempts with an invalid reservoir are
+        // not recorded and shrink the draw count slightly.
+        // The effective solid-angle density of the RIS-chosen connection is 1/(W * geo).
+        const float weight = reservoir.w_sum_or_W * geo;
+        rec.vertex(params.path_records, surface.sp.pos, wo, weight > 0.f ? 1.f / weight : 0.f,
+                   f_cos * weight, 0, 0, PATH_RECORD_METHOD_RESTIR,
+                   path_record_pack_material(surface.sp.material_id), PATH_RECORD_FLAG_NEE);
+        rec.emission(f_cos * reservoir.y.radiance * reservoir.w_sum_or_W * geo);
+        end_pos = reservoir.y.pos;
     }
+    rec.end(params.path_records, end_pos);
 
     if (merian_render_demodulate_albedo) {
         irradiance /= params.gbuffer.get_demodulation_albedo(pixel);

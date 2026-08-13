@@ -7,6 +7,7 @@
 #include "merian-graph/graph/node.hpp"
 #include "merian-graph/nodes/render_pt_mcpg/mcpg.hpp"
 #include "merian-graph/objects/gbuffer_object.hpp"
+#include "merian-graph/objects/path_record_sink.hpp"
 #include "merian-shaders/gbuffer.hpp"
 #include "merian-shaders/light-cache/hashed_irradiance_cache.hpp"
 #include "merian-shaders/scene/scene.hpp"
@@ -113,6 +114,7 @@ class RenderMCPG : public Node {
     ManagedVkImageOutHandle con_distance_mc;
     VkSampledImageInHandle con_prev_volume_depth = VkSampledImageIn::create();
     VkSampledImageInHandle con_prev_distance_mc = VkSampledImageIn::create();
+    PathRecordSink path_records;
 
     // Owns its own persistent buffer + shader binding (composed into this node's program).
     HashedIrradianceCacheHandle irr_cache;

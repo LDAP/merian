@@ -51,6 +51,7 @@ void RenderSSMM::update_render_constants() {
                     "export static const int merian_ssmm_smis_group_size = {};\n"
                     "}}",
                     spp, surf_bsdf_p, ml_prior_n, ml_max_n, ml_min_alpha, smis_group_size));
+    composition->add_module_from_string("path_record_constants", path_records.export_line());
 }
 
 std::vector<InputConnectorDescriptor> RenderSSMM::describe_inputs() {
@@ -64,9 +65,12 @@ std::vector<OutputConnectorDescriptor>
 RenderSSMM::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     con_irradiance = ManagedVkImageOut::create(irradiance_format, extent);
     con_ssmc = ManagedVkBufferOut::create(ssmc_buffer_create_info());
-    return {{"irradiance", con_irradiance, ConnectorAccess::ray_tracing_write},
-            {"ssmc", con_ssmc,
-             ConnectorAccess::ray_tracing_read_write | ConnectorAccess::transfer_dst}};
+    return {
+        {"irradiance", con_irradiance, ConnectorAccess::ray_tracing_write},
+        {"ssmc", con_ssmc, ConnectorAccess::ray_tracing_read_write | ConnectorAccess::transfer_dst},
+        path_records.describe_output(
+            extent, static_cast<uint32_t>(spp), 1,
+            context->get_physical_device()->get_device_limits().maxStorageBufferRange)};
 }
 
 RenderSSMM::NodeStatusFlags
@@ -77,6 +81,9 @@ RenderSSMM::on_connected(const NodeIOLayout& io_layout,
     composition = nullptr;
     obj_allocator = nullptr;
     ssmc_needs_reset = true;
+    if (path_records.update_connected(io_layout)) {
+        return NEEDS_RECONNECT;
+    }
 
     if (randomize_seed) {
         std::random_device dev;
@@ -165,6 +172,8 @@ RenderSSMM::process(const NodeIO& io, const NodeProcessInfo& info, Submission& s
     auto cursor = params_obj->get_cursor();
     cursor["gbuffer"] = gbuf.r();
     cursor["irradiance"] = io[con_irradiance].get_texture();
+    path_records.begin_frame(cmd, io, info.get_iteration());
+    path_records.bind(cursor.find("path_records"), io);
 
     SSMMPushConstant pc{};
     pc.ssmc_prev = io[con_prev_ssmc]->get_device_address();
@@ -215,6 +224,8 @@ RenderSSMM::NodeStatusFlags RenderSSMM::properties(Properties& config) {
     }
 
     config.st_separate();
+    needs_reconnect |=
+        path_records.properties(config) || path_records.needs_resize(static_cast<uint32_t>(spp), 1);
     needs_reconnect |=
         config.config_enum("irradiance format", irradiance_format, Properties::OptionsStyle::COMBO);
 

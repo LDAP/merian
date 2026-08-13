@@ -68,7 +68,10 @@ std::vector<OutputConnectorDescriptor> RenderMCPG::describe_outputs(const NodeIO
             {"volume", con_volume, ConnectorAccess::compute_write, no_volume},
             {"volume_depth", con_volume_depth, ConnectorAccess::compute_write, no_volume},
             {"volume_mv", con_volume_mv, ConnectorAccess::compute_read_write, no_volume},
-            {"distance_mc", con_distance_mc, ConnectorAccess::compute_read_write, no_volume}};
+            {"distance_mc", con_distance_mc, ConnectorAccess::compute_read_write, no_volume},
+            path_records.describe_output(
+                extent, static_cast<uint32_t>(spp), static_cast<uint32_t>(max_path_length),
+                context->get_physical_device()->get_device_limits().maxStorageBufferRange)};
 }
 
 void RenderMCPG::create_distance_mc() {
@@ -106,6 +109,10 @@ RenderMCPG::on_connected(const NodeIOLayout& io_layout,
 
     // force the program graph to be rewired next process()
     composition = nullptr;
+
+    if (path_records.update_connected(io_layout)) {
+        return NEEDS_RECONNECT;
+    }
 
     io_layout.register_event_listener(
         "/graph/reload_shaders", [this](const GraphEvent::Info&, const GraphEvent::Data& force) {
@@ -237,6 +244,8 @@ RenderMCPG::process(const NodeIO& io, const NodeProcessInfo& info, Submission& s
     auto cursor = params_obj->get_cursor();
     cursor["gbuffer"] = gbuf.r();
     cursor["irradiance"] = io[con_irradiance].get_texture();
+    path_records.begin_frame(cmd, io, info.get_iteration());
+    path_records.bind(cursor.find("path_records"), io);
     if (auto debug = cursor["debug"]; debug.is_valid())
         debug = io[con_debug].get_texture();
     irr_cache->write_to(cursor["irr_cache"]);
@@ -457,6 +466,7 @@ void RenderMCPG::update_render_constants() {
                     reference_mode ? 0.0f : volume_p_dist_guiding, volume_forward_project_min_z,
                     distance_mc_samples, distance_mc_base_width,
                     std::max(distance_mc_level_count, 1u), distance_mc_distribution_dimension));
+    composition->add_module_from_string("path_record_constants", path_records.export_line());
 }
 
 RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
@@ -622,6 +632,10 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
         }
         config.st_end_child();
     }
+
+    needs_reconnect |= path_records.properties(config) ||
+                       path_records.needs_resize(static_cast<uint32_t>(spp),
+                                                 static_cast<uint32_t>(max_path_length));
 
     config.st_separate("instance mask");
     for (uint32_t bit = 0; bit < 8; ++bit) {
