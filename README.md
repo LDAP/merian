@@ -2,10 +2,12 @@
 
 ~ _A Vulkan development framework._ ~
 
-<p align="left">
-  <img src="images/ABeautifulGame.png" width="650" />
+<p align="middle">
+  <img src="images/alk.png" width="400" />
+  <img src="images/caustics.png" width="400" /> 
+  <img src="images/ABeautifulGame.png" width="400" /> 
+  <img src="images/tears.png" width="400" /> 
 </p>
-
 
 Merian is split into multiple components:
 
