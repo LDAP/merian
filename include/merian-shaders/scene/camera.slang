@@ -55,6 +55,13 @@ struct Camera {
         return ray;
     }
 
+    // World position of a gbuffer sample: linear_z is the distance along the camera ray
+    // (see gbuffer_rt), so this inverts it exactly for pinhole cameras.
+    float3 position_from_linear_z(const uint2 pixel, const uint2 frame_dimensions,
+                                  const float linear_z) {
+        return position + get_pinhole_direction(pixel, frame_dimensions) * linear_z;
+    }
+
     // Project a world-space position to fractional pixel coordinates using pinhole model.
     // U, V, W must be orthogonal (standard pinhole camera).
     float2 project_pinhole(const float3 world_pos, const uint2 frame_dimensions) {
