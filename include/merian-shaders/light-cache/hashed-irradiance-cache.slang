@@ -4,23 +4,35 @@ import merian_shaders.utils.random;
 namespace merian {
 
 static const uint16_t HASHED_IRR_CACHE_MAX_N = 256;
+static const float HASHED_IRR_CACHE_MAX_VALUE = float16_t.maxValue;
 
 struct HashedIrradianceCacheData {
     half3 irr;
     uint16_t N;
 }
 
+half3 hashed_irradiance_cache_sanitize(const half3 irr) {
+    return select(any(isinf(irr)) || any(isnan(irr)), half3(0), irr);
+}
+
 struct HashedIrradianceCacheUpdate : HashGridUpdateFunction<HashedIrradianceCacheData> {
-    half3 irr;
+    float3 irr;
 
     void update(inout HashedIrradianceCacheData data) {
-        if (any(isinf(data.irr)) || any(isnan(data.irr))) {
-            data.N = 1;
-            data.irr = irr;
+        if (any(isnan(irr))) {
+            return;
+        }
+
+        const float3 sample = clamp(irr, float3(0), float3(HASHED_IRR_CACHE_MAX_VALUE));
+
+        float3 mean = float3(data.irr);
+        if (any(isinf(mean)) || any(isnan(mean))) {
+            mean = sample;
+            data.N = uint16_t(0);
         }
 
         data.N = min(uint16_t(data.N + uint16_t(1)), HASHED_IRR_CACHE_MAX_N);
-        data.irr = half3(lerp(float3(data.irr), float3(irr), 1.0 / float(data.N)));
+        data.irr = half3(lerp(mean, sample, 1.0 / float(data.N)));
     }
 }
 
@@ -36,7 +48,7 @@ struct HashedIrradianceCache<let BUFFER_SIZE : uint,
     half3
     get(const float3 pos, const float3 normal, const float3 cam_pos, inout RandomGenerator rng) {
         if (let r = grid.get(pos, normal, cam_pos, rng)) {
-            return r.irr;
+            return hashed_irradiance_cache_sanitize(r.irr);
         }
         return half3(0);
     }
@@ -49,7 +61,7 @@ struct HashedIrradianceCache<let BUFFER_SIZE : uint,
               inout RandomGenerator rng,
               out HashGridPos grid_pos) {
         if (let r = grid.get(pos, normal, cam_pos, prev_cam_pos, rng, grid_pos)) {
-            return r.irr;
+            return hashed_irradiance_cache_sanitize(r.irr);
         }
         return half3(0);
     }
