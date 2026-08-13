@@ -2,6 +2,10 @@
 
 ~ _A Vulkan development framework._ ~
 
+<p align="left">
+  <img src="images/ABeautifulGame.png" width="650" />
+</p>
+
 
 Merian is split into multiple components:
 
@@ -9,7 +13,29 @@ Merian is split into multiple components:
  - [`merian-graph`](https://github.com/LDAP/merian/tree/main/include/merian-graph): Implements an extensible Vulkan processing graph. Already implemented nodes can be found [here](https://github.com/LDAP/merian/tree/main/include/merian-graph/nodes).
  - [`merian-shaders`](https://github.com/LDAP/merian/tree/main/include/merian-shaders): Reusable shader code plus the scene representation, glTF/FBX loaders, material system and texture management.
 
-`merian-graph-run` is a generic executable that loads a processing graph from a JSON file and runs it (`merian-graph-run [options] [graph.json [args...]]`; without an argument it starts with an empty graph). Options:
+Merian aims for compatibility with Windows, Linux as well as all major GPU vendors.
+
+## Getting started
+
+### Build
+
+```bash
+git clone --recursive https://github.com/LDAP/merian
+# optionally clone any plugin you want to use into subprojects:
+# cd subprojects
+# git clone https://github.com/LDAP/merian-plugin-quake
+meson setup build
+# You can enable / disable some feature by appending -Dfeature_name=enabled, for example glslang (GLSL compiler), glfw (windowing), sdl (windowing+audio), performance_profiling, tinygltf, ufbx, pbrt (scene formats) or switch to a debug build with --buildtype=debug/debugoptimized.
+cd build
+meson compile
+meson devenv # needed on Windows to find all the dlls
+# this builds all the shared libraries and a runner for merian graphs:
+./merian-graph-run
+```
+
+### Examples: merian-graph-run
+
+merian ships a generic executable `merian-graph-run` that loads a [`merian-graph`](https://github.com/LDAP/merian/tree/main/include/merian-graph) from a JSON file and runs it (`merian-graph-run [options] [graph.json [args...]]`; without an argument it starts with an empty graph). Options:
 
 - `--loglevel=<trace|debug|info|warn|error>`: log verbosity.
 - `--plugin-path=<dir>`: extra plugin search directory (repeatable).
@@ -18,34 +44,61 @@ Merian is split into multiple components:
 - `--<name> <value>`: set an override declared in the graph's `cli` block (see the per-graph options below).
 - `--help`: with a `graph.json`, also lists that graph's `cli` overrides.
 
-It ships with a set of built-in nodes and can be extended with additional node sets and renderers through its [plugin system](#plugins). Current plugins:
-
-- [merian-plugin-quake](https://github.com/LDAP/Merian-plugin-quake): A scene node for Quake backed by the full power of quakespasm, including GUI support. 
-
-## Examples
+It ships with a set of built-in nodes and can be extended with additional node sets and renderers through its [plugin system](#plugins).
 
 Example graphs for `merian-graph-run` are in the [`examples`](https://github.com/LDAP/merian/tree/main/examples) folder:
 
 - [`hdr_viewer.json`](https://github.com/LDAP/merian/tree/main/examples/hdr_viewer.json): a tone-mapped HDR image viewer — `merian-graph-run examples/hdr_viewer.json <image.hdr>`.
 - [`shadertoy.json`](https://github.com/LDAP/merian/tree/main/examples/shadertoy.json): runs a Shadertoy-style shader — `merian-graph-run examples/shadertoy.json <shader.glsl>`.
-- [`gltf.json`](https://github.com/LDAP/merian/tree/main/examples/gltf.json) / [`fbx.json`](https://github.com/LDAP/merian/tree/main/examples/fbx.json): a glTF / FBX scene viewer — `merian-graph-run examples/gltf.json <scene.gltf> [options]`. Options:
+- [`gltf.json`](https://github.com/LDAP/merian/tree/main/examples/gltf.json) / [`fbx.json`](https://github.com/LDAP/merian/tree/main/examples/fbx.json) / [`pbrt.json`](https://github.com/LDAP/merian/tree/main/examples/pbrt.json): a glTF / FBX / PBRTv4 scene viewer — `merian-graph-run examples/gltf.json <scene.gltf> [options]`. Options:
     - `<scene>` (required): path to the glTF / FBX scene to load.
     - `--renderer <pt|mcpg|restir_di>`: renderer, merged from [`examples/renderers`](https://github.com/LDAP/merian/tree/main/examples/renderers) (default: `pt`; the selection persists when the graph is stored). Also accepts a path to a custom renderer fragment, e.g. `--renderer my/renderer.json`.
     - `--env-map <path>`: lat-long HDR environment map (sets the env type to `LatLong`).
     - `--max-path-length <n>`: maximum path length (`pt`, `mcpg`).
     - `--spp <n>`: samples per pixel.
 
-For using merian as a library in your own project, see [merian-example-sum](https://github.com/LDAP/merian-example-sum) (computing a sum on the GPU) and [merian-quake](https://github.com/LDAP/merian-quake), a path tracer for the original Quake game.
+### Plugins
 
-Merian aims for compatibility with Windows, Linux as well as all major GPU vendors.
+A plugin is a separate repository that builds a `merian-plugin-*` shared library and contributes nodes and/or context extensions, which are discovered automatically at startup by `merian-graph-run` and any merian host. Plugins should never vendor merian but consume it via `dependency('merian')`. To build a plugin alongside merian, clone it into the `subprojects` folder (the directory must be named `merian-plugin-*`); `meson compile` then builds it as part of merian (no `PKG_CONFIG_PATH` needed):
 
+```sh
+git clone <plugin-repo> subprojects/merian-plugin-<name>
+meson setup build --reconfigure
+meson compile -C build
+```
 
-<p align="left">
-  <img src="images/ABeautifulGame.png" width="650" />
-</p>
+- [merian-plugin-quake](https://github.com/LDAP/Merian-plugin-quake): A scene node for Quake backed by the full power of quakespasm, including GUI support. 
 
+## Environment variables
 
-## Getting started
+merian reads the following environment variables at startup:
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `MERIAN_SHADER_CACHE` | on | Set to `0` to disable the on-disk Slang shader cache (serialized IR modules + compiled SPIR-V). |
+| `MERIAN_SHADER_CACHE_DIR` | `./.merian-cache` | Directory for the shader cache. Safe to delete at any time. |
+| `MERIAN_SHADER_CACHE_MAX_MB` | `128` | Cache size cap in MiB, enforced (oldest-first) when a shader session is torn down. `0` = unbounded (manage by hand). |
+| `MERIAN_TARGET_VK_API_VERSION` | highest supported | Target Vulkan API version, e.g. `1.3`. Clamped to the range supported by the Vulkan headers. |
+| `MERIAN_DEFAULT_FILTER_VENDOR_ID` | — | Pick the GPU by PCI vendor id (decimal). |
+| `MERIAN_DEFAULT_FILTER_DEVICE_ID` | — | Pick the GPU by device id (decimal). |
+| `MERIAN_DEFAULT_FILTER_DEVICE_NAME` | — | Pick the GPU by (a substring of) its name. |
+| `MERIAN_DEBUG_UTILS_ASSERT_ERROR` | on | When the `merian-debug-utils` extension is loaded, throw on a validation message of severity error. Set to `false` to only log it. |
+| `MERIAN_PLUGIN_PATH` | — | Extra plugin search directories, separated by `:` (`;` on Windows). In addition, the user data dir is searched: `$XDG_DATA_HOME/merian/plugins` (or `$HOME/.local/share/merian/plugins`; `%APPDATA%\merian\plugins` on Windows). |
+
+## Documentation
+
+Documentation is in the `docs` subdirectory of this repository.
+
+Nodes are documented in their [respective subfolder](https://github.com/LDAP/merian/tree/main/include/merian-graph/nodes).
+
+## Integration in your own Project
+
+If you do not want to use merians graph / plugin system, you can use merian in as a library in your own project. Examples:
+
+- [merian-example-sum](https://github.com/LDAP/merian-example-sum) (computing a sum on the GPU) 
+- [merian-quake](https://github.com/LDAP/merian-quake) (deprecated, if you want to play Quake use merian-plugin-quake).
+
+Merian is similar to the `vulkan_raii.hpp` layer for `vulkan.hpp`. Most objects follow the RAII principle. The `merian` namespace provides shareable handles for most Vulkan types (e.g. `merian::ImageHandle` for `vk::Image`) and objects are automatically destroyed if their reference count becomes 0. The `Context` class initializes and destroys a Vulkan device and holds core objects (PhysicalDevice, Device, Queues, ...). Create a Context using `Context::create(ContextCreateInfo)`. The core `"merian"` extension is always loaded automatically. Make sure your program ends with `[INFO] [context.cpp:XX] context destroyed`. Note that the Vulkan dynamic dispatch loader must be used and the merian build system definition should already ensure that.
 
 ```c++
 int main() {
@@ -86,7 +139,7 @@ merian::ContextHandle context = merian::Context::create({
 });
 ```
 
-## Include Merian into your Project
+### Buildsystem Integration
 
 This library uses the [Meson Build System](https://mesonbuild.com/) and declares a dependency for it:
 
@@ -116,8 +169,6 @@ exe = executable(
     ],
     # ...
 )
-
-
 ```
 
 To allow meson to find Merian, either clone this repo into the `subprojects` folder or add a file `subprojects/merian.wrap` with
@@ -133,57 +184,4 @@ clone-recursive = true
 
 [provide]
 merian = merian_dep
-```
-
-
-## Environment variables
-
-merian reads the following environment variables at startup:
-
-| Variable | Default | Description |
-| --- | --- | --- |
-| `MERIAN_SHADER_CACHE` | on | Set to `0` to disable the on-disk Slang shader cache (serialized IR modules + compiled SPIR-V). |
-| `MERIAN_SHADER_CACHE_DIR` | `./.merian-cache` | Directory for the shader cache. Safe to delete at any time. |
-| `MERIAN_SHADER_CACHE_MAX_MB` | `128` | Cache size cap in MiB, enforced (oldest-first) when a shader session is torn down. `0` = unbounded (manage by hand). |
-| `MERIAN_TARGET_VK_API_VERSION` | highest supported | Target Vulkan API version, e.g. `1.3`. Clamped to the range supported by the Vulkan headers. |
-| `MERIAN_DEFAULT_FILTER_VENDOR_ID` | — | Pick the GPU by PCI vendor id (decimal). |
-| `MERIAN_DEFAULT_FILTER_DEVICE_ID` | — | Pick the GPU by device id (decimal). |
-| `MERIAN_DEFAULT_FILTER_DEVICE_NAME` | — | Pick the GPU by (a substring of) its name. |
-| `MERIAN_DEBUG_UTILS_ASSERT_ERROR` | on | When the `merian-debug-utils` extension is loaded, throw on a validation message of severity error. Set to `false` to only log it. |
-| `MERIAN_PLUGIN_PATH` | — | Extra plugin search directories, separated by `:` (`;` on Windows). In addition, the user data dir is searched: `$XDG_DATA_HOME/merian/plugins` (or `$HOME/.local/share/merian/plugins`; `%APPDATA%\merian\plugins` on Windows). |
-
-## Plugins
-
-A plugin is a separate repository that builds a `merian-plugin-*` shared library and contributes nodes and/or context extensions, which are discovered automatically at startup by `merian-graph-run` and any merian host. Plugins do not vendor merian — they consume it via `dependency('merian')`.
-
-To build a plugin alongside merian, clone it into the `subprojects` folder (the directory must be named `merian-plugin-*`); `meson compile` then builds it as part of merian (no `PKG_CONFIG_PATH` needed):
-
-```sh
-git clone <plugin-repo> subprojects/merian-plugin-<name>
-meson setup build --reconfigure
-meson compile -C build
-```
-
-See [Plugin Development](docs/PluginDevelopment.md) for writing a plugin and building it standalone against an installed merian.
-
-## Documentation
-
-Documentation is in the `docs` subdirectory of this repository.
-
-Nodes are documented in their [respective subfolder](https://github.com/LDAP/merian/tree/main/include/merian-graph/nodes).
-
-## Usage
-
-Merian is similar to the `vulkan_raii.hpp` layer for `vulkan.hpp`. Most objects follow the RAII principle. The `merian` namespace provides shareable handles for most Vulkan types (e.g. `merian::ImageHandle` for `vk::Image`) and objects are automatically destroyed if their reference count becomes 0.
-
-The `Context` class initializes and destroys a Vulkan device and holds core objects (PhysicalDevice, Device, Queues, ...).
-
-Create a Context using `Context::create(ContextCreateInfo)`. The core `"merian"` extension is always loaded automatically. Additional extensions are loaded by name via `ContextCreateInfo::context_extensions`. Vulkan features are requested via `ContextCreateInfo::features` using a `VulkanFeatures` object.
-
-Make sure your program ends with `[INFO] [context.cpp:XX] context destroyed`.
-
-Note that the Vulkan dynamic dispatch loader must be used. The default dispatcher is initialized in `Context`. The merian build system should already ensure that.
-
-```c++
-#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 ```
