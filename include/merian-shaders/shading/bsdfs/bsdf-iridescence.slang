@@ -301,7 +301,7 @@ struct IridescentRoughDielectricBSDF : BSDF {
         const float g = smith_g2_over_widotn(abs(wo.z), wi.z, alpha_squared) /
                         smith_g1_over_widotn(wi.z, alpha_squared);
         return ShadingFunctionSample(wo, pdf, ((1.0f - R) / (1.0f - p)) * pow2(eta) * tint * g,
-                                     BSDFLobe::Glossy);
+                                     BSDFLobe::Glossy | BSDFLobe::Transmission);
     }
 
     Albedo get_albedo(const float3 wi) {

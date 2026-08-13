@@ -105,7 +105,8 @@ struct RoughDielectricBSDF : BSDF {
         // (1 - R) cancels; the eta^2 radiance factor stays.
         const float weight = pow2(eta) * smith_g2_over_widotn(abs(wo.z), wi.z, alpha_squared) /
                              smith_g1_over_widotn(wi.z, alpha_squared);
-        return ShadingFunctionSample(wo, pdf, tint * weight, BSDFLobe::Glossy);
+        return ShadingFunctionSample(wo, pdf, tint * weight,
+                                     BSDFLobe::Glossy | BSDFLobe::Transmission);
     }
 
     Albedo get_albedo(const float3 wi) {

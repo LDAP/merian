@@ -2,10 +2,14 @@ __exported import merian_shaders.utils.random;
 
 namespace merian {
 
+// Scattering smoothness of a sample plus the side of the surface it went to, as independent bits
+// so a consumer can test either alone.
+[Flags]
 enum BSDFLobe {
-    Delta,   // singular (perfect mirror / refraction)
-    Glossy,  // microfacet reflection or transmission
-    Diffuse, // Lambertian / ideal-rough
+    Delta = 1,        // singular (perfect mirror / refraction)
+    Glossy = 2,       // microfacet
+    Diffuse = 4,      // Lambertian / ideal-rough
+    Transmission = 8, // scattered through the surface instead of off it
 }
 
 // A sample from a BSDF or PhaseFunction.
