@@ -183,22 +183,23 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<SSMMBinding> params) {
                 float3 direction = float3(0);
                 float3 position = float3(0);
                 bool bsdf_sample = false;
-                do {
-                    if (vmfs[s].w == 0 || rng.next_float() < merian_ssmm_bsdf_p) {
-                        let wo_local = bsdf.sample(wi_local, rng);
-                        if (!wo_local.hasValue)
-                            break;
-                        direction = frame.to_world(wo_local.value);
-                        if (dot(direction, normal) <= 1e-3 || dot(direction, geonormal) <= 1e-3)
-                            break;
+                // no break out of the sampling block: Slang 2026.11 emits unstructured SPIR-V
+                // for the early exit (spirv-val rejects it, Nvidia crashes on it)
+                bool sample_ok = true;
+                if (vmfs[s].w == 0 || rng.next_float() < merian_ssmm_bsdf_p) {
+                    let wo_local = bsdf.sample(wi_local, rng);
+                    const float3 wo = wo_local.hasValue ? wo_local.value : float3(0, 0, 1);
+                    direction = frame.to_world(wo);
+                    sample_ok = wo_local.hasValue && dot(direction, normal) > 1e-3 &&
+                                dot(direction, geonormal) > 1e-3;
+                    pdf = sample_ok ? bsdf.pdf(wi_local, wo) : 0.f;
+                    bsdf_sample = sample_ok;
+                } else {
+                    direction = vmf_sample_tokuyosh(vmfs[s].xyz, vmfs[s].w, rng.next_float2());
+                    pdf = vmf_pdf_tokuyoshi(direction, vmfs[s].xyz, vmfs[s].w);
+                }
 
-                        pdf = bsdf.pdf(wi_local, wo_local.value);
-                        bsdf_sample = true;
-                    } else {
-                        direction = vmf_sample_tokuyosh(vmfs[s].xyz, vmfs[s].w, rng.next_float2());
-                        pdf = vmf_pdf_tokuyoshi(direction, vmfs[s].xyz, vmfs[s].w);
-                    }
-
+                if (sample_ok) {
                     const float3 throughput = bsdf.eval(wi_local, frame.to_local(direction), rng);
 
                     RayDesc ray;
@@ -216,7 +217,7 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<SSMMBinding> params) {
 
                     sample_dirs[s] = direction;
                     sample_weights[s] = throughput * next_sp.emission;
-                } while (false);
+                }
 
                 const float tent_f = yuv_luminance(directContrib);
                 if (curr.f == 0 || rng.next_float() < tent_f / curr.f) {
