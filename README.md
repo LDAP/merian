@@ -21,6 +21,8 @@ Merian aims for compatibility with Windows, Linux as well as all major GPU vendo
 
 ### Build
 
+You need the [Meson](https://github.com/mesonbuild/meson) buildsystem along with ninja and cmake. You can install it using your favorite package manager or pip: `pip3 install meson ninja cmake`.
+
 ```bash
 git clone --recursive https://github.com/LDAP/merian
 # optionally clone any plugin you want to use into subprojects:
