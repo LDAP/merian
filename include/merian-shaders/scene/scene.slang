@@ -445,6 +445,7 @@ struct Scene {
         sp.prev_pos = prev_pos;
         sp.enc_face_normal = encode_normal(surface.face_normal);
         sp.has_surface_material = with_material;
+        sp.material_id = surface.material_id;
         if (with_material) {
             sp.surface_material = material_system.get_material_sample(
                 surface.material_id, sd, sp.emission, sp.shading_frame, lod);
@@ -494,6 +495,7 @@ struct Scene {
         sp.emission = env_map.eval(sd, material_system.texture_manager, lod);
         sp.shading_frame = OrthonormalFrame(-ray.Direction);
         sp.has_surface_material = false;
+        sp.material_id = uint(-1);
         return sp;
     }
 

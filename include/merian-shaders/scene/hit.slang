@@ -115,6 +115,8 @@ struct ShadingPoint {
     // see https://github.com/shader-slang/slang/issues/12338
     bool has_surface_material;
     MaterialSample surface_material;
+    // scene material id; uint(-1) where the ray left the scene
+    uint material_id;
 
     // in worldspace
     float3 get_face_normal() {
