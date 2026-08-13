@@ -2,6 +2,7 @@
 
 #include "merian/utils/properties_imgui.hpp"
 #include "merian/vk/imgui/imgui_merian_window_backend.hpp"
+#include "merian/vk/imgui/imgui_theme.hpp"
 
 #include <imgui.h>
 
@@ -56,6 +57,10 @@ ImGuiNode::process(const NodeIO& io, const NodeProcessInfo& info, Submission& su
 
 ImGuiNode::NodeStatusFlags ImGuiNode::properties(Properties& config) {
     static_cast<void>(config.config_text("imgui event", imgui_event));
+    if (config.config_enum("theme", theme, Properties::OptionsStyle::COMBO) && imgui_ctx) {
+        set_default_imgui_theme(theme);
+        imgui_ctx->with_context([&] { apply_imgui_theme(ImGui::GetStyle(), theme); });
+    }
     return {};
 }
 

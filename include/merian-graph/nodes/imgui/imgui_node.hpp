@@ -8,6 +8,7 @@
 #include "merian/vk/imgui/imgui_context.hpp"
 #include "merian/vk/imgui/imgui_merian_backend.hpp"
 #include "merian/vk/imgui/imgui_renderer.hpp"
+#include "merian/vk/imgui/imgui_theme.hpp"
 #include "merian/vk/window/swapchain_manager.hpp"
 #include "merian/vk/window/window.hpp"
 
@@ -37,6 +38,7 @@ class ImGuiNode : public Node {
     Stopwatch frametime;
 
     std::string imgui_event = "ui";
+    ImGuiTheme theme = default_imgui_theme();
 
     PtrInHandle<SwapchainAcquireResult> con_acquire = PtrIn<SwapchainAcquireResult>::create();
     PtrInHandle<Window> con_window = PtrIn<Window>::create();

@@ -1,5 +1,7 @@
 #include "merian/vk/imgui/imgui_renderer.hpp"
+
 #include "merian/vk/imgui/extension_imgui.hpp"
+#include "merian/vk/pipeline/specialization_info_builder.hpp"
 #include "merian/vk/utils/profiler.hpp"
 
 #include "imgui.frag.spv.h"
@@ -80,6 +82,13 @@ void ImGuiRenderer::init_pipeline(vk::Format color_format) {
                                    "main", vk::ShaderStageFlagBits::eVertex);
     auto frag = EntryPoint::create(context, merian_imgui_frag_spv(), merian_imgui_frag_spv_size(),
                                    "main", vk::ShaderStageFlagBits::eFragment);
+    // sRGB targets encode on write; the shader must linearize the display-encoded ImGui colors
+    const bool target_is_srgb = color_format == vk::Format::eR8G8B8A8Srgb ||
+                                color_format == vk::Format::eB8G8R8A8Srgb ||
+                                color_format == vk::Format::eA8B8G8R8SrgbPack32;
+    SpecializationInfoBuilder spec_builder;
+    spec_builder.add_entry<uint32_t>(target_is_srgb ? 1 : 0);
+    frag = frag->specialize(spec_builder.build());
 
     pipeline =
         GraphicsPipelineBuilder()
