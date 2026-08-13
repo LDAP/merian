@@ -1,0 +1,24 @@
+{
+    "nodes": {
+        "debug": {
+            "properties": {
+                "maps": {
+                    "show panels": true,
+                    "scope": "selected pixel",
+                    "frame": "local shading frame",
+                    "transform": "octahedral",
+                    "resolution (log2)": 6,
+                    "sampled density": true,
+                    "BSDF pdf": true,
+                    "sampling z-score": true,
+                    "density / pdf": true
+                },
+                "mode": "selected pixel",
+                "selected pixel": [
+                    960,
+                    540
+                ]
+            }
+        }
+    }
+}

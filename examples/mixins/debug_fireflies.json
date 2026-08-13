@@ -1,0 +1,17 @@
+{
+    "nodes": {
+        "debug": {
+            "properties": {
+                "display": {
+                    "path color": "luminance",
+                    "overlay alpha": 0.9
+                },
+                "firefly fraction": 0.0001,
+                "maps": {
+                    "show panels": false
+                },
+                "mode": "fireflies"
+            }
+        }
+    }
+}

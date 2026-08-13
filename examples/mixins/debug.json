@@ -1,0 +1,55 @@
+{
+    "cli": {
+        "debug": {
+            "default": "plain",
+            "type": "variant",
+            "variants": {
+                "plain": {},
+                "fireflies": {
+                    "merge": "mixins/debug_fireflies.json"
+                },
+                "sampling": {
+                    "merge": "mixins/debug_sampling.json"
+                },
+                "filtered": {
+                    "merge": "mixins/debug_filtered.json"
+                }
+            }
+        }
+    },
+    "nodes": {
+        "debug": {
+            "enabled": true,
+            "outputs": [
+                "out->blit.src"
+            ],
+            "type": "Path Debugger"
+        },
+        "gbuffer": {
+            "$+$outputs": [
+                "gbuffer->debug.gbuffer"
+            ]
+        },
+        "output": {
+            "$+$outputs": [
+                "controller->debug.controller",
+                "window->debug.window"
+            ]
+        },
+        "render": {
+            "$+$outputs": [
+                "path_records->debug.records"
+            ]
+        },
+        "scene": {
+            "$+$outputs": [
+                "scene->debug.scene"
+            ]
+        },
+        "tonemap": {
+            "outputs": [
+                "out->debug.src"
+            ]
+        }
+    }
+}

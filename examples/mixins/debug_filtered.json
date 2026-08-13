@@ -1,0 +1,51 @@
+{
+    "nodes": {
+        "accum_filtered": {
+            "enabled": true,
+            "outputs": [
+                "history->accum_filtered.prev_history",
+                "out->accum_filtered.prev_out",
+                "out->exposure_filtered.src"
+            ],
+            "properties": {
+                "alpha": 1.0,
+                "clear event pattern": "/user/clear,//geometry_changed,//transform_changed,//camera_changed"
+            },
+            "type": "Accumulate"
+        },
+        "debug": {
+            "outputs": [
+                "filtered->accum_filtered.src"
+            ],
+            "properties": {
+                "k": 0,
+                "maps": {
+                    "show panels": false
+                },
+                "filter": {
+                    "enable": true,
+                    "path expression": ".{1}"
+                }
+            }
+        },
+        "exposure_filtered": {
+            "enabled": true,
+            "outputs": [
+                "out->tonemap_filtered.src"
+            ],
+            "type": "Exposure"
+        },
+        "gbuffer": {
+            "$+$outputs": [
+                "gbuffer->accum_filtered.gbuffer"
+            ]
+        },
+        "tonemap_filtered": {
+            "enabled": true,
+            "outputs": [
+                "out->blit.src"
+            ],
+            "type": "Tonemap"
+        }
+    }
+}

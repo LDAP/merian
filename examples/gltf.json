@@ -10,7 +10,7 @@
             "variants": {
                 "none": {},
                 "svgf": {
-                    "merge": "denoisers/svgf.json"
+                    "merge": "mixins/svgf.json"
                 }
             }
         },
