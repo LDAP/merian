@@ -80,9 +80,14 @@ struct OpenPBRMaterial<let TRANSMISSION : bool = false,
         get { return volume; }
     }
 
+    // The EDF emits into the hemisphere around the normal, so back faces are dark. Two-sided
+    // emission would require thin-walled mode, which is not modelled.
     override float3 get_emission(const ShadingData sd,
                                  const TextureManager tm,
                                  const LODSampler2D lod) {
+        if (!sd.front_facing) {
+            return float3(0);
+        }
         float3 emission_out = emission;
         if (emission_texture != TextureID(-1)) {
             emission_out *= lod.sample(tm.get_sampler2D(emission_texture), sd.uv).rgb;
@@ -124,11 +129,6 @@ struct OpenPBRMaterial<let TRANSMISSION : bool = false,
             } else {
                 shading_frame = mapped;
             }
-        }
-
-        float3 emission_out = emission;
-        if (emission_texture != TextureID(-1)) {
-            emission_out *= lod.sample(tm.get_sampler2D(emission_texture), sd.uv).rgb;
         }
 
         const float alpha = ggx_roughness_to_alpha(max(rough, merian_hint_min_roughness));
@@ -184,7 +184,7 @@ struct OpenPBRMaterial<let TRANSMISSION : bool = false,
         OpenPBRMaterialSample s;
         s.brdf = OpenPBRBSDF(with_coat, SheenBRDF(sheen_col, sheen_rough), sw);
         out_shading_frame = shading_frame;
-        out_emission = emission_out;
+        out_emission = get_emission(sd, tm, lod);
         s.eta = eta;
         s.absorption = absorb;
         return s;

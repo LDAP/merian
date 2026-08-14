@@ -1,12 +1,12 @@
 #pragma once
 
 #include "merian-shaders/scene/scene.hpp"
+#include "merian/utils/hash.hpp"
 
 #include <filesystem>
-#include <map>
 #include <optional>
 #include <set>
-#include <tuple>
+#include <unordered_map>
 
 namespace merian {
 
@@ -99,13 +99,21 @@ class PBRTScene : public Scene {
     std::unordered_map<std::string, TextureSlot> texture_slots;
     // named pbrt texture (+ color space) -> resolved factor/texture
     std::unordered_map<std::string, Resolved> resolved_textures;
-    // emission is baked into the material, so emissive uses of a shared named material copy
     struct CachedMaterial {
         MaterialID id;
         MeshFlags flags;
     };
-    std::map<std::tuple<int32_t, float, float, float, bool, int32_t>, CachedMaterial>
-        material_cache;
+    // pbrt keeps material, area light and interior medium separate; merian folds all three into
+    // one material, so they jointly identify it.
+    struct MaterialKey {
+        int32_t material;
+        float3 emission;
+        int32_t inside_medium;
+
+        bool operator==(const MaterialKey&) const = default;
+    };
+    static_assert(sizeof(MaterialKey) == 20, "MaterialKey must be padding-free for HashAligned32");
+    std::unordered_map<MaterialKey, CachedMaterial, HashAligned32<MaterialKey>> material_cache;
 
     std::vector<std::optional<MeshID>> shape_meshes;
     std::vector<AABB> shape_aabbs;

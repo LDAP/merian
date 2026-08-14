@@ -85,6 +85,28 @@ void pack_vertices(Scene::SimpleMesh& sm,
     }
 }
 
+// Adds a coincident copy with opposite winding and mirrored frame. Only sound on backface-culled
+// geometry: both sheets are hit otherwise.
+void append_reversed_sheet(Scene::SimpleMesh& sm) {
+    const uint32_t vertex_base = static_cast<uint32_t>(sm.vertices.size());
+    const size_t prim_count = sm.indices.size();
+
+    sm.vertices.reserve(sm.vertices.size() * 2);
+    for (uint32_t i = 0; i < vertex_base; i++) {
+        PackedVertexData v = sm.vertices[i];
+        v.encoded_normal = encode_normal(-decode_normal(v.encoded_normal));
+        const float4 t = decode_tangent(v.encoded_tangent);
+        v.encoded_tangent = encode_tangent(float4(t.x, t.y, t.z, -t.w));
+        sm.vertices.push_back(v);
+    }
+
+    sm.indices.reserve(prim_count * 2);
+    for (size_t i = 0; i < prim_count; i++) {
+        const uint3& tri = sm.indices[i];
+        sm.indices.emplace_back(vertex_base + tri.x, vertex_base + tri.z, vertex_base + tri.y);
+    }
+}
+
 } // namespace
 
 struct PBRTScene::MaterialBuild {
@@ -468,9 +490,7 @@ MaterialID PBRTScene::material_for_shape(const CommandBufferHandle& cmd,
                                          const ShapeDesc& shape,
                                          MeshFlags& out_flags) {
     const float3 emission = shape.area_light ? shape.area_light->radiance : float3(0);
-    const bool twosided = shape.area_light && shape.area_light->twosided;
-    const auto key = std::make_tuple(shape.material, emission.x, emission.y, emission.z, twosided,
-                                     shape.inside_medium);
+    const MaterialKey key{shape.material, emission, shape.inside_medium};
     if (const auto it = material_cache.find(key); it != material_cache.end()) {
         out_flags = it->second.flags;
         return it->second.id;
@@ -478,9 +498,6 @@ MaterialID PBRTScene::material_for_shape(const CommandBufferHandle& cmd,
 
     MaterialBuild build = convert_material(cmd, shape.material, 0);
     build.material.emission = emission;
-    if (twosided) {
-        build.flags = build.flags | MeshFlags::TwoSided;
-    }
     if (shape.inside_medium >= 0) {
         const float3 sigma_a = desc->media[shape.inside_medium].sigma_a;
         if (sigma_a.x > 0.f || sigma_a.y > 0.f || sigma_a.z > 0.f) {
@@ -781,8 +798,18 @@ std::optional<Scene::MeshID> PBRTScene::build_shape_mesh(const CommandBufferHand
 
     MeshFlags flags = MeshFlags::IsOpaque;
     sm->material_id = material_for_shape(cmd, shape, flags);
-    // pbrt geometry is never backface-culled.
-    flags = flags | MeshFlags::TwoSided;
+    // A two-sided emitter is built as two single-sided sheets, so it must stay culled; all other
+    // pbrt geometry is visible from both sides.
+    const bool two_sided_emitter = shape.area_light && shape.area_light->twosided;
+    if (two_sided_emitter && !(flags & MeshFlags::TwoSided)) {
+        append_reversed_sheet(*sm);
+    } else {
+        if (two_sided_emitter) {
+            warn_once("twosided_light",
+                      "two-sided area light needs a one-sided material, emitting front side only");
+        }
+        flags = flags | MeshFlags::TwoSided;
+    }
 
     if (shape.reverse_orientation != (det3(shape.ctm) < 0.f)) {
         flags = flags | MeshFlags::FlipFacing;
