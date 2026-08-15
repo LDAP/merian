@@ -5,6 +5,9 @@
 #include "merian-graph/graph/node.hpp"
 
 #include "merian/utils/input_controller.hpp"
+#include "merian/vk/imgui/imgui_context.hpp"
+#include "merian/vk/imgui/imgui_merian_backend.hpp"
+#include "merian/vk/imgui/imgui_renderer.hpp"
 #include "merian/vk/utils/blits.hpp"
 #include "merian/vk/window/swapchain.hpp"
 #include "merian/vk/window/swapchain_manager.hpp"
@@ -35,6 +38,8 @@ class WindowNode : public Node {
 
     NodeStatusFlags properties(Properties& config) override;
 
+    NodeStatusFlags load_config(const nlohmann::json& json) override;
+
     // The optional input that is blitted to the swapchain.
     static constexpr std::string_view DISPLAY_INPUT = "src";
 
@@ -55,10 +60,18 @@ class WindowNode : public Node {
   private:
     const std::shared_ptr<WindowProvider>& get_selected_provider() const;
 
+    // Creates window and swapchain for the selected provider. Returns true if (re)created.
+    bool ensure_window();
+
+    // Renders and presents a frame with centered text outside of graph runs.
+    void present_status(const std::string& text);
+
     uint32_t src_array_element = 0;
     uint32_t current_src_array_size = 1;
 
     ContextHandle context;
+    ResourceAllocatorHandle allocator;
+    QueueHandle queue;
     std::vector<std::shared_ptr<WindowProvider>> providers;
     int selected_provider = 0;
     std::shared_ptr<WindowProvider> active_provider;
@@ -83,6 +96,13 @@ class WindowNode : public Node {
     bool on_should_close_remove_node = true;
 
     bool throttle = false;
+
+    // Status frames until the graph presents ("Initializing...", "Connecting graph...").
+    bool status_active = false;
+    ImGuiContextHandle status_ctx;
+    std::shared_ptr<ImGuiRenderer> status_renderer;
+    std::shared_ptr<ImGuiMerianBackend> status_backend;
+    CommandPoolHandle status_cmd_pool;
 };
 
 } // namespace merian

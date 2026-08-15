@@ -1,36 +1,128 @@
 #include "merian-graph/nodes/window/window_node.hpp"
 
 #include "merian-graph/graph/errors.hpp"
+#include "merian/vk/command/command_buffer.hpp"
 #include "merian/vk/extension/extension_registry.hpp"
 #include "merian/vk/utils/profiler.hpp"
 
+#include <imgui.h>
+
+#include <cfloat>
 #include <csignal>
 
 namespace merian {
 
 void WindowNode::initialize(const ContextHandle& context,
-                            const ResourceAllocatorHandle& /*allocator*/) {
+                            const ResourceAllocatorHandle& allocator) {
     this->context = context;
+    this->allocator = allocator;
+    queue = context->get_queue_GCT();
     providers = context->find_providers<WindowProvider>();
     if (providers.empty()) {
         throw graph_errors::node_error{"WindowNode requires at least one WindowProvider"};
     }
+
+    status_ctx = std::make_shared<ImGuiContext>();
+    status_renderer = std::make_shared<ImGuiRenderer>(context, allocator, status_ctx);
+    status_backend = std::make_shared<ImGuiMerianBackend>(status_ctx);
+    status_active = true;
+
+    ensure_window();
+    present_status("Initializing...");
 }
 
-WindowNode::NodeStatusFlags WindowNode::on_connected(const NodeIOLayout& /*io_layout*/,
+WindowNode::NodeStatusFlags WindowNode::load_config(const nlohmann::json& json) {
+    const NodeStatusFlags flags = Node::load_config(json);
+    // Apply a configured backend before the first frame. Nodes are recreated on graph load, so
+    // no swapchain of this node can be in flight here.
+    if (ensure_window() && status_active) {
+        present_status("Initializing...");
+    }
+    return flags;
+}
+
+WindowNode::NodeStatusFlags WindowNode::on_connected(const NodeIOLayout& io_layout,
                                                      const NodeIO& /*io*/,
                                                      const NodeConnectionInfo& /*info*/,
                                                      Submission& /*submission*/) {
-    const auto& selected = get_selected_provider();
-    if (!window || selected != active_provider) {
-        window = selected->create_window(context->get_device(), create_info);
-        active_provider = selected;
+    ensure_window();
 
-        const SwapchainHandle swapchain =
-            std::make_shared<merian::Swapchain>(context, window->get_surface());
-        swapchain_manager.emplace(swapchain);
+    io_layout.register_event_listener("/graph/connect",
+                                      [this](const GraphEvent::Info&, const GraphEvent::Data&) {
+                                          status_active = true;
+                                          present_status("Connecting graph...");
+                                          return false;
+                                      });
+
+    if (status_active) {
+        present_status("Connecting graph...");
     }
     return {};
+}
+
+bool WindowNode::ensure_window() {
+    const auto& selected = get_selected_provider();
+    if (window && selected == active_provider) {
+        return false;
+    }
+    window = selected->create_window(context->get_device(), create_info);
+    active_provider = selected;
+
+    const SwapchainHandle swapchain =
+        std::make_shared<merian::Swapchain>(context, window->get_surface());
+    swapchain_manager.emplace(swapchain);
+    return true;
+}
+
+void WindowNode::present_status(const std::string& text) {
+    if (!window || !swapchain_manager) {
+        return;
+    }
+    window->poll_events();
+
+    const std::optional<SwapchainAcquireResult> acquire =
+        swapchain_manager->acquire(window, acquire_timeout_ns);
+    if (!acquire) {
+        return;
+    }
+
+    const ImageHandle image = acquire->image_view->get_image();
+    const vk::Extent3D extent = image->get_extent();
+
+    ImGuiIO& io = status_ctx->get_io();
+    io.DisplaySize = ImVec2(static_cast<float>(extent.width), static_cast<float>(extent.height));
+    status_backend->new_frame(0.f);
+    status_ctx->with_context([&] {
+        ImFont* const font = ImGui::GetFont();
+        const float font_size = 2.f * ImGui::GetFontSize();
+        const ImVec2 text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0.f, text.c_str());
+        const ImVec2 pos{(io.DisplaySize.x - text_size.x) / 2.f,
+                         (io.DisplaySize.y - text_size.y) / 2.f};
+        ImGui::GetBackgroundDrawList()->AddText(font, font_size, pos, IM_COL32(255, 255, 255, 255),
+                                                text.c_str());
+    });
+
+    if (!status_cmd_pool) {
+        status_cmd_pool = CommandPool::create(queue);
+    } else {
+        status_cmd_pool->reset();
+    }
+    // The connect profiler has no GPU query pool; keep status frames out of profiling.
+    const ScopedDefaultProfiler no_profiler{nullptr};
+    const CommandBufferHandle cmd = CommandBuffer::create(status_cmd_pool);
+    cmd->begin();
+    cmd->barrier(image->barrier2(vk::ImageLayout::eTransferDstOptimal, true));
+    cmd->clear(image);
+    status_renderer->render(cmd, acquire->image_view);
+    cmd->barrier(image->barrier2(vk::ImageLayout::ePresentSrcKHR));
+    cmd->end();
+
+    queue->submit_wait(cmd, VK_NULL_HANDLE, {**acquire->signal_semaphore},
+                       {**acquire->wait_semaphore}, {vk::PipelineStageFlagBits::eTransfer});
+    try {
+        get_swapchain()->present(queue, acquire->index);
+    } catch (const Swapchain::needs_recreate&) {
+    }
 }
 
 std::vector<InputConnectorDescriptor> WindowNode::describe_inputs() {
@@ -58,6 +150,7 @@ WindowNode::NodeStatusFlags WindowNode::pre_process([[maybe_unused]] const NodeI
 [[nodiscard]] WindowNode::NodeStatusFlags
 WindowNode::process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) {
     assert(swapchain_manager);
+    status_active = false;
     NodeStatusFlags flags{};
 
     const int64_t signed_max_img_count = get_swapchain()->get_max_image_count();
