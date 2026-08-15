@@ -1,0 +1,17 @@
+{
+    "nodes": {
+        "scene": {
+            "properties": {
+                "scene": {
+                    "cameras": {
+                        "store cameras": true,
+                        "active": 0,
+                        "position": [-9.5, 1.7, -0.3],
+                        "target": [5.0, 2.5, 0.0],
+                        "up": [0.0, 1.0, 0.0]
+                    }
+                }
+            }
+        }
+    }
+}

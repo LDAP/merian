@@ -1,0 +1,77 @@
+{
+    "cli": {
+        "capture-enable": {
+            "pointer": "/nodes/capture/properties/enable"
+        },
+        "capture-file": {
+            "pointer": "/nodes/capture/properties/filename"
+        },
+        "capture-iteration": {
+            "pointer": "/nodes/capture/properties/iteration"
+        },
+        "capture-power": {
+            "pointer": "/nodes/capture/properties/iteration power"
+        },
+        "capture-quit": {
+            "pointer": "/nodes/capture/properties/advanced/exit at iteration"
+        },
+        "capture-start": {
+            "pointer": "/nodes/capture/properties/advanced/start at run"
+        },
+        "dual-chain": {
+            "pointer": "/nodes/render/properties/mc/dual chain"
+        },
+        "guiding-prob": {
+            "pointer": "/nodes/render/properties/guiding prob"
+        },
+        "guiding-type": {
+            "pointer": "/nodes/render/properties/directional sampling type"
+        },
+        "reference-mode": {
+            "pointer": "/nodes/render/properties/reference mode"
+        },
+        "seed-offset": {
+            "pointer": "/nodes/render/properties/seed offset"
+        }
+    },
+    "graph_properties": {
+        "fps limiter": false
+    },
+    "nodes": {
+        "accumulate": {
+            "$+$outputs": [
+                "out->capture.src"
+            ],
+            "properties": {
+                "clear event pattern": "/user/clear,//geometry_changed,//transform_changed,//camera_changed,//bounces_changed,/capture/start"
+            }
+        },
+        "capture": {
+            "enabled": true,
+            "properties": {
+                "advanced": {
+                    "exit at iteration": 4096
+                },
+                "enable": true,
+                "filename": "/tmp/mcpg-eval/{record_iteration:05}",
+                "format": "PFM",
+                "iteration": 1,
+                "iteration offset": 0,
+                "iteration power": 2,
+                "trigger": "iteration"
+            },
+            "type": "Image Write"
+        },
+        "render": {
+            "properties": {
+                "mc": {
+                    "mc_direct": {
+                        "grid distribution dimension": 1.5,
+                        "grid level bias": 0.0,
+                        "grid tan(alpha/2)": 0.003
+                    }
+                }
+            }
+        }
+    }
+}
