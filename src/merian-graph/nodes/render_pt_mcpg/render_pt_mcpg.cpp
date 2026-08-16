@@ -494,10 +494,12 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
         "directional sampling type", guiding_directional_sampling_type,
         Properties::OptionsStyle::COMBO,
         "How the guiding probability is derived. Roughness additionally scales it by the BSDF "
-        "roughness.");
-    constants_changed |=
-        config.config_float("roughness threshold", guiding_roughness_threshold,
-                            "only use guiding with roughness >= this value", 0.001f);
+        "alpha, so it falls off continuously towards the threshold instead of cutting off.");
+    constants_changed |= config.config_float(
+        "alpha threshold", guiding_roughness_threshold,
+        "only use guiding with GGX alpha (roughness^2) >= this value; the lobe subtends "
+        "~4*pi*alpha^2 sr, below which a vMF sample cannot land in it",
+        0.001f);
 
     config.st_separate("RT Volume");
     constants_changed |= config.config_int("volume samples per pixel", volume_spp,

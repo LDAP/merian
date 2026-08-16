@@ -58,9 +58,15 @@ struct MixBSDF<B0 : BSDF, B1 : BSDF> : BSDF {
                     bsdf1.get_preintegrated_specular(F0, wi), weight);
     }
 
-    // Weighted RMS
+    // Weighted RMS in GGX alpha space (alpha = roughness^2), matching Cycles'
+    // surface_shader_average_sample_weight_squared_roughness; returned as perceptual roughness so
+    // the interface contract still holds. Nesting is consistent: a mean of squared alphas composes
+    // into the flat weight-averaged mean of squared alphas over all leaf lobes.
     property float roughness {
-        get { return sqrt(lerp(pow2(bsdf0.roughness), pow2(bsdf1.roughness), weight)); }
+        get {
+            return sqrt(
+                sqrt(lerp(pow2(pow2(bsdf0.roughness)), pow2(pow2(bsdf1.roughness)), weight)));
+        }
     }
 }
 

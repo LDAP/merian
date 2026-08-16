@@ -171,8 +171,12 @@ struct IridescentFresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
         return layer.get_preintegrated_specular(F0, wi);
     }
 
+    // Weighted RMS in GGX alpha space, see MixBSDF. min() here reported the specular layer's
+    // roughness for every glTF material, which hid the diffuse base from the guiding gate.
     property float roughness {
-        get { return min(layer.roughness, base.roughness); }
+        get {
+            return sqrt(sqrt(lerp(pow2(pow2(base.roughness)), pow2(pow2(layer.roughness)), ior_f0)));
+        }
     }
 }
 

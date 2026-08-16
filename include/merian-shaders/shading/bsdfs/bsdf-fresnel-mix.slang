@@ -56,8 +56,11 @@ struct FresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
         return layer.get_preintegrated_specular(F0, wi);
     }
 
+    // Weighted RMS in GGX alpha space, see MixBSDF. ior_f0 stands in for the average Fresnel.
     property float roughness {
-        get { return sqrt(lerp(pow2(base.roughness), pow2(layer.roughness), ior_f0)); }
+        get {
+            return sqrt(sqrt(lerp(pow2(pow2(base.roughness)), pow2(pow2(layer.roughness)), ior_f0)));
+        }
     }
 }
 

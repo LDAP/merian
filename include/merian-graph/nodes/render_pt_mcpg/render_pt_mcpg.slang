@@ -3,6 +3,7 @@ import merian_shaders.scene.scene;
 import merian_shaders.utils.random;
 import merian_shaders.utils.hash;
 import merian_shaders.utils.textures;
+import merian_shaders.utils.math;
 import merian_shaders.colors.debug;
 import merian_shaders.colors.colorspaces;
 import mcpg_common;
@@ -101,10 +102,14 @@ float3 trace_path(const ParameterBlock<Scene> scene,
             }
         }
 
-        const bool can_guide = score_sum > 0.0 && m_bsdf.roughness >= guiding_roughness_threshold;
+        // Effective GGX alpha of the whole (composite) BSDF, matching Cycles' avg_roughness: the
+        // lobe solid angle is ~4*pi*alpha^2, so alpha is what decides whether a vMF sample can
+        // land in the lobe at all. Perceptual roughness would gate ~20x too low in alpha.
+        const float bsdf_alpha = pow2(m_bsdf.roughness);
+        const bool can_guide = score_sum > 0.0 && bsdf_alpha >= guiding_roughness_threshold;
         const float p_guide =
             select(guiding_directional_sampling_type == GUIDING_DIRECTIONAL_SAMPLING_MIS_ROUGHNESS,
-                   p_guiding * m_bsdf.roughness, p_guiding);
+                   p_guiding * bsdf_alpha, p_guiding);
 
         // Sample wo from the BSDF or the selected lobe
         const bool guide = can_guide && rng.next_float() < p_guide;

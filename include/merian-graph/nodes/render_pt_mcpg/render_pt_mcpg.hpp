@@ -142,7 +142,8 @@ class RenderMCPG : public Node {
 
     GuidingDirectionalSamplingType guiding_directional_sampling_type =
         GuidingDirectionalSamplingType::MIS;
-    // Guiding is skipped below this roughness, where the vMF mixture cannot represent the lobe.
+    // Guiding is skipped below this GGX alpha, where the vMF mixture cannot represent the lobe.
+    // Compared against pow2(BSDF::roughness), so 0.05 matches Cycles' default (alpha units too).
     float guiding_roughness_threshold = 0.05f;
 
     // --- Light cache ---

@@ -22,6 +22,8 @@ interface BSDF : ShadingFunction {
     float3 get_preintegrated_specular(const float3 F0, const float3 wi);
 
     // Perceptual roughness in [0, 1]; 0 for a perfectly specular (delta) lobe, 1 for ideal diffuse.
+    // Composite BSDFs combine their lobes as a weighted RMS in GGX alpha space (alpha =
+    // roughness^2), so pow2(roughness) is an effective alpha suitable for lobe-width decisions.
     property float roughness { get; }
 }
 
