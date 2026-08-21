@@ -126,6 +126,10 @@ class RenderMCPG : public Node {
     int32_t emitted_max_path_length = max_path_length;
     bool emission_on_primary = true;
     bool demodulate_albedo = false;
+    int32_t nee_mode = 1;
+    float nee_probability = 0.5f;
+    int32_t nee_candidates = 1;
+    int32_t nee_bounces = 0;
     bool reference_mode = false;
     std::array<bool, 8> mask_enabled{true, true, true, true, true, true, true, true};
 

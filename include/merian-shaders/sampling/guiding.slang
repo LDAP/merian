@@ -47,10 +47,12 @@ struct PathSegment {
     uint16_t bounce;
 
     float3 wo; // in worldspace
-    // density that generated wo, over the whole scatter mixture; 0 for a delta lobe
+    // density that generated wo, over every technique that could have
     float pdf;
-    // f(wi, wo) * dot(wo, n) divided by the density that generated it
+    // f(wi, wo) * dot(wo, n) divided by that density
     float3 weight;
+    // no technique other than the BSDF could have generated wo
+    bool delta;
     // no vertex will be scattered from beyond this segment
     bool is_last;
 
@@ -157,9 +159,11 @@ struct NullGuidingModel : GuidingModel {
 // One draw from the scatter mixture.
 struct ScatterSample {
     float3 wo; // in worldspace
-    // f(wi, wo) * dot(wo, n) divided by the density that produced it
-    float3 weight;
-    // density of the mixture at wo, 0 for a delta lobe
+    // f(wi, wo) * dot(wo, n); for a delta lobe the sample weight, which already divides by the
+    // lobe's own probability
+    float3 f_cos;
+    // density of the mixture at wo; for a delta lobe the probability of the strategy that
+    // produced it, so that f_cos / pdf is the throughput factor either way
     float pdf;
     // no other technique can generate this direction
     bool delta;
@@ -213,15 +217,15 @@ struct ScatterMixture {
             if (bs.value.lobe == BSDFLobe::Delta) {
                 // a delta direction has no density under the guiding lobe, so all that is left of
                 // the mixture is the chance of having drawn from the BSDF at all
-                s.weight = bs.value.weight / (1.f - p_guiding);
-                s.pdf = 0.f;
+                s.f_cos = bs.value.weight;
+                s.pdf = 1.f - p_guiding;
                 s.delta = true;
                 return s;
             }
         }
 
+        s.f_cos = bsdf.eval(wi_local, wo_local, rng);
         s.pdf = pdf(bsdf, guiding, wi_local, wo_local, s.wo);
-        s.weight = s.pdf > 0.f ? bsdf.eval(wi_local, wo_local, rng) / s.pdf : float3(0);
         return s;
     }
 }

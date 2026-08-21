@@ -414,6 +414,10 @@ void RenderMCPG::update_render_constants() {
                     "export static const int merian_render_max_path_length = {};\n"
                     "export static const uint merian_render_instance_mask = {}u;\n"
                     "export static const bool merian_render_demodulate_albedo = {};\n"
+                    "export static const int merian_render_nee_mode = {};\n"
+                    "export static const float merian_render_nee_probability = {:f};\n"
+                    "export static const int merian_render_nee_candidates = {};\n"
+                    "export static const int merian_render_nee_bounces = {};\n"
                     "}}\n"
                     "export static const bool use_light_cache_tail = {};\n"
                     "export static const bool missing_light_heuristic = {};\n"
@@ -443,7 +447,8 @@ void RenderMCPG::update_render_constants() {
                     "export static const uint distance_mc_level_count = {}u;\n"
                     "export static const float distance_mc_distribution_dimension = {:f};\n",
                     emission_on_primary ? "true" : "false", spp, max_path_length, mask,
-                    demodulate_albedo ? "true" : "false", use_light_cache_tail ? "true" : "false",
+                    demodulate_albedo ? "true" : "false", nee_mode, nee_probability, nee_candidates,
+                    nee_bounces, use_light_cache_tail ? "true" : "false",
                     missing_light_heuristic ? "true" : "false", mc_samples,
                     reference_mode ? 0.0f : p_guiding,
                     static_cast<uint32_t>(guiding_directional_sampling_type),
@@ -478,6 +483,28 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
         "demodulate albedo", demodulate_albedo,
         "Divide the primary-hit albedo out of the output so a denoiser can re-modulate after "
         "filtering. Use with 'emission on primary' disabled (emission is albedo-independent).");
+    constants_changed |=
+        config.config_options("next event estimation", nee_mode, {"off", "mixture", "resampled"},
+                              Properties::OptionsStyle::COMBO,
+                              "Direct light sampling. 'mixture' replaces the "
+                              "scatter sample with a light sample and costs no "
+                              "extra ray; 'resampled' adds a shadow ray.");
+    if (nee_mode == 1) {
+        constants_changed |=
+            config.config_percent("NEE probability", nee_probability,
+                                  "Fraction of scatter samples drawn from the lights.");
+    }
+    if (nee_mode == 2) {
+        constants_changed |= config.config_int(
+            "NEE candidates", nee_candidates,
+            "Light samples resampled into the one shadow ray by unshadowed contribution (RIS).", 1,
+            32);
+    }
+    if (nee_mode != 0) {
+        constants_changed |= config.config_int(
+            "NEE bounces", nee_bounces,
+            "Path vertices (counted from the primary hit) that perform NEE; 0 = all.", 0, 16);
+    }
 
     config.st_separate("RT Surface");
     constants_changed |=

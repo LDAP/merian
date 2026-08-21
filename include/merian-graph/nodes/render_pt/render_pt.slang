@@ -18,6 +18,13 @@ extern static const int merian_render_max_path_length = 8;
 extern static const uint merian_render_instance_mask = 0xFFu;
 extern static const bool merian_render_enable_ser = false;
 extern static const bool merian_render_demodulate_albedo = false;
+extern static const int merian_render_nee_mode = NEE_MODE_RESAMPLED;
+// probability of replacing the scatter sample with a light sample (NEE_MODE_MIXTURE)
+extern static const float merian_render_nee_probability = 0.5;
+// light samples resampled into one shadow ray (NEE_MODE_RESAMPLED)
+extern static const int merian_render_nee_candidates = 1;
+// vertices (from the primary) that perform NEE; 0 = all
+extern static const int merian_render_nee_bounces = 0;
 }
 
 struct RenderBinding {
@@ -28,6 +35,7 @@ struct RenderBinding {
 
 float3 trace_path(const ParameterBlock<Scene> scene,
                   const ParameterBlock<RenderBinding> params,
+                  const uint2 pixel,
                   RayDesc ray,
                   ShadingPoint sp,
                   const uint16_t sample_index,
@@ -42,10 +50,35 @@ float3 trace_path(const ParameterBlock<Scene> scene,
                                         scene.time, scene.time_diff, scene.frame};
     var guiding_state = params.guiding.begin_path();
 
+    const bool nee = merian_render_nee_mode != NEE_MODE_OFF && scene.nee.has_lights();
+    const uint candidates = uint(max(merian_render_nee_candidates, 1));
+
     for (uint16_t bounce = 1; bounce < merian_render_max_path_length; bounce++) {
         // the ray left the scene: nothing to scatter from, emission is already accumulated
         if (!sp.has_surface_material || all(throughput < SCENE_THROUGHPUT_THRESHOLD)) {
             break;
+        }
+
+        const bool nee_here =
+            nee && (merian_render_nee_bounces <= 0 || bounce <= merian_render_nee_bounces);
+        const uint light_bucket =
+            nee_here ? scene.get_light_bucket(pixel, sp.pos) : LIGHT_INVALID_INDEX;
+        // Drawn before the mixture below is built: the triangle record would otherwise be live
+        // across the guiding candidates and the material sample at once.
+        const bool light_technique = merian_render_nee_mode == NEE_MODE_MIXTURE && nee_here &&
+                                     rng.next_float() < merian_render_nee_probability;
+        uint sampled_light = LIGHT_INVALID_INDEX;
+        float3 light_dir = float3(0, 0, 1);
+        if (light_technique) {
+            if (let lp = scene.sample_light_point(light_bucket, sp.pos, rng)) {
+                // aimed from where the ray will start: a direction taken from the unoffset point
+                // misses the sampled triangle near its edges
+                const float3 ng = sp.get_face_normal();
+                const float3 origin =
+                    offset_ray_origin(sp.pos, dot(lp.pos - sp.pos, ng) < 0.f ? -ng : ng);
+                light_dir = normalize(lp.pos - origin);
+                sampled_light = lp.index;
+            }
         }
 
         const OrthonormalFrame frame = sp.shading_frame;
@@ -58,23 +91,73 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         let guiding = params.guiding.get_distribution(guiding_state, frame_info, vertex, rng);
         const ScatterMixture mixture = ScatterMixture(guiding, bsdf.alpha);
 
-        // 2. one scatter direction out of the mixture
-        const Optional<ScatterSample> scatter = mixture.sample(bsdf, guiding, frame, wi_local, rng);
-        if (!scatter.hasValue) {
-            break;
+        // light sampling is wasted on a near-specular lobe: it is far more peaked than any light
+        const bool nee_surface = nee_here && bsdf.alpha >= NEE_MIN_ALPHA;
+
+        // 2. resampled direct light: M candidates share one shadow ray. Only the reservoir
+        // survives to the trace below; the candidates die here.
+        DirectLightReservoir reservoir = DirectLightReservoir();
+        if (merian_render_nee_mode == NEE_MODE_RESAMPLED && nee_surface) {
+            for (uint i = 0; i < candidates; i++) {
+                if (let ls = scene.sample_light(light_bucket, sp.pos, rng)) {
+                    const float3 wo_l = frame.to_local(ls.wo);
+                    reservoir.add_light(
+                        ls, bsdf.eval(wi_local, wo_l, rng) * ls.Li * medium.transmittance(ls.dist),
+                        candidates * ls.pdf + mixture.pdf(bsdf, guiding, wi_local, wo_l, ls.wo),
+                        rng);
+                }
+            }
         }
-        const ScatterSample s = scatter.value;
-        const float3 wo_local = frame.to_local(s.wo);
+
+        // 3. one scatter direction: from a light, or out of the mixture. The light technique
+        // replaces the scatter sample, so it is one ray either way; its density joins the mixture
+        // once the hit says which light the ray reached.
+        // The mass the light technique holds, whichever technique the draw above landed on: it is
+        // the density that has to be charged, not the outcome.
+        const float p_light =
+            merian_render_nee_mode == NEE_MODE_MIXTURE && nee_surface
+                ? merian_render_nee_probability
+                : 0.f;
+        // A vertex that generates no direction still owes its direct light, so it leaves through
+        // the same path as one whose ray finds nothing: zero throughput, no continuation.
+        bool scattered = false;
+        bool guided = false;
+        float3 wo_world = float3(0, 0, 1);
+        float3 f_cos = float3(0);
+        float scatter_pdf = 0.f;
+        bool delta = false;
+        if (light_technique && p_light > 0.f) {
+            scattered = sampled_light != LIGHT_INVALID_INDEX;
+            wo_world = light_dir;
+            if (scattered) {
+                const float3 wo_l = frame.to_local(wo_world);
+                f_cos = bsdf.eval(wi_local, wo_l, rng);
+                scatter_pdf = mixture.pdf(bsdf, guiding, wi_local, wo_l, wo_world);
+            }
+        } else {
+            sampled_light = LIGHT_INVALID_INDEX;
+            if (let s = mixture.sample(bsdf, guiding, frame, wi_local, rng)) {
+                wo_world = s.wo;
+                f_cos = s.f_cos;
+                scatter_pdf = s.pdf;
+                delta = s.delta;
+                guided = s.guided;
+                scattered = true;
+            }
+        }
+        const float3 wo_local = frame.to_local(wo_world);
 
         // resolved before the continuation ray so that no candidate stays live across it
         PathSegment segment;
         segment.pos = vertex.pos;
         segment.normal = frame.get_normal();
         segment.bounce = bounce;
-        segment.wo = s.wo;
-        segment.pdf = s.pdf;
-        segment.weight = s.weight;
-        segment.delta = s.delta;
+        segment.wo = wo_world;
+        // a delta lobe already carries the only probability there is; the light term below is
+        // zero for it either way
+        segment.pdf = delta ? scatter_pdf : (1.f - p_light) * scatter_pdf;
+        segment.weight = float3(0);
+        segment.delta = delta;
         segment.traced = false;
         segment.is_last = bounce + uint16_t(1) >= merian_render_max_path_length;
         segment.next_pos = vertex.pos;
@@ -84,7 +167,12 @@ float3 trace_path(const ParameterBlock<Scene> scene,
 
         // Last thing before the ray: the record is what crosses the traversal, so it must not be
         // taken while the mixture densities above are still live.
-        let guiding_record = params.guiding.record_scatter(guiding, s.guided);
+        let guiding_record = params.guiding.record_scatter(guiding, guided);
+
+        // The shadow ray goes out once the guiding candidates are dead: only the reservoir and
+        // the narrowed record cross this traversal.
+        radiance += throughput * scene.resolve_direct_light(sp.pos, sp.get_face_normal(), reservoir,
+                                                            merian_render_instance_mask);
 
 #if defined(MERIAN_SPIRV_CAP_SUPPORTED_ShaderInvocationReorderEXT)
         if (merian_render_enable_ser) {
@@ -95,8 +183,8 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         // A transmission event crosses the surface; update the medium we are now in.
         const bool transmission = wi_local.z * wo_local.z < 0.f;
         Optional<RayDesc> next_ray = none;
-        if (any(s.weight > 0.f)) {
-            next_ray = sp.make_ray(-ray.Direction, s.wo, transmission);
+        if (scattered && any(f_cos > 0.f)) {
+            next_ray = sp.make_ray(-ray.Direction, wo_world, transmission);
         }
 
         if (let next = next_ray) {
@@ -111,9 +199,29 @@ float3 trace_path(const ParameterBlock<Scene> scene,
             ray = next;
 
             // the last vertex is never scattered from, so its material sample would be dead
-            sp = scene.trace_and_get_shading_point(ray, merian_render_instance_mask,
-                                                   RenderContext(bounce), DefaultLODSampler(),
-                                                   !segment.is_last);
+            const Hit hit = scene.trace_ray(ray, RAY_FLAG_NONE, merian_render_instance_mask);
+
+            // resolved before the hit is shaded, so neither the hit nor the ray stay live across
+            // it. A delta direction is one no light sampler could have produced.
+            float mis_weight = 1.f;
+            if (nee_here && !delta) {
+                const LightHit lh =
+                    scene.get_light_hit(light_bucket, ray.Origin, ray.Direction, hit);
+                if (merian_render_nee_mode == NEE_MODE_RESAMPLED) {
+                    // the candidates above sampled this vertex M times
+                    mis_weight = segment.pdf / (candidates * lh.pdf + segment.pdf);
+                } else {
+                    segment.pdf += p_light * lh.pdf;
+                    // a light sample that reached something else is occluded: the vertex the ray
+                    // found was generated by neither technique
+                    if (sampled_light != LIGHT_INVALID_INDEX && sampled_light != lh.index) {
+                        segment.pdf = 0.f;
+                    }
+                }
+            }
+
+            sp = scene.get_shading_point(ray, hit, RenderContext(bounce), DefaultLODSampler(),
+                                         !segment.is_last);
 
             // Beer-Lambert attenuation over the segment just travelled inside the medium.
             // In-scattering is not accounted for here; that is the volume renderer's job. Folded
@@ -126,17 +234,20 @@ float3 trace_path(const ParameterBlock<Scene> scene,
             segment.next_normal = sp.shading_normal;
             segment.next_mv = half3((sp.pos - sp.prev_pos) / scene.time_diff);
             segment.incident = sp.emission * segment_transmittance;
+            segment.weight = segment.pdf > 0.f ? f_cos / segment.pdf : float3(0);
 
             throughput *= segment.weight;
-            radiance += throughput * segment.incident;
+            // the guiding learns the plain incident radiance; only the image estimate weighs the
+            // emission against the light samples
+            radiance += throughput * segment.incident * mis_weight;
         }
 
-        // 3. what the guiding learns, and the estimate it completes the path with
+        // 4. what the guiding learns, and the estimate it completes the path with
         const float3 tail =
             params.guiding.record_segment(guiding_state, frame_info, guiding_record, segment, rng);
         radiance += throughput * tail;
 
-        if (!next_ray.hasValue) {
+        if (!next_ray.hasValue || !any(segment.weight > 0.f)) {
             break;
         }
     }
@@ -169,7 +280,8 @@ void render_pixel(const uint2 pixel,
         RandomGenerator rng = PCG(pcg4d16(uint4(pixel, scene.frame, s)));
 
         const float3 contrib =
-            trace_path(scene, params, primary_ray, primary_sp, uint16_t(s), rng) / demod_albedo;
+            trace_path(scene, params, pixel, primary_ray, primary_sp, uint16_t(s), rng) /
+            demod_albedo;
         if (!any(isnan(contrib)) && !any(isinf(contrib))) {
             irradiance += contrib;
             const float l = yuv_luminance(contrib);

@@ -84,6 +84,11 @@ class RenderPT : public Node {
     bool demodulate_albedo = false;
     int32_t guiding_method = GUIDING_NONE;
     GuidingModelHandle guiding;
+
+    int32_t nee_mode = 2;
+    float nee_probability = 0.5f;
+    int32_t nee_candidates = 1;
+    int32_t nee_bounces = 0;
     std::array<bool, 8> mask_enabled{true, true, true, true, true, true, true, true};
 
     // Slang program + pipeline; rebuilt when the scene composition changes.

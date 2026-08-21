@@ -202,9 +202,14 @@ void RenderPT::update_render_constants() {
                     "export static const uint merian_render_instance_mask = {}u;\n"
                     "export static const bool merian_render_enable_ser = {};\n"
                     "export static const bool merian_render_demodulate_albedo = {};\n"
+                    "export static const int merian_render_nee_mode = {};\n"
+                    "export static const float merian_render_nee_probability = {:f};\n"
+                    "export static const int merian_render_nee_candidates = {};\n"
+                    "export static const int merian_render_nee_bounces = {};\n"
                     "}}",
                     emission_on_primary ? "true" : "false", spp, max_path_length, mask,
-                    enable_ser ? "true" : "false", demodulate_albedo ? "true" : "false"));
+                    enable_ser ? "true" : "false", demodulate_albedo ? "true" : "false", nee_mode,
+                    nee_probability, nee_candidates, nee_bounces));
 }
 
 RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
@@ -220,6 +225,28 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
         config.config_bool("emission on primary", emission_on_primary,
                            "Fold primary-hit emission into irradiance (self-contained). "
                            "Otherwise it is the GBuffer emission texture's job.");
+    constants_changed |=
+        config.config_options("next event estimation", nee_mode, {"off", "mixture", "resampled"},
+                              Properties::OptionsStyle::COMBO,
+                              "Direct light sampling. 'mixture' replaces the "
+                              "scatter sample with a light sample and costs no "
+                              "extra ray; 'resampled' adds a shadow ray.");
+    if (nee_mode == 1) {
+        constants_changed |=
+            config.config_percent("NEE probability", nee_probability,
+                                  "Fraction of scatter samples drawn from the lights.");
+    }
+    if (nee_mode == 2) {
+        constants_changed |= config.config_int(
+            "NEE candidates", nee_candidates,
+            "Light samples resampled into the one shadow ray by unshadowed contribution (RIS).", 1,
+            32);
+    }
+    if (nee_mode != 0) {
+        constants_changed |= config.config_int(
+            "NEE bounces", nee_bounces,
+            "Path vertices (counted from the primary hit) that perform NEE; 0 = all.", 0, 16);
+    }
     constants_changed |=
         config.config_bool("shader execution reordering", enable_ser,
                            "Reorder threads after the primary hit to improve coherence.");

@@ -18,8 +18,8 @@ static const int NEE_MODE_MIXTURE = 1;
 // Light candidates resampled into one shadow ray, MIS-weighted against the scatter sample.
 static const int NEE_MODE_RESAMPLED = 2;
 
-// light sampling is wasted below this roughness: the BSDF is far more peaked than the light
-static const float NEE_MIN_ROUGHNESS = 0.05f;
+// light sampling is wasted below this lobe width: the BSDF is far more peaked than the light
+static const float NEE_MIN_ALPHA = 0.05f;
 
 // Scenes whose environment does not emit compile the importance warp out entirely. Set from
 // EnvMap::is_emissive() (see scene.cpp).
