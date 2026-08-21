@@ -3,12 +3,25 @@
 import merian_shaders.utils.textures;
 import merian_shaders.utils.envmap;
 import merian_shaders.utils.math;
+import merian_shaders.utils.sampling;
 __exported import merian_shaders.shading.materials.material;
 
 namespace merian {
 
 // virtual hit point distance
 static const float ENV_MAP_DISTANCE = 1e7f;
+
+// ShadingData for looking up the environment along dir (pointing away from the receiver).
+ShadingData make_env_shading_data(const float3 dir, const float3 origin, const float time) {
+    return ShadingData(-dir, origin + dir * ENV_MAP_DISTANCE, float2(0), time,
+                       OrthonormalFrame(-dir), -dir, uint16_t(1), 1.0f, true);
+}
+
+struct EnvSample {
+    float3 dir; // towards the environment
+    float pdf;  // solid angle
+    float3 Le;  // radiance arriving from dir
+}
 
 interface IEnvMap {
     float3 eval(const ShadingData sd, const TextureManager tm, const LODSampler2D lod);
@@ -41,29 +54,10 @@ struct EqualAreaOctMap : IEnvMap {
     float4x4 to_local;
     float intensity;
 
-    static float2 dir_to_uv(const float3 d) {
-        const float3 a = abs(d);
-        const float r = sqrt(max(0.f, 1.f - a.z));
-        const float m = max(a.x, a.y);
-        const float b = m == 0.f ? 0.f : min(a.x, a.y) / m;
-        float phi = atan(b) * (2.f / MERIAN_M_PI);
-        if (a.x < a.y) {
-            phi = 1.f - phi;
-        }
-        float v = phi * r;
-        float u = r - v;
-        if (d.z < 0.f) {
-            const float mirrored_u = u;
-            u = 1.f - v;
-            v = 1.f - mirrored_u;
-        }
-        u = d.x < 0.f ? -u : u;
-        v = d.y < 0.f ? -v : v;
-        return 0.5f * float2(u + 1.f, v + 1.f);
-    }
-
     float3 eval(const ShadingData sd, const TextureManager tm, const LODSampler2D lod) {
-        return intensity * lod.sample(env_map, dir_to_uv(mul((float3x3)to_local, -sd.wi))).rgb;
+        return intensity *
+               lod.sample(env_map, equal_area_sphere_to_square(mul((float3x3)to_local, -sd.wi)))
+                   .rgb;
     }
 }
 
@@ -105,4 +99,4 @@ struct CubeMap : IEnvMap {
     }
 }
 
-}
+} // namespace merian

@@ -139,6 +139,7 @@ MaterialID MaterialSystem::add_material(const MaterialModelID type_id, const Mat
     StoredMaterial stored;
     stored.header = material.header;
     stored.header.material_model_type_id = type_id;
+    stored.emissive = material.is_emissive();
 
     uint32_t payload_bytes = material.get_payload_size();
     stored.payload.resize(payload_bytes);
@@ -189,6 +190,7 @@ void MaterialSystem::update_material(const MaterialID id, const Material& materi
     const auto type_id = stored.header.material_model_type_id;
     stored.header = material.header;
     stored.header.material_model_type_id = type_id;
+    stored.emissive = material.is_emissive();
 
     stored.payload.resize(payload_bytes);
     material.write_payload(stored.payload.data());

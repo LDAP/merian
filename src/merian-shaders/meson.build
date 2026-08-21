@@ -1,5 +1,6 @@
 merian_shaders_src = [
     'light-cache/hashed_irradiance_cache.cpp',
+    'scene/light_collection.cpp',
     'scene/scene.cpp',
     'shading/materials/material_system.cpp',
     'utils/hash_grid.cpp',

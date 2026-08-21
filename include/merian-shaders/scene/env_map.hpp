@@ -23,6 +23,11 @@ class EnvMap {
 
     virtual void write_to(ShaderCursor cursor) const = 0;
 
+    // False if eval is identically zero; NEE then never samples the environment.
+    virtual bool is_emissive() const {
+        return true;
+    }
+
     // Yaw/pitch UI; subclasses can extend to expose more state.
     virtual void properties(Properties& props) {
         bool changed = false;
@@ -93,6 +98,10 @@ class EmptyEnvMap : public EnvMap {
 
     std::string get_type_name() const override {
         return "merian::EmptyEnv";
+    }
+
+    bool is_emissive() const override {
+        return false;
     }
 
     void write_to([[maybe_unused]] ShaderCursor cursor) const override {}

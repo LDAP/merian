@@ -35,7 +35,7 @@ Scene::Scene(const ShaderCompileContextHandle& compile_context,
                                                        ->get_enabled_features()
                                                        .get_acceleration_structure_features_khr()
                                                        .accelerationStructure == VK_TRUE),
-      material_system(material_system) {
+      material_system(material_system), lights(compile_context, context, allocator) {
 
     composition = SlangComposition::create();
     composition->add_composition(material_system->get_composition());
@@ -92,6 +92,9 @@ Scene::query_device_support_composition(const DeviceSupportQueryInfo& query_info
                     "namespace merian {{ public typealias SceneAccelerationStructure = {}; }}",
                     as_supported ? "HWAccelerationStructure" : "NullAccelerationStructure"));
     composition->add_module_from_string(
+        "scene_env_light",
+        "namespace merian { export static const bool merian_scene_has_env_light = false; }");
+    composition->add_module_from_string(
         "scene_env_map_workaround",
         "module scene_env_map_workaround;\n"
         "import \"merian-shaders/scene/environment-map.slang\";\n"
@@ -113,6 +116,11 @@ void Scene::set_env(EnvMapHandle env) {
         return;
     }
 
+    composition->add_module_from_string(
+        "scene_env_light",
+        fmt::format("namespace merian {{ export static const bool merian_scene_has_env_light = "
+                    "{}; }}",
+                    env_map->is_emissive() ? "true" : "false"));
     composition->add_module(env_map->get_slang_module());
     composition->add_module_from_string(
         "scene_env_map_workaround",
@@ -180,6 +188,7 @@ ShaderObjectHandle Scene::build_shader_object() const {
     if (as_supported && tlas) {
         c["as"]["as"] = tlas;
     }
+    lights.write_to(c["nee"]);
     return object;
 }
 
@@ -872,6 +881,10 @@ void Scene::properties_env(Properties& props) {
     }
 }
 
+void Scene::properties_lights(Properties& props) {
+    lights.properties(props);
+}
+
 void Scene::properties_volume(Properties& props) {
     static const std::vector<std::string> kinds = {"Vacuum", "Fog"};
     // the volume can also be set by the scene implementation, so the current type is the state
@@ -1010,6 +1023,10 @@ void Scene::properties(Properties& props) {
     }
     if (props.st_begin_child("env", "Environment Map")) {
         properties_env(props);
+        props.st_end_child();
+    }
+    if (props.st_begin_child("lights", "Lights")) {
+        properties_lights(props);
         props.st_end_child();
     }
     if (props.st_begin_child("stats", "Statistics")) {
@@ -1230,8 +1247,12 @@ void Scene::upload_transforms(const CommandBufferHandle& cmd) {
 void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
     MERIAN_PROFILE_SCOPE_GPU(cmd, "Scene::upload_geometry_data");
     geometries.clear();
+    emissive_geometries.clear();
+    bool has_sky_portals = false;
 
     const float4x4 identity_transform = identity();
+    // same (group, node) order as build_tlas
+    uint32_t instance_index = 0;
 
     for (MeshGroupID group_id = 0; group_id < mesh_groups.size(); group_id++) {
         MeshGroup& group = mesh_groups[group_id];
@@ -1249,6 +1270,13 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
                 assert(info.vertex_buffer && (!mesh.has_indices() || info.index_buffer));
 
                 const bool needs_prev = needs_prev_vertices(group, info);
+
+                has_sky_portals |= (mesh.flags & MeshFlags::UseEnvMap);
+                if (!(mesh.flags & MeshFlags::UseEnvMap) &&
+                    material_system->is_emissive(mesh.material_id)) {
+                    emissive_geometries.push_back({static_cast<GeometryID>(geometries.size()),
+                                                   instance_index, mesh.get_primitive_count()});
+                }
 
                 GeometryData gd;
                 gd.material_id = mesh.material_id;
@@ -1288,8 +1316,12 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
 
                 geometries.emplace_back(gd);
             }
+            instance_index++;
         }
     }
+
+    lights.set_geometries(emissive_geometries, static_cast<uint32_t>(geometries.size()));
+    lights.set_has_sky_portals(has_sky_portals);
 
     const auto staging = allocator->get_staging();
     auto c = shader_object->get_cursor();
@@ -1894,7 +1926,8 @@ void Scene::build_tlas(const CommandBufferHandle& cmd) {
 void Scene::update(const CommandBufferHandle& cmd,
                    const float time,
                    const float time_diff,
-                   const uint32_t frame) {
+                   const uint32_t frame,
+                   const ShaderObjectAllocatorHandle& obj_allocator) {
     MERIAN_PROFILE_SCOPE_GPU(cmd, "Scene::update");
     current_frame = frame;
     frame_stats = {};
@@ -2037,6 +2070,13 @@ void Scene::update(const CommandBufferHandle& cmd,
     prev_active_camera = *cam;
 
     env_map->write_to(c["env_map"]);
+
+    // Binds the scene object, so every write to it must precede this (descriptor sets are not
+    // update-after-bind).
+    lights.set_env_emissive(env_map->is_emissive());
+    lights.prepare(cmd);
+    lights.write_to(c["nee"]);
+    lights.update(cmd, composition, shader_object.get(), obj_allocator);
 }
 
 } // namespace merian

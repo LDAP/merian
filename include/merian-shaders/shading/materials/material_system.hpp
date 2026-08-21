@@ -1,7 +1,7 @@
 #pragma once
 
-#include "merian-shaders/utils/texture_manager.hpp"
 #include "merian-shaders/shading/materials/material-system-data.slangh"
+#include "merian-shaders/utils/texture_manager.hpp"
 #include "merian/shader/shader_object.hpp"
 #include "merian/shader/slang_composition.hpp"
 #include "merian/shader/slang_program.hpp"
@@ -24,6 +24,10 @@ struct Material {
     virtual uint32_t get_payload_size() const = 0;
     // Write the payload AFTER the header to dest.
     virtual void write_payload(void* dest) const = 0;
+    // True if get_emission can be non-zero; enrolls the material's geometry as a light source.
+    virtual bool is_emissive() const {
+        return false;
+    }
 };
 
 struct DiffuseMaterial : Material {
@@ -75,6 +79,11 @@ class MaterialSystem : public std::enable_shared_from_this<MaterialSystem> {
 
     uint32_t get_material_count() const {
         return static_cast<uint32_t>(materials.size());
+    }
+
+    bool is_emissive(const MaterialID id) const {
+        assert(id < materials.size());
+        return materials[id].emissive;
     }
 
     // Upload material buffer to GPU and update ShaderObject state.
@@ -135,6 +144,7 @@ class MaterialSystem : public std::enable_shared_from_this<MaterialSystem> {
     struct StoredMaterial {
         MaterialHeader header;
         std::vector<uint8_t> payload;
+        bool emissive = false;
     };
     std::vector<StoredMaterial> materials;
 

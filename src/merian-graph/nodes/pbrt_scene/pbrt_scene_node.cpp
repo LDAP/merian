@@ -57,7 +57,8 @@ PBRTSceneNode::process([[maybe_unused]] const NodeIO& io,
     }
 
     scene->update(cmd, static_cast<float>(info.get_elapsed()),
-                  static_cast<float>(info.get_time_delta()), info.get_total_iteration());
+                  static_cast<float>(info.get_time_delta()), info.get_total_iteration(),
+                  info.get_shader_object_allocator());
 
     const Scene::UpdateChanges& changes = scene->get_last_update_changes();
     if (changes.geometry_changed)

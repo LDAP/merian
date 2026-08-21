@@ -4,6 +4,7 @@ __exported import merian_shaders.scene.environment_map;
 __exported import merian_shaders.shading.materials.material_system;
 __exported import merian_shaders.scene.scene_data;
 __exported import merian_shaders.scene.hit;
+__exported import merian_shaders.scene.nee;
 
 import merian_shaders.utils.encoding;
 import merian_shaders.utils.hash;
@@ -40,6 +41,7 @@ struct Scene {
 
     ParameterBlock<MaterialSystem> material_system;
     SceneEnvMap env_map;
+    NEE nee;
 
     Camera camera;
     Camera prev_camera;
@@ -381,7 +383,8 @@ struct Scene {
         return s;
     }
 
-    // prefer get_prev_world_position(const Hit hit, const TriangleHit tri) which reuses the triangle data if possible
+    // prefer get_prev_world_position(const Hit hit, const TriangleHit tri) which reuses the
+    // triangle data if possible
     float3 get_prev_world_position(const Hit hit, const GeometryData gd) {
         const float3 prev_obj =
             get_interpolated_prev_object_position(gd, hit.primitive_id, hit.get_barycentrics3());
@@ -475,6 +478,92 @@ struct Scene {
                                              const bool with_material = true) {
         return get_shading_point(ray, trace_ray(ray, RAY_FLAG_NONE, instance_mask), ctx, lod,
                                  with_material);
+    }
+
+    // -----------------------------------------
+
+    // Next event estimation: one light sample for the receiver at pos (unshadowed).
+    Optional<LightSample> sample_light(const float3 pos, inout RandomGenerator rng) {
+        return nee.sample(pos, rng, material_system, env_map, time);
+    }
+
+    // A point on a light without its radiance, for the mixture estimator.
+    Optional<LightPoint> sample_light_point(const float3 pos, inout RandomGenerator rng) {
+        return nee.sample_point(pos, rng);
+    }
+
+    // Ray from the receiver (offset along its face normal) towards a point on a light. Distant
+    // samples pass through sky portals (UseEnvMap geometry) to the environment behind them.
+    RayDesc make_light_ray(const float3 pos,
+                           const float3 face_normal,
+                           const float3 light_pos,
+                           const bool distant) {
+        const float3 origin = offset_ray_origin(
+            pos, dot(light_pos - pos, face_normal) < 0.f ? -face_normal : face_normal);
+        // aim at the point itself: a ray along the unoffset direction that stops at the offset
+        // distance clips the light triangle at grazing angles
+        const float3 to_light = light_pos - origin;
+        const float dist = length(to_light);
+
+        RayDesc ray;
+        ray.Origin = origin;
+        ray.Direction = dist > 0.f ? to_light / dist : float3(0, 0, 1);
+        ray.TMin = SCENE_RAY_TMIN;
+        ray.TMax = distant || !(dist > 0.f) ? SCENE_RAY_TMAX : dist;
+        return ray;
+    }
+
+    // Shadow ray towards a point on a light. One ray query for every case: each query object
+    // costs its own traversal stack.
+    bool trace_light_visibility(const float3 pos,
+                                const float3 face_normal,
+                                const float3 light_pos,
+                                const bool distant,
+                                const uint instances_mask = 0xff) {
+        const RayDesc ray = make_light_ray(pos, face_normal, light_pos, distant);
+        // a sky portal in front of the environment must not end the search
+        const bool closest = distant && nee.has_sky_portals;
+        SceneAccelerationStructure::RayQueryImpl rq;
+        as.trace_ray(rq, ray, closest ? RAY_FLAG_NONE : RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH,
+                     instances_mask);
+        _proceed_ray(rq);
+        if (rq.CommittedStatus() == COMMITTED_NOTHING)
+            return true;
+        if (!closest)
+            return false;
+        return (get_geometry_data(rq.CommittedInstanceID(), rq.CommittedGeometryIndex()).flags &
+                GeometryDataFlags::UseEnvMap) != 0;
+    }
+
+    // Contribution of the reservoir's winner; traces the shadow ray if a light sample won.
+    float3 resolve_direct_light(const float3 pos,
+                                const float3 face_normal,
+                                const DirectLightReservoir reservoir,
+                                const uint instances_mask = 0xff) {
+        if (!(reservoir.weight_sum > 0.f))
+            return float3(0);
+        if (reservoir.needs_shadow_ray() &&
+            !trace_light_visibility(pos, face_normal, reservoir.light_pos,
+                                    reservoir.light_index == LIGHT_ENV_INDEX, instances_mask))
+            return float3(0);
+        return reservoir.resolve();
+    }
+
+    // Which light the ray from origin along dir ended on, and the density with which
+    // sample_light would have generated that point. For MIS against scatter sampling;
+    // independent of the shading point, so it can run before the hit is shaded.
+    LightHit get_light_hit(const float3 origin, const float3 dir, const Hit hit) {
+        bool distant = !hit.is_valid();
+        if (!distant) {
+            const GeometryData gd = get_geometry_data(hit.instance_id, hit.geometry_index);
+            distant = (gd.flags & GeometryDataFlags::UseEnvMap) != 0;
+            if (!distant)
+                return nee.get_light_hit(hit.get_geometry_id(), hit.primitive_id, origin, dir);
+        }
+        LightHit lh;
+        lh.index = LIGHT_ENV_INDEX;
+        lh.pdf = nee.pdf_env(dir);
+        return lh;
     }
 
     // -----------------------------------------

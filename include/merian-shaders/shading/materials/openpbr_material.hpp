@@ -71,6 +71,10 @@ struct OpenPBRMaterial : Material {
     std::optional<OpenPBRSheenData> sheen;
     std::optional<OpenPBRVolumeData> volume;
 
+    bool is_emissive() const override {
+        return emission.x > 0.f || emission.y > 0.f || emission.z > 0.f;
+    }
+
     OpenPBRMaterial() {
         header.alpha_texture_id = TextureID(-1);
     }

@@ -1,10 +1,12 @@
 #pragma once
 
 #include "merian-shaders/scene/env_map.hpp"
+#include "merian-shaders/scene/light_collection.hpp"
 #include "merian-shaders/scene/scene-data.slangh"
 #include "merian-shaders/shading/homogeneous_volume.hpp"
 #include "merian-shaders/shading/materials/material_system.hpp"
 #include "merian/shader/shader_object.hpp"
+#include "merian/shader/shader_object_allocator.hpp"
 #include "merian/shader/slang_composition.hpp"
 #include "merian/shader/slang_program.hpp"
 #include "merian/utils/camera/camera.hpp"
@@ -449,7 +451,12 @@ class Scene : public std::enable_shared_from_this<Scene> {
 
     // ------------------------------
 
-    void update(const CommandBufferHandle& cmd, float time, float time_diff, uint32_t frame);
+    // obj_allocator binds the scene for the light update pass; falls back to a non-caching one.
+    void update(const CommandBufferHandle& cmd,
+                float time,
+                float time_diff,
+                uint32_t frame,
+                const ShaderObjectAllocatorHandle& obj_allocator = nullptr);
 
     // What changed during the most recent update(). Lets consumers (e.g. temporal
     // accumulation) react to scene edits without diffing the scene themselves.
@@ -475,6 +482,10 @@ class Scene : public std::enable_shared_from_this<Scene> {
 
     const EnvMapHandle& get_env() const {
         return env_map;
+    }
+
+    LightCollection& get_light_collection() {
+        return lights;
     }
 
     void set_env(EnvMapHandle env);
@@ -722,6 +733,7 @@ class Scene : public std::enable_shared_from_this<Scene> {
     void properties_statistics(Properties& props);
     void properties_env(Properties& props);
     void properties_volume(Properties& props);
+    void properties_lights(Properties& props);
 
     void process_pending_env_load(const CommandBufferHandle& cmd);
 
@@ -750,6 +762,8 @@ class Scene : public std::enable_shared_from_this<Scene> {
 
     MaterialSystemHandle material_system;
     EnvMapHandle env_map;
+    LightCollection lights;
+    std::vector<LightCollection::EmissiveGeometry> emissive_geometries;
 
     struct EnvUIState {
         int selection = 0;

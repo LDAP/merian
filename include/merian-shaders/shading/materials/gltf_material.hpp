@@ -67,6 +67,10 @@ struct GltfMaterial : Material {
     std::optional<GltfIridescenceData> iridescence;
     std::optional<GltfAnisotropyData> anisotropy;
 
+    bool is_emissive() const override {
+        return emissive_factor.x > 0.f || emissive_factor.y > 0.f || emissive_factor.z > 0.f;
+    }
+
     GltfMaterial() {
         header.alpha_texture_id = TextureID(-1);
     }
