@@ -13,8 +13,8 @@ static const float SCENE_RAY_TMAX = 1e7f;
 // Assumes pos was computed via barycentric interpolation, not from the ray t.
 float3 offset_ray_origin(const float3 pos, const float3 n) {
     static const float origin = 1.f / 16.f;
-    static const float float_scale = 3.f / 65536.f;
-    static const float int_scale = 3.f * 256.f;
+    static const float float_scale = 1.f / 65536.f;
+    static const float int_scale = 256.f;
 
     const int3 int_offset = int3(n * int_scale);
     const float3 int_pos = asfloat(asint(pos) + select(pos < 0.f, -int_offset, int_offset));
