@@ -130,14 +130,14 @@ struct HashGrid<typename T,
         return grid_idx_lower_scaled(staggered);
     }
 
-    // Dominant-axis cube face of the normal (6 bins).
-    uint normal_bin(const float3 normal) {
-        return cubemap_side(normal);
+    // axis aligned cubemap index or 45deg turned cubemap index every other level
+    uint normal_bin(const float3 normal, const uint level) {
+        return (level & 1u) == 0u ? cubemap_side(normal) : cubemap_side_45deg(normal);
     }
 
     // Pack the LOD level and the cube face into one word (face in the low 3 bits).
     uint level_normal_word(const uint level, const float3 normal) {
-        return (level << 3) | normal_bin(normal);
+        return (level << 3) | normal_bin(normal, level);
     }
 
     uint level_normal_word(const uint level) {
@@ -214,7 +214,7 @@ struct HashGrid<typename T,
         const uint level = target_level_for_pos(pos, cam_pos, rng);
         const int3 gidx = grid_idx(pos, grid_inv_width_for_level(level), rng);
         if (find(get_hash_grid_pos(gidx, level, normal)).is_valid())
-            return normal_bin(normal);
+            return normal_bin(normal, level);
         return MERIAN_HASH_GRID_INVALID_SLOT;
     }
 

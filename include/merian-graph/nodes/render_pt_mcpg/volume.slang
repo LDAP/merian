@@ -117,7 +117,7 @@ void render_pixel(const uint2 pixel,
         VonMisesFisher3<false> vmfs[mc_samples];
         float score_sum = 0.0;
         // the chains are normal-binned; a volume point has no normal, so bin by the view direction
-        const float3 access_normal = params.mcpg.jitter_normal(-primary_ray.Direction, rng);
+        const float3 access_normal = -primary_ray.Direction;
         for (int i = 0; i < mc_samples; i++) {
             HashGridPos grid_pos;
             uint level;

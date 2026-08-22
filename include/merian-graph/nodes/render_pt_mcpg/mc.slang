@@ -2,7 +2,6 @@ import merian_shaders.utils.grid;
 import merian_shaders.utils.random;
 import merian_shaders.utils.hash_grid;
 import merian_shaders.utils.frame;
-import merian_shaders.utils.sampling;
 __exported import merian_shaders.distributions.distribution;
 __exported import merian_shaders.distributions.von_mises_fisher;
 
@@ -130,21 +129,13 @@ struct MCPG<let ADAPTIVE_BUFFER_SIZE : uint,
              LOCALITY_BITS, true>
         grid;
 
-    float3 jitter_normal(const OrthonormalFrame shading_frame, inout RandomGenerator rng) {
-        return shading_frame.to_world(sample_cos(rng));
-    }
-
-    float3 jitter_normal(const float3 normal, inout RandomGenerator rng) {
-        return mul(sample_cos(rng), make_frame(normal));
-    }
-
     MCState load(const float3 pos,
                  const OrthonormalFrame shading_frame,
                  const float3 cam_pos,
                  const float time,
                  inout RandomGenerator rng) {
         // slang defaults initializes none optionals
-        var s = grid.distributed_get(pos, jitter_normal(shading_frame, rng), cam_pos, rng).value;
+        var s = grid.distributed_get(pos, shading_frame.get_normal(), cam_pos, rng).value;
         if (s.is_valid()) {
             s.set_w_tgt(s.w_tgt + s.sum_w * (time - s.T) * float3(s.mv));
         } else {

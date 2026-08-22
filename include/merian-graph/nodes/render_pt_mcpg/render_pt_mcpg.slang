@@ -79,7 +79,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         float score_sum = 0.0;
         float scores[mc_samples];
         VonMisesFisher3<false> vmfs[mc_samples];
-        const float3 access_normal = params.mcpg.jitter_normal(frame, rng);
+        const float3 access_normal = frame.get_normal();
         for (int i = 0; i < mc_samples; i++) {
             HashGridPos grid_pos;
             uint level;
@@ -323,7 +323,8 @@ void render_pixel(const uint2 pixel,
     }
     case 10: { // lc normal bin (actual)
         const float3 n = primary_sp.shading_normal;
-        params.debug[pixel] = float4(random_color(params.irr_cache.grid.normal_bin(n)), 1);
+        const uint level = params.irr_cache.grid.target_level_for_pos(primary_sp.pos, cam_pos, rng);
+        params.debug[pixel] = float4(random_color(params.irr_cache.grid.normal_bin(n, level)), 1);
         break;
     }
     case 11: { // lc normal bin (selected)
