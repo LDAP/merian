@@ -71,10 +71,22 @@ struct LightHit {
 // with probability p_env. All densities are per solid angle at the receiver.
 struct NEE {
     StructuredBuffer<EmissiveTriangle, ScalarDataLayout> triangles;
-    // inclusive prefix sum of the triangle flux
+    // inclusive prefix sum of the selection weights
     StructuredBuffer<float> cdf;
+    // per-triangle selection weight; the last cdf entry normalizes it
+    StructuredBuffer<float> weights;
+    // per-frame draws from the weights, small enough to stay in cache
+    StructuredBuffer<uint> pool;
+    // LIGHT_GRID_SLOTS lights per cell, resampled towards the cell every frame
+    StructuredBuffer<uint> grid;
     // GeometryID -> first triangle index, LIGHT_INVALID_INDEX for non-emissive geometry
     StructuredBuffer<uint> geometry_light_offsets;
+    StructuredBuffer<LightGridInfo, ScalarDataLayout> grid_info;
+    // probability of taking the cell list where one exists; the rest falls back to the pool so
+    // that no light is ever unreachable
+    float grid_probability;
+    uint pool_size;
+    uint selection;
     uint triangle_count;
     uint geometry_count;
     // 0 if the environment is not sampled
@@ -82,13 +94,24 @@ struct NEE {
     // UseEnvMap geometry exists: rays towards the environment must find the closest hit
     bool has_sky_portals;
     EnvImportance env_importance;
+    // texels drawn from env_importance this frame; empty while the descent is used per sample
+    StructuredBuffer<uint> env_pool;
+    uint env_pool_size;
 
-    float get_total_flux() {
+    // One load from the per-frame texel pool where it exists, the pyramid descent otherwise. Both
+    // draw the same distribution.
+    Optional<EnvSample> sample_env(inout RandomGenerator rng) {
+        if (env_pool_size > 0)
+            return env_importance.pool_sample(env_pool, env_pool_size, rng);
+        return env_importance.sample_direction(rng);
+    }
+
+    float get_total_weight() {
         return triangle_count > 0 ? cdf[triangle_count - 1] : 0.f;
     }
 
     bool has_emissive_triangles() {
-        return get_total_flux() > 0.f;
+        return get_total_weight() > 0.f;
     }
 
     bool has_lights() {
@@ -104,21 +127,95 @@ struct NEE {
 
     // --- triangle selection ---
 
-    // Selects a triangle with probability flux / total flux (upper_bound over the cdf).
-    uint select_triangle(const float u, out float p_select) {
-        const float total = cdf[triangle_count - 1];
-        const float target = u * total;
-        uint lo = 0;
-        uint hi = triangle_count - 1;
-        while (lo < hi) {
-            const uint mid = (lo + hi) >> 1;
-            if (cdf[mid] > target)
-                hi = mid;
-            else
-                lo = mid + 1;
+    // Cell holding pos, or LIGHT_INVALID_INDEX outside the grid.
+    uint get_grid_cell(const float3 pos) {
+        if (selection != LightSelection::LightSelectionGrid)
+            return LIGHT_INVALID_INDEX;
+        const LightGridInfo info = grid_info[0];
+        if (info.dimension == 0)
+            return LIGHT_INVALID_INDEX;
+        const int3 coord = int3(floor((pos - info.origin) * info.inv_cell_size));
+        if (any(coord < 0) || any(coord >= int(info.dimension)))
+            return LIGHT_INVALID_INDEX;
+        return uint(coord.x) + info.dimension * (uint(coord.y) + info.dimension * uint(coord.z));
+    }
+
+    // Slots holding this light, and slots holding nothing, over the slot count. The first is the
+    // density of a cell sample, the second the mass a cell hands back to the pool.
+    void scan_cell(const uint cell, const uint index, out float p_cell, out float p_fallback) {
+        uint count = 0;
+        uint empty = 0;
+        for (uint slot = 0; slot < LIGHT_GRID_SLOTS; slot++) {
+            const uint slot_index = grid[cell * LIGHT_GRID_SLOTS + slot];
+            count += uint(slot_index == index);
+            empty += uint(slot_index == LIGHT_INVALID_INDEX);
         }
-        p_select = triangles[lo].flux / total;
-        return lo;
+        p_cell = float(count) * (1.f / float(LIGHT_GRID_SLOTS));
+        p_fallback = float(empty) * (1.f / float(LIGHT_GRID_SLOTS));
+    }
+
+    // Probability of the global technique picking a light.
+    float get_global_select_pdf(const uint index) {
+        const float total = get_total_weight();
+        return total > 0.f ? weights[index] / total : 0.f;
+    }
+
+    // Chance of consulting the cell list at pos.
+    float get_grid_probability(const uint cell) {
+        return cell != LIGHT_INVALID_INDEX ? grid_probability : 0.f;
+    }
+
+    // Density with which select_light would pick this light in that cell: a mixture of the cell
+    // list and the global pool, so it is never zero for a light that can contribute.
+    float get_select_pdf(const uint cell, const uint index) {
+        const float p_grid = get_grid_probability(cell);
+        if (p_grid <= 0.f)
+            return get_global_select_pdf(index);
+
+        float p_cell, p_fallback;
+        scan_cell(cell, index, p_cell, p_fallback);
+        return p_grid * p_cell +
+               (1.f - p_grid + p_grid * p_fallback) * get_global_select_pdf(index);
+    }
+
+    // One load from the cell list, or from the per-frame pool. Only the power technique still
+    // searches the whole scene.
+    uint select_light(const uint cell, inout RandomGenerator rng, out float p_select) {
+        p_select = 0.f;
+        if (!(get_total_weight() > 0.f))
+            return LIGHT_INVALID_INDEX;
+
+        const float p_grid = get_grid_probability(cell);
+        uint index = LIGHT_INVALID_INDEX;
+
+        if (p_grid > 0.f && rng.next_float() < p_grid) {
+            const uint slot = min(uint(rng.next_float() * LIGHT_GRID_SLOTS), LIGHT_GRID_SLOTS - 1);
+            index = grid[cell * LIGHT_GRID_SLOTS + slot];
+        }
+        // an empty slot hands the sample back to the global technique, which get_select_pdf
+        // charges for
+        if (index == LIGHT_INVALID_INDEX) {
+            if (selection == LightSelection::LightSelectionPower || pool_size == 0) {
+                const float target = rng.next_float() * cdf[triangle_count - 1];
+                uint lo = 0;
+                uint hi = triangle_count - 1;
+                while (lo < hi) {
+                    const uint mid = (lo + hi) >> 1;
+                    if (cdf[mid] > target)
+                        hi = mid;
+                    else
+                        lo = mid + 1;
+                }
+                index = lo;
+            } else {
+                index = pool[min(uint(rng.next_float() * pool_size), pool_size - 1)];
+                if (index == LIGHT_INVALID_INDEX)
+                    return LIGHT_INVALID_INDEX;
+            }
+        }
+
+        p_select = get_select_pdf(cell, index);
+        return index;
     }
 
     Optional<uint> get_triangle_index(const GeometryID geometry_id, const uint primitive_id) {
@@ -202,14 +299,15 @@ struct NEE {
     // --- combined ---
 
     // Uniform point on a flux-selected light, without evaluating its emission.
-    Optional<LightPoint> sample_point(const float3 pos, inout RandomGenerator rng) {
+    Optional<LightPoint>
+    sample_point(const uint cell, const float3 pos, inout RandomGenerator rng) {
         const float p_e = get_env_probability();
         if (p_e <= 0.f && !has_emissive_triangles())
             return none;
 
         LightPoint lp;
         if (rng.next_float() < p_e) {
-            if (let es = env_importance.sample_direction(rng)) {
+            if (let es = sample_env(rng)) {
                 lp.pos = pos + es.dir * ENV_MAP_DISTANCE;
                 lp.index = LIGHT_ENV_INDEX;
                 return lp;
@@ -218,8 +316,8 @@ struct NEE {
         }
 
         float p_select;
-        const uint index = select_triangle(rng.next_float(), p_select);
-        if (p_select <= 0.f)
+        const uint index = select_light(cell, rng, p_select);
+        if (index == LIGHT_INVALID_INDEX || p_select <= 0.f)
             return none;
 
         const EmissiveTriangle tri = triangles[index];
@@ -236,7 +334,8 @@ struct NEE {
         return lp;
     }
 
-    Optional<LightSample> sample<Env : IEnvMap>(const float3 pos,
+    Optional<LightSample> sample<Env : IEnvMap>(const uint cell,
+                                                const float3 pos,
                                                 inout RandomGenerator rng,
                                                 const MaterialSystem material_system,
                                                 const Env env,
@@ -246,7 +345,7 @@ struct NEE {
             return none;
 
         if (rng.next_float() < p_e) {
-            if (let es = env_importance.sample_direction(rng)) {
+            if (let es = sample_env(rng)) {
                 LightSample ls;
                 ls.wo = es.dir;
                 ls.dist = SCENE_RAY_TMAX;
@@ -261,8 +360,8 @@ struct NEE {
         }
 
         float p_select;
-        const uint index = select_triangle(rng.next_float(), p_select);
-        if (p_select <= 0.f)
+        const uint index = select_light(cell, rng, p_select);
+        if (index == LIGHT_INVALID_INDEX || p_select <= 0.f)
             return none;
         const Optional<LightSample> opt = sample_triangle(index, pos, rng, material_system, time);
         if (!opt.hasValue)
@@ -280,24 +379,23 @@ struct NEE {
         return p_e > 0.f ? p_e * env_importance.pdf(dir) : 0.f;
     }
 
-    // Density of sample() producing the point where the ray meets the triangle index.
-    float pdf_index(const uint index, const float3 origin, const float3 dir) {
-        const float total = get_total_flux();
-        if (total <= 0.f)
-            return 0.f;
-        return (1.f - get_env_probability()) * (triangles[index].flux / total) *
+    // Density of sample() producing the point where the ray meets the triangle index. The
+    // selection depends on where the ray started, so the density does too.
+    float pdf_index(const uint cell, const uint index, const float3 origin, const float3 dir) {
+        return (1.f - get_env_probability()) * get_select_pdf(cell, index) *
                pdf_triangle(index, origin, dir);
     }
 
     // The light-sampling side of a hit on the given primitive.
-    LightHit get_light_hit(const GeometryID geometry_id,
+    LightHit get_light_hit(const uint cell,
+                           const GeometryID geometry_id,
                            const uint primitive_id,
                            const float3 origin,
                            const float3 dir) {
         LightHit lh;
         if (let index = get_triangle_index(geometry_id, primitive_id)) {
             lh.index = index;
-            lh.pdf = pdf_index(index, origin, dir);
+            lh.pdf = pdf_index(cell, index, origin, dir);
         }
         return lh;
     }

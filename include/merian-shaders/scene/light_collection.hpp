@@ -1,6 +1,7 @@
 #pragma once
 
 #include "merian-shaders/scene/light-data.slangh"
+#include "merian-shaders/scene/light-select.slangh"
 #include "merian/shader/shader_compile_context.hpp"
 #include "merian/shader/shader_cursor.hpp"
 #include "merian/shader/shader_object.hpp"
@@ -9,6 +10,7 @@
 #include "merian/shader/slang_entry_point.hpp"
 #include "merian/shader/slang_program.hpp"
 #include "merian/utils/versioned.hpp"
+#include "merian/vk/memory/resource_allocations.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 
@@ -45,7 +47,8 @@ class LightCollection {
     void update(const CommandBufferHandle& cmd,
                 const SlangCompositionHandle& scene_composition,
                 const ShaderObjectHandle& scene_object,
-                const ShaderObjectAllocatorHandle& obj_allocator);
+                const ShaderObjectAllocatorHandle& obj_allocator,
+                uint32_t frame);
 
     // Binds the buffers to a merian::NEE cursor.
     void write_to(ShaderCursor cursor) const;
@@ -82,6 +85,15 @@ class LightCollection {
         env_emissive = value;
     }
 
+    // The grid follows the camera.
+    void set_acceleration_structure(const AccelerationStructureHandle& as) {
+        acceleration_structure = as;
+    }
+
+    void set_camera(const float3& position) {
+        camera_position = position;
+    }
+
     // Whether UseEnvMap geometry exists (rays to the environment must not stop at it).
     void set_has_sky_portals(const bool value) {
         has_sky_portals = value;
@@ -93,6 +105,10 @@ class LightCollection {
         return 1u << static_cast<uint32_t>(env_importance_log2);
     }
     uint32_t env_importance_quad_count() const;
+    uint32_t grid_cell_count() const {
+        const uint32_t d = static_cast<uint32_t>(grid_dimension);
+        return d * d * d;
+    }
     void ensure_buffer(BufferHandle& buffer,
                        vk::DeviceSize size,
                        const std::string& name,
@@ -103,6 +119,18 @@ class LightCollection {
     ResourceAllocatorHandle allocator;
 
     bool enabled = true;
+    int32_t selection = LightSelection::LightSelectionGrid;
+    int32_t env_selection = EnvSelection::EnvSelectionPool;
+    int32_t env_pool_size = 8192;
+    int32_t pool_size = 4096;
+    int32_t grid_dimension = 32;
+    int32_t grid_candidates = 8;
+    float grid_probability = 0.7f;
+    AccelerationStructureHandle acceleration_structure;
+    float grid_cell_size = 0.f; // 0: derived from the light bounds
+    float grid_coverage = 0.5f;
+    bool grid_visibility = true;
+    float3 camera_position{0.f};
     float env_probability = 0.5f;
     bool env_emissive = false;
     bool has_sky_portals = false;
@@ -119,6 +147,11 @@ class LightCollection {
     ShaderObjectAllocatorHandle fallback_obj_allocator;
 
     BufferHandle env_importance_buffer;
+    BufferHandle env_pool_buffer;
+    BufferHandle weights_buffer;
+    BufferHandle pool_buffer;
+    BufferHandle grid_buffer;
+    BufferHandle grid_info_buffer;
     BufferHandle triangles_buffer;
     BufferHandle cdf_buffer;
     BufferHandle light_geometries_buffer;
@@ -130,8 +163,26 @@ class LightCollection {
     Versioned<Pipeline> update_pipeline;
     Versioned<ShaderObject> update_params;
 
+    SlangCompositionHandle preprocess_composition;
+    Versioned<SlangProgram> preprocess_program;
+    Versioned<SlangProgramEntryPoint> setup_entry_point;
+    Versioned<SlangProgramEntryPoint> weights_entry_point;
+    Versioned<SlangProgramEntryPoint> pool_entry_point;
+    Versioned<SlangProgramEntryPoint> grid_entry_point;
+    Versioned<Pipeline> setup_pipeline;
+    Versioned<Pipeline> weights_pipeline;
+    Versioned<Pipeline> pool_pipeline;
+    Versioned<Pipeline> grid_pipeline;
+    Versioned<ShaderObject> setup_params;
+    Versioned<ShaderObject> weights_params;
+    Versioned<ShaderObject> pool_params;
+    Versioned<ShaderObject> grid_params;
+
     SlangCompositionHandle env_composition;
     Versioned<SlangProgram> env_program;
+    Versioned<SlangProgramEntryPoint> env_pool_entry_point;
+    Versioned<Pipeline> env_pool_pipeline;
+    Versioned<ShaderObject> env_pool_params;
     Versioned<SlangProgramEntryPoint> env_build_entry_point;
     Versioned<SlangProgramEntryPoint> env_reduce_entry_point;
     Versioned<Pipeline> env_build_pipeline;

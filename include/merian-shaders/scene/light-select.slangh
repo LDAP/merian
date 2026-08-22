@@ -1,0 +1,60 @@
+#pragma once
+
+#ifdef __cplusplus
+#include "merian-shaders/types.slang.h"
+#include <cstdint>
+#endif
+
+namespace merian {
+
+// How a light is chosen for a shading point. All three build their tables in a per-frame
+// preprocess; the per-sample work is what differs.
+enum LightSelection : uint32_t {
+    // Proportional to emitted power. One binary search over the whole scene, blind to where the
+    // shading point is.
+    LightSelectionPower = 0,
+    // The same distribution drawn from a per-frame pool of pre-resampled lights: one load, and
+    // the pool is small enough to stay in cache.
+    LightSelectionPool = 1,
+    // Per-frame world-space grid: each cell keeps a short list resampled towards that cell, so
+    // the choice follows the shading point. One load plus a scan of the list for the density.
+    LightSelectionGrid = 2,
+};
+
+// How a direction towards the environment is chosen.
+enum EnvSelection : uint32_t {
+    // Hierarchical warp over the importance pyramid, per sample.
+    EnvSelectionWarp = 0,
+    // Per-frame pool of texels drawn by that warp; the sample is one load plus a jitter.
+    EnvSelectionPool = 1,
+};
+
+// Lights per grid cell. The density of a cell sample is the number of slots holding that light
+// divided by this, so the scan that evaluates it stays inside one cache line.
+#ifdef __cplusplus
+static constexpr uint32_t LIGHT_GRID_SLOTS = 8;
+#else
+static const uint LIGHT_GRID_SLOTS = 8;
+#endif
+
+// Camera-anchored uniform grid; cells outside it fall back to the pool. Derived on the GPU from
+// the bounds of the emissive geometry, which the scene itself may not know.
+struct LightGridInfo {
+    float3 origin;
+    float inv_cell_size;
+    uint32_t dimension; // cells per side, 0 while the grid is unused
+};
+
+#ifndef __cplusplus
+// Monotonic float <-> uint mapping so that InterlockedMin/Max order floats correctly.
+uint float_to_ordered(const float f) {
+    const uint u = asuint(f);
+    return (u & 0x80000000u) != 0 ? ~u : (u | 0x80000000u);
+}
+
+float ordered_to_float(const uint u) {
+    return asfloat((u & 0x80000000u) != 0 ? (u & 0x7FFFFFFFu) : ~u);
+}
+#endif
+
+} // namespace merian

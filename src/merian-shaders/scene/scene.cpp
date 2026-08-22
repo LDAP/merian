@@ -2074,9 +2074,13 @@ void Scene::update(const CommandBufferHandle& cmd,
     // Binds the scene object, so every write to it must precede this (descriptor sets are not
     // update-after-bind).
     lights.set_env_emissive(env_map->is_emissive());
+    lights.set_camera(cam->get_position());
+    if (as_supported && tlas) {
+        lights.set_acceleration_structure(tlas);
+    }
     lights.prepare(cmd);
     lights.write_to(c["nee"]);
-    lights.update(cmd, composition, shader_object.get(), obj_allocator);
+    lights.update(cmd, composition, shader_object.get(), obj_allocator, frame);
 }
 
 } // namespace merian

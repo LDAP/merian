@@ -43,12 +43,14 @@ struct EnvImportance {
     }
 
     // Descends the pyramid, splitting the random numbers by the four children at every step.
-    Optional<EnvSample> sample_direction(inout RandomGenerator rng) {
+    // Returns the texel and the leftover random numbers, which are uniform inside it.
+    bool sample_texel(inout RandomGenerator rng, out uint2 texel, out float2 u) {
+        texel = uint2(0);
+        u = float2(0);
         if (!is_valid())
-            return none;
+            return false;
 
-        float2 u = rng.next_float2();
-        uint2 texel = uint2(0);
+        u = rng.next_float2();
         for (int level = int(level_count) - 2; level >= 0; level--) {
             // x = (0,0), y = (1,0), z = (0,1), w = (1,1) in Morton order
             const float4 w = load_quad(level, texel);
@@ -58,7 +60,7 @@ struct EnvImportance {
             const float top = w.x + w.y;
             const float total = top + w.z + w.w;
             if (!(total > 0.f))
-                return none;
+                return false;
             const float p_top = top / total;
             const bool bottom = u.y >= p_top;
             u.y = bottom ? (u.y - p_top) / (1.f - p_top) : u.y / p_top;
@@ -69,7 +71,11 @@ struct EnvImportance {
             u.x = right ? (u.x - p_left) / (1.f - p_left) : u.x / p_left;
             texel += uint2(right ? 1 : 0, bottom ? 1 : 0);
         }
+        return true;
+    }
 
+    // A direction uniformly inside the texel, with the density the descent gave it.
+    Optional<EnvSample> texel_sample(const uint2 texel, const float2 u) {
         const float value = texel_value(texel);
         if (!(value > 0.f))
             return none;
@@ -79,6 +85,27 @@ struct EnvImportance {
         s.pdf = value / (get_average() * MERIAN_FOUR_PI);
         s.Le = float3(0);
         return s;
+    }
+
+    Optional<EnvSample> sample_direction(inout RandomGenerator rng) {
+        uint2 texel;
+        float2 u;
+        if (!sample_texel(rng, texel, u))
+            return none;
+        return texel_sample(texel, u);
+    }
+
+    // One load instead of a descent: the pool holds texels the descent drew this frame, so the
+    // density is unchanged.
+    Optional<EnvSample> pool_sample(const StructuredBuffer<uint> pool,
+                                    const uint pool_size,
+                                    inout RandomGenerator rng) {
+        if (!is_valid() || pool_size == 0)
+            return none;
+        const uint packed = pool[min(uint(rng.next_float() * pool_size), pool_size - 1)];
+        if (packed == 0xFFFFFFFFu)
+            return none;
+        return texel_sample(uint2(packed & 0xFFFFu, packed >> 16u), rng.next_float2());
     }
 
     float texel_value(const uint2 texel) {

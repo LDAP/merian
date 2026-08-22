@@ -1,8 +1,10 @@
 #pragma once
 
 #ifdef __cplusplus
+#include "merian-shaders/scene/light-select.slangh"
 #include "merian-shaders/scene/scene-data.slangh"
 #else
+__exported import merian_shaders.scene.light_select;
 import merian_shaders.scene.scene_data;
 #endif
 

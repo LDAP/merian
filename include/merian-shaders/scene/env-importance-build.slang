@@ -2,8 +2,11 @@
 
 import merian_shaders.scene.scene;
 import merian_shaders.utils.envmap;
+import merian_shaders.scene.env_importance;
 import merian_shaders.utils.morton;
 import merian_shaders.utils.pseudorandom;
+import merian_shaders.utils.hash;
+import merian_shaders.utils.random;
 import merian_shaders.colors.colorspaces;
 
 using merian;
@@ -14,6 +17,15 @@ struct EnvImportanceBinding {
     uint level;
     // texels per side of the level being written
     uint level_size;
+};
+
+struct EnvPoolBinding {
+    StructuredBuffer<float4> levels;
+    RWStructuredBuffer<uint> pool;
+    uint size;
+    uint level_count;
+    uint pool_size;
+    uint frame;
 };
 
 // First quad of a level; every level holds its texels in Morton order, four per entry.
@@ -66,4 +78,24 @@ uint quad_child(const uint2 texel) {
 
     params.levels[level_offset(params.size, params.level) + quad_index(thread_id.xy)]
                  [quad_child(thread_id.xy)] = mean;
+}
+
+// Draws the pool the samplers load from: one descent per entry, once per frame instead of once
+// per sample.
+[shader("compute")][numthreads(64, 1, 1)] void env_pool(uint3 thread_id : SV_DispatchThreadID,
+                                                        ParameterBlock<EnvPoolBinding> params) {
+    const uint i = thread_id.x;
+    if (i >= params.pool_size)
+        return;
+
+    EnvImportance importance;
+    importance.levels = params.levels;
+    importance.size = params.size;
+    importance.level_count = params.level_count;
+
+    RandomGenerator rng = PCG(xxhash32(uint2(i, params.frame)));
+    uint2 texel;
+    float2 u;
+    params.pool[i] =
+        importance.sample_texel(rng, texel, u) ? (texel.x | (texel.y << 16u)) : 0xFFFFFFFFu;
 }

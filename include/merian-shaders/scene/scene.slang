@@ -482,14 +482,22 @@ struct Scene {
 
     // -----------------------------------------
 
+    // The light grid cell of a shading point. Sampling and density evaluation must use the same
+    // one, so it is taken once per vertex and passed to both.
+    uint get_light_cell(const float3 pos) {
+        return nee.get_grid_cell(pos);
+    }
+
     // Next event estimation: one light sample for the receiver at pos (unshadowed).
-    Optional<LightSample> sample_light(const float3 pos, inout RandomGenerator rng) {
-        return nee.sample(pos, rng, material_system, env_map, time);
+    Optional<LightSample>
+    sample_light(const uint cell, const float3 pos, inout RandomGenerator rng) {
+        return nee.sample(cell, pos, rng, material_system, env_map, time);
     }
 
     // A point on a light without its radiance, for the mixture estimator.
-    Optional<LightPoint> sample_light_point(const float3 pos, inout RandomGenerator rng) {
-        return nee.sample_point(pos, rng);
+    Optional<LightPoint>
+    sample_light_point(const uint cell, const float3 pos, inout RandomGenerator rng) {
+        return nee.sample_point(cell, pos, rng);
     }
 
     // Ray from the receiver (offset along its face normal) towards a point on a light. Distant
@@ -552,13 +560,14 @@ struct Scene {
     // Which light the ray from origin along dir ended on, and the density with which
     // sample_light would have generated that point. For MIS against scatter sampling;
     // independent of the shading point, so it can run before the hit is shaded.
-    LightHit get_light_hit(const float3 origin, const float3 dir, const Hit hit) {
+    LightHit get_light_hit(const uint cell, const float3 origin, const float3 dir, const Hit hit) {
         bool distant = !hit.is_valid();
         if (!distant) {
             const GeometryData gd = get_geometry_data(hit.instance_id, hit.geometry_index);
             distant = (gd.flags & GeometryDataFlags::UseEnvMap) != 0;
             if (!distant)
-                return nee.get_light_hit(hit.get_geometry_id(), hit.primitive_id, origin, dir);
+                return nee.get_light_hit(cell, hit.get_geometry_id(), hit.primitive_id, origin,
+                                         dir);
         }
         LightHit lh;
         lh.index = LIGHT_ENV_INDEX;

@@ -115,11 +115,12 @@ float3 trace_path(const ParameterBlock<Scene> scene,
                                       m_bsdf.alpha >= NEE_MIN_ALPHA
                                   ? merian_render_nee_probability
                                   : 0.f;
+        const uint light_cell = nee_here ? scene.get_light_cell(cur_pos) : LIGHT_INVALID_INDEX;
         const bool light_technique = p_light > 0.f && rng.next_float() < p_light;
         uint sampled_light = LIGHT_INVALID_INDEX;
         float3 light_dir = float3(0, 0, 1);
         if (light_technique) {
-            if (let ls = scene.sample_light_point(cur_pos, rng)) {
+            if (let ls = scene.sample_light_point(light_cell, cur_pos, rng)) {
                 // aiming at the point keeps the ray on the light at grazing angles
                 light_dir = normalize(ls.pos - cur_pos);
                 sampled_light = ls.index;
@@ -166,7 +167,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         if (merian_render_nee_mode == NEE_MODE_RESAMPLED && nee_here) {
             DirectLightReservoir reservoir = DirectLightReservoir();
             for (uint i = 0; i < nee_candidates; i++) {
-                if (let ls = scene.sample_light(cur_pos, rng)) {
+                if (let ls = scene.sample_light(light_cell, cur_pos, rng)) {
                     const float3 wo_l = frame.to_local(ls.wo);
                     reservoir.add_light(
                         ls,
@@ -251,7 +252,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
             // it
             float mis_weight = 1.f;
             if (nee_here && !delta) {
-                const LightHit lh = scene.get_light_hit(ray.Origin, ray.Direction, hit);
+                const LightHit lh = scene.get_light_hit(light_cell, ray.Origin, ray.Direction, hit);
                 if (merian_render_nee_mode == NEE_MODE_MIXTURE) {
                     wo_p += p_light * lh.pdf;
                     // a light sample that reached something else is occluded: the vertex the ray
