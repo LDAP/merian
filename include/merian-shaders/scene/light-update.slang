@@ -15,39 +15,7 @@ struct LightUpdateBinding {
     uint triangle_count;
     // emission evaluations per triangle for the flux estimate
     uint flux_samples;
-    // rays that will sample these lights only see instances in this mask
-    uint instance_mask;
-    // 0 skips the reachability probe below
-    uint validate;
 };
-
-// Whether the tracer can reach this record where it claims to be. A record that fails describes
-// an emitter no ray can be blocked by, so next event estimation would add light the scatter
-// technique cannot weigh against — both count it in full. One short ray per triangle per frame
-// settles it, and a wrong verdict cannot bias the image: a zero weight hands the emitter back to
-// the scatter technique, which then carries it alone at MIS weight one.
-bool reachable(const ParameterBlock<Scene> scene,
-               const EmissiveTriangle tri,
-               const GeometryID geometry_id,
-               const uint instance_mask) {
-    const float3 scaled_n = tri.get_scaled_normal();
-    const float area2 = length(scaled_n);
-    if (area2 <= 0.f)
-        return false;
-
-    const float3 n = scaled_n / area2;
-    const float3 centroid = (tri.p0 + tri.p1 + tri.p2) * (1.f / 3.f);
-    const float offset = max(1e-3f * length(centroid), 1e-2f);
-
-    RayDesc probe;
-    probe.Origin = centroid + n * offset;
-    probe.Direction = -n;
-    probe.TMin = 0.f;
-    probe.TMax = 2.f * offset;
-
-    const Hit hit = scene.trace_ray(probe, RAY_FLAG_NONE, instance_mask);
-    return hit.is_valid() && hit.get_geometry_id() == geometry_id;
-}
 
 // light geometry containing triangle index i (upper_bound over first_triangle)
 uint find_light_geometry(const ParameterBlock<LightUpdateBinding> params, const uint i) {
@@ -102,7 +70,8 @@ uint find_light_geometry(const ParameterBlock<LightUpdateBinding> params, const 
     tri.flags = two_sided ? EmissiveTriangleFlags::EmissiveTwoSided : EmissiveTriangleFlags(0);
 
     // flux = pi * area * mean radiance (diffuse emitter) per visible face, estimated at
-    // stratified points
+    // stratified points. Cutout texels are no surface (the tracer passes through them) and
+    // contribute nothing.
     const float3 scaled_n = tri.get_scaled_normal();
     const float area2 = length(scaled_n);
     float flux = 0.f;
@@ -118,6 +87,8 @@ uint find_light_geometry(const ParameterBlock<LightUpdateBinding> params, const 
             const float3 bary = float3(1.f - su, su * (1.f - u.y), su * u.y);
             const float3 pos = tri.get_position(bary);
             const float2 uv = tri.get_uv(bary);
+            if (scene.material_system.alpha_test(gd.material_id, uv))
+                continue;
             luminance_sum += yuv_luminance(scene.material_system.get_emission(
                 gd.material_id,
                 ShadingData(n, pos, uv, scene.time, OrthonormalFrame(n), n, uint16_t(1), 1.0f,
@@ -132,10 +103,6 @@ uint find_light_geometry(const ParameterBlock<LightUpdateBinding> params, const 
             }
         }
         flux = MERIAN_PI * 0.5f * area2 * luminance_sum / float(params.flux_samples);
-    }
-    if (params.validate != 0 && flux > 0.f &&
-        !reachable(scene, tri, lg.geometry_id, params.instance_mask)) {
-        flux = 0.f;
     }
     tri.flux = isfinite(flux) ? flux : 0.f;
 

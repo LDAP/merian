@@ -255,6 +255,10 @@ struct NEE {
         const EmissiveTriangle tri = triangles[index];
         const float3 bary = merian::sample_triangle(rng);
         const float3 light_pos = tri.get_position(bary);
+        const float2 uv = tri.get_uv(bary);
+        // a cutout texel is no surface: the tracer passes through it, so it emits nothing
+        if (material_system.alpha_test(tri.material_id, uv))
+            return none;
 
         const float3 scaled_n = tri.get_scaled_normal();
         const float area2 = length(scaled_n);
@@ -281,8 +285,8 @@ struct NEE {
         if (cos_l <= 0.f)
             return none;
 
-        const ShadingData sd = ShadingData(-wo, light_pos, tri.get_uv(bary), time,
-                                           OrthonormalFrame(n), n, uint16_t(1), 1.0f, front_facing);
+        const ShadingData sd = ShadingData(-wo, light_pos, uv, time, OrthonormalFrame(n), n,
+                                           uint16_t(1), 1.0f, front_facing);
 
         LightSample ls;
         ls.wo = wo;

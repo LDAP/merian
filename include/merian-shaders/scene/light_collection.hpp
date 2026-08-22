@@ -135,8 +135,6 @@ class LightCollection {
     float env_probability = 0.5f;
     bool env_emissive = false;
     bool has_sky_portals = false;
-    bool validate_lights = true;
-    int32_t instance_mask = 0xFF;
     int32_t flux_samples = 32;
     // log2 side length of the equal-area octahedral importance map over the environment
     int32_t env_importance_log2 = 8;
