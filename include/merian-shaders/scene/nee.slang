@@ -75,8 +75,10 @@ struct NEE {
     StructuredBuffer<float> cdf;
     // per-triangle selection weight; the last cdf entry normalizes it
     StructuredBuffer<float> weights;
-    // per-frame draws from the weights, small enough to stay in cache
+    // per-frame draws from the weights, in tiles: every pixel of a screen tile draws from the
+    // same one, so the entries it touches stay in cache
     StructuredBuffer<uint> pool;
+    uint pool_tile_size;
     // LIGHT_GRID_SLOTS lights per cell, resampled towards the cell every frame
     StructuredBuffer<uint> grid;
     // GeometryID -> first triangle index, LIGHT_INVALID_INDEX for non-emissive geometry
@@ -165,6 +167,15 @@ struct NEE {
         return max(gap, 0.f) / total;
     }
 
+    // First entry of the tile a shading point draws from. Which tile it is does not change the
+    // density: every entry is an independent draw from the same distribution.
+    uint pool_offset(const uint bucket) {
+        if (pool_size <= pool_tile_size || bucket == LIGHT_INVALID_INDEX)
+            return 0;
+        const uint tiles = pool_size / pool_tile_size;
+        return (bucket % tiles) * pool_tile_size;
+    }
+
     // Chance of consulting the cell list at pos.
     float get_grid_probability(const uint cell) {
         return cell != LIGHT_INVALID_INDEX ? grid_probability : 0.f;
@@ -213,7 +224,8 @@ struct NEE {
                 }
                 index = lo;
             } else {
-                index = pool[min(uint(rng.next_float() * pool_size), pool_size - 1)];
+                index = pool[pool_offset(cell) +
+                             min(uint(rng.next_float() * pool_tile_size), pool_tile_size - 1)];
                 if (index == LIGHT_INVALID_INDEX)
                     return LIGHT_INVALID_INDEX;
             }

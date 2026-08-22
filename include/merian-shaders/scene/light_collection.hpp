@@ -123,6 +123,7 @@ class LightCollection {
     int32_t env_selection = EnvSelection::EnvSelectionPool;
     int32_t env_pool_size = 8192;
     int32_t pool_size = 4096;
+    int32_t pool_tile_size = 256;
     int32_t grid_dimension = 32;
     int32_t grid_candidates = 8;
     float grid_probability = 0.7f;

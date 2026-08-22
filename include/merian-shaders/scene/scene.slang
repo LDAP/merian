@@ -482,10 +482,15 @@ struct Scene {
 
     // -----------------------------------------
 
-    // The light grid cell of a shading point. Sampling and density evaluation must use the same
-    // one, so it is taken once per vertex and passed to both.
-    uint get_light_cell(const float3 pos) {
-        return nee.get_grid_cell(pos);
+    // Which pre-resampled bucket a shading point draws from: a grid cell where the grid is used,
+    // otherwise the light tile its screen tile shares. Sampling and density evaluation must agree,
+    // so it is taken once per vertex and passed to both.
+    uint get_light_bucket(const uint2 pixel, const float3 pos) {
+        const uint cell = nee.get_grid_cell(pos);
+        if (cell != LIGHT_INVALID_INDEX)
+            return cell;
+        // 16 x 16 pixels share a tile
+        return xxhash32(uint3(pixel >> 4, frame));
     }
 
     // Next event estimation: one light sample for the receiver at pos (unshadowed).

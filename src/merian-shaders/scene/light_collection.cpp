@@ -454,6 +454,8 @@ void LightCollection::write_to(ShaderCursor cursor) const {
     cursor["pool_size"] = active && selection != LightSelection::LightSelectionPower
                               ? static_cast<uint32_t>(pool_size)
                               : 0u;
+    cursor["pool_tile_size"] =
+        std::min(static_cast<uint32_t>(pool_tile_size), static_cast<uint32_t>(pool_size));
     cursor["selection"] = static_cast<uint32_t>(selection);
     cursor["grid_probability"] = grid_probability;
     cursor["triangle_count"] = active ? triangle_count : 0u;
@@ -492,6 +494,10 @@ void LightCollection::properties(Properties& props) {
                          "How a light is chosen: a search over the whole scene, one load from a "
                          "pre-resampled pool, or one load from a per-frame world-space grid.");
     if (selection != LightSelection::LightSelectionPower) {
+        props.config_int("pool tile size", pool_tile_size,
+                         "Lights a screen tile draws from. Smaller keeps the entries in cache; the "
+                         "density does not depend on it.",
+                         16, 65536);
         props.config_int("pool size", pool_size,
                          "Lights pre-resampled per frame; a sample is one load from it.", 64,
                          65536);

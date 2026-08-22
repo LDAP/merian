@@ -71,6 +71,7 @@ float directional_pdf<B : BSDF>(const B bsdf,
 
 float3 trace_path(const ParameterBlock<Scene> scene,
                   const ParameterBlock<RenderBinding> params,
+                  const uint2 pixel,
                   RayDesc ray,
                   ShadingPoint sp,
                   const int sample_i,
@@ -115,12 +116,13 @@ float3 trace_path(const ParameterBlock<Scene> scene,
                                       m_bsdf.alpha >= NEE_MIN_ALPHA
                                   ? merian_render_nee_probability
                                   : 0.f;
-        const uint light_cell = nee_here ? scene.get_light_cell(cur_pos) : LIGHT_INVALID_INDEX;
+        const uint light_bucket =
+            nee_here ? scene.get_light_bucket(pixel, cur_pos) : LIGHT_INVALID_INDEX;
         const bool light_technique = p_light > 0.f && rng.next_float() < p_light;
         uint sampled_light = LIGHT_INVALID_INDEX;
         float3 light_dir = float3(0, 0, 1);
         if (light_technique) {
-            if (let ls = scene.sample_light_point(light_cell, cur_pos, rng)) {
+            if (let ls = scene.sample_light_point(light_bucket, cur_pos, rng)) {
                 // aimed from where the ray will start: a direction taken from the unoffset point
                 // misses the sampled triangle near its edges
                 const float3 ng = cur_face_normal;
@@ -171,7 +173,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         if (merian_render_nee_mode == NEE_MODE_RESAMPLED && nee_here) {
             DirectLightReservoir reservoir = DirectLightReservoir();
             for (uint i = 0; i < nee_candidates; i++) {
-                if (let ls = scene.sample_light(light_cell, cur_pos, rng)) {
+                if (let ls = scene.sample_light(light_bucket, cur_pos, rng)) {
                     const float3 wo_l = frame.to_local(ls.wo);
                     reservoir.add_light(
                         ls,
@@ -256,7 +258,8 @@ float3 trace_path(const ParameterBlock<Scene> scene,
             // it
             float mis_weight = 1.f;
             if (nee_here && !delta) {
-                const LightHit lh = scene.get_light_hit(light_cell, ray.Origin, ray.Direction, hit);
+                const LightHit lh =
+                    scene.get_light_hit(light_bucket, ray.Origin, ray.Direction, hit);
                 if (merian_render_nee_mode == NEE_MODE_MIXTURE) {
                     wo_p += p_light * lh.pdf;
                     // a light sample that reached something else is occluded: the vertex the ray
@@ -351,7 +354,7 @@ void render_pixel(const uint2 pixel,
 
     for (int sample_i = 0; sample_i < merian_render_spp; sample_i++) {
         const float3 contrib =
-            trace_path(scene, params, primary_ray, primary_sp, sample_i, rng) / demod_albedo;
+            trace_path(scene, params, pixel, primary_ray, primary_sp, sample_i, rng) / demod_albedo;
 
         if (!any(isnan(contrib)) && !any(isinf(contrib))) {
             irradiance += contrib;
