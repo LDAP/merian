@@ -120,7 +120,7 @@ class LightCollection {
     ResourceAllocatorHandle allocator;
 
     bool enabled = true;
-    int32_t selection = LightSelection::LightSelectionGrid;
+    int32_t selection = LightSelection::LightSelectionPool;
     int32_t env_selection = EnvSelection::EnvSelectionPool;
     int32_t env_pool_size = 8192;
     int32_t pool_size = 4096;
