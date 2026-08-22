@@ -154,10 +154,15 @@ struct NEE {
         p_fallback = float(empty) * (1.f / float(LIGHT_GRID_SLOTS));
     }
 
-    // Probability of the global technique picking a light.
+    // Probability of the global technique picking a light. Taken from the stored prefix sums,
+    // not from the weight: with many lights the difference of two neighbouring sums is what the
+    // search actually realizes, and the two disagree once the sums lose the weight in rounding.
     float get_global_select_pdf(const uint index) {
         const float total = get_total_weight();
-        return total > 0.f ? weights[index] / total : 0.f;
+        if (!(total > 0.f))
+            return 0.f;
+        const float gap = index == 0 ? cdf[0] : cdf[index] - cdf[index - 1];
+        return max(gap, 0.f) / total;
     }
 
     // Chance of consulting the cell list at pos.

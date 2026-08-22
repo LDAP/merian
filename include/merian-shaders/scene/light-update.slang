@@ -15,7 +15,38 @@ struct LightUpdateBinding {
     uint triangle_count;
     // emission evaluations per triangle for the flux estimate
     uint flux_samples;
+    // rays that will sample these lights only see instances in this mask
+    uint instance_mask;
+    // 0 skips the reachability probe below
+    uint validate;
 };
+
+// A record the tracer cannot reach where it claims to be is not a light: sampling it would add
+// light that no ray can be blocked by. Costs one short ray per triangle per frame; marking a real
+// light unreachable only loses next event estimation for it, never energy, because a zero weight
+// hands the light back to the scatter technique in full.
+bool reachable(const ParameterBlock<Scene> scene,
+               const EmissiveTriangle tri,
+               const GeometryID geometry_id,
+               const uint instance_mask) {
+    const float3 scaled_n = tri.get_scaled_normal();
+    const float area2 = length(scaled_n);
+    if (area2 <= 0.f)
+        return false;
+
+    const float3 n = scaled_n / area2;
+    const float3 centroid = (tri.p0 + tri.p1 + tri.p2) * (1.f / 3.f);
+    const float offset = max(1e-3f * length(centroid), 1e-2f);
+
+    RayDesc probe;
+    probe.Origin = centroid + n * offset;
+    probe.Direction = -n;
+    probe.TMin = 0.f;
+    probe.TMax = 2.f * offset;
+
+    const Hit hit = scene.trace_ray(probe, RAY_FLAG_NONE, instance_mask);
+    return hit.is_valid() && hit.get_geometry_id() == geometry_id;
+}
 
 // light geometry containing triangle index i (upper_bound over first_triangle)
 uint find_light_geometry(const ParameterBlock<LightUpdateBinding> params, const uint i) {
@@ -100,6 +131,10 @@ uint find_light_geometry(const ParameterBlock<LightUpdateBinding> params, const 
             }
         }
         flux = MERIAN_PI * 0.5f * area2 * luminance_sum / float(params.flux_samples);
+    }
+    if (params.validate != 0 && flux > 0.f &&
+        !reachable(scene, tri, lg.geometry_id, params.instance_mask)) {
+        flux = 0.f;
     }
     tri.flux = isfinite(flux) ? flux : 0.f;
 

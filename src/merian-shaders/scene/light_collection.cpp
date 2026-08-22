@@ -330,6 +330,8 @@ void LightCollection::update(const CommandBufferHandle& cmd,
         c["light_geometry_count"] = static_cast<uint32_t>(light_geometries.size());
         c["triangle_count"] = triangle_count;
         c["flux_samples"] = static_cast<uint32_t>(flux_samples);
+        c["instance_mask"] = static_cast<uint32_t>(instance_mask);
+        c["validate"] = static_cast<uint32_t>(validate_lights ? 1 : 0);
 
         cmd->bind(pipe);
         ep->bind("scene", scene_object, cmd, pipe, obj_allocator);
@@ -511,6 +513,9 @@ void LightCollection::properties(Properties& props) {
         props.config_bool("grid visibility", grid_visibility,
                           "Drop cell entries the cell cannot see. Costs one ray per slot.");
     }
+    props.config_bool("validate lights", validate_lights,
+                      "Drop emitters the tracer cannot reach where they claim to be. Costs one "
+                      "short ray per emissive triangle per frame.");
     props.config_int("flux samples", flux_samples,
                      "Emission evaluations per triangle for the flux estimate.", 1, 256);
     int32_t env_size_option = env_importance_log2 - 6;
