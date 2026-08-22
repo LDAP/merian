@@ -5,7 +5,6 @@ namespace merian {
 
 // A medium with constant coefficients. Implementations are selected statically, so Vacuum folds
 // the medium out of a renderer entirely rather than being branched around at runtime.
-[anyValueSize(48)]
 interface HomogeneousVolume {
     associatedtype PhaseFunctionImpl : PhaseFunction;
 
