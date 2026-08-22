@@ -1,4 +1,5 @@
 #include "merian-graph/nodes/render_pt/render_pt.hpp"
+#include "merian-graph/nodes/render_pt_mcpg/mcpg_guiding_model.hpp"
 
 #include "merian/shader/shader_compile_context.hpp"
 #include "merian/vk/pipeline/pipeline_ray_tracing_builder.hpp"
@@ -7,10 +8,15 @@
 
 namespace merian {
 
-RenderPT::RenderPT() = default;
+RenderPT::RenderPT() : guiding(std::make_shared<NullGuidingModel>()) {}
 
 DeviceSupportInfo RenderPT::query_device_support(const DeviceSupportQueryInfo& query_info) {
     const auto composition = Scene::query_device_support_composition(query_info);
+    composition->add_composition(MCPGGuidingModel::query_device_support_composition());
+    composition->add_module_from_string(
+        "render_pt_guiding", "module render_pt_guiding;\n"
+                             "import \"merian-shaders/sampling/guiding.slang\";\n"
+                             "public typealias RenderGuiding = merian::NullGuidingModel;");
     composition->add_module_from_path("merian-graph/nodes/render_pt/render_pt.slang", true);
     const auto program = SlangProgram::create(query_info.compile_context, composition);
     return DeviceSupportInfo::check(query_info, {"rayTracingPipeline"}, {"rayQuery"}) &
@@ -21,6 +27,9 @@ void RenderPT::initialize(const ContextHandle& context, const ResourceAllocatorH
     this->context = context;
     this->resource_allocator = allocator;
     this->compile_context = context->get_shader_compile_context();
+
+    use_raygen = !context->get_device()->get_physical_device()->is_amd();
+    set_guiding(guiding_method);
 }
 
 std::vector<InputConnectorDescriptor> RenderPT::describe_inputs() {
@@ -60,29 +69,73 @@ RenderPT::NodeStatusFlags RenderPT::on_connected(const NodeIOLayout& io_layout,
     return {};
 }
 
+void RenderPT::set_guiding(const int32_t method) {
+    guiding_method = method;
+    // properties() can run before the node is initialized; initialize() replays the selection
+    if (!context) {
+        return;
+    }
+    switch (method) {
+    case GUIDING_MCPG: {
+        const bool split_storage = !context->get_device()->get_physical_device()->is_amd();
+        guiding =
+            std::make_shared<MCPGGuidingModel>(compile_context, resource_allocator, split_storage);
+        break;
+    }
+    default:
+        guiding = std::make_shared<NullGuidingModel>();
+        break;
+    }
+}
+
+void RenderPT::update_guiding_slot() {
+    std::string imports;
+    for (const std::string& import : guiding->get_slang_imports()) {
+        imports += fmt::format("import \"{}\";\n", import);
+    }
+    composition->add_composition(guiding->get_composition());
+    composition->add_module_from_string(
+        "render_pt_guiding", fmt::format("module render_pt_guiding;\n"
+                                         "import \"merian-shaders/sampling/guiding.slang\";\n"
+                                         "{}"
+                                         "public typealias RenderGuiding = {};",
+                                         imports, guiding->get_type_name()));
+}
+
 void RenderPT::ensure_pipeline(const SceneHandle& scene) {
     if (composition) {
         return;
     }
     composition = SlangComposition::create();
     composition->add_composition(scene->get_composition());
+    update_guiding_slot();
     composition->add_module_from_path("merian-graph/nodes/render_pt/render_pt.slang", true);
     update_render_constants();
 
     program = SlangProgram::create(compile_context, composition);
-    entry_point = SlangProgramEntryPoint::create(program, "main");
+    entry_point = SlangProgramEntryPoint::create(program, use_raygen ? "main" : "main_compute");
 
-    pipeline = Versioned<RayTracingPipeline>([this] {
-        const auto ep = entry_point.get();
-        return RayTracingPipelineBuilder()
-            .add_raygen_group(ep->specialize())
-            .build(ep->get_pipeline_layout(context));
-    });
-    pipeline.depends_on(entry_point);
+    if (use_raygen) {
+        pipeline = Versioned<Pipeline>([this] {
+            const auto ep = entry_point.get();
+            return RayTracingPipelineBuilder()
+                .add_raygen_group(ep->specialize())
+                .build(ep->get_pipeline_layout(context));
+        });
+        pipeline.depends_on(entry_point);
 
-    sbt = Versioned<ShaderBindingTable>(
-        [this] { return ShaderBindingTable::create(pipeline.get(), resource_allocator); });
-    sbt.depends_on(pipeline);
+        sbt = Versioned<ShaderBindingTable>([this] {
+            return ShaderBindingTable::create(
+                std::dynamic_pointer_cast<RayTracingPipeline>(pipeline.get()), resource_allocator);
+        });
+        sbt.depends_on(pipeline);
+    } else {
+        pipeline = Versioned<Pipeline>([this] {
+            const auto ep = entry_point.get();
+            return ComputePipeline::create(ep->get_pipeline_layout(context), ep->specialize());
+        });
+        pipeline.depends_on(entry_point);
+    }
 
     params = Versioned<ShaderObject>([this] {
         return entry_point->create_shader_object_for_parameter(context, "params",
@@ -111,15 +164,25 @@ RenderPT::process(const NodeIO& io, const NodeProcessInfo& info, Submission& sub
     const auto pipe = pipeline.get();
     const auto params_obj = params.get();
 
+    // Reset the persistent guiding state on the first frame of a run.
+    if (info.get_iteration() == 0) {
+        guiding->reset(cmd);
+    }
+
     auto cursor = params_obj->get_cursor();
     cursor["gbuffer"] = gbuf.r();
     cursor["irradiance"] = io[con_irradiance].get_texture();
+    guiding->write_to(cursor["guiding"]);
 
     cmd->bind(pipe);
     ep->bind("scene", scene->get_shader_object(), cmd, pipe, obj_allocator);
     ep->bind("params", params_obj, cmd, pipe, obj_allocator);
 
-    cmd->trace_rays(sbt.get(), extent);
+    if (use_raygen) {
+        cmd->trace_rays(sbt.get(), extent);
+    } else {
+        cmd->dispatch(extent, 8, 8);
+    }
     return {};
 }
 
@@ -148,8 +211,8 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
     bool needs_reconnect = false;
     bool constants_changed = false;
 
-    constants_changed |= config.config_int("samples per pixel", spp,
-                                           "Number of BSDF-sampled paths per pixel.", 1, 16);
+    constants_changed |=
+        config.config_int("samples per pixel", spp, "Number of paths per pixel.", 1, 16);
     constants_changed |=
         config.config_int("max path length", max_path_length,
                           "Maximum number of path segments, including the primary hit.", 1, 16);
@@ -176,7 +239,25 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
         update_render_constants();
     }
 
+    if (config.st_begin_child("guiding", "Guiding", Properties::ChildFlagBits::DEFAULT_OPEN)) {
+        bool guiding_changed = false;
+        if (int32_t method = guiding_method;
+            config.config_options("method", method, {"none", "markov chain path guiding"})) {
+            set_guiding(method);
+            guiding_changed = true;
+        }
+        guiding_changed |= guiding->properties(config);
+        if (guiding_changed && composition) {
+            update_guiding_slot();
+        }
+        config.st_end_child();
+    }
+
     config.st_separate();
+    needs_reconnect |= config.config_bool(
+        "ray tracing pipeline", use_raygen,
+        "Trace from a raygen shader instead of a compute shader. The compute path avoids the "
+        "ray-tracing pipeline register cap.");
     needs_reconnect |=
         config.config_enum("irradiance format", irradiance_format, Properties::OptionsStyle::COMBO);
 

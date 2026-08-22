@@ -24,7 +24,8 @@ struct PathVertex {
     // where the vertex was one frame ago; guiding methods with temporal state look up here
     float3 prev_pos;
     OrthonormalFrame shading_frame;
-    float roughness;
+    // GGX alpha in [0, 1]: 0 is a perfect mirror, 1 ideal diffuse
+    float alpha;
     uint16_t bounce; // 1 is the first scattering vertex
     uint16_t sample_index;
 
@@ -46,10 +47,10 @@ struct PathSegment {
     uint16_t bounce;
 
     float3 wo; // in worldspace
-    // density that generated wo, over the whole scatter mixture
+    // density that generated wo, over the whole scatter mixture; 0 for a delta lobe
     float pdf;
-    // f(wi, wo) * dot(wo, n), without the density
-    float3 f_cos;
+    // f(wi, wo) * dot(wo, n) divided by the density that generated it
+    float3 weight;
     // no vertex will be scattered from beyond this segment
     bool is_last;
 
@@ -74,7 +75,7 @@ interface GuidingDistribution : Distribution<float3> {
     bool is_valid();
 
     // Probability the integrator gives this distribution in the one-sample mixture.
-    float get_selection_probability(const float roughness);
+    float get_selection_probability(const float alpha);
 }
 
 // A directional guiding method: a resource-holding object in the shader binding that hands out
@@ -121,7 +122,7 @@ struct NullGuidingDistribution : GuidingDistribution {
         return {float3(0, 0, 1), 0.f};
     }
     bool is_valid() { return false; }
-    float get_selection_probability(const float roughness) { return 0.f; }
+    float get_selection_probability(const float alpha) { return 0.f; }
 }
 
 struct NullGuidingModel : GuidingModel {
@@ -153,6 +154,18 @@ struct NullGuidingModel : GuidingModel {
     }
 }
 
+// One draw from the scatter mixture.
+struct ScatterSample {
+    float3 wo; // in worldspace
+    // f(wi, wo) * dot(wo, n) divided by the density that produced it
+    float3 weight;
+    // density of the mixture at wo, 0 for a delta lobe
+    float pdf;
+    // no other technique can generate this direction
+    bool delta;
+    bool guided;
+}
+
 // One-sample MIS between the BSDF and a guiding distribution. Neither is stored: the BSDF comes
 // out of the material system as an existential, and the distribution is dead as soon as the
 // direction is drawn — keeping either would hold it live across the continuation ray.
@@ -160,25 +173,8 @@ struct ScatterMixture {
     // 0 where the guiding distribution has nothing to offer
     float p_guiding;
 
-    __init<G : GuidingDistribution>(const G guiding, const float roughness) {
-        p_guiding = guiding.is_valid() ? guiding.get_selection_probability(roughness) : 0.f;
-    }
-
-    // Draws a direction in worldspace; none where the BSDF refused to scatter.
-    Optional<float3> sample<B : BSDF, G : GuidingDistribution>(const B bsdf,
-                                                               const G guiding,
-                                                               const OrthonormalFrame frame,
-                                                               const float3 wi_local,
-                                                               inout RandomGenerator rng,
-                                                               out bool guided) {
-        guided = p_guiding > 0.f && rng.next_float() < p_guiding;
-        if (guided) {
-            return guiding.sample(rng);
-        }
-        if (let wo_local = bsdf.sample(wi_local, rng)) {
-            return frame.to_world(wo_local);
-        }
-        return none;
+    __init<G : GuidingDistribution>(const G guiding, const float alpha) {
+        p_guiding = guiding.is_valid() ? guiding.get_selection_probability(alpha) : 0.f;
     }
 
     // The guiding term comes first on purpose: it consumes the candidates, and the material pdf
@@ -191,6 +187,42 @@ struct ScatterMixture {
                                                  const float3 wo_world) {
         const float p_guided = p_guiding > 0.f ? p_guiding * guiding.pdf(wo_world) : 0.f;
         return p_guided + (1.f - p_guiding) * bsdf.pdf(wi_local, wo_local);
+    }
+
+    // Draws a direction in worldspace; none where the BSDF refused to scatter.
+    Optional<ScatterSample> sample<B : BSDF, G : GuidingDistribution>(const B bsdf,
+                                                                      const G guiding,
+                                                                      const OrthonormalFrame frame,
+                                                                      const float3 wi_local,
+                                                                      inout RandomGenerator rng) {
+        ScatterSample s;
+        s.delta = false;
+        s.guided = p_guiding > 0.f && rng.next_float() < p_guiding;
+
+        float3 wo_local;
+        if (s.guided) {
+            s.wo = guiding.sample(rng);
+            wo_local = frame.to_local(s.wo);
+        } else {
+            const Optional<ShadingFunctionSample> bs = bsdf.sample_eval(wi_local, rng);
+            if (!bs.hasValue) {
+                return none;
+            }
+            wo_local = bs.value.wo;
+            s.wo = frame.to_world(wo_local);
+            if (bs.value.lobe == BSDFLobe::Delta) {
+                // a delta direction has no density under the guiding lobe, so all that is left of
+                // the mixture is the chance of having drawn from the BSDF at all
+                s.weight = bs.value.weight / (1.f - p_guiding);
+                s.pdf = 0.f;
+                s.delta = true;
+                return s;
+            }
+        }
+
+        s.pdf = pdf(bsdf, guiding, wi_local, wo_local, s.wo);
+        s.weight = s.pdf > 0.f ? bsdf.eval(wi_local, wo_local, rng) / s.pdf : float3(0);
+        return s;
     }
 }
 

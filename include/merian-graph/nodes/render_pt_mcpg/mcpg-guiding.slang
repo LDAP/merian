@@ -10,10 +10,10 @@ namespace merian {
 
 extern static const int merian_guiding_mc_samples = 5;
 extern static const float merian_guiding_probability = 0.9;
-// scale the guiding probability with the perceptual roughness
-extern static const bool merian_guiding_scale_with_roughness = true;
-// no guiding below this perceptual roughness: the BSDF is far more peaked than any lobe
-extern static const float merian_guiding_roughness_threshold = 0.05;
+// scale the guiding probability with the lobe width
+extern static const bool merian_guiding_scale_with_alpha = true;
+// no guiding below this alpha: the BSDF is far more peaked than any lobe
+extern static const float merian_guiding_alpha_threshold = 0.05;
 extern static const bool merian_guiding_missing_light_heuristic = true;
 // complete a truncated path with the cached irradiance at its last vertex
 extern static const bool merian_guiding_light_cache_tail = false;
@@ -65,12 +65,12 @@ struct MCPGDistribution : GuidingDistribution {
         return score_sum > 0.0;
     }
 
-    float get_selection_probability(const float roughness) {
-        if (roughness < merian_guiding_roughness_threshold) {
+    float get_selection_probability(const float alpha) {
+        if (alpha < merian_guiding_alpha_threshold) {
             return 0.0;
         }
-        return merian_guiding_scale_with_roughness ? merian_guiding_probability * roughness
-                                                   : merian_guiding_probability;
+        return merian_guiding_scale_with_alpha ? merian_guiding_probability * alpha
+                                               : merian_guiding_probability;
     }
 }
 
@@ -163,6 +163,11 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
         // What the integrator will gather beyond this vertex: the emission where the continuation
         // found one, the cached irradiance where it is going to keep scattering. A path that stops
         // right here gathers nothing else, so it learns the emission alone.
+        // a vMF lobe cannot represent a delta direction
+        if (segment.delta) {
+            return float3(0);
+        }
+
         const bool emissive = any(segment.incident > 0.0);
         const bool gathers_emission_only =
             !merian_guiding_light_cache_tail && segment.is_last && segment.bounce == uint16_t(1);
@@ -172,15 +177,18 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
                                           frame_info.prev_cam_pos, rng, state.lc_grid_pos));
         }
 
-        const float3 contribution = target * segment.f_cos / segment.pdf;
+        const float3 contribution = target * segment.weight;
         const float mc_f = yuv_luminance(contribution);
         if (isinf(mc_f) || isnan(mc_f)) {
             return float3(0);
         }
 
+        // clamping the density bounds what a single near-specular sample can teach
         irr_cache.update(segment.pos, segment.normal,
-                         target * segment.f_cos / max(segment.pdf, merian_guiding_lc_min_pdf),
-                         frame_info.cam_pos, frame_info.prev_cam_pos, frame_info.index, rng, update_pos);
+                         target * segment.weight *
+                             min(1.f, segment.pdf / merian_guiding_lc_min_pdf),
+                         frame_info.cam_pos, frame_info.prev_cam_pos, frame_info.index, rng,
+                         update_pos);
 
         if (rng.next_float() * record.score_sum < mc_f * merian_guiding_mc_samples) {
             MCState chain = record.selected;

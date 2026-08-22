@@ -53,8 +53,8 @@ class MCPGGuidingModel : public GuidingModel {
     int32_t mc_samples = 5;
     float dir_guide_prior = 0.2f;
     float probability = 0.9f;
-    bool scale_with_roughness = true;
-    float roughness_threshold = 0.05f;
+    bool scale_with_alpha = true;
+    float alpha_threshold = 0.05f;
     bool missing_light_heuristic = true;
     bool light_cache_tail = false;
     float lc_min_pdf = 1.0f;

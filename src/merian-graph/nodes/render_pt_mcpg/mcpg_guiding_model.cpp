@@ -43,15 +43,15 @@ SlangCompositionHandle MCPGGuidingModel::get_composition() const {
         fmt::format("namespace merian {{\n"
                     "export static const int merian_guiding_mc_samples = {};\n"
                     "export static const float merian_guiding_probability = {};\n"
-                    "export static const bool merian_guiding_scale_with_roughness = {};\n"
-                    "export static const float merian_guiding_roughness_threshold = {};\n"
+                    "export static const bool merian_guiding_scale_with_alpha = {};\n"
+                    "export static const float merian_guiding_alpha_threshold = {};\n"
                     "export static const bool merian_guiding_missing_light_heuristic = {};\n"
                     "export static const bool merian_guiding_light_cache_tail = {};\n"
                     "export static const float merian_guiding_lc_min_pdf = {};\n"
                     "}}\n"
                     "export static const float dir_guide_prior = {};",
-                    mc_samples, probability, scale_with_roughness ? "true" : "false",
-                    roughness_threshold, missing_light_heuristic ? "true" : "false",
+                    mc_samples, probability, scale_with_alpha ? "true" : "false",
+                    alpha_threshold, missing_light_heuristic ? "true" : "false",
                     light_cache_tail ? "true" : "false", lc_min_pdf, dir_guide_prior));
     return composition;
 }
@@ -91,11 +91,11 @@ bool MCPGGuidingModel::properties(Properties& props) {
             "Probability of drawing the scatter direction from the guiding lobes.", 0.01f, 0.f,
             1.f);
         constants_changed |=
-            props.config_bool("scale with roughness", scale_with_roughness,
-                              "Scale the guiding probability with the perceptual roughness.");
+            props.config_bool("scale with alpha", scale_with_alpha,
+                              "Scale the guiding probability with the lobe width.");
         constants_changed |=
-            props.config_float("roughness threshold", roughness_threshold,
-                               "Do not guide below this perceptual roughness.", 0.01f, 0.f, 1.f);
+            props.config_float("alpha threshold", alpha_threshold,
+                               "Do not guide below this lobe width.", 0.01f, 0.f, 1.f);
         constants_changed |= props.config_bool(
             "missing light heuristic", missing_light_heuristic,
             "Flood the Markov chains with invalidated states when no light is detected.");
