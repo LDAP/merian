@@ -170,15 +170,15 @@ struct NEE {
     // First entry of the tile a shading point draws from. Which tile it is does not change the
     // density: every entry is an independent draw from the same distribution.
     uint pool_offset(const uint bucket) {
-        if (pool_size <= pool_tile_size || bucket == LIGHT_INVALID_INDEX)
+        if (pool_size <= pool_tile_size)
             return 0;
         const uint tiles = pool_size / pool_tile_size;
-        return (bucket % tiles) * pool_tile_size;
+        return ((bucket & ~LIGHT_BUCKET_TILE) % tiles) * pool_tile_size;
     }
 
-    // Chance of consulting the cell list at pos.
-    float get_grid_probability(const uint cell) {
-        return cell != LIGHT_INVALID_INDEX ? grid_probability : 0.f;
+    // Chance of consulting the cell list; zero for a bucket that names a tile, not a cell.
+    float get_grid_probability(const uint bucket) {
+        return (bucket & LIGHT_BUCKET_TILE) == 0 ? grid_probability : 0.f;
     }
 
     // Density with which select_light would pick this light in that cell: a mixture of the cell

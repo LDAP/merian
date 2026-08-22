@@ -14,10 +14,14 @@ namespace merian {
 static constexpr uint32_t LIGHT_INVALID_INDEX = 0xFFFFFFFFu;
 // the environment map, which has no triangle index
 static constexpr uint32_t LIGHT_ENV_INDEX = 0xFFFFFFFEu;
+// marks a light bucket as a pool tile rather than a grid cell
+static constexpr uint32_t LIGHT_BUCKET_TILE = 0x80000000u;
 #else
 static const uint LIGHT_INVALID_INDEX = 0xFFFFFFFFu;
 // the environment map, which has no triangle index
 static const uint LIGHT_ENV_INDEX = 0xFFFFFFFEu;
+// marks a light bucket as a pool tile rather than a grid cell
+static const uint LIGHT_BUCKET_TILE = 0x80000000u;
 #endif
 
 enum EmissiveTriangleFlags : uint16_t {
