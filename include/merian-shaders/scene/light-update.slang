@@ -21,10 +21,11 @@ struct LightUpdateBinding {
     uint validate;
 };
 
-// A record the tracer cannot reach where it claims to be is not a light: sampling it would add
-// light that no ray can be blocked by. Costs one short ray per triangle per frame; marking a real
-// light unreachable only loses next event estimation for it, never energy, because a zero weight
-// hands the light back to the scatter technique in full.
+// Whether the tracer can reach this record where it claims to be. A record that fails describes
+// an emitter no ray can be blocked by, so next event estimation would add light the scatter
+// technique cannot weigh against — both count it in full. One short ray per triangle per frame
+// settles it, and a wrong verdict cannot bias the image: a zero weight hands the emitter back to
+// the scatter technique, which then carries it alone at MIS weight one.
 bool reachable(const ParameterBlock<Scene> scene,
                const EmissiveTriangle tri,
                const GeometryID geometry_id,

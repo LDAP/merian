@@ -459,12 +459,6 @@ struct DirectLightReservoir {
         add(candidate_value, pdf_denominator, ls.index, ls.pos, rng);
     }
 
-    [mutating] void add_continuation(const float3 candidate_value,
-                                     const float pdf_denominator,
-                                     inout RandomGenerator rng) {
-        add(candidate_value, pdf_denominator, LIGHT_INVALID_INDEX, float3(0), rng);
-    }
-
     bool needs_shadow_ray() {
         return light_index != LIGHT_INVALID_INDEX;
     }
