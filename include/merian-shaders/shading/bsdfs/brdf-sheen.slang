@@ -8,25 +8,23 @@ namespace merian {
 // Microfacet sheen BRDF (Estevez & Kulla 2017).
 struct SheenBRDF : BSDF {
     float3 color;
-    // Sheen uses the perceptual roughness directly as the distribution width (no GGX alpha = r^2
-    // remap), per Estevez & Kulla.
-    float roughness;
+    float alpha;
 
-    __init(float3 color, float roughness) {
+    __init(float3 color, float alpha) {
         this.color = color;
-        this.roughness = max(roughness, 1e-6f);
+        this.alpha = max(alpha, 1e-6f);
     }
 
     float sheen_D(const float ndoth) {
-        const float inv_alpha = 1.f / roughness;
+        const float inv_alpha = 1.f / alpha;
         const float cos2h = ndoth * ndoth;
         const float sin2h = max(1.f - cos2h, 0.0078125f);
         return (2.f + inv_alpha) * pow(sin2h, inv_alpha * 0.5f) * (0.5f * MERIAN_INV_PI);
     }
 
-    // Rational fit for the visibility lambda term, parameterised by (1 - roughness)^2.
+    // Rational fit for the visibility lambda term, parameterised by (1 - alpha)^2.
     float sheen_L(const float x) {
-        const float r = (1.f - roughness) * (1.f - roughness);
+        const float r = (1.f - alpha) * (1.f - alpha);
         const float inv_r = 1.f - r;
         const float a = 25.3245f * r + 21.5473f * inv_r;
         const float b = 3.32435f * r + 3.82987f * inv_r;
@@ -83,7 +81,7 @@ struct SheenBRDF : BSDF {
     }
 
     Albedo get_albedo(const float3 wi) {
-        return Albedo(color * sheen_directional_albedo(wi.z, roughness));
+        return Albedo(color * sheen_directional_albedo(wi.z, alpha));
     }
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
@@ -92,9 +90,9 @@ struct SheenBRDF : BSDF {
 }
 
 // Sheen directional albedo (hemispherical reflectance) of the Estevez & Kulla BRDF, tabulated per
-// roughness (0..1 in 0.1 steps) and fit in cosTheta; the stored curve is the transmitted fraction,
-// so the reflectance is 1 - it. Coefficients from Falcor's SheenBSDF.
-float sheen_directional_albedo(const float ndotv, const float roughness) {
+// alpha (0..1 in 0.1 steps) and fit in cosTheta; the stored curve is the transmitted fraction, so
+// the reflectance is 1 - it.
+float sheen_directional_albedo(const float ndotv, const float alpha) {
     const float coeff[11][5] = {
         {1.01108f, 75.2286f, -9.4671f, 0.000973445f, -1.01325f},
         {8.44447f, 0.0135054f, 1.11637f, 0.479139f, -9.30873f},
@@ -109,9 +107,9 @@ float sheen_directional_albedo(const float ndotv, const float roughness) {
         {5.8912f, 0.0171461f, 0.66366f, 0.288735f, -6.78867f},
     };
     const float x = clamp(ndotv, 0.f, 1.f) * 20.f + 1.f; // fit domain [1, 21]
-    const int ib = clamp(int(floor(roughness * 10.f)), 0, 10);
+    const int ib = clamp(int(floor(alpha * 10.f)), 0, 10);
     const int it = min(ib + 1, 10);
-    const float wb = float(it) - roughness * 10.f;
+    const float wb = float(it) - alpha * 10.f;
     const float tb = coeff[ib][4] + pow(x, coeff[ib][3]) +
                      coeff[ib][0] / (1.f + coeff[ib][1] * pow(x, coeff[ib][2]));
     const float tt = coeff[it][4] + pow(x, coeff[it][3]) +

@@ -420,7 +420,7 @@ void RenderMCPG::update_render_constants() {
                     "export static const int mc_samples = {};\n"
                     "export static const float p_guiding = {:f};\n"
                     "export static const int guiding_directional_sampling_type = {};\n"
-                    "export static const float guiding_roughness_threshold = {:f};\n"
+                    "export static const float guiding_alpha_threshold = {:f};\n"
                     "export static const float dir_guide_prior = {:f};\n"
                     "export static const int debug_output_selector = {};\n"
                     "export static const uint lc_buffer_size = {}u;\n"
@@ -447,8 +447,8 @@ void RenderMCPG::update_render_constants() {
                     missing_light_heuristic ? "true" : "false", mc_samples,
                     reference_mode ? 0.0f : p_guiding,
                     static_cast<uint32_t>(guiding_directional_sampling_type),
-                    guiding_roughness_threshold, dir_guide_prior, debug_output_selector,
-                    lc_buffer_size, lc_probe_count, lc_stochastic_interpolation ? "true" : "false",
+                    guiding_alpha_threshold, dir_guide_prior, debug_output_selector, lc_buffer_size,
+                    lc_probe_count, lc_stochastic_interpolation ? "true" : "false",
                     lc_split_hash_payload_storage ? "true" : "false", lc_locality_bits, lc_min_pdf,
                     mc_adaptive_buffer_size, mc_probe_count,
                     mc_split_hash_payload_storage ? "true" : "false", mc_locality_bits, volume_spp,
@@ -493,11 +493,14 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
     constants_changed |= config.config_enum<GuidingDirectionalSamplingType>(
         "directional sampling type", guiding_directional_sampling_type,
         Properties::OptionsStyle::COMBO,
-        "How the guiding probability is derived. Roughness additionally scales it by the BSDF "
-        "roughness.");
-    constants_changed |=
-        config.config_float("roughness threshold", guiding_roughness_threshold,
-                            "only use guiding with roughness >= this value", 0.001f);
+        "How the guiding probability is derived. Roughness additionally scales it by the BSDF lobe "
+        "width, so it falls off continuously towards the threshold instead of cutting off.");
+    float guiding_roughness_threshold = std::sqrt(guiding_alpha_threshold);
+    if (config.config_float("roughness threshold", guiding_roughness_threshold,
+                            "only use guiding with roughness >= this value", 0.001f)) {
+        guiding_alpha_threshold = guiding_roughness_threshold * guiding_roughness_threshold;
+        constants_changed = true;
+    }
 
     config.st_separate("RT Volume");
     constants_changed |= config.config_int("volume samples per pixel", volume_spp,

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "merian-shaders/scene/scene.hpp"
+#include "merian-shaders/shading/materials/openpbr_material.hpp"
 #include "merian/utils/hash.hpp"
 
 #include <filesystem>
@@ -67,7 +68,8 @@ class PBRTScene : public Scene {
     void apply_roughness(const CommandBufferHandle& cmd,
                          const pbrt::ParamDict& params,
                          const std::string& prefix,
-                         float& out_roughness,
+                         float2& out_alpha,
+                         RoughnessEncoding& out_encoding,
                          TextureID& out_texture);
 
     Resolved resolve_color_param(const CommandBufferHandle& cmd,

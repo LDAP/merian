@@ -56,8 +56,9 @@ struct FresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
         return layer.get_preintegrated_specular(F0, wi);
     }
 
-    property float roughness {
-        get { return sqrt(lerp(pow2(base.roughness), pow2(layer.roughness), ior_f0)); }
+    // Weighted RMS, by the share of the response the layer takes at normal incidence.
+    property float alpha {
+        get { return sqrt(lerp(pow2(base.alpha), pow2(layer.alpha), ior_f0)); }
     }
 }
 

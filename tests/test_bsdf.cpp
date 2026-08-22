@@ -138,6 +138,16 @@ export merian::RoughDielectricBSDF make_test_bsdf(BSDFParams p) {
 }
 )";
 
+const char* const CONFIG_SHEEN = R"(
+import merian_shaders.shading.bsdfs.brdf_sheen;
+import bsdf.bsdf_test_common;
+namespace merian_test {
+export merian::SheenBRDF make_test_bsdf(BSDFParams p) {
+    return merian::SheenBRDF(p.albedo, p.alpha);
+}
+}
+)";
+
 const char* const CONFIG_CONDUCTOR = R"(
 import merian_shaders.shading.bsdfs.bsdf_conductor_fresnel;
 import merian_shaders.shading.bsdfs.brdf_ggx;
@@ -366,6 +376,32 @@ TEST_F(BSDFTest, LambertGrazing) {
     expect_pdf_normalized(r);
     EXPECT_NEAR(r.furnace.x, p.albedo.x, MC_SIGMA * r.furnace_stderr.x);
 }
+
+// Sheen. Reciprocity is left out: the Estevez & Kulla shadowing term raises the outgoing
+// lambda alone (terminator softening), so f is asymmetric by construction.
+class SheenAlpha : public BSDFTest, public ::testing::WithParamInterface<float> {
+  protected:
+    void check(const float3 wi) {
+        BSDFParams p;
+        p.albedo = {0.8f, 0.5f, 0.2f};
+        p.alpha = GetParam();
+        const auto r = run(CONFIG_SHEEN, wi, p);
+        expect_sample_pdf_match(r);
+        expect_sample_eval_consistent(r);
+        expect_energy_conserving(r);
+        expect_pdf_normalized(r);
+        expect_albedo_matches_furnace(r);
+    }
+};
+
+TEST_P(SheenAlpha, Normal) {
+    check(WI_NORMAL);
+}
+TEST_P(SheenAlpha, Grazing) {
+    check(WI_GRAZING);
+}
+
+INSTANTIATE_TEST_SUITE_P(Alpha, SheenAlpha, ::testing::Values(0.09f, 0.3f, 0.5f, 1.0f));
 
 // GGX (varying roughness). pdf normalization is left out: VNDF reflection sends part of
 // the lobe below the horizon, so INT pdf dwo equals the acceptance rate, not 1.

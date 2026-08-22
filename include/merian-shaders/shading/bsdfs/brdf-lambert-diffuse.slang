@@ -55,7 +55,7 @@ struct LambertDiffuseBRDF : BSDF {
         return float3(0.0f);
     }
 
-    property float roughness {
+    property float alpha {
         get { return 1.0f; }
     }
 }

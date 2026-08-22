@@ -30,7 +30,7 @@ namespace merian {
 enum class GuidingDirectionalSamplingType : uint32_t {
     // Guide with the configured probability wherever the lobe is guidable at all.
     MIS,
-    // Additionally scale that probability by the BSDF roughness.
+    // Additionally scale that probability by the BSDF lobe width.
     MIS_ROUGHNESS,
 };
 
@@ -132,7 +132,7 @@ class RenderMCPG : public Node {
     // --- Guiding Markov chain ---
     float dir_guide_prior = 0.2f;
     int32_t mc_samples = 5;
-    float p_guiding = 0.85f; // probability to sample the guiding distribution instead of the BSDF
+    float p_guiding = 0.5f; // probability to sample the guiding distribution instead of the BSDF
     bool missing_light_heuristic = true;
 
     uint32_t mc_adaptive_buffer_size = 32777259;
@@ -141,9 +141,9 @@ class RenderMCPG : public Node {
     uint32_t mc_locality_bits = 3;
 
     GuidingDirectionalSamplingType guiding_directional_sampling_type =
-        GuidingDirectionalSamplingType::MIS;
-    // Guiding is skipped below this roughness, where the vMF mixture cannot represent the lobe.
-    float guiding_roughness_threshold = 0.05f;
+        GuidingDirectionalSamplingType::MIS_ROUGHNESS;
+    // Guiding is skipped below this GGX alpha, where the vMF mixture cannot represent the lobe.
+    float guiding_alpha_threshold = 0.05f;
 
     // --- Light cache ---
     bool use_light_cache_tail = false;

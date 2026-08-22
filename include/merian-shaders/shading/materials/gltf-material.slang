@@ -291,9 +291,10 @@ struct GltfMaterial<let TRANSMISSION : bool = false,
                 sheen_rough *= lod0.sample(tm.get_sampler2D(sh.roughness_texture), sd.uv).a;
             }
         }
+        const float sheen_alpha = ggx_roughness_to_alpha(sheen_rough);
         const float max_sheen = max(sheen_col.r, max(sheen_col.g, sheen_col.b));
         const GltfSheened sheened =
-            GltfSheened(SheenBRDF(sheen_col, sheen_rough), reflective, sheen_rough, max_sheen);
+            GltfSheened(SheenBRDF(sheen_col, sheen_alpha), reflective, sheen_alpha, max_sheen);
 
         GltfMaterialSample s;
         s.brdf =

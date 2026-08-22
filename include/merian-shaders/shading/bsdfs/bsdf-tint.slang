@@ -39,9 +39,9 @@ struct TintBSDF<Base : BSDF> : BSDF {
         return tint * base.get_preintegrated_specular(F0, wi);
     }
 
-    property float roughness {
+    property float alpha {
         get {
-            return base.roughness;
+            return base.alpha;
         }
     }
 }

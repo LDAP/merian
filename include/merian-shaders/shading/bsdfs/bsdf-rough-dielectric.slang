@@ -117,10 +117,6 @@ struct RoughDielectricBSDF : BSDF {
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
         return GGXBRDF(alpha).get_preintegrated_specular(F0, wi);
     }
-
-    property float roughness {
-        get { return sqrt(alpha); }
-    }
 }
 
 } // namespace merian

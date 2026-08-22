@@ -25,8 +25,8 @@ static const int GUIDING_DIRECTIONAL_SAMPLING_MIS = 0;
 static const int GUIDING_DIRECTIONAL_SAMPLING_MIS_ROUGHNESS = 1;
 extern static const int guiding_directional_sampling_type = GUIDING_DIRECTIONAL_SAMPLING_MIS_ROUGHNESS;
 
-// use guiding with roughness >= this
-extern static const float guiding_roughness_threshold = 0.05;
+// use guiding with GGX alpha >= this
+extern static const float guiding_alpha_threshold = 0.05;
 
 struct RenderBinding {
     ParameterBlock<GBuffer> gbuffer;
@@ -101,10 +101,11 @@ float3 trace_path(const ParameterBlock<Scene> scene,
             }
         }
 
-        const bool can_guide = score_sum > 0.0 && m_bsdf.roughness >= guiding_roughness_threshold;
+        const float bsdf_alpha = m_bsdf.alpha;
+        const bool can_guide = score_sum > 0.0 && bsdf_alpha >= guiding_alpha_threshold;
         const float p_guide =
             select(guiding_directional_sampling_type == GUIDING_DIRECTIONAL_SAMPLING_MIS_ROUGHNESS,
-                   p_guiding * m_bsdf.roughness, p_guiding);
+                   p_guiding * bsdf_alpha, p_guiding);
 
         // Sample wo from the BSDF or the selected lobe
         const bool guide = can_guide && rng.next_float() < p_guide;

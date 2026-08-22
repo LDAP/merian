@@ -10,19 +10,42 @@
 
 namespace merian {
 
+inline float ggx_roughness_to_alpha(const float roughness) {
+    return roughness * roughness;
+}
+
+// What a sampled roughness texel holds. The material itself stores the GGX alpha = roughness^2.
+enum class RoughnessEncoding : uint32_t {
+    Roughness,
+    Alpha,
+    AlphaSquared,
+};
+
+inline const char* slang_name(const RoughnessEncoding encoding) {
+    switch (encoding) {
+    case RoughnessEncoding::Alpha:
+        return "merian::RoughnessEncoding::Alpha";
+    case RoughnessEncoding::AlphaSquared:
+        return "merian::RoughnessEncoding::AlphaSquared";
+    case RoughnessEncoding::Roughness:
+        break;
+    }
+    return "merian::RoughnessEncoding::Roughness";
+}
+
 struct OpenPBRTransmissionData {
     float weight{0.0f};
     float3 color{1, 1, 1};
 };
 struct OpenPBRClearcoatData {
     float weight{0.0f};
-    float roughness{0.0f};
+    float alpha{0.0f};
     float ior{1.6f};
 };
 struct OpenPBRSheenData {
     float weight{0.0f};
     float3 color{1, 1, 1};
-    float roughness{0.3f};
+    float alpha{0.09f};
 };
 struct OpenPBRVolumeData {
     float3 absorption{0, 0, 0};
@@ -32,7 +55,7 @@ struct OpenPBRMaterial : Material {
     float3 base_color{1, 1, 1};
     float opacity{1.0f};
     float metalness{0.0f};
-    float roughness{1.0f};
+    float2 specular_alpha{1.0f, 1.0f}; // per-axis (tangent, bitangent)
     float specular_weight{1.0f};
     float specular_ior{1.5f};
     float3 emission{0, 0, 0};
@@ -41,6 +64,7 @@ struct OpenPBRMaterial : Material {
     TextureID roughness_texture{TextureID(-1)};
     TextureID emission_texture{TextureID(-1)};
     TextureID normal_texture{TextureID(-1)};
+    RoughnessEncoding roughness_encoding{RoughnessEncoding::Roughness};
 
     std::optional<OpenPBRTransmissionData> transmission;
     std::optional<OpenPBRClearcoatData> clearcoat;
@@ -53,8 +77,10 @@ struct OpenPBRMaterial : Material {
 
     std::string variant_type_name() const {
         const auto b = [](bool v) { return v ? "true" : "false"; };
-        return fmt::format("merian::OpenPBRMaterial<{}, {}, {}, {}>", b(transmission.has_value()),
-                           b(clearcoat.has_value()), b(sheen.has_value()), b(volume.has_value()));
+        return fmt::format("merian::OpenPBRMaterial<{}, {}, {}, {}, {}>",
+                           b(transmission.has_value()), b(clearcoat.has_value()),
+                           b(sheen.has_value()), b(volume.has_value()),
+                           slang_name(roughness_encoding));
     }
 
     uint32_t get_payload_size() const override {
@@ -78,7 +104,7 @@ struct OpenPBRMaterial : Material {
         put(base_color);
         put(opacity);
         put(metalness);
-        put(roughness);
+        put(specular_alpha);
         put(specular_weight);
         put(specular_ior);
         put(emission);
@@ -94,13 +120,13 @@ struct OpenPBRMaterial : Material {
         }
         if (clearcoat) {
             put(clearcoat->weight);
-            put(clearcoat->roughness);
+            put(clearcoat->alpha);
             put(clearcoat->ior);
         }
         if (sheen) {
             put(sheen->weight);
             put(sheen->color);
-            put(sheen->roughness);
+            put(sheen->alpha);
         }
         if (volume) {
             put(volume->absorption);

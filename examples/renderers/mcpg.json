@@ -23,7 +23,6 @@
                 "6": true,
                 "7": true,
                 "emission on primary": true,
-                "guiding prob": 0.9,
                 "lc": {
                     "LC buffer size": 8000009,
                     "LC probe count": 2,

@@ -329,14 +329,14 @@ float3 ggx_integral_approx_separable(const float3 F0, const float alpha, const f
 // A specular microfacet BRDF with GGX normal distribution. alpha is per-axis (tangent,
 // bitangent); a scalar broadcast yields the isotropic lobe at no extra cost.
 struct GGXBRDF : BSDF {
-    float2 alpha;
+    float2 alpha_xy;
 
     __init(float alpha) {
-        this.alpha = float2(alpha);
+        this.alpha_xy = float2(alpha);
     }
 
     __init(float2 alpha) {
-        this.alpha = alpha;
+        this.alpha_xy = alpha;
     }
 
     float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) {
@@ -345,8 +345,8 @@ struct GGXBRDF : BSDF {
         }
 
         const float3 h = normalize(wo + wi);
-        const float G2_over_widotn = smith_g2_over_widotn(wo, wi, alpha);
-        const float D = ggx_NDF(h, alpha);
+        const float G2_over_widotn = smith_g2_over_widotn(wo, wi, alpha_xy);
+        const float D = ggx_NDF(h, alpha_xy);
 
         // wo.z cancels
         return float3((D * G2_over_widotn) / 4.0f);
@@ -357,7 +357,7 @@ struct GGXBRDF : BSDF {
             return none;
         }
 
-        float3 h = ggx_VNDF_sample_H(wi, alpha, rng.next_float2());
+        float3 h = ggx_VNDF_sample_H(wi, alpha_xy, rng.next_float2());
         float widoth = dot(wi, h);
         float3 wo = reflect2(wi, h, widoth);
 
@@ -374,7 +374,7 @@ struct GGXBRDF : BSDF {
         }
 
         const float3 h = normalize(wi + wo);
-        return ggx_VNDF_pdf_wo(wi, h, alpha);
+        return ggx_VNDF_pdf_wo(wi, h, alpha_xy);
     }
 
     override Optional<ShadingFunctionSample> sample_eval(const float3 wi,
@@ -383,15 +383,16 @@ struct GGXBRDF : BSDF {
             return none;
         }
 
-        const float3 h = ggx_VNDF_sample_H(wi, alpha, rng.next_float2());
+        const float3 h = ggx_VNDF_sample_H(wi, alpha_xy, rng.next_float2());
         const float3 wo = reflect2(wi, h, dot(wi, h));
         if (wo.z < BSDF_MIN_COS_THETA) {
             return none;
         }
 
         // the NDF and cosines cancel, so it stays finite even at alpha -> 0.
-        const float pdf = ggx_VNDF_pdf_wo(wi, h, alpha);
-        const float weight = smith_g2_over_widotn(wo, wi, alpha) / smith_g1_over_widotn(wi, alpha);
+        const float pdf = ggx_VNDF_pdf_wo(wi, h, alpha_xy);
+        const float weight =
+            smith_g2_over_widotn(wo, wi, alpha_xy) / smith_g1_over_widotn(wi, alpha_xy);
         return ShadingFunctionSample(wo, pdf, float3(weight), BSDFLobe::Glossy);
     }
 
@@ -401,11 +402,12 @@ struct GGXBRDF : BSDF {
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
         // the fit is isotropic; sqrt(alpha_x * alpha_y) preserves the NDF peak.
-        return ggx_integral_approx_correlated(F0, sqrt(alpha.x * alpha.y), wi.z);
+        return ggx_integral_approx_correlated(F0, sqrt(alpha_xy.x * alpha_xy.y), wi.z);
     }
 
-    property float roughness {
-        get { return sqrt(min(alpha.x, alpha.y)); }
+    // The narrower axis bounds how sharp the lobe gets.
+    property float alpha {
+        get { return min(alpha_xy.x, alpha_xy.y); }
     }
 }
 
@@ -497,10 +499,6 @@ struct GGXBTDF : BSDF {
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
         return float3(0.0f);
-    }
-
-    property float roughness {
-        get { return sqrt(alpha); }
     }
 }
 

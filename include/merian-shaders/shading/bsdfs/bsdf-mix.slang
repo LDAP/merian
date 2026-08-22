@@ -59,8 +59,8 @@ struct MixBSDF<B0 : BSDF, B1 : BSDF> : BSDF {
     }
 
     // Weighted RMS
-    property float roughness {
-        get { return sqrt(lerp(pow2(bsdf0.roughness), pow2(bsdf1.roughness), weight)); }
+    property float alpha {
+        get { return sqrt(lerp(pow2(bsdf0.alpha), pow2(bsdf1.alpha), weight)); }
     }
 }
 

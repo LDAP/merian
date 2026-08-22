@@ -33,6 +33,14 @@ class MaterialSystemTest : public ::testing::Test {
     static void SetUpTestSuite() {
         spdlog::set_level(spdlog::level::debug);
         ContextCreateInfo info{
+            // Materials store fp16 (half3 tint/emission), so the shaders declare 16-bit
+            // StorageBuffer variables; without these the validation layer rejects them.
+            .features =
+                VulkanFeatures({"scalarBlockLayout", "shaderInt64", "shaderInt16", "shaderFloat16",
+                                "storageBuffer16BitAccess", "uniformAndStorageBuffer16BitAccess",
+                                "storageBuffer8BitAccess", "uniformAndStorageBuffer8BitAccess",
+                                "shaderSampledImageArrayNonUniformIndexing",
+                                "runtimeDescriptorArray"}),
             .context_extensions = {ExtensionVkValidationLayers::name, ExtensionResources::name},
             .application_name = "test-material-system",
         };

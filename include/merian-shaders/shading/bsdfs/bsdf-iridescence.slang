@@ -71,8 +71,8 @@ struct IridescentConductorBSDF<Inner : BSDF> : BSDF {
         return bsdf.get_preintegrated_specular(F0, wi);
     }
 
-    property float roughness {
-        get { return bsdf.roughness; }
+    property float alpha {
+        get { return bsdf.alpha; }
     }
 }
 
@@ -171,8 +171,9 @@ struct IridescentFresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
         return layer.get_preintegrated_specular(F0, wi);
     }
 
-    property float roughness {
-        get { return min(layer.roughness, base.roughness); }
+    // Weighted RMS, by the share of the response the layer takes at normal incidence.
+    property float alpha {
+        get { return sqrt(lerp(pow2(base.alpha), pow2(layer.alpha), ior_f0)); }
     }
 }
 
@@ -318,10 +319,6 @@ struct IridescentRoughDielectricBSDF : BSDF {
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
         return GGXBRDF(alpha).get_preintegrated_specular(F0, wi);
-    }
-
-    property float roughness {
-        get { return sqrt(alpha); }
     }
 }
 

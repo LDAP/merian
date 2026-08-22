@@ -140,7 +140,9 @@ void FBXScene::load_materials(const CommandBufferHandle& cmd) {
         mat.metalness_texture = load(pbr.metalness, true);
         mat.metalness = mat.metalness_texture != TextureID(-1) ? 1.f : map_real(pbr.metalness, 0.f);
         mat.roughness_texture = load(pbr.roughness, true);
-        mat.roughness = mat.roughness_texture != TextureID(-1) ? 1.f : map_real(pbr.roughness, 1.f);
+        const float roughness =
+            mat.roughness_texture != TextureID(-1) ? 1.f : map_real(pbr.roughness, 1.f);
+        mat.specular_alpha = float2(ggx_roughness_to_alpha(roughness));
 
         // specular
         mat.specular_weight = map_real(pbr.specular_factor, 1.f);
@@ -154,12 +156,14 @@ void FBXScene::load_materials(const CommandBufferHandle& cmd) {
         mat.normal_texture = load(pbr.normal_map, true);
 
         if (const float coat_weight = map_real(pbr.coat_factor, 0.f); coat_weight > 0.f) {
-            mat.clearcoat = OpenPBRClearcoatData{coat_weight, map_real(pbr.coat_roughness, 0.f),
-                                                 map_real(pbr.coat_ior, 1.6f)};
+            mat.clearcoat = OpenPBRClearcoatData{
+                coat_weight, ggx_roughness_to_alpha(map_real(pbr.coat_roughness, 0.f)),
+                map_real(pbr.coat_ior, 1.6f)};
         }
         if (const float sheen_weight = map_real(pbr.sheen_factor, 0.f); sheen_weight > 0.f) {
-            mat.sheen = OpenPBRSheenData{sheen_weight, map_vec3(pbr.sheen_color, float3(1)),
-                                         map_real(pbr.sheen_roughness, 0.3f)};
+            mat.sheen =
+                OpenPBRSheenData{sheen_weight, map_vec3(pbr.sheen_color, float3(1)),
+                                 ggx_roughness_to_alpha(map_real(pbr.sheen_roughness, 0.3f))};
         }
         if (transmission > 0.f) {
             mat.transmission =

@@ -13,25 +13,25 @@ namespace merian {
 struct SheenLayerBSDF<Base : BSDF> : BSDF {
     SheenBRDF sheen;
     Base base;
-    float sheen_roughness; // perceptual, for the directional-albedo lookup
+    float sheen_alpha;
     float max_sheen_color; // max channel of the sheen colour
 
-    __init(SheenBRDF sheen, Base base, float sheen_roughness, float max_sheen_color) {
+    __init(SheenBRDF sheen, Base base, float sheen_alpha, float max_sheen_color) {
         this.sheen = sheen;
         this.base = base;
-        this.sheen_roughness = sheen_roughness;
+        this.sheen_alpha = sheen_alpha;
         this.max_sheen_color = max_sheen_color;
     }
 
     // Energy-conserving darkening of the base, evaluated for a single direction cosine.
     float albedo_scaling(const float ndot) {
-        return 1.f - max_sheen_color * sheen_directional_albedo(ndot, sheen_roughness);
+        return 1.f - max_sheen_color * sheen_directional_albedo(ndot, sheen_alpha);
     }
 
     // Probability of sampling the sheen lobe (rest goes to the base). Approximates the sheen's
     // share of the reflected energy; 0 when there is no sheen, so the sheen path is eliminated.
     float prob_sheen(const float ndotv) {
-        return clamp(max_sheen_color * sheen_directional_albedo(ndotv, sheen_roughness), 0.f, 0.9f);
+        return clamp(max_sheen_color * sheen_directional_albedo(ndotv, sheen_alpha), 0.f, 0.9f);
     }
 
     float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) {
@@ -74,8 +74,8 @@ struct SheenLayerBSDF<Base : BSDF> : BSDF {
         return base.get_preintegrated_specular(F0, wi);
     }
 
-    property float roughness {
-        get { return base.roughness; }
+    property float alpha {
+        get { return base.alpha; }
     }
 }
 

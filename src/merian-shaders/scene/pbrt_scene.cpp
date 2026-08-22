@@ -332,31 +332,34 @@ PBRTScene::Resolved PBRTScene::resolve_color_param(const CommandBufferHandle& cm
 void PBRTScene::apply_roughness(const CommandBufferHandle& cmd,
                                 const ParamDict& params,
                                 const std::string& prefix,
-                                float& out_roughness,
+                                float2& out_alpha,
+                                RoughnessEncoding& out_encoding,
                                 TextureID& out_texture) {
+    // pbrt's parameter is a GGX alpha directly, or sqrt(alpha) when remapped.
+    // WARN: there has been a mishap where they computed sqrt(roughness) while it should have been
+    // sqr(roughness) but pbrt leaves it as is so that rendered results with existing pbrt-v4
+    // scenes don't change. See https://github.com/mmp/pbrt-v4/issues/479
+    const bool remap = params.get_bool("remaproughness", true);
+    const auto to_alpha = [remap](const float r) { return remap ? std::sqrt(r) : r; };
+
     const ParsedParameter* rough = params.find(prefix + "roughness");
     if (rough != nullptr && rough->type == "texture" && !rough->strings.empty()) {
         const Resolved r = resolve_texture_ref(cmd, rough->strings[0], false, 0);
         out_texture = r.texture;
-        out_roughness = r.factor.x;
+        out_encoding = remap ? RoughnessEncoding::AlphaSquared : RoughnessEncoding::Alpha;
+        out_alpha = float2(to_alpha(r.factor.x));
         return;
     }
 
-    float value = rough != nullptr && !rough->floats.empty() ? rough->floats[0] : 0.f;
+    const float value = rough != nullptr && !rough->floats.empty() ? rough->floats[0] : 0.f;
     const ParsedParameter* u = params.find(prefix + "uroughness");
     const ParsedParameter* v = params.find(prefix + "vroughness");
+    out_alpha = float2(to_alpha(value));
     if (u != nullptr || v != nullptr) {
         const float ur = u != nullptr && !u->floats.empty() ? u->floats[0] : value;
         const float vr = v != nullptr && !v->floats.empty() ? v->floats[0] : value;
-        value = 0.5f * (ur + vr);
-        warn_once("aniso", "anisotropic roughness is averaged to isotropic");
+        out_alpha = float2(to_alpha(ur), to_alpha(vr));
     }
-    // remaproughness=true (default): the value is perceptual, matching merian's roughness.
-    // Otherwise it is GGX alpha; merian applies alpha = roughness^2.
-    if (!params.get_bool("remaproughness", true)) {
-        value = std::sqrt(value);
-    }
-    out_roughness = value;
 }
 
 PBRTScene::MaterialBuild PBRTScene::convert_material(const CommandBufferHandle& cmd,
@@ -368,7 +371,7 @@ PBRTScene::MaterialBuild PBRTScene::convert_material(const CommandBufferHandle& 
     if (material_index < 0 || depth > 4) {
         // pbrt's default material is coateddiffuse with reflectance 0.5.
         mat.base_color = float3(0.5f);
-        mat.roughness = 0.f;
+        mat.specular_alpha = float2(0.f);
         return out;
     }
 
@@ -382,7 +385,7 @@ PBRTScene::MaterialBuild PBRTScene::convert_material(const CommandBufferHandle& 
         mat.base_color = refl.factor;
         mat.header.alpha_texture_id = refl.texture;
         mat.specular_weight = 0.f;
-        mat.roughness = 1.f;
+        mat.specular_alpha = float2(1.f);
         if (refl.has_alpha) {
             out.flags = MeshFlags::TwoSided;
         }
@@ -394,7 +397,8 @@ PBRTScene::MaterialBuild PBRTScene::convert_material(const CommandBufferHandle& 
         mat.base_color = refl.factor;
         mat.header.alpha_texture_id = refl.texture;
         mat.specular_ior = p.get_float("eta", 1.5f);
-        apply_roughness(cmd, p, "", mat.roughness, mat.roughness_texture);
+        apply_roughness(cmd, p, "", mat.specular_alpha, mat.roughness_encoding,
+                        mat.roughness_texture);
         if (refl.has_alpha) {
             out.flags = MeshFlags::TwoSided;
         }
@@ -428,7 +432,8 @@ PBRTScene::MaterialBuild PBRTScene::convert_material(const CommandBufferHandle& 
             // pbrt's default conductor is copper.
             mat.base_color = f0.value_or(float3(0.955f, 0.637f, 0.538f));
         }
-        apply_roughness(cmd, p, prefix, mat.roughness, mat.roughness_texture);
+        apply_roughness(cmd, p, prefix, mat.specular_alpha, mat.roughness_encoding,
+                        mat.roughness_texture);
         if (type == "coatedconductor") {
             warn_once("mat_coatedconductor", "coatedconductor interface layer is ignored");
         }
@@ -448,7 +453,12 @@ PBRTScene::MaterialBuild PBRTScene::convert_material(const CommandBufferHandle& 
         }
         mat.specular_ior = eta;
         mat.transmission = OpenPBRTransmissionData{1.f, float3(1)};
-        apply_roughness(cmd, p, "", mat.roughness, mat.roughness_texture);
+        apply_roughness(cmd, p, "", mat.specular_alpha, mat.roughness_encoding,
+                        mat.roughness_texture);
+        if (mat.specular_alpha.x != mat.specular_alpha.y) {
+            warn_once("aniso_dielectric",
+                      "anisotropic roughness of a dielectric is averaged to isotropic");
+        }
         out.flags = MeshFlags::TwoSided;
         if (type == "thindielectric") {
             warn_once("mat_thin", "thindielectric approximated as solid dielectric");
@@ -469,12 +479,12 @@ PBRTScene::MaterialBuild PBRTScene::convert_material(const CommandBufferHandle& 
         }
         mat.base_color = float3(0.5f);
         mat.specular_weight = 0.f;
-        mat.roughness = 1.f;
+        mat.specular_alpha = float2(1.f);
     } else {
         warn_once("mat_" + type, fmt::format("material '{}' is unsupported, using diffuse", type));
         mat.base_color = float3(0.5f);
         mat.specular_weight = 0.f;
-        mat.roughness = 1.f;
+        mat.specular_alpha = float2(1.f);
     }
 
     if (const std::string normal_map = p.get_string("normalmap", ""); !normal_map.empty()) {

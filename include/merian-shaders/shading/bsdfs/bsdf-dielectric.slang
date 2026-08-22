@@ -64,7 +64,7 @@ struct SmoothDielectricBSDF : BSDF {
         return fresnel_schlick(wi.z, F0);
     }
 
-    property float roughness {
+    property float alpha {
         get { return 0.0f; }
     }
 }

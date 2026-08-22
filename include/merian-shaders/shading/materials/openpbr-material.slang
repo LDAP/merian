@@ -24,19 +24,25 @@ typealias OpenPBRCoated = FresnelMixBSDF<SpecularBRDF, OpenPBRSubstrate>;
 typealias OpenPBRWithCoat = MixBSDF<OpenPBRSubstrate, OpenPBRCoated>; // by coat weight
 typealias OpenPBRBSDF = MixBSDF<OpenPBRWithCoat, SheenBRDF>; // by sheen weight
 
+enum RoughnessEncoding {
+    Roughness,
+    Alpha,
+    AlphaSquared,
+}
+
 struct OpenPBRTransmission {
     float weight;
     float3 color;
 };
 struct OpenPBRClearcoat {
     float weight;
-    float roughness;
+    float alpha;
     float ior;
 };
 struct OpenPBRSheen {
     float weight;
     float3 color;
-    float roughness;
+    float alpha;
 };
 struct OpenPBRVolume {
     float3 absorption; // sigma_a (Beer-Lambert)
@@ -45,14 +51,16 @@ struct OpenPBRVolume {
 struct OpenPBRMaterial<let TRANSMISSION : bool = false,
                        let CLEARCOAT : bool = false,
                        let SHEEN : bool = false,
-                       let VOLUME : bool = false> : MaterialModel {
+                       let VOLUME : bool = false,
+                       let ROUGHNESS_ENCODING : RoughnessEncoding = RoughnessEncoding::Roughness>
+    : MaterialModel {
     typealias MaterialSampleImpl = OpenPBRMaterialSample;
 
     MaterialHeader header; // alpha_texture_id = base color texture
     float3 base_color;
     float opacity;
     float metalness;
-    float roughness;
+    float2 specular_alpha; // per-axis (tangent, bitangent)
     float specular_weight;
     float specular_ior;
     float3 emission;
@@ -111,10 +119,20 @@ struct OpenPBRMaterial<let TRANSMISSION : bool = false,
         if (metalness_texture != TextureID(-1)) {
             metal *= lod0.sample(tm.get_sampler2D(metalness_texture), sd.uv).r;
         }
-        float rough = roughness;
+        const float min_alpha = ggx_roughness_to_alpha(merian_hint_min_roughness);
+        float2 alpha = specular_alpha;
         if (roughness_texture != TextureID(-1)) {
-            rough *= lod0.sample(tm.get_sampler2D(roughness_texture), sd.uv).r;
+            const float texel = lod0.sample(tm.get_sampler2D(roughness_texture), sd.uv).r;
+            // The texel scales the lobe width, so it enters in alpha space.
+            if (ROUGHNESS_ENCODING == RoughnessEncoding::AlphaSquared) {
+                alpha *= sqrt(texel);
+            } else if (ROUGHNESS_ENCODING == RoughnessEncoding::Alpha) {
+                alpha *= texel;
+            } else {
+                alpha *= ggx_roughness_to_alpha(texel);
+            }
         }
+        alpha = max(alpha, float2(min_alpha));
 
         OrthonormalFrame shading_frame = sd.frame;
         if (normal_texture != TextureID(-1)) {
@@ -131,8 +149,6 @@ struct OpenPBRMaterial<let TRANSMISSION : bool = false,
             }
         }
 
-        const float alpha = ggx_roughness_to_alpha(max(rough, merian_hint_min_roughness));
-
         // Dielectric specular F0 from IOR, scaled by the specular weight.
         const float ior_t = (specular_ior - 1.0f) / (specular_ior + 1.0f);
         const float dielectric_f0 = clamp(specular_weight * ior_t * ior_t, 0.0f, 1.0f);
@@ -146,18 +162,20 @@ struct OpenPBRMaterial<let TRANSMISSION : bool = false,
             transmission_color = trans.color;
         }
 
+        // The coupled rough dielectric is isotropic; sqrt(ax * ay) preserves the NDF peak.
+        const float alpha_iso = TRANSMISSION ? sqrt(alpha.x * alpha.y) : alpha.x;
         const OpenPBRDielectric dielectric = OpenPBRDielectric(
             OpenPBROpaqueDielectric(SpecularBRDF(alpha), LambertDiffuseBRDF(base), dielectric_f0),
-            RoughDielectricBSDF(alpha, eta, transmission_color), tw);
+            RoughDielectricBSDF(alpha_iso, eta, transmission_color), tw);
         const OpenPBRSubstrate substrate =
             OpenPBRSubstrate(dielectric, OpenPBRMetal(SpecularBRDF(alpha), base), metal);
 
         float cw = 0.0f;
-        float coat_alpha = ggx_roughness_to_alpha(merian_hint_min_roughness);
+        float coat_alpha = min_alpha;
         float coat_f0 = 0.0f;
         if (let coat = clearcoat_opt) {
             cw = coat.weight;
-            coat_alpha = ggx_roughness_to_alpha(max(coat.roughness, merian_hint_min_roughness));
+            coat_alpha = max(coat.alpha, min_alpha);
             const float coat_t = (coat.ior - 1.0f) / (coat.ior + 1.0f);
             coat_f0 = coat_t * coat_t;
         }
@@ -166,11 +184,11 @@ struct OpenPBRMaterial<let TRANSMISSION : bool = false,
 
         float sw = 0.0f;
         float3 sheen_col = float3(0.0f);
-        float sheen_rough = 0.0f;
+        float sheen_alpha = 0.0f;
         if (let sh = sheen_opt) {
             sw = sh.weight;
             sheen_col = sh.color;
-            sheen_rough = sh.roughness;
+            sheen_alpha = sh.alpha;
         }
 
         // volume absorption, entered on a front-face transmission.
@@ -182,7 +200,7 @@ struct OpenPBRMaterial<let TRANSMISSION : bool = false,
         }
 
         OpenPBRMaterialSample s;
-        s.brdf = OpenPBRBSDF(with_coat, SheenBRDF(sheen_col, sheen_rough), sw);
+        s.brdf = OpenPBRBSDF(with_coat, SheenBRDF(sheen_col, sheen_alpha), sw);
         out_shading_frame = shading_frame;
         out_emission = get_emission(sd, tm, lod);
         s.eta = eta;
