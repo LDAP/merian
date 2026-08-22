@@ -121,8 +121,12 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         float3 light_dir = float3(0, 0, 1);
         if (light_technique) {
             if (let ls = scene.sample_light_point(light_cell, cur_pos, rng)) {
-                // aiming at the point keeps the ray on the light at grazing angles
-                light_dir = normalize(ls.pos - cur_pos);
+                // aimed from where the ray will start: a direction taken from the unoffset point
+                // misses the sampled triangle near its edges
+                const float3 ng = cur_face_normal;
+                const float3 origin =
+                    offset_ray_origin(cur_pos, dot(ls.pos - cur_pos, ng) < 0.f ? -ng : ng);
+                light_dir = normalize(ls.pos - origin);
                 sampled_light = ls.index;
             }
         }
