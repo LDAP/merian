@@ -70,25 +70,19 @@ bool reprojection_valid(float3 curr_normal,
 
 // Intersects the motion vector with the image borders.
 //
-// Returns true if prev pos was outside the image borders.
+// Returns true if prev pos was outside the image borders, in which case prev_pos is moved back
+// along mv onto the border.
 // prev_pos = pos + mv
-bool reprojection_intersect_border(float2 prev_pos, float2 mv, float2 image_size_minus_one) {
-    float2 _136 = round(prev_pos);
-    bool _138 = any(bool2(_136.x > image_size_minus_one.x, _136.y > image_size_minus_one.y));
-    bool _146;
-    if (!_138) {
-        float2 _143 = round(prev_pos);
-        _146 = any(bool2(_143.x < 0.0f.xx.x, _143.y < 0.0f.xx.y));
-    } else {
-        _146 = _138;
+bool reprojection_intersect_border(inout float2 prev_pos, float2 mv, float2 image_size_minus_one) {
+    const float2 rounded = round(prev_pos);
+    if (all(rounded >= float2(0.0)) && all(rounded <= image_size_minus_one)) {
+        return false;
     }
-    if (_146) {
-        float tmin = max(min(prev_pos.x / mv.x, (prev_pos.x - image_size_minus_one.x) / mv.x),
-                         min(prev_pos.y / mv.y, (prev_pos.y - image_size_minus_one.y) / mv.y));
-        prev_pos -= (mv * tmin);
-        return true;
-    }
-    return false;
+
+    const float tmin = max(min(prev_pos.x / mv.x, (prev_pos.x - image_size_minus_one.x) / mv.x),
+                           min(prev_pos.y / mv.y, (prev_pos.y - image_size_minus_one.y) / mv.y));
+    prev_pos -= mv * tmin;
+    return true;
 }
 
 // pixel = current_pixel + mv
