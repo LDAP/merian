@@ -149,7 +149,6 @@ class LightCollection {
 
     BufferHandle env_importance_buffer;
     BufferHandle env_pool_buffer;
-    BufferHandle weights_buffer;
     BufferHandle pool_buffer;
     BufferHandle grid_buffer;
     BufferHandle grid_info_buffer;
@@ -167,15 +166,12 @@ class LightCollection {
     SlangCompositionHandle preprocess_composition;
     Versioned<SlangProgram> preprocess_program;
     Versioned<SlangProgramEntryPoint> setup_entry_point;
-    Versioned<SlangProgramEntryPoint> weights_entry_point;
     Versioned<SlangProgramEntryPoint> pool_entry_point;
     Versioned<SlangProgramEntryPoint> grid_entry_point;
     Versioned<Pipeline> setup_pipeline;
-    Versioned<Pipeline> weights_pipeline;
     Versioned<Pipeline> pool_pipeline;
     Versioned<Pipeline> grid_pipeline;
     Versioned<ShaderObject> setup_params;
-    Versioned<ShaderObject> weights_params;
     Versioned<ShaderObject> pool_params;
     Versioned<ShaderObject> grid_params;
 

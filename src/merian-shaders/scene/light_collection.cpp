@@ -117,7 +117,6 @@ void LightCollection::ensure_pipelines(const SlangCompositionHandle& scene_compo
             params.depends_on(ep);
         };
         make("grid_setup", setup_entry_point, setup_pipeline, setup_params);
-        make("weights", weights_entry_point, weights_pipeline, weights_params);
         make("pool", pool_entry_point, pool_pipeline, pool_params);
         make("grid", grid_entry_point, grid_pipeline, grid_params);
     }
@@ -202,8 +201,6 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
     }
 
     if (triangle_count > 0) {
-        ensure_buffer(weights_buffer, triangle_count * sizeof(float), "LightCollection::weights",
-                      cmd);
         ensure_buffer(pool_buffer, static_cast<uint32_t>(pool_size) * sizeof(uint32_t),
                       "LightCollection::pool", cmd);
         ensure_buffer(grid_buffer, grid_cell_count() * LIGHT_GRID_SLOTS * sizeof(uint32_t),
@@ -358,7 +355,6 @@ void LightCollection::update(const CommandBufferHandle& cmd,
             auto c = params->get_cursor();
             c["triangles"] = triangles_buffer;
             c["cdf"] = cdf_buffer;
-            c["weights"] = weights_buffer;
             c["pool"] = pool_buffer;
             c["grid"] = grid_buffer;
             c["grid_info"] = grid_info_buffer;
@@ -381,19 +377,11 @@ void LightCollection::update(const CommandBufferHandle& cmd,
 
         const bool use_grid = selection == LightSelection::LightSelectionGrid;
         {
-            const auto ep = weights_entry_point.get();
-            const auto pipe = weights_pipeline.get();
-            cmd->bind(pipe);
-            ep->bind("params", write_preprocess(weights_params.get()), cmd, pipe, obj_allocator);
-            cmd->dispatch((triangle_count + 63) / 64, 1, 1);
-        }
-        barrier();
-        {
             const auto ep = cdf_entry_point.get();
             const auto pipe = cdf_pipeline.get();
             const auto params = cdf_params.get();
             auto c = params->get_cursor();
-            c["weights"] = weights_buffer;
+            c["triangles"] = triangles_buffer;
             c["cdf"] = cdf_buffer;
             c["triangle_count"] = triangle_count;
 
@@ -444,7 +432,6 @@ void LightCollection::write_to(ShaderCursor cursor) const {
     const BufferHandle& dummy = allocator->get_dummy_buffer();
     cursor["triangles"] = active ? triangles_buffer : dummy;
     cursor["cdf"] = active ? cdf_buffer : dummy;
-    cursor["weights"] = active ? weights_buffer : dummy;
     cursor["pool"] = active ? pool_buffer : dummy;
     cursor["grid"] = active ? grid_buffer : dummy;
     cursor["geometry_light_offsets"] = active ? geometry_light_offsets_buffer : dummy;

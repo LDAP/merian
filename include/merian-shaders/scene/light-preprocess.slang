@@ -7,15 +7,14 @@ import merian_shaders.utils.sampling;
 
 using merian;
 
-// Per-frame preprocess for next event estimation: a selection weight per triangle, a pool of
-// pre-resampled lights, and a world-space grid of short per-cell lists. Everything a sample
-// needs afterwards is one or two loads.
+// Per-frame preprocess for next event estimation: a pool of pre-resampled lights and a
+// world-space grid of short per-cell lists. Everything a sample needs afterwards is one or two
+// loads.
 
 struct LightPreprocessBinding {
     StructuredBuffer<EmissiveTriangle, ScalarDataLayout> triangles;
-    // inclusive prefix sum of the weights
+    // inclusive prefix sum of the flux
     StructuredBuffer<float> cdf;
-    RWStructuredBuffer<float> weights;
     RWStructuredBuffer<uint> pool;
     RWStructuredBuffer<uint> grid;
     RWStructuredBuffer<LightGridInfo, ScalarDataLayout> grid_info;
@@ -44,8 +43,10 @@ float clamped_distance2(const EmissiveTriangle tri, const float3 pos, const floa
     return max(dot(to_light, to_light), max(0.5f * length(scaled_n), radius * radius));
 }
 
-// Importance of a light for a point: power reaching it, with the emitting side facing it.
-float light_target(const EmissiveTriangle tri, const float3 pos, const float radius) {
+// Importance of a light for a point over the density the pool draws it with: the pool is
+// already proportional to the flux, so what remains is the geometry term towards the point,
+// with the emitting side facing it.
+float resampling_weight(const EmissiveTriangle tri, const float3 pos, const float radius) {
     if (tri.flux <= 0.f)
         return 0.f;
     const float3 centroid = (tri.p0 + tri.p1 + tri.p2) * (1.f / 3.f);
@@ -59,27 +60,13 @@ float light_target(const EmissiveTriangle tri, const float3 pos, const float rad
         cos_l = abs(cos_l);
     if (cos_l <= 0.f)
         return 0.f;
-    return tri.flux * cos_l / clamped_distance2(tri, pos, radius);
+    return cos_l / clamped_distance2(tri, pos, radius);
 }
 
-// The weight a light is selected with globally. Power only: any point-dependent term would
-// starve lights that face away from that point but still light what it sees, and the grid below
-// is where locality belongs.
-[shader("compute")][numthreads(64, 1, 1)] void
-weights(uint3 thread_id : SV_DispatchThreadID, ParameterBlock<LightPreprocessBinding> params) {
-    const uint i = thread_id.x;
-    if (i >= params.triangle_count)
-        return;
-
-    const EmissiveTriangle tri = params.triangles[i];
-    const float w = tri.flux;
-    params.weights[i] = isfinite(w) ? max(w, 0.f) : 0.f;
-}
-
-    // Places the grid around the camera, sized so that it spans a fraction of the lit region. The
-    // extent comes from a stride over the pool: the scene itself may not know its own bounds.
-    [shader("compute")][numthreads(1, 1, 1)] void grid_setup(
-        ParameterBlock<LightPreprocessBinding> params) {
+// Places the grid around the camera, sized so that it spans a fraction of the lit region. The
+// extent comes from a stride over the pool: the scene itself may not know its own bounds.
+[shader("compute")][numthreads(1, 1, 1)] void
+grid_setup(ParameterBlock<LightPreprocessBinding> params) {
     const uint dim = params.grid_dimension;
     float cell = params.grid_cell_size;
     if (cell <= 0.f) {
@@ -147,7 +134,7 @@ uint select_light(const StructuredBuffer<float> cdf, const uint count, const flo
 }
 
 // The pool holds independent draws from that distribution, so a sample is one load from a buffer
-// small enough to stay in cache, and its density is still weights[i] / total.
+// small enough to stay in cache, and its density is still flux[i] / total.
 [shader("compute")][numthreads(64, 1, 1)] void pool(uint3 thread_id : SV_DispatchThreadID,
                                                     ParameterBlock<LightPreprocessBinding> params) {
     const uint i = thread_id.x;
@@ -193,9 +180,7 @@ uint select_light(const StructuredBuffer<float> cdf, const uint count, const flo
             const uint index = params.pool[min(uint(rng.next_float() * pool_size), pool_size - 1)];
             if (index == LIGHT_INVALID_INDEX)
                 continue;
-            // the pool already draws with weights[index]; resampling divides it out again
-            total += light_target(params.triangles[index], point, radius) /
-                     max(params.weights[index], 1e-20f);
+            total += resampling_weight(params.triangles[index], point, radius);
         }
     }
     if (!(total > 0.f)) {
@@ -214,8 +199,7 @@ uint select_light(const StructuredBuffer<float> cdf, const uint count, const flo
         const uint index = params.pool[min(uint(rng.next_float() * pool_size), pool_size - 1)];
         if (index == LIGHT_INVALID_INDEX)
             continue;
-        sum += light_target(params.triangles[index], point, radius) /
-               max(params.weights[index], 1e-20f);
+        sum += resampling_weight(params.triangles[index], point, radius);
         while (sum > next && slot < LIGHT_GRID_SLOTS) {
             params.grid[cell * LIGHT_GRID_SLOTS + slot] = index;
             slot++;

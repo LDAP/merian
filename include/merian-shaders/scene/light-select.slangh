@@ -45,16 +45,4 @@ struct LightGridInfo {
     uint32_t dimension; // cells per side, 0 while the grid is unused
 };
 
-#ifndef __cplusplus
-// Monotonic float <-> uint mapping so that InterlockedMin/Max order floats correctly.
-uint float_to_ordered(const float f) {
-    const uint u = asuint(f);
-    return (u & 0x80000000u) != 0 ? ~u : (u | 0x80000000u);
-}
-
-float ordered_to_float(const uint u) {
-    return asfloat((u & 0x80000000u) != 0 ? (u & 0x7FFFFFFFu) : ~u);
-}
-#endif
-
 } // namespace merian

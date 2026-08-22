@@ -71,12 +71,10 @@ struct LightHit {
 // with probability p_env. All densities are per solid angle at the receiver.
 struct NEE {
     StructuredBuffer<EmissiveTriangle, ScalarDataLayout> triangles;
-    // inclusive prefix sum of the selection weights
+    // inclusive prefix sum of the flux
     StructuredBuffer<float> cdf;
-    // per-triangle selection weight; the last cdf entry normalizes it
-    StructuredBuffer<float> weights;
-    // per-frame draws from the weights, in tiles: every pixel of a screen tile draws from the
-    // same one, so the entries it touches stay in cache
+    // per-frame draws from that distribution, in tiles: every pixel of a screen tile draws from
+    // the same one, so the entries it touches stay in cache
     StructuredBuffer<uint> pool;
     uint pool_tile_size;
     // LIGHT_GRID_SLOTS lights per cell, resampled towards the cell every frame
@@ -108,12 +106,12 @@ struct NEE {
         return env_importance.sample_direction(rng);
     }
 
-    float get_total_weight() {
+    float get_total_flux() {
         return triangle_count > 0 ? cdf[triangle_count - 1] : 0.f;
     }
 
     bool has_emissive_triangles() {
-        return get_total_weight() > 0.f;
+        return get_total_flux() > 0.f;
     }
 
     bool has_lights() {
@@ -157,10 +155,10 @@ struct NEE {
     }
 
     // Probability of the global technique picking a light. Taken from the stored prefix sums,
-    // not from the weight: with many lights the difference of two neighbouring sums is what the
-    // search actually realizes, and the two disagree once the sums lose the weight in rounding.
+    // not from the record's flux: with many lights the difference of two neighbouring sums is what
+    // the search actually realizes, and the two disagree once a sum loses the flux in rounding.
     float get_global_select_pdf(const uint index) {
-        const float total = get_total_weight();
+        const float total = get_total_flux();
         if (!(total > 0.f))
             return 0.f;
         const float gap = index == 0 ? cdf[0] : cdf[index] - cdf[index - 1];
@@ -198,7 +196,7 @@ struct NEE {
     // searches the whole scene.
     uint select_light(const uint cell, inout RandomGenerator rng, out float p_select) {
         p_select = 0.f;
-        if (!(get_total_weight() > 0.f))
+        if (!(get_total_flux() > 0.f))
             return LIGHT_INVALID_INDEX;
 
         const float p_grid = get_grid_probability(cell);
