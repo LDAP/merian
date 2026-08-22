@@ -94,7 +94,9 @@ grid_setup(ParameterBlock<LightPreprocessBinding> params) {
     params.grid_info[0].dimension = dim;
 }
 
-// Whether the cell point sees the light, tested against one point on the triangle.
+// Whether the cell point sees the light, tested against one point on the triangle. Every
+// triangle blocks, whichever way it faces and whatever its alpha: a point inside a wall must see
+// nothing, and the tracer's culled query would see everything from there.
 bool cell_sees_light(const RaytracingAccelerationStructure as,
                      const EmissiveTriangle tri,
                      const float3 from,
@@ -112,13 +114,13 @@ bool cell_sees_light(const RaytracingAccelerationStructure as,
     ray.TMin = 1e-3f * dist;
     ray.TMax = 0.999f * dist;
 
-    RayQuery<RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH> rq;
+    RayQuery<RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_FORCE_OPAQUE> rq;
     rq.TraceRayInline(as, RAY_FLAG_NONE, 0xff, ray);
     rq.Proceed();
     return rq.CommittedStatus() == COMMITTED_NOTHING;
 }
 
-// Selects a light with probability weights[i] / total.
+// Selects a light with probability flux[i] / total.
 uint select_light(const StructuredBuffer<float> cdf, const uint count, const float u) {
     const float target = u * cdf[count - 1];
     uint lo = 0;

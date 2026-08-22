@@ -85,11 +85,12 @@ class LightCollection {
         env_emissive = value;
     }
 
-    // The grid follows the camera.
+    // The grid's visibility probe traces against it.
     void set_acceleration_structure(const AccelerationStructureHandle& as) {
         acceleration_structure = as;
     }
 
+    // The grid follows the camera.
     void set_camera(const float3& position) {
         camera_position = position;
     }
