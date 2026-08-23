@@ -31,20 +31,37 @@ extern static const int merian_render_scatter_mode = SCATTER_MODE_MIS;
 extern static const int merian_render_scatter_candidates = 2;
 } // namespace merian
 
+// Thread reordering is a ray tracing pipeline feature, so the call may only exist in the raygen
+// specialization of the path loop.
+interface IThreadReorder {
+    static void reorder();
+}
+struct NoThreadReorder : IThreadReorder {
+    static void reorder() {}
+}
+struct SerThreadReorder : IThreadReorder {
+    static void reorder() {
+#if defined(MERIAN_SPIRV_CAP_SUPPORTED_ShaderInvocationReorderEXT)
+        if (merian_render_enable_ser) {
+            ReorderThread(0, 0);
+        }
+#endif
+    }
+}
+
 struct RenderBinding {
     ParameterBlock<GBuffer> gbuffer;
     RWTexture2D<float4> irradiance;
     ParameterBlock<RenderGuiding> guiding;
 }
 
-float3
-trace_path(const ParameterBlock<Scene> scene,
-           const ParameterBlock<RenderBinding> params,
-           const uint2 pixel,
-           RayDesc ray,
-           ShadingPoint sp,
-           const uint16_t sample_index,
-           inout RandomGenerator rng) {
+float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
+                                            const ParameterBlock<RenderBinding> params,
+                                            const uint2 pixel,
+                                            RayDesc ray,
+                                            ShadingPoint sp,
+                                            const uint16_t sample_index,
+                                            inout RandomGenerator rng) {
     // Medium the ray is travelling through; updated on transmission events.
     var medium = scene.make_path_medium();
 
@@ -184,11 +201,7 @@ trace_path(const ParameterBlock<Scene> scene,
         radiance += throughput * scene.resolve_direct_light(sp.pos, sp.get_face_normal(), reservoir,
                                                             merian_render_instance_mask);
 
-#if defined(MERIAN_SPIRV_CAP_SUPPORTED_ShaderInvocationReorderEXT)
-        if (merian_render_enable_ser) {
-            ReorderThread(0, 0);
-        }
-#endif
+        Reorder.reorder();
 
         // A transmission event crosses the surface; update the medium we are now in.
         const bool transmission = wi_local.z * wo_local.z < 0.f;
@@ -262,9 +275,9 @@ trace_path(const ParameterBlock<Scene> scene,
     return radiance;
 }
 
-void render_pixel(const uint2 pixel,
-                  const ParameterBlock<Scene> scene,
-                  const ParameterBlock<RenderBinding> params) {
+void render_pixel<Reorder : IThreadReorder>(const uint2 pixel,
+                                            const ParameterBlock<Scene> scene,
+                                            const ParameterBlock<RenderBinding> params) {
     if (not_on_texture(pixel, params.irradiance))
         return;
 
@@ -286,7 +299,7 @@ void render_pixel(const uint2 pixel,
         RandomGenerator rng = PCG(pcg4d16(uint4(pixel, scene.frame, s)));
 
         const float3 contrib =
-            trace_path(scene, params, pixel, primary_ray, primary_sp, uint16_t(s), rng) /
+            trace_path<Reorder>(scene, params, pixel, primary_ray, primary_sp, uint16_t(s), rng) /
             demod_albedo;
         if (!any(isnan(contrib)) && !any(isinf(contrib))) {
             irradiance += contrib;
@@ -308,10 +321,10 @@ void render_pixel(const uint2 pixel,
 [shader("compute")][numthreads(8, 8, 1)] void main_compute(uint3 thread_id : SV_DispatchThreadID,
                                                            ParameterBlock<Scene> scene,
                                                            ParameterBlock<RenderBinding> params) {
-    render_pixel(thread_id.xy, scene, params);
+    render_pixel<NoThreadReorder>(thread_id.xy, scene, params);
 }
 
-    [shader("raygeneration")] void main(ParameterBlock<Scene> scene,
-                                        ParameterBlock<RenderBinding> params) {
-    render_pixel(DispatchRaysIndex().xy, scene, params);
+[shader("raygeneration")] void main(ParameterBlock<Scene> scene,
+                                    ParameterBlock<RenderBinding> params) {
+    render_pixel<SerThreadReorder>(DispatchRaysIndex().xy, scene, params);
 }
