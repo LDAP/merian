@@ -110,4 +110,27 @@ struct IsotropicVolume : HomogeneousVolume {
     }
 }
 
+// The medium a path travels in: the scene's exterior, or the interior of the surface it last
+// transmitted into. Both types are static, so a Vacuum exterior still folds the medium away.
+struct PathMedium<Exterior : HomogeneousVolume> {
+    Exterior exterior;
+    IsotropicVolume interior;
+    bool inside;
+
+    __init(const Exterior exterior) {
+        this.exterior = exterior;
+        this.interior = IsotropicVolume(float3(0.0f), float3(0.0f), 1.0f);
+        this.inside = false;
+    }
+
+    [mutating] void cross_boundary(const IsotropicVolume interior, const bool entering) {
+        this.interior = interior;
+        this.inside = entering;
+    }
+
+    float3 transmittance(const float t) {
+        return inside ? interior.transmittance(t) : exterior.transmittance(t);
+    }
+}
+
 } // namespace merian

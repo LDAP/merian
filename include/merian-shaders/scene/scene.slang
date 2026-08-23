@@ -57,6 +57,10 @@ struct Scene {
 
     // -----------------------------------------
 
+    PathMedium<SceneHomogeneousVolume> make_path_medium() {
+        return PathMedium<SceneHomogeneousVolume>(exterior_volume);
+    }
+
     /* Traces the ray agains the scenes acceleration structure.
      *
      * Returns the hit information.

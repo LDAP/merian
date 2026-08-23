@@ -41,7 +41,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
                   const uint16_t sample_index,
                   inout RandomGenerator rng) {
     // Medium the ray is travelling through; updated on transmission events.
-    HomogeneousVolume medium = scene.exterior_volume;
+    var medium = scene.make_path_medium();
 
     float3 throughput = medium.transmittance(distance(ray.Origin, sp.pos));
     float3 radiance = merian_render_emission_on_primary ? throughput * sp.emission : float3(0);
@@ -189,12 +189,9 @@ float3 trace_path(const ParameterBlock<Scene> scene,
 
         if (let next = next_ray) {
             if (transmission) {
-                const IsotropicVolume interior = sp.surface_material.get_interior_volume();
                 // leaving a surface puts the ray back into the medium enclosing the scene
-                if (dot(-ray.Direction, sp.get_face_normal()) >= 0.f)
-                    medium = interior;
-                else
-                    medium = scene.exterior_volume;
+                medium.cross_boundary(sp.surface_material.get_interior_volume(),
+                                      dot(-ray.Direction, sp.get_face_normal()) >= 0.f);
             }
             ray = next;
 
