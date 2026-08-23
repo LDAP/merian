@@ -19,6 +19,9 @@ class SSMMGuidingNode : public GuidingNode {
     NodeStatusFlags
     process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) override {
         ssmm().set_gbuffer(io[con_gbuffer].r());
+        // the fits are the node's own, so the graph does not order last frame's writes against
+        // this frame's reads
+        submission.get_cmd()->barrier(ssmm().carry_barriers());
         return GuidingNode::process(io, info, submission);
     }
 

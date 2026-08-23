@@ -34,6 +34,9 @@ class SSMMGuidingModel : public GuidingModel {
 
     void reset(const CommandBufferHandle& cmd) override;
 
+    // Orders the previous frame's writes against this frame's reads.
+    std::array<vk::BufferMemoryBarrier2, 2> carry_barriers() const;
+
     bool properties(Properties& props) override;
 
   private:

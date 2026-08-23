@@ -90,6 +90,17 @@ void SSMMGuidingModel::reset(const CommandBufferHandle& cmd) {
     frame = 0;
 }
 
+std::array<vk::BufferMemoryBarrier2, 2> SSMMGuidingModel::carry_barriers() const {
+    std::array<vk::BufferMemoryBarrier2, 2> barriers;
+    for (uint32_t i = 0; i < states.size(); i++) {
+        barriers[i] = states[i]->buffer_barrier2(
+            vk::PipelineStageFlagBits2::eAllCommands, vk::PipelineStageFlagBits2::eAllCommands,
+            vk::AccessFlagBits2::eMemoryWrite,
+            vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite);
+    }
+    return barriers;
+}
+
 bool SSMMGuidingModel::properties(Properties& props) {
     bool constants_changed = false;
 
