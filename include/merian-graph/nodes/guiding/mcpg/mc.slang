@@ -66,9 +66,11 @@ struct MCState {
         return true;
     }
 
+    // Inverse Langevin function, the maximum likelihood concentration of a vMF on S2 whose
+    // samples have mean resultant length r. Jedynak 2015.
     float kappa(const float3 pos) {
         const float r = mean_cos(pos);
-        return (3.0 * r - r * r * r) / (1.0 - r * r);
+        return r * (3.0 - 2.6 * r + 0.7 * r * r) / ((1.0 - r) * (1.0 + 0.1 * r));
     }
 
     // vmf lobe float4(direction, kappa) for a position
