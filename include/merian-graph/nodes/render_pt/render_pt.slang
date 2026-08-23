@@ -25,6 +25,10 @@ extern static const float merian_render_nee_probability = 0.5;
 extern static const int merian_render_nee_candidates = 1;
 // vertices (from the primary) that perform NEE; 0 = all
 extern static const int merian_render_nee_bounces = 0;
+// SCATTER_MODE_MIS draws the direction once from the mixture; SCATTER_MODE_RIS draws several and
+// resamples them by how much the shading function makes of each
+extern static const int merian_render_scatter_mode = SCATTER_MODE_MIS;
+extern static const int merian_render_scatter_candidates = 2;
 } // namespace merian
 
 struct RenderBinding {
@@ -136,7 +140,12 @@ trace_path(const ParameterBlock<Scene> scene,
             }
         } else {
             sampled_light = LIGHT_INVALID_INDEX;
-            if (let s = mixture.sample(bsdf, guiding, frame, wi_local, rng)) {
+            const Optional<ScatterSample> scatter =
+                merian_render_scatter_mode == SCATTER_MODE_RIS
+                    ? mixture.sample_ris(bsdf, guiding, frame,
+                                         merian_render_scatter_candidates, wi_local, rng)
+                    : mixture.sample(bsdf, guiding, frame, wi_local, rng);
+            if (let s = scatter) {
                 wo_world = s.wo;
                 f_cos = s.f_cos;
                 scatter_pdf = s.pdf;

@@ -332,6 +332,8 @@ void RenderPT::update_render_constants() {
                     "export static const float merian_render_nee_probability = {:f};\n"
                     "export static const int merian_render_nee_candidates = {};\n"
                     "export static const int merian_render_nee_bounces = {};\n"
+                    "export static const int merian_render_scatter_mode = {};\n"
+                    "export static const int merian_render_scatter_candidates = {};\n"
                     "export static const int merian_render_volume_spp = {};\n"
                     "export static const int merian_render_volume_nee_candidates = {};\n"
                     "export static const float merian_render_volume_forward_project_min_z "
@@ -339,8 +341,8 @@ void RenderPT::update_render_constants() {
                     "}}",
                     emission_on_primary ? "true" : "false", spp, max_path_length, mask,
                     enable_ser ? "true" : "false", demodulate_albedo ? "true" : "false", nee_mode,
-                    nee_probability, nee_candidates, nee_bounces, volume_spp, volume_nee_candidates,
-                    volume_forward_project_min_z));
+                    nee_probability, nee_candidates, nee_bounces, scatter_mode, scatter_candidates,
+                    volume_spp, volume_nee_candidates, volume_forward_project_min_z));
 }
 
 RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
@@ -357,6 +359,16 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
         config.config_bool("emission on primary", emission_on_primary,
                            "Fold primary-hit emission into irradiance (self-contained). "
                            "Otherwise it is the GBuffer emission texture's job.");
+    constants_changed |= config.config_options(
+        "scatter sampling", scatter_mode, {"mixture (MIS)", "resampled (RIS)"},
+        Properties::OptionsStyle::COMBO,
+        "How one direction comes out of the guiding lobes and the shading function. 'resampled' "
+        "draws several and keeps one by how much the shading function makes of it, at the cost of "
+        "the extra evaluations; it still traces one ray.");
+    if (scatter_mode == 1) {
+        constants_changed |= config.config_int("scatter candidates", scatter_candidates,
+                                               "Directions drawn before one is kept.", 1, 16);
+    }
     constants_changed |=
         config.config_options("next event estimation", nee_mode, {"off", "mixture", "resampled"},
                               Properties::OptionsStyle::COMBO,

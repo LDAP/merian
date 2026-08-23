@@ -99,6 +99,10 @@ class RenderPT : public Node {
     float volume_forward_project_min_z = 50.f;
     vk::Format volume_depth_format = vk::Format::eR32Sfloat;
 
+    // 0 = one draw from the mixture (MIS), 1 = resample several (RIS)
+    int32_t scatter_mode = 0;
+    int32_t scatter_candidates = 2;
+
     int32_t nee_mode = 2;
     float nee_probability = 0.1f;
     int32_t nee_candidates = 1;

@@ -3,8 +3,13 @@ __exported import merian_shaders.shading.bsdfs.bsdf;
 __exported import merian_shaders.shading.shading_function;
 __exported import merian_shaders.utils.frame;
 __exported import merian_shaders.utils.random;
+__exported import merian_shaders.colors.colorspaces;
 
 namespace merian {
+
+// How the integrator turns the mixture into one direction.
+static const int SCATTER_MODE_MIS = 0;
+static const int SCATTER_MODE_RIS = 1;
 
 // When, and from where, the current frame is rendered. Spatial guiding structures are
 // camera-adaptive and age their records, so they need it; passed rather than stored, the values
@@ -339,6 +344,77 @@ struct ScatterMixture {
         s.f_cos = bsdf.eval(wi_local, wo_local, rng);
         s.pdf = pdf(bsdf, guiding, wi_local, wo_local, s.wo);
         return s;
+    }
+
+    /* Resampled importance sampling over the same two techniques.
+     *
+     * Draws `candidates` directions from the mixture, weighs each by how much the shading
+     * function makes of it, and keeps one. Unlike the single draw above it can pass over a
+     * direction the shading function cannot use, at the cost of the extra evaluations; it still
+     * traces one ray. The target is the shading function alone: neither the guiding lobes nor the
+     * caches behind them carry radiance per direction, so there is nothing to weigh it against.
+     */
+    Optional<ScatterSample>
+    sample_ris<B : ShadingFunction, G : GuidingDistribution<float3>>(const B bsdf,
+                                                                     const G guiding,
+                                                                     const OrthonormalFrame frame,
+                                                                     const int candidates,
+                                                                     const float3 wi_local,
+                                                                     inout RandomGenerator rng) {
+        // without guiding lobes the mixture is the shading function, and resampling it against
+        // itself gains nothing
+        if (!(p_guiding > 0.f)) {
+            return sample(bsdf, guiding, frame, wi_local, rng);
+        }
+
+        ScatterSample selected;
+        float target = 0.f;
+        float weight_sum = 0.f;
+
+        for (int i = 0; i < candidates; i++) {
+            ScatterSample c;
+            c.delta = false;
+            c.guided = rng.next_float() < p_guiding;
+
+            float3 wo_local;
+            if (c.guided) {
+                c.wo = guiding.sample(rng);
+                wo_local = frame.to_local(c.wo);
+            } else {
+                const Optional<ShadingFunctionSample> bs = bsdf.sample_eval(wi_local, rng);
+                if (!bs.hasValue) {
+                    continue;
+                }
+                wo_local = bs.value.wo;
+                c.wo = frame.to_world(wo_local);
+                if (bs.value.lobe == BSDFLobe::Delta) {
+                    // a delta direction has no density to resample against, so it leaves the pool
+                    // the way the single draw takes it
+                    c.f_cos = bs.value.weight;
+                    c.pdf = 1.f - p_guiding;
+                    c.delta = true;
+                    return c;
+                }
+            }
+
+            c.f_cos = bsdf.eval(wi_local, wo_local, rng);
+            const float q = pdf(bsdf, guiding, wi_local, wo_local, c.wo);
+            const float t = yuv_luminance(c.f_cos);
+            const float w = q > 0.f ? t / q : 0.f;
+            weight_sum += w;
+            if (w > 0.f && rng.next_float() * weight_sum < w) {
+                selected = c;
+                target = t;
+            }
+        }
+
+        if (!(weight_sum > 0.f)) {
+            return none;
+        }
+        // f_cos / pdf stays the throughput factor: this is the density that reproduces the
+        // resampling weight
+        selected.pdf = target * candidates / weight_sum;
+        return selected;
     }
 }
 
