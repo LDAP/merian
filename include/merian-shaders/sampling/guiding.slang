@@ -11,9 +11,7 @@ namespace merian {
 static const int SCATTER_MODE_MIS = 0;
 static const int SCATTER_MODE_RIS = 1;
 
-// When, and from where, the current frame is rendered. Spatial guiding structures are
-// camera-adaptive and age their records, so they need it; passed rather than stored, the values
-// are wave-uniform.
+// When, and from where, the current frame is rendered; the values are wave-uniform.
 struct RenderFrameInfo {
     float3 cam_pos;
     float3 prev_cam_pos;
@@ -49,9 +47,8 @@ struct PathVertex {
 
 /* The resolved continuation of a vertex.
  *
- * Deliberately narrow, and it repeats the few vertex fields a guiding method still needs: every
- * field in here sits in registers across the traversal, and the path tracer is already at the
- * spilling threshold there.
+ * Every field sits in registers across the continuation ray, where the path tracer is already at
+ * the spilling threshold: keep it narrow.
  */
 struct PathSegment {
     // the vertex the ray started from
@@ -69,7 +66,7 @@ struct PathSegment {
     // no vertex will be scattered from beyond this segment
     bool is_last;
 
-    // --- only set where a continuation ray was traced ---
+    // set only where a continuation ray was traced:
 
     // False where the surface refused the direction. A ray that left the scene did trace: it
     // reached the environment.
@@ -104,7 +101,7 @@ interface GuidingModel {
     associatedtype PathState;
     associatedtype DistributionImpl : GuidingDistribution<float3>;
     // Everything record_segment needs, and nothing else: it is the only thing that survives the
-    // continuation ray, and the path tracer already spills there.
+    // continuation ray.
     associatedtype UpdateRecord;
 
     PathState begin_path();
@@ -149,12 +146,7 @@ struct RaySegment {
     float weight;
 }
 
-/* A distance guiding method: the same shape as GuidingModel, over distances rather than
- * directions.
- *
- * Kept apart from it rather than made generic: a scattering vertex and a ray are different things
- * to be told about, and a method that guides one has nothing to say about the other.
- */
+// A distance guiding method: the same shape as GuidingModel, over distances rather than directions.
 interface DistanceGuidingModel {
     associatedtype PathState;
     associatedtype DistributionImpl : GuidingDistribution<float>;
@@ -173,8 +165,6 @@ interface DistanceGuidingModel {
                         const UpdateRecord record, const RaySegment segment,
                         inout RandomGenerator rng);
 }
-
-// --- no guiding ---
 
 struct NullGuidingDistribution : GuidingDistribution<float3> {
     float pdf(const float3 s) {
@@ -289,9 +279,8 @@ struct ScatterSample {
 }
 
 // One-sample MIS between a shading function and a guiding distribution: a BSDF at a surface, a
-// phase function in a medium. Neither is stored: the BSDF comes out of the material system as an
-// existential, and the distribution is dead as soon as the direction is drawn — keeping either
-// would hold it live across the continuation ray.
+// phase function in a medium. Both are passed in per call so that neither stays live across the
+// continuation ray.
 struct ScatterMixture {
     // 0 where the guiding distribution has nothing to offer
     float p_guiding;
