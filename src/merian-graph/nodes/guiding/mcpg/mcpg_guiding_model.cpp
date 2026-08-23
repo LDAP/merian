@@ -47,13 +47,14 @@ SlangCompositionHandle MCPGGuidingModel::get_composition() const {
                     "export static const bool merian_guiding_scale_with_alpha = {};\n"
                     "export static const float merian_guiding_alpha_threshold = {};\n"
                     "export static const bool merian_guiding_missing_light_heuristic = {};\n"
+                    "export static const bool merian_guiding_discount_nee = {};\n"
                     "export static const bool merian_guiding_light_cache_tail = {};\n"
                     "export static const float merian_guiding_lc_min_pdf = {};\n"
                     "}}\n"
                     "export static const float dir_guide_prior = {};",
                     mc_samples, probability, scale_with_alpha ? "true" : "false", alpha_threshold,
-                    missing_light_heuristic ? "true" : "false", light_cache_tail ? "true" : "false",
-                    lc_min_pdf, dir_guide_prior));
+                    missing_light_heuristic ? "true" : "false", discount_nee ? "true" : "false",
+                    light_cache_tail ? "true" : "false", lc_min_pdf, dir_guide_prior));
     return composition;
 }
 
@@ -97,6 +98,10 @@ bool MCPGGuidingModel::properties(Properties& props) {
         constants_changed |=
             props.config_float("alpha threshold", alpha_threshold,
                                "Do not guide below this lobe width.", 0.01f, 0.f, 1.f);
+        constants_changed |= props.config_bool(
+            "discount what NEE covers", discount_nee,
+            "Weigh an emitter the continuation found by how much next event estimation missed it, "
+            "so the chains learn the light it cannot reach. Only sensible with NEE on.");
         constants_changed |= props.config_bool(
             "missing light heuristic", missing_light_heuristic,
             "Flood the Markov chains with invalidated states when no light is detected.");

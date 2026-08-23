@@ -142,8 +142,8 @@ trace_path(const ParameterBlock<Scene> scene,
             sampled_light = LIGHT_INVALID_INDEX;
             const Optional<ScatterSample> scatter =
                 merian_render_scatter_mode == SCATTER_MODE_RIS
-                    ? mixture.sample_ris(bsdf, guiding, frame,
-                                         merian_render_scatter_candidates, wi_local, rng)
+                    ? mixture.sample_ris(bsdf, guiding, frame, merian_render_scatter_candidates,
+                                         wi_local, rng)
                     : mixture.sample(bsdf, guiding, frame, wi_local, rng);
             if (let s = scatter) {
                 wo_world = s.wo;
@@ -173,6 +173,7 @@ trace_path(const ParameterBlock<Scene> scene,
         segment.next_normal = segment.normal;
         segment.next_mv = half3(0);
         segment.incident = float3(0);
+        segment.nee_weight = 1.f;
 
         // Last thing before the ray: the record is what crosses the traversal, so it must not be
         // taken while the mixture densities above are still live.
@@ -239,6 +240,7 @@ trace_path(const ParameterBlock<Scene> scene,
             segment.next_normal = sp.shading_normal;
             segment.next_mv = half3((sp.pos - sp.prev_pos) / scene.time_diff);
             segment.incident = sp.emission * segment_transmittance;
+            segment.nee_weight = mis_weight;
             segment.weight = segment.pdf > 0.f ? f_cos / segment.pdf : float3(0);
 
             throughput *= segment.weight;

@@ -15,6 +15,9 @@ extern static const bool merian_guiding_scale_with_alpha = true;
 // no guiding below this alpha: the BSDF is far more peaked than any lobe
 extern static const float merian_guiding_alpha_threshold = 0.05;
 extern static const bool merian_guiding_missing_light_heuristic = true;
+// discount an emitter the continuation found by how much next event estimation already covers it,
+// so the chains spend themselves on the light it cannot reach
+extern static const bool merian_guiding_discount_nee = false;
 // complete a truncated path with the cached irradiance at its last vertex
 extern static const bool merian_guiding_light_cache_tail = false;
 // floor on the density the irradiance cache divides by, bounding the variance it stores
@@ -199,13 +202,19 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
             target * segment.weight * min(1.f, segment.pdf / merian_guiding_lc_min_pdf),
             frame_info.cam_pos, frame_info.prev_cam_pos, frame_info.index, rng, update_pos);
 
-        if (rng.next_float() * record.score_sum < mc_f * merian_guiding_mc_samples) {
+        // What the chains are worth steering towards. The cache above keeps the emitter whole
+        // either way: it stands in for the whole path tail, not for the part the chains steer.
+        const float guide_f =
+            merian_guiding_discount_nee && emissive ? mc_f * segment.nee_weight : mc_f;
+
+        if (rng.next_float() * record.score_sum < guide_f * merian_guiding_mc_samples) {
             MCState chain = record.selected;
-            chain.add_sample(segment.pos, mc_f, segment.next_pos, segment.next_mv, frame_info.time);
+            chain.add_sample(segment.pos, guide_f, segment.next_pos, segment.next_mv,
+                             frame_info.time);
             mcpg.store(chain, segment.pos, record.access_normal, frame_info.cam_pos,
                        frame_info.index, rng);
         } else if (merian_guiding_missing_light_heuristic && record.selected_pos.is_valid() &&
-                   record.selected.light_missing_heuristic(mc_f, segment.wo, segment.pos,
+                   record.selected.light_missing_heuristic(guide_f, segment.wo, segment.pos,
                                                            segment.next_pos)) {
             mcpg.kill(record.selected_pos);
         }

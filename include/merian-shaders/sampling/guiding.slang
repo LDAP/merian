@@ -80,6 +80,9 @@ struct PathSegment {
     half3 next_mv;
     // radiance arriving from the next vertex
     float3 incident;
+    // share of that radiance the scatter technique is the one that pays for: 1 where no light
+    // sampler could have found it
+    float nee_weight;
 }
 
 // What a guiding method offers at one vertex: directions in worldspace (solid angle) for a
