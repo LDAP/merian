@@ -607,11 +607,11 @@ RenderMCPG::NodeStatusFlags RenderMCPG::properties(Properties& config) {
             "Give each 2^n-wide cell tile a contiguous Morton-ordered slot range so nearby "
             "cells share cache lines (0 = scatter every cell).",
             0u, 5u);
-        constants_changed |= config.config_float(
-            "LC min pdf", lc_min_pdf,
-            "Increase to reduce fireflies in the irradiance cache and bias the guiding towards "
-            "direct light, especially useful for short maximum path lengths.",
-            0.1f, 0.0f);
+        constants_changed |=
+            config.config_float("LC min pdf", lc_min_pdf,
+                                "Clamps the pdf the irradiance cache divides by. Reduces fireflies "
+                                "and biases guiding towards direct light.",
+                                0.1f, 0.0f);
         // Fail gracefully if compilation fails.
         if (irr_cache) {
             if (recreate_cache) {

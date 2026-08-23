@@ -152,7 +152,7 @@ class RenderMCPG : public Node {
     bool lc_stochastic_interpolation = false;
     bool lc_split_hash_payload_storage = true;
     uint32_t lc_locality_bits = 3;
-    float lc_min_pdf = 1.0f;
+    float lc_min_pdf = 0.25f;
 
     // --- Volume transport ---
     // Single scattering along the primary ray, guided by a per-pixel distance chain and the same

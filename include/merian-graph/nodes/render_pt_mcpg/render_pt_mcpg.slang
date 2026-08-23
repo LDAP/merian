@@ -18,6 +18,9 @@ extern static const bool merian_render_demodulate_albedo = false;
 
 extern static const bool use_light_cache_tail = false;
 extern static const float lc_min_pdf = 1.0;
+static const bool use_light_cache = merian_render_max_path_length > 2 || use_light_cache_tail;
+static const bool recursive_light_cache =
+    merian_render_max_path_length > 3 || use_light_cache_tail;
 
 extern static const float p_guiding = 0.9;
 
@@ -164,12 +167,10 @@ float3 trace_path(const ParameterBlock<Scene> scene,
 
             incident = sp.emission;
 
-            lc_incident =select(
-                any(incident > 0.0) ||
-                        (!use_light_cache_tail && merian_render_max_path_length == 2),
-                     incident,
-                     float3(params.irr_cache.get(next_pos, sp.shading_normal, cam_pos,
-                                                 prev_cam_pos, rng, lc_grid_pos)));
+            lc_incident = incident;
+            if (use_light_cache && !any(incident > 0.0))
+                lc_incident = float3(params.irr_cache.get(next_pos, sp.shading_normal, cam_pos,
+                                                          prev_cam_pos, rng, lc_grid_pos));
 
             // Beer-Lambert attenuation over the segment just travelled; in-scattering is the
             // volume renderer's job. Folded into the incident radiance so that the guiding and the
@@ -187,8 +188,11 @@ float3 trace_path(const ParameterBlock<Scene> scene,
 
         const float mc_f = yuv_luminance(lc_incident * bsdf / wo_p);
         if (!isinf(mc_f) && !isnan(mc_f)) {
-            params.irr_cache.update(cur_pos, normal, lc_incident * bsdf / max(wo_p, lc_min_pdf),
-                                    cam_pos, prev_cam_pos, scene.frame, rng, cur_lc_grid_pos);
+            if (use_light_cache) {
+                const float3 irr = select(recursive_light_cache, lc_incident, incident);
+                params.irr_cache.update(cur_pos, normal, irr * bsdf / max(wo_p, lc_min_pdf),
+                                        cam_pos, prev_cam_pos, scene.frame, rng, cur_lc_grid_pos);
+            }
 
             if (rng.next_float() * score_sum < mc_f * mc_samples) {
                 const half3 target_mv = half3((sp.pos - sp.prev_pos) / scene.time_diff);
