@@ -51,10 +51,12 @@ class PBRTSceneTest : public ::testing::Test {
     static void SetUpTestSuite() {
         spdlog::set_level(spdlog::level::debug);
         ContextCreateInfo info{
-            .features =
-                VulkanFeatures({"scalarBlockLayout", "shaderInt64", "shaderFloat16",
-                                "accelerationStructure", "storageBuffer16BitAccess",
-                                "storageBuffer8BitAccess", "uniformAndStorageBuffer8BitAccess"}),
+            .features = VulkanFeatures(
+                {"scalarBlockLayout", "shaderInt64", "shaderFloat16", "shaderInt8", "shaderInt16",
+                 "accelerationStructure", "storageBuffer16BitAccess",
+                 "uniformAndStorageBuffer16BitAccess", "storageBuffer8BitAccess",
+                 "uniformAndStorageBuffer8BitAccess", "shaderSampledImageArrayNonUniformIndexing",
+                 "rayTracingPipeline", "rayQuery"}),
             .context_extensions = {ExtensionVkValidationLayers::name, ExtensionResources::name},
             .application_name = "test-pbrt-scene",
         };
