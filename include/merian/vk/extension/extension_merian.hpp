@@ -20,15 +20,17 @@ class ExtensionMerian : public ContextExtension {
                                             "synchronization2", // for all kinds of sync
                                         },
                                         {
-                                            "maintenance4",      // for memory allocator
-                                            "samplerAnisotropy", // for sampler pool
-                                            "scalarBlockLayout", // for scalar-layout buffers
+                                            "maintenance4",           // for memory allocator
+                                            "samplerAnisotropy",      // for sampler pool
+                                            "scalarBlockLayout",      // for scalar-layout buffers
+                                            "pipelineExecutableInfo", // for MERIAN_SHADER_STATS
                                         },
                                         {},
                                         {
                                             VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
                                             VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
                                             VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
+                                            VK_KHR_PIPELINE_EXECUTABLE_PROPERTIES_EXTENSION_NAME,
                                         });
     }
 

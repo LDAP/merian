@@ -65,7 +65,10 @@ class RayTracingPipeline : public Pipeline {
                        const void* pNext)
         : Pipeline(pipeline_layout->get_context(),
                    pipeline_layout,
-                   raygen_groups.empty() ? flags | vk::PipelineCreateFlagBits::eLibraryKHR : flags),
+                   capture_statistics(pipeline_layout->get_context(),
+                                      raygen_groups.empty()
+                                          ? flags | vk::PipelineCreateFlagBits::eLibraryKHR
+                                          : flags)),
           raygen_groups(std::move(raygen_groups)), miss_groups(std::move(miss_groups)),
           triangle_hit_groups(std::move(triangle_hit_groups)),
           procedural_hit_groups(std::move(procedural_hit_groups)),
@@ -173,6 +176,7 @@ class RayTracingPipeline : public Pipeline {
                        .createRayTracingPipelinesKHR(
                            {}, context->get_device()->get_pipeline_cache(), {create_info})
                        .value[0];
+        log_statistics("ray tracing pipeline");
     }
 
   public:

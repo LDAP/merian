@@ -12,7 +12,9 @@ class ComputePipeline : public Pipeline {
                     const vk::PipelineCreateFlags flags = {},
                     const PipelineHandle& base_pipeline = {},
                     const void* pNext = nullptr)
-        : Pipeline(pipeline_layout->get_context(), pipeline_layout, flags),
+        : Pipeline(pipeline_layout->get_context(),
+                   pipeline_layout,
+                   capture_statistics(pipeline_layout->get_context(), flags)),
           entry_point(entry_point), base_pipeline(base_pipeline) {
 
         assert(entry_point->get_stage() == vk::ShaderStageFlagBits::eCompute);
@@ -20,7 +22,7 @@ class ComputePipeline : public Pipeline {
         SPDLOG_DEBUG("create ComputePipeline ({})", fmt::ptr(this));
 
         const vk::ComputePipelineCreateInfo info{
-            flags,
+            this->flags,
             entry_point->get_shader_stage_create_info(context),
             *pipeline_layout,
             base_pipeline ? base_pipeline->get_pipeline() : nullptr,
@@ -32,6 +34,7 @@ class ComputePipeline : public Pipeline {
                        ->get_device()
                        .createComputePipeline(context->get_device()->get_pipeline_cache(), info)
                        .value;
+        log_statistics(entry_point->get_name());
     }
 
   public:
