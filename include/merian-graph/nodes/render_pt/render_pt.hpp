@@ -1,5 +1,6 @@
 #pragma once
 
+#include "merian-graph/connectors/image/vk_image_in_sampled.hpp"
 #include "merian-graph/connectors/image/vk_image_out_managed.hpp"
 #include "merian-graph/connectors/ptr_in.hpp"
 #include "merian-graph/connectors/shader_object_in.hpp"
@@ -68,7 +69,13 @@ class RenderPT : public Node {
     PtrInHandle<Scene> con_scene = PtrIn<Scene>::create();
     ShaderObjectInHandle<GBufferObject> con_gbuffer = ShaderObjectIn<GBufferObject>::create();
     ShaderObjectInHandle<GuidingObject> con_guiding = ShaderObjectIn<GuidingObject>::create();
+    ShaderObjectInHandle<GuidingObject> con_distance_guiding =
+        ShaderObjectIn<GuidingObject>::create();
     ManagedVkImageOutHandle con_irradiance;
+    ManagedVkImageOutHandle con_volume;
+    ManagedVkImageOutHandle con_volume_depth;
+    ManagedVkImageOutHandle con_volume_mv;
+    VkSampledImageInHandle con_prev_volume_depth = VkSampledImageIn::create();
 
     vk::Extent3D extent = vk::Extent3D{1920, 1080, 1};
     int32_t spp = 1;
@@ -81,12 +88,31 @@ class RenderPT : public Node {
     // NullGuidingModel while nothing is connected: the slot then compiles out entirely.
     GuidingModelHandle guiding;
     uint32_t guiding_version = 0;
+    GuidingModelHandle distance_guiding;
+    uint32_t distance_guiding_version = 0;
+
+    // Single scattering along the primary ray; compiled out where the scene has no medium.
+    bool volume_available = false;
+    int32_t volume_spp = 1;
+    int32_t volume_nee_candidates = 0;
+    bool volume_forward_project = true;
+    float volume_forward_project_min_z = 50.f;
+    vk::Format volume_depth_format = vk::Format::eR32Sfloat;
 
     int32_t nee_mode = 2;
     float nee_probability = 0.5f;
     int32_t nee_candidates = 1;
     int32_t nee_bounces = 0;
     std::array<bool, 8> mask_enabled{true, true, true, true, true, true, true, true};
+
+    struct VolumePass {
+        Versioned<SlangProgramEntryPoint> entry_point;
+        Versioned<Pipeline> pipeline;
+        Versioned<ShaderObject> params;
+    };
+    VolumePass single_scattering;
+    VolumePass project_seed;
+    VolumePass project;
 
     // Slang program + pipeline; rebuilt when the scene composition changes.
     SlangCompositionHandle composition;

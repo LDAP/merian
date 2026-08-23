@@ -1,5 +1,6 @@
 __exported import merian_shaders.distributions.distribution;
 __exported import merian_shaders.shading.bsdfs.bsdf;
+__exported import merian_shaders.shading.shading_function;
 __exported import merian_shaders.utils.frame;
 __exported import merian_shaders.utils.random;
 
@@ -119,6 +120,52 @@ interface GuidingModel {
                           inout RandomGenerator rng);
 }
 
+/* The primary ray a medium sits on.
+ *
+ * Distance guiding is per pixel along one ray, so unlike a scattering vertex there is no frame and
+ * no lobe width: the distribution is over the distance travelled before scattering.
+ */
+struct RayVertex {
+    float3 origin;
+    float3 direction;
+    // how far the medium reaches along the ray
+    float max_distance;
+    uint2 pixel;
+    uint16_t sample_index;
+}
+
+// The resolved scattering event of a RayVertex.
+struct RaySegment {
+    float distance;
+    // what the sample contributed at that distance
+    float weight;
+}
+
+/* A distance guiding method: the same shape as GuidingModel, over distances rather than
+ * directions.
+ *
+ * Kept apart from it rather than made generic: a scattering vertex and a ray are different things
+ * to be told about, and a method that guides one has nothing to say about the other.
+ */
+interface DistanceGuidingModel {
+    associatedtype PathState;
+    associatedtype DistributionImpl : GuidingDistribution<float>;
+    associatedtype UpdateRecord;
+
+    PathState begin_path();
+
+    DistributionImpl get_distribution(inout PathState state, const RenderFrameInfo frame_info,
+                                      const RayVertex vertex, inout RandomGenerator rng);
+
+    // Narrows the distribution down to what the update needs, once the distance is known.
+    UpdateRecord record_scatter(const DistributionImpl dist, const bool guided);
+
+    // Learns from the resolved scattering event.
+    void record_segment(inout PathState state, const RenderFrameInfo frame_info,
+                        const UpdateRecord record, const RaySegment segment,
+                        inout RandomGenerator rng);
+}
+
 // --- no guiding ---
 
 struct NullGuidingDistribution : GuidingDistribution<float3> {
@@ -171,6 +218,54 @@ struct NullGuidingModel : GuidingModel {
     }
 }
 
+struct NullDistanceGuidingDistribution : GuidingDistribution<float> {
+    float pdf(const float s) {
+        return 0.f;
+    }
+    float sample(inout RandomGenerator rng) {
+        return 0.f;
+    }
+    DistributionSample<float> sample_eval(inout RandomGenerator rng) {
+        return {0.f, 0.f};
+    }
+    bool is_valid() {
+        return false;
+    }
+    float get_selection_probability(const float alpha) {
+        return 0.f;
+    }
+}
+
+struct NullDistanceGuidingModel : DistanceGuidingModel {
+    struct State {
+    }
+
+    typealias PathState = State;
+    typealias DistributionImpl = NullDistanceGuidingDistribution;
+    typealias UpdateRecord = State;
+
+    State begin_path() {
+        return {};
+    }
+
+    NullDistanceGuidingDistribution get_distribution(inout State state,
+                                                     const RenderFrameInfo frame_info,
+                                                     const RayVertex vertex,
+                                                     inout RandomGenerator rng) {
+        return {};
+    }
+
+    State record_scatter(const NullDistanceGuidingDistribution dist, const bool guided) {
+        return {};
+    }
+
+    void record_segment(inout State state,
+                        const RenderFrameInfo frame_info,
+                        const State record,
+                        const RaySegment segment,
+                        inout RandomGenerator rng) {}
+}
+
 // One draw from the scatter mixture.
 struct ScatterSample {
     float3 wo; // in worldspace
@@ -185,9 +280,10 @@ struct ScatterSample {
     bool guided;
 }
 
-// One-sample MIS between the BSDF and a guiding distribution. Neither is stored: the BSDF comes
-// out of the material system as an existential, and the distribution is dead as soon as the
-// direction is drawn — keeping either would hold it live across the continuation ray.
+// One-sample MIS between a shading function and a guiding distribution: a BSDF at a surface, a
+// phase function in a medium. Neither is stored: the BSDF comes out of the material system as an
+// existential, and the distribution is dead as soon as the direction is drawn — keeping either
+// would hold it live across the continuation ray.
 struct ScatterMixture {
     // 0 where the guiding distribution has nothing to offer
     float p_guiding;
@@ -199,22 +295,22 @@ struct ScatterMixture {
     // The guiding term comes first on purpose: it consumes the candidates, and the material pdf
     // below is an existential switch that would otherwise raise the peak by the whole candidate
     // set.
-    float pdf<B : BSDF, G : GuidingDistribution<float3>>(const B bsdf,
-                                                         const G guiding,
-                                                         const float3 wi_local,
-                                                         const float3 wo_local,
-                                                         const float3 wo_world) {
+    float pdf<B : ShadingFunction, G : GuidingDistribution<float3>>(const B bsdf,
+                                                                    const G guiding,
+                                                                    const float3 wi_local,
+                                                                    const float3 wo_local,
+                                                                    const float3 wo_world) {
         const float p_guided = p_guiding > 0.f ? p_guiding * guiding.pdf(wo_world) : 0.f;
         return p_guided + (1.f - p_guiding) * bsdf.pdf(wi_local, wo_local);
     }
 
-    // Draws a direction in worldspace; none where the BSDF refused to scatter.
+    // Draws a direction in worldspace; none where the shading function refused to scatter.
     Optional<ScatterSample>
-    sample<B : BSDF, G : GuidingDistribution<float3>>(const B bsdf,
-                                                      const G guiding,
-                                                      const OrthonormalFrame frame,
-                                                      const float3 wi_local,
-                                                      inout RandomGenerator rng) {
+    sample<B : ShadingFunction, G : GuidingDistribution<float3>>(const B bsdf,
+                                                                 const G guiding,
+                                                                 const OrthonormalFrame frame,
+                                                                 const float3 wi_local,
+                                                                 inout RandomGenerator rng) {
         ScatterSample s;
         s.delta = false;
         s.guided = p_guiding > 0.f && rng.next_float() < p_guiding;

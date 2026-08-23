@@ -8,6 +8,7 @@
 
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace merian {
@@ -46,10 +47,10 @@ class GuidingModel {
 
 using GuidingModelHandle = std::shared_ptr<GuidingModel>;
 
-class NullGuidingModel : public GuidingModel {
+// Host side of a method that is present but does nothing; the slot then compiles out entirely.
+class NullModel : public GuidingModel {
   public:
-    void initialize([[maybe_unused]] const ContextHandle& context,
-                    [[maybe_unused]] const ResourceAllocatorHandle& allocator) override {}
+    explicit NullModel(std::string type_name) : type_name(std::move(type_name)) {}
 
     SlangCompositionHandle get_composition() const override {
         return SlangComposition::create();
@@ -60,8 +61,11 @@ class NullGuidingModel : public GuidingModel {
     }
 
     std::string get_type_name() const override {
-        return "merian::NullGuidingModel";
+        return type_name;
     }
+
+    void initialize([[maybe_unused]] const ContextHandle& context,
+                    [[maybe_unused]] const ResourceAllocatorHandle& allocator) override {}
 
     void write_to([[maybe_unused]] ShaderCursor cursor) override {}
 
@@ -70,6 +74,19 @@ class NullGuidingModel : public GuidingModel {
     bool properties([[maybe_unused]] Properties& props) override {
         return false;
     }
+
+  private:
+    const std::string type_name;
+};
+
+class NullGuidingModel : public NullModel {
+  public:
+    NullGuidingModel() : NullModel("merian::NullGuidingModel") {}
+};
+
+class NullDistanceGuidingModel : public NullModel {
+  public:
+    NullDistanceGuidingModel() : NullModel("merian::NullDistanceGuidingModel") {}
 };
 
 } // namespace merian

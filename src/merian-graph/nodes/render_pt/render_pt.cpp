@@ -2,20 +2,26 @@
 
 #include "merian/shader/shader_compile_context.hpp"
 #include "merian/vk/pipeline/pipeline_ray_tracing_builder.hpp"
+#include "merian/vk/utils/profiler.hpp"
 
 #include <fmt/format.h>
 
 namespace merian {
 
-RenderPT::RenderPT() : guiding(std::make_shared<NullGuidingModel>()) {}
+RenderPT::RenderPT()
+    : guiding(std::make_shared<NullGuidingModel>()),
+      distance_guiding(std::make_shared<NullDistanceGuidingModel>()) {}
 
 DeviceSupportInfo RenderPT::query_device_support(const DeviceSupportQueryInfo& query_info) {
     const auto composition = Scene::query_device_support_composition(query_info);
     composition->add_module_from_string(
-        "render_pt_guiding", "module render_pt_guiding;\n"
-                             "import \"merian-shaders/sampling/guiding.slang\";\n"
-                             "public typealias RenderGuiding = merian::NullGuidingModel;");
+        "render_pt_guiding",
+        "module render_pt_guiding;\n"
+        "import \"merian-shaders/sampling/guiding.slang\";\n"
+        "public typealias RenderGuiding = merian::NullGuidingModel;\n"
+        "public typealias RenderDistanceGuiding = merian::NullDistanceGuidingModel;");
     composition->add_module_from_path("merian-graph/nodes/render_pt/render_pt.slang", true);
+    composition->add_module_from_path("merian-graph/nodes/render_pt/render_pt_volume.slang", true);
     const auto program = SlangProgram::create(query_info.compile_context, composition);
     return DeviceSupportInfo::check(query_info, {"rayTracingPipeline"}, {"rayQuery"}) &
            program.get()->query_device_support(query_info);
@@ -35,26 +41,47 @@ std::vector<InputConnectorDescriptor> RenderPT::describe_inputs() {
             {.name = "guiding",
              .connector = con_guiding,
              .access = ConnectorAccess::ray_tracing_read,
+             .optional = true},
+            {.name = "distance_guiding",
+             .connector = con_distance_guiding,
+             .access = ConnectorAccess::compute_read,
+             .optional = true},
+            {.name = "prev_volume_depth",
+             .connector = con_prev_volume_depth,
+             .access = ConnectorAccess::compute_read,
+             .delay = 1,
              .optional = true}};
 }
 
 std::vector<OutputConnectorDescriptor> RenderPT::describe_outputs(const NodeIOLayout& io_layout) {
     extent = io_layout[con_gbuffer]->get_create_info().extent;
-    const GuidingModelHandle connected =
-        io_layout.is_connected(con_guiding)
-            ? io_layout[con_guiding]->get_create_info().model
-            : std::static_pointer_cast<GuidingModel>(std::make_shared<NullGuidingModel>());
-    const uint32_t connected_version =
-        io_layout.is_connected(con_guiding) ? io_layout[con_guiding]->get_create_info().version : 0;
     // the method's type and constants are baked in, so either changing rebuilds the program
-    if (!guiding || guiding->get_type_name() != connected->get_type_name() ||
-        guiding_version != connected_version) {
-        composition.reset();
-    }
-    guiding = connected;
-    guiding_version = connected_version;
+    const auto adopt = [&](const ShaderObjectInHandle<GuidingObject>& con, GuidingModelHandle& slot,
+                           uint32_t& slot_version, const GuidingModelHandle& none) {
+        const GuidingModelHandle connected =
+            io_layout.is_connected(con) ? io_layout[con]->get_create_info().model : none;
+        const uint32_t version =
+            io_layout.is_connected(con) ? io_layout[con]->get_create_info().version : 0;
+        if (!slot || slot->get_type_name() != connected->get_type_name() ||
+            slot_version != version) {
+            composition.reset();
+        }
+        slot = connected;
+        slot_version = version;
+    };
+    adopt(con_guiding, guiding, guiding_version, std::make_shared<NullGuidingModel>());
+    adopt(con_distance_guiding, distance_guiding, distance_guiding_version,
+          std::make_shared<NullDistanceGuidingModel>());
     con_irradiance = ManagedVkImageOut::create(irradiance_format, extent);
-    return {{"irradiance", con_irradiance, ConnectorAccess::ray_tracing_write}};
+    con_volume = ManagedVkImageOut::create(irradiance_format, extent);
+    con_volume_depth = ManagedVkImageOut::create(volume_depth_format, extent);
+    con_volume_mv = ManagedVkImageOut::create(vk::Format::eR16G16Sfloat, extent);
+
+    const bool no_volume = !volume_available;
+    return {{"irradiance", con_irradiance, ConnectorAccess::ray_tracing_write},
+            {"volume", con_volume, ConnectorAccess::compute_write, no_volume},
+            {"volume_depth", con_volume_depth, ConnectorAccess::compute_write, no_volume},
+            {"volume_mv", con_volume_mv, ConnectorAccess::compute_read_write, no_volume}};
 }
 
 RenderPT::NodeStatusFlags RenderPT::on_connected(const NodeIOLayout& io_layout,
@@ -86,16 +113,20 @@ RenderPT::NodeStatusFlags RenderPT::on_connected(const NodeIOLayout& io_layout,
 
 void RenderPT::update_guiding_slot() {
     std::string imports;
-    for (const std::string& import : guiding->get_slang_imports()) {
-        imports += fmt::format("import \"{}\";\n", import);
+    for (const GuidingModelHandle& model : {guiding, distance_guiding}) {
+        composition->add_composition(model->get_composition());
+        for (const std::string& import : model->get_slang_imports()) {
+            imports += fmt::format("import \"{}\";\n", import);
+        }
     }
-    composition->add_composition(guiding->get_composition());
     composition->add_module_from_string(
-        "render_pt_guiding", fmt::format("module render_pt_guiding;\n"
-                                         "import \"merian-shaders/sampling/guiding.slang\";\n"
-                                         "{}"
-                                         "public typealias RenderGuiding = {};",
-                                         imports, guiding->get_type_name()));
+        "render_pt_guiding",
+        fmt::format("module render_pt_guiding;\n"
+                    "import \"merian-shaders/sampling/guiding.slang\";\n"
+                    "{}"
+                    "public typealias RenderGuiding = {};\n"
+                    "public typealias RenderDistanceGuiding = {};",
+                    imports, guiding->get_type_name(), distance_guiding->get_type_name()));
 }
 
 void RenderPT::ensure_pipeline(const SceneHandle& scene) {
@@ -106,6 +137,7 @@ void RenderPT::ensure_pipeline(const SceneHandle& scene) {
     composition->add_composition(scene->get_composition());
     update_guiding_slot();
     composition->add_module_from_path("merian-graph/nodes/render_pt/render_pt.slang", true);
+    composition->add_module_from_path("merian-graph/nodes/render_pt/render_pt_volume.slang", true);
     update_render_constants();
 
     program = SlangProgram::create(compile_context, composition);
@@ -137,6 +169,23 @@ void RenderPT::ensure_pipeline(const SceneHandle& scene) {
         return entry_point->create_shader_object_for_parameter(context, "params",
                                                                resource_allocator);
     });
+
+    const auto build_volume_pass = [this](VolumePass& pass, const std::string& name) {
+        pass.entry_point = SlangProgramEntryPoint::create(program, name);
+        pass.pipeline = Versioned<Pipeline>([&pass, this] {
+            const auto ep = pass.entry_point.get();
+            return ComputePipeline::create(ep->get_pipeline_layout(context), ep->specialize());
+        });
+        pass.pipeline.depends_on(pass.entry_point);
+        pass.params = Versioned<ShaderObject>([&pass, this] {
+            return pass.entry_point->create_shader_object_for_parameter(context, "params",
+                                                                        resource_allocator);
+        });
+        pass.params.depends_on(pass.entry_point);
+    };
+    build_volume_pass(single_scattering, "single_scattering");
+    build_volume_pass(project_seed, "volume_project_seed");
+    build_volume_pass(project, "volume_project");
     params.depends_on(entry_point);
 }
 
@@ -151,6 +200,12 @@ RenderPT::process(const NodeIO& io, const NodeProcessInfo& info, Submission& sub
     if (max_path_length != emitted_max_path_length) {
         emitted_max_path_length = max_path_length;
         io.send_event("bounces_changed");
+    }
+
+    if (const bool available = volume_spp > 0 && scene->has_exterior_volume();
+        available != volume_available) {
+        volume_available = available;
+        return NodeStatusFlagBits::NEEDS_RECONNECT;
     }
 
     ensure_pipeline(scene);
@@ -171,10 +226,76 @@ RenderPT::process(const NodeIO& io, const NodeProcessInfo& info, Submission& sub
     ep->bind("scene", scene->get_shader_object(), cmd, pipe, obj_allocator);
     ep->bind("params", params_obj, cmd, pipe, obj_allocator);
 
-    if (use_raygen) {
-        cmd->trace_rays(sbt.get(), extent);
-    } else {
+    {
+        MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "surface");
+        if (use_raygen) {
+            cmd->trace_rays(sbt.get(), extent);
+        } else {
+            cmd->dispatch(extent, 8, 8);
+        }
+    }
+
+    if (!volume_available) {
+        return {};
+    }
+
+    const auto write_volume_binding = [&](const ShaderObjectHandle& obj) {
+        auto volume_cursor = obj->get_cursor();
+        volume_cursor["gbuffer"] = gbuf.r();
+        volume_cursor["volume"] = io[con_volume].get_texture();
+        volume_cursor["volume_depth"] = io[con_volume_depth].get_texture();
+        volume_cursor["volume_mv"] = io[con_volume_mv].get_texture();
+        if (io.is_connected(con_guiding)) {
+            volume_cursor["guiding"] = io[con_guiding].r();
+        }
+        if (io.is_connected(con_distance_guiding)) {
+            volume_cursor["distance_guiding"] = io[con_distance_guiding].r();
+        }
+        // resources do not convert to descriptors: assigning them falls into the byte-copy
+        // overload, so bind the texture explicitly
+        if (auto field = volume_cursor["prev_volume_depth"];
+            field.is_valid() && io.is_connected(con_prev_volume_depth)) {
+            field.write(io[con_prev_volume_depth].get_texture(), vk::ImageLayout::eGeneral);
+        }
+        return obj;
+    };
+
+    const auto dispatch_volume = [&](const VolumePass& pass, const bool bind_scene) {
+        const auto volume_ep = pass.entry_point.get();
+        const auto volume_pipe = pass.pipeline.get();
+        cmd->bind(volume_pipe);
+        if (bind_scene) {
+            volume_ep->bind("scene", scene->get_shader_object(), cmd, volume_pipe, obj_allocator);
+        }
+        volume_ep->bind("params", write_volume_binding(pass.params.get()), cmd, volume_pipe,
+                        obj_allocator);
         cmd->dispatch(extent, 8, 8);
+    };
+
+    const auto barrier_volume_mv = [&] {
+        cmd->barrier(io[con_volume_mv]->barrier2(
+            vk::ImageLayout::eGeneral, vk::AccessFlagBits2::eShaderWrite,
+            vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
+            vk::PipelineStageFlagBits2::eComputeShader,
+            vk::PipelineStageFlagBits2::eComputeShader));
+    };
+
+    {
+        MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "volume project");
+        dispatch_volume(project_seed, false);
+        barrier_volume_mv();
+
+        // the ping-pong is only valid from the second iteration on
+        if (volume_forward_project && io.is_connected(con_prev_volume_depth) &&
+            info.get_iteration() != 0) {
+            dispatch_volume(project, true);
+            barrier_volume_mv();
+        }
+    }
+
+    {
+        MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "single scattering");
+        dispatch_volume(single_scattering, true);
     }
     return {};
 }
@@ -199,16 +320,22 @@ void RenderPT::update_render_constants() {
                     "export static const float merian_render_nee_probability = {:f};\n"
                     "export static const int merian_render_nee_candidates = {};\n"
                     "export static const int merian_render_nee_bounces = {};\n"
+                    "export static const int merian_render_volume_spp = {};\n"
+                    "export static const int merian_render_volume_nee_candidates = {};\n"
+                    "export static const float merian_render_volume_forward_project_min_z "
+                    "= {:f};\n"
                     "}}",
                     emission_on_primary ? "true" : "false", spp, max_path_length, mask,
                     enable_ser ? "true" : "false", demodulate_albedo ? "true" : "false", nee_mode,
-                    nee_probability, nee_candidates, nee_bounces));
+                    nee_probability, nee_candidates, nee_bounces, volume_spp, volume_nee_candidates,
+                    volume_forward_project_min_z));
 }
 
 RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
     bool needs_reconnect = false;
     bool constants_changed = false;
 
+    config.st_separate("surface");
     constants_changed |=
         config.config_int("samples per pixel", spp, "Number of paths per pixel.", 1, 16);
     constants_changed |=
@@ -247,6 +374,31 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
         "demodulate albedo", demodulate_albedo,
         "Divide the primary-hit albedo out of the output so a denoiser can re-modulate after "
         "filtering. Use with 'emission on primary' disabled (emission is albedo-independent).");
+
+    config.st_separate("volume");
+    constants_changed |= config.config_int(
+        "volume samples per pixel", volume_spp,
+        "Single-scattering samples along the primary ray; 0 disables the volume pass, and with it "
+        "every node that consumes its outputs.",
+        0, 16);
+    if (volume_spp > 0) {
+        constants_changed |= config.config_int(
+            "volume NEE candidates", volume_nee_candidates,
+            "Light samples resampled into the one shadow ray at the scattering vertex (RIS). "
+            "Costs a shadow ray per sample; worth it where the medium is lit by sources the phase "
+            "function rarely finds.",
+            0, 32);
+        needs_reconnect |= config.config_bool(
+            "volume forward project", volume_forward_project,
+            "Reproject the mean scattering distance into this frame's motion vectors instead of "
+            "keeping the surface ones, which describe the first opaque hit.");
+        if (volume_forward_project) {
+            constants_changed |= config.config_float(
+                "volume forward project min z", volume_forward_project_min_z,
+                "Below this scattering distance the surface motion vector is the better estimate.",
+                0.f);
+        }
+    }
 
     config.st_separate("instance mask");
     for (uint32_t bit = 0; bit < 8; ++bit) {

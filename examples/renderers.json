@@ -23,6 +23,14 @@
                         "renderers/pt_mcpg.json"
                     ]
                 },
+                "pt_mcpg_volume": {
+                    "merge": [
+                        "renderers/pt.json",
+                        "renderers/pt_mcpg.json",
+                        "renderers/pt_volume.json",
+                        "renderers/mcpg_volume_combine.json"
+                    ]
+                },
                 "pt_ssmm": {
                     "merge": [
                         "renderers/pt.json",
