@@ -72,6 +72,7 @@ class RenderPT : public Node {
     enum GuidingMethod : int32_t {
         GUIDING_NONE = 0,
         GUIDING_MCPG = 1,
+        GUIDING_SSMM = 2,
     };
 
     vk::Extent3D extent = vk::Extent3D{1920, 1080, 1};
@@ -83,6 +84,7 @@ class RenderPT : public Node {
     bool use_raygen = true;
     bool demodulate_albedo = false;
     int32_t guiding_method = GUIDING_NONE;
+    bool guiding_needs_reset = true;
     GuidingModelHandle guiding;
 
     int32_t nee_mode = 2;

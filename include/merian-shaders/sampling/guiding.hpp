@@ -29,7 +29,12 @@ class GuidingModel {
 
     virtual std::string get_type_name() const = 0;
 
-    virtual void write_to(ShaderCursor cursor) const = 0;
+    // The render target's size, whenever the renderer (re)connects. Screen-space methods size
+    // their per-pixel state with it.
+    virtual void on_extent([[maybe_unused]] const vk::Extent3D& extent) {}
+
+    // Binds the method for the frame about to be rendered.
+    virtual void write_to(ShaderCursor cursor) = 0;
 
     virtual void reset(const CommandBufferHandle& cmd) = 0;
 
@@ -53,7 +58,7 @@ class NullGuidingModel : public GuidingModel {
         return "merian::NullGuidingModel";
     }
 
-    void write_to([[maybe_unused]] ShaderCursor cursor) const override {}
+    void write_to([[maybe_unused]] ShaderCursor cursor) override {}
 
     void reset([[maybe_unused]] const CommandBufferHandle& cmd) override {}
 

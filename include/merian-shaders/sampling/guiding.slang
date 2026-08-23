@@ -28,9 +28,13 @@ struct PathVertex {
     float alpha;
     uint16_t bounce; // 1 is the first scattering vertex
     uint16_t sample_index;
+    // the pixel the path was started from
+    uint2 pixel;
 
     property float3 normal {
-        get { return shading_frame.get_normal(); }
+        get {
+            return shading_frame.get_normal();
+        }
     }
 }
 
@@ -92,10 +96,8 @@ interface GuidingModel {
 
     PathState begin_path();
 
-    DistributionImpl get_distribution(inout PathState state,
-                                  const RenderFrameInfo frame_info,
-                                  const PathVertex vertex,
-                                  inout RandomGenerator rng);
+    DistributionImpl get_distribution(inout PathState state, const RenderFrameInfo frame_info,
+                                      const PathVertex vertex, inout RandomGenerator rng);
 
     /* Narrows the distribution down to what the update needs, once the direction is known.
      *
@@ -108,38 +110,47 @@ interface GuidingModel {
      * Returns radiance that completes the path at the next vertex, or float3(0) where the method
      * has no such estimate. The integrator adds it in place of continuing.
      */
-    float3 record_segment(inout PathState state,
-                      const RenderFrameInfo frame_info,
-                      const UpdateRecord record,
-                      const PathSegment segment,
-                      inout RandomGenerator rng);
+    float3 record_segment(inout PathState state, const RenderFrameInfo frame_info,
+                          const UpdateRecord record, const PathSegment segment,
+                          inout RandomGenerator rng);
 }
 
 // --- no guiding ---
 
 struct NullGuidingDistribution : GuidingDistribution {
-    float pdf(const float3 s) { return 0.f; }
-    float3 sample(inout RandomGenerator rng) { return float3(0, 0, 1); }
+    float pdf(const float3 s) {
+        return 0.f;
+    }
+    float3 sample(inout RandomGenerator rng) {
+        return float3(0, 0, 1);
+    }
     DistributionSample<float3> sample_eval(inout RandomGenerator rng) {
         return {float3(0, 0, 1), 0.f};
     }
-    bool is_valid() { return false; }
-    float get_selection_probability(const float alpha) { return 0.f; }
+    bool is_valid() {
+        return false;
+    }
+    float get_selection_probability(const float alpha) {
+        return 0.f;
+    }
 }
 
 struct NullGuidingModel : GuidingModel {
-    struct State {}
+    struct State {
+    }
 
     typealias PathState = State;
     typealias DistributionImpl = NullGuidingDistribution;
     typealias UpdateRecord = State;
 
-    State begin_path() { return {}; }
+    State begin_path() {
+        return {};
+    }
 
     NullGuidingDistribution get_distribution(inout State state,
-                                         const RenderFrameInfo frame_info,
-                                         const PathVertex vertex,
-                                         inout RandomGenerator rng) {
+                                             const RenderFrameInfo frame_info,
+                                             const PathVertex vertex,
+                                             inout RandomGenerator rng) {
         return {};
     }
 
@@ -148,10 +159,10 @@ struct NullGuidingModel : GuidingModel {
     }
 
     float3 record_segment(inout State state,
-                      const RenderFrameInfo frame_info,
-                      const State record,
-                      const PathSegment segment,
-                      inout RandomGenerator rng) {
+                          const RenderFrameInfo frame_info,
+                          const State record,
+                          const PathSegment segment,
+                          inout RandomGenerator rng) {
         return float3(0);
     }
 }

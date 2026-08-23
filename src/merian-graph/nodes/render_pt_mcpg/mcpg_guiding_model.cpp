@@ -50,9 +50,9 @@ SlangCompositionHandle MCPGGuidingModel::get_composition() const {
                     "export static const float merian_guiding_lc_min_pdf = {};\n"
                     "}}\n"
                     "export static const float dir_guide_prior = {};",
-                    mc_samples, probability, scale_with_alpha ? "true" : "false",
-                    alpha_threshold, missing_light_heuristic ? "true" : "false",
-                    light_cache_tail ? "true" : "false", lc_min_pdf, dir_guide_prior));
+                    mc_samples, probability, scale_with_alpha ? "true" : "false", alpha_threshold,
+                    missing_light_heuristic ? "true" : "false", light_cache_tail ? "true" : "false",
+                    lc_min_pdf, dir_guide_prior));
     return composition;
 }
 
@@ -68,7 +68,7 @@ std::string MCPGGuidingModel::get_type_name() const {
                        lc_split_storage ? "true" : "false", lc_locality_bits);
 }
 
-void MCPGGuidingModel::write_to(ShaderCursor cursor) const {
+void MCPGGuidingModel::write_to(ShaderCursor cursor) {
     mcpg->write_to(cursor["mcpg"]);
     irr_cache->write_to(cursor["irr_cache"]);
 }

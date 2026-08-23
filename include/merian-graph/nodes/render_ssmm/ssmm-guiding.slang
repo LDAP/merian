@@ -1,15 +1,17 @@
-#include "merian-graph/nodes/render_ssmm/render_ssmm.slangh"
+#include "merian-graph/nodes/render_ssmm/ssmm_guiding.slangh"
 
 __exported import merian_shaders.sampling.guiding;
+import merian_shaders.gbuffer;
 import merian_shaders.distributions.von_mises_fisher;
 import merian_shaders.colors.colorspaces;
-import merian_shaders.gbuffer;
 
 using merian;
 
 namespace merian {
-// candidates resampled out of the screen neighbourhood, and mixed for the density
-extern static const int merian_ssmm_candidates = 5;
+// neighbour fits resampled towards this vertex
+extern static const int merian_ssmm_group_size = 5;
+// standard deviation of the neighbourhood the resampling reaches into, in pixels
+extern static const float merian_ssmm_reuse_radius = 15.0;
 // probability the integrator gives the fitted lobe
 extern static const float merian_ssmm_probability = 0.85;
 // no guiding below this lobe width: the BSDF is far more peaked than any fitted lobe
@@ -18,11 +20,11 @@ extern static const float merian_ssmm_alpha_threshold = 0.05;
 extern static const uint merian_ssmm_max_n = 1024u;
 extern static const float merian_ssmm_min_alpha = 0.01;
 extern static const float merian_ssmm_prior_n = 0.2;
-}
+} // namespace merian
 
 // Screen-space mixture models (Dittebrandt et al. 2023), ported from VKDT with the author's
-// approval. One fitted lobe per pixel, carried over frames through the motion vectors; it only
-// describes the first scattering vertex, so deeper vertices get nothing.
+// approval. One fitted lobe per pixel, carried over frames through the motion vectors; it
+// describes the first scattering vertex only.
 namespace merian {
 
 bool ssmm_valid(const SSMCState s) {
@@ -33,7 +35,7 @@ float3 ssmm_target_dir(const SSMCState s, const float3 x) {
     return normalize(s.sum_tgt / (s.sum_w > 0.0 ? s.sum_w : 1.0) - x);
 }
 
-// vMF lobe (direction, concentration) the state stands for at x
+// the vMF lobe (direction, concentration) the state stands for at x
 float4 ssmm_vmf(const SSMCState s, const float3 x) {
     float r = s.sum_len / (s.sum_w > 0.0 ? s.sum_w : 1.0); // mean cosine in [0, 1]
     r = (s.N * s.N * r) / (s.N * s.N + merian_ssmm_prior_n);
@@ -54,7 +56,7 @@ void ssmm_add(inout SSMCState s, const float3 x, const float w, const float3 dir
 // How much a neighbour's fit is worth here: its own score, discounted where the surface it was
 // fitted on does not match this one. SVGF-style normal and depth weights.
 float ssmm_reuse_weight(const SSMCState s,
-                        const GBuffer gbuffer,
+                        const ParameterBlock<GBuffer> gbuffer,
                         const float3 cam_pos,
                         const uint2 resolution,
                         const float3 pos,
@@ -66,25 +68,18 @@ float ssmm_reuse_weight(const SSMCState s,
     return s.f * w_n * w_d;
 }
 
-// The neighbourhood's fits around one vertex. All candidates are kept: their densities form the
-// stochastic MIS weight, exactly as the Markov chain guiding does.
+// The one fit resampled out of the neighbourhood, as a vMF lobe.
 struct SSMMDistribution : GuidingDistribution {
-    float4 vmfs[merian_ssmm_candidates];
-    float scores[merian_ssmm_candidates];
-    float score_sum;
-    // the resampled fit the update continues from
+    float4 vmf;
+    // the fit the update continues from
     SSMCState selected;
 
     float pdf(const float3 s) {
-        float p = 0.0;
-        for (int i = 0; i < merian_ssmm_candidates; i++) {
-            p += vmfs[i].w > 0.0 ? scores[i] * vmf_pdf_tokuyoshi(s, vmfs[i].xyz, vmfs[i].w) : 0.0;
-        }
-        return p / score_sum;
+        return vmf.w > 0.0 ? vmf_pdf_tokuyoshi(s, vmf.xyz, vmf.w) : 0.0;
     }
 
     float3 sample(inout RandomGenerator rng) {
-        return vmf_sample_tokuyosh(vmfs[0].xyz, vmfs[0].w, rng.next_float2());
+        return vmf_sample_tokuyosh(vmf.xyz, vmf.w, rng.next_float2());
     }
 
     DistributionSample<float3> sample_eval(inout RandomGenerator rng) {
@@ -93,7 +88,7 @@ struct SSMMDistribution : GuidingDistribution {
     }
 
     bool is_valid() {
-        return score_sum > 0.0 && vmfs[0].w > 0.0;
+        return vmf.w > 0.0;
     }
 
     float get_selection_probability(const float alpha) {
@@ -102,15 +97,14 @@ struct SSMMDistribution : GuidingDistribution {
 }
 
 struct SSMMGuiding : GuidingModel {
-    SSMCStateAddress prev;
-    SSMCStateAddress next;
     ParameterBlock<GBuffer> gbuffer;
+    StructuredBuffer<SSMCState, ScalarDataLayout> prev;
+    RWStructuredBuffer<SSMCState, ScalarDataLayout> next;
 
     struct State {
         // where the fit is written back; only the first vertex has one
         uint2 pixel;
         bool has_fit;
-        SSMCState fit;
     }
 
     struct Record {
@@ -132,31 +126,29 @@ struct SSMMGuiding : GuidingModel {
                                       const RenderFrameInfo frame_info,
                                       const PathVertex vertex,
                                       inout RandomGenerator rng) {
-        SSMMDistribution d;
-        d.score_sum = 0.0;
-        for (int i = 0; i < merian_ssmm_candidates; i++) {
-            d.vmfs[i] = float4(0);
-            d.scores[i] = 0.0;
-        }
+        SSMMDistribution dist;
+        dist.vmf = float4(0);
+        dist.selected = SSMCState(float3(0), 0.0, 0, 0.0, 0.0);
         // a screen-space fit only describes the vertex the pixel actually sees
         if (vertex.bounce != uint16_t(1)) {
-            return d;
+            return dist;
         }
 
         const uint2 resolution = gbuffer.get_dimensions();
-        state.pixel = vertex.pixel;
         const float2 mv = gbuffer.get_motion_vectors(vertex.pixel);
         const int2 reprojected = int2(float2(vertex.pixel) + mv);
 
-        // resample the neighbourhood towards this vertex; the walk is the same one the fit was
-        // trained with, so the accepted candidate leads
-        SSMCState tent =
-            prev[ssmm_index(clamp(reprojected, int2(0), int2(resolution) - 1), resolution)];
-        float sum = ssmm_reuse_weight(tent, gbuffer, frame_info.cam_pos, resolution, vertex.pos,
-                                      vertex.normal, reprojected);
-        for (int i = 0; i < merian_ssmm_candidates; i++) {
-            const float2 r = rng.next_float2();
-            const int2 offset = int2(30.0 * (r - 0.5));
+        // Resample the neighbourhood towards this vertex, walking outwards from the reprojected
+        // pixel. Offsets are the sum of six uniforms, so the neighbourhood is sampled densely at
+        // the centre and thinly at the edges.
+        SSMCState tent = SSMCState(float3(0), 0.0, 0, 0.0, 0.0);
+        float sum = 0.0;
+        for (int i = 0; i < merian_ssmm_group_size; i++) {
+            const float4 r0 = rng.next_float4();
+            const float4 r1 = rng.next_float4();
+            const float4 r2 = rng.next_float4();
+            const int2 offset = int2(merian_ssmm_reuse_radius *
+                                     (r0.xy + r0.zw + r1.xy + r1.zw + r2.xy + r2.zw - 3.0));
             const int2 tc = clamp(reprojected + offset, int2(0), int2(resolution) - 1);
             const SSMCState other = prev[ssmm_index(tc, resolution)];
             const float w = ssmm_reuse_weight(other, gbuffer, frame_info.cam_pos, resolution,
@@ -165,22 +157,16 @@ struct SSMMGuiding : GuidingModel {
                 tent = other;
             }
             sum += w;
-
-            d.scores[i] = w;
-            d.vmfs[i] = ssmm_valid(other) ? ssmm_vmf(other, vertex.pos) : float4(0);
-            d.score_sum += w;
         }
-        // the accepted fit leads, so that sample() draws from it
-        d.selected = tent;
+
         if (ssmm_valid(tent)) {
-            d.vmfs[0] = ssmm_vmf(tent, vertex.pos);
-            d.scores[0] = max(d.scores[0], tent.f);
-            d.score_sum = max(d.score_sum, d.scores[0]);
+            dist.vmf = ssmm_vmf(tent, vertex.pos);
         }
+        dist.selected = tent;
 
+        state.pixel = vertex.pixel;
         state.has_fit = true;
-        state.fit = tent;
-        return d;
+        return dist;
     }
 
     Record record_scatter(const SSMMDistribution dist, const bool guided) {
@@ -200,19 +186,17 @@ struct SSMMGuiding : GuidingModel {
             return float3(0);
         }
 
-        SSMCState fit = record.selected;
         const float f = yuv_luminance(segment.incident * segment.weight);
-        if (!isinf(f) && !isnan(f)) {
-            if (!record.guided) {
-                // a BSDF sample explores: it starts a fit rather than continuing one
-                fit = SSMCState(float3(0), 0.0, 0, 0.0, 0.0);
-            }
-            fit.f = f;
-            ssmm_add(fit, segment.pos, f, segment.wo, segment.next_pos);
-            state.fit = fit;
+        if (isinf(f) || isnan(f)) {
+            return float3(0);
         }
 
-        next[ssmm_index(int2(state.pixel), gbuffer.get_dimensions())] = state.fit;
+        // a direction the fit did not propose explores: it starts a fit rather than continuing one
+        SSMCState fit = record.guided ? record.selected : SSMCState(float3(0), 0.0, 0, 0.0, 0.0);
+        fit.f = f;
+        ssmm_add(fit, segment.pos, f, segment.wo, segment.next_pos);
+
+        next[ssmm_index(int2(state.pixel), gbuffer.get_dimensions())] = fit;
         return float3(0);
     }
 }

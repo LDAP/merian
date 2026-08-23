@@ -85,7 +85,8 @@ trace_path(const ParameterBlock<Scene> scene,
         const OrthonormalFrame frame = sp.shading_frame;
         let bsdf = sp.surface_material.get_bsdf();
         const float3 wi_local = frame.to_local(-ray.Direction);
-        const PathVertex vertex = {sp.pos, sp.prev_pos, frame, bsdf.alpha, bounce, sample_index};
+        const PathVertex vertex = {sp.pos, sp.prev_pos,  frame, bsdf.alpha,
+                                   bounce, sample_index, pixel};
 
         // 1. the guiding lobes around this vertex, mixed with the BSDF
         let guiding = params.guiding.get_distribution(guiding_state, frame_info, vertex, rng);

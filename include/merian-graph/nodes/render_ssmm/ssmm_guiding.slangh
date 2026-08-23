@@ -1,0 +1,33 @@
+#pragma once
+
+#ifdef __cplusplus
+#include "merian-shaders/types.slang.h"
+#include <vulkan/vulkan.hpp>
+#endif
+
+namespace merian {
+
+// One fitted lobe, as a running maximum-likelihood estimate.
+struct SSMCState {
+    float3 sum_tgt;
+    float sum_w;
+    uint32_t N;
+    float sum_len;
+    float f;
+};
+
+#ifdef __cplusplus
+using SSMCStateAddress = vk::DeviceAddress;
+#else
+typealias SSMCStateAddress = SSMCState*;
+#endif
+
+} // namespace merian
+
+#ifndef __cplusplus
+
+uint ssmm_index(const int2 pixel, const uint2 dim) {
+    return pixel.y * dim.x + pixel.x;
+}
+
+#endif
