@@ -27,7 +27,6 @@ float3 trace_path(const ParameterBlock<Scene> scene,
                   inout RandomGenerator rng) {
     // Medium the ray is travelling through; updated on transmission events.
     HomogeneousVolume medium = scene.exterior_volume;
-    float current_ior = 1.0f;
 
     float3 throughput = medium.transmittance(distance(ray.Origin, sp.pos));
     float3 radiance = merian_render_emission_on_primary ? throughput * sp.emission : float3(0);
@@ -60,7 +59,6 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         const bool transmission = wi_local.z * bs.wo.z < 0.f;
         if (transmission) {
             const IsotropicVolume interior = sp.surface_material.get_interior_volume();
-            current_ior /= interior.get_eta();
             // leaving a surface puts the ray back into the medium enclosing the scene
             if (dot(-ray.Direction, sp.get_face_normal()) >= 0.f)
                 medium = interior;
@@ -76,7 +74,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
 
         // the last vertex is never scattered from, so its material sample would be dead
         sp = scene.trace_and_get_shading_point(
-            ray, merian_render_instance_mask, RenderContext(uint16_t(bounce), current_ior),
+            ray, merian_render_instance_mask, RenderContext(uint16_t(bounce)),
             DefaultLODSampler(), bounce + 1 < merian_render_max_path_length);
 
         // Beer-Lambert attenuation over the segment just travelled inside the medium. In-scattering

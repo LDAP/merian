@@ -6,6 +6,7 @@
 #include "vulkan/vulkan.hpp"
 
 #include <cstdint>
+#include <string>
 
 namespace merian {
 
@@ -18,5 +19,9 @@ Slang::ComPtr<slang::IGlobalSession> get_global_slang_session();
 // the epoch is unchanged, because a slang::ISession binds each module name to one immutable source.
 uint64_t slang_source_epoch();
 void bump_slang_source_epoch();
+
+// Records the source a module name is compiled from and advances the epoch when the name is bound
+// to a different one, so the binding is never observed by a session that already holds the old one.
+void bind_slang_module_source(const std::string& name, uint64_t source_hash);
 
 } // namespace merian

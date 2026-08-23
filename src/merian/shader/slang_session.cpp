@@ -252,6 +252,7 @@ uint64_t SlangSession::ir_cache_key(const std::string& name,
                  shader_compile_context->get_optimization_level(),
                  static_cast<uint32_t>(
                      debug_info_level(shader_compile_context->should_generate_debug_info())));
+    hash_combine(seed, string_module_fingerprint);
     return seed;
 }
 

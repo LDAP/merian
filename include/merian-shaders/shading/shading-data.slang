@@ -5,16 +5,13 @@ namespace merian {
 // Per-interaction path state the integrator hands to the scene/material.
 struct RenderContext {
     uint16_t bounce; // 0 is the first surface (gbuffer)
-    float ior;       // index of refraction of the medium the ray is currently in
 
     __init() {
         bounce = 0;
-        ior = 1.0f;
     }
 
-    __init(const uint16_t bounce, const float ior) {
+    __init(const uint16_t bounce) {
         this.bounce = bounce;
-        this.ior = ior;
     }
 }
 
@@ -30,8 +27,7 @@ struct ShadingData {
     OrthonormalFrame frame; // shading frame; flipped for backfacing to match the incoming ray dir
     float3
         face_normal; // geometric face normal; flipped for backfacing to match the incoming ray dir
-    uint16_t bounce; // 0 is the first surface (gbuffer)
-    float ior;       // index of refraction of the medium the ray is currently in
+    uint16_t bounce;   // 0 is the first surface (gbuffer)
     bool front_facing; // true if wi hit the mesh-canonical front side (i.e. an entering ray)
 
     __init(const float3 wi,
@@ -41,7 +37,6 @@ struct ShadingData {
            const OrthonormalFrame frame,
            const float3 face_normal,
            const uint16_t bounce,
-           const float ior,
            const bool front_facing) {
         this.wi = wi;
         this.pos = pos;
@@ -50,7 +45,6 @@ struct ShadingData {
         this.frame = frame;
         this.face_normal = face_normal;
         this.bounce = bounce;
-        this.ior = ior;
         this.front_facing = front_facing;
     }
 }

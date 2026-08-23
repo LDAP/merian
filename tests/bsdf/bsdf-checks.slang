@@ -42,8 +42,10 @@ float accumulate_err(const float acc, const float v) {
     float mean_cos = 0; // estimator of INT cos(theta) dwo
     float m2_cos = 0;
     uint valid = 0;
+    uint delta_samples = 0;
     float max_weight_err = 0;
     float max_pdf_err = 0;
+    float max_delta_err = 0;
 
     for (uint i = 0; i < params.n_samples; ++i) {
         // A below-horizon / clamped draw contributes zero and is still counted
@@ -61,11 +63,23 @@ float accumulate_err(const float acc, const float v) {
             // relative terms.
             const float pdf_ref = bsdf.pdf(wi, s.wo);
             const float3 eval_ref = bsdf.eval(wi, s.wo, rng);
-            max_pdf_err = accumulate_err(max_pdf_err, abs(s.pdf - pdf_ref) /
-                                                          (max(abs(s.pdf), abs(pdf_ref)) + 1e-6f));
-            if (pdf_ref > 0) {
-                max_weight_err =
-                    accumulate_err(max_weight_err, length(s.weight - (eval_ref / pdf_ref)));
+            if (s.lobe == merian::BSDFLobe::Delta) {
+                // a delta direction carries no solid-angle density, so eval() and pdf() vanish
+                // there and the reported weight is the whole estimator
+                delta_samples++;
+                max_delta_err = accumulate_err(max_delta_err, pdf_ref);
+                max_delta_err = accumulate_err(max_delta_err,
+                                               max(max(eval_ref.x, eval_ref.y), eval_ref.z));
+                max_delta_err =
+                    accumulate_err(max_delta_err, all(isfinite(s.weight)) ? 0.0f : 1e30f);
+            } else {
+                max_pdf_err =
+                    accumulate_err(max_pdf_err, abs(s.pdf - pdf_ref) /
+                                                    (max(abs(s.pdf), abs(pdf_ref)) + 1e-6f));
+                if (pdf_ref > 0) {
+                    max_weight_err =
+                        accumulate_err(max_weight_err, length(s.weight - (eval_ref / pdf_ref)));
+                }
             }
         }
 
@@ -132,4 +146,6 @@ float accumulate_err(const float acc, const float v) {
     params.output[13] = asuint(albedo.r);
     params.output[14] = asuint(albedo.g);
     params.output[15] = asuint(albedo.b);
+    params.output[16] = delta_samples;
+    params.output[17] = asuint(max_delta_err);
 }

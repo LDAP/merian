@@ -56,9 +56,16 @@ struct SheenLayerBSDF<Base : BSDF> : BSDF {
         // Sample sheen or base, but evaluate the combined pdf/weight. Delegate to the chosen
         // sub-BSDF so its lobe classification propagates.
         const float p = prob_sheen(wi.z);
+        const bool take_sheen = p > 0.0f && rng.next_float() < p;
         Optional<ShadingFunctionSample> sub =
-            (p > 0.0f && rng.next_float() < p) ? sheen.sample_eval(wi, rng) : base.sample_eval(wi, rng);
+            take_sheen ? sheen.sample_eval(wi, rng) : base.sample_eval(wi, rng);
         if (let s = sub) {
+            // Only the scaled base reaches a delta direction, and its scaling does not cancel.
+            if (s.lobe == BSDFLobe::Delta) {
+                const float scaling = min(albedo_scaling(wi.z), albedo_scaling(s.wo.z));
+                return ShadingFunctionSample(s.wo, (1.0f - p) * s.pdf,
+                                             scaling * s.weight / (1.0f - p), s.lobe);
+            }
             const float pdf = this.pdf(wi, s.wo);
             return ShadingFunctionSample(s.wo, pdf, this.eval(wi, s.wo, rng) / pdf, s.lobe);
         }

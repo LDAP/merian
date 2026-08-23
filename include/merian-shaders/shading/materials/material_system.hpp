@@ -90,11 +90,6 @@ class MaterialSystem : public std::enable_shared_from_this<MaterialSystem> {
     }
     void set_clamp_normals(bool clamp);
 
-    float get_min_roughness() const {
-        return min_roughness;
-    }
-    void set_min_roughness(float min_roughness);
-
     void properties(Properties& props);
 
     const SlangCompositionHandle& get_composition() const {
@@ -151,7 +146,6 @@ class MaterialSystem : public std::enable_shared_from_this<MaterialSystem> {
     uint32_t dirty_end = 0;
     float alpha_test_threshold = 0.5F;
     bool clamp_normals = true;
-    float min_roughness = 0.0316F;
     SlangCompositionHandle composition;
     Versioned<SlangProgram> layout_program;
     Versioned<ShaderObject> shader_object;

@@ -119,7 +119,6 @@ struct OpenPBRMaterial<let TRANSMISSION : bool = false,
         if (metalness_texture != TextureID(-1)) {
             metal *= lod0.sample(tm.get_sampler2D(metalness_texture), sd.uv).r;
         }
-        const float min_alpha = ggx_roughness_to_alpha(merian_hint_min_roughness);
         float2 alpha = specular_alpha;
         if (roughness_texture != TextureID(-1)) {
             const float texel = lod0.sample(tm.get_sampler2D(roughness_texture), sd.uv).r;
@@ -132,7 +131,6 @@ struct OpenPBRMaterial<let TRANSMISSION : bool = false,
                 alpha *= ggx_roughness_to_alpha(texel);
             }
         }
-        alpha = max(alpha, float2(min_alpha));
 
         OrthonormalFrame shading_frame = sd.frame;
         if (normal_texture != TextureID(-1)) {
@@ -157,7 +155,9 @@ struct OpenPBRMaterial<let TRANSMISSION : bool = false,
         float tw = 0.0f;
         float3 transmission_color = float3(1.0f);
         if (let trans = transmission_opt) {
-            eta = sd.ior / (sd.front_facing ? specular_ior : 1.0f);
+            // A transmissive material is always traced two-sided, and a one-sided mesh has its
+            // back faces culled, so the face alone says which side of the interface the ray is on.
+            eta = sd.front_facing ? 1.0f / specular_ior : specular_ior;
             tw = trans.weight;
             transmission_color = trans.color;
         }
@@ -171,11 +171,11 @@ struct OpenPBRMaterial<let TRANSMISSION : bool = false,
             OpenPBRSubstrate(dielectric, OpenPBRMetal(SpecularBRDF(alpha), base), metal);
 
         float cw = 0.0f;
-        float coat_alpha = min_alpha;
+        float coat_alpha = 0.0f;
         float coat_f0 = 0.0f;
         if (let coat = clearcoat_opt) {
             cw = coat.weight;
-            coat_alpha = max(coat.alpha, min_alpha);
+            coat_alpha = coat.alpha;
             const float coat_t = (coat.ior - 1.0f) / (coat.ior + 1.0f);
             coat_f0 = coat_t * coat_t;
         }

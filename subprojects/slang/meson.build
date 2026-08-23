@@ -1,6 +1,6 @@
 project('slang',
         'cpp',
-        version: '2026.11')
+        version: '2026.16')
 
 fs = import('fs')
 python = import('python').find_installation()

@@ -438,7 +438,7 @@ struct Scene {
         }
 
         const ShadingData sd = ShadingData(-ray.Direction, surface.pos, surface.uv, time, frame,
-                                           face_normal, ctx.bounce, ctx.ior, front_facing);
+                                           face_normal, ctx.bounce, front_facing);
 
         ShadingPoint sp;
         sp.pos = surface.pos;
@@ -485,7 +485,7 @@ struct Scene {
         const float3 pos = ray.Origin + ray.Direction * ENV_MAP_DISTANCE;
         const ShadingData sd =
             ShadingData(-ray.Direction, pos, float2(0), time, OrthonormalFrame(-ray.Direction),
-                        -ray.Direction, ctx.bounce, ctx.ior, true);
+                        -ray.Direction, ctx.bounce, true);
 
         ShadingPoint sp;
         sp.pos = pos;

@@ -2,6 +2,7 @@
 
 import bsdf;
 import merian_shaders.shading.bsdfs.brdf_ggx;
+import merian_shaders.shading.bsdfs.bsdf_dielectric;
 import merian_shaders.utils.fresnel;
 import merian_shaders.utils.math;
 
@@ -21,8 +22,13 @@ struct RoughDielectricBSDF : BSDF {
         this.tint = tint;
     }
 
+    // Both leave the refraction Jacobian singular: no microfacet bends the ray at eta 1.
+    bool is_delta() {
+        return eta == 1.0f || alpha < BSDF_SMOOTH_ALPHA;
+    }
+
     float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) {
-        if (wi.z < BSDF_MIN_COS_THETA) {
+        if (is_delta() || wi.z < BSDF_MIN_COS_THETA) {
             return float3(0.0f);
         }
         if (wo.z > BSDF_MIN_COS_THETA) {
@@ -49,14 +55,14 @@ struct RoughDielectricBSDF : BSDF {
     }
 
     float pdf(const float3 wi, const float3 wo) {
-        if (wi.z < BSDF_MIN_COS_THETA) {
+        if (is_delta() || wi.z < BSDF_MIN_COS_THETA) {
             return 0.0f;
         }
         const float alpha_squared = pow2(alpha);
         if (wo.z > BSDF_MIN_COS_THETA) {
             const float3 h = normalize(wi + wo);
             const float R = fresnel_dielectric(abs(dot(wi, h)), eta);
-            return R * ggx_VNDF_pdf_wo(wi.z, pow2(max(0.0f, h.z)), alpha_squared);
+            return R * ggx_VNDF_pdf_wo(wi.z, h, alpha_squared);
         }
         if (wo.z < -BSDF_MIN_COS_THETA) {
             float3 h = normalize(wo + wi * eta);
@@ -74,6 +80,9 @@ struct RoughDielectricBSDF : BSDF {
         if (wi.z < BSDF_MIN_COS_THETA) {
             return none;
         }
+        if (is_delta()) {
+            return SmoothDielectricBSDF(eta, tint).sample_eval(wi, rng);
+        }
         const float alpha_squared = pow2(alpha);
         const float3 wm = ggx_VNDF_sample_H(wi, alpha, rng.next_float2());
         const float widoth = dot(wi, wm);
@@ -88,7 +97,7 @@ struct RoughDielectricBSDF : BSDF {
             }
             const float weight = smith_g2_over_widotn(wo.z, wi.z, alpha_squared) /
                                  smith_g1_over_widotn(wi.z, alpha_squared);
-            const float pdf = R * ggx_VNDF_pdf_wo(wi.z, pow2(wm.z), alpha_squared);
+            const float pdf = R * ggx_VNDF_pdf_wo(wi.z, wm, alpha_squared);
             return ShadingFunctionSample(wo, pdf, float3(weight), BSDFLobe::Glossy);
         }
 

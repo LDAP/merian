@@ -77,16 +77,13 @@ class SlangComposition : public std::enable_shared_from_this<SlangComposition> {
             return source_path;
         }
 
-        // Whether replacing prev changes the compiled source (so its session can't be reused). Same
-        // path = same source; on-disk edits go through reload().
-        bool source_differs_from(const SlangModule& prev) const {
-            if (source_path != prev.source_path) {
-                return true;
-            }
+        // Identifies the compiled source behind this name. Same path = same source; on-disk edits
+        // go through reload().
+        uint64_t source_hash() const {
             if (source_path.has_value()) {
-                return false;
+                return hash_val(true, source_path->string());
             }
-            return source != prev.source;
+            return hash_val(false, source.value_or(std::string{}));
         }
 
         // can be relative to search paths of the composits compile context.

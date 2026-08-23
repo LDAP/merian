@@ -6,6 +6,7 @@
 #include "merian/shader/shader_module.hpp"
 #include "merian/shader/slang_composition.hpp"
 #include "merian/shader/slang_global_session.hpp"
+#include "merian/utils/hash.hpp"
 
 #include "slang-com-ptr.h"
 #include "slang.h"
@@ -189,11 +190,18 @@ class SlangSession {
                                 fmt::format("{:016x}.slang-mod", ir_cache_key(name, source, path))}
                 : std::nullopt;
 
+        // A module can only import what the session already holds, so every source-string module
+        // loaded so far is a possible dependency that isBinaryModuleUpToDate cannot see. Folded in
+        // after this module's own key, which already covers its own source.
+        if (!path) {
+            hash_combine(string_module_fingerprint, name, source);
+        }
+
         // 1. try the serialized IR cache
         if (ir_path) {
             if (Slang::ComPtr<slang::IBlob> ir = cache_read(*ir_path)) {
-                // path-based modules are re-validated against their (transitive) sources; source
-                // string modules rely solely on the content hash in the key.
+                // path-based modules are re-validated against their (transitive) source files;
+                // what has no file on disk is covered by the key.
                 if (!path || session->isBinaryModuleUpToDate(path_cstr, ir)) {
                     Slang::ComPtr<slang::IModule> module;
                     module = session->loadModuleFromIRBlob(name.c_str(), path_cstr, ir,
@@ -376,6 +384,18 @@ class SlangSession {
 
         std::set<SlangComposition::EntryPoint> additional_entry_points;
         for (auto& module : composition->modules) {
+            // Rebinding a name retires the session (see bind_slang_module_source), so reaching this
+            // means two live compositions claim the same name for different source.
+            const uint64_t source_hash = module.source_hash();
+            const auto [source_it, source_inserted] =
+                module_source_hashes.try_emplace(module.get_name(), source_hash);
+            if (!source_inserted && source_it->second != source_hash) {
+                throw ShaderCompiler::compilation_failed(
+                    fmt::format("module {} is already compiled from different source in this "
+                                "session; give the modules distinct names",
+                                module.get_name()));
+            }
+
             auto it = slang_module_cache.find(module.get_name());
             if (it == slang_module_cache.end()) {
                 it = slang_module_cache
@@ -724,6 +744,8 @@ class SlangSession {
              std::pair<Slang::ComPtr<slang::IEntryPoint>, Slang::ComPtr<slang::IComponentType>>>
         entry_point_cache;
     std::map<std::string, Slang::ComPtr<slang::IModule>> slang_module_cache;
+    std::map<std::string, uint64_t> module_source_hashes;
+    std::size_t string_module_fingerprint = 0;
     std::map<SlangComposition::TypeConformance, Slang::ComPtr<slang::IComponentType>>
         type_conformance_cache;
     std::map<SlangCompositionHandle, Slang::ComPtr<slang::IComponentType>> composition_cache;

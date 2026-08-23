@@ -6,7 +6,6 @@
 #include "merian/shader/shader_cursor.hpp"
 #include "merian/shader/shader_object_allocator.hpp"
 #include "merian/shader/slang_entry_point.hpp"
-#include "merian/shader/slang_global_session.hpp"
 #include "merian/shader/slang_program.hpp"
 #include "merian/vk/command/queue.hpp"
 #include "merian/vk/context.hpp"
@@ -179,8 +178,7 @@ TEST_F(SlangHotReloadTest, MaterialPipelineRebuildsAfterForceReload) {
 
 // ---------------------------------------------------------------------------
 // Generated-source nodes (Reduce, Shadertoy) recompile a module under a fixed name with changed
-// content. The session caches modules by name, so the new source is only picked up once the
-// source epoch is bumped — which is exactly what AbstractCompute::invalidate_shader does.
+// content. A session binds each name to one immutable source, so rebinding one has to retire it.
 // ---------------------------------------------------------------------------
 
 TEST_F(SlangHotReloadTest, RegeneratedModuleUnderFixedNamePicksUpNewSource) {
@@ -226,14 +224,34 @@ TEST_F(SlangHotReloadTest, RegeneratedModuleUnderFixedNamePicksUpNewSource) {
 
     EXPECT_EQ(dispatch_writing("regen_fixed_name", 11), 11u);
 
-    // Without retiring the session the cache returns the first module for the reused name.
-    EXPECT_EQ(dispatch_writing("regen_fixed_name", 22), 11u)
-        << "session cache is keyed by module name";
+    // Rebinding a name to new source retires the session, so the regenerated source is what runs.
+    EXPECT_EQ(dispatch_writing("regen_fixed_name", 22), 22u);
+    EXPECT_EQ(dispatch_writing("regen_fixed_name", 33), 33u);
+}
 
-    // invalidate_shader bumps the epoch, retiring the session so the new source is compiled.
-    bump_slang_source_epoch();
-    EXPECT_EQ(dispatch_writing("regen_fixed_name", 22), 22u)
-        << "epoch bump retires the stale session";
+// Two compositions that are alive at once cannot share a name: retiring the session resolves a
+// name rebound over time, but not two live claims on the same slot.
+TEST_F(SlangHotReloadTest, SameNameFromDifferentSourceInOneSessionThrows) {
+    const auto composition_writing = [](uint32_t value) {
+        const auto composition = SlangComposition::create();
+        composition->add_module_from_string("collide",
+                                            fmt::format(R"(
+            struct Params {{ RWStructuredBuffer<uint> output; }};
+            [shader("compute")]
+            [numthreads(1, 1, 1)]
+            void main(ParameterBlock<Params> params) {{ params.output[0] = {}u; }}
+        )",
+                                                        value),
+                                            true);
+        return composition;
+    };
+
+    const auto first = composition_writing(1);
+    const auto second = composition_writing(2);
+
+    SlangProgram::create(compile_context, first).get();
+    EXPECT_THROW(SlangProgram::create(compile_context, second).get(),
+                 ShaderCompiler::compilation_failed);
 }
 
 // ---------------------------------------------------------------------------

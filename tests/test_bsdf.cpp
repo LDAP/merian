@@ -138,6 +138,30 @@ export merian::RoughDielectricBSDF make_test_bsdf(BSDFParams p) {
 }
 )";
 
+const char* const CONFIG_ROUGH_DIELECTRIC_MATCHED = R"(
+import merian_shaders.shading.bsdfs.bsdf_rough_dielectric;
+import bsdf.bsdf_test_common;
+namespace merian_test {
+export merian::RoughDielectricBSDF make_test_bsdf(BSDFParams p) {
+    // index-matched interface: nothing bends the ray, whatever the roughness
+    return merian::RoughDielectricBSDF(p.alpha, 1.0f, p.albedo);
+}
+}
+)";
+
+const char* const CONFIG_MIX = R"(
+import merian_shaders.shading.bsdfs.bsdf_mix;
+import merian_shaders.shading.bsdfs.brdf_ggx;
+import merian_shaders.shading.bsdfs.brdf_lambert_diffuse;
+import bsdf.bsdf_test_common;
+namespace merian_test {
+export merian::MixBSDF<merian::LambertDiffuseBRDF, merian::GGXBRDF> make_test_bsdf(BSDFParams p) {
+    return merian::MixBSDF<merian::LambertDiffuseBRDF, merian::GGXBRDF>(
+        merian::LambertDiffuseBRDF(p.albedo), merian::GGXBRDF(p.alpha), p.mix_weight);
+}
+}
+)";
+
 const char* const CONFIG_SHEEN = R"(
 import merian_shaders.shading.bsdfs.brdf_sheen;
 import bsdf.bsdf_test_common;
@@ -196,29 +220,34 @@ class BSDFTest : public ::testing::Test {
         float ior_f0 = 0.04f;
         float alpha_bitangent = 0.3f;
         float iridescence = 0.0f;
+        float mix_weight = 0.5f;
     };
 
     struct CheckResult {
-        float3 furnace;        // average sample_eval weight (directional albedo)
-        float3 furnace_stderr; // standard error of furnace
-        float mean_cos;        // MC estimate of INT cos(theta) dwo
-        float stderr_cos;      // standard error of mean_cos
-        uint32_t valid;        // number of accepted samples
-        float max_weight_err;  // max |sample_eval.weight - eval/pdf|
-        float max_pdf_err;     // max |sample_eval.pdf - pdf(wi,wo)|
-        float pdf_integral;    // deterministic quadrature of INT pdf dwo
-        float max_recip_err;   // max relative |f(wi,wo) - f(wo,wi)|
-        float3 albedo;         // get_albedo(wi).reflection (should equal the directional albedo)
+        float3 furnace;         // average sample_eval weight (directional albedo)
+        float3 furnace_stderr;  // standard error of furnace
+        float mean_cos;         // MC estimate of INT cos(theta) dwo
+        float stderr_cos;       // standard error of mean_cos
+        uint32_t valid;         // number of accepted samples
+        float max_weight_err;   // max |sample_eval.weight - eval/pdf|
+        float max_pdf_err;      // max |sample_eval.pdf - pdf(wi,wo)|
+        float pdf_integral;     // deterministic quadrature of INT pdf dwo
+        float max_recip_err;    // max relative |f(wi,wo) - f(wo,wi)|
+        float3 albedo;          // get_albedo(wi).reflection (should equal the directional albedo)
+        uint32_t delta_samples; // samples drawn from a delta lobe
+        float max_delta_err;    // max eval()/pdf() left at a delta direction
     };
 
     static float as_float(uint32_t u) {
         return std::bit_cast<float>(u);
     }
 
+    static constexpr uint32_t N_SAMPLES = 1u << 18;
+
     CheckResult run(const char* config_src,
                     const float3 wi,
                     const BSDFParams& p,
-                    const uint32_t n_samples = (1u << 18),
+                    const uint32_t n_samples = N_SAMPLES,
                     const uint32_t seed = 0x1234567u) {
         const auto composition = SlangComposition::create();
         composition->add_module_from_string("bsdf_config", config_src);
@@ -230,7 +259,7 @@ class BSDFTest : public ::testing::Test {
         const auto pipeline = ComputePipeline::create(pipe_layout, entry_point.get()->specialize());
         const auto obj_allocator = std::make_shared<SimpleShaderObjectAllocator>(allocator);
 
-        constexpr uint32_t SLOTS = 16;
+        constexpr uint32_t SLOTS = 18;
         const auto output_buffer = allocator->create_buffer(
             SLOTS * sizeof(uint32_t),
             vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
@@ -248,6 +277,7 @@ class BSDFTest : public ::testing::Test {
         cursor["p"]["ior_f0"] = p.ior_f0;
         cursor["p"]["alpha_bitangent"] = p.alpha_bitangent;
         cursor["p"]["iridescence"] = p.iridescence;
+        cursor["p"]["mix_weight"] = p.mix_weight;
         cursor["output"] = output_buffer;
 
         queue->submit_wait([&](const CommandBufferHandle& cmd) {
@@ -270,15 +300,18 @@ class BSDFTest : public ::testing::Test {
                             as_float(slots[10]),
                             as_float(slots[11]),
                             as_float(slots[12]),
-                            {as_float(slots[13]), as_float(slots[14]), as_float(slots[15])}};
+                            {as_float(slots[13]), as_float(slots[14]), as_float(slots[15])},
+                            slots[16],
+                            as_float(slots[17])};
         std::fprintf(stderr,
                      "DUMP furnace=%.6g,%.6g,%.6g fse=%.3g,%.3g,%.3g albedo=%.6g,%.6g,%.6g "
                      "meancos=%.7f secos=%.4g werr=%.4g perr=%.4g pdfint=%.7f reciperr=%.4g "
-                     "acc=%.5f\n",
+                     "acc=%.5f delta=%.5f derr=%.4g\n",
                      r.furnace.x, r.furnace.y, r.furnace.z, r.furnace_stderr.x, r.furnace_stderr.y,
                      r.furnace_stderr.z, r.albedo.x, r.albedo.y, r.albedo.z, r.mean_cos,
                      r.stderr_cos, r.max_weight_err, r.max_pdf_err, r.pdf_integral, r.max_recip_err,
-                     float(r.valid) / float(n_samples));
+                     float(r.valid) / float(n_samples), float(r.delta_samples) / float(n_samples),
+                     r.max_delta_err);
         return r;
     }
 
@@ -311,6 +344,19 @@ class BSDFTest : public ::testing::Test {
         EXPECT_LE(r.furnace.x, 1.0f + MC_SIGMA * r.furnace_stderr.x) << "furnace r";
         EXPECT_LE(r.furnace.y, 1.0f + MC_SIGMA * r.furnace_stderr.y) << "furnace g";
         EXPECT_LE(r.furnace.z, 1.0f + MC_SIGMA * r.furnace_stderr.z) << "furnace b";
+    }
+
+    // The delta lobe is reached exactly as often as the composite selects it.
+    void expect_delta_share(const CheckResult& r, const float expected_fraction) {
+        EXPECT_NEAR(float(r.delta_samples) / float(N_SAMPLES), expected_fraction, 0.01f)
+            << "share of samples drawn from the delta lobe";
+    }
+
+    // A BSDF that is delta everywhere carries no solid-angle density at all: eval() and pdf()
+    // must vanish at the sampled direction, and the reported weight is the whole estimator.
+    void expect_pure_delta(const CheckResult& r) {
+        expect_delta_share(r, 1.0f);
+        EXPECT_LT(r.max_delta_err, FLOAT_EQ_TOL) << "eval()/pdf() at a delta direction";
     }
 
     // pdf integrates to 1 over the hemisphere. Only valid for samplers that never place
@@ -591,3 +637,109 @@ TEST_P(ConductorRoughness, Grazing) {
 }
 
 INSTANTIATE_TEST_SUITE_P(Alpha, ConductorRoughness, ::testing::Values(0.05f, 0.3f, 0.8f));
+
+// A perfectly smooth interface is the delta lobe it approximates. The mix weight of a delta
+// sub-lobe cancels against the probability of picking it, so the directional albedo stays the
+// exact (1 - w) * rho_lambert + w * 1 the two components give.
+class DeltaMixWeight : public BSDFTest, public ::testing::WithParamInterface<float> {
+  protected:
+    static constexpr float LAMBERT_ALBEDO = 0.6f;
+
+    void check(const float3 wi) {
+        BSDFParams p;
+        p.alpha = 0.0f;
+        p.albedo = {LAMBERT_ALBEDO, LAMBERT_ALBEDO, LAMBERT_ALBEDO};
+        p.mix_weight = GetParam();
+        const auto r = run(CONFIG_MIX, wi, p);
+        expect_delta_share(r, p.mix_weight);
+        expect_sample_eval_consistent(r);
+        expect_energy_conserving(r);
+        const float expected = (1.0f - p.mix_weight) * LAMBERT_ALBEDO + p.mix_weight;
+        EXPECT_NEAR(r.furnace.x, expected, MC_SIGMA * r.furnace_stderr.x + MC_NUMERIC_FLOOR)
+            << "directional albedo of the mixed delta lobe";
+    }
+};
+
+TEST_P(DeltaMixWeight, Normal) {
+    check(WI_NORMAL);
+}
+TEST_P(DeltaMixWeight, Grazing) {
+    check(WI_GRAZING);
+}
+
+INSTANTIATE_TEST_SUITE_P(Weight, DeltaMixWeight, ::testing::Values(0.25f, 0.5f, 0.75f));
+
+// Mix<Lambert, GGX> with both lobes non-delta: the only configuration in which eval() sums two
+// live sub-lobes.
+class RoughMixWeight : public BSDFTest, public ::testing::WithParamInterface<float> {
+  protected:
+    static constexpr float LAMBERT_ALBEDO = 0.6f;
+
+    void check(const float3 wi) {
+        BSDFParams p;
+        p.alpha = 0.3f;
+        p.albedo = {LAMBERT_ALBEDO, LAMBERT_ALBEDO, LAMBERT_ALBEDO};
+        p.mix_weight = GetParam();
+        const auto r = run(CONFIG_MIX, wi, p);
+        expect_sample_pdf_match(r);
+        expect_sample_eval_consistent(r);
+        expect_reciprocal(r);
+        expect_energy_conserving(r);
+    }
+};
+
+TEST_P(RoughMixWeight, Normal) {
+    check(WI_NORMAL);
+}
+TEST_P(RoughMixWeight, Grazing) {
+    check(WI_GRAZING);
+}
+
+INSTANTIATE_TEST_SUITE_P(Weight, RoughMixWeight, ::testing::Values(0.25f, 0.5f, 0.75f));
+
+// An index-matched interface: Fresnel vanishes at every angle and no microfacet bends the ray, so
+// the BSDF is the delta pass-through at any roughness. Sampling it as a refraction instead divides
+// by the vanishing half vector wo + eta * wi.
+class IndexMatchedInterface : public BSDFTest, public ::testing::WithParamInterface<float> {
+  protected:
+    void check(const float3 wi) {
+        BSDFParams p;
+        p.alpha = GetParam();
+        p.albedo = {0.9f, 0.95f, 1.0f}; // transmission tint
+        const auto r = run(CONFIG_ROUGH_DIELECTRIC_MATCHED, wi, p);
+        expect_pure_delta(r);
+        EXPECT_NEAR(r.furnace.x, p.albedo.x, FLOAT_EQ_TOL) << "pass-through carries only the tint";
+        EXPECT_NEAR(r.furnace.y, p.albedo.y, FLOAT_EQ_TOL);
+        EXPECT_NEAR(r.furnace.z, p.albedo.z, FLOAT_EQ_TOL);
+    }
+};
+
+TEST_P(IndexMatchedInterface, Normal) {
+    check(WI_NORMAL);
+}
+TEST_P(IndexMatchedInterface, Grazing) {
+    check(WI_GRAZING);
+}
+
+INSTANTIATE_TEST_SUITE_P(Alpha, IndexMatchedInterface, ::testing::Values(0.0f, 0.001f, 0.3f, 0.8f));
+
+// A Fresnel layer over a smooth base. Only the delta share and the vanishing eval()/pdf() are
+// pinned; the layering heuristic itself has no closed-form directional albedo.
+class FresnelMixDelta : public BSDFTest, public ::testing::WithParamInterface<float3> {
+  protected:
+    static float schlick(const float cos_theta, const float f0) {
+        const float m = 1.0f - cos_theta;
+        return f0 + (1.0f - f0) * m * m * m * m * m;
+    }
+};
+
+TEST_P(FresnelMixDelta, DeltaShare) {
+    const float3 wi = GetParam();
+    BSDFParams p;
+    p.alpha = 0.0f;
+    p.albedo = {0.6f, 0.6f, 0.6f};
+    const auto r = run(CONFIG_FRESNEL_MIX, wi, p);
+    expect_delta_share(r, schlick(wi.z, p.ior_f0));
+}
+
+INSTANTIATE_TEST_SUITE_P(Incidence, FresnelMixDelta, ::testing::Values(WI_NORMAL, WI_GRAZING));

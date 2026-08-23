@@ -170,7 +170,7 @@ void render_pixel(const uint2 pixel,
         ray.TMax = SCENE_RAY_TMAX;
         // single scattering never scatters off this surface, so the material sample would be dead
         const ShadingPoint sp = scene.trace_and_get_shading_point(
-            ray, merian_render_instance_mask, RenderContext(uint16_t(1), 1.0f),
+            ray, merian_render_instance_mask, RenderContext(uint16_t(1)),
             DefaultLODSampler(), false);
 
         float3 incident = sp.emission;

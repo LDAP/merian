@@ -13,6 +13,10 @@ struct ConductorFresnelBSDF<Inner : BSDF> : BSDF {
     }
 
     float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) {
+        // opposite hemispheres have no half vector, and a conductor does not transmit
+        if (min(wi.z, wo.z) < BSDF_MIN_COS_THETA) {
+            return float3(0.0f);
+        }
         const float3 h = normalize(wi + wo);
         const float3 F = fresnel_schlick(dot(wi, h), f0);
         return F * bsdf.eval(wi, wo, rng);

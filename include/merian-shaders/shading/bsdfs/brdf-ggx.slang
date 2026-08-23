@@ -82,10 +82,17 @@ float smith_g2_over_widotn(const float3 wo, const float3 wi, const float2 alpha)
 // -----------------------------------------------------------------
 // NDF
 
-// Returns D(h)
-float ggx_NDF(float ndoth_squared, float alpha_squared) {
-    return alpha_squared /
-           (MERIAN_PI * pow2((ndoth_squared * alpha_squared) + (1.0f - ndoth_squared)));
+// Returns D(h). sin_theta_squared must come from the tangential components of h: for a narrow
+// lobe 1 - (n.h)^2 cancels away every significant digit in fp32.
+float ggx_NDF(const float ndoth_squared,
+              const float sin_theta_squared,
+              const float alpha_squared) {
+    return alpha_squared / (MERIAN_PI * pow2((ndoth_squared * alpha_squared) + sin_theta_squared));
+}
+
+// Returns D(h). Assumes a local space with n = (0, 0, 1).
+float ggx_NDF(const float3 h, const float alpha_squared) {
+    return ggx_NDF(pow2(h.z), dot(h.xy, h.xy), alpha_squared);
 }
 
 // Returns D(h) for per-axis alpha; division-free form from Heitz 2018,
@@ -119,7 +126,7 @@ float3 ggx_NDF_sample_H(float alpha_squared, float2 random) {
  * Returns: D(h) * h.z = D(h) * cos_theta
  */
 float ggx_NDF_pdf_H(float3 h, float alpha_squared) {
-    return ggx_NDF(pow2(h.z), alpha_squared) * h.z;
+    return ggx_NDF(h, alpha_squared) * h.z;
 }
 
 // -----------------------------------------------------------------
@@ -220,9 +227,9 @@ float3 ggx_VNDF_sample_wo(float3 wi, float alpha, float2 random) {
  *
  * Returns: G1(wi) * D(h) * max(0,dot(wi,h)) / wodotn
  */
-float ggx_VNDF_pdf_H(float widotn, float widoth, float ndoth_squared, float alpha_squared) {
+float ggx_VNDF_pdf_H(float widotn, float widoth, float3 h, float alpha_squared) {
     float G1_over_widotn = smith_g1_over_widotn(widotn, alpha_squared);
-    float D = ggx_NDF(ndoth_squared, alpha_squared);
+    float D = ggx_NDF(h, alpha_squared);
     return D * G1_over_widotn * max(0.f, widoth);
 }
 
@@ -233,7 +240,7 @@ float ggx_VNDF_pdf_H(float widotn, float widoth, float ndoth_squared, float alph
  */
 float ggx_VNDF_H_pdf(float3 wi, float3 h, float alpha_squared) {
     float G1_over_widotn = smith_g1_over_widotn(wi.z, alpha_squared);
-    float D = ggx_NDF(pow2(h.z), alpha_squared);
+    float D = ggx_NDF(h, alpha_squared);
     /* / (4 * dot(wi, h)) is the Jacobian of the reflection */
     return D * G1_over_widotn * max(0.f, dot(wi, h));
 }
@@ -243,9 +250,9 @@ float ggx_VNDF_H_pdf(float3 wi, float3 h, float alpha_squared) {
  * widoth > 0.
  *
  */
-float ggx_VNDF_pdf_wo(float widotn, float ndoth_squared, float alpha_squared) {
+float ggx_VNDF_pdf_wo(float widotn, float3 h, float alpha_squared) {
     float G1_over_widotn = smith_g1_over_widotn(widotn, alpha_squared);
-    float D = ggx_NDF(ndoth_squared, alpha_squared);
+    float D = ggx_NDF(h, alpha_squared);
     /* / (4 * dot(wi, h)) is the Jacobian of the reflection */
     return (D * G1_over_widotn /* * max(0.f, dot(wi, h)*/) / 4.0f /* dot(wi, h) */;
 }
@@ -254,10 +261,11 @@ float ggx_VNDF_pdf_wo(float widotn, float ndoth_squared, float alpha_squared) {
  * The VNDF pdf for an outgoing direction (has the Jacobian of the reflection applied).
  */
 float ggx_VNDF_pdf_wo(float3 wi, float3 wo, float3 n, float alpha_squared) {
-    float3 h = normalize(wo + wi);
-    float widotn = dot(wi, n);
-    float ndoth = max(0.0f, dot(n, h));
-    return ggx_VNDF_pdf_wo(widotn, pow2(ndoth), alpha_squared);
+    const float3 h = normalize(wo + wi);
+    const float ndoth = dot(n, h);
+    const float3 h_tangential = h - (n * ndoth);
+    const float D = ggx_NDF(pow2(ndoth), dot(h_tangential, h_tangential), alpha_squared);
+    return (D * smith_g1_over_widotn(dot(wi, n), alpha_squared)) / 4.0f;
 }
 
 /**
@@ -265,8 +273,7 @@ float ggx_VNDF_pdf_wo(float3 wi, float3 wo, float3 n, float alpha_squared) {
  * local space with n = (0, 0, 1).
  */
 float ggx_VNDF_pdf_wo(float3 wi, float3 wo, float alpha_squared) {
-    float3 h = normalize(wo + wi);
-    return ggx_VNDF_pdf_wo(wi.z, pow2(max(0.f, h.z)), alpha_squared);
+    return ggx_VNDF_pdf_wo(wi.z, normalize(wo + wi), alpha_squared);
 }
 
 /**
@@ -339,8 +346,12 @@ struct GGXBRDF : BSDF {
         this.alpha_xy = alpha;
     }
 
+    bool is_delta() {
+        return max(alpha_xy.x, alpha_xy.y) < BSDF_SMOOTH_ALPHA;
+    }
+
     float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) {
-        if (min(wi.z, wo.z) < BSDF_MIN_COS_THETA) {
+        if (is_delta() || min(wi.z, wo.z) < BSDF_MIN_COS_THETA) {
             return float3(0.0f);
         }
 
@@ -356,6 +367,9 @@ struct GGXBRDF : BSDF {
         if (wi.z < BSDF_MIN_COS_THETA) {
             return none;
         }
+        if (is_delta()) {
+            return reflect_z(wi);
+        }
 
         float3 h = ggx_VNDF_sample_H(wi, alpha_xy, rng.next_float2());
         float widoth = dot(wi, h);
@@ -369,7 +383,7 @@ struct GGXBRDF : BSDF {
     }
 
     float pdf(const float3 wi, const float3 wo) {
-        if (min(wi.z, wo.z) < BSDF_MIN_COS_THETA) {
+        if (is_delta() || min(wi.z, wo.z) < BSDF_MIN_COS_THETA) {
             return 0.0f;
         }
 
@@ -381,6 +395,9 @@ struct GGXBRDF : BSDF {
                                                          inout RandomGenerator rng) {
         if (wi.z < BSDF_MIN_COS_THETA) {
             return none;
+        }
+        if (is_delta()) {
+            return ShadingFunctionSample(reflect_z(wi), 1.0f, float3(1.0f), BSDFLobe::Delta);
         }
 
         const float3 h = ggx_VNDF_sample_H(wi, alpha_xy, rng.next_float2());
@@ -424,8 +441,13 @@ struct GGXBTDF : BSDF {
         this.tint = tint;
     }
 
+    // Both leave the refraction Jacobian singular: no microfacet bends the ray at eta 1.
+    bool is_delta() {
+        return eta == 1.0f || alpha < BSDF_SMOOTH_ALPHA;
+    }
+
     float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) {
-        if (wi.z < BSDF_MIN_COS_THETA || wo.z > -BSDF_MIN_COS_THETA) {
+        if (is_delta() || wi.z < BSDF_MIN_COS_THETA || wo.z > -BSDF_MIN_COS_THETA) {
             return float3(0.0f);
         }
 
@@ -435,7 +457,7 @@ struct GGXBTDF : BSDF {
         const float wodoth = dot(wo, h);
         const float alpha_squared = pow2(alpha);
         const float G2_over_widotn = smith_g2_over_widotn(abs(wo.z), wi.z, alpha_squared);
-        const float D = ggx_NDF(pow2(h.z), alpha_squared);
+        const float D = ggx_NDF(h, alpha_squared);
 
         const float denom = wodoth + (eta * widoth);
         const float jacobian = pow2(eta) * widoth * wodoth / pow2(denom);
@@ -448,7 +470,8 @@ struct GGXBTDF : BSDF {
             return none;
         }
 
-        const float3 h = ggx_VNDF_sample_H(wi, alpha, rng.next_float2());
+        const float3 h = is_delta() ? float3(0.0f, 0.0f, 1.0f)
+                                    : ggx_VNDF_sample_H(wi, alpha, rng.next_float2());
         const float3 wo = refract(-wi, h, eta);
         if (all(wo == float3(0.0f)) || wo.z > -BSDF_MIN_COS_THETA) {
             return none; // total internal reflection
@@ -458,7 +481,7 @@ struct GGXBTDF : BSDF {
     }
 
     float pdf(const float3 wi, const float3 wo) {
-        if (wi.z < BSDF_MIN_COS_THETA || wo.z > -BSDF_MIN_COS_THETA) {
+        if (is_delta() || wi.z < BSDF_MIN_COS_THETA || wo.z > -BSDF_MIN_COS_THETA) {
             return 0.0f;
         }
 
@@ -474,6 +497,13 @@ struct GGXBTDF : BSDF {
                                                          inout RandomGenerator rng) {
         if (wi.z < BSDF_MIN_COS_THETA) {
             return none;
+        }
+        if (is_delta()) {
+            const float3 wt = refract(-wi, float3(0.0f, 0.0f, 1.0f), eta);
+            if (all(wt == float3(0.0f))) {
+                return none; // total internal reflection
+            }
+            return ShadingFunctionSample(wt, 1.0f, pow2(eta) * tint, BSDFLobe::Delta);
         }
 
         const float alpha_squared = pow2(alpha);

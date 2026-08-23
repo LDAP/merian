@@ -50,7 +50,6 @@ float3 trace_path(const ParameterBlock<Scene> scene,
 
     // Medium the ray is travelling through; updated on transmission events.
     HomogeneousVolume medium = scene.exterior_volume;
-    float current_ior = 1.0f;
 
     float3 throughput = medium.transmittance(distance(ray.Origin, sp.pos));
     float3 radiance = merian_render_emission_on_primary ? throughput * sp.emission : float3(0);
@@ -112,14 +111,19 @@ float3 trace_path(const ParameterBlock<Scene> scene,
 
         // Sample wo from the BSDF or the selected lobe
         const bool guide = can_guide && rng.next_float() < p_guide;
+        const float bsdf_w = can_guide ? (1.0 - p_guide) : 1.0;
         float3 wo_world;
         float3 wo_local;
+        bool delta = false;
+        float3 delta_weight = float3(0);
         if (guide) {
             wo_world = vmfs[0].sample(rng);
             wo_local = frame.to_local(wo_world);
-        } else if (let local = m_bsdf.sample(wi_local, rng)) {
-            wo_local = local;
-            wo_world = frame.to_world(local);
+        } else if (let s = m_bsdf.sample_eval(wi_local, rng)) {
+            wo_local = s.wo;
+            wo_world = frame.to_world(s.wo);
+            delta = s.lobe == BSDFLobe::Delta;
+            delta_weight = s.weight;
             selected = MCState();
             selected_pos = HashGridPos();
             selected_level = params.mcpg.grid.target_level_for_pos(cur_pos, cam_pos, rng);
@@ -128,17 +132,24 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         }
 
         // Stochastic MIS
-        float wo_p = 0.0;
-        if (can_guide) {
-            for (int i = 0; i < mc_samples; i++) {
-                wo_p += scores[i] * vmfs[i].pdf(wo_world);
+        float wo_p;
+        float3 bsdf;
+        if (delta) {
+            // the guiding mixture cannot produce a delta direction, only the BSDF strategy can
+            wo_p = bsdf_w;
+            bsdf = bsdf_w * delta_weight;
+        } else {
+            float guide_p = 0.0;
+            if (can_guide) {
+                for (int i = 0; i < mc_samples; i++) {
+                    guide_p += scores[i] * vmfs[i].pdf(wo_world);
+                }
+                guide_p /= score_sum;
             }
-            wo_p /= score_sum;
+            wo_p = bsdf_w * m_bsdf.pdf(wi_local, wo_local) +
+                   select(can_guide, p_guide, 0.0) * guide_p;
+            bsdf = m_bsdf.eval(wi_local, wo_local, rng);
         }
-        const float bsdf_w = can_guide ? (1.0 - p_guide) : 1.0;
-        wo_p = bsdf_w * m_bsdf.pdf(wi_local, wo_local) + select(can_guide, p_guide, 0.0) * wo_p;
-
-        const float3 bsdf = m_bsdf.eval(wi_local, wo_local, rng);
         const bool transmission = wi_local.z * wo_local.z < 0.f;
         Optional<RayDesc> next_ray = none;
         if (any(bsdf > 0.0))
@@ -151,7 +162,6 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         if (let next = next_ray) {
             if (transmission) {
                 const IsotropicVolume interior = sp.surface_material.get_interior_volume();
-                current_ior /= interior.get_eta();
                 // leaving a surface puts the ray back into the medium enclosing the scene
                 if (dot(-ray.Direction, sp.get_face_normal()) >= 0.f)
                     medium = interior;
@@ -161,7 +171,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
             ray = next;
             // the last vertex is never scattered from, so its material sample would be dead
             sp = scene.trace_and_get_shading_point(
-                ray, merian_render_instance_mask, RenderContext(bounce, current_ior),
+                ray, merian_render_instance_mask, RenderContext(bounce),
                 DefaultLODSampler(), bounce + 1 < merian_render_max_path_length);
             next_pos = sp.pos;
 

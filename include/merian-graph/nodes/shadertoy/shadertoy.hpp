@@ -59,6 +59,9 @@ class Shadertoy : public AbstractCompute {
     // Validates the composed shader; stores the error and returns false on failure.
     bool try_compile(const std::string& body);
 
+    // Unique per instance: several Shadertoy nodes coexist, and a module name binds to one source.
+    const std::string module_name;
+
     int shader_source_selector = 0;
     std::string shader_glsl;
     std::string shader_path = {0};

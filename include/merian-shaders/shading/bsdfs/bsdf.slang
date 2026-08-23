@@ -12,6 +12,15 @@ struct Albedo {
 
 static const float BSDF_MIN_COS_THETA = 1e-6f;
 
+// Below this the microfacet formulation divides by a vanishing half vector and the lobe is
+// narrower than a pixel. pbrt-v4, TrowbridgeReitzDistribution::EffectivelySmooth.
+static const float BSDF_SMOOTH_ALPHA = 1e-3f;
+
+// Mirror direction in the shading frame.
+float3 reflect_z(const float3 wi) {
+    return float3(-wi.x, -wi.y, wi.z);
+}
+
 interface BSDF : ShadingFunction {
 
     // The incident direction points away from the

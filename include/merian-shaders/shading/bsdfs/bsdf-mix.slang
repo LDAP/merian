@@ -34,6 +34,10 @@ struct MixBSDF<B0 : BSDF, B1 : BSDF> : BSDF {
         // weight > 0.0f check enables dead code elimination
         if (weight > 0.0f && rng.next_float() < weight) {
             if (let s = bsdf1.sample_eval(wi, rng)) {
+                // The mix weight cancels against the probability of having picked that lobe.
+                if (s.lobe == BSDFLobe::Delta) {
+                    return ShadingFunctionSample(s.wo, weight * s.pdf, s.weight, s.lobe);
+                }
                 const float mix_pdf = lerp(bsdf0.pdf(wi, s.wo), s.pdf, weight);
                 const float3 mix_eval = lerp(bsdf0.eval(wi, s.wo, rng), s.weight * s.pdf, weight);
                 return ShadingFunctionSample(s.wo, mix_pdf, mix_eval / mix_pdf, s.lobe);
@@ -41,6 +45,9 @@ struct MixBSDF<B0 : BSDF, B1 : BSDF> : BSDF {
             return none;
         }
         if (let s = bsdf0.sample_eval(wi, rng)) {
+            if (s.lobe == BSDFLobe::Delta) {
+                return ShadingFunctionSample(s.wo, (1.0f - weight) * s.pdf, s.weight, s.lobe);
+            }
             const float mix_pdf = lerp(s.pdf, bsdf1.pdf(wi, s.wo), weight);
             const float3 mix_eval = lerp(s.weight * s.pdf, bsdf1.eval(wi, s.wo, rng), weight);
             return ShadingFunctionSample(s.wo, mix_pdf, mix_eval / mix_pdf, s.lobe);

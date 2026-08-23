@@ -4,7 +4,16 @@
 #include "merian-graph/graph/errors.hpp"
 #include "merian/io/file_loader.hpp"
 
+#include <atomic>
+
 namespace merian {
+
+namespace {
+std::string next_module_name() {
+    static std::atomic<uint64_t> counter = 0;
+    return fmt::format("merian_shadertoy_generated_{}", counter++);
+}
+} // namespace
 
 // The user body is GLSL-flavored (mainImage(out vec4, in vec2)); slang's glsl module keeps the
 // common Shadertoy vocabulary (vec*, mix, fract, ...) valid.
@@ -57,7 +66,9 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 }
 )";
 
-Shadertoy::Shadertoy() : AbstractCompute(sizeof(PushConstant)), shader_glsl(default_shader) {}
+Shadertoy::Shadertoy()
+    : AbstractCompute(sizeof(PushConstant)), module_name(next_module_name()),
+      shader_glsl(default_shader) {}
 
 DeviceSupportInfo Shadertoy::query_device_support(const DeviceSupportQueryInfo& query_info) {
     return DeviceSupportInfo::check(query_info, {}, {}, {}, {}, {"Shader", "ImageQuery"}, {}, {},
@@ -83,7 +94,7 @@ std::string Shadertoy::compose_source(const std::string& body) {
 bool Shadertoy::try_compile(const std::string& body) {
     try {
         const auto composition = SlangComposition::create();
-        composition->add_module_from_string("merian_shadertoy", compose_source(body), true);
+        composition->add_module_from_string(module_name, compose_source(body), true);
         SlangProgram::create(compile_context, composition).get();
         error.reset();
         return true;
@@ -117,7 +128,7 @@ Shadertoy::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
 
 SlangCompositionHandle Shadertoy::create_composition() {
     const auto composition = SlangComposition::create();
-    composition->add_module_from_string("merian_shadertoy", compose_source(current_body()), true);
+    composition->add_module_from_string(module_name, compose_source(current_body()), true);
     return composition;
 }
 

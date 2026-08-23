@@ -6,28 +6,25 @@ namespace merian {
 SlangComposition::SlangComposition() {}
 
 void SlangComposition::add_module(const SlangModule& module) {
+    // A name is a link-time slot shared by every composition, so the binding is tracked globally.
+    bind_slang_module_source(module.name, module.source_hash());
+
     auto [it, inserted] = module_index.try_emplace(module.name, modules.size());
     if (inserted) {
-        // New module name: an existing session loads it incrementally, no fresh session needed.
         modules.emplace_back(module);
     } else {
-        // Replacing an existing name only forces a fresh session if the source actually changed.
-        if (module.source_differs_from(modules[it->second])) {
-            bump_slang_source_epoch();
-        }
         modules[it->second] = module;
     }
     edits++;
 }
 
 void SlangComposition::add_module(SlangModule&& module) {
+    bind_slang_module_source(module.name, module.source_hash());
+
     auto [it, inserted] = module_index.try_emplace(module.name, modules.size());
     if (inserted) {
         modules.emplace_back(std::move(module));
     } else {
-        if (module.source_differs_from(modules[it->second])) {
-            bump_slang_source_epoch();
-        }
         modules[it->second] = std::move(module);
     }
     edits++;

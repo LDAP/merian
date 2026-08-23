@@ -1,10 +1,14 @@
 #include "merian/shader/slang_global_session.hpp"
 
 #include <atomic>
+#include <mutex>
+#include <unordered_map>
 
 namespace {
 Slang::ComPtr<slang::IGlobalSession> global_session;
 std::atomic<uint64_t> source_epoch = 0;
+std::mutex module_sources_mutex;
+std::unordered_map<std::string, uint64_t> module_sources;
 } // namespace
 
 namespace merian {
@@ -64,6 +68,15 @@ uint64_t slang_source_epoch() {
 
 void bump_slang_source_epoch() {
     source_epoch.fetch_add(1, std::memory_order_relaxed);
+}
+
+void bind_slang_module_source(const std::string& name, const uint64_t source_hash) {
+    const std::lock_guard<std::mutex> lock(module_sources_mutex);
+    const auto [it, inserted] = module_sources.try_emplace(name, source_hash);
+    if (!inserted && it->second != source_hash) {
+        it->second = source_hash;
+        bump_slang_source_epoch();
+    }
 }
 
 } // namespace merian

@@ -14,10 +14,6 @@ struct SmoothDielectricBSDF : BSDF {
         this.transmission_color = transmission_color;
     }
 
-    float3 reflect_dir(const float3 wi) {
-        return float3(-wi.x, -wi.y, wi.z);
-    }
-
     float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) {
         return float3(0.0f);
     }
@@ -27,10 +23,10 @@ struct SmoothDielectricBSDF : BSDF {
             return none;
         }
         if (rng.next_float() < fresnel_dielectric(wi.z, eta)) {
-            return reflect_dir(wi);
+            return reflect_z(wi);
         }
         const float3 wt = refract(-wi, float3(0.0f, 0.0f, 1.0f), eta);
-        return all(wt == float3(0.0f)) ? reflect_dir(wi) : wt;
+        return all(wt == float3(0.0f)) ? reflect_z(wi) : wt;
     }
 
     float pdf(const float3 wi, const float3 wo) {
@@ -41,15 +37,18 @@ struct SmoothDielectricBSDF : BSDF {
         if (wi.z < BSDF_MIN_COS_THETA) {
             return none;
         }
-        if (rng.next_float() < fresnel_dielectric(wi.z, eta)) {
-            return ShadingFunctionSample(reflect_dir(wi), 1.0f, float3(1.0f), BSDFLobe::Delta);
+        // the pdf of a delta lobe is the discrete probability of picking it
+        const float R = fresnel_dielectric(wi.z, eta);
+        if (rng.next_float() < R) {
+            return ShadingFunctionSample(reflect_z(wi), R, float3(1.0f), BSDFLobe::Delta);
         }
         const float3 wt = refract(-wi, float3(0.0f, 0.0f, 1.0f), eta);
         if (all(wt == float3(0.0f))) {
-            return ShadingFunctionSample(reflect_dir(wi), 1.0f, float3(1.0f),
+            return ShadingFunctionSample(reflect_z(wi), 1.0f, float3(1.0f),
                                          BSDFLobe::Delta); // total internal reflection
         }
-        return ShadingFunctionSample(wt, 1.0f, pow2(eta) * transmission_color, BSDFLobe::Delta);
+        return ShadingFunctionSample(wt, 1.0f - R, pow2(eta) * transmission_color,
+                                     BSDFLobe::Delta);
     }
 
     Albedo get_albedo(const float3 wi) {

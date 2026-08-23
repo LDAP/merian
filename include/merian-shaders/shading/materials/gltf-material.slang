@@ -191,7 +191,7 @@ struct GltfMaterial<let TRANSMISSION : bool = false,
             emission *= lod.sample(tm.get_sampler2D(emissive_texture), sd.uv).rgb;
         }
 
-        const float alpha = ggx_roughness_to_alpha(max(roughness, merian_hint_min_roughness));
+        const float alpha = ggx_roughness_to_alpha(roughness);
 
         // KHR_materials_anisotropy
         float2 specular_alpha = float2(alpha);
@@ -216,8 +216,10 @@ struct GltfMaterial<let TRANSMISSION : bool = false,
         const float ior_r = (ior - 1.0f) / (ior + 1.0f);
         const float dielectric_f0 = ior_r * ior_r;
 
-        // relative IOR (incident / transmitted); drives the Fresnel split and the refraction.
-        const float eta = sd.ior / (sd.front_facing ? ior : 1.0f);
+        // Relative IOR (incident / transmitted); drives the Fresnel split and the refraction. A
+        // transmissive material is always traced two-sided, and a one-sided mesh has its back
+        // faces culled, so the face alone says which side of the interface the ray is on.
+        const float eta = sd.front_facing ? 1.0f / ior : ior;
         float tw = 0.0f;
         if (let trans = transmission_opt) {
             tw = trans.weight;
@@ -257,7 +259,7 @@ struct GltfMaterial<let TRANSMISSION : bool = false,
                            metallic);
 
         float coat_weight = 0.0f;
-        float coat_alpha = ggx_roughness_to_alpha(merian_hint_min_roughness);
+        float coat_alpha = 0.0f;
         if (let coat = clearcoat_opt) {
             coat_weight = coat.weight;
             if (coat.texture != TextureID(-1)) {
@@ -267,7 +269,7 @@ struct GltfMaterial<let TRANSMISSION : bool = false,
             if (coat.roughness_texture != TextureID(-1)) {
                 coat_rough *= lod0.sample(tm.get_sampler2D(coat.roughness_texture), sd.uv).g;
             }
-            coat_alpha = ggx_roughness_to_alpha(max(coat_rough, merian_hint_min_roughness));
+            coat_alpha = ggx_roughness_to_alpha(coat_rough);
         }
 
         // volume absorption, entered on a front-face transmission.

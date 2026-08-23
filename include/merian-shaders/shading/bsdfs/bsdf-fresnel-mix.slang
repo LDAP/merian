@@ -16,8 +16,9 @@ struct FresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
     }
 
     float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) {
-        const float3 h = normalize(wi + wo);
-        const float F = fresnel_schlick(dot(wi, h), ior_f0);
+        // a transmitted direction has no half vector with wi, so mix by the incidence angle
+        const float F = wi.z * wo.z > 0.0f ? fresnel_schlick(dot(wi, normalize(wi + wo)), ior_f0)
+                                           : fresnel_schlick(wi.z, ior_f0);
         return lerp(base.eval(wi, wo, rng), layer.eval(wi, wo, rng), F);
     }
 
@@ -38,9 +39,15 @@ struct FresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
         // Sample one of the two lobes by Fresnel, but evaluate the combined pdf/weight (one-sample
         // MIS). Delegate to the chosen sub-BSDF so its lobe classification propagates.
         const float F = fresnel_schlick(wi.z, ior_f0);
+        const bool take_layer = rng.next_float() < F;
         Optional<ShadingFunctionSample> sub =
-            rng.next_float() < F ? layer.sample_eval(wi, rng) : base.sample_eval(wi, rng);
+            take_layer ? layer.sample_eval(wi, rng) : base.sample_eval(wi, rng);
         if (let s = sub) {
+            // The Fresnel cancels against the probability of having picked that lobe.
+            if (s.lobe == BSDFLobe::Delta) {
+                return ShadingFunctionSample(s.wo, (take_layer ? F : 1.0f - F) * s.pdf, s.weight,
+                                             s.lobe);
+            }
             const float p = this.pdf(wi, s.wo);
             return ShadingFunctionSample(s.wo, p, this.eval(wi, s.wo, rng) / p, s.lobe);
         }

@@ -61,7 +61,7 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<WGBuffer> gbuffer) {
             }
 
             const ShadingData sd = ShadingData(-ray.Direction, surface.pos, surface.uv, scene.time,
-                                               frame, face_normal, uint16_t(0), 1.0f, front_facing);
+                                               frame, face_normal, uint16_t(0), front_facing);
             float3 mat_emission;
             OrthonormalFrame mat_shading_frame;
             let mat = scene.material_system.get_material_sample(

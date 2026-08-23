@@ -36,6 +36,10 @@ struct IridescentConductorBSDF<Inner : BSDF> : BSDF {
     }
 
     float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) {
+        // opposite hemispheres have no half vector, and a conductor does not transmit
+        if (min(wi.z, wo.z) < BSDF_MIN_COS_THETA) {
+            return float3(0.0f);
+        }
         const float3 h = normalize(wi + wo);
         return fresnel(dot(wi, h)) * bsdf.eval(wi, wo, rng);
     }
@@ -110,7 +114,8 @@ struct IridescentFresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
 
         // Reflect/transmit split at the microfacet angle (VdotH); the full dielectric form keeps
         // TIR -> 1 so transmissive glass reflects past the critical angle instead of going dark.
-        const float widoth = abs(dot(wi, normalize(wi + wo)));
+        // A transmitted direction has no half vector with wi, so fall back to the incidence angle.
+        const float widoth = wi.z * wo.z > 0.0f ? abs(dot(wi, normalize(wi + wo))) : abs(wi.z);
         const float f = fresnel_dielectric(widoth, eta);
         const float3 dielectric = lerp(base_e, layer_e, f);
 
@@ -147,9 +152,15 @@ struct IridescentFresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
         // Sample layer or base by Fresnel, evaluate the combined pdf/weight, propagate the
         // chosen sub-BSDF's lobe.
         const float f = fresnel_dielectric(wi.z, eta);
+        const bool take_layer = rng.next_float() < f;
         Optional<ShadingFunctionSample> sub =
-            rng.next_float() < f ? layer.sample_eval(wi, rng) : base.sample_eval(wi, rng);
+            take_layer ? layer.sample_eval(wi, rng) : base.sample_eval(wi, rng);
         if (let s = sub) {
+            // The Fresnel cancels against the probability of having picked that lobe.
+            if (s.lobe == BSDFLobe::Delta) {
+                return ShadingFunctionSample(s.wo, (take_layer ? f : 1.0f - f) * s.pdf, s.weight,
+                                             s.lobe);
+            }
             const float pdf = this.pdf(wi, s.wo);
             return ShadingFunctionSample(s.wo, pdf, this.eval(wi, s.wo, rng) / pdf, s.lobe);
         }
@@ -217,8 +228,13 @@ struct IridescentRoughDielectricBSDF : BSDF {
                     fresnel_iridescent(1.0f, film_ior, base_f0, thickness, widoth), iridescence);
     }
 
+    // Both leave the refraction Jacobian singular: no microfacet bends the ray at eta 1.
+    bool is_delta() {
+        return eta == 1.0f || alpha < BSDF_SMOOTH_ALPHA;
+    }
+
     float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) {
-        if (wi.z < BSDF_MIN_COS_THETA) {
+        if (is_delta() || wi.z < BSDF_MIN_COS_THETA) {
             return float3(0.0f);
         }
         if (wo.z > BSDF_MIN_COS_THETA) {
@@ -245,14 +261,14 @@ struct IridescentRoughDielectricBSDF : BSDF {
     }
 
     float pdf(const float3 wi, const float3 wo) {
-        if (wi.z < BSDF_MIN_COS_THETA) {
+        if (is_delta() || wi.z < BSDF_MIN_COS_THETA) {
             return 0.0f;
         }
         const float alpha_squared = pow2(alpha);
         if (wo.z > BSDF_MIN_COS_THETA) {
             const float3 h = normalize(wi + wo);
             const float p = max3(reflectance(abs(dot(wi, h))));
-            return p * ggx_VNDF_pdf_wo(wi.z, pow2(max(0.0f, h.z)), alpha_squared);
+            return p * ggx_VNDF_pdf_wo(wi.z, h, alpha_squared);
         }
         if (wo.z < -BSDF_MIN_COS_THETA) {
             float3 h = normalize(wo + wi * eta);
@@ -270,6 +286,22 @@ struct IridescentRoughDielectricBSDF : BSDF {
         if (wi.z < BSDF_MIN_COS_THETA) {
             return none;
         }
+        if (is_delta()) {
+            // the film still reflects where the indices match
+            const float3 R_delta = reflectance(wi.z);
+            const float p_delta = max3(R_delta);
+            if (rng.next_float() < p_delta) {
+                return ShadingFunctionSample(reflect_z(wi), p_delta, R_delta / p_delta,
+                                             BSDFLobe::Delta);
+            }
+            const float3 wt = refract(-wi, float3(0.0f, 0.0f, 1.0f), eta);
+            if (all(wt == float3(0.0f))) {
+                return ShadingFunctionSample(reflect_z(wi), 1.0f, float3(1.0f), BSDFLobe::Delta);
+            }
+            return ShadingFunctionSample(wt, 1.0f - p_delta,
+                                         ((1.0f - R_delta) / (1.0f - p_delta)) * pow2(eta) * tint,
+                                         BSDFLobe::Delta);
+        }
         const float alpha_squared = pow2(alpha);
         const float3 wm = ggx_VNDF_sample_H(wi, alpha, rng.next_float2());
         const float widoth = dot(wi, wm);
@@ -284,7 +316,7 @@ struct IridescentRoughDielectricBSDF : BSDF {
             }
             const float g = smith_g2_over_widotn(wo.z, wi.z, alpha_squared) /
                             smith_g1_over_widotn(wi.z, alpha_squared);
-            const float pdf = p * ggx_VNDF_pdf_wo(wi.z, pow2(wm.z), alpha_squared);
+            const float pdf = p * ggx_VNDF_pdf_wo(wi.z, wm, alpha_squared);
             return ShadingFunctionSample(wo, pdf, (R / p) * g, BSDFLobe::Glossy);
         }
 
