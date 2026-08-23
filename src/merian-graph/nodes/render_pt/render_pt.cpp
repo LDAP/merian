@@ -364,9 +364,11 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
                               "scatter sample with a light sample and costs no "
                               "extra ray; 'resampled' adds a shadow ray.");
     if (nee_mode == 1) {
-        constants_changed |=
-            config.config_percent("NEE probability", nee_probability,
-                                  "Fraction of scatter samples drawn from the lights.");
+        constants_changed |= config.config_percent(
+            "NEE probability", nee_probability,
+            "Fraction of scatter samples drawn from the lights. A light sample replaces the "
+            "scatter sample, so this is taken out of the budget the indirect signal lives on: "
+            "past roughly a tenth the direct gain stops paying for the indirect noise.");
     }
     if (nee_mode == 2) {
         constants_changed |= config.config_int(
