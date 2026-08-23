@@ -28,6 +28,11 @@ struct Material {
     virtual bool is_emissive() const {
         return false;
     }
+    // True if get_interior_volume can be anything but vacuum; renderers that track the medium a
+    // path travels in compile that tracking out where no material needs it.
+    virtual bool has_interior_volume() const {
+        return false;
+    }
 };
 
 struct DiffuseMaterial : Material {
@@ -152,6 +157,7 @@ class MaterialSystem : public std::enable_shared_from_this<MaterialSystem> {
     std::vector<uint8_t> host_buffer;
     BufferHandle material_buffer;
     uint32_t max_payload_size = 0;
+    bool any_interior_volume = false;
     uint32_t dirty_begin = UINT32_MAX;
     uint32_t dirty_end = 0;
     float alpha_test_threshold = 0.5F;

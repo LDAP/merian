@@ -5,6 +5,8 @@ namespace merian {
 extern static const int merian_material_system_payload_max_size;
 // alpha values less than the threshold are considered transparent.
 extern static const float merian_alpha_test_threshold = 0.5;
+// False where no material can have anything but vacuum behind a transmission event.
+extern static const bool merian_material_system_any_interior_volume = false;
 
 struct MaterialPayload {
     uint blob[merian_material_system_payload_max_size];
@@ -72,4 +74,4 @@ struct MaterialSystem {
     }
 }
 
-}
+} // namespace merian

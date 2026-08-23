@@ -25,7 +25,7 @@ extern static const float merian_render_nee_probability = 0.5;
 extern static const int merian_render_nee_candidates = 1;
 // vertices (from the primary) that perform NEE; 0 = all
 extern static const int merian_render_nee_bounces = 0;
-}
+} // namespace merian
 
 struct RenderBinding {
     ParameterBlock<GBuffer> gbuffer;
@@ -33,13 +33,14 @@ struct RenderBinding {
     RenderGuiding guiding;
 }
 
-float3 trace_path(const ParameterBlock<Scene> scene,
-                  const ParameterBlock<RenderBinding> params,
-                  const uint2 pixel,
-                  RayDesc ray,
-                  ShadingPoint sp,
-                  const uint16_t sample_index,
-                  inout RandomGenerator rng) {
+float3
+trace_path(const ParameterBlock<Scene> scene,
+           const ParameterBlock<RenderBinding> params,
+           const uint2 pixel,
+           RayDesc ray,
+           ShadingPoint sp,
+           const uint16_t sample_index,
+           inout RandomGenerator rng) {
     // Medium the ray is travelling through; updated on transmission events.
     var medium = scene.make_path_medium();
 
@@ -84,8 +85,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         const OrthonormalFrame frame = sp.shading_frame;
         let bsdf = sp.surface_material.get_bsdf();
         const float3 wi_local = frame.to_local(-ray.Direction);
-        const PathVertex vertex = {sp.pos,     sp.prev_pos, frame,
-                                   bsdf.alpha, bounce,      sample_index};
+        const PathVertex vertex = {sp.pos, sp.prev_pos, frame, bsdf.alpha, bounce, sample_index};
 
         // 1. the guiding lobes around this vertex, mixed with the BSDF
         let guiding = params.guiding.get_distribution(guiding_state, frame_info, vertex, rng);
@@ -114,10 +114,9 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         // once the hit says which light the ray reached.
         // The mass the light technique holds, whichever technique the draw above landed on: it is
         // the density that has to be charged, not the outcome.
-        const float p_light =
-            merian_render_nee_mode == NEE_MODE_MIXTURE && nee_surface
-                ? merian_render_nee_probability
-                : 0.f;
+        const float p_light = merian_render_nee_mode == NEE_MODE_MIXTURE && nee_surface
+                                  ? merian_render_nee_probability
+                                  : 0.f;
         // A vertex that generates no direction still owes its direct light, so it leaves through
         // the same path as one whose ray finds nothing: zero throughput, no continuation.
         bool scattered = false;
@@ -188,7 +187,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
         }
 
         if (let next = next_ray) {
-            if (transmission) {
+            if (merian_material_system_any_interior_volume && transmission) {
                 // leaving a surface puts the ray back into the medium enclosing the scene
                 medium.cross_boundary(sp.surface_material.get_interior_volume(),
                                       dot(-ray.Direction, sp.get_face_normal()) >= 0.f);
@@ -223,8 +222,7 @@ float3 trace_path(const ParameterBlock<Scene> scene,
             // Beer-Lambert attenuation over the segment just travelled inside the medium.
             // In-scattering is not accounted for here; that is the volume renderer's job. Folded
             // into the incident radiance so that the guiding sees the attenuated signal.
-            const float3 segment_transmittance =
-                medium.transmittance(distance(ray.Origin, sp.pos));
+            const float3 segment_transmittance = medium.transmittance(distance(ray.Origin, sp.pos));
 
             segment.traced = true;
             segment.next_pos = sp.pos;
@@ -266,9 +264,8 @@ void render_pixel(const uint2 pixel,
     const ShadingPoint primary_sp = scene.get_shading_point(primary_ray, primary_hit);
 
     // demodulate per sample so the second moment stays consistent with the stored radiance
-    const float3 demod_albedo = merian_render_demodulate_albedo
-                                    ? params.gbuffer.get_demodulation_albedo(pixel)
-                                    : float3(1);
+    const float3 demod_albedo =
+        merian_render_demodulate_albedo ? params.gbuffer.get_demodulation_albedo(pixel) : float3(1);
 
     float3 irradiance = float3(0);
     float second_moment = 0.f;
@@ -296,15 +293,13 @@ void render_pixel(const uint2 pixel,
 
 // Two entry points over the same body: compute is faster (no RT-pipeline VGPR cap), while the
 // raygen variant is available for experiments that need ray-tracing-pipeline-only features (SER).
-[shader("compute")]
-[numthreads(8, 8, 1)]
-void main_compute(uint3 thread_id: SV_DispatchThreadID,
-                  ParameterBlock<Scene> scene,
-                  ParameterBlock<RenderBinding> params) {
+[shader("compute")][numthreads(8, 8, 1)] void main_compute(uint3 thread_id : SV_DispatchThreadID,
+                                                           ParameterBlock<Scene> scene,
+                                                           ParameterBlock<RenderBinding> params) {
     render_pixel(thread_id.xy, scene, params);
 }
 
-[shader("raygeneration")]
-void main(ParameterBlock<Scene> scene, ParameterBlock<RenderBinding> params) {
+    [shader("raygeneration")] void main(ParameterBlock<Scene> scene,
+                                        ParameterBlock<RenderBinding> params) {
     render_pixel(DispatchRaysIndex().xy, scene, params);
 }

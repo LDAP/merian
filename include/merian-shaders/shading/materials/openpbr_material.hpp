@@ -87,6 +87,10 @@ struct OpenPBRMaterial : Material {
                            slang_name(roughness_encoding));
     }
 
+    bool has_interior_volume() const override {
+        return volume.has_value();
+    }
+
     uint32_t get_payload_size() const override {
         return serialize(nullptr);
     }

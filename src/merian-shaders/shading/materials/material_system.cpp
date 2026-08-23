@@ -36,9 +36,10 @@ SlangCompositionHandle MaterialSystem::query_device_support_composition() {
     const auto composition = SlangComposition::create();
     composition->add_composition(TextureManager::query_device_support_composition());
     composition->add_module_from_path("merian-shaders/shading/materials/material-system.slang");
-    composition->add_module_from_string("material_system_constants",
-                                        "namespace merian { export static const int "
-                                        "merian_material_system_payload_max_size = 1; }");
+    composition->add_module_from_string(
+        "material_system_constants",
+        "namespace merian { export static const int merian_material_system_payload_max_size = 1;\n"
+        "export static const bool merian_material_system_any_interior_volume = false; }");
     composition->add_module_from_path("merian-shaders/shading/materials/diffuse-material.slang");
     composition->add_type_conformance("merian::MaterialModel", "merian::DiffuseMaterial", 0);
     return composition;
@@ -47,9 +48,11 @@ SlangCompositionHandle MaterialSystem::query_device_support_composition() {
 void MaterialSystem::update_composition_constants() {
     const uint32_t payload_uints = std::max(payload_size_in_uints(max_payload_size), 1u);
     composition->add_module_from_string(
-        "material_system_constants", fmt::format("namespace merian {{ export static const int "
-                                                 "merian_material_system_payload_max_size = {}; }}",
-                                                 payload_uints));
+        "material_system_constants",
+        fmt::format("namespace merian {{ export static const int "
+                    "merian_material_system_payload_max_size = {};\n"
+                    "export static const bool merian_material_system_any_interior_volume = {}; }}",
+                    payload_uints, any_interior_volume ? "true" : "false"));
 }
 
 void MaterialSystem::set_alpha_test_threshold(const float threshold) {
@@ -140,6 +143,11 @@ MaterialID MaterialSystem::add_material(const MaterialModelID type_id, const Mat
     stored.header = material.header;
     stored.header.material_model_type_id = type_id;
     stored.emissive = material.is_emissive();
+
+    if (material.has_interior_volume() && !any_interior_volume) {
+        any_interior_volume = true;
+        update_composition_constants();
+    }
 
     uint32_t payload_bytes = material.get_payload_size();
     stored.payload.resize(payload_bytes);

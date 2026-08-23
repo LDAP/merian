@@ -84,6 +84,10 @@ struct GltfMaterial : Material {
                            b(iridescence.has_value()), b(anisotropy.has_value()));
     }
 
+    bool has_interior_volume() const override {
+        return volume.has_value();
+    }
+
     uint32_t get_payload_size() const override {
         return serialize(nullptr);
     }
