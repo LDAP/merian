@@ -17,6 +17,18 @@
                 "pt": {
                     "merge": "renderers/pt.json"
                 },
+                "pt_mcpg": {
+                    "merge": [
+                        "renderers/pt.json",
+                        "renderers/pt_mcpg.json"
+                    ]
+                },
+                "pt_ssmm": {
+                    "merge": [
+                        "renderers/pt.json",
+                        "renderers/pt_ssmm.json"
+                    ]
+                },
                 "restir_di": {
                     "merge": "renderers/restir_di.json"
                 },

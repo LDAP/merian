@@ -1,0 +1,29 @@
+{
+    "nodes": {
+        "render": {
+            "properties": {
+                "guiding": {
+                    "lc": {
+                        "LC buffer size": 8000009,
+                        "LC probe count": 2,
+                        "LC stochastic interpolation": false,
+                        "grid distribution dimension": 2.0,
+                        "grid level bias": 0.0,
+                        "grid tan(alpha/2)": 0.012000000052154064,
+                        "surf: use LC": false
+                    },
+                    "mc": {
+                        "MC samples": 5,
+                        "ML prior": 0.2,
+                        "adaptive grid buf size": 32777259,
+                        "grid distribution dimension": 1.5,
+                        "grid level bias": 0.0,
+                        "grid tan(alpha/2)": 0.003,
+                        "missing light heuristic": true
+                    },
+                    "method": "markov chain path guiding"
+                }
+            }
+        }
+    }
+}

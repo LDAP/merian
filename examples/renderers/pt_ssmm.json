@@ -1,0 +1,11 @@
+{
+    "nodes": {
+        "render": {
+            "properties": {
+                "guiding": {
+                    "method": "screen-space mixture models"
+                }
+            }
+        }
+    }
+}
