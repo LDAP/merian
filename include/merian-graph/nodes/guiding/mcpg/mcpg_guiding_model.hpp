@@ -55,7 +55,7 @@ class MCPGGuidingModel : public GuidingModel {
     bool scale_with_alpha = true;
     float alpha_threshold = 0.05f;
     bool missing_light_heuristic = true;
-    bool discount_nee = false;
+    bool nee_reweight = false;
     bool light_cache_tail = false;
     float lc_min_pdf = 1.0f;
 };

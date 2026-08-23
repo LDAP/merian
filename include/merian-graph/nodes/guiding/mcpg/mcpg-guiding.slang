@@ -15,9 +15,10 @@ extern static const bool merian_guiding_scale_with_alpha = true;
 // no guiding below this alpha: the BSDF is far more peaked than any lobe
 extern static const float merian_guiding_alpha_threshold = 0.05;
 extern static const bool merian_guiding_missing_light_heuristic = true;
-// discount an emitter the continuation found by how much next event estimation already covers it,
-// so the chains spend themselves on the light it cannot reach
-extern static const bool merian_guiding_discount_nee = false;
+// Reweight an emitter the continuation found by how much next event estimation already covers it,
+// so the chains spend themselves on the light it cannot reach. "Guide direct illumination
+// weighted by MIS weights" in Rath et al., Variance-Aware Path Guiding, SIGGRAPH 2020.
+extern static const bool merian_guiding_nee_reweight = false;
 // complete a truncated path with the cached irradiance at its last vertex
 extern static const bool merian_guiding_light_cache_tail = false;
 // floor on the density the irradiance cache divides by, bounding the variance it stores
@@ -205,7 +206,7 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
         // What the chains are worth steering towards. The cache above keeps the emitter whole
         // either way: it stands in for the whole path tail, not for the part the chains steer.
         const float guide_f =
-            merian_guiding_discount_nee && emissive ? mc_f * segment.nee_weight : mc_f;
+            merian_guiding_nee_reweight && emissive ? mc_f * segment.nee_weight : mc_f;
 
         if (rng.next_float() * record.score_sum < guide_f * merian_guiding_mc_samples) {
             MCState chain = record.selected;
