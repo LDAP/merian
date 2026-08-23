@@ -185,8 +185,8 @@ RenderPT::process(const NodeIO& io, const NodeProcessInfo& info, Submission& sub
     cursor["irradiance"] = io[con_irradiance].get_texture();
     auto guiding_cursor = cursor["guiding"];
     // screen-space methods reproject through the gbuffer; the others do not declare it
-    if (auto guiding_gbuffer = guiding_cursor["gbuffer"]; guiding_gbuffer.is_valid()) {
-        guiding_gbuffer = gbuf.r();
+    if (guiding_cursor.is_valid() && guiding_cursor.has_field("gbuffer")) {
+        guiding_cursor["gbuffer"] = gbuf.r();
     }
     guiding->write_to(guiding_cursor);
 
