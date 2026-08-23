@@ -10,8 +10,8 @@ namespace merian {
 namespace {
 
 constexpr const char* GUIDING_MODULE =
-    "merian-graph/nodes/render_pt_mcpg/mcpg-distance-guiding.slang";
-constexpr const char* CHAIN_MODULE = "merian-graph/nodes/render_pt_mcpg/mc_distance.slang";
+    "merian-graph/nodes/guiding/mcpg-distance-guiding.slang";
+constexpr const char* CHAIN_MODULE = "merian-graph/nodes/guiding/mc_distance.slang";
 
 } // namespace
 

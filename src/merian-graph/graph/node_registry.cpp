@@ -28,9 +28,7 @@
 #include "merian-graph/nodes/pbrt_scene/pbrt_scene_node.hpp"
 #include "merian-graph/nodes/reduce/reduce.hpp"
 #include "merian-graph/nodes/render_pt/render_pt.hpp"
-#include "merian-graph/nodes/render_pt_mcpg/render_pt_mcpg.hpp"
 #include "merian-graph/nodes/render_restir_di/render_restir_di.hpp"
-#include "merian-graph/nodes/render_ssmm/render_ssmm.hpp"
 #include "merian-graph/nodes/shadertoy/shadertoy.hpp"
 #include "merian-graph/nodes/svgf/svgf.hpp"
 #include "merian-graph/nodes/swapchain_blit/swapchain_blit.hpp"
@@ -102,16 +100,11 @@ NodeRegistry::NodeRegistry() {
         "Guiding (SSMM)",
         "Screen-space mixture models by Dittebrandt et al. (2023) for a path tracer's "
         "guiding slot.");
-    register_node_type<RenderMCPG>("Render (Path-traced, MCPG)",
-                                   "Path-traced renderer using Markov chain path-guiding.");
     register_node_type<RenderPT>("Render (Path-traced)",
                                  "Path-traced renderer using BSDF-sampling path tracer.");
     register_node_type<RenderRestirDI>(
         "Render (ReSTIR DI)",
         "Screen-space ReSTIR direct illumination with spatiotemporal reservoir reuse.");
-    register_node_type<RenderSSMM>(
-        "Render (SSMM)",
-        "Renders a scene using screen-space mixture models by Dittebrandt et al. (2023).");
     register_node_type<Shadertoy>("Shadertoy",
                                   "Execute Shadertoy-like shaders (Limited implementation).");
     register_node_type<SVGF>("Denoiser (SVGF)", "Spatiotemporal Variance-Guided Filtering.");

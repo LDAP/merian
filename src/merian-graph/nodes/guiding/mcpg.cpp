@@ -1,9 +1,9 @@
-#include "merian-graph/nodes/render_pt_mcpg/mcpg.hpp"
+#include "merian-graph/nodes/guiding/mcpg.hpp"
 
 namespace merian {
 
 namespace {
-constexpr const char* MODULE_PATH = "merian-graph/nodes/render_pt_mcpg/mc.slang";
+constexpr const char* MODULE_PATH = "merian-graph/nodes/guiding/mc.slang";
 
 SlangCompositionHandle make_composition() {
     const auto composition = SlangComposition::create();

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "merian-graph/nodes/render_pt_mcpg/mcpg.hpp"
+#include "merian-graph/nodes/guiding/mcpg.hpp"
 #include "merian-shaders/light-cache/hashed_irradiance_cache.hpp"
 #include "merian-shaders/sampling/guiding.hpp"
 

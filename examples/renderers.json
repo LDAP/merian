@@ -4,16 +4,6 @@
             "default": "pt",
             "type": "variant",
             "variants": {
-                "mcpg": {
-                    "merge": "renderers/mcpg.json"
-                },
-                "mcpg_volume": {
-                    "merge": [
-                        "renderers/mcpg.json",
-                        "renderers/mcpg_volume.json",
-                        "renderers/mcpg_volume_combine.json"
-                    ]
-                },
                 "pt": {
                     "merge": "renderers/pt.json"
                 },
@@ -28,7 +18,7 @@
                         "renderers/pt.json",
                         "renderers/pt_mcpg.json",
                         "renderers/pt_volume.json",
-                        "renderers/mcpg_volume_combine.json"
+                        "renderers/volume_combine.json"
                     ]
                 },
                 "pt_ssmm": {
@@ -39,9 +29,6 @@
                 },
                 "restir_di": {
                     "merge": "renderers/restir_di.json"
-                },
-                "ssmm": {
-                    "merge": "renderers/ssmm.json"
                 }
             }
         }

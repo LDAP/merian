@@ -2,7 +2,7 @@
 
 #include "merian-graph/connectors/shader_object_in.hpp"
 #include "merian-graph/nodes/guiding/guiding_node.hpp"
-#include "merian-graph/nodes/render_ssmm/ssmm_guiding_model.hpp"
+#include "merian-graph/nodes/guiding/ssmm_guiding_model.hpp"
 #include "merian-graph/objects/gbuffer_object.hpp"
 
 namespace merian {

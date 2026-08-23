@@ -1,6 +1,6 @@
-#include "merian-graph/nodes/render_ssmm/ssmm_guiding_model.hpp"
+#include "merian-graph/nodes/guiding/ssmm_guiding_model.hpp"
 
-#include "merian-graph/nodes/render_ssmm/ssmm_guiding.slangh"
+#include "merian-graph/nodes/guiding/ssmm_guiding.slangh"
 #include "merian/utils/properties.hpp"
 
 #include <fmt/format.h>
@@ -9,7 +9,7 @@ namespace merian {
 
 namespace {
 
-constexpr const char* GUIDING_MODULE = "merian-graph/nodes/render_ssmm/ssmm-guiding.slang";
+constexpr const char* GUIDING_MODULE = "merian-graph/nodes/guiding/ssmm-guiding.slang";
 
 } // namespace
 

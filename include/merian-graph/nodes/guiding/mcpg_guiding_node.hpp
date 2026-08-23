@@ -1,7 +1,7 @@
 #pragma once
 
 #include "merian-graph/nodes/guiding/guiding_node.hpp"
-#include "merian-graph/nodes/render_pt_mcpg/mcpg_guiding_model.hpp"
+#include "merian-graph/nodes/guiding/mcpg_guiding_model.hpp"
 
 namespace merian {
 
