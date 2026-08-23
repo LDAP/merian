@@ -8,8 +8,10 @@ namespace merian {
 
 namespace {
 
-constexpr const char* CLEAR_MODULE = "merian-graph/nodes/guiding/mcpg_distance/mcpg-distance-clear.slang";
-constexpr const char* PROJECT_MODULE = "merian-graph/nodes/guiding/mcpg_distance/mcpg-distance-project.slang";
+constexpr const char* CLEAR_MODULE =
+    "merian-graph/nodes/guiding/mcpg_distance/mcpg-distance-clear.slang";
+constexpr const char* PROJECT_MODULE =
+    "merian-graph/nodes/guiding/mcpg_distance/mcpg-distance-project.slang";
 
 } // namespace
 
@@ -107,21 +109,19 @@ MCPGDistanceGuidingNode::NodeStatusFlags MCPGDistanceGuidingNode::process(
     };
     cmd->barrier({}, {}, carry);
 
-    const auto write_binding = [&](const ShaderObjectHandle& obj, const uint32_t level) {
-        auto cursor = obj->get_cursor();
-        auto grid_levels = cursor["grid"]["levels"];
+    const auto write_grid = [&](const ShaderObjectHandle& obj) {
+        auto grid_levels = obj->get_cursor()["grid"]["levels"];
         for (uint32_t i = 0; i < levels; i++) {
             grid_levels[i] = chains().get_levels()[i];
         }
-        if (auto field = cursor["prev"]; field.is_valid()) {
-            field.write(chains().get_prev_texture(), vk::ImageLayout::eGeneral);
-        }
-        if (auto field = cursor["level"]; field.is_valid()) {
-            field = level;
-        }
-        if (auto field = cursor["dim"]; field.is_valid()) {
-            field = uint2{extent.width, extent.height};
-        }
+        return obj;
+    };
+
+    const auto write_project = [&](const ShaderObjectHandle& obj, const uint32_t level) {
+        auto cursor = write_grid(obj)->get_cursor();
+        cursor["prev"].write(chains().get_prev_texture(), vk::ImageLayout::eGeneral);
+        cursor["level"] = level;
+        cursor["dim"] = uint2{extent.width, extent.height};
         return obj;
     };
 
@@ -138,7 +138,7 @@ MCPGDistanceGuidingNode::NodeStatusFlags MCPGDistanceGuidingNode::process(
         const auto ep = clear.entry_point.get();
         const auto pipe = clear.pipeline.get();
         cmd->bind(pipe);
-        ep->bind("params", write_binding(clear.params.get(), 0), cmd, pipe, obj_allocator);
+        ep->bind("params", write_grid(clear.params.get()), cmd, pipe, obj_allocator);
         cmd->dispatch(chains().get_grid()->get_extent(), 8, 8);
         barrier_grid();
     }
@@ -150,7 +150,7 @@ MCPGDistanceGuidingNode::NodeStatusFlags MCPGDistanceGuidingNode::process(
         cmd->bind(pipe);
         ep->bind("scene", io[con_scene]->get_shader_object(), cmd, pipe, obj_allocator);
         for (uint32_t level = 0; level < levels; level++) {
-            ep->bind("params", write_binding(project_params[level].get(), level), cmd, pipe,
+            ep->bind("params", write_project(project_params[level].get(), level), cmd, pipe,
                      obj_allocator);
             cmd->dispatch(chains().get_grid()->get_extent(), 8, 8);
             barrier_grid();
