@@ -13,8 +13,10 @@ constexpr const char* GUIDING_MODULE = "merian-graph/nodes/render_ssmm/ssmm-guid
 
 } // namespace
 
-SSMMGuidingModel::SSMMGuidingModel(ResourceAllocatorHandle allocator)
-    : allocator(std::move(allocator)) {}
+void SSMMGuidingModel::initialize([[maybe_unused]] const ContextHandle& context,
+                                  const ResourceAllocatorHandle& allocator) {
+    this->allocator = allocator;
+}
 
 SlangCompositionHandle SSMMGuidingModel::query_device_support_composition() {
     const auto composition = SlangComposition::create();
@@ -64,7 +66,12 @@ void SSMMGuidingModel::on_extent(const vk::Extent3D& new_extent) {
     }
 }
 
+void SSMMGuidingModel::set_gbuffer(const ShaderObjectHandle& gbuffer) {
+    this->gbuffer = gbuffer;
+}
+
 void SSMMGuidingModel::write_to(ShaderCursor cursor) {
+    cursor["gbuffer"] = gbuffer;
     cursor["prev"] = states[(frame + 1) & 1u];
     cursor["next"] = states[frame & 1u];
     frame++;

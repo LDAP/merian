@@ -16,6 +16,8 @@
 #include "merian-graph/nodes/gbuffer_debug/gbuffer_debug.hpp"
 #include "merian-graph/nodes/gbuffer_rt/gbuffer.hpp"
 #include "merian-graph/nodes/gltf_scene/gltf_scene_node.hpp"
+#include "merian-graph/nodes/guiding/mcpg_guiding_node.hpp"
+#include "merian-graph/nodes/guiding/ssmm_guiding_node.hpp"
 #include "merian-graph/nodes/image_read/hdr_image.hpp"
 #include "merian-graph/nodes/image_read/ldr_image.hpp"
 #include "merian-graph/nodes/image_write/image_write.hpp"
@@ -90,6 +92,12 @@ NodeRegistry::NodeRegistry() {
     register_node_type<MedianApproxNode>("Median (Approximation)",
                                          "Computes an approximation of the median of a component.");
     register_node_type<Reduce>("Reduce", "Reduce values of multiple input images.");
+    register_node_type<MCPGGuidingNode>(
+        "Guiding (MCPG)", "Markov-chain path guiding for a path tracer's guiding slot.");
+    register_node_type<SSMMGuidingNode>(
+        "Guiding (SSMM)",
+        "Screen-space mixture models by Dittebrandt et al. (2023) for a path tracer's "
+        "guiding slot.");
     register_node_type<RenderMCPG>("Render (Path-traced, MCPG)",
                                    "Path-traced renderer using Markov chain path-guiding.");
     register_node_type<RenderPT>("Render (Path-traced)",

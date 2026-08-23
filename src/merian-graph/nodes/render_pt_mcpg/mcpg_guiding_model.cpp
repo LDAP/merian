@@ -10,11 +10,12 @@ constexpr const char* GUIDING_MODULE = "merian-graph/nodes/render_pt_mcpg/mcpg-g
 
 } // namespace
 
-MCPGGuidingModel::MCPGGuidingModel(const ShaderCompileContextHandle& compile_context,
-                                   const ResourceAllocatorHandle& allocator,
-                                   const bool split_hash_payload_storage)
-    : compile_context(compile_context), allocator(allocator),
-      mc_split_storage(split_hash_payload_storage), lc_split_storage(split_hash_payload_storage) {
+void MCPGGuidingModel::initialize(const ContextHandle& context,
+                                  const ResourceAllocatorHandle& allocator) {
+    this->compile_context = context->get_shader_compile_context();
+    this->allocator = allocator;
+    // splitting keys from the payload costs a second indirection that only pays off off AMD
+    mc_split_storage = lc_split_storage = !context->get_device()->get_physical_device()->is_amd();
     recreate_grids();
 }
 
@@ -112,7 +113,9 @@ bool MCPGGuidingModel::properties(Properties& props) {
             "Give each 2^n-wide cell tile a contiguous Morton-ordered slot range so nearby "
             "cells share cache lines (0 = scatter every cell).",
             0u, 5u);
-        mcpg->properties(props);
+        if (mcpg) {
+            mcpg->properties(props);
+        }
         props.st_end_child();
     }
 
@@ -140,11 +143,13 @@ bool MCPGGuidingModel::properties(Properties& props) {
             "Increase to reduce fireflies in the irradiance cache and bias the guiding towards "
             "direct light, especially useful for short maximum path lengths.",
             0.1f, 0.0f);
-        irr_cache->properties(props);
+        if (irr_cache) {
+            irr_cache->properties(props);
+        }
         props.st_end_child();
     }
 
-    if (recreate) {
+    if (recreate && mcpg) {
         recreate_grids();
     }
 

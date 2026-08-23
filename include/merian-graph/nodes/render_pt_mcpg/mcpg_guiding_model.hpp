@@ -12,9 +12,8 @@ namespace merian {
 // Markov-chain path guiding over an adaptive hash grid, learning from an irradiance cache.
 class MCPGGuidingModel : public GuidingModel {
   public:
-    MCPGGuidingModel(const ShaderCompileContextHandle& compile_context,
-                     const ResourceAllocatorHandle& allocator,
-                     bool split_hash_payload_storage);
+    void initialize(const ContextHandle& context,
+                    const ResourceAllocatorHandle& allocator) override;
 
     static SlangCompositionHandle query_device_support_composition();
 
@@ -42,13 +41,13 @@ class MCPGGuidingModel : public GuidingModel {
     uint32_t mc_buffer_size = 32777259;
     uint32_t mc_probe_count = 2;
     uint32_t mc_locality_bits = 3;
-    bool mc_split_storage;
+    bool mc_split_storage = true;
 
     uint32_t lc_buffer_size = 4000000;
     uint32_t lc_probe_count = 4;
     uint32_t lc_locality_bits = 3;
     bool lc_stochastic_interpolation = false;
-    bool lc_split_storage;
+    bool lc_split_storage = true;
 
     int32_t mc_samples = 5;
     float dir_guide_prior = 0.2f;

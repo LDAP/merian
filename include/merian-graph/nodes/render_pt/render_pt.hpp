@@ -5,6 +5,7 @@
 #include "merian-graph/connectors/shader_object_in.hpp"
 #include "merian-graph/graph/node.hpp"
 #include "merian-graph/objects/gbuffer_object.hpp"
+#include "merian-graph/objects/guiding_object.hpp"
 #include "merian-shaders/gbuffer.hpp"
 #include "merian-shaders/sampling/guiding.hpp"
 #include "merian-shaders/scene/scene.hpp"
@@ -58,7 +59,6 @@ class RenderPT : public Node {
     void ensure_pipeline(const SceneHandle& scene);
     void update_render_constants();
     void update_guiding_slot();
-    void set_guiding(int32_t method);
 
     ContextHandle context;
     ResourceAllocatorHandle resource_allocator;
@@ -67,13 +67,8 @@ class RenderPT : public Node {
     // Connectors
     PtrInHandle<Scene> con_scene = PtrIn<Scene>::create();
     ShaderObjectInHandle<GBufferObject> con_gbuffer = ShaderObjectIn<GBufferObject>::create();
+    ShaderObjectInHandle<GuidingObject> con_guiding = ShaderObjectIn<GuidingObject>::create();
     ManagedVkImageOutHandle con_irradiance;
-
-    enum GuidingMethod : int32_t {
-        GUIDING_NONE = 0,
-        GUIDING_MCPG = 1,
-        GUIDING_SSMM = 2,
-    };
 
     vk::Extent3D extent = vk::Extent3D{1920, 1080, 1};
     int32_t spp = 1;
@@ -83,9 +78,9 @@ class RenderPT : public Node {
     bool enable_ser = false;
     bool use_raygen = true;
     bool demodulate_albedo = false;
-    int32_t guiding_method = GUIDING_NONE;
-    bool guiding_needs_reset = true;
+    // NullGuidingModel while nothing is connected: the slot then compiles out entirely.
     GuidingModelHandle guiding;
+    uint32_t guiding_version = 0;
 
     int32_t nee_mode = 2;
     float nee_probability = 0.5f;

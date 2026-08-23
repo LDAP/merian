@@ -4,6 +4,7 @@
 #include "merian/shader/slang_composition.hpp"
 #include "merian/utils/properties.hpp"
 #include "merian/vk/command/command_buffer.hpp"
+#include "merian/vk/memory/resource_allocator.hpp"
 
 #include <memory>
 #include <string>
@@ -22,16 +23,17 @@ class GuidingModel {
   public:
     virtual ~GuidingModel() = default;
 
+    // Device resources, once the node holding the method has them. Properties are loaded before
+    // this, so the constructor must not need a device.
+    virtual void initialize(const ContextHandle& context,
+                            const ResourceAllocatorHandle& allocator) = 0;
+
     virtual SlangCompositionHandle get_composition() const = 0;
 
     // Modules the renderer's slot module has to import for get_type_name() to resolve.
     virtual std::vector<std::string> get_slang_imports() const = 0;
 
     virtual std::string get_type_name() const = 0;
-
-    // The render target's size, whenever the renderer (re)connects. Screen-space methods size
-    // their per-pixel state with it.
-    virtual void on_extent([[maybe_unused]] const vk::Extent3D& extent) {}
 
     // Binds the method for the frame about to be rendered.
     virtual void write_to(ShaderCursor cursor) = 0;
@@ -46,6 +48,9 @@ using GuidingModelHandle = std::shared_ptr<GuidingModel>;
 
 class NullGuidingModel : public GuidingModel {
   public:
+    void initialize([[maybe_unused]] const ContextHandle& context,
+                    [[maybe_unused]] const ResourceAllocatorHandle& allocator) override {}
+
     SlangCompositionHandle get_composition() const override {
         return SlangComposition::create();
     }

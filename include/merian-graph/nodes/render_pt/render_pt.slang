@@ -30,7 +30,7 @@ extern static const int merian_render_nee_bounces = 0;
 struct RenderBinding {
     ParameterBlock<GBuffer> gbuffer;
     RWTexture2D<float4> irradiance;
-    RenderGuiding guiding;
+    ParameterBlock<RenderGuiding> guiding;
 }
 
 float3

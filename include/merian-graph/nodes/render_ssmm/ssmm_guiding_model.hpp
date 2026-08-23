@@ -13,7 +13,8 @@ namespace merian {
 // neighbourhood. Describes the first scattering vertex only.
 class SSMMGuidingModel : public GuidingModel {
   public:
-    explicit SSMMGuidingModel(ResourceAllocatorHandle allocator);
+    void initialize(const ContextHandle& context,
+                    const ResourceAllocatorHandle& allocator) override;
 
     static SlangCompositionHandle query_device_support_composition();
 
@@ -23,7 +24,11 @@ class SSMMGuidingModel : public GuidingModel {
 
     std::string get_type_name() const override;
 
-    void on_extent(const vk::Extent3D& extent) override;
+    // One fit per pixel of the render target.
+    void on_extent(const vk::Extent3D& extent);
+
+    // The gbuffer the fits are reprojected through, for the frame about to be rendered.
+    void set_gbuffer(const ShaderObjectHandle& gbuffer);
 
     void write_to(ShaderCursor cursor) override;
 
@@ -33,6 +38,7 @@ class SSMMGuidingModel : public GuidingModel {
 
   private:
     ResourceAllocatorHandle allocator;
+    ShaderObjectHandle gbuffer;
 
     vk::Extent3D extent{};
     // read and written alternately, so a frame sees the fits of the one before it

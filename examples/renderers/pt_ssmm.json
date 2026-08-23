@@ -1,11 +1,16 @@
 {
     "nodes": {
-        "render": {
-            "properties": {
-                "guiding": {
-                    "method": "screen-space mixture models"
-                }
-            }
+        "gbuffer": {
+            "$+$outputs": [
+                "gbuffer->guiding.gbuffer"
+            ]
+        },
+        "guiding": {
+            "enabled": true,
+            "outputs": [
+                "guiding->render.guiding"
+            ],
+            "type": "Guiding (SSMM)"
         }
     }
 }

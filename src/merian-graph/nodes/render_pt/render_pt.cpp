@@ -1,6 +1,4 @@
 #include "merian-graph/nodes/render_pt/render_pt.hpp"
-#include "merian-graph/nodes/render_pt_mcpg/mcpg_guiding_model.hpp"
-#include "merian-graph/nodes/render_ssmm/ssmm_guiding_model.hpp"
 
 #include "merian/shader/shader_compile_context.hpp"
 #include "merian/vk/pipeline/pipeline_ray_tracing_builder.hpp"
@@ -13,8 +11,6 @@ RenderPT::RenderPT() : guiding(std::make_shared<NullGuidingModel>()) {}
 
 DeviceSupportInfo RenderPT::query_device_support(const DeviceSupportQueryInfo& query_info) {
     const auto composition = Scene::query_device_support_composition(query_info);
-    composition->add_composition(MCPGGuidingModel::query_device_support_composition());
-    composition->add_composition(SSMMGuidingModel::query_device_support_composition());
     composition->add_module_from_string(
         "render_pt_guiding", "module render_pt_guiding;\n"
                              "import \"merian-shaders/sampling/guiding.slang\";\n"
@@ -31,17 +27,32 @@ void RenderPT::initialize(const ContextHandle& context, const ResourceAllocatorH
     this->compile_context = context->get_shader_compile_context();
 
     use_raygen = !context->get_device()->get_physical_device()->is_amd();
-    set_guiding(guiding_method);
 }
 
 std::vector<InputConnectorDescriptor> RenderPT::describe_inputs() {
-    return {{"scene", con_scene}, {"gbuffer", con_gbuffer, ConnectorAccess::ray_tracing_read}};
+    return {{"scene", con_scene},
+            {"gbuffer", con_gbuffer, ConnectorAccess::ray_tracing_read},
+            {.name = "guiding",
+             .connector = con_guiding,
+             .access = ConnectorAccess::ray_tracing_read,
+             .optional = true}};
 }
 
 std::vector<OutputConnectorDescriptor> RenderPT::describe_outputs(const NodeIOLayout& io_layout) {
     extent = io_layout[con_gbuffer]->get_create_info().extent;
-    guiding->on_extent(extent);
-    guiding_needs_reset = true;
+    const GuidingModelHandle connected =
+        io_layout.is_connected(con_guiding)
+            ? io_layout[con_guiding]->get_create_info().model
+            : std::static_pointer_cast<GuidingModel>(std::make_shared<NullGuidingModel>());
+    const uint32_t connected_version =
+        io_layout.is_connected(con_guiding) ? io_layout[con_guiding]->get_create_info().version : 0;
+    // the method's type and constants are baked in, so either changing rebuilds the program
+    if (!guiding || guiding->get_type_name() != connected->get_type_name() ||
+        guiding_version != connected_version) {
+        composition.reset();
+    }
+    guiding = connected;
+    guiding_version = connected_version;
     con_irradiance = ManagedVkImageOut::create(irradiance_format, extent);
     return {{"irradiance", con_irradiance, ConnectorAccess::ray_tracing_write}};
 }
@@ -71,30 +82,6 @@ RenderPT::NodeStatusFlags RenderPT::on_connected(const NodeIOLayout& io_layout,
     }
 
     return {};
-}
-
-void RenderPT::set_guiding(const int32_t method) {
-    guiding_method = method;
-    // properties() can run before the node is initialized; initialize() replays the selection
-    if (!context) {
-        return;
-    }
-    switch (method) {
-    case GUIDING_MCPG: {
-        const bool split_storage = !context->get_device()->get_physical_device()->is_amd();
-        guiding =
-            std::make_shared<MCPGGuidingModel>(compile_context, resource_allocator, split_storage);
-        break;
-    }
-    case GUIDING_SSMM:
-        guiding = std::make_shared<SSMMGuidingModel>(resource_allocator);
-        break;
-    default:
-        guiding = std::make_shared<NullGuidingModel>();
-        break;
-    }
-    guiding->on_extent(extent);
-    guiding_needs_reset = true;
 }
 
 void RenderPT::update_guiding_slot() {
@@ -173,22 +160,12 @@ RenderPT::process(const NodeIO& io, const NodeProcessInfo& info, Submission& sub
     const auto pipe = pipeline.get();
     const auto params_obj = params.get();
 
-    // Reset the persistent guiding state on the first frame of a run, and whenever the method or
-    // the render target changed underneath it.
-    if (info.get_iteration() == 0 || guiding_needs_reset) {
-        guiding->reset(cmd);
-        guiding_needs_reset = false;
-    }
-
     auto cursor = params_obj->get_cursor();
     cursor["gbuffer"] = gbuf.r();
     cursor["irradiance"] = io[con_irradiance].get_texture();
-    auto guiding_cursor = cursor["guiding"];
-    // screen-space methods reproject through the gbuffer; the others do not declare it
-    if (guiding_cursor.is_valid() && guiding_cursor.has_field("gbuffer")) {
-        guiding_cursor["gbuffer"] = gbuf.r();
+    if (io.is_connected(con_guiding)) {
+        cursor["guiding"] = io[con_guiding].r();
     }
-    guiding->write_to(guiding_cursor);
 
     cmd->bind(pipe);
     ep->bind("scene", scene->get_shader_object(), cmd, pipe, obj_allocator);
@@ -280,21 +257,6 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
 
     if (constants_changed && composition) {
         update_render_constants();
-    }
-
-    if (config.st_begin_child("guiding", "Guiding", Properties::ChildFlagBits::DEFAULT_OPEN)) {
-        bool guiding_changed = false;
-        if (int32_t method = guiding_method; config.config_options(
-                "method", method,
-                {"none", "markov chain path guiding", "screen-space mixture models"})) {
-            set_guiding(method);
-            guiding_changed = true;
-        }
-        guiding_changed |= guiding->properties(config);
-        if (guiding_changed && composition) {
-            update_guiding_slot();
-        }
-        config.st_end_child();
     }
 
     config.st_separate();
