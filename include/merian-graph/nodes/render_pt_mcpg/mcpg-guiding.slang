@@ -87,8 +87,11 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
                    let LC_LOCALITY_BITS : uint> : GuidingModel {
 
     MCPG<MC_BUFFER_SIZE, MC_PROBE_COUNT, MC_SPLIT_STORAGE, MC_LOCALITY_BITS> mcpg;
-    HashedIrradianceCache<LC_BUFFER_SIZE, LC_PROBE_COUNT, LC_STOCHASTIC_INTERPOLATION,
-                          LC_SPLIT_STORAGE, LC_LOCALITY_BITS>
+    HashedIrradianceCache<LC_BUFFER_SIZE,
+                          LC_PROBE_COUNT,
+                          LC_STOCHASTIC_INTERPOLATION,
+                          LC_SPLIT_STORAGE,
+                          LC_LOCALITY_BITS>
         irr_cache;
 
     // Where the irradiance cache was already probed for this vertex, one bounce earlier.
@@ -105,12 +108,13 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
     }
 
     MCPGDistribution get_distribution(inout State state,
-                                  const RenderFrameInfo frame_info,
-                                  const PathVertex vertex,
-                                  inout RandomGenerator rng) {
+                                      const RenderFrameInfo frame_info,
+                                      const PathVertex vertex,
+                                      inout RandomGenerator rng) {
         // temporally reproject the lookup for the first sample so the lobe written last frame is
         // found despite geometry motion
-        const float3 lookup_pos = select(vertex.sample_index == uint16_t(0), vertex.prev_pos, vertex.pos);
+        const float3 lookup_pos =
+            select(vertex.sample_index == uint16_t(0), vertex.prev_pos, vertex.pos);
 
         MCPGDistribution dist;
         dist.score_sum = 0.0;
@@ -121,8 +125,8 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
         for (int i = 0; i < merian_guiding_mc_samples; i++) {
             HashGridPos grid_pos;
             uint level;
-            const MCState s = mcpg.load(lookup_pos, dist.access_normal, frame_info.cam_pos, frame_info.time,
-                                        rng, grid_pos, level);
+            const MCState s = mcpg.load(lookup_pos, dist.access_normal, frame_info.cam_pos,
+                                        frame_info.time, rng, grid_pos, level);
             dist.score_sum += s.sum_w;
             // comparison with NaN is false (when s.sum_w == 0 and score_sum == 0)
             if (rng.next_float() < s.sum_w / dist.score_sum) {
@@ -153,10 +157,10 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
     }
 
     float3 record_segment(inout State state,
-                      const RenderFrameInfo frame_info,
-                      const MCPGRecord record,
-                      const PathSegment segment,
-                      inout RandomGenerator rng) {
+                          const RenderFrameInfo frame_info,
+                          const MCPGRecord record,
+                          const PathSegment segment,
+                          inout RandomGenerator rng) {
         const HashGridPos update_pos = state.lc_grid_pos;
         state.lc_grid_pos = HashGridPos();
 
@@ -171,10 +175,16 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
         const bool emissive = any(segment.incident > 0.0);
         const bool gathers_emission_only =
             !merian_guiding_light_cache_tail && segment.is_last && segment.bounce == uint16_t(1);
+        // An emissive vertex keeps its own radiance, but the lookup still runs: it resolves the
+        // cell the next vertex updates into.
         float3 target = segment.incident;
-        if (segment.traced && !emissive && !gathers_emission_only) {
-            target = float3(irr_cache.get(segment.next_pos, segment.next_normal, frame_info.cam_pos,
-                                          frame_info.prev_cam_pos, rng, state.lc_grid_pos));
+        if (segment.traced && !gathers_emission_only) {
+            const float3 cached =
+                float3(irr_cache.get(segment.next_pos, segment.next_normal, frame_info.cam_pos,
+                                     frame_info.prev_cam_pos, rng, state.lc_grid_pos));
+            if (!emissive) {
+                target = cached;
+            }
         }
 
         const float3 contribution = target * segment.weight;
@@ -184,25 +194,23 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
         }
 
         // clamping the density bounds what a single near-specular sample can teach
-        irr_cache.update(segment.pos, segment.normal,
-                         target * segment.weight *
-                             min(1.f, segment.pdf / merian_guiding_lc_min_pdf),
-                         frame_info.cam_pos, frame_info.prev_cam_pos, frame_info.index, rng,
-                         update_pos);
+        irr_cache.update(
+            segment.pos, segment.normal,
+            target * segment.weight * min(1.f, segment.pdf / merian_guiding_lc_min_pdf),
+            frame_info.cam_pos, frame_info.prev_cam_pos, frame_info.index, rng, update_pos);
 
         if (rng.next_float() * record.score_sum < mc_f * merian_guiding_mc_samples) {
             MCState chain = record.selected;
             chain.add_sample(segment.pos, mc_f, segment.next_pos, segment.next_mv, frame_info.time);
-            mcpg.store(chain, segment.pos, record.access_normal, frame_info.cam_pos, frame_info.index,
-                       rng);
+            mcpg.store(chain, segment.pos, record.access_normal, frame_info.cam_pos,
+                       frame_info.index, rng);
         } else if (merian_guiding_missing_light_heuristic && record.selected_pos.is_valid() &&
                    record.selected.light_missing_heuristic(mc_f, segment.wo, segment.pos,
                                                            segment.next_pos)) {
             mcpg.kill(record.selected_pos);
         }
 
-        return merian_guiding_light_cache_tail && segment.traced && segment.is_last &&
-                       !emissive
+        return merian_guiding_light_cache_tail && segment.traced && segment.is_last && !emissive
                    ? target
                    : float3(0);
     }
