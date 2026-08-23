@@ -69,7 +69,7 @@ float ssmm_reuse_weight(const SSMCState s,
 }
 
 // The one fit resampled out of the neighbourhood, as a vMF lobe.
-struct SSMMDistribution : GuidingDistribution {
+struct SSMMDistribution : GuidingDistribution<float3> {
     float4 vmf;
     // the fit the update continues from
     SSMCState selected;

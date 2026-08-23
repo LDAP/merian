@@ -32,7 +32,7 @@ struct MCPGRecord {
 
 // The Markov-chain candidates around a vertex. All of them are kept, not just the resampled one:
 // their densities form the stochastic MIS weight.
-struct MCPGDistribution : GuidingDistribution {
+struct MCPGDistribution : GuidingDistribution<float3> {
     VonMisesFisher3<false> vmfs[merian_guiding_mc_samples];
     float scores[merian_guiding_mc_samples];
     float score_sum;

@@ -30,6 +30,9 @@ struct PathVertex {
     uint16_t sample_index;
     // the pixel the path was started from
     uint2 pixel;
+    // a medium vertex has no surface: the frame is built around the view direction and the lobe
+    // width is the phase function's
+    bool in_volume;
 
     property float3 normal {
         get {
@@ -73,9 +76,10 @@ struct PathSegment {
     float3 incident;
 }
 
-// The directional distribution a guiding method offers at one vertex. Densities are solid angle
-// in worldspace and cover the guiding lobes only; the integrator mixes them with the BSDF.
-interface GuidingDistribution : Distribution<float3> {
+// What a guiding method offers at one vertex: directions in worldspace (solid angle) for a
+// scattering vertex, distances along a ray for a medium. It covers the guiding lobes only; the
+// integrator mixes them with the analytic technique it would have sampled otherwise.
+interface GuidingDistribution<T : IFloat> : Distribution<T> {
 
     // False where nothing was found; the integrator then samples the BSDF alone.
     bool is_valid();
@@ -89,7 +93,7 @@ interface GuidingDistribution : Distribution<float3> {
 interface GuidingModel {
     // Carried along a path, for methods that reuse what a lookup found one vertex earlier.
     associatedtype PathState;
-    associatedtype DistributionImpl : GuidingDistribution;
+    associatedtype DistributionImpl : GuidingDistribution<float3>;
     // Everything record_segment needs, and nothing else: it is the only thing that survives the
     // continuation ray, and the path tracer already spills there.
     associatedtype UpdateRecord;
@@ -117,7 +121,7 @@ interface GuidingModel {
 
 // --- no guiding ---
 
-struct NullGuidingDistribution : GuidingDistribution {
+struct NullGuidingDistribution : GuidingDistribution<float3> {
     float pdf(const float3 s) {
         return 0.f;
     }
@@ -188,28 +192,29 @@ struct ScatterMixture {
     // 0 where the guiding distribution has nothing to offer
     float p_guiding;
 
-    __init<G : GuidingDistribution>(const G guiding, const float alpha) {
+    __init<G : GuidingDistribution<float3>>(const G guiding, const float alpha) {
         p_guiding = guiding.is_valid() ? guiding.get_selection_probability(alpha) : 0.f;
     }
 
     // The guiding term comes first on purpose: it consumes the candidates, and the material pdf
     // below is an existential switch that would otherwise raise the peak by the whole candidate
     // set.
-    float pdf<B : BSDF, G : GuidingDistribution>(const B bsdf,
-                                                 const G guiding,
-                                                 const float3 wi_local,
-                                                 const float3 wo_local,
-                                                 const float3 wo_world) {
+    float pdf<B : BSDF, G : GuidingDistribution<float3>>(const B bsdf,
+                                                         const G guiding,
+                                                         const float3 wi_local,
+                                                         const float3 wo_local,
+                                                         const float3 wo_world) {
         const float p_guided = p_guiding > 0.f ? p_guiding * guiding.pdf(wo_world) : 0.f;
         return p_guided + (1.f - p_guiding) * bsdf.pdf(wi_local, wo_local);
     }
 
     // Draws a direction in worldspace; none where the BSDF refused to scatter.
-    Optional<ScatterSample> sample<B : BSDF, G : GuidingDistribution>(const B bsdf,
-                                                                      const G guiding,
-                                                                      const OrthonormalFrame frame,
-                                                                      const float3 wi_local,
-                                                                      inout RandomGenerator rng) {
+    Optional<ScatterSample>
+    sample<B : BSDF, G : GuidingDistribution<float3>>(const B bsdf,
+                                                      const G guiding,
+                                                      const OrthonormalFrame frame,
+                                                      const float3 wi_local,
+                                                      inout RandomGenerator rng) {
         ScatterSample s;
         s.delta = false;
         s.guided = p_guiding > 0.f && rng.next_float() < p_guiding;
