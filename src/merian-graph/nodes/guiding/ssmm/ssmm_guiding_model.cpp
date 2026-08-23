@@ -110,9 +110,11 @@ bool SSMMGuidingModel::properties(Properties& props) {
         "reuse radius", reuse_radius,
         "Standard deviation of the neighbourhood the resampling reaches into, in pixels.", 1.f,
         64.f);
-    constants_changed |=
-        props.config_percent("probability", probability,
-                             "Probability the integrator gives the fitted lobe over the BSDF.");
+    constants_changed |= props.config_percent(
+        "probability", probability,
+        "Probability the integrator gives the fitted lobe over the BSDF. The fit describes "
+        "where the emitters are, so this comes out of the budget the rest of the path lives "
+        "on; the 0.85 of the original single-bounce renderer starves it.");
     constants_changed |= props.config_float(
         "alpha threshold", alpha_threshold,
         "No guiding below this GGX alpha: the BSDF is more peaked than any fitted lobe.", 0.f, 1.f);

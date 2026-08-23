@@ -50,7 +50,7 @@ class SSMMGuidingModel : public GuidingModel {
 
     int32_t group_size = 5;
     float reuse_radius = 15.0f;
-    float probability = 0.85f;
+    float probability = 0.5f;
     float alpha_threshold = 0.05f;
     uint32_t max_n = 1024;
     float min_alpha = 0.01f;
