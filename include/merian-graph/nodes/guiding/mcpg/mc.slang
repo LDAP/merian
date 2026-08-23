@@ -15,7 +15,8 @@ extern static const float dir_guide_prior = 0.2;
 struct MCState {
     float3 w_tgt;
     float sum_w;
-    float w_cos;
+    // weighted mean squared chord to the mean direction, which is exactly 2 (1 - cos)
+    float w_chord2;
 
     half3 mv;
     uint16_t N;
@@ -25,7 +26,7 @@ struct MCState {
     __init() {
         w_tgt = float3(0.0);
         sum_w = 0.0;
-        w_cos = 0.0;
+        w_chord2 = 0.0;
         mv = half3(0);
         T = 0.0;
         N = uint16_t(0);
@@ -45,9 +46,18 @@ struct MCState {
         return max(0.0001, dir_guide_prior / dot(d, d));
     }
 
+    // 1 - mean resultant length. Kept as the primary quantity: it is what the concentration
+    // depends on, and the half that float resolves once the lobe is tight.
+    float one_minus_mean_cos(const float3 pos) {
+        const float n = float(N);
+        const float p = prior(pos);
+        const float u = 0.5 * w_chord2 / sum_w;
+        // shrink r towards 0 by n^2 / (n^2 + p), i.e. grow u by the complement
+        return clamp(u + (1.0 - u) * p / (n * n + p), 1e-7, 1.0);
+    }
+
     float mean_cos(const float3 pos) {
-        const uint n = uint(N);
-        return clamp((n * n * w_cos / sum_w) / (n * n + prior(pos)), 0, 0.9999999);
+        return 1.0 - one_minus_mean_cos(pos);
     }
 
     bool light_missing_heuristic(const float mc_f,
@@ -58,19 +68,17 @@ struct MCState {
             return false;
         }
 
-        const float cos = dot(wo, get_dir(pos));
-        if (cos < 0.9 + 0.1 * mean_cos(pos)) {
-            return false;
-        }
-
-        return true;
+        // the sample has to have probed the lobe's core to say anything about the target
+        return 1.0 - dot(wo, get_dir(pos)) <= 0.1 * one_minus_mean_cos(pos);
     }
 
     // Inverse Langevin function, the maximum likelihood concentration of a vMF on S2 whose
-    // samples have mean resultant length r. Jedynak 2015.
+    // samples have mean resultant length r = 1 - u. Jedynak 2015. Carried in u because
+    // kappa ~ 1/u, so u holds the concentration to full relative precision where r saturates.
     float kappa(const float3 pos) {
-        const float r = mean_cos(pos);
-        return r * (3.0 - 2.6 * r + 0.7 * r * r) / ((1.0 - r) * (1.0 + 0.1 * r));
+        const float u = one_minus_mean_cos(pos);
+        const float r = 1.0 - u;
+        return r * (3.0 - 2.6 * r + 0.7 * r * r) / (u * (1.1 - 0.1 * u));
     }
 
     // vmf lobe float4(direction, kappa) for a position
@@ -88,7 +96,7 @@ struct MCState {
     void reweight(const float factor) {
         sum_w *= factor;
         w_tgt *= factor;
-        w_cos *= factor;
+        w_chord2 *= factor;
     }
 
     // add sample to lobe via maximum likelihood estimator and exponentially weighted average
@@ -103,8 +111,8 @@ struct MCState {
 
         sum_w = lerp(sum_w, w, alpha);
         w_tgt = lerp(w_tgt, w * target, alpha);
-        w_cos = clamp(lerp(w_cos, w * max(0, dot(normalize(target - pos), get_dir(pos))), alpha), 0,
-                      sum_w);
+        const float3 chord = normalize(target - pos) - get_dir(pos);
+        w_chord2 = lerp(w_chord2, w * dot(chord, chord), alpha);
 
         mv = target_mv;
         T = time;
