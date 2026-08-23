@@ -14,7 +14,7 @@ static const float ENV_MAP_DISTANCE = 1e7f;
 // ShadingData for looking up the environment along dir (pointing away from the receiver).
 ShadingData make_env_shading_data(const float3 dir, const float3 origin, const float time) {
     return ShadingData(-dir, origin + dir * ENV_MAP_DISTANCE, float2(0), time,
-                       OrthonormalFrame(-dir), -dir, uint16_t(1), 1.0f, true);
+                       OrthonormalFrame(-dir), -dir, uint16_t(1), true);
 }
 
 struct EnvSample {

@@ -116,7 +116,7 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
         dist.score_sum = 0.0;
         dist.selected = MCState();
         dist.selected_pos = HashGridPos();
-        dist.access_normal = mcpg.jitter_normal(vertex.shading_frame, rng);
+        dist.access_normal = vertex.normal;
 
         for (int i = 0; i < merian_guiding_mc_samples; i++) {
             HashGridPos grid_pos;

@@ -91,14 +91,13 @@ uint find_light_geometry(const ParameterBlock<LightUpdateBinding> params, const 
                 continue;
             luminance_sum += yuv_luminance(scene.material_system.get_emission(
                 gd.material_id,
-                ShadingData(n, pos, uv, scene.time, OrthonormalFrame(n), n, uint16_t(1), 1.0f,
-                            true),
+                ShadingData(n, pos, uv, scene.time, OrthonormalFrame(n), n, uint16_t(1), true),
                 DefaultLODSampler()));
             if (two_sided) {
                 luminance_sum += yuv_luminance(scene.material_system.get_emission(
                     gd.material_id,
                     ShadingData(-n, pos, uv, scene.time, OrthonormalFrame(-n), -n, uint16_t(1),
-                                1.0f, false),
+                                false),
                     DefaultLODSampler()));
             }
         }

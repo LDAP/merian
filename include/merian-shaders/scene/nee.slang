@@ -284,7 +284,7 @@ struct NEE {
             return none;
 
         const ShadingData sd = ShadingData(-wo, light_pos, uv, time, OrthonormalFrame(n), n,
-                                           uint16_t(1), 1.0f, front_facing);
+                                           uint16_t(1), front_facing);
 
         LightSample ls;
         ls.wo = wo;
