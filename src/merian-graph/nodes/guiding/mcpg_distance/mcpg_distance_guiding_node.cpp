@@ -1,4 +1,4 @@
-#include "merian-graph/nodes/guiding/mcpg_distance_guiding_node.hpp"
+#include "merian-graph/nodes/guiding/mcpg_distance/mcpg_distance_guiding_node.hpp"
 
 #include "merian/vk/utils/profiler.hpp"
 
@@ -8,8 +8,8 @@ namespace merian {
 
 namespace {
 
-constexpr const char* CLEAR_MODULE = "merian-graph/nodes/guiding/mcpg-distance-clear.slang";
-constexpr const char* PROJECT_MODULE = "merian-graph/nodes/guiding/mcpg-distance-project.slang";
+constexpr const char* CLEAR_MODULE = "merian-graph/nodes/guiding/mcpg_distance/mcpg-distance-clear.slang";
+constexpr const char* PROJECT_MODULE = "merian-graph/nodes/guiding/mcpg_distance/mcpg-distance-project.slang";
 
 } // namespace
 

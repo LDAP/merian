@@ -36,21 +36,22 @@ void RenderPT::initialize(const ContextHandle& context, const ResourceAllocatorH
 }
 
 std::vector<InputConnectorDescriptor> RenderPT::describe_inputs() {
-    return {{"scene", con_scene},
-            {"gbuffer", con_gbuffer, ConnectorAccess::ray_tracing_read},
-            {.name = "guiding",
-             .connector = con_guiding,
-             .access = ConnectorAccess::ray_tracing_read,
-             .optional = true},
-            {.name = "distance_guiding",
-             .connector = con_distance_guiding,
-             .access = ConnectorAccess::compute_read,
-             .optional = true},
-            {.name = "prev_volume_depth",
-             .connector = con_prev_volume_depth,
-             .access = ConnectorAccess::compute_read,
-             .delay = 1,
-             .optional = true}};
+    return {
+        {.name = "scene", .connector = con_scene},
+        {.name = "gbuffer", .connector = con_gbuffer, .access = ConnectorAccess::ray_tracing_read},
+        {.name = "guiding",
+         .connector = con_guiding,
+         .access = ConnectorAccess::ray_tracing_read,
+         .optional = true},
+        {.name = "distance_guiding",
+         .connector = con_distance_guiding,
+         .access = ConnectorAccess::compute_read,
+         .optional = true},
+        {.name = "prev_volume_depth",
+         .connector = con_prev_volume_depth,
+         .access = ConnectorAccess::compute_read,
+         .delay = 1,
+         .optional = true}};
 }
 
 std::vector<OutputConnectorDescriptor> RenderPT::describe_outputs(const NodeIOLayout& io_layout) {
@@ -78,10 +79,21 @@ std::vector<OutputConnectorDescriptor> RenderPT::describe_outputs(const NodeIOLa
     con_volume_mv = ManagedVkImageOut::create(vk::Format::eR16G16Sfloat, extent);
 
     const bool no_volume = !volume_available;
-    return {{"irradiance", con_irradiance, ConnectorAccess::ray_tracing_write},
-            {"volume", con_volume, ConnectorAccess::compute_write, no_volume},
-            {"volume_depth", con_volume_depth, ConnectorAccess::compute_write, no_volume},
-            {"volume_mv", con_volume_mv, ConnectorAccess::compute_read_write, no_volume}};
+    return {{.name = "irradiance",
+             .connector = con_irradiance,
+             .access = ConnectorAccess::ray_tracing_write},
+            {.name = "volume",
+             .connector = con_volume,
+             .access = ConnectorAccess::compute_write,
+             .disabled = no_volume},
+            {.name = "volume_depth",
+             .connector = con_volume_depth,
+             .access = ConnectorAccess::compute_write,
+             .disabled = no_volume},
+            {.name = "volume_mv",
+             .connector = con_volume_mv,
+             .access = ConnectorAccess::compute_read_write,
+             .disabled = no_volume}};
 }
 
 RenderPT::NodeStatusFlags RenderPT::on_connected(const NodeIOLayout& io_layout,

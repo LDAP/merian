@@ -3,7 +3,7 @@
 #include "merian-graph/connectors/ptr_in.hpp"
 #include "merian-graph/connectors/shader_object_in.hpp"
 #include "merian-graph/nodes/guiding/guiding_node.hpp"
-#include "merian-graph/nodes/guiding/mcpg_distance_guiding_model.hpp"
+#include "merian-graph/nodes/guiding/mcpg_distance/mcpg_distance_guiding_model.hpp"
 #include "merian-graph/objects/gbuffer_object.hpp"
 #include "merian-shaders/scene/scene.hpp"
 

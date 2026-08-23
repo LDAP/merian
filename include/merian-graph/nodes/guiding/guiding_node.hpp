@@ -22,7 +22,7 @@ class GuidingNode : public Node {
         configure(io_layout);
         con_guiding = ShaderObjectOut<GuidingObject>::create({model, version}, true);
         needs_reset = true;
-        return {{"guiding", con_guiding}};
+        return {{.name = "guiding", .connector = con_guiding}};
     }
 
     NodeStatusFlags

@@ -1,4 +1,4 @@
-#include "merian-graph/nodes/guiding/mcpg_guiding_model.hpp"
+#include "merian-graph/nodes/guiding/mcpg/mcpg_guiding_model.hpp"
 
 #include <fmt/format.h>
 
@@ -6,7 +6,7 @@ namespace merian {
 
 namespace {
 
-constexpr const char* GUIDING_MODULE = "merian-graph/nodes/guiding/mcpg-guiding.slang";
+constexpr const char* GUIDING_MODULE = "merian-graph/nodes/guiding/mcpg/mcpg-guiding.slang";
 
 } // namespace
 

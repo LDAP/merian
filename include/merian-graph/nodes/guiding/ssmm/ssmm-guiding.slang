@@ -1,4 +1,4 @@
-#include "merian-graph/nodes/guiding/ssmm_guiding.slangh"
+#include "merian-graph/nodes/guiding/ssmm/ssmm_guiding.slangh"
 
 __exported import merian_shaders.sampling.guiding;
 import merian_shaders.gbuffer;
