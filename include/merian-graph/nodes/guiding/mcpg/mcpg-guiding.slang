@@ -8,6 +8,13 @@ using merian;
 
 namespace merian {
 
+// What the chains make of an emitter the continuation found, where next event estimation covers
+// the same light. In the mixture mode the density already carries the light technique, so the
+// middle one is a no-op there and only separates the two in the resampled mode.
+static const int GUIDING_DIRECT_FULL = 0; // the emission as the continuation found it
+static const int GUIDING_DIRECT_MIS = 1;  // only the share the scatter technique pays for
+static const int GUIDING_DIRECT_NONE = 2; // nothing: the light sampler owns it
+
 extern static const int merian_guiding_mc_samples = 5;
 extern static const float merian_guiding_probability = 0.9;
 // scale the guiding probability with the lobe width
@@ -15,10 +22,10 @@ extern static const bool merian_guiding_scale_with_alpha = true;
 // no guiding below this alpha: the BSDF is far more peaked than any lobe
 extern static const float merian_guiding_alpha_threshold = 0.05;
 extern static const bool merian_guiding_missing_light_heuristic = true;
-// Reweight an emitter the continuation found by how much next event estimation already covers it,
-// so the chains spend themselves on the light it cannot reach. "Guide direct illumination
-// weighted by MIS weights" in Rath et al., Variance-Aware Path Guiding, SIGGRAPH 2020.
-extern static const bool merian_guiding_nee_reweight = false;
+// The three direct illumination strategies of Rath et al., Variance-Aware Path Guiding
+// (SIGGRAPH 2020). Their MIS compensation is a different weight again — the guiding's own share
+// against the BSDF, on a squared target — and the chains do not carry it.
+extern static const int merian_guiding_direct_target = GUIDING_DIRECT_FULL;
 // complete a truncated path with the cached irradiance at its last vertex
 extern static const bool merian_guiding_light_cache_tail = false;
 // floor on the density the irradiance cache divides by, bounding the variance it stores
@@ -205,8 +212,21 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
 
         // What the chains are worth steering towards. The cache above keeps the emitter whole
         // either way: it stands in for the whole path tail, not for the part the chains steer.
-        const float guide_f =
-            merian_guiding_nee_reweight && emissive ? mc_f * segment.nee_weight : mc_f;
+        float direct_scale = 1.f;
+        if (emissive) {
+            if (merian_guiding_direct_target == GUIDING_DIRECT_MIS) {
+                direct_scale = segment.nee_weight;
+            } else if (merian_guiding_direct_target == GUIDING_DIRECT_NONE) {
+                direct_scale = 0.f;
+            }
+        }
+        if (!(direct_scale > 0.f)) {
+            // nothing to teach and nothing to hold against the cell either
+            return merian_guiding_light_cache_tail && segment.traced && segment.is_last && !emissive
+                       ? target
+                       : float3(0);
+        }
+        const float guide_f = mc_f * direct_scale;
 
         if (rng.next_float() * record.score_sum < guide_f * merian_guiding_mc_samples) {
             MCState chain = record.selected;
