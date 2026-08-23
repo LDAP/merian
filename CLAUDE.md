@@ -20,7 +20,7 @@ Run a graph: `build/merian-graph-run <config.json>`, better with timeout:
 Enable tests: `meson configure build -Dtests=true`
 Run one: `build/tests/test-<name>` (e.g. `test-small-vector`)
 
-If a failure is preexisting, but the fix is quick, then fix instead of just report (but ask first).
+If a failure is preexisting, but the fix is quick, then fix instead of just report.
 
 # Plugins
 
@@ -31,7 +31,7 @@ runtime without edits to merian's build files.
 
 A plugin shares merian's ABI, so it **must** be built with merian's assertion/optimization config:
 mixing `NDEBUG` / `_GLIBCXX_ASSERTIONS` / optimization across the `.so` boundary is undefined and
-crashes deep in the driver.A plugin therefore must not pin `buildtype`/`b_ndebug` in its
+crashes deep in the driver. A plugin therefore must not pin `buildtype`/`b_ndebug` in its
 `project()`. Plugins cloned into `subprojects/` inherit merian's config; standalone, pass `--buildtype`.
 
 # Coding style
@@ -40,24 +40,19 @@ Expect the code to be read only by experienced (graphics) programmers.
 
 ## Comments
 
-- Keep a minimal comment style. Only add comments if it's likely that a function would be used in a wrong way otherwise or at very complex code, that is not clear even to an experienced programmer.
-- Single short line is the default; multi-line walls of text are out. If the explanation needs a
-  paragraph, the code probably needs restructuring instead.
-- Explain *why*, never *what*. Identifier names already say what. Don't mention implementation
-  details to users of a function, class, or interface.
-- Don't explain usage of well-known concepts (a type alias already makes a one-line-swap obvious).
+- Keep a minimal comment style; single-line, short, concise.
+- Code should be self explaining, if it's not, maybe a variable as to be renamed or the code has to be rewritten, resort to an explaining comment only as last resort at a complex function that is not clear even to an experienced programmer (don't explain well known concepts).
+- If a code or formula is from a paper, cite it.
+- Don't mention implementation details to users of a function, class, or interface.
+- Don't mention alternatives you did not implement (even if tested) or justifications.
+- Don't explain where a symbol is used elsewhere (the call sites document that)
+- Don't point to commit history, removed files, or the old implementation
+- Don't reference concrete implementations (from an abstract class/interface). Don't comment about how
+  subclasses might override, design alternatives considered, or future intent.
 - Inside long methods, label sub-sections with one-liner comments (`// 1. ...`, `// upload prev
   vertices`) — never banner separators.
 - File-level major dividers (`// --- Section ---`) are allowed sparingly for the obvious lifecycle
   splits (constructor / building / update). Don't multiply them.
-- Comments describe what the code does locally — the math, the invariant, the units, the
-  non-obvious choice. They are not a place for cross-references or provenance narration. Do **not**
-  explain where a symbol is used elsewhere (the call sites document that), narrate provenance, or
-  justify a choice against alternatives. A bare citation (paper name/year, URL) is welcome; the
-  chain of how the snippet got here is not.
-- Drop comments that point to commit history, removed files, or the old pipeline, or that reference
-  a concrete implementation from an abstract class/interface. Do **not** comment about how
-  subclasses might override, design alternatives considered, or future intent.
 - Keep reusable code domain-agnostic. A generic BSDF / shader util must not carry glTF (or any
   other spec's) function or variable names in its comments or identifiers — describe the math
   itself, with a bare citation if useful. The spec's vocabulary and parameter mapping belong only
@@ -89,8 +84,6 @@ Expect the code to be read only by experienced (graphics) programmers.
   (e.g. ImGui draws via a graph event, not a registry singleton).
 - Header/source split: declarations in the `.hpp`, definitions in the `.cpp`. Keep includes
   alphabetical.
-- In `properties()`, render each control inside the method that owns it; don't wrap a node's
-  config at the call site. Group nested settings with `st_begin_child(id, label)`.
 
 ## Commits
 
@@ -99,7 +92,7 @@ Expect the code to be read only by experienced (graphics) programmers.
 - The body carries **only what the code cannot**: the symptom that motivated the change, measured
   numbers, a bare citation. Never restate the mechanism — that is what the comment at the code is
   for, and a body that duplicates it is noise.
-- Quote measurements with the setup that produced them: `Quake mcpg 1280x720, RTX 5070 Laptop,
+- If available, quote measurements with the setup that produced them: `Quake mcpg 1280x720, RTX 5070 Laptop,
   timedemo demo1 over 500 frames render 12.27 -> 11.20 ms (-8.7 %)`.
 - No verification narration, no provenance ("port of \<sha\>", "rebased onto"), no alternatives
   considered, no trailers of any kind (`Co-Authored-By`, session links).
