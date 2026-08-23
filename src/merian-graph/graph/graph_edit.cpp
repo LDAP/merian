@@ -144,6 +144,12 @@ const std::string& Graph::add_node(const std::shared_ptr<Node>& node,
         it->second.unsupported_reason = instance_support.unsupported_reason;
     }
 
+    if (it->second.unsupported) {
+        SPDLOG_WARN("node {} ({}) is unsupported: {}", node_identifier,
+                    NodeRegistry::get_instance().node_type_name(node),
+                    it->second.unsupported_reason);
+    }
+
     try {
         if (!it->second.unsupported) {
             node->initialize(context, resource_allocator);
