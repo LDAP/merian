@@ -36,8 +36,6 @@ extern static const float merian_guiding_lc_min_pdf = 1.0;
 struct MCPGRecord {
     MCState selected;
     HashGridPos selected_pos;
-    // jittered normal the candidates were looked up with; the update must reuse it
-    float3 access_normal;
     float score_sum;
 }
 
@@ -51,8 +49,6 @@ struct MCPGDistribution : GuidingDistribution<float3> {
     // the resampled chain, and the cell it was read from
     MCState selected;
     HashGridPos selected_pos;
-    // jittered normal the candidates were looked up with
-    float3 access_normal;
 
     // Stochastic MIS over the candidates.
     float pdf(const float3 s) {
@@ -131,12 +127,11 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
         dist.score_sum = 0.0;
         dist.selected = MCState();
         dist.selected_pos = HashGridPos();
-        dist.access_normal = vertex.normal;
 
         for (int i = 0; i < merian_guiding_mc_samples; i++) {
             HashGridPos grid_pos;
             uint level;
-            const MCState s = mcpg.load(lookup_pos, dist.access_normal, frame_info.cam_pos,
+            const MCState s = mcpg.load(lookup_pos, vertex.normal, frame_info.cam_pos,
                                         frame_info.time, rng, grid_pos, level);
             dist.score_sum += s.sum_w;
             // comparison with NaN is false (when s.sum_w == 0 and score_sum == 0)
@@ -162,7 +157,6 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
         // the cell the candidates came from
         record.selected = guided ? dist.selected : MCState();
         record.selected_pos = guided ? dist.selected_pos : HashGridPos();
-        record.access_normal = dist.access_normal;
         record.score_sum = dist.score_sum;
         return record;
     }
@@ -175,9 +169,6 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
         const HashGridPos update_pos = state.lc_grid_pos;
         state.lc_grid_pos = HashGridPos();
 
-        // What the integrator will gather beyond this vertex: the emission where the continuation
-        // found one, the cached irradiance where it is going to keep scattering. A path that stops
-        // right here gathers nothing else, so it learns the emission alone.
         // a vMF lobe cannot represent a delta direction
         if (segment.delta) {
             return float3(0);
@@ -186,8 +177,12 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
         const bool emissive = any(segment.incident > 0.0);
         const bool gathers_emission_only =
             !merian_guiding_light_cache_tail && segment.is_last && segment.bounce == uint16_t(1);
-        // An emissive vertex keeps its own radiance, but the lookup still runs: it resolves the
-        // cell the next vertex updates into.
+
+        // What the integrator will gather beyond this vertex: the emission where the continuation
+        // found one, the cached irradiance where it is going to keep scattering. A path that stops
+        // right here gathers nothing else, so it learns the emission alone. An emissive vertex
+        // keeps its own radiance, but the lookup still runs: it resolves the cell the next vertex
+        // updates into.
         float3 target = segment.incident;
         if (segment.traced && !gathers_emission_only) {
             const float3 cached =
@@ -232,8 +227,8 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
             MCState chain = record.selected;
             chain.add_sample(segment.pos, guide_f, segment.next_pos, segment.next_mv,
                              frame_info.time);
-            mcpg.store(chain, segment.pos, record.access_normal, frame_info.cam_pos,
-                       frame_info.index, rng);
+            mcpg.store(chain, segment.pos, segment.normal, frame_info.cam_pos, frame_info.index,
+                       rng);
         } else if (merian_guiding_missing_light_heuristic && record.selected_pos.is_valid() &&
                    record.selected.light_missing_heuristic(guide_f, segment.wo, segment.pos,
                                                            segment.next_pos)) {
