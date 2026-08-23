@@ -24,7 +24,7 @@ class MCPGGuidingModel : public GuidingModel {
 
     std::string get_type_name() const override;
 
-    void write_to(ShaderCursor cursor) const override;
+    void write_to(ShaderCursor cursor) override;
 
     void reset(const CommandBufferHandle& cmd) override;
 
@@ -52,7 +52,7 @@ class MCPGGuidingModel : public GuidingModel {
 
     int32_t mc_samples = 5;
     float dir_guide_prior = 0.2f;
-    float probability = 0.9f;
+    float probability = 0.5f;
     bool scale_with_alpha = true;
     float alpha_threshold = 0.05f;
     bool missing_light_heuristic = true;
