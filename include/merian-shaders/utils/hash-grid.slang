@@ -92,7 +92,7 @@ struct HashGrid<typename T,
     // 3 = volume). Keeps the expected threads per cell roughly constant; smaller widens the spread.
     float grid_distribution_dimension;
 
-    uint target_level_for_pos(const float3 pos, const float3 cam_pos, inout RandomGenerator rng) {
+    uint target_level_for_pos(const float3 pos, const float3 cam_pos, const float xi) {
         const float3 d = cam_pos - pos;
         const float dist2 = max(dot(d, d), 1e-12);
         const float level = max(GRID_STEPS_PER_UNIT_SIZE * (0.5 * log(dist2) / log(GRID_POWER) +
@@ -100,17 +100,39 @@ struct HashGrid<typename T,
                                     grid_level_bias,
                                 1.0);
         if (LEVEL_STOCHASTIC_INTERPOLATION)
-            return uint(floor(level) + select(rng.next_float() < fract(level), 1.0, 0.0));
+            return uint(floor(level) + select(xi < fract(level), 1.0, 0.0));
         return uint(floor(level));
+    }
+
+    uint target_level_for_pos(const float3 pos, const float3 cam_pos, inout RandomGenerator rng) {
+        return target_level_for_pos(pos, cam_pos, rng.next_float());
+    }
+
+    // Cell widths the level offset spans per unit of -log(1 - xi).
+    float level_offset_scale() {
+        return float(GRID_STEPS_PER_UNIT_SIZE) / (grid_distribution_dimension * log(GRID_POWER));
+    }
+
+    uint distributed_level_for_pos(const uint target_level, const float xi) {
+        return uint(round(float(target_level) + level_offset_scale() * -log(1.0 - xi)));
     }
 
     // Attemps to keep expected value of threads threads per cell constant
     uint
     distributed_level_for_pos(const float3 pos, const float3 cam_pos, inout RandomGenerator rng) {
-        const float level = target_level_for_pos(pos, cam_pos, rng) +
-                            (-float(GRID_STEPS_PER_UNIT_SIZE) / grid_distribution_dimension *
-                             log(1.0 - rng.next_float()) / log(GRID_POWER));
-        return uint(round(level));
+        return distributed_level_for_pos(target_level_for_pos(pos, cam_pos, rng), rng.next_float());
+    }
+
+    // The uniforms distributed_level_for_pos maps onto `level`. Inverting the offset in closed
+    // form lets a caller stratify a second dimension over exactly the draws that repeat a level.
+    void distributed_level_uniforms(const uint target_level,
+                                    const uint level,
+                                    out float lo,
+                                    out float hi) {
+        const float over = float(level) - float(target_level);
+        const float inv_scale = 1.0 / level_offset_scale();
+        lo = over <= 0.5 ? 0.0 : 1.0 - exp(-(over - 0.5) * inv_scale);
+        hi = over <= -0.5 ? 0.0 : 1.0 - exp(-(over + 0.5) * inv_scale);
     }
 
     // The lattice math only needs pos in cell widths, so no access has to divide.
@@ -121,13 +143,17 @@ struct HashGrid<typename T,
                                        float(GRID_STEPS_PER_UNIT_SIZE));
     }
 
-    int3 grid_idx(const float3 pos, const float inv_width, inout RandomGenerator rng) {
+    int3 grid_idx(const float3 pos, const float inv_width, const float xi) {
         // Offset the lattice by half a cell so that levels of different width don't share vertices
         // (Müller et al., "Instant Neural Graphics Primitives", Appendix A.)
         const float3 staggered = pos * inv_width + 0.5;
         if (STOCHASTIC_INTERPOLATION)
-            return grid_idx_interpolate_scaled(staggered, rng.next_float());
+            return grid_idx_interpolate_scaled(staggered, xi);
         return grid_idx_lower_scaled(staggered);
+    }
+
+    int3 grid_idx(const float3 pos, const float inv_width, inout RandomGenerator rng) {
+        return grid_idx(pos, inv_width, rng.next_float());
     }
 
     // axis aligned cubemap index or 45deg turned cubemap index every other level
@@ -288,6 +314,34 @@ struct HashGrid<typename T,
                                  out uint level) {
         level = distributed_level_for_pos(pos, cam_pos, rng);
         return find_level(level, pos, normal, rng);
+    }
+
+    /* One cell of a resampling set: candidate `index` of `count`, from a single draw `xi` per set.
+     *
+     * The offset is exponential, so independent draws land several candidates on the same level,
+     * where the stochastic lattice interpolation then often repeats a cell. Stratifying the offset
+     * spreads the levels; stratifying the lattice vertex over the candidates that still share a
+     * level spreads those. Which candidates those are follows from the offset in closed form.
+     */
+    HashGridPos stratified_find(const float3 pos,
+                                const float3 normal,
+                                const float3 cam_pos,
+                                const uint index,
+                                const uint count,
+                                const float3 xi,
+                                out uint level) {
+        const uint target_level = target_level_for_pos(pos, cam_pos, xi.x);
+        const float n = float(count);
+        level = distributed_level_for_pos(target_level, (float(index) + xi.y) / n);
+
+        float lo, hi;
+        distributed_level_uniforms(target_level, level, lo, hi);
+        const float first = ceil(n * lo - xi.y);
+        const float share = max(1.0, ceil(n * hi - xi.y) - first);
+
+        const int3 gidx = grid_idx(pos, grid_inv_width_for_level(level),
+                                   (float(index) - first + xi.z) / share);
+        return find(get_hash_grid_pos(gidx, level, normal));
     }
 
     Optional<T> distributed_get(const float3 pos,
