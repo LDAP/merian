@@ -128,11 +128,16 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
         dist.selected = MCState();
         dist.selected_pos = HashGridPos();
 
+        // one draw for the whole set: the level offset is stratified over it, the lattice vertex
+        // again over the candidates that still share a level
+        const float3 xi = float3(rng.next_float(), rng.next_float(), rng.next_float());
+
         for (int i = 0; i < merian_guiding_mc_samples; i++) {
             HashGridPos grid_pos;
             uint level;
-            const MCState s = mcpg.load(lookup_pos, vertex.normal, frame_info.cam_pos,
-                                        frame_info.time, rng, grid_pos, level);
+            const MCState s =
+                mcpg.load(lookup_pos, vertex.normal, frame_info.cam_pos, frame_info.time, uint(i),
+                          uint(merian_guiding_mc_samples), xi, grid_pos, level);
             dist.score_sum += s.sum_w;
             // comparison with NaN is false (when s.sum_w == 0 and score_sum == 0)
             if (rng.next_float() < s.sum_w / dist.score_sum) {

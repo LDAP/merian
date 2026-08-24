@@ -164,13 +164,10 @@ struct MCPG<let ADAPTIVE_BUFFER_SIZE : uint,
              LOCALITY_BITS, true>
         grid;
 
-    MCState load(const float3 pos,
-                 const OrthonormalFrame shading_frame,
-                 const float3 cam_pos,
-                 const float time,
-                 inout RandomGenerator rng) {
+    // The chain in a cell, its target carried to the current time. An empty cell reads invalid.
+    MCState at_time(const HashGridPos grid_pos, const float time) {
         // slang defaults initializes none optionals
-        var s = grid.distributed_get(pos, shading_frame.get_normal(), cam_pos, rng).value;
+        var s = grid.load(grid_pos).value;
         if (s.is_valid()) {
             s.set_w_tgt(s.w_tgt + s.sum_w * (time - s.T) * float3(s.mv));
         } else {
@@ -180,23 +177,29 @@ struct MCPG<let ADAPTIVE_BUFFER_SIZE : uint,
         return s;
     }
 
-    // Reports the queried level and where the lobe was read from, invalid if no cell matched.
+    MCState load(const float3 pos,
+                 const OrthonormalFrame shading_frame,
+                 const float3 cam_pos,
+                 const float time,
+                 inout RandomGenerator rng) {
+        uint level;
+        return at_time(grid.distributed_find(pos, shading_frame.get_normal(), cam_pos, rng, level),
+                       time);
+    }
+
+    // One cell of a resampling set, with the set's single draw xi. Reports the queried level and
+    // where the lobe was read from, invalid if no cell matched.
     MCState load(const float3 pos,
                  const float3 access_normal,
                  const float3 cam_pos,
                  const float time,
-                 inout RandomGenerator rng,
+                 const uint index,
+                 const uint count,
+                 const float3 xi,
                  out HashGridPos grid_pos,
                  out uint level) {
-        grid_pos = grid.distributed_find(pos, access_normal, cam_pos, rng, level);
-        var s = grid.load(grid_pos).value;
-        if (s.is_valid()) {
-            s.set_w_tgt(s.w_tgt + s.sum_w * (time - s.T) * float3(s.mv));
-        } else {
-            s.sum_w = 0.0;
-        }
-
-        return s;
+        grid_pos = grid.stratified_find(pos, access_normal, cam_pos, index, count, xi, level);
+        return at_time(grid_pos, time);
     }
 
     void store(const MCState s,
