@@ -102,7 +102,7 @@ const std::filesystem::path& SlangSession::cache_root() {
     return root;
 }
 
-std::filesystem::path SlangSession::cache_dir(const std::string_view subdir) {
+const std::string& SlangSession::cache_tag() {
     static const std::string tag = [] {
         std::string t = get_global_slang_session()->getBuildTagString();
         for (char& c : t) {
@@ -113,7 +113,11 @@ std::filesystem::path SlangSession::cache_dir(const std::string_view subdir) {
         }
         return t;
     }();
-    return cache_root() / tag / subdir;
+    return tag;
+}
+
+std::filesystem::path SlangSession::cache_dir(const std::string_view subdir) {
+    return cache_root() / cache_tag() / subdir;
 }
 
 Slang::ComPtr<slang::IBlob> SlangSession::cache_read(const std::filesystem::path& path) {
@@ -178,7 +182,7 @@ void SlangSession::cache_evict() {
         return;
     }
 
-    uint64_t budget = 128ull * 1024 * 1024;
+    uint64_t budget = 512ull * 1024 * 1024;
     if (const char* env = std::getenv("MERIAN_SHADER_CACHE_MAX_MB")) {
         const uint64_t mb = std::strtoull(env, nullptr, 10);
         if (mb == 0) {
@@ -192,6 +196,19 @@ void SlangSession::cache_evict() {
     if (!std::filesystem::exists(root, ec) || ec) {
         return;
     }
+
+    // Nothing under another build tag can be read again, so it goes before the size cap gets to
+    // evict what this session just compiled.
+    for (std::filesystem::directory_iterator it(root, ec), end; it != end; it.increment(ec)) {
+        if (ec) {
+            break;
+        }
+        std::error_code entry_ec;
+        if (it->is_directory(entry_ec) && !entry_ec && it->path().filename() != cache_tag()) {
+            std::filesystem::remove_all(it->path(), entry_ec);
+        }
+    }
+    ec.clear();
 
     struct Entry {
         std::filesystem::path path;

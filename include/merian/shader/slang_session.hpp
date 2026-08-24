@@ -716,13 +716,16 @@ class SlangSession {
     static bool cache_enabled();
     // MERIAN_SHADER_CACHE_DIR, else <cwd>/.merian-cache.
     static const std::filesystem::path& cache_root();
+    // Sanitized Slang build tag; the level under the root that isolates Slang versions.
+    static const std::string& cache_tag();
     // <root>/<slang-build-tag>/<subdir>; the build-tag level isolates Slang versions.
     static std::filesystem::path cache_dir(std::string_view subdir);
     // File -> owning blob (nullptr if absent/unreadable); touches mtime on a hit.
     static Slang::ComPtr<slang::IBlob> cache_read(const std::filesystem::path& path);
     // Atomic write (temp + rename), best-effort.
     static void cache_write(const std::filesystem::path& path, const void* data, size_t size);
-    // LRU size-cap sweep (MERIAN_SHADER_CACHE_MAX_MB, default 128, 0 = unbounded).
+    // Drops other build tags, then an LRU size-cap sweep (MERIAN_SHADER_CACHE_MAX_MB,
+    // default 512, 0 = unbounded).
     static void cache_evict();
 
     uint64_t ir_cache_key(const std::string& name,
