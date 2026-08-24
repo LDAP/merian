@@ -128,15 +128,21 @@ struct ShadingPoint {
         }
     }
 
-    // Continuation ray for a scatter event; transmission is the shading-frame classification
-    // (wi_local.z * wo_local.z < 0). Returns none if the geometric sides disagree, e.g. a
+    // Whether wo leaves on the geometric side the shading-frame classification implies;
+    // transmission is that classification (wi_local.z * wo_local.z < 0). False for a
     // normal-mapped "reflection" that would tunnel through the surface.
-    Optional<RayDesc> make_ray(const float3 wi, const float3 wo, const bool transmission) {
+    bool geometric_side_agrees(const float3 wi, const float3 wo, const bool transmission) {
         const float3 ng = get_face_normal();
-        const float wo_ng = dot(wo, ng);
-        if (((dot(wi, ng) < 0.f) != (wo_ng < 0.f)) != transmission)
+        return ((dot(wi, ng) < 0.f) != (dot(wo, ng) < 0.f)) == transmission;
+    }
+
+    // Continuation ray for a scatter event; none where the geometric sides disagree.
+    Optional<RayDesc> make_ray(const float3 wi, const float3 wo, const bool transmission) {
+        if (!geometric_side_agrees(wi, wo, transmission))
             return none;
 
+        const float3 ng = get_face_normal();
+        const float wo_ng = dot(wo, ng);
         RayDesc ray;
         ray.Origin = offset_ray_origin(pos, wo_ng < 0.f ? -ng : ng);
         ray.Direction = wo;

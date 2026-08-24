@@ -123,6 +123,10 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
             for (uint i = 0; i < candidates; i++) {
                 if (let ls = scene.sample_light(light_bucket, sp.pos, rng)) {
                     const float3 wo_l = frame.to_local(ls.wo);
+                    // A light the geometry hides is not reachable from this surface, however the
+                    // shading frame tilts: the shadow ray would start behind it and escape.
+                    if (!sp.geometric_side_agrees(-ray.Direction, ls.wo, wi_local.z * wo_l.z < 0.f))
+                        continue;
                     reservoir.add_light(
                         ls, bsdf.eval(wi_local, wo_l, rng) * ls.Li * medium.transmittance(ls.dist),
                         candidates * ls.pdf + mixture.pdf(bsdf, guiding, wi_local, wo_l, ls.wo),
