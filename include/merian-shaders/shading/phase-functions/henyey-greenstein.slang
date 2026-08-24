@@ -11,10 +11,12 @@ struct HenyeyGreensteinPhaseFunction : PhaseFunction {
 
     // cos_theta is the cosine if the angle between the old particle direction and the new particle
     // direction (cosine of deflection). cos_theta = dot(prev_dir, new_dir) = dot(-wi, wo)
+    // Carried in u = 1 - g and 1 - cos: the textbook 1 + g^2 - 2 g cos and 1 - g^2 are both
+    // differences of nearly equal numbers as g -> 1, exactly where the density is largest.
     static float eval(float cos_theta, float g) {
-        float g2 = merian::pow2(g);
-        float denom = (1 + g2 - 2 * g * cos_theta);
-        return MERIAN_INV_FOUR_PI * (1.0 - g2) / (denom * sqrt(denom));
+        const float u = 1.0 - g;
+        const float denom = mad(2.0 * (1.0 - u), 1.0 - cos_theta, u * u);
+        return MERIAN_INV_FOUR_PI * (u * (2.0 - u)) / (denom * sqrt(denom));
     }
 
     // Sample an exact deflection cosine, i.e. dot(prev_dir, next_dir) = dot(-wi, wo)
