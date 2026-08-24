@@ -11,6 +11,12 @@ static const uint16_t ML_MAX_N = 1024;
 static const float ML_MIN_ALPHA = 0.01;
 
 extern static const float dir_guide_prior = 0.2;
+// Standard normal quantile of the lobe width's upper confidence limit, see width_upper_limit.
+// 0 samples the maximum likelihood width instead.
+extern static const float mc_conf_z = 1.6449;
+// Width an undetermined chain falls back to. 1 - 2/3 is the mean resultant length deficit of a
+// cosine lobe, so such a chain proposes what the BSDF would and costs nothing.
+static const float ML_MAX_ONE_MINUS_COS = 1.0 / 3.0;
 
 struct MCState {
     float3 w_tgt;
@@ -46,12 +52,33 @@ struct MCState {
         return max(0.0001, dir_guide_prior / dot(d, d));
     }
 
+    // Upper confidence limit of the width, over the width itself. 1 - cos is exponentially
+    // distributed in the concentration, so n samples give a Gamma estimate and its limit is a
+    // chi-square quantile away; one degree of freedom goes to the axis the spread is measured
+    // against, so a single sample leaves the width undetermined. Wilson-Hilferty for the quantile,
+    // which is within 2.4 % for n >= 9 and diverges below n ~ 3, where the clamp decides instead.
+    static float width_upper_limit(const float u, const float n) {
+        const float k = 2.0 * (n - 1.0);
+        if (k <= 0.0)
+            return ML_MAX_ONE_MINUS_COS;
+        const float t = 2.0 / (9.0 * k);
+        const float g = 1.0 - t - mc_conf_z * sqrt(t);
+        if (g <= 0.0)
+            return ML_MAX_ONE_MINUS_COS;
+        return min(u * (2.0 * n / k) / (g * g * g), ML_MAX_ONE_MINUS_COS);
+    }
+
     // 1 - mean resultant length. Kept as the primary quantity: it is what the concentration
     // depends on, and the half that float resolves once the lobe is tight.
     float one_minus_mean_cos(const float3 pos) {
         const float n = float(N);
         const float p = prior(pos);
-        const float u = 0.5 * w_chord2 / sum_w;
+        float u = 0.5 * w_chord2 / sum_w;
+        if (mc_conf_z > 0.0) {
+            // samples behind the fit; the exponentially weighted average saturates at 2 / alpha - 1
+            const float n_eff = min(2.0 * n - 1.0, 2.0 / ML_MIN_ALPHA - 1.0);
+            u = width_upper_limit(u, n_eff);
+        }
         // shrink r towards 0 by n^2 / (n^2 + p), i.e. grow u by the complement
         return clamp(u + (1.0 - u) * p / (n * n + p), 1e-7, 1.0);
     }

@@ -51,10 +51,11 @@ SlangCompositionHandle MCPGGuidingModel::get_composition() const {
                     "export static const bool merian_guiding_light_cache_tail = {};\n"
                     "export static const float merian_guiding_lc_min_pdf = {};\n"
                     "}}\n"
-                    "export static const float dir_guide_prior = {};",
+                    "export static const float dir_guide_prior = {};\n"
+                    "export static const float mc_conf_z = {};",
                     mc_samples, probability, scale_with_alpha ? "true" : "false", alpha_threshold,
                     missing_light_heuristic ? "true" : "false", direct_target,
-                    light_cache_tail ? "true" : "false", lc_min_pdf, dir_guide_prior));
+                    light_cache_tail ? "true" : "false", lc_min_pdf, dir_guide_prior, mc_conf_z));
     return composition;
 }
 
@@ -88,6 +89,12 @@ bool MCPGGuidingModel::properties(Properties& props) {
                              Properties::ChildFlagBits::DEFAULT_OPEN)) {
         constants_changed |= props.config_percent("ML prior", dir_guide_prior);
         constants_changed |= props.config_int("MC samples", mc_samples, "", 0, 30);
+        constants_changed |= props.config_float(
+            "width confidence z", mc_conf_z,
+            "Sample the lobe width's upper confidence limit at this standard normal quantile "
+            "instead of the maximum likelihood width, so a chain with little behind it proposes a "
+            "wide lobe rather than a confident one. 0 disables, 1.6449 is the 95 % limit.",
+            0.01f, 0.f, 4.f);
         constants_changed |= props.config_float(
             "guiding probability", probability,
             "Probability of drawing the scatter direction from the guiding lobes.", 0.01f, 0.f,
