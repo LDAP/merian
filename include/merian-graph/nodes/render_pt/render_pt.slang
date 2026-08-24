@@ -125,7 +125,7 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
                     const float3 wo_l = frame.to_local(ls.wo);
                     // A light the geometry hides is not reachable from this surface, however the
                     // shading frame tilts: the shadow ray would start behind it and escape.
-                    if (!sp.geometric_side_agrees(-ray.Direction, ls.wo, wi_local.z * wo_l.z < 0.f))
+                    if (!sp.geometric_side_matches_shading(ls.wo))
                         continue;
                     reservoir.add_light(
                         ls, bsdf.eval(wi_local, wo_l, rng) * ls.Li * medium.transmittance(ls.dist),

@@ -136,6 +136,16 @@ struct ShadingPoint {
         return ((dot(wi, ng) < 0.f) != (dot(wo, ng) < 0.f)) == transmission;
     }
 
+    // Whether the geometry agrees with the shading frame about the side wo is on. Normal mapping
+    // lifts directions above the shading horizon that the geometry still hides; a light sampled
+    // there would be lit through the surface.
+    bool geometric_side_matches_shading(const float3 wo) {
+        const float3 ns = shading_frame.get_normal();
+        const float3 ng = get_face_normal();
+        const float3 ng_shading_side = dot(ng, ns) < 0.f ? -ng : ng;
+        return (dot(wo, ns) < 0.f) == (dot(wo, ng_shading_side) < 0.f);
+    }
+
     // Continuation ray for a scatter event; none where the geometric sides disagree.
     Optional<RayDesc> make_ray(const float3 wi, const float3 wo, const bool transmission) {
         if (!geometric_side_agrees(wi, wo, transmission))
