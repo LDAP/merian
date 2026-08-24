@@ -68,23 +68,26 @@ struct MCState {
         return min(u * (2.0 * n / k) / (g * g * g), ML_MAX_ONE_MINUS_COS);
     }
 
-    // 1 - mean resultant length. Kept as the primary quantity: it is what the concentration
-    // depends on, and the half that float resolves once the lobe is tight.
-    float one_minus_mean_cos(const float3 pos) {
+    // shrink r towards 0 by n^2 / (n^2 + p), i.e. grow the width u by the complement
+    float apply_prior(const float u, const float3 pos) {
         const float n = float(N);
         const float p = prior(pos);
-        float u = 0.5 * w_chord2 / sum_w;
-        if (mc_conf_z > 0.0) {
-            // samples behind the fit; the exponentially weighted average saturates at 2 / alpha - 1
-            const float n_eff = min(2.0 * n - 1.0, 2.0 / ML_MIN_ALPHA - 1.0);
-            u = width_upper_limit(u, n_eff);
-        }
-        // shrink r towards 0 by n^2 / (n^2 + p), i.e. grow u by the complement
         return clamp(u + (1.0 - u) * p / (n * n + p), 1e-7, 1.0);
     }
 
-    float mean_cos(const float3 pos) {
-        return 1.0 - one_minus_mean_cos(pos);
+    // 1 - mean resultant length of the chain's own fit. Kept as the primary quantity: it is what
+    // the concentration depends on, and the half that float resolves once the lobe is tight.
+    float one_minus_mean_cos(const float3 pos) {
+        return apply_prior(0.5 * w_chord2 / sum_w, pos);
+    }
+
+    // The same width, widened to what the samples behind the fit cannot rule out.
+    float one_minus_mean_cos_limited(const float3 pos) {
+        if (mc_conf_z <= 0.0)
+            return one_minus_mean_cos(pos);
+        // the exponentially weighted average saturates at 2 / alpha - 1 samples
+        const float n_eff = min(2.0 * float(N) - 1.0, 2.0 / ML_MIN_ALPHA - 1.0);
+        return apply_prior(width_upper_limit(0.5 * w_chord2 / sum_w, n_eff), pos);
     }
 
     bool light_missing_heuristic(const float mc_f,
@@ -103,7 +106,7 @@ struct MCState {
     // samples have mean resultant length r = 1 - u. Jedynak 2015. Carried in u because
     // kappa ~ 1/u, so u holds the concentration to full relative precision where r saturates.
     float kappa(const float3 pos) {
-        const float u = one_minus_mean_cos(pos);
+        const float u = one_minus_mean_cos_limited(pos);
         const float r = 1.0 - u;
         return r * (3.0 - 2.6 * r + 0.7 * r * r) / (u * (1.1 - 0.1 * u));
     }
