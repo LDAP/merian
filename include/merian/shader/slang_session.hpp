@@ -27,7 +27,7 @@ using SlangSessionHandle = std::shared_ptr<SlangSession>;
 class SlangSession {
   protected:
     SlangSession(const ShaderCompileContextHandle& shader_compile_context)
-        : shader_compile_context(shader_compile_context) {
+        : weak_compile_context(shader_compile_context) {
         const auto global_session = get_global_slang_session();
 
         slang::SessionDesc slang_session_desc = {};
@@ -131,8 +131,8 @@ class SlangSession {
     }
 
   public:
-    const ShaderCompileContextHandle& get_compile_context() {
-        return shader_compile_context;
+    ShaderCompileContextHandle get_compile_context() {
+        return compile_context();
     }
 
     // The path can be used as path-based import statement the
@@ -155,12 +155,12 @@ class SlangSession {
     load_module_from_path(const std::string& name,
                           const std::filesystem::path& path,
                           const std::optional<std::filesystem::path>& source_path = std::nullopt) {
+        const ShaderCompileContextHandle context = compile_context();
         std::optional<std::string> source;
         if (source_path) {
-            source = shader_compile_context->get_search_path_file_loader().find_and_load_file(
-                source_path.value());
+            source = context->get_search_path_file_loader().find_and_load_file(source_path.value());
         } else {
-            source = shader_compile_context->get_search_path_file_loader().find_and_load_file(path);
+            source = context->get_search_path_file_loader().find_and_load_file(path);
         }
 
         if (!source) {
@@ -739,7 +739,14 @@ class SlangSession {
                      uint32_t entry_point_index);
 
   private:
-    const ShaderCompileContextHandle shader_compile_context;
+    // The context owns the session it hands out, so the way back must not own it: a handle here
+    // closes a reference cycle that keeps both alive past the last use, and with them the
+    // destructor that caps the cache on disk.
+    ShaderCompileContextHandle compile_context() const {
+        return weak_compile_context.lock();
+    }
+
+    const std::weak_ptr<ShaderCompileContext> weak_compile_context;
     Slang::ComPtr<slang::ISession> session;
 
     // -> entry_point, renamed

@@ -262,13 +262,13 @@ uint64_t SlangSession::ir_cache_key(const std::string& name,
     hash_combine(seed, name);
     hash_combine(seed, path ? path->string() : std::string{});
     hash_combine(seed, source);
-    for (const auto& [key, value] : shader_compile_context->get_preprocessor_macros()) {
+    const ShaderCompileContextHandle context = compile_context();
+    for (const auto& [key, value] : context->get_preprocessor_macros()) {
         hash_combine(seed, key, value);
     }
-    hash_combine(seed, static_cast<uint32_t>(shader_compile_context->get_target()),
-                 shader_compile_context->get_optimization_level(),
-                 static_cast<uint32_t>(
-                     debug_info_level(shader_compile_context->should_generate_debug_info())));
+    hash_combine(seed, static_cast<uint32_t>(context->get_target()),
+                 context->get_optimization_level(),
+                 static_cast<uint32_t>(debug_info_level(context->should_generate_debug_info())));
     hash_combine(seed, string_module_fingerprint);
     return seed;
 }
