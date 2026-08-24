@@ -31,7 +31,8 @@ class SwapchainBlit : public Node {
     VkImageInHandle con_src = VkImageIn::create();
     PtrInHandle<SwapchainAcquireResult> con_acquire = PtrIn<SwapchainAcquireResult>::create();
     // Passed through so further nodes (e.g. ImGui) chain after this blit and render on top.
-    PtrOutHandle<SwapchainAcquireResult> con_acquire_out = PtrOut<SwapchainAcquireResult>::create();
+    PtrOutHandle<SwapchainAcquireResult> con_acquire_out =
+        PtrOut<SwapchainAcquireResult>::create_optional();
 };
 
 } // namespace merian

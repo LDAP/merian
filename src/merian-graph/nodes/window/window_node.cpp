@@ -74,13 +74,16 @@ WindowNode::process(const NodeIO& io, const NodeProcessInfo& info, Submission& s
         acquire = swapchain_manager->acquire(window, acquire_timeout_ns);
     }
 
+    // A minimised window, a timed out acquire or an exhausted recreate all leave the iteration
+    // without an image. The window and its controller exist either way; the acquire is cleared
+    // explicitly so that no consumer picks up the one left in this ring slot.
+    io[con_acquire] = acquire ? std::make_shared<SwapchainAcquireResult>(*acquire) : nullptr;
+    io[con_controller] = window->get_input_controller();
+    io[con_window] = window;
+
     if (acquire) {
         const CommandBufferHandle& cmd = submission.get_cmd();
         const ImageHandle image = acquire->image_view->get_image();
-
-        io[con_acquire] = std::make_shared<SwapchainAcquireResult>(*acquire);
-        io[con_controller] = window->get_input_controller();
-        io[con_window] = window;
 
         // Provide the swapchain image as a canvas: blit the optional "src" input, or clear.
         // Downstream nodes consuming "acquire" composite on top (load-preserving the result).

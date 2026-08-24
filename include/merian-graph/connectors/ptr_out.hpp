@@ -18,7 +18,8 @@ template <typename T>
 class PtrOut : public OutputConnector, public AccessibleConnector<std::shared_ptr<T>&> {
 
   public:
-    PtrOut(const bool persistent) : OutputConnector(!persistent), persistent(persistent) {}
+    PtrOut(const bool persistent, const bool optional)
+        : OutputConnector(!persistent), persistent(persistent), optional(optional) {}
 
     GraphResourceHandle
     create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
@@ -41,7 +42,7 @@ class PtrOut : public OutputConnector, public AccessibleConnector<std::shared_pt
         [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
         [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override {
         const auto& res = debugable_ptr_cast<PtrResource<T>>(resource);
-        if (!res->ptr) {
+        if (!res->ptr && !optional) {
             throw graph_errors::connector_error{"Node did not set the resource for output."};
         }
         res->processed_inputs = 0;
@@ -51,11 +52,18 @@ class PtrOut : public OutputConnector, public AccessibleConnector<std::shared_pt
 
   public:
     static PtrOutHandle<T> create(const bool persistent = false) {
-        return std::make_shared<PtrOut<T>>(persistent);
+        return std::make_shared<PtrOut<T>>(persistent, false);
+    }
+
+    // An output a node may leave empty in an iteration. Every consumer has to handle the null
+    // pointer, and the producer has to clear it: nothing resets the resource between iterations.
+    static PtrOutHandle<T> create_optional(const bool persistent = false) {
+        return std::make_shared<PtrOut<T>>(persistent, true);
     }
 
   private:
     const bool persistent;
+    const bool optional;
 };
 
 } // namespace merian

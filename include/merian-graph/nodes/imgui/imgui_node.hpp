@@ -40,7 +40,8 @@ class ImGuiNode : public Node {
 
     PtrInHandle<SwapchainAcquireResult> con_acquire = PtrIn<SwapchainAcquireResult>::create();
     PtrInHandle<Window> con_window = PtrIn<Window>::create();
-    PtrOutHandle<SwapchainAcquireResult> con_acquire_out = PtrOut<SwapchainAcquireResult>::create();
+    PtrOutHandle<SwapchainAcquireResult> con_acquire_out =
+        PtrOut<SwapchainAcquireResult>::create_optional();
 };
 
 } // namespace merian

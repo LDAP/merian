@@ -71,7 +71,8 @@ class WindowNode : public Node {
 
     VkImageInHandle image_in = VkImageIn::create();
 
-    PtrOutHandle<SwapchainAcquireResult> con_acquire = PtrOut<SwapchainAcquireResult>::create();
+    PtrOutHandle<SwapchainAcquireResult> con_acquire =
+        PtrOut<SwapchainAcquireResult>::create_optional();
     PtrOutHandle<InputController> con_controller = PtrOut<InputController>::create();
     PtrOutHandle<Window> con_window = PtrOut<Window>::create();
 
