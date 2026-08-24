@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <atomic>
 #include <csignal>
+#include <exception>
 #include <fstream>
 #include <limits>
 #include <optional>
@@ -133,6 +134,21 @@ void build_default_graph(const merian::GraphHandle& graph) {
 } // namespace
 
 int main(const int argc, const char** argv) {
+    std::set_terminate([] {
+        if (const auto in_flight = std::current_exception()) {
+            try {
+                std::rethrow_exception(in_flight);
+            } catch (const std::exception& e) {
+                SPDLOG_CRITICAL("terminating on an uncaught exception: {}", e.what());
+            } catch (...) {
+                SPDLOG_CRITICAL("terminating on an uncaught non-standard exception");
+            }
+        } else {
+            SPDLOG_CRITICAL("terminating with no exception in flight");
+        }
+        spdlog::default_logger()->flush();
+        std::abort();
+    });
     const auto options = parse(std::vector<std::string>(argv, argv + argc));
     if (!options) {
         return 1;

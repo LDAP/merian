@@ -414,8 +414,15 @@ void Graph::run_node(Submission& submission,
         }
         for (auto& [output, per_output_info] : data.output_connections) {
             auto& [resource, resource_index] = per_output_info.precomputed_resources[set_idx];
-            const Connector::ConnectorStatusFlags flags = output->on_post_process(
-                submission, resource, node, image_barriers, buffer_barriers);
+            Connector::ConnectorStatusFlags flags = 0;
+            try {
+                flags = output->on_post_process(submission, resource, node, image_barriers,
+                                                buffer_barriers);
+            } catch (const graph_errors::connector_error& e) {
+                throw graph_errors::connector_error{fmt::format(
+                    "output '{}' of node '{}': {}", data.output_name_for_connector.at(output),
+                    data.identifier, e.what())};
+            }
             if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) != 0u) {
                 SPDLOG_DEBUG("output connector {} at node {} requested reconnect.",
                              data.output_name_for_connector.at(output), data.identifier);
