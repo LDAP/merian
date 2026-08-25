@@ -61,7 +61,7 @@ uint quad_child(const uint2 texel) {
     }
 
     const float value = 0.25f * sum;
-    params.levels[thread_id.y * params.size + thread_id.x] =
+    params.levels[quad_index(thread_id.xy)][quad_child(thread_id.xy)] =
         isfinite(value) ? max(value, 0.f) : 0.f;
 }
 
