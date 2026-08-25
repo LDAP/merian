@@ -2074,6 +2074,7 @@ void Scene::update(const CommandBufferHandle& cmd,
     // Binds the scene object, so every write to it must precede this (descriptor sets are not
     // update-after-bind).
     lights.set_env_emissive(env_map->is_emissive());
+    lights.set_env_state(env_map->get_version(), env_map->is_static());
     lights.set_camera(cam->get_position());
     if (as_supported && tlas) {
         lights.set_acceleration_structure(tlas);

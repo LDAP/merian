@@ -28,6 +28,18 @@ class EnvMap {
         return true;
     }
 
+    // Whether eval depends only on state that bumps the version, so a cached importance map over
+    // it stays valid. False rebuilds that map every frame, which any time-varying environment
+    // needs.
+    virtual bool is_static() const {
+        return false;
+    }
+
+    // Bumped whenever anything eval reads changes.
+    uint64_t get_version() const {
+        return version;
+    }
+
     // Yaw/pitch UI; subclasses can extend to expose more state.
     virtual void properties(Properties& props) {
         bool changed = false;
@@ -36,7 +48,9 @@ class EnvMap {
         if (changed) {
             rebuild_transform();
         }
-        props.config_float("Intensity", intensity, "", 0.01f, 0.f);
+        if (props.config_float("Intensity", intensity, "", 0.01f, 0.f)) {
+            ++version;
+        }
     }
 
     // Seeded by the host once (e.g. Scene::get_up alignment); yaw/pitch compose on top.
@@ -79,6 +93,7 @@ class EnvMap {
         const float4x4 yaw = rotation(float3(0, 1, 0), yaw_rad);
         const float4x4 pitch = rotation(float3(1, 0, 0), pitch_rad);
         to_local = mul(pitch, mul(yaw, base_to_local));
+        ++version;
     }
 
     float4x4 to_local = identity<float4x4>();
@@ -86,11 +101,16 @@ class EnvMap {
     float yaw_rad = 0.f;
     float pitch_rad = 0.f;
     float intensity = 1.f;
+    uint64_t version = 0;
 };
 using EnvMapHandle = std::shared_ptr<EnvMap>;
 
 class EmptyEnvMap : public EnvMap {
   public:
+    bool is_static() const override {
+        return true;
+    }
+
     SlangComposition::SlangModule get_slang_module() const override {
         return SlangComposition::SlangModule::from_path(
             "merian-shaders/scene/environment-map.slang", false);
@@ -120,6 +140,10 @@ class LatLongEnvMap : public EnvMap {
         return "merian::LatLongMap";
     }
 
+    bool is_static() const override {
+        return true;
+    }
+
     void write_to(ShaderCursor cursor) const override {
         cursor["env_map"] = texture;
         cursor["to_local"] = to_local;
@@ -132,6 +156,7 @@ class LatLongEnvMap : public EnvMap {
 
     void set_texture(TextureHandle t) {
         texture = std::move(t);
+        ++version;
     }
 
   private:
@@ -152,6 +177,10 @@ class EqualAreaOctEnvMap : public EnvMap {
         return "merian::EqualAreaOctMap";
     }
 
+    bool is_static() const override {
+        return true;
+    }
+
     void write_to(ShaderCursor cursor) const override {
         cursor["env_map"] = texture;
         cursor["to_local"] = to_local;
@@ -164,6 +193,7 @@ class EqualAreaOctEnvMap : public EnvMap {
 
     void set_texture(TextureHandle t) {
         texture = std::move(t);
+        ++version;
     }
 
   private:
@@ -183,6 +213,10 @@ class CubeMapEnvMap : public EnvMap {
         return "merian::CubeMap";
     }
 
+    bool is_static() const override {
+        return true;
+    }
+
     void write_to(ShaderCursor cursor) const override {
         cursor["rt"] = faces[0];
         cursor["bk"] = faces[1];
@@ -200,6 +234,7 @@ class CubeMapEnvMap : public EnvMap {
 
     void set_faces(std::array<TextureHandle, 6> f) {
         faces = std::move(f);
+        ++version;
     }
 
   private:

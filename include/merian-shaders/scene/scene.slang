@@ -490,11 +490,14 @@ struct Scene {
     // the point, otherwise the light tile its screen tile shares. Sampling and density evaluation
     // must agree, so it is taken once per vertex and passed to both.
     uint get_light_bucket(const uint2 pixel, const float3 pos) {
-        const uint cell = nee.get_grid_cell(pos);
+        // one offset per 16 x 16 pixels, so a tile shares its cell and the loads stay coherent
+        const uint tile = xxhash32(uint3(pixel >> 4, frame));
+        RandomGenerator tile_rng = PCG(tile);
+        const uint cell =
+            nee.get_grid_cell(pos, nee.grid_jitter * (tile_rng.next_float3() - 0.5f));
         if (cell != LIGHT_INVALID_INDEX)
             return cell;
-        // 16 x 16 pixels share a tile
-        return LIGHT_BUCKET_TILE | xxhash32(uint3(pixel >> 4, frame));
+        return LIGHT_BUCKET_TILE | tile;
     }
 
     // Next event estimation: one light sample for the receiver at pos (unshadowed).

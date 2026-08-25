@@ -65,6 +65,49 @@ struct EmissiveTriangle {
 #endif
 };
 
+// Compact stand-in for an emissive triangle, for the passes that only need where it sits and how
+// much it emits. Half the bytes of the record, and the normal is already there.
+struct EmissiveLightProxy {
+    float3 centroid;
+    float flux;
+    // unnormalized front-facing normal, length = 2 * area
+    float3 scaled_normal;
+    uint32_t flags;
+
+#ifndef __cplusplus
+    bool is_two_sided() {
+        return (flags & uint32_t(EmissiveTriangleFlags::EmissiveTwoSided)) != 0;
+    }
+#endif
+};
+
+// A drawn pool entry with the geometry the cell resampling needs, so a candidate costs one load
+// instead of an index load and a dependent lookup into the light list.
+struct PooledLight {
+    float3 centroid;
+    float flux;
+    // unnormalized front-facing normal, length = 2 * area
+    float3 scaled_normal;
+    // triangle index, two-sided in the top bit; LIGHT_INVALID_INDEX for an empty draw
+    uint32_t packed_index;
+
+#ifndef __cplusplus
+    static const uint32_t TWO_SIDED_BIT = 0x80000000u;
+
+    bool is_valid() {
+        return packed_index != LIGHT_INVALID_INDEX;
+    }
+
+    uint32_t get_index() {
+        return packed_index & ~TWO_SIDED_BIT;
+    }
+
+    bool is_two_sided() {
+        return (packed_index & TWO_SIDED_BIT) != 0;
+    }
+#endif
+};
+
 // An emissive geometry as seen by the light update pass.
 struct LightGeometry {
     GeometryID geometry_id;
@@ -81,6 +124,8 @@ struct LightGeometry {
 static_assert(sizeof(EmissiveTriangle) == 64,
               "EmissiveTriangle must match the Slang scalar layout");
 static_assert(sizeof(LightGeometry) == 16, "LightGeometry layout mismatch");
+static_assert(sizeof(EmissiveLightProxy) == 32, "EmissiveLightProxy layout mismatch");
+static_assert(sizeof(PooledLight) == 32, "PooledLight layout mismatch");
 #endif
 
 } // namespace merian

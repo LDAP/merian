@@ -14,6 +14,7 @@
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 
+#include <limits>
 #include <vector>
 
 namespace merian {
@@ -81,6 +82,15 @@ class LightCollection {
     }
 
     // Whether the scene's environment map emits; false routes all samples to the triangles.
+    // The importance map is a function of the environment alone, so a static one is built once
+    // and kept until it changes. The per-frame texel pool is drawn from it either way.
+    void set_env_state(const uint64_t version, const bool is_static) {
+        if (version != env_version || !is_static) {
+            env_importance_built = false;
+        }
+        env_version = version;
+    }
+
     void set_env_emissive(const bool value) {
         env_emissive = value;
     }
@@ -106,9 +116,14 @@ class LightCollection {
         return 1u << static_cast<uint32_t>(env_importance_log2);
     }
     uint32_t env_importance_quad_count() const;
+    // threads per block of the flux scan; matches CDF_GROUP_SIZE
+    static constexpr uint32_t CDF_GROUP_SIZE = 1024;
+    uint32_t cdf_block_count() const {
+        return (triangle_count + CDF_GROUP_SIZE - 1) / CDF_GROUP_SIZE;
+    }
     uint32_t grid_cell_count() const {
         const uint32_t d = static_cast<uint32_t>(grid_dimension);
-        return d * d * d;
+        return static_cast<uint32_t>(grid_cascades) * d * d * d;
     }
     void ensure_buffer(BufferHandle& buffer,
                        vk::DeviceSize size,
@@ -125,12 +140,16 @@ class LightCollection {
     int32_t env_pool_size = 8192;
     int32_t pool_size = 4096;
     int32_t pool_tile_size = 256;
-    int32_t grid_dimension = 32;
-    int32_t grid_candidates = 8;
+    int32_t grid_dimension = 16;
+    int32_t grid_cascades = 6;
+    // Where the cell list stops improving on a level with well separated lights; a scene whose
+    // emitters crowd one cell keeps gaining past this, at a cost the frame has to afford.
+    int32_t grid_candidates = 64;
     float grid_probability = 0.7f;
     AccelerationStructureHandle acceleration_structure;
-    float grid_cell_size = 0.f; // 0: derived from the light bounds
-    float grid_coverage = 0.5f;
+    float grid_cell_size = 0.f; // 0: derived from the distance to the lights
+    float grid_coverage = 1.f;
+    float grid_jitter = 1.f;
     bool grid_visibility = true;
     float3 camera_position{0.f};
     float env_probability = 0.5f;
@@ -140,6 +159,8 @@ class LightCollection {
     // log2 side length of the equal-area octahedral importance map over the environment
     int32_t env_importance_log2 = 8;
     bool env_importance_resized = false;
+    bool env_importance_built = false;
+    uint64_t env_version = std::numeric_limits<uint64_t>::max();
 
     std::vector<LightGeometry> light_geometries;
     std::vector<uint32_t> geometry_light_offsets;
@@ -149,12 +170,16 @@ class LightCollection {
     ShaderObjectAllocatorHandle fallback_obj_allocator;
 
     BufferHandle env_importance_buffer;
+    BufferHandle env_importance_built_buffer;
     BufferHandle env_pool_buffer;
     BufferHandle pool_buffer;
+    BufferHandle pool_lights_buffer;
     BufferHandle grid_buffer;
     BufferHandle grid_info_buffer;
     BufferHandle triangles_buffer;
+    BufferHandle proxies_buffer;
     BufferHandle cdf_buffer;
+    BufferHandle cdf_block_sums_buffer;
     BufferHandle light_geometries_buffer;
     BufferHandle geometry_light_offsets_buffer;
 
@@ -190,9 +215,15 @@ class LightCollection {
 
     SlangCompositionHandle cdf_composition;
     Versioned<SlangProgram> cdf_program;
-    Versioned<SlangProgramEntryPoint> cdf_entry_point;
-    Versioned<Pipeline> cdf_pipeline;
-    Versioned<ShaderObject> cdf_params;
+    Versioned<SlangProgramEntryPoint> cdf_blocks_entry_point;
+    Versioned<SlangProgramEntryPoint> cdf_sums_entry_point;
+    Versioned<SlangProgramEntryPoint> cdf_offset_entry_point;
+    Versioned<Pipeline> cdf_blocks_pipeline;
+    Versioned<Pipeline> cdf_sums_pipeline;
+    Versioned<Pipeline> cdf_offset_pipeline;
+    Versioned<ShaderObject> cdf_blocks_params;
+    Versioned<ShaderObject> cdf_sums_params;
+    Versioned<ShaderObject> cdf_offset_params;
 };
 
 } // namespace merian

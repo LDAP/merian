@@ -10,6 +10,7 @@ using merian;
 
 struct LightUpdateBinding {
     RWStructuredBuffer<EmissiveTriangle, ScalarDataLayout> triangles;
+    RWStructuredBuffer<EmissiveLightProxy, ScalarDataLayout> proxies;
     StructuredBuffer<LightGeometry, ScalarDataLayout> light_geometries;
     uint light_geometry_count;
     uint triangle_count;
@@ -106,4 +107,11 @@ uint find_light_geometry(const ParameterBlock<LightUpdateBinding> params, const 
     tri.flux = isfinite(flux) ? flux : 0.f;
 
     params.triangles[i] = tri;
+
+    EmissiveLightProxy proxy;
+    proxy.centroid = (tri.p0 + tri.p1 + tri.p2) * (1.f / 3.f);
+    proxy.flux = tri.flux;
+    proxy.scaled_normal = scaled_n;
+    proxy.flags = uint(tri.flags);
+    params.proxies[i] = proxy;
 }

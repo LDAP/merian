@@ -85,6 +85,8 @@ struct NEE {
     // probability of taking the cell list where one exists; the rest falls back to the pool so
     // that no light is ever unreachable
     float grid_probability;
+    // cells the grid lookup is offset by, so the cell boundaries do not show
+    float grid_jitter;
     uint pool_size;
     uint selection;
     uint triangle_count;
@@ -127,17 +129,39 @@ struct NEE {
 
     // --- triangle selection ---
 
-    // Cell holding pos, or LIGHT_INVALID_INDEX outside the grid.
-    uint get_grid_cell(const float3 pos) {
+    // Cell holding pos, or LIGHT_INVALID_INDEX beyond the last cascade. jitter is a per-tile
+    // offset in cells that softens the cell boundaries; the caller has to reuse the cell it
+    // returns for the density, so both see the same list.
+    uint get_grid_cell(const float3 pos, const float3 jitter = float3(0)) {
         if (selection != LightSelection::LightSelectionGrid)
             return LIGHT_INVALID_INDEX;
-        const LightGridInfo info = grid_info[0];
-        if (info.dimension == 0)
+        const LightGridInfo base = grid_info[0];
+        if (base.dimension == 0)
             return LIGHT_INVALID_INDEX;
-        const int3 coord = int3(floor((pos - info.origin) * info.inv_cell_size));
-        if (any(coord < 0) || any(coord >= int(info.dimension)))
-            return LIGHT_INVALID_INDEX;
-        return uint(coord.x) + info.dimension * (uint(coord.y) + info.dimension * uint(coord.z));
+
+        // the cascade is picked from the unjittered position, so the jitter cannot walk the
+        // lookup across cascades and change the cell size under it
+        const float cell = 1.f / base.inv_cell_size;
+        const float3 to_center =
+            abs(pos - (base.origin + 0.5f * float(base.dimension) * cell));
+        const float distance = max(to_center.x, max(to_center.y, to_center.z));
+        // snapping moves a cascade by up to one cell, so only dimension / 2 - 1 cells are certain
+        const float reach = max(0.5f * float(base.dimension) - 1.f, 1.f) * cell;
+        uint cascade = uint(max(ceil(log2(max(distance / reach, 1e-6f))), 0.f));
+
+        const uint cells_per_cascade = base.dimension * base.dimension * base.dimension;
+        // the cascade the distance implies always contains pos unless the snapping pushed it out,
+        // which the next one up covers
+        for (uint step = 0; step < 2 && cascade < base.cascade_count; step++, cascade++) {
+            const LightGridInfo info = grid_info[cascade];
+            const float3 local = (pos - info.origin) * info.inv_cell_size + jitter;
+            const int3 coord = int3(floor(local));
+            if (all(coord >= 0) && all(coord < int(info.dimension))) {
+                return cascade * cells_per_cascade + uint(coord.x) +
+                       info.dimension * (uint(coord.y) + info.dimension * uint(coord.z));
+            }
+        }
+        return LIGHT_INVALID_INDEX;
     }
 
     // Slots holding this light, and slots holding nothing, over the slot count. The first is the

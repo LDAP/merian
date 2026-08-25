@@ -171,17 +171,27 @@ void LightCollection::ensure_pipelines(const SlangCompositionHandle& scene_compo
         cdf_composition = SlangComposition::create();
         cdf_composition->add_module_from_path("merian-shaders/scene/light-cdf.slang", true);
         cdf_program = SlangProgram::create(compile_context, cdf_composition);
-        cdf_entry_point = SlangProgramEntryPoint::create(cdf_program, "main");
-        cdf_pipeline = Versioned<Pipeline>([this] {
-            const auto ep = cdf_entry_point.get();
-            return ComputePipeline::create(ep->get_pipeline_layout(context), ep->specialize());
-        });
-        cdf_pipeline.depends_on(cdf_entry_point);
-        cdf_params = Versioned<ShaderObject>([this] {
-            return cdf_entry_point->create_shader_object_for_parameter(context, "params",
+        const auto make_cdf_pass = [this](const char* name,
+                                          Versioned<SlangProgramEntryPoint>& entry_point,
+                                          Versioned<Pipeline>& pipeline,
+                                          Versioned<ShaderObject>& params) {
+            entry_point = SlangProgramEntryPoint::create(cdf_program, name);
+            pipeline = Versioned<Pipeline>([&entry_point, this] {
+                const auto ep = entry_point.get();
+                return ComputePipeline::create(ep->get_pipeline_layout(context), ep->specialize());
+            });
+            pipeline.depends_on(entry_point);
+            params = Versioned<ShaderObject>([&entry_point, this] {
+                return entry_point->create_shader_object_for_parameter(context, "params",
                                                                        allocator);
-        });
-        cdf_params.depends_on(cdf_entry_point);
+            });
+            params.depends_on(entry_point);
+        };
+        make_cdf_pass("scan_blocks", cdf_blocks_entry_point, cdf_blocks_pipeline,
+                      cdf_blocks_params);
+        make_cdf_pass("scan_block_sums", cdf_sums_entry_point, cdf_sums_pipeline, cdf_sums_params);
+        make_cdf_pass("add_block_offset", cdf_offset_entry_point, cdf_offset_pipeline,
+                      cdf_offset_params);
     }
 }
 
@@ -192,10 +202,16 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
     if (env_emissive) {
         if (env_importance_resized && env_importance_buffer) {
             cmd->keep_until_pool_reset(std::move(env_importance_buffer));
+            env_importance_built = false;
         }
         env_importance_resized = false;
+        const bool had_buffer = static_cast<bool>(env_importance_buffer);
         ensure_buffer(env_importance_buffer, env_importance_quad_count() * 4 * sizeof(float),
                       "LightCollection::env_importance", cmd);
+        if (!had_buffer || env_importance_buffer != env_importance_built_buffer) {
+            env_importance_built = false;
+            env_importance_built_buffer = env_importance_buffer;
+        }
         ensure_buffer(env_pool_buffer, static_cast<uint32_t>(env_pool_size) * sizeof(uint32_t),
                       "LightCollection::env_pool", cmd);
     }
@@ -203,9 +219,15 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
     if (triangle_count > 0) {
         ensure_buffer(pool_buffer, static_cast<uint32_t>(pool_size) * sizeof(uint32_t),
                       "LightCollection::pool", cmd);
+        ensure_buffer(pool_lights_buffer,
+                      std::min(static_cast<uint32_t>(pool_size), LIGHT_GRID_POOL) *
+                          sizeof(PooledLight),
+                      "LightCollection::pool_lights", cmd);
         ensure_buffer(grid_buffer, grid_cell_count() * LIGHT_GRID_SLOTS * sizeof(uint32_t),
                       "LightCollection::grid", cmd);
-        ensure_buffer(grid_info_buffer, sizeof(LightGridInfo), "LightCollection::grid_info", cmd);
+        ensure_buffer(grid_info_buffer,
+                      static_cast<uint32_t>(grid_cascades) * sizeof(LightGridInfo),
+                      "LightCollection::grid_info", cmd);
     }
 
     if (triangle_count > 0 && tables_dirty) {
@@ -216,7 +238,11 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
         ensure_buffer(geometry_light_offsets_buffer, offsets_size, "LightCollection::offsets", cmd);
         ensure_buffer(triangles_buffer, triangle_count * sizeof(EmissiveTriangle),
                       "LightCollection::triangles", cmd);
+        ensure_buffer(proxies_buffer, triangle_count * sizeof(EmissiveLightProxy),
+                      "LightCollection::proxies", cmd);
         ensure_buffer(cdf_buffer, triangle_count * sizeof(float), "LightCollection::cdf", cmd);
+        ensure_buffer(cdf_block_sums_buffer, cdf_block_count() * sizeof(float),
+                      "LightCollection::cdf_block_sums", cmd);
         staging->cmd_to_device(cmd, light_geometries_buffer, light_geometries.data(), 0,
                                geometries_size);
         staging->cmd_to_device(cmd, geometry_light_offsets_buffer, geometry_light_offsets.data(), 0,
@@ -254,7 +280,7 @@ void LightCollection::update(const CommandBufferHandle& cmd,
         const uint32_t size = env_importance_size();
         // the coarsest level is 2 x 2: its single quad holds the mean
         const uint32_t levels = level_count_for(size) - 1;
-        {
+        if (!env_importance_built) {
             const auto ep = env_build_entry_point.get();
             const auto pipe = env_build_pipeline.get();
             const auto params = env_build_params.get();
@@ -271,6 +297,7 @@ void LightCollection::update(const CommandBufferHandle& cmd,
                           (size + ENV_GROUP_SIZE - 1) / ENV_GROUP_SIZE, 1);
         }
 
+        if (!env_importance_built) {
         const auto ep = env_reduce_entry_point.get();
         const auto pipe = env_reduce_pipeline.get();
         cmd->bind(pipe);
@@ -291,6 +318,8 @@ void LightCollection::update(const CommandBufferHandle& cmd,
             ep->bind("params", params, cmd, pipe, obj_allocator);
             cmd->dispatch((level_size + ENV_GROUP_SIZE - 1) / ENV_GROUP_SIZE,
                           (level_size + ENV_GROUP_SIZE - 1) / ENV_GROUP_SIZE, 1);
+        }
+        env_importance_built = true;
         }
 
         if (env_selection == EnvSelection::EnvSelectionPool && env_pool_buffer) {
@@ -323,6 +352,7 @@ void LightCollection::update(const CommandBufferHandle& cmd,
         const auto params = update_params.get();
         auto c = params->get_cursor();
         c["triangles"] = triangles_buffer;
+        c["proxies"] = proxies_buffer;
         c["light_geometries"] = light_geometries_buffer;
         c["light_geometry_count"] = static_cast<uint32_t>(light_geometries.size());
         c["triangle_count"] = triangle_count;
@@ -354,8 +384,11 @@ void LightCollection::update(const CommandBufferHandle& cmd,
         const auto write_preprocess = [&](const ShaderObjectHandle& params) {
             auto c = params->get_cursor();
             c["triangles"] = triangles_buffer;
+            c["proxies"] = proxies_buffer;
             c["cdf"] = cdf_buffer;
             c["pool"] = pool_buffer;
+            c["pool_lights_out"] = pool_lights_buffer;
+            c["pool_lights"] = pool_lights_buffer;
             c["grid"] = grid_buffer;
             c["grid_info"] = grid_info_buffer;
             c["grid_coverage"] = grid_coverage;
@@ -364,7 +397,9 @@ void LightCollection::update(const CommandBufferHandle& cmd,
             c["pool_size"] = static_cast<uint32_t>(pool_size);
             c["grid_candidates"] = static_cast<uint32_t>(grid_candidates);
             c["grid_dimension"] = static_cast<uint32_t>(grid_dimension);
+            c["grid_cascades"] = static_cast<uint32_t>(grid_cascades);
             c["grid_cell_size"] = grid_cell_size;
+            c["grid_jitter"] = grid_jitter;
             c["grid_visibility"] =
                 static_cast<uint32_t>(grid_visibility && acceleration_structure ? 1 : 0);
             if (acceleration_structure) {
@@ -377,21 +412,38 @@ void LightCollection::update(const CommandBufferHandle& cmd,
 
         const bool use_grid = selection == LightSelection::LightSelectionGrid;
         {
-            const auto ep = cdf_entry_point.get();
-            const auto pipe = cdf_pipeline.get();
-            const auto params = cdf_params.get();
-            auto c = params->get_cursor();
-            c["triangles"] = triangles_buffer;
-            c["cdf"] = cdf_buffer;
-            c["triangle_count"] = triangle_count;
-
-            cmd->bind(pipe);
-            ep->bind("params", params, cmd, pipe, obj_allocator);
-            cmd->dispatch(1, 1, 1);
+            MERIAN_PROFILE_SCOPE_GPU(cmd, "cdf");
+            const uint32_t blocks = cdf_block_count();
+            const auto write_cdf = [&](const ShaderObjectHandle& params) {
+                auto c = params->get_cursor();
+                c["proxies"] = proxies_buffer;
+                c["cdf"] = cdf_buffer;
+                c["block_sums"] = cdf_block_sums_buffer;
+                c["triangle_count"] = triangle_count;
+                c["block_count"] = blocks;
+                return params;
+            };
+            const auto pass = [&](Versioned<SlangProgramEntryPoint>& entry_point,
+                                  Versioned<Pipeline>& pipeline, Versioned<ShaderObject>& params,
+                                  const uint32_t groups) {
+                const auto ep = entry_point.get();
+                const auto pipe = pipeline.get();
+                cmd->bind(pipe);
+                ep->bind("params", write_cdf(params.get()), cmd, pipe, obj_allocator);
+                cmd->dispatch(groups, 1, 1);
+            };
+            pass(cdf_blocks_entry_point, cdf_blocks_pipeline, cdf_blocks_params, blocks);
+            if (blocks > 1) {
+                barrier();
+                pass(cdf_sums_entry_point, cdf_sums_pipeline, cdf_sums_params, 1);
+                barrier();
+                pass(cdf_offset_entry_point, cdf_offset_pipeline, cdf_offset_params, blocks);
+            }
         }
         if (selection != LightSelection::LightSelectionPower) {
             barrier();
             {
+                MERIAN_PROFILE_SCOPE_GPU(cmd, "pool");
                 const auto ep = pool_entry_point.get();
                 const auto pipe = pool_pipeline.get();
                 cmd->bind(pipe);
@@ -402,6 +454,7 @@ void LightCollection::update(const CommandBufferHandle& cmd,
         if (use_grid) {
             barrier();
             {
+                MERIAN_PROFILE_SCOPE_GPU(cmd, "grid setup");
                 const auto ep = setup_entry_point.get();
                 const auto pipe = setup_pipeline.get();
                 cmd->bind(pipe);
@@ -410,11 +463,13 @@ void LightCollection::update(const CommandBufferHandle& cmd,
             }
             barrier();
             {
+                MERIAN_PROFILE_SCOPE_GPU(cmd, "grid fill");
                 const auto ep = grid_entry_point.get();
                 const auto pipe = grid_pipeline.get();
                 cmd->bind(pipe);
                 ep->bind("params", write_preprocess(grid_params.get()), cmd, pipe, obj_allocator);
-                cmd->dispatch((grid_cell_count() + 63) / 64, 1, 1);
+                // one group per cell
+                cmd->dispatch(grid_cell_count(), 1, 1);
             }
         }
     }
@@ -443,6 +498,7 @@ void LightCollection::write_to(ShaderCursor cursor) const {
         std::min(static_cast<uint32_t>(pool_tile_size), static_cast<uint32_t>(pool_size));
     cursor["selection"] = static_cast<uint32_t>(selection);
     cursor["grid_probability"] = grid_probability;
+    cursor["grid_jitter"] = grid_jitter;
     cursor["triangle_count"] = active ? triangle_count : 0u;
     cursor["geometry_count"] = active ? static_cast<uint32_t>(geometry_light_offsets.size()) : 0u;
     cursor["p_env"] = enabled && env_emissive ? env_probability : 0.f;
@@ -488,19 +544,32 @@ void LightCollection::properties(Properties& props) {
                          65536);
     }
     if (selection == LightSelection::LightSelectionGrid) {
-        props.config_int("grid dimension", grid_dimension, "Cells per side of the light grid.", 4,
-                         128);
+        props.config_int("grid dimension", grid_dimension,
+                         "Cells per side of every cascade. Also sets how much of the view a cell "
+                         "covers, since a cascade is placed by the distance it has to reach.",
+                         4, 128);
+        props.config_int("grid cascades", grid_cascades,
+                         "Camera-anchored cascades. Each one doubles the cell size of the one "
+                         "before, so the resolution follows the distance to the camera.",
+                         1, 16);
         props.config_int("grid candidates", grid_candidates,
-                         "Pool draws resampled into each of the cell's slots.", 1, 64);
+                         "Pool draws resampled into the cell's slots. Below the slot count the "
+                         "list is the raw pool draw and the cell is never resampled towards.",
+                         1, 256);
         props.config_percent("grid probability", grid_probability,
                              "How often the cell list is used; the rest falls back to the pool so "
                              "that every light stays reachable.");
         props.config_float("grid cell size", grid_cell_size,
-                           "World units per cell; 0 derives it from the light bounds.", 0.1f, 0.f);
+                           "World units per cell of the finest cascade; 0 derives it from the "
+                           "distance to the lights.",
+                           0.1f, 0.f);
         props.config_float("grid coverage", grid_coverage,
-                           "Fraction of the light bounds the grid spans, when the cell size is "
-                           "derived.",
+                           "Fraction of the distance to the farthest light that the coarsest "
+                           "cascade spans, when the cell size is derived.",
                            0.05f, 0.01f, 16.f);
+        props.config_float("grid jitter", grid_jitter,
+                           "Cells the lookup is offset by, so the cell boundaries do not show.",
+                           0.05f, 0.f, 2.f);
         props.config_bool("grid visibility", grid_visibility,
                           "Drop cell entries the cell cannot see. Costs one ray per slot.");
     }

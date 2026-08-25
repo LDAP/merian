@@ -33,16 +33,28 @@ enum EnvSelection : uint32_t {
 // divided by this, so the scan that evaluates it stays inside one cache line.
 #ifdef __cplusplus
 static constexpr uint32_t LIGHT_GRID_SLOTS = 8;
+// One thread per candidate builds a cell, so this is both the candidate ceiling and the group size.
+static constexpr uint32_t LIGHT_GRID_MAX_CANDIDATES = 256;
+// Pre-resampled lights the cells draw their candidates from. Small enough to stay in cache
+// whatever the scene holds: every cell reads it scattered, once per candidate.
+static constexpr uint32_t LIGHT_GRID_POOL = 1024;
 #else
 static const uint LIGHT_GRID_SLOTS = 8;
+// One thread per candidate builds a cell, so this is both the candidate ceiling and the group size.
+static const uint LIGHT_GRID_MAX_CANDIDATES = 256;
+// Pre-resampled lights the cells draw their candidates from. Small enough to stay in cache
+// whatever the scene holds: every cell reads it scattered, once per candidate.
+static const uint LIGHT_GRID_POOL = 1024;
 #endif
 
-// Camera-anchored uniform grid; cells outside it fall back to the pool. Derived on the GPU from
-// the bounds of the emissive geometry, which the scene itself may not know.
+// One cascade of the light grid. Every cascade holds dimension^3 cells and is snapped to the
+// camera, and the cell size doubles from one cascade to the next, so the resolution follows the
+// distance to the camera. Points beyond the last cascade fall back to the pool.
 struct LightGridInfo {
     float3 origin;
     float inv_cell_size;
     uint32_t dimension; // cells per side, 0 while the grid is unused
+    uint32_t cascade_count;
 };
 
 } // namespace merian
