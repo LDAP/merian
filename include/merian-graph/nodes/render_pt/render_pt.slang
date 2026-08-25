@@ -226,9 +226,10 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
             const Hit hit = scene.trace_ray(ray, RAY_FLAG_NONE, merian_render_instance_mask);
 
             // resolved before the hit is shaded, so neither the hit nor the ray stay live across
-            // it. A delta direction is one no light sampler could have produced.
+            // it. A delta direction is one no light sampler could have produced, and a vertex that
+            // drew no light sample owes the emission it found in full.
             float mis_weight = 1.f;
-            if (nee_here && !delta) {
+            if (nee_surface && !delta) {
                 const LightHit lh =
                     scene.get_light_hit(light_bucket, ray.Origin, ray.Direction, hit);
                 if (merian_render_nee_mode == NEE_MODE_RESAMPLED) {
