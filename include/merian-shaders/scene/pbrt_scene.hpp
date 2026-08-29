@@ -42,13 +42,15 @@ class PBRTScene : public Scene {
     struct Resolved {
         float3 factor{1, 1, 1};
         TextureID texture{TextureID(-1)};
-        bool has_alpha = false;
+        // smallest alpha in the sampled texture; 1 where it has none
+        float min_alpha = 1.f;
     };
 
     struct TextureSlot {
         TextureID id_srgb = TextureID(-1);
         TextureID id_linear = TextureID(-1);
-        bool has_alpha = false;
+        // smallest alpha in the image; 1 where it has no alpha channel
+        float min_alpha = 1.f;
     };
 
     struct MaterialBuild; // OpenPBRMaterial + derived mesh flags, defined in the .cpp
@@ -90,7 +92,7 @@ class PBRTScene : public Scene {
     TextureID load_image_texture(const CommandBufferHandle& cmd,
                                  const std::string& filename,
                                  bool srgb,
-                                 bool* out_has_alpha);
+                                 float* out_min_alpha);
 
     void warn_once(const std::string& key, const std::string& message);
 

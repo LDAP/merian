@@ -135,12 +135,12 @@ void PBRTScene::warn_once(const std::string& key, const std::string& message) {
 TextureID PBRTScene::load_image_texture(const CommandBufferHandle& cmd,
                                         const std::string& filename,
                                         const bool srgb,
-                                        bool* out_has_alpha) {
+                                        float* out_min_alpha) {
     TextureSlot& slot = texture_slots[filename];
     TextureID& cached = srgb ? slot.id_srgb : slot.id_linear;
     if (cached != TextureID(-1)) {
-        if (out_has_alpha != nullptr) {
-            *out_has_alpha = slot.has_alpha;
+        if (out_min_alpha != nullptr) {
+            *out_min_alpha = slot.min_alpha;
         }
         return cached;
     }
@@ -173,19 +173,19 @@ TextureID PBRTScene::load_image_texture(const CommandBufferHandle& cmd,
                 vk::Filter::eLinear, vk::Filter::eLinear, path.filename().string(), srgb);
             cmd->barrier(texture->get_image()->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal));
         } else {
-            bool has_alpha = false;
+            float min_alpha = 1.f;
             texture = get_allocator()->create_texture_from_file(
                 cmd, path, srgb, vk::SamplerAddressMode::eRepeat, vk::Filter::eLinear,
-                vk::Filter::eLinear, path.filename().string(), srgb, &has_alpha);
-            slot.has_alpha = has_alpha;
+                vk::Filter::eLinear, path.filename().string(), srgb, &min_alpha);
+            slot.min_alpha = min_alpha;
         }
     } catch (const std::exception& e) {
         SPDLOG_WARN("PBRTScene: failed to load texture '{}': {}", path.string(), e.what());
         return TextureID(-1);
     }
 
-    if (out_has_alpha != nullptr) {
-        *out_has_alpha = slot.has_alpha;
+    if (out_min_alpha != nullptr) {
+        *out_min_alpha = slot.min_alpha;
     }
     cached = get_texture_manager()->add_texture(texture);
     return cached;
@@ -244,7 +244,7 @@ PBRTScene::Resolved PBRTScene::resolve_texture_ref(const CommandBufferHandle& cm
         const std::string filename = p.get_string("filename", "");
         const std::string encoding = p.get_string("encoding", srgb ? "sRGB" : "linear");
         const bool use_srgb = encoding.starts_with("sRGB");
-        result.texture = load_image_texture(cmd, filename, use_srgb, &result.has_alpha);
+        result.texture = load_image_texture(cmd, filename, use_srgb, &result.min_alpha);
         result.factor = float3(p.get_float("scale", 1.f));
         if (p.get_float("uscale", 1.f) != 1.f || p.get_float("vscale", 1.f) != 1.f ||
             p.get_float("udelta", 0.f) != 0.f || p.get_float("vdelta", 0.f) != 0.f) {
@@ -386,7 +386,7 @@ PBRTScene::MaterialBuild PBRTScene::convert_material(const CommandBufferHandle& 
         mat.header.alpha_texture_id = refl.texture;
         mat.specular_weight = 0.f;
         mat.specular_alpha = float2(1.f);
-        if (refl.has_alpha) {
+        if (refl.min_alpha < get_material_system()->get_alpha_test_threshold()) {
             out.flags = MeshFlags::TwoSided;
         }
         if (type != "diffuse") {
@@ -399,7 +399,7 @@ PBRTScene::MaterialBuild PBRTScene::convert_material(const CommandBufferHandle& 
         mat.specular_ior = p.get_float("eta", 1.5f);
         apply_roughness(cmd, p, "", mat.specular_alpha, mat.roughness_encoding,
                         mat.roughness_texture);
-        if (refl.has_alpha) {
+        if (refl.min_alpha < get_material_system()->get_alpha_test_threshold()) {
             out.flags = MeshFlags::TwoSided;
         }
     } else if (type == "conductor" || type == "coatedconductor") {

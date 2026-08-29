@@ -69,7 +69,8 @@ class FBXScene : public Scene {
     struct TextureSlot {
         TextureID id_srgb = TextureID(-1);
         TextureID id_linear = TextureID(-1);
-        bool has_alpha = false;
+        // smallest alpha in the image; 1 where it has no alpha channel
+        float min_alpha = 1.f;
     };
     // One entry per ufbx texture typed_id; populated lazily by get_or_load_texture.
     std::vector<TextureSlot> texture_slots;

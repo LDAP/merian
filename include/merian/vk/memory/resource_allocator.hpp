@@ -252,7 +252,7 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
         const vk::Filter min_filter = vk::Filter::eLinear,
         const std::string& debug_name = {},
         const bool generate_mipmaps = false,
-        bool* out_has_alpha = nullptr);
+        float* out_min_alpha = nullptr);
 
     // Returns a dummy 4x4 texture with the "missing texture" color (1,0,1,1).
     const TextureHandle& get_dummy_texture() const;
