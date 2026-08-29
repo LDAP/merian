@@ -1,0 +1,179 @@
+#pragma once
+
+// The initial candidate: one path traced from the pixel's primary vertex, with the record a shift
+// needs to move it elsewhere.
+
+#include "merian-graph/nodes/render_restir_cgns/render_restir_cgns_shift.slangh"
+
+namespace merian {
+
+extern static const bool merian_cgns_emission_on_primary = true;
+extern static const int merian_cgns_spp = 1;
+extern static const int merian_cgns_max_path_length = 8;
+
+// Traces one path from `primary` and keeps one of its light-carrying subpaths.
+CgnsCandidate cgns_trace_candidate(const ParameterBlock<Scene> scene,
+                                   const CgnsVertex primary,
+                                   const uint2 pixel,
+                                   inout RandomGenerator rng) {
+    CgnsCandidate candidate = CgnsCandidate();
+
+    ShadingPoint sp = primary.sp;
+    float3 wi = primary.wi;
+
+    // the scatter weights at x1 and x2 are the ones a shift rebuilds, so they stay apart from
+    // the tail the shift carries over untouched
+    float3 early_throughput = float3(1);
+    float3 throughput = float3(1);
+    CgnsReconnection running = CgnsReconnection();
+
+    if (merian_cgns_emission_on_primary && any(sp.emission > 0.f)) {
+        CgnsReconnection rec = running;
+        rec.path_length = 1;
+        rec.set(CgnsFlags::CgnsLightIsDistant, !sp.has_surface_material);
+        rec.irradiance = sp.emission;
+        candidate.add(rng, sp.emission, rec);
+    }
+
+    for (uint bounce = 1; bounce < uint(merian_cgns_max_path_length); bounce++) {
+        if (!sp.has_surface_material ||
+            all(early_throughput * throughput < SCENE_THROUGHPUT_THRESHOLD))
+            break;
+
+        const OrthonormalFrame frame = sp.shading_frame;
+        let bsdf = sp.surface_material.get_bsdf();
+        const float3 wi_local = frame.to_local(wi);
+        const float3 ng = sp.get_face_normal();
+        // light sampling is wasted on a near-specular lobe: it is far more peaked than any light
+        const bool nee = scene.nee.has_lights() && bsdf.alpha >= NEE_MIN_ALPHA;
+        const uint light_bucket = nee ? scene.get_light_bucket(pixel, sp.pos) : LIGHT_INVALID_INDEX;
+
+        // 1. direct light: one sample, MIS-weighted against the scatter direction
+        if (nee) {
+            if (let ls = scene.sample_light(light_bucket, sp.pos, rng)) {
+                const float3 light_local = frame.to_local(ls.wo);
+                // A light the geometry hides is not reachable from this surface, however the
+                // shading frame tilts.
+                if (sp.geometric_side_matches_shading(ls.wo)) {
+                    const float3 f_cos = bsdf.eval(wi_local, light_local, rng);
+                    const float pdf_scatter = bsdf.pdf(wi_local, light_local);
+                    const float3 value = f_cos * ls.Li / (ls.pdf + pdf_scatter);
+                    if (any(value > 0.f) &&
+                        scene.trace_light_visibility(sp.pos, ng, ls.pos, ls.is_distant(),
+                                                     merian_cgns_instance_mask)) {
+                        CgnsReconnection rec = running;
+                        rec.path_length = bounce + 1;
+                        rec.set(CgnsFlags::CgnsLightIsNEE, true);
+                        rec.set(CgnsFlags::CgnsLightIsDistant, ls.is_distant());
+                        if (bounce == 1) {
+                            const float geometry =
+                                ls.is_distant() ? 1.f
+                                                : abs(dot(ls.normal, -ls.wo)) / (ls.dist * ls.dist);
+                            // the point itself, not the offset one a shadow ray aims at: a shift
+                            // rebuilds the direction from it and has to arrive at ls.wo again
+                            rec.second_pos = sp.pos + ls.wo * ls.dist;
+                            rec.enc_second_normal = encode_normal(ls.normal);
+                            rec.set(CgnsFlags::CgnsSecondIsDistant, ls.is_distant());
+                            rec.secondary_pdf = ls.pdf * geometry;
+                            rec.light_pdf = rec.secondary_pdf;
+                            rec.irradiance = ls.Li;
+                        } else if (bounce == 2) {
+                            rec.second_wo = ls.wo;
+                            rec.light_pdf = ls.pdf;
+                            rec.irradiance = ls.Li;
+                        } else {
+                            rec.light_pdf = 0.f;
+                            rec.irradiance = throughput * value;
+                        }
+                        candidate.add(rng, early_throughput * throughput * value, rec);
+                    }
+                }
+            }
+        }
+
+        // 2. one scatter direction out of the shading function
+        const Optional<ShadingFunctionSample> scatter = bsdf.sample_eval(wi_local, rng);
+        if (!scatter.hasValue)
+            break;
+        const bool delta = scatter.value.lobe == BSDFLobe::Delta;
+        const float3 wo_local = scatter.value.wo;
+        const float3 wo = frame.to_world(wo_local);
+        // a delta lobe carries the only density there is
+        const float3 f_cos = delta ? scatter.value.weight : bsdf.eval(wi_local, wo_local, rng);
+        const float pdf_scatter = delta ? 1.f : bsdf.pdf(wi_local, wo_local);
+        if (!any(f_cos > 0.f) || !(pdf_scatter > 0.f))
+            break;
+        const float3 weight = f_cos / pdf_scatter;
+
+        const Optional<RayDesc> next = sp.make_ray(wi, wo, wi_local.z * wo_local.z < 0.f);
+        if (!next.hasValue)
+            break;
+        const RayDesc ray = next.value;
+        const Hit hit = scene.trace_ray(ray, RAY_FLAG_NONE, merian_cgns_instance_mask);
+
+        // density with which the light sampler would have produced this vertex; a delta direction
+        // is one no light sampler could have generated
+        const LightHit light_hit =
+            nee && !delta ? scene.get_light_hit(light_bucket, ray.Origin, ray.Direction, hit)
+                          : LightHit();
+        const float mis = pdf_scatter / (light_hit.pdf + pdf_scatter);
+
+        const bool last = bounce + 1 >= uint(merian_cgns_max_path_length);
+        const ShadingPoint next_sp = scene.get_shading_point(
+            ray, hit, RenderContext(uint16_t(bounce)), DefaultLODSampler(), !last);
+
+        // --- arrival at vertex bounce + 1 ---
+        if (bounce == 1) {
+            bool distant = !hit.is_valid();
+            if (!distant) {
+                const GeometryData gd =
+                    scene.get_geometry_data(hit.instance_id, hit.geometry_index);
+                distant = (gd.flags & GeometryDataFlags::UseEnvMap) != 0;
+            }
+            // measured from the vertex rather than from the offset ray origin, so that a shift
+            // rebuilding the direction from x2 reproduces this density
+            const float3 to_next = next_sp.pos - sp.pos;
+            const float dist2_next = dot(to_next, to_next);
+            const float geometry =
+                distant ? 1.f
+                        : abs(dot(next_sp.get_face_normal(), -to_next * rsqrt(dist2_next))) /
+                              dist2_next;
+            running.second_pos = next_sp.pos;
+            running.enc_second_normal = encode_normal(next_sp.get_face_normal());
+            running.set_second_hit(hit);
+            running.set(CgnsFlags::CgnsSecondIsDistant, distant);
+            running.secondary_pdf = pdf_scatter * geometry;
+            running.light_pdf = light_hit.pdf * geometry;
+        } else if (bounce == 2) {
+            running.second_wo = wo;
+            running.secondary_pdf *= pdf_scatter;
+            running.light_pdf = light_hit.pdf;
+        }
+
+        if (any(next_sp.emission > 0.f)) {
+            CgnsReconnection rec = running;
+            rec.path_length = bounce + 1;
+            rec.set(CgnsFlags::CgnsLightIsNEE, false);
+            if (bounce <= 2) {
+                rec.irradiance = next_sp.emission;
+            } else {
+                rec.light_pdf = 0.f;
+                rec.irradiance = throughput * weight * next_sp.emission * mis;
+            }
+            candidate.add(rng, early_throughput * throughput * weight * next_sp.emission * mis,
+                          rec);
+        }
+
+        if (bounce <= 2) {
+            early_throughput *= weight;
+        } else {
+            throughput *= weight;
+        }
+        sp = next_sp;
+        wi = -ray.Direction;
+    }
+
+    return candidate;
+}
+
+} // namespace merian

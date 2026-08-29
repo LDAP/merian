@@ -16,8 +16,8 @@
 #include "merian-graph/nodes/gbuffer_debug/gbuffer_debug.hpp"
 #include "merian-graph/nodes/gbuffer_rt/gbuffer.hpp"
 #include "merian-graph/nodes/gltf_scene/gltf_scene_node.hpp"
-#include "merian-graph/nodes/guiding/mcpg_distance/mcpg_distance_guiding_node.hpp"
 #include "merian-graph/nodes/guiding/mcpg/mcpg_guiding_node.hpp"
+#include "merian-graph/nodes/guiding/mcpg_distance/mcpg_distance_guiding_node.hpp"
 #include "merian-graph/nodes/guiding/ssmm/ssmm_guiding_node.hpp"
 #include "merian-graph/nodes/image_read/hdr_image.hpp"
 #include "merian-graph/nodes/image_read/ldr_image.hpp"
@@ -28,6 +28,7 @@
 #include "merian-graph/nodes/pbrt_scene/pbrt_scene_node.hpp"
 #include "merian-graph/nodes/reduce/reduce.hpp"
 #include "merian-graph/nodes/render_pt/render_pt.hpp"
+#include "merian-graph/nodes/render_restir_cgns/render_restir_cgns.hpp"
 #include "merian-graph/nodes/render_restir_di/render_restir_di.hpp"
 #include "merian-graph/nodes/shadertoy/shadertoy.hpp"
 #include "merian-graph/nodes/svgf/svgf.hpp"
@@ -105,6 +106,9 @@ NodeRegistry::NodeRegistry() {
     register_node_type<RenderRestirDI>(
         "Render (ReSTIR DI)",
         "Screen-space ReSTIR direct illumination with spatiotemporal reservoir reuse.");
+    register_node_type<RenderRestirCGNS>(
+        "Render (ReSTIR PT, CGNS)",
+        "ReSTIR path tracing whose spatial neighbors are selected by geometric compatibility.");
     register_node_type<Shadertoy>("Shadertoy",
                                   "Execute Shadertoy-like shaders (Limited implementation).");
     register_node_type<SVGF>("Denoiser (SVGF)", "Spatiotemporal Variance-Guided Filtering.");

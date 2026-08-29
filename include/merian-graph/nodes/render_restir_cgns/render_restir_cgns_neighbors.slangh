@@ -1,0 +1,185 @@
+#pragma once
+
+// Compatibility-guided neighbor selection [Junkins et al. 2026]. Candidates are drawn from a
+// quasi-random disk around the pixel, scored by how compatible their primary hit is with this
+// pixel's, and M of them are kept proportional to that score by weighted reservoir sampling.
+
+#include "merian-graph/nodes/render_restir_cgns/render_restir_cgns.slangh"
+
+#include "merian-shaders/utils/math-constants.slangh"
+
+namespace merian {
+
+// K: candidates scored per pixel per spatial round
+extern static const int merian_cgns_candidates = 32;
+// M: neighbors handed to the spatial pass
+extern static const int merian_cgns_neighbor_count = 1;
+extern static const bool merian_cgns_early_stopping = true;
+
+static const float CGNS_EPSILON = 1e-8f;
+// period of the quasi-random offset sequence, so that neighbouring pixels take different runs
+static const uint CGNS_OFFSET_COUNT = 8192;
+// A-ES keeps its selections in registers
+static const uint CGNS_MAX_NEIGHBOR_COUNT = 5;
+
+// Characteristic world-space radius at distance d, so the heuristic is agnostic to scene scale.
+float cgns_neighbor_scale(const float solid_angle, const float dist) {
+    return max(CGNS_EPSILON, sqrt(solid_angle * MERIAN_M_1_PI) * dist);
+}
+
+// h = exp(-||x - y|| / s) * max(n_x . n_y, 0)^beta, paper section 4.3.
+float cgns_neighbor_weight(const bool query_valid,
+                           const bool candidate_valid,
+                           const float3 query_pos,
+                           const float3 query_normal,
+                           const float3 candidate_pos,
+                           const float3 candidate_normal,
+                           const float scale,
+                           const float normal_beta) {
+    // two pixels that both left the scene reuse well; a surface and the environment do not
+    if (!query_valid || !candidate_valid)
+        return query_valid == candidate_valid ? 1.f : CGNS_EPSILON;
+
+    const float position_score = exp(-distance(query_pos, candidate_pos) / scale);
+    const float normal_score = max(0.f, dot(query_normal, candidate_normal));
+    return clamp(position_score * pow(normal_score, normal_beta), CGNS_EPSILON, 1.f);
+}
+
+// Unit-disk offset i of the R2 sequence [Roberts 2018] under the concentric mapping
+// [Shirley and Chiu 1997].
+float2 cgns_disk_offset(const uint index) {
+    // increments are 1 / rho and 1 / rho^2 with the plastic constant rho
+    const float phi = 1.f / 1.3247179572447f;
+    const float n = float(index + 1);
+    const float a = 2.f * frac(0.5f + phi * n) - 1.f;
+    const float b = 2.f * frac(0.5f + phi * phi * n) - 1.f;
+
+    float r, angle;
+    if (abs(a) > abs(b)) {
+        r = a;
+        angle = a != 0.f ? MERIAN_M_PI_4 * (b / a) : 0.f;
+    } else {
+        r = b;
+        angle = b != 0.f ? MERIAN_M_PI_2 - MERIAN_M_PI_4 * (a / b) : 0.f;
+    }
+    return r * float2(cos(angle), sin(angle));
+}
+
+// A-Chao [Chao 1982]: probabilistic accept against the running weight sum. One selection only.
+struct CgnsAChao {
+    int2 selected;
+    float weight_sum;
+
+    __init(const int2 initial) {
+        selected = initial;
+        weight_sum = 0.f;
+    }
+
+    [mutating] void add(const int2 candidate, const float score, inout RandomGenerator rng) {
+        weight_sum += score;
+        if (weight_sum > 0.f && rng.next_float() < score / weight_sum)
+            selected = candidate;
+    }
+}
+
+// A-ES [Efraimidis and Spirakis 2006]: key = log(u) / w, keep the top M by evicting the smallest.
+struct CgnsAES {
+    int2 selected[CGNS_MAX_NEIGHBOR_COUNT];
+    float keys[CGNS_MAX_NEIGHBOR_COUNT];
+
+    __init(const int2 initial) {
+        // fewer candidates than slots leaves duplicates of the initial item
+        for (uint i = 0; i < uint(merian_cgns_neighbor_count); i++) {
+            selected[i] = initial;
+            keys[i] = -MERIAN_FLT_MAX;
+        }
+    }
+
+    [mutating] void add(const int2 candidate, const float score, inout RandomGenerator rng) {
+        const float key = log(max(rng.next_float(), CGNS_EPSILON)) / max(score, CGNS_EPSILON);
+        uint min_index = 0;
+        float min_key = keys[0];
+        for (uint i = 1; i < uint(merian_cgns_neighbor_count); i++) {
+            if (keys[i] < min_key) {
+                min_key = keys[i];
+                min_index = i;
+            }
+        }
+        if (key > min_key) {
+            selected[min_index] = candidate;
+            keys[min_index] = key;
+        }
+    }
+}
+
+// The GBuffer's depth saturates at the environment's distance, which is what marks a pixel where
+// the primary ray left the scene.
+bool cgns_is_surface(const float linear_z) {
+    return linear_z < MAX_LINEAR_Z;
+}
+
+// The M pixels this one resamples from.
+struct CgnsNeighbors {
+    int2 pixels[CGNS_MAX_NEIGHBOR_COUNT];
+}
+
+// Draws K candidates from a quasi-random disk around `pixel`, scores each by how compatible its
+// primary hit is with this one, and keeps M of them proportional to that score.
+CgnsNeighbors cgns_select_neighbors(const ParameterBlock<Scene> scene,
+                                    const GBuffer gbuffer,
+                                    const uint2 pixel,
+                                    const uint2 dim,
+                                    const float radius,
+                                    const float solid_angle,
+                                    const float normal_beta,
+                                    const float early_stop_cutoff,
+                                    inout RandomGenerator rng) {
+    const SurfaceData query = gbuffer.get_surface(pixel);
+    const bool query_valid = cgns_is_surface(query.linear_z);
+    const float3 query_pos =
+        scene.camera.position + scene.camera.get_pinhole_direction(pixel, dim) * query.linear_z;
+    const float scale = cgns_neighbor_scale(solid_angle, query.linear_z);
+
+    const uint start = uint(rng.next_float() * CGNS_OFFSET_COUNT);
+
+    CgnsAChao chao = CgnsAChao(int2(pixel));
+    CgnsAES es = CgnsAES(int2(pixel));
+    int high_quality = 0;
+
+    for (int k = 0; k < merian_cgns_candidates; k++) {
+        const int2 candidate = int2(
+            round(float2(pixel) + radius * cgns_disk_offset((start + uint(k)) % CGNS_OFFSET_COUNT)));
+        if (any(candidate < 0) || any(uint2(candidate) >= dim))
+            continue;
+
+        const SurfaceData other = gbuffer.get_surface(uint2(candidate));
+        const float3 other_pos = scene.camera.position +
+                                 scene.camera.get_pinhole_direction(uint2(candidate), dim) *
+                                     other.linear_z;
+        const float score = cgns_neighbor_weight(query_valid, cgns_is_surface(other.linear_z),
+                                                 query_pos, query.normal, other_pos, other.normal,
+                                                 scale, normal_beta);
+
+        if (merian_cgns_neighbor_count == 1) {
+            chao.add(candidate, score, rng);
+        } else {
+            es.add(candidate, score, rng);
+        }
+
+        // a candidate this compatible is not worth improving on, paper sections 5 and 7.5
+        if (merian_cgns_early_stopping && score >= early_stop_cutoff &&
+            ++high_quality >= merian_cgns_neighbor_count)
+            break;
+    }
+
+    CgnsNeighbors neighbors;
+    if (merian_cgns_neighbor_count == 1) {
+        neighbors.pixels[0] = chao.selected;
+    } else {
+        for (uint i = 0; i < uint(merian_cgns_neighbor_count); i++)
+            neighbors.pixels[i] = es.selected[i];
+    }
+    return neighbors;
+}
+
+} // namespace merian

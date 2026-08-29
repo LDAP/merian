@@ -27,6 +27,9 @@
                         "renderers/pt_ssmm.json"
                     ]
                 },
+                "restir_cgns": {
+                    "merge": "renderers/restir_cgns.json"
+                },
                 "restir_di": {
                     "merge": "renderers/restir_di.json"
                 }

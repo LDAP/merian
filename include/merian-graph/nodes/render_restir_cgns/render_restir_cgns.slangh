@@ -1,0 +1,285 @@
+#pragma once
+
+#ifdef __cplusplus
+#include "merian-shaders/types.slang.h"
+#include <vulkan/vulkan.hpp>
+#else
+import merian_shaders.gbuffer;
+import merian_shaders.scene.scene;
+import merian_shaders.utils.encoding;
+import merian_shaders.utils.hash;
+import merian_shaders.utils.random;
+import merian_shaders.colors.colorspaces;
+#endif
+
+namespace merian {
+
+enum CgnsPass : uint32_t {
+    CgnsPassInitial = 0,
+    CgnsPassTemporal = 1,
+    CgnsPassSelect = 2,
+    CgnsPassSpatial = 3,
+    CgnsPassCount = 4,
+};
+
+enum CgnsPassFlags : uint32_t {
+    // this dispatch is the last one before the image is read
+    CgnsPassResolves = 0x1,
+};
+
+enum CgnsFlags : uint32_t {
+    // the light vertex was drawn by next event estimation rather than by the scatter ray
+    CgnsLightIsNEE = 0x1,
+    // the light vertex is the environment
+    CgnsLightIsDistant = 0x2,
+    // the reconnection vertex is the environment, i.e. path_length == 2 on a distant light
+    CgnsSecondIsDistant = 0x4,
+};
+
+// the flags share their word with the path length
+#ifdef __cplusplus
+static constexpr uint32_t CGNS_PATH_LENGTH_SHIFT = 8;
+#else
+static const uint CGNS_PATH_LENGTH_SHIFT = 8;
+#endif
+
+#ifndef __cplusplus
+// samples a reservoir may stand for; caps how long a path survives temporal reuse
+extern static const float merian_cgns_confidence_cap = 20.f;
+// the reconnection ray stops short of x2 so it does not hit it
+static const float CGNS_RECONNECT_SHORTEN = 0.999f;
+#endif
+
+// One resampled path per pixel. The estimate is integrand * weight_sum / luminance(integrand).
+struct CgnsReservoir {
+    // number of canonical samples the reservoir stands for, capped at CGNS_CONFIDENCE_CAP
+    float confidence;
+    float weight_sum;
+    // contribution of the selected path, in the primary sample space of this pixel
+    float3 integrand;
+
+#ifndef __cplusplus
+    __init() {
+        confidence = 0.f;
+        weight_sum = 0.f;
+        integrand = float3(0);
+    }
+
+    // Unbiased contribution weight of the selected path.
+    float get_ucw() {
+        const float target = yuv_luminance(integrand);
+        return target > 0.f ? weight_sum / target : 0.f;
+    }
+
+    // Resample another reservoir's path, already shifted into this domain. `shifted_integrand` is
+    // the shifted contribution and `jacobian` the shift's, so that W_y = W_x |T'(x)|.
+    [mutating] bool add(inout RandomGenerator rng,
+                        const float mis,
+                        const float3 shifted_integrand,
+                        const float jacobian,
+                        const CgnsReservoir other) {
+        const float weight = mis * yuv_luminance(shifted_integrand) * other.get_ucw() * jacobian;
+        confidence = min(confidence + other.confidence, merian_cgns_confidence_cap);
+        weight_sum += max(weight, 0.f);
+        if (rng.next_float() * weight_sum < weight) {
+            integrand = shifted_integrand;
+            return true;
+        }
+        return false;
+    }
+#endif
+};
+
+// What the shift needs to move the selected path into another pixel's domain: everything from the
+// reconnection vertex x2 onward. The primary vertex x1 is the destination's own and is never
+// stored; the segment x1 -> x2 is rebuilt by the shift.
+struct CgnsReconnection {
+    // x2 in world space; ENV_MAP_DISTANCE away along the ray for a distant vertex
+    float3 second_pos;
+    uint32_t enc_second_normal;
+    // x2's hit, so the shift can re-shade it. Only a scatter vertex is re-shaded (path_length > 2).
+    uint32_t hit_instance_id;
+    uint32_t hit_primitive_id;
+    // geometry index in the low half, instance index in the high half
+    uint32_t hit_indices;
+    uint32_t hit_barycentrics;
+    // direction the path leaves x2 along (path_length > 2)
+    float3 second_wo;
+    // radiance of the light vertex for a path that ends at x2 or x3, otherwise the whole tail
+    // past x2 including its MIS weights
+    float3 irradiance;
+    // density of x2 (area measure) and of x3 (solid angle), i.e. the segments the shift rebuilds
+    float secondary_pdf;
+    // density of the light vertex: area measure at x1 when it is x2, solid angle at x2 when it is
+    // x3. Transported rather than re-evaluated so the MIS weights stay consistent across domains.
+    float light_pdf;
+    // path length in the upper bits, CgnsFlags in the lower ones
+    uint32_t flags;
+
+#ifndef __cplusplus
+    __init() {
+        second_pos = float3(0);
+        enc_second_normal = 0;
+        hit_instance_id = uint(-1);
+        hit_primitive_id = uint(-1);
+        hit_indices = uint(-1);
+        hit_barycentrics = 0;
+        second_wo = float3(0, 0, 1);
+        irradiance = float3(0);
+        secondary_pdf = 1.f;
+        light_pdf = 0.f;
+        flags = 0;
+    }
+
+    [mutating] void set_second_hit(const Hit hit) {
+        hit_instance_id = hit.instance_id;
+        hit_primitive_id = hit.primitive_id;
+        hit_indices = (hit.geometry_index & 0xFFFFu) | (hit.instance_index << 16);
+        hit_barycentrics = reinterpret<uint32_t>(half2(hit.barycentrics));
+    }
+
+    Hit get_second_hit() {
+        return Hit(hit_instance_id, hit_indices >> 16, hit_primitive_id, hit_indices & 0xFFFFu,
+                   float2(unpackHalf2x16ToHalf(hit_barycentrics)));
+    }
+
+    float3 get_second_normal() {
+        return decode_normal(enc_second_normal);
+    }
+
+    property uint path_length {
+        get { return flags >> CGNS_PATH_LENGTH_SHIFT; }
+        set { flags = (flags & ((1u << CGNS_PATH_LENGTH_SHIFT) - 1u)) |
+                      (newValue << CGNS_PATH_LENGTH_SHIFT); }
+    }
+
+    bool has(const CgnsFlags flag) {
+        return (flags & uint(flag)) != 0;
+    }
+
+    [mutating] void set(const CgnsFlags flag, const bool value) {
+        flags = value ? (flags | uint(flag)) : (flags & ~uint(flag));
+    }
+#endif
+};
+
+#ifdef __cplusplus
+using CgnsReservoirAddress = vk::DeviceAddress;
+using CgnsReconnectionAddress = vk::DeviceAddress;
+using CgnsNeighborAddress = vk::DeviceAddress;
+#else
+typealias CgnsReservoirAddress = CgnsReservoir*;
+typealias CgnsReconnectionAddress = CgnsReconnection*;
+typealias CgnsNeighborAddress = int2*;
+#endif
+
+struct CgnsPushConstant {
+    CgnsReservoirAddress reservoirs_in;
+    CgnsReservoirAddress reservoirs_out;
+    CgnsReservoirAddress reservoirs_prev;
+
+    CgnsReconnectionAddress reconnection_in;
+    CgnsReconnectionAddress reconnection_out;
+    CgnsReconnectionAddress reconnection_prev;
+
+    // one pixel per selected neighbor, merian_cgns_neighbor_count of them per pixel
+    CgnsNeighborAddress neighbors;
+
+    uint32_t frame;
+    uint32_t seed;
+    uint32_t pass;
+    uint32_t spatial_round;
+    uint32_t flags;
+
+    float spatial_radius;
+    // solid angle of the characteristic search disk, paper section 4.3
+    float scale_solid_angle;
+    float normal_beta;
+    float early_stop_cutoff;
+};
+
+#ifndef __cplusplus
+
+// Reservoir over the light-carrying subpaths of one traced path. They are disjoint, so every
+// candidate enters with m_i = 1 and the target function cancels against the contribution weight.
+struct CgnsCandidate {
+    float weight_sum;
+    float3 integrand;
+    CgnsReconnection reconnection;
+
+    __init() {
+        weight_sum = 0.f;
+        integrand = float3(0);
+        reconnection = CgnsReconnection();
+    }
+
+    [mutating] bool add(inout RandomGenerator rng,
+                        const float3 contribution,
+                        const CgnsReconnection rec) {
+        const float weight = yuv_luminance(contribution);
+        if (!(weight > 0.f))
+            return false;
+        weight_sum += weight;
+        if (rng.next_float() * weight_sum < weight) {
+            integrand = contribution;
+            reconnection = rec;
+            return true;
+        }
+        return false;
+    }
+}
+
+struct CgnsBinding {
+    ParameterBlock<GBuffer> gbuffer;
+    ParameterBlock<GBuffer> prev_gbuffer;
+    RWTexture2D<float4> irradiance;
+};
+
+// The primary vertex a pixel's paths start from. Its hit comes from the GBuffer, so every domain
+// is a pixel centre and the shift never has to retrace a primary ray.
+struct CgnsVertex {
+    ShadingPoint sp;
+    // towards the camera
+    float3 wi;
+    bool valid;
+};
+
+CgnsVertex cgns_vertex(const ParameterBlock<Scene> scene,
+                       const GBuffer gbuffer,
+                       const RayDesc ray,
+                       const uint2 pixel) {
+    CgnsVertex v;
+    v.wi = -ray.Direction;
+    v.valid = false;
+
+    const Hit hit = gbuffer.get_hit(pixel);
+    // a GBuffer from the previous frame can reference despawned or resized geometry
+    if (hit.is_valid() &&
+        (!scene.is_valid_geometry_id(hit.get_geometry_id()) ||
+         hit.primitive_id >= scene.get_geometry_data(hit.get_geometry_id()).primitive_count))
+        return v;
+
+    v.sp = scene.get_shading_point(ray, hit);
+    v.valid = true;
+    return v;
+}
+
+#endif
+
+} // namespace merian
+
+#ifndef __cplusplus
+
+[vk::push_constant]
+ConstantBuffer<merian::CgnsPushConstant> pc;
+
+uint cgns_index(const uint2 pixel, const uint2 dim) {
+    return pixel.y * dim.x + pixel.x;
+}
+
+merian::RandomGenerator cgns_rng(const uint2 pixel, const uint offset) {
+    return merian::PCG(merian::pcg4d16(
+        uint4(pixel, pc.frame * merian::CgnsPass::CgnsPassCount + pc.pass + offset, pc.seed)));
+}
+
+#endif

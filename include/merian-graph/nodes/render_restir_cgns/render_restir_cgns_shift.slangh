@@ -1,0 +1,212 @@
+#pragma once
+
+// The reconnection shift. Paths reconnect at their second vertex: a shift keeps everything from
+// x2 onwards and rebuilds the segment from the destination's own primary vertex, which comes from
+// the GBuffer. Every domain is therefore a pixel centre and no primary ray is ever retraced.
+
+#include "merian-graph/nodes/render_restir_cgns/render_restir_cgns.slangh"
+
+namespace merian {
+
+extern static const uint merian_cgns_instance_mask = 0xFFu;
+
+// A path moved into another pixel's domain.
+struct CgnsShifted {
+    // contribution in the destination's primary sample space
+    float3 radiance;
+    // density of the rebuilt segments there; the shift's Jacobian is the ratio against the
+    // source's secondary_pdf
+    float pdf;
+
+    __init() {
+        radiance = float3(0);
+        pdf = 0.f;
+    }
+}
+
+// The segment from the destination's primary vertex to x2, as that pixel would have sampled it.
+struct CgnsFirstSegment {
+    float3 f;
+    float pdf;
+    // geometry term of the segment; a distant x2 subtends the same solid angle from anywhere
+    float geometry;
+    // from x2 back towards the primary vertex, which is how a scatter vertex is re-shaded
+    float3 wi;
+    bool valid;
+
+    __init() {
+        f = float3(0);
+        pdf = 0.f;
+        geometry = 0.f;
+        wi = float3(0, 0, 1);
+        valid = false;
+    }
+}
+
+// `light_sampled` says which technique produced the segment at the source, because the
+// destination has to reject the direction on the same terms or the round trip through a shift no
+// longer reproduces the path it started from.
+// `one_sided` restricts the segment to the side of x2 the source path arrived on. A light vertex
+// is stored with the emission the source saw and the normal that faced it, so a destination on
+// the far side is not carrying the same path.
+CgnsFirstSegment cgns_rebuild_first(const ParameterBlock<Scene> scene,
+                                    const CgnsVertex dst,
+                                    const float3 second_pos,
+                                    const float3 second_normal,
+                                    const bool distant,
+                                    const bool light_sampled,
+                                    const bool one_sided,
+                                    inout RandomGenerator rng) {
+    CgnsFirstSegment segment = CgnsFirstSegment();
+
+    const float3 to_second = second_pos - dst.sp.pos;
+    const float dist = length(to_second);
+    if (!(dist > 0.f))
+        return segment;
+    const float3 wo = to_second / dist;
+
+    const OrthonormalFrame frame = dst.sp.shading_frame;
+    const float3 wi_local = frame.to_local(dst.wi);
+    const float3 wo_local = frame.to_local(wo);
+    const bool reachable =
+        light_sampled ? dst.sp.geometric_side_matches_shading(wo)
+                      : dst.sp.geometric_side_agrees(dst.wi, wo, wi_local.z * wo_local.z < 0.f);
+    if (!reachable)
+        return segment;
+
+    let bsdf = dst.sp.surface_material.get_bsdf();
+    segment.f = bsdf.eval(wi_local, wo_local, rng);
+    segment.pdf = bsdf.pdf(wi_local, wo_local);
+    const float cos_second = dot(second_normal, -wo);
+    segment.geometry = distant ? 1.f
+                               : (one_sided ? cos_second : abs(cos_second)) / (dist * dist);
+    segment.wi = -wo;
+    if (!any(segment.f > 0.f) || !(segment.pdf > 0.f) || !(segment.geometry > 0.f))
+        return segment;
+
+    const float3 ng = dst.sp.get_face_normal();
+    if (distant) {
+        if (!scene.trace_light_visibility(dst.sp.pos, ng, second_pos, true,
+                                          merian_cgns_instance_mask))
+            return segment;
+    } else {
+        RayDesc ray;
+        ray.Origin = offset_ray_origin(dst.sp.pos, dot(wo, ng) < 0.f ? -ng : ng);
+        ray.Direction = wo;
+        ray.TMin = SCENE_RAY_TMIN;
+        // stop in front of x2 so the reconnection ray does not find it
+        ray.TMax = length(second_pos - ray.Origin) * CGNS_RECONNECT_SHORTEN;
+        if (!scene.trace_visibility_ray(ray, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH,
+                                        merian_cgns_instance_mask))
+            return segment;
+    }
+
+    segment.valid = true;
+    return segment;
+}
+
+// Moves the path `rec` describes into `dst`'s domain. Fails (zero radiance) where the destination
+// cannot carry it: a primary vertex of the wrong kind, a lobe that does not scatter towards x2, or
+// an occluded reconnection.
+CgnsShifted cgns_shift(const ParameterBlock<Scene> scene,
+                       const CgnsVertex dst,
+                       const CgnsReconnection rec,
+                       inout RandomGenerator rng) {
+    CgnsShifted shifted = CgnsShifted();
+    if (!dst.valid || rec.path_length == 0)
+        return shifted;
+
+    // 1. a path that ends on the primary vertex carries over only if both domains end the same way
+    if (rec.path_length == 1) {
+        if (dst.sp.has_surface_material == rec.has(CgnsFlags::CgnsLightIsDistant))
+            return shifted;
+        shifted.radiance = dst.sp.emission;
+        shifted.pdf = 1.f;
+        return shifted;
+    }
+
+    if (!dst.sp.has_surface_material)
+        return shifted;
+
+    // 2. a path that ends at x2: the light vertex stays where the source sampled it, only the
+    // density it was drawn with is rebuilt. Both techniques arrive at f / (p_light + p_scatter);
+    // they differ in which density parametrizes the path.
+    if (rec.path_length == 2) {
+        const bool nee = rec.has(CgnsFlags::CgnsLightIsNEE);
+        const CgnsFirstSegment segment =
+            cgns_rebuild_first(scene, dst, rec.second_pos, rec.get_second_normal(),
+                               rec.has(CgnsFlags::CgnsSecondIsDistant), nee, true, rng);
+        if (!segment.valid)
+            return shifted;
+
+        // the light density travels in area measure, so the destination only re-projects it
+        const float pdf_light = rec.light_pdf / segment.geometry;
+        if (nee && !(pdf_light > 0.f))
+            return shifted;
+
+        shifted.pdf = segment.geometry * (nee ? pdf_light : segment.pdf);
+        shifted.radiance = segment.f * rec.irradiance / (segment.pdf + pdf_light);
+        return shifted;
+    }
+
+    // 3. reconnect at a scatter vertex: reload it, rebuild the segment towards it, and leave it
+    // along the direction the source did
+    const Hit second_hit = rec.get_second_hit();
+    if (!second_hit.is_valid() || !scene.is_valid_geometry_id(second_hit.get_geometry_id()))
+        return shifted;
+    const GeometryData gd = scene.get_geometry_data(second_hit.get_geometry_id());
+    if (second_hit.primitive_id >= gd.primitive_count)
+        return shifted;
+    const TriangleHit tri = scene.get_triangle_hit(second_hit, gd);
+    const Surface surface = scene.get_surface(second_hit, tri);
+
+    const CgnsFirstSegment segment =
+        cgns_rebuild_first(scene, dst, surface.pos, surface.face_normal, false, false, false, rng);
+    if (!segment.valid)
+        return shifted;
+
+    RayDesc second_ray;
+    second_ray.Origin = dst.sp.pos;
+    second_ray.Direction = -segment.wi;
+    second_ray.TMin = SCENE_RAY_TMIN;
+    second_ray.TMax = SCENE_RAY_TMAX;
+    const ShadingPoint second_sp =
+        scene.get_shading_point(second_ray, second_hit, tri, surface, RenderContext(uint16_t(2)));
+    if (!second_sp.has_surface_material)
+        return shifted;
+
+    const OrthonormalFrame second_frame = second_sp.shading_frame;
+    let second_bsdf = second_sp.surface_material.get_bsdf();
+    const float3 second_wi_local = second_frame.to_local(segment.wi);
+    const float3 second_wo_local = second_frame.to_local(rec.second_wo);
+    const float3 f_second = second_bsdf.eval(second_wi_local, second_wo_local, rng);
+    const float pdf_second = second_bsdf.pdf(second_wi_local, second_wo_local);
+    if (!any(f_second > 0.f))
+        return shifted;
+
+    const float3 throughput = segment.f / segment.pdf;
+
+    // 4. a path that ends at x3: the density of that light does not depend on how x2 was reached
+    if (rec.path_length == 3) {
+        if (rec.has(CgnsFlags::CgnsLightIsNEE)) {
+            if (!(rec.light_pdf > 0.f))
+                return shifted;
+            shifted.pdf = segment.geometry * segment.pdf;
+        } else {
+            if (!(pdf_second > 0.f))
+                return shifted;
+            shifted.pdf = segment.geometry * segment.pdf * pdf_second;
+        }
+        shifted.radiance = throughput * f_second * rec.irradiance / (pdf_second + rec.light_pdf);
+        return shifted;
+    }
+
+    // 5. everything past x3 is unchanged and already carries its own MIS weights
+    if (!(pdf_second > 0.f))
+        return shifted;
+    shifted.pdf = segment.geometry * segment.pdf * pdf_second;
+    shifted.radiance = throughput * (f_second / pdf_second) * rec.irradiance;
+    return shifted;
+}
+
+} // namespace merian
