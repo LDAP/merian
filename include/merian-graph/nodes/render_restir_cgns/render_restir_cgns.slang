@@ -66,7 +66,8 @@ void initial(uint3 thread_id: SV_DispatchThreadID,
 }
 
 // Resamples this pixel's canonical path against the one it held last frame, both shifted into the
-// other's domain (generalized balance heuristic over the two domains).
+// other's domain, with the generalized Talbot MIS weights of [Lin et al. 2022, eq. 36] scaled by
+// each reservoir's confidence [Lin et al. 2022, 6.2].
 [shader("compute")]
 [numthreads(8, 8, 1)]
 void temporal(uint3 thread_id: SV_DispatchThreadID,
@@ -94,8 +95,9 @@ void temporal(uint3 thread_id: SV_DispatchThreadID,
         const int2 top_left = int2(floor(prev_float));
         const float2 fractional = saturate(prev_float - float2(top_left));
 
-        // The history length follows the whole footprint the pixel landed in rather than the one
+        // The confidence follows the whole footprint the pixel landed in rather than the one
         // reservoir it lands on, so it does not step as the reprojection crosses pixel borders.
+        // [Liu et al. 2025]
         float confidence = 0.f;
         for (int y = 0; y < 2; y++) {
             for (int x = 0; x < 2; x++) {
@@ -193,7 +195,9 @@ void select_neighbors(uint3 thread_id: SV_DispatchThreadID,
         pc.neighbors[base + i] = neighbors.pixels[i];
 }
 
-// Resamples the pre-selected neighbors into this pixel, pairwise-MIS weighted.
+// Resamples the pre-selected neighbors into this pixel with the defensive pairwise resampling MIS
+// weights of [Lin et al. 2022, eq. 38], in the confidence-weighted form of
+// [Hedstrom et al. 2026, eq. 11].
 [shader("compute")]
 [numthreads(8, 8, 1)]
 void spatial(uint3 thread_id: SV_DispatchThreadID,
@@ -215,13 +219,15 @@ void spatial(uint3 thread_id: SV_DispatchThreadID,
     const CgnsReservoir central_res = pc.reservoirs_in[index];
     const CgnsReconnection central_rec = pc.reconnection_in[index];
     const float central_confidence = merian_cgns_confidence_spatial ? central_res.confidence : 1.f;
-    const float central_weight = yuv_luminance(central_res.integrand) /
-                                 float(merian_cgns_neighbor_count) * central_confidence;
+    const float central_target = yuv_luminance(central_res.integrand);
 
-    CgnsReservoir dst = CgnsReservoir();
-    CgnsReconnection dst_rec = CgnsReconnection();
-    float central_mis = 1.f;
+    // 1. which neighbors survive, and how much confidence they carry between them. The pairwise
+    // weights need that sum (c in eq. 11) before the first pair is weighed, so acceptance cannot
+    // be decided inside the loop below.
+    int2 accepted_pixel[CGNS_MAX_NEIGHBOR_COUNT];
+    float accepted_confidence[CGNS_MAX_NEIGHBOR_COUNT];
     int accepted = 0;
+    float confidence_sum = 0.f;
 
     for (uint i = 0; i < uint(merian_cgns_neighbor_count); i++) {
         const int2 npixel = pc.neighbors[index * uint(merian_cgns_neighbor_count) + i];
@@ -230,8 +236,7 @@ void spatial(uint3 thread_id: SV_DispatchThreadID,
 
         if (merian_cgns_geometry_rejection) {
             const SurfaceData ns = params.gbuffer.get_surface(uint2(npixel));
-            const bool nsurface = cgns_is_surface(ns.linear_z);
-            if (central_surface != nsurface)
+            if (central_surface != cgns_is_surface(ns.linear_z))
                 continue;
             if (central_surface &&
                 (dot(central.normal, ns.normal) < merian_cgns_reject_normal ||
@@ -239,30 +244,50 @@ void spatial(uint3 thread_id: SV_DispatchThreadID,
                      merian_cgns_reject_depth * central.linear_z))
                 continue;
         }
-        accepted++;
 
-        const uint nindex = cgns_index(uint2(npixel), dim);
+        accepted_pixel[accepted] = npixel;
+        accepted_confidence[accepted] =
+            merian_cgns_confidence_spatial
+                ? pc.reservoirs_in[cgns_index(uint2(npixel), dim)].confidence
+                : 1.f;
+        confidence_sum += accepted_confidence[accepted];
+        accepted++;
+    }
+
+    const float total_confidence = confidence_sum + central_confidence;
+
+    CgnsReservoir dst = CgnsReservoir();
+    CgnsReconnection dst_rec = CgnsReconnection();
+    // the term that keeps the canonical sample defensive, eq. 11b
+    float central_mis = total_confidence > 0.f ? central_confidence / total_confidence : 1.f;
+
+    for (int i = 0; i < accepted; i++) {
+        const uint2 npixel = uint2(accepted_pixel[i]);
+        const float nconfidence = accepted_confidence[i];
+        const uint nindex = cgns_index(npixel, dim);
         const CgnsReservoir nres = pc.reservoirs_in[nindex];
         CgnsReconnection nrec = pc.reconnection_in[nindex];
-        const float nconfidence = merian_cgns_confidence_spatial ? nres.confidence : 1.f;
 
-        // what this pixel's own path would be worth to the neighbor. Shading the neighbor is the
-        // expensive half of the pairwise weight, so nothing loads it for a pixel that has no path.
-        float m_there = 0.f;
-        if (any(central_res.integrand > 0.f)) {
-            const CgnsVertex nvertex =
-                cgns_vertex(scene, params.gbuffer,
-                            scene.generate_camera_ray(uint2(npixel), dim), uint2(npixel));
+        // What this pixel's own path is worth in the neighbor's domain. Shading the neighbor is
+        // the expensive half of the pair, so nothing loads it for a pixel that has no path.
+        float target_there = 0.f;
+        if (central_target > 0.f) {
+            const CgnsVertex nvertex = cgns_vertex(
+                scene, params.gbuffer, scene.generate_camera_ray(npixel, dim), npixel);
             const CgnsShifted shifted = cgns_shift(scene, nvertex, central_rec, rng);
-            m_there = yuv_luminance(shifted.radiance) * nconfidence *
-                      (central_rec.secondary_pdf > 0.f ? shifted.pdf / central_rec.secondary_pdf
-                                                       : 0.f);
-            m_there = isfinite(m_there) ? m_there : 0.f;
+            target_there =
+                yuv_luminance(shifted.radiance) *
+                (central_rec.secondary_pdf > 0.f ? shifted.pdf / central_rec.secondary_pdf : 0.f);
+            target_there = isfinite(target_there) ? target_there : 0.f;
         }
-        central_mis += 1.f;
-        central_mis -= m_there + central_weight > 0.f ? m_there / (m_there + central_weight) : 0.f;
+        const float central_pair =
+            confidence_sum * target_there + central_confidence * central_target;
+        if (central_pair > 0.f) {
+            central_mis += (nconfidence / total_confidence) *
+                           (central_confidence * central_target) / central_pair;
+        }
 
-        // and the neighbor's path here
+        // and the neighbor's path here, eq. 11a
         float nmis = 0.f;
         float3 nradiance = float3(0);
         float njacobian = 1.f;
@@ -270,17 +295,20 @@ void spatial(uint3 thread_id: SV_DispatchThreadID,
             const CgnsShifted shifted = cgns_shift(scene, vertex, nrec, rng);
             const float jacobian =
                 nrec.secondary_pdf > 0.f ? shifted.pdf / nrec.secondary_pdf : 0.f;
-            float m_here = yuv_luminance(shifted.radiance) * jacobian * central_confidence;
-            if (isfinite(m_here) && m_here > 0.f) {
+            float target_here = yuv_luminance(shifted.radiance) * jacobian;
+            if (isfinite(target_here) && target_here > 0.f) {
                 nradiance = shifted.radiance;
                 njacobian = jacobian;
+                // the path now lives in this domain
                 nrec.secondary_pdf = shifted.pdf;
             } else {
-                m_here = 0.f;
+                target_here = 0.f;
             }
-            m_here /= float(merian_cgns_neighbor_count);
-            const float m_at_neighbor = yuv_luminance(nres.integrand) * nconfidence;
-            nmis = m_here + m_at_neighbor > 0.f ? m_at_neighbor / (m_here + m_at_neighbor) : 0.f;
+            const float ntarget = yuv_luminance(nres.integrand);
+            const float pair = confidence_sum * ntarget + central_confidence * target_here;
+            if (pair > 0.f) {
+                nmis = (confidence_sum / total_confidence) * (nconfidence * ntarget) / pair;
+            }
         }
         if (dst.add(rng, nmis, nradiance, njacobian, nres))
             dst_rec = nrec;
@@ -289,7 +317,6 @@ void spatial(uint3 thread_id: SV_DispatchThreadID,
     // the canonical sample needed the sum over the neighbors, so it goes in last
     if (dst.add(rng, central_mis, central_res.integrand, 1.f, central_res))
         dst_rec = central_rec;
-    dst.weight_sum /= float(accepted + 1);
 
     pc.reservoirs_out[index] = dst;
     pc.reconnection_out[index] = dst_rec;

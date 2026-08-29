@@ -1,8 +1,9 @@
 #pragma once
 
-// The reconnection shift. Paths reconnect at their second vertex: a shift keeps everything from
-// x2 onwards and rebuilds the segment from the destination's own primary vertex, which comes from
-// the GBuffer. Every domain is therefore a pixel centre and no primary ray is ever retraced.
+// The reconnection shift [Lehtinen et al. 2013; Lin et al. 2022, 7.3]: y2 = x2, so a shift keeps
+// everything from the second vertex onwards and rebuilds the segment from the destination's own
+// primary vertex, which comes from the GBuffer. Every domain is therefore a pixel centre and no
+// primary ray is ever retraced.
 
 #include "merian-graph/nodes/render_restir_cgns/render_restir_cgns.slangh"
 
@@ -14,8 +15,9 @@ extern static const uint merian_cgns_instance_mask = 0xFFu;
 struct CgnsShifted {
     // contribution in the destination's primary sample space
     float3 radiance;
-    // density of the rebuilt segments there; the shift's Jacobian is the ratio against the
-    // source's secondary_pdf
+    // Density of the rebuilt segments there, in the primary sample space the paths are built in
+    // [Lin et al. 2022, 8.1]. The shift's Jacobian is the ratio against the source's
+    // secondary_pdf, which is eq. 52 divided through by the scatter densities.
     float pdf;
 
     __init() {
@@ -77,6 +79,7 @@ CgnsFirstSegment cgns_rebuild_first(const ParameterBlock<Scene> scene,
     let bsdf = dst.sp.surface_material.get_bsdf();
     segment.f = bsdf.eval(wi_local, wo_local, rng);
     segment.pdf = bsdf.pdf(wi_local, wo_local);
+    // the cosine over squared distance of [Lin et al. 2022, eq. 52]
     const float cos_second = dot(second_normal, -wo);
     segment.geometry = distant ? 1.f
                                : (one_sided ? cos_second : abs(cos_second)) / (dist * dist);

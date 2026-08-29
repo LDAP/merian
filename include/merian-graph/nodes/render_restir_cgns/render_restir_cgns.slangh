@@ -44,15 +44,16 @@ static const uint CGNS_PATH_LENGTH_SHIFT = 8;
 #endif
 
 #ifndef __cplusplus
-// samples a reservoir may stand for; caps how long a path survives temporal reuse
+// Bounds the relative weight a reused path can reach, which is what keeps the chain from
+// converging to the wrong result [Lin et al. 2022, 6.4].
 extern static const float merian_cgns_confidence_cap = 20.f;
 // the reconnection ray stops short of x2 so it does not hit it
 static const float CGNS_RECONNECT_SHORTEN = 0.999f;
 #endif
 
-// One resampled path per pixel. The estimate is integrand * weight_sum / luminance(integrand).
+// One resampled path per pixel, as a GRIS reservoir [Lin et al. 2022].
 struct CgnsReservoir {
-    // number of canonical samples the reservoir stands for, capped at CGNS_CONFIDENCE_CAP
+    // relative weight the reservoir carries into the next resampling step [Lin et al. 2022, 6.2]
     float confidence;
     float weight_sum;
     // contribution of the selected path, in the primary sample space of this pixel
@@ -65,14 +66,14 @@ struct CgnsReservoir {
         integrand = float3(0);
     }
 
-    // Unbiased contribution weight of the selected path.
+    // Unbiased contribution weight of the selected path, [Lin et al. 2022, eq. 22].
     float get_ucw() {
         const float target = yuv_luminance(integrand);
         return target > 0.f ? weight_sum / target : 0.f;
     }
 
-    // Resample another reservoir's path, already shifted into this domain. `shifted_integrand` is
-    // the shifted contribution and `jacobian` the shift's, so that W_y = W_x |T'(x)|.
+    // Resample another reservoir's path, already shifted into this domain. The weight is the
+    // resampling weight of [Lin et al. 2022, eq. 19]: m_i * target * W_i * |dT_i/dx|.
     [mutating] bool add(inout RandomGenerator rng,
                         const float mis,
                         const float3 shifted_integrand,
@@ -200,8 +201,8 @@ struct CgnsPushConstant {
 
 #ifndef __cplusplus
 
-// Reservoir over the light-carrying subpaths of one traced path. They are disjoint, so every
-// candidate enters with m_i = 1 and the target function cancels against the contribution weight.
+// Reservoir over the light-carrying subpaths of one traced path. Their domains are disjoint, so
+// every candidate enters with m_i = 1 and the target cancels against the contribution weight.
 struct CgnsCandidate {
     float weight_sum;
     float3 integrand;
