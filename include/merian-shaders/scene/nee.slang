@@ -33,6 +33,8 @@ struct LightSample {
     // point on the light, offset towards the receiver so a ray aimed at it ends in front of the
     // emitting side; for the environment a point along wo at ENV_MAP_DISTANCE
     float3 pos;
+    // emitting side's normal at that point; -wo for the environment
+    float3 normal;
     // emissive triangle, or LIGHT_ENV_INDEX; identifies the sampled light at a hit
     uint index;
 
@@ -317,6 +319,7 @@ struct NEE {
         // area measure to solid angle
         ls.pdf = dist2 / (cos_l * 0.5f * area2);
         ls.pos = offset_ray_origin(light_pos, n);
+        ls.normal = n;
         ls.index = index;
         return ls;
     }
@@ -396,6 +399,7 @@ struct NEE {
                                  material_system.texture_manager, DefaultLODSampler());
                 ls.pdf = es.pdf * p_e;
                 ls.pos = pos + es.dir * ENV_MAP_DISTANCE;
+                ls.normal = -es.dir;
                 ls.index = LIGHT_ENV_INDEX;
                 return ls;
             }

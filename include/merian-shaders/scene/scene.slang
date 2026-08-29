@@ -429,14 +429,23 @@ struct Scene {
                                    const LODSampler2D lod = DefaultLODSampler(),
                                    const bool with_material = true) {
         const TriangleHit tri = get_triangle_hit(hit, gd);
-        const Surface surface = get_surface(hit, tri);
+        return get_shading_point(ray, hit, tri, get_surface(hit, tri), ctx, lod, with_material);
+    }
 
+    // For callers that already hold the triangle and its surface.
+    ShadingPoint get_shading_point(const RayDesc ray,
+                                   const Hit hit,
+                                   const TriangleHit tri,
+                                   const Surface surface,
+                                   const RenderContext ctx = RenderContext(),
+                                   const LODSampler2D lod = DefaultLODSampler(),
+                                   const bool with_material = true) {
         const float3 prev_pos = get_prev_world_position(hit, tri);
 
         OrthonormalFrame frame = surface.frame;
         float3 face_normal = surface.face_normal;
         bool front_facing = true;
-        if (gd.flags & GeometryDataFlags::TwoSided) {
+        if (tri.gd.flags & GeometryDataFlags::TwoSided) {
             front_facing = dot(-ray.Direction, surface.face_normal) >= 0.f;
             if (!front_facing) {
                 frame.flip_normal();
