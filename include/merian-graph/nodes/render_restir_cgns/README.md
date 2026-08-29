@@ -17,10 +17,10 @@ mechanisms. The default configuration uses none of them.
 
 The reuse chain is what limits how closely the output tracks the path tracer. ReSTIR does not
 converge at a fixed reuse width and a fixed confidence cap; the cap is what bounds how far it
-drifts (Lin et al. 2022, section 6.4). Measured against `Render (Path-traced)` (pbrt scenes, 1024
-against 3000 iterations), the mean stays within 0.03 - 0.08 %, and the offset is proportional to
-`history cap`: it is 0.008 % per unit of it and vanishes with the cap at 1, with the reuse
-disabled, or with either reuse pass on its own.
+drifts (Lin et al. 2022, section 6.4). Measured against `Render (Path-traced)` (pbrt scenes at
+their own film resolution, 1024 against 3000 iterations), the mean stays within 0.03 - 0.08 %, and
+the offset is proportional to `history cap`: it is 0.008 % per unit of it and vanishes with the cap
+at 1, with the reuse disabled, or with either reuse pass on its own.
 
 ## References
 
