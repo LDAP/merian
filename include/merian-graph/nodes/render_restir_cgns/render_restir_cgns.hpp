@@ -81,6 +81,7 @@ class RenderRestirCGNS : public Node {
     int32_t emitted_max_path_length = max_path_length;
     uint32_t seed = 0;
     bool emission_on_primary = true;
+    bool russian_roulette = true;
     bool demodulate_albedo = false;
     std::array<bool, 8> mask_enabled{true, true, true, true, true, true, true, true};
 

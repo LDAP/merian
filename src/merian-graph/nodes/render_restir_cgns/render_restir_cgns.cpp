@@ -67,6 +67,7 @@ void RenderRestirCGNS::update_render_constants() {
         "render_restir_cgns_constants",
         fmt::format("namespace merian {{\n"
                     "export static const bool merian_cgns_emission_on_primary = {};\n"
+                    "export static const bool merian_cgns_russian_roulette = {};\n"
                     "export static const bool merian_cgns_demodulate_albedo = {};\n"
                     "export static const int merian_cgns_spp = {};\n"
                     "export static const int merian_cgns_max_path_length = {};\n"
@@ -81,11 +82,11 @@ void RenderRestirCGNS::update_render_constants() {
                     "export static const int merian_cgns_candidates = {};\n"
                     "export static const bool merian_cgns_early_stopping = {};\n"
                     "}}",
-                    emission_on_primary ? "true" : "false", demodulate_albedo ? "true" : "false",
-                    spp, max_path_length, mask, confidence_temporal ? "true" : "false",
-                    confidence_spatial ? "true" : "false", confidence_cap,
-                    geometry_rejection ? "true" : "false", reject_normal, reject_depth,
-                    neighbor_count, candidates, early_stopping ? "true" : "false"));
+                    emission_on_primary ? "true" : "false", russian_roulette ? "true" : "false",
+                    demodulate_albedo ? "true" : "false", spp, max_path_length, mask,
+                    confidence_temporal ? "true" : "false", confidence_spatial ? "true" : "false",
+                    confidence_cap, geometry_rejection ? "true" : "false", reject_normal,
+                    reject_depth, neighbor_count, candidates, early_stopping ? "true" : "false"));
 }
 
 std::vector<InputConnectorDescriptor> RenderRestirCGNS::describe_inputs() {
@@ -302,6 +303,9 @@ RenderRestirCGNS::NodeStatusFlags RenderRestirCGNS::properties(Properties& confi
     constants_changed |=
         config.config_int("max path length", max_path_length,
                           "Maximum number of path segments, including the primary hit.", 2, 16);
+    constants_changed |= config.config_bool(
+        "russian roulette", russian_roulette,
+        "Terminate low-throughput paths after the vertex a shift reconnects at.");
     constants_changed |=
         config.config_bool("emission on primary", emission_on_primary,
                            "Fold primary-hit emission into irradiance (self-contained). "

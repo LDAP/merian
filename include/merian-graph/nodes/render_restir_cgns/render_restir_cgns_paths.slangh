@@ -8,6 +8,7 @@
 namespace merian {
 
 extern static const bool merian_cgns_emission_on_primary = true;
+extern static const bool merian_cgns_russian_roulette = true;
 extern static const int merian_cgns_spp = 1;
 extern static const int merian_cgns_max_path_length = 8;
 
@@ -91,7 +92,16 @@ CgnsCandidate cgns_trace_candidate(const ParameterBlock<Scene> scene,
             }
         }
 
-        // 2. one scatter direction out of the shading function
+        // 2. russian roulette on the tail throughput only, so the two segments a shift rebuilds
+        // keep the density they were sampled with
+        if (merian_cgns_russian_roulette) {
+            const float survive = min(1.f, yuv_luminance(throughput));
+            if (rng.next_float() >= survive)
+                break;
+            throughput /= survive;
+        }
+
+        // 3. one scatter direction out of the shading function
         const Optional<ShadingFunctionSample> scatter = bsdf.sample_eval(wi_local, rng);
         if (!scatter.hasValue)
             break;
