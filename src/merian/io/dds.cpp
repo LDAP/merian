@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cctype>
 #include <cstring>
 #include <fstream>
@@ -122,6 +123,54 @@ void decode_alpha_block(const uint8_t* src, std::array<uint8_t, 16>& out) {
     }
 }
 
+// Smallest alpha over mip 0. BC2 stores it explicitly, BC3 in a BC4-style block, and a BC7 block
+// only carries alpha in modes 4 to 7, so the mode byte alone settles the opaque case.
+float min_alpha_of_mip0(const vk::Format format,
+                        const uint32_t width,
+                        const uint32_t height,
+                        const uint8_t* data,
+                        const size_t size) {
+    const uint32_t blocks_x = std::max(1u, (width + 3) / 4);
+    const uint32_t blocks_y = std::max(1u, (height + 3) / 4);
+    const size_t blocks = static_cast<size_t>(blocks_x) * blocks_y;
+    if (blocks * 16 > size) {
+        return 0.f;
+    }
+
+    const bool is_bc2 = format == vk::Format::eBc2UnormBlock || format == vk::Format::eBc2SrgbBlock;
+    const bool is_bc3 = format == vk::Format::eBc3UnormBlock || format == vk::Format::eBc3SrgbBlock;
+    const bool is_bc7 = format == vk::Format::eBc7UnormBlock || format == vk::Format::eBc7SrgbBlock;
+
+    uint8_t min_alpha = 255;
+    for (size_t block = 0; block < blocks; block++) {
+        const uint8_t* src = data + block * 16;
+        if (is_bc2) {
+            for (uint32_t byte = 0; byte < 8; byte++) {
+                // two 4-bit texels per byte, replicated to 8 bits the way the hardware does
+                min_alpha = std::min({min_alpha, static_cast<uint8_t>((src[byte] & 0xF) * 17),
+                                      static_cast<uint8_t>((src[byte] >> 4) * 17)});
+            }
+        } else if (is_bc3) {
+            std::array<uint8_t, 16> alpha{};
+            decode_alpha_block(src, alpha);
+            min_alpha = std::min(min_alpha, *std::min_element(alpha.begin(), alpha.end()));
+        } else if (is_bc7) {
+            // the mode is the number of leading zero bits before the first set bit of byte 0
+            const uint32_t mode = src[0] == 0 ? 8 : static_cast<uint32_t>(std::countr_zero(src[0]));
+            if (mode >= 4) {
+                return 0.f;
+            }
+            continue;
+        } else {
+            return 0.f;
+        }
+        if (min_alpha == 0) {
+            break;
+        }
+    }
+    return static_cast<float>(min_alpha) / 255.f;
+}
+
 } // namespace
 
 bool is_dds(const std::filesystem::path& path) {
@@ -221,6 +270,10 @@ DdsImage dds_load(const std::filesystem::path& path, const bool srgb) {
     file.read(reinterpret_cast<char*>(dds.data.data()),
               static_cast<std::streamsize>(dds.data.size()));
     dds.has_alpha = format_has_alpha(dds.format);
+    if (dds.has_alpha) {
+        dds.min_alpha =
+            min_alpha_of_mip0(dds.format, dds.width, dds.height, dds.data.data(), dds.data.size());
+    }
     return dds;
 }
 

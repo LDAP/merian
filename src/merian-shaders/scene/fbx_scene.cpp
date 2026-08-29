@@ -94,6 +94,7 @@ void FBXScene::free_scene() {
 // ---------------------------------------------------------------------------
 
 void FBXScene::load_materials(const CommandBufferHandle& cmd) {
+    const float alpha_threshold = get_material_system()->get_alpha_test_threshold();
     // Textures upload lazily on first material access.
     texture_slots.assign(scene->textures.count, TextureSlot{});
 
@@ -124,10 +125,14 @@ void FBXScene::load_materials(const CommandBufferHandle& cmd) {
         mat.opacity = map_real(pbr.opacity, 1.f);
         mat.header.alpha_texture_id = load(pbr.base_color, false);
 
+        // Only a base color that actually drops below the alpha threshold needs the test; a
+        // texture that merely carries an alpha channel does not make the geometry non-opaque.
         const ufbx_texture* base_tex = pbr.base_color.texture;
-        const bool base_has_alpha = base_tex != nullptr &&
-                                    base_tex->typed_id < texture_slots.size() &&
-                                    texture_slots[base_tex->typed_id].has_alpha;
+        const float base_min_alpha =
+            base_tex != nullptr && base_tex->typed_id < texture_slots.size()
+                ? texture_slots[base_tex->typed_id].min_alpha
+                : 1.f;
+        const bool base_has_alpha = base_min_alpha < alpha_threshold;
         const bool opaque = !base_has_alpha && transmission == 0.f && mat.opacity >= 0.999f;
         // Back faces are shaded for alpha-cutout (foliage), explicitly double-sided materials, and
         // glass (so the ray hits the exit interface).
@@ -219,7 +224,15 @@ TextureID FBXScene::get_or_load_texture(const CommandBufferHandle& cmd,
             static_cast<uint32_t>(height), address_mode, vk::Filter::eLinear, vk::Filter::eLinear,
             !linear, tex->name.data, generate_mipmaps);
         cmd->barrier(texture->get_image()->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal));
-        slot.has_alpha = comp == 4;
+        slot.min_alpha = 1.f;
+        if (comp == 4) {
+            uint8_t smallest = 255;
+            const size_t count = static_cast<size_t>(width) * height;
+            for (size_t i = 0; i < count && smallest > 0; i++) {
+                smallest = std::min(smallest, pixels[i * 4 + 3]);
+            }
+            slot.min_alpha = static_cast<float>(smallest) / 255.f;
+        }
         stbi_image_free(pixels);
     } else {
         // External file: one call dispatches to the right host-side loader by extension.
@@ -229,11 +242,11 @@ TextureID FBXScene::get_or_load_texture(const CommandBufferHandle& cmd,
             return TextureID(-1);
         }
         try {
-            bool has_alpha = false;
+            float min_alpha = 1.f;
             texture = get_allocator()->create_texture_from_file(
                 cmd, path, /*srgb=*/!linear, address_mode, vk::Filter::eLinear, vk::Filter::eLinear,
-                path.filename().string(), generate_mipmaps, &has_alpha);
-            slot.has_alpha = has_alpha;
+                path.filename().string(), generate_mipmaps, &min_alpha);
+            slot.min_alpha = min_alpha;
         } catch (const std::exception& e) {
             SPDLOG_WARN("FBXScene: failed to load texture '{}': {}", path.string(), e.what());
             return TextureID(-1);

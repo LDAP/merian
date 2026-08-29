@@ -20,6 +20,10 @@ struct DdsImage {
     uint32_t mip_levels = 1;
     // True if the format carries an alpha channel.
     bool has_alpha = false;
+    // Smallest alpha over mip 0, or 1 where the format carries no alpha. A texture whose alpha
+    // never drops below the alpha test threshold does not need the test, and the geometry using it
+    // can stay opaque.
+    float min_alpha = 1.f;
     std::vector<uint8_t> data;
 };
 

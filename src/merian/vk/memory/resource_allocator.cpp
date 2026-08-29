@@ -440,12 +440,12 @@ TextureHandle ResourceAllocator::create_texture_from_file(const CommandBufferHan
                                                           const vk::Filter min_filter,
                                                           const std::string& debug_name,
                                                           const bool generate_mipmaps,
-                                                          bool* out_has_alpha) {
+                                                          float* out_min_alpha) {
     // BCn DDS: upload the raw compressed blocks (and its stored mip chain) directly.
     if (is_dds(path)) {
         const DdsImage dds = dds_load(path, srgb);
-        if (out_has_alpha != nullptr) {
-            *out_has_alpha = dds.has_alpha;
+        if (out_min_alpha != nullptr) {
+            *out_min_alpha = dds.min_alpha;
         }
         const SamplerHandle sampler = m_samplerPool->for_filter_and_address_mode(
             mag_filter, min_filter, address_mode, vk::SamplerMipmapMode::eLinear);
@@ -457,8 +457,17 @@ TextureHandle ResourceAllocator::create_texture_from_file(const CommandBufferHan
     // Everything else: decode to RGBA8 via the host-side stb loader.
     ImageInfo info;
     const BlobHandle blob = image_load_u8(path, info, 4);
-    if (out_has_alpha != nullptr) {
-        *out_has_alpha = info.source_channels == 4;
+    if (out_min_alpha != nullptr) {
+        *out_min_alpha = 1.f;
+        if (info.source_channels == 4) {
+            const uint8_t* texels = blob->get_data<uint8_t>();
+            const size_t count = static_cast<size_t>(info.width) * info.height;
+            uint8_t smallest = 255;
+            for (size_t i = 0; i < count && smallest > 0; i++) {
+                smallest = std::min(smallest, texels[i * 4 + 3]);
+            }
+            *out_min_alpha = static_cast<float>(smallest) / 255.f;
+        }
     }
     const TextureHandle texture = create_texture_from_rgba8(
         cmd, blob->get_data<uint32_t>(), static_cast<uint32_t>(info.width),
