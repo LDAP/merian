@@ -23,7 +23,8 @@ DeviceSupportInfo RenderPT::query_device_support(const DeviceSupportQueryInfo& q
     composition->add_module_from_path("merian-graph/nodes/render_pt/render_pt.slang", true);
     composition->add_module_from_path("merian-graph/nodes/render_pt/render_pt_volume.slang", true);
     const auto program = SlangProgram::create(query_info.compile_context, composition);
-    return DeviceSupportInfo::check(query_info, {"rayTracingPipeline"}, {"rayQuery"}) &
+    return DeviceSupportInfo::check(query_info, {"rayTracingPipeline"},
+                                    {"rayQuery", "rayTracingInvocationReorder"}) &
            program.get()->query_device_support(query_info);
 }
 
