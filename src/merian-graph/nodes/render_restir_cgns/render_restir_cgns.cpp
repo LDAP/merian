@@ -59,6 +59,20 @@ vk::BufferCreateInfo RenderRestirCGNS::neighbor_buffer_create_info() const {
                                     vk::BufferUsageFlagBits::eShaderDeviceAddress};
 }
 
+vk::BufferCreateInfo RenderRestirCGNS::splat_buffer_create_info() const {
+    return vk::BufferCreateInfo{{},
+                                vk::DeviceSize(extent.width) * extent.height * splat_capacity * 4,
+                                vk::BufferUsageFlagBits::eStorageBuffer |
+                                    vk::BufferUsageFlagBits::eShaderDeviceAddress};
+}
+
+vk::BufferCreateInfo RenderRestirCGNS::splat_count_buffer_create_info() const {
+    return vk::BufferCreateInfo{{},
+                                vk::DeviceSize(extent.width) * extent.height * 4,
+                                vk::BufferUsageFlagBits::eStorageBuffer |
+                                    vk::BufferUsageFlagBits::eTransferDst};
+}
+
 void RenderRestirCGNS::update_render_constants() {
     uint32_t mask = 0u;
     for (uint32_t bit = 0; bit < 8; ++bit) {
@@ -84,12 +98,15 @@ void RenderRestirCGNS::update_render_constants() {
                     "export static const int merian_cgns_neighbor_count = {};\n"
                     "export static const int merian_cgns_candidates = {};\n"
                     "export static const bool merian_cgns_early_stopping = {};\n"
+                    "export static const int merian_cgns_temporal_mode = {};\n"
+                    "export static const int merian_cgns_splat_capacity = {};\n"
                     "}}",
                     emission_on_primary ? "true" : "false", russian_roulette ? "true" : "false",
                     demodulate_albedo ? "true" : "false", spp, max_path_length, mask,
                     confidence_temporal ? "true" : "false", confidence_spatial ? "true" : "false",
                     confidence_cap, geometry_rejection ? "true" : "false", reject_normal,
-                    reject_depth, neighbor_count, candidates, early_stopping ? "true" : "false"));
+                    reject_depth, neighbor_count, candidates, early_stopping ? "true" : "false",
+                    static_cast<int>(temporal_mode), splat_capacity));
 }
 
 std::vector<InputConnectorDescriptor> RenderRestirCGNS::describe_inputs() {
@@ -151,6 +168,10 @@ RenderRestirCGNS::on_connected(const NodeIOLayout& io_layout,
         reconnection_buffer_create_info(), MemoryMappingType::NONE, "ReSTIR CGNS reconnection");
     neighbors = resource_allocator->create_buffer(neighbor_buffer_create_info(),
                                                   MemoryMappingType::NONE, "ReSTIR CGNS neighbors");
+    splats = resource_allocator->create_buffer(splat_buffer_create_info(), MemoryMappingType::NONE,
+                                               "ReSTIR CGNS splats");
+    splat_counts = resource_allocator->create_buffer(
+        splat_count_buffer_create_info(), MemoryMappingType::NONE, "ReSTIR CGNS splat counts");
 
     // the first temporal pass resamples from reservoirs that no pass has written yet
     submission.get_cmd()->fill(io[con_reservoirs]);
@@ -241,6 +262,7 @@ RenderRestirCGNS::process(const NodeIO& io, const NodeProcessInfo& info, Submiss
     pc.reservoirs_prev = io[con_prev_reservoirs]->get_device_address();
     pc.reconnection_prev = io[con_prev_reconnection]->get_device_address();
     pc.neighbors = neighbors->get_device_address();
+    pc.splats = splats->get_device_address();
     pc.frame = static_cast<uint32_t>(info.get_iteration());
     pc.seed = seed;
     pc.spatial_radius = spatial_radius;
@@ -257,6 +279,7 @@ RenderRestirCGNS::process(const NodeIO& io, const NodeProcessInfo& info, Submiss
         cursor["gbuffer"] = io[con_gbuffer].r();
         cursor["prev_gbuffer"] = io[con_prev_gbuffer].r();
         cursor["irradiance"] = io[con_irradiance].get_texture();
+        cursor["splat_counts"] = splat_counts;
 
         pc.pass = static_cast<uint32_t>(p);
         pc.flags = flags;
@@ -301,6 +324,17 @@ RenderRestirCGNS::process(const NodeIO& io, const NodeProcessInfo& info, Submiss
     }
 
     if (temporal) {
+        if (temporal_mode != TemporalMode::Gather) {
+            MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "splat");
+            cmd->fill(splat_counts, 0);
+            cmd->barrier(vk::PipelineStageFlagBits::eTransfer,
+                         vk::PipelineStageFlagBits::eComputeShader,
+                         splat_counts->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
+                                                      vk::AccessFlagBits::eShaderRead |
+                                                          vk::AccessFlagBits::eShaderWrite));
+            run(Temporal, current, current, CgnsPassSplats);
+            sync({splats, splat_counts});
+        }
         sync({current.reservoirs, current.reconnection});
         MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "temporal");
         run(Temporal, current, current, last);
@@ -349,6 +383,19 @@ RenderRestirCGNS::NodeStatusFlags RenderRestirCGNS::properties(Properties& confi
         "filtering. Use with 'emission on primary' disabled (emission is albedo-independent).");
 
     config.st_separate("temporal reuse");
+    int32_t mode = static_cast<int32_t>(temporal_mode);
+    constants_changed |= config.config_options(
+        "reprojection", mode, {"gather", "splat", "splat, gather fallback"},
+        Properties::OptionsStyle::COMBO,
+        "How the previous frame's reservoirs reach a pixel. 'gather' pulls the one this pixel's "
+        "motion vector points at; 'splat' pushes every reservoir onto the pixel its own primary "
+        "vertex projects to.");
+    temporal_mode = static_cast<TemporalMode>(mode);
+    if (temporal_mode != TemporalMode::Gather) {
+        needs_reconnect |=
+            config.config_int("splat capacity", splat_capacity,
+                              "Reservoirs a pixel can receive. Any past that are dropped.", 1, 8);
+    }
     config.config_bool("enable temporal reuse", temporal_enable);
     constants_changed |= config.config_bool(
         "confidence weights##temporal", confidence_temporal,

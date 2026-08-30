@@ -11,9 +11,28 @@ the `Render (Path-traced)` node, which is what the output is meant to converge a
 that samples the film would need the lens-vertex and primary-hit-reconnection shifts of Area
 ReSTIR, which this node does not implement.
 
-Not carried over from the reference implementation: reservoir splatting and the scatter-based
-temporal modes, motion blur, depth of field, Russian roulette, and the clamped and robust gather
-mechanisms. The default configuration uses none of them.
+Not carried over from the reference implementation: motion blur, depth of field, and the clamped
+and robust gather mechanisms.
+
+## Temporal reprojection
+
+`reprojection` picks how the previous frame's reservoirs reach a pixel.
+
+`gather` pulls the one this pixel's motion vector points at. `splat` pushes every reservoir onto
+the pixel its own primary vertex projects to (Liu et al. 2025), which reprojects the vertex rather
+than trusting a screen-space vector, and `splat, gather fallback` pulls along the motion vector at
+the pixels nothing landed on. A pixel holds `splat capacity` reservoirs; any past that are dropped.
+
+Splatting sends any number of reservoirs to one pixel, so they share the defensive pairwise weights
+the spatial pass uses rather than the two-way balance heuristic a gather needs. Every reservoir is
+splatted, empty ones included: dropping one would take a technique out of those weights, not just a
+sample.
+
+The reference keeps the splatted reservoirs in a compacted list built from a prefix sum over the
+per-pixel counts; a fixed number of slots per pixel needs one dispatch instead of four for the same
+resampling.
+
+## Convergence
 
 The reuse chain is what limits how closely the output tracks the path tracer. ReSTIR does not
 converge at a fixed reuse width and a fixed confidence cap; the cap is what bounds how far it
@@ -21,6 +40,10 @@ drifts (Lin et al. 2022, section 6.4). Measured against `Render (Path-traced)` (
 their own film resolution, 1024 against 3000 iterations), the mean stays within 0.03 - 0.08 %, and
 the offset is proportional to `history cap`: it is 0.008 % per unit of it and vanishes with the cap
 at 1, with the reuse disabled, or with either reuse pass on its own.
+
+Splatting widens that offset where it moves history across pixel borders, since the destination
+then carries a confidence its own domain never earned: veach-ajar and staircase stay at 0.05 %,
+while bathroom reaches 1.9 % at the default cap of 20 and falls back to 0.3 % at a cap of 1.
 
 ## References
 

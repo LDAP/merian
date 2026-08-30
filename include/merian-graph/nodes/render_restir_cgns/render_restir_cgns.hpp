@@ -31,6 +31,9 @@ class RenderRestirCGNS : public Node {
   public:
     enum Pass { Initial = 0, Temporal = 1, SelectNeighbors = 2, Spatial = 3, PassCount = 4 };
 
+    // How the previous frame's reservoirs reach a pixel.
+    enum class TemporalMode { Gather = 0, Splat = 1, SplatGather = 2 };
+
     RenderRestirCGNS();
 
     ~RenderRestirCGNS() override = default;
@@ -60,6 +63,10 @@ class RenderRestirCGNS : public Node {
     [[nodiscard]] vk::BufferCreateInfo reservoir_buffer_create_info() const;
     [[nodiscard]] vk::BufferCreateInfo reconnection_buffer_create_info() const;
     [[nodiscard]] vk::BufferCreateInfo neighbor_buffer_create_info() const;
+
+    [[nodiscard]] vk::BufferCreateInfo splat_buffer_create_info() const;
+
+    [[nodiscard]] vk::BufferCreateInfo splat_count_buffer_create_info() const;
 
     ContextHandle context;
     ResourceAllocatorHandle resource_allocator;
@@ -101,6 +108,8 @@ class RenderRestirCGNS : public Node {
 
     // CGNS neighbor selection
     int32_t neighbor_count = 1;
+    TemporalMode temporal_mode = TemporalMode::Gather;
+    int32_t splat_capacity = 4;
     int32_t candidates = 32;
     float scale_solid_angle = 0.05f;
     float normal_beta = 8.f;
@@ -117,6 +126,8 @@ class RenderRestirCGNS : public Node {
     BufferHandle pong_reservoirs;
     BufferHandle pong_reconnection;
     BufferHandle neighbors;
+    BufferHandle splats;
+    BufferHandle splat_counts;
 };
 
 } // namespace merian

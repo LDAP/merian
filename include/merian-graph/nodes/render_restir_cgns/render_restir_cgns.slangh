@@ -25,6 +25,8 @@ enum CgnsPass : uint32_t {
 enum CgnsPassFlags : uint32_t {
     // this dispatch is the last one before the image is read
     CgnsPassResolves = 0x1,
+    // this dispatch splats the previous reservoirs instead of resampling them
+    CgnsPassSplats = 0x2,
 };
 
 enum CgnsFlags : uint32_t {
@@ -168,10 +170,12 @@ struct CgnsReconnection {
 using CgnsReservoirAddress = vk::DeviceAddress;
 using CgnsReconnectionAddress = vk::DeviceAddress;
 using CgnsNeighborAddress = vk::DeviceAddress;
+using CgnsSplatAddress = vk::DeviceAddress;
 #else
 typealias CgnsReservoirAddress = CgnsReservoir*;
 typealias CgnsReconnectionAddress = CgnsReconnection*;
 typealias CgnsNeighborAddress = int2*;
+typealias CgnsSplatAddress = uint32_t*;
 #endif
 
 struct CgnsPushConstant {
@@ -185,6 +189,9 @@ struct CgnsPushConstant {
 
     // one pixel per selected neighbor, merian_cgns_neighbor_count of them per pixel
     CgnsNeighborAddress neighbors;
+
+    // previous-frame pixels that project onto a pixel, merian_cgns_splat_capacity slots each
+    CgnsSplatAddress splats;
 
     uint32_t frame;
     uint32_t seed;
@@ -234,6 +241,8 @@ struct CgnsBinding {
     ParameterBlock<GBuffer> gbuffer;
     ParameterBlock<GBuffer> prev_gbuffer;
     RWTexture2D<float4> irradiance;
+    // how many previous reservoirs tried to land on a pixel
+    RWStructuredBuffer<uint> splat_counts;
 };
 
 // The primary vertex a pixel's paths start from. Its hit comes from the GBuffer, so every domain
