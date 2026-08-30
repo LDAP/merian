@@ -11,7 +11,6 @@ extern static const bool merian_cgns_confidence_spatial = true;
 // neighbors whose normals or depths diverge this far from the pixel's are not resampled
 extern static const float merian_cgns_reject_normal = 0.5f;
 extern static const float merian_cgns_reject_depth = 0.1f;
-extern static const int merian_cgns_splat_capacity = 4;
 // how a previous reservoir reaches a pixel: pulled along the motion vector, pushed by projecting
 // its own primary vertex, or pushed with the pull as a fallback where nothing lands
 static const int CGNS_TEMPORAL_GATHER = 0;
@@ -88,15 +87,17 @@ void cgns_splat(const uint2 pixel,
     if (!(dot(vertex.sp.pos - scene.camera.position, scene.camera.W) > 0.f))
         return;
 
-    const float2 splat = scene.camera.project_pinhole(vertex.sp.pos, dim) - scene.camera.jitter;
+    // Unjittered: a domain here is a whole pixel, so the sub-pixel offset the two frames were
+    // sampled with says nothing about which of them the path belongs to.
+    const float2 splat = scene.camera.project_pinhole(vertex.sp.pos, dim);
     if (!all(splat > float2(-0.5f)) || !all(splat < float2(dim) - 0.5f))
         return;
 
     const uint target = cgns_index(uint2(round(splat)), dim);
     uint slot;
     InterlockedAdd(params.splat_counts[target], 1u, slot);
-    if (slot < uint(merian_cgns_splat_capacity))
-        pc.splats[target * uint(merian_cgns_splat_capacity) + slot] = index;
+    if (slot == 0)
+        pc.splats[target] = index;
 }
 
 // Bilinear confidence over the footprint the pixel reprojects into, rather than the one reservoir
@@ -186,13 +187,13 @@ void cgns_pass_temporal(const uint2 pixel,
                     : (merian_cgns_confidence_temporal ? cgns_prev_confidence(prev_float, dim)
                                                        : 1.f);
 
-    const uint splat_count = merian_cgns_temporal_mode == CGNS_TEMPORAL_GATHER
-                                 ? 0u
-                                 : min(params.splat_counts[index],
-                                       uint(merian_cgns_splat_capacity));
+    // A pixel keeps one reservoir: the weights below pair it with the canonical path, and a
+    // second one would be weighed against that same path and count itself in as well.
+    const bool splatted =
+        merian_cgns_temporal_mode != CGNS_TEMPORAL_GATHER && params.splat_counts[index] > 0;
     const bool gather =
         merian_cgns_temporal_mode == CGNS_TEMPORAL_GATHER ||
-        (merian_cgns_temporal_mode == CGNS_TEMPORAL_SPLAT_GATHER && splat_count == 0);
+        (merian_cgns_temporal_mode == CGNS_TEMPORAL_SPLAT_GATHER && !splatted);
 
     CgnsReservoir dst = CgnsReservoir();
     CgnsReconnection dst_rec = CgnsReconnection();
@@ -234,82 +235,43 @@ void cgns_pass_temporal(const uint2 pixel,
         cgns_resample_prev(scene, vertex, current_confidence, prev_vertex.valid, prev, prev_rec,
                            dst, dst_rec, rng);
     } else {
-        // any number of reservoirs can land on one pixel, so they share the defensive pairwise
-        // weights of [Lin et al. 2022, eq. 38] in the confidence-weighted form of
-        // [Hedstrom et al. 2026, eq. 11], as in the spatial pass
-        const uint base = index * uint(merian_cgns_splat_capacity);
-        float confidence_sum = 0.f;
-        for (uint i = 0; i < splat_count; i++) {
-            confidence_sum += merian_cgns_confidence_temporal
-                                  ? pc.reservoirs_prev[pc.splats[base + i]].confidence
-                                  : 1.f;
-        }
-        const float total_confidence = confidence_sum + current_confidence;
-        const float central_target = yuv_luminance(current.integrand);
-        // the term that keeps the canonical sample defensive, eq. 11b
-        float current_mis = total_confidence > 0.f ? current_confidence / total_confidence : 1.f;
+        // The splatted reservoir and this pixel's canonical path are the pair that competes
+        // for it, weighed by the balance heuristic of [Lin et al. 2022, eq. 36]. The reference
+        // pairs the canonical with the reservoir at the pixel it reprojects onto instead, which is
+        // the one that splatted here only while the two maps invert each other; a pixel index is
+        // too coarse for that, so the pairing follows the splat.
+        const uint source = pc.splats[index];
+        const uint2 source_pixel = uint2(source % dim.x, source / dim.x);
+        const CgnsVertex source_vertex =
+            cgns_vertex(scene, params.prev_gbuffer,
+                        scene.prev_camera.generate_ray_pinhole(source_pixel, dim), source_pixel);
+        const float source_confidence =
+            merian_cgns_confidence_temporal ? pc.reservoirs_prev[source].confidence : 1.f;
 
-        for (uint i = 0; i < splat_count; i++) {
-            const uint source = pc.splats[base + i];
-            const uint2 source_pixel = uint2(source % dim.x, source / dim.x);
-            const float sconfidence =
-                merian_cgns_confidence_temporal ? pc.reservoirs_prev[source].confidence : 1.f;
-            const CgnsVertex source_vertex =
-                cgns_vertex(scene, params.prev_gbuffer,
-                            scene.prev_camera.generate_ray_pinhole(source_pixel, dim),
-                            source_pixel);
-
-            // what this pixel's own path is worth back in the source's domain
-            float target_there = 0.f;
-            if (central_target > 0.f && source_vertex.valid) {
+        float current_mis = 0.f;
+        if (any(current.integrand > 0.f)) {
+            const float m_here = yuv_luminance(current.integrand) * current_confidence;
+            float m_there = 0.f;
+            if (source_vertex.valid) {
                 const CgnsShifted shifted = cgns_shift(scene, source_vertex, current_rec, rng);
-                target_there =
-                    yuv_luminance(shifted.radiance) *
-                    (current_rec.secondary_pdf > 0.f ? shifted.pdf / current_rec.secondary_pdf
-                                                     : 0.f);
-                target_there = isfinite(target_there) ? target_there : 0.f;
+                m_there = yuv_luminance(shifted.radiance) * source_confidence *
+                          (current_rec.secondary_pdf > 0.f ? shifted.pdf / current_rec.secondary_pdf
+                                                           : 0.f);
+                m_there = isfinite(m_there) ? m_there : 0.f;
             }
-            const float central_pair =
-                confidence_sum * target_there + current_confidence * central_target;
-            if (central_pair > 0.f) {
-                current_mis += (sconfidence / total_confidence) *
-                               (current_confidence * central_target) / central_pair;
-            }
-
-            // and the splatted path here, eq. 11a
-            CgnsReservoir sres = pc.reservoirs_prev[source];
-            sres.confidence = sconfidence;
-            CgnsReconnection srec = pc.reconnection_prev[source];
-            float smis = 0.f;
-            float3 sradiance = float3(0);
-            float sjacobian = 1.f;
-            if (source_vertex.valid && any(sres.integrand > 0.f)) {
-                const CgnsShifted shifted = cgns_shift(scene, vertex, srec, rng);
-                const float jacobian =
-                    srec.secondary_pdf > 0.f ? shifted.pdf / srec.secondary_pdf : 0.f;
-                float target_here = yuv_luminance(shifted.radiance) * jacobian;
-                if (isfinite(target_here) && target_here > 0.f) {
-                    sradiance = shifted.radiance;
-                    sjacobian = jacobian;
-                    // the path now lives in this domain
-                    srec.secondary_pdf = shifted.pdf;
-                } else {
-                    target_here = 0.f;
-                }
-                const float starget = yuv_luminance(sres.integrand);
-                const float pair = confidence_sum * starget + current_confidence * target_here;
-                if (pair > 0.f)
-                    smis = (confidence_sum / total_confidence) * (sconfidence * starget) / pair;
-            }
-            if (dst.add(rng, smis, sradiance, sjacobian, sres))
-                dst_rec = srec;
+            current_mis = m_here + m_there > 0.f ? m_here / (m_here + m_there) : 0.f;
         }
-
-        // the canonical sample needed the sum over the splats, so it goes in last
         if (dst.add(rng, current_mis, current.integrand, 1.f, current))
             dst_rec = current_rec;
-    }
 
+        CgnsReservoir prev = pc.reservoirs_prev[source];
+        prev.confidence = source_confidence;
+        cgns_resample_prev(scene, vertex, current_confidence, source_vertex.valid, prev,
+                           pc.reconnection_prev[source], dst, dst_rec, rng);
+
+        // the history a pixel inherits follows its motion vector, not what happened to land on it
+        dst.confidence = min(current.confidence + inherited, merian_cgns_confidence_cap);
+    }
 
     pc.reservoirs_out[index] = dst;
     pc.reconnection_out[index] = dst_rec;

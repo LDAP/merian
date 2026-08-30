@@ -190,7 +190,7 @@ struct CgnsPushConstant {
     // one pixel per selected neighbor, merian_cgns_neighbor_count of them per pixel
     CgnsNeighborAddress neighbors;
 
-    // previous-frame pixels that project onto a pixel, merian_cgns_splat_capacity slots each
+    // the previous-frame pixel whose reservoir landed on a pixel, one per pixel
     CgnsSplatAddress splats;
 
     uint32_t frame;

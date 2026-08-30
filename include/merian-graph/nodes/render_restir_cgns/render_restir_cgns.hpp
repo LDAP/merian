@@ -109,7 +109,6 @@ class RenderRestirCGNS : public Node {
     // CGNS neighbor selection
     int32_t neighbor_count = 1;
     TemporalMode temporal_mode = TemporalMode::Gather;
-    int32_t splat_capacity = 4;
     int32_t candidates = 32;
     float scale_solid_angle = 0.05f;
     float normal_beta = 8.f;

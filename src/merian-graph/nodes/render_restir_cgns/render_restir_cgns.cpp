@@ -61,7 +61,7 @@ vk::BufferCreateInfo RenderRestirCGNS::neighbor_buffer_create_info() const {
 
 vk::BufferCreateInfo RenderRestirCGNS::splat_buffer_create_info() const {
     return vk::BufferCreateInfo{{},
-                                vk::DeviceSize(extent.width) * extent.height * splat_capacity * 4,
+                                vk::DeviceSize(extent.width) * extent.height * 4,
                                 vk::BufferUsageFlagBits::eStorageBuffer |
                                     vk::BufferUsageFlagBits::eShaderDeviceAddress};
 }
@@ -99,14 +99,13 @@ void RenderRestirCGNS::update_render_constants() {
                     "export static const int merian_cgns_candidates = {};\n"
                     "export static const bool merian_cgns_early_stopping = {};\n"
                     "export static const int merian_cgns_temporal_mode = {};\n"
-                    "export static const int merian_cgns_splat_capacity = {};\n"
                     "}}",
                     emission_on_primary ? "true" : "false", russian_roulette ? "true" : "false",
                     demodulate_albedo ? "true" : "false", spp, max_path_length, mask,
                     confidence_temporal ? "true" : "false", confidence_spatial ? "true" : "false",
                     confidence_cap, geometry_rejection ? "true" : "false", reject_normal,
                     reject_depth, neighbor_count, candidates, early_stopping ? "true" : "false",
-                    static_cast<int>(temporal_mode), splat_capacity));
+                    static_cast<int>(temporal_mode)));
 }
 
 std::vector<InputConnectorDescriptor> RenderRestirCGNS::describe_inputs() {
@@ -391,11 +390,6 @@ RenderRestirCGNS::NodeStatusFlags RenderRestirCGNS::properties(Properties& confi
         "motion vector points at; 'splat' pushes every reservoir onto the pixel its own primary "
         "vertex projects to.");
     temporal_mode = static_cast<TemporalMode>(mode);
-    if (temporal_mode != TemporalMode::Gather) {
-        needs_reconnect |=
-            config.config_int("splat capacity", splat_capacity,
-                              "Reservoirs a pixel can receive. Any past that are dropped.", 1, 8);
-    }
     config.config_bool("enable temporal reuse", temporal_enable);
     constants_changed |= config.config_bool(
         "confidence weights##temporal", confidence_temporal,

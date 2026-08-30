@@ -21,16 +21,26 @@ and robust gather mechanisms.
 `gather` pulls the one this pixel's motion vector points at. `splat` pushes every reservoir onto
 the pixel its own primary vertex projects to (Liu et al. 2025), which reprojects the vertex rather
 than trusting a screen-space vector, and `splat, gather fallback` pulls along the motion vector at
-the pixels nothing landed on. A pixel holds `splat capacity` reservoirs; any past that are dropped.
+the pixels nothing landed on.
 
-Splatting sends any number of reservoirs to one pixel, so they share the defensive pairwise weights
-the spatial pass uses rather than the two-way balance heuristic a gather needs. Every reservoir is
-splatted, empty ones included: dropping one would take a technique out of those weights, not just a
-sample.
+A pixel keeps one reservoir and its canonical path is weighed against it with the same balance
+heuristic a gather uses. A second one would be weighed against that same path and count itself in
+as well, which doubles the energy within a few frames.
 
-The reference keeps the splatted reservoirs in a compacted list built from a prefix sum over the
-per-pixel counts; a fixed number of slots per pixel needs one dispatch instead of four for the same
-resampling.
+Two places where a pixel-sized domain cannot follow the reference, which carries a sub-pixel
+position and a lens sample per reservoir:
+
+- The target is the pixel the vertex projects to with the camera jitter left out. Taking the jitter
+  into account is what the reference does, and is right only when the destination is the sub-pixel
+  position the splat actually lands on; against a pixel index it walks every reservoir a pixel per
+  frame and mixes the history across the image.
+- The reference pairs the canonical path with the reservoir at the pixel it reprojects onto, which
+  is the one that splatted here only while the two maps invert each other. Rounding to a pixel
+  breaks that, so the pairing follows the splat instead.
+
+Every reservoir is splatted, empty ones included: dropping one would take a technique out of the
+weights, not just a sample. The reference keeps the splatted reservoirs in a compacted list built
+from a prefix sum over the per-pixel counts; one slot per pixel needs a single dispatch.
 
 ## Convergence
 
@@ -41,9 +51,7 @@ their own film resolution, 1024 against 3000 iterations), the mean stays within 
 the offset is proportional to `history cap`: it is 0.008 % per unit of it and vanishes with the cap
 at 1, with the reuse disabled, or with either reuse pass on its own.
 
-Splatting widens that offset where it moves history across pixel borders, since the destination
-then carries a confidence its own domain never earned: veach-ajar and staircase stay at 0.05 %,
-while bathroom reaches 1.9 % at the default cap of 20 and falls back to 0.3 % at a cap of 1.
+Splatting stays in the same range: 0.03 - 0.08 % over the same scenes, in either of its modes.
 
 ## References
 
