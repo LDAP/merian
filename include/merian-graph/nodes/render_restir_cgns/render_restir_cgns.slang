@@ -240,16 +240,21 @@ void cgns_pass_temporal(const uint2 pixel,
         // pairs the canonical with the reservoir at the pixel it reprojects onto instead, which is
         // the one that splatted here only while the two maps invert each other; a pixel index is
         // too coarse for that, so the pairing follows the splat.
-        const uint source = pc.splats[index];
+        // The slot keeps whatever last landed in it, so a pixel that received nothing this frame
+        // has no previous technique at all and its canonical path carries the whole weight.
+        const uint source = splatted ? pc.splats[index] : index;
         const uint2 source_pixel = uint2(source % dim.x, source / dim.x);
-        const CgnsVertex source_vertex =
-            cgns_vertex(scene, params.prev_gbuffer,
-                        scene.prev_camera.generate_ray_pinhole(source_pixel, dim), source_pixel);
+        CgnsVertex source_vertex;
+        source_vertex.valid = false;
+        if (splatted)
+            source_vertex = cgns_vertex(scene, params.prev_gbuffer,
+                                        scene.prev_camera.generate_ray_pinhole(source_pixel, dim),
+                                        source_pixel);
         const float source_confidence =
             merian_cgns_confidence_temporal ? pc.reservoirs_prev[source].confidence : 1.f;
 
-        float current_mis = 0.f;
-        if (any(current.integrand > 0.f)) {
+        float current_mis = any(current.integrand > 0.f) ? 1.f : 0.f;
+        if (splatted && any(current.integrand > 0.f)) {
             const float m_here = yuv_luminance(current.integrand) * current_confidence;
             float m_there = 0.f;
             if (source_vertex.valid) {
@@ -264,10 +269,12 @@ void cgns_pass_temporal(const uint2 pixel,
         if (dst.add(rng, current_mis, current.integrand, 1.f, current))
             dst_rec = current_rec;
 
-        CgnsReservoir prev = pc.reservoirs_prev[source];
-        prev.confidence = source_confidence;
-        cgns_resample_prev(scene, vertex, current_confidence, source_vertex.valid, prev,
-                           pc.reconnection_prev[source], dst, dst_rec, rng);
+        if (splatted) {
+            CgnsReservoir prev = pc.reservoirs_prev[source];
+            prev.confidence = source_confidence;
+            cgns_resample_prev(scene, vertex, current_confidence, source_vertex.valid, prev,
+                               pc.reconnection_prev[source], dst, dst_rec, rng);
+        }
 
         // the history a pixel inherits follows its motion vector, not what happened to land on it
         dst.confidence = min(current.confidence + inherited, merian_cgns_confidence_cap);
