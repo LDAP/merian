@@ -29,12 +29,9 @@ void cgns_write_irradiance(const CgnsBinding params,
 
 // One path per sample, resampled into a single reservoir. All samples are independent, so each
 // enters with m_i = 1 / spp.
-[shader("compute")]
-[numthreads(8, 8, 1)]
-void initial(uint3 thread_id: SV_DispatchThreadID,
-             ParameterBlock<Scene> scene,
-             ParameterBlock<CgnsBinding> params) {
-    const uint2 pixel = thread_id.xy;
+void cgns_pass_initial(const uint2 pixel,
+                       const ParameterBlock<Scene> scene,
+                       const ParameterBlock<CgnsBinding> params) {
     const uint2 dim = params.gbuffer.get_dimensions();
     if (any(pixel >= dim))
         return;
@@ -68,12 +65,9 @@ void initial(uint3 thread_id: SV_DispatchThreadID,
 // Resamples this pixel's canonical path against the one it held last frame, both shifted into the
 // other's domain, with the generalized Talbot MIS weights of [Lin et al. 2022, eq. 36] scaled by
 // each reservoir's confidence [Lin et al. 2022, 6.2].
-[shader("compute")]
-[numthreads(8, 8, 1)]
-void temporal(uint3 thread_id: SV_DispatchThreadID,
-              ParameterBlock<Scene> scene,
-              ParameterBlock<CgnsBinding> params) {
-    const uint2 pixel = thread_id.xy;
+void cgns_pass_temporal(const uint2 pixel,
+                        const ParameterBlock<Scene> scene,
+                        const ParameterBlock<CgnsBinding> params) {
     const uint2 dim = params.gbuffer.get_dimensions();
     if (any(pixel >= dim))
         return;
@@ -175,12 +169,9 @@ void temporal(uint3 thread_id: SV_DispatchThreadID,
 }
 
 // Writes the neighbors every pixel resamples from.
-[shader("compute")]
-[numthreads(8, 8, 1)]
-void select_neighbors(uint3 thread_id: SV_DispatchThreadID,
-                      ParameterBlock<Scene> scene,
-                      ParameterBlock<CgnsBinding> params) {
-    const uint2 pixel = thread_id.xy;
+void cgns_pass_select_neighbors(const uint2 pixel,
+                                const ParameterBlock<Scene> scene,
+                                const ParameterBlock<CgnsBinding> params) {
     const uint2 dim = params.gbuffer.get_dimensions();
     if (any(pixel >= dim))
         return;
@@ -198,12 +189,9 @@ void select_neighbors(uint3 thread_id: SV_DispatchThreadID,
 // Resamples the pre-selected neighbors into this pixel with the defensive pairwise resampling MIS
 // weights of [Lin et al. 2022, eq. 38], in the confidence-weighted form of
 // [Hedstrom et al. 2026, eq. 11].
-[shader("compute")]
-[numthreads(8, 8, 1)]
-void spatial(uint3 thread_id: SV_DispatchThreadID,
-             ParameterBlock<Scene> scene,
-             ParameterBlock<CgnsBinding> params) {
-    const uint2 pixel = thread_id.xy;
+void cgns_pass_spatial(const uint2 pixel,
+                       const ParameterBlock<Scene> scene,
+                       const ParameterBlock<CgnsBinding> params) {
     const uint2 dim = params.gbuffer.get_dimensions();
     if (any(pixel >= dim))
         return;
@@ -322,4 +310,35 @@ void spatial(uint3 thread_id: SV_DispatchThreadID,
     pc.reconnection_out[index] = dst_rec;
     if ((pc.flags & CgnsPassFlags::CgnsPassResolves) != 0)
         cgns_write_irradiance(params, pixel, dst);
+}
+
+// The candidate trace also runs from a raygen shader: the ray tracing pipeline schedules its long,
+// divergent paths better than a compute dispatch does.
+[shader("raygeneration")] void initial_rt(ParameterBlock<Scene> scene,
+                                          ParameterBlock<CgnsBinding> params) {
+    cgns_pass_initial(DispatchRaysIndex().xy, scene, params);
+}
+
+[shader("compute")][numthreads(8, 8, 1)] void initial(uint3 thread_id: SV_DispatchThreadID,
+                                                      ParameterBlock<Scene> scene,
+                                                      ParameterBlock<CgnsBinding> params) {
+    cgns_pass_initial(thread_id.xy, scene, params);
+}
+
+[shader("compute")][numthreads(8, 8, 1)] void temporal(uint3 thread_id: SV_DispatchThreadID,
+                                                       ParameterBlock<Scene> scene,
+                                                       ParameterBlock<CgnsBinding> params) {
+    cgns_pass_temporal(thread_id.xy, scene, params);
+}
+
+[shader("compute")][numthreads(8, 8, 1)] void select_neighbors(uint3 thread_id: SV_DispatchThreadID,
+                                                               ParameterBlock<Scene> scene,
+                                                               ParameterBlock<CgnsBinding> params) {
+    cgns_pass_select_neighbors(thread_id.xy, scene, params);
+}
+
+[shader("compute")][numthreads(8, 8, 1)] void spatial(uint3 thread_id: SV_DispatchThreadID,
+                                                      ParameterBlock<Scene> scene,
+                                                      ParameterBlock<CgnsBinding> params) {
+    cgns_pass_spatial(thread_id.xy, scene, params);
 }

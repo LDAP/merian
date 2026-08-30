@@ -17,6 +17,7 @@
 #include "merian/shader/slang_entry_point.hpp"
 #include "merian/shader/slang_program.hpp"
 #include "merian/vk/pipeline/pipeline_compute.hpp"
+#include "merian/vk/raytrace/shader_binding_table.hpp"
 
 #include <array>
 
@@ -82,6 +83,7 @@ class RenderRestirCGNS : public Node {
     uint32_t seed = 0;
     bool emission_on_primary = true;
     bool russian_roulette = true;
+    bool use_raygen = true;
     bool demodulate_albedo = false;
     std::array<bool, 8> mask_enabled{true, true, true, true, true, true, true, true};
 
@@ -109,6 +111,7 @@ class RenderRestirCGNS : public Node {
     Versioned<SlangProgram> program;
     std::array<Versioned<SlangProgramEntryPoint>, PassCount> entry_points;
     std::array<Versioned<Pipeline>, PassCount> pipelines;
+    Versioned<ShaderBindingTable> initial_sbt;
     std::array<Versioned<ShaderObject>, PassCount> params;
 
     BufferHandle pong_reservoirs;

@@ -3,6 +3,7 @@
 #include "merian-graph/nodes/render_restir_cgns/render_restir_cgns.slangh"
 #include "merian/shader/shader_compile_context.hpp"
 #include "merian/utils/small_vector.hpp"
+#include "merian/vk/pipeline/pipeline_ray_tracing_builder.hpp"
 #include "merian/vk/utils/profiler.hpp"
 
 #include <fmt/format.h>
@@ -22,7 +23,7 @@ DeviceSupportInfo RenderRestirCGNS::query_device_support(const DeviceSupportQuer
     const auto composition = Scene::query_device_support_composition(query_info);
     composition->add_module_from_path(SHADER_MODULE, true);
     const auto program = SlangProgram::create(query_info.compile_context, composition);
-    return DeviceSupportInfo::check(query_info, {"rayQuery"}) &
+    return DeviceSupportInfo::check(query_info, {"rayTracingPipeline"}, {"rayQuery"}) &
            program.get()->query_device_support(query_info);
 }
 
@@ -31,6 +32,8 @@ void RenderRestirCGNS::initialize(const ContextHandle& context,
     this->context = context;
     this->resource_allocator = allocator;
     this->compile_context = context->get_shader_compile_context();
+
+    use_raygen = !context->get_device()->get_physical_device()->is_amd();
 }
 
 vk::BufferCreateInfo RenderRestirCGNS::reservoir_buffer_create_info() const {
@@ -172,13 +175,35 @@ void RenderRestirCGNS::ensure_pipeline(const SceneHandle& scene) {
     program = SlangProgram::create(compile_context, composition);
 
     for (uint32_t p = 0; p < PassCount; p++) {
-        entry_points[p] = SlangProgramEntryPoint::create(program, PASS_ENTRY_POINTS[p]);
+        // The candidate trace is the only pass long and divergent enough to pay for a ray tracing
+        // pipeline; the resampling passes stay compute.
+        const bool raygen = use_raygen && p == Initial;
+        entry_points[p] = SlangProgramEntryPoint::create(
+            program, raygen ? fmt::format("{}_rt", PASS_ENTRY_POINTS[p])
+                            : std::string(PASS_ENTRY_POINTS[p]));
 
-        pipelines[p] = Versioned<Pipeline>([this, p] {
-            const auto ep = entry_points[p].get();
-            return ComputePipeline::create(ep->get_pipeline_layout(context), ep->specialize());
-        });
-        pipelines[p].depends_on(entry_points[p]);
+        if (raygen) {
+            pipelines[p] = Versioned<Pipeline>([this, p] {
+                const auto ep = entry_points[p].get();
+                return RayTracingPipelineBuilder()
+                    .add_raygen_group(ep->specialize())
+                    .build(ep->get_pipeline_layout(context));
+            });
+            pipelines[p].depends_on(entry_points[p]);
+
+            initial_sbt = Versioned<ShaderBindingTable>([this] {
+                return ShaderBindingTable::create(
+                    std::dynamic_pointer_cast<RayTracingPipeline>(pipelines[Initial].get()),
+                    resource_allocator);
+            });
+            initial_sbt.depends_on(pipelines[p]);
+        } else {
+            pipelines[p] = Versioned<Pipeline>([this, p] {
+                const auto ep = entry_points[p].get();
+                return ComputePipeline::create(ep->get_pipeline_layout(context), ep->specialize());
+            });
+            pipelines[p].depends_on(entry_points[p]);
+        }
 
         params[p] = Versioned<ShaderObject>([this, p] {
             return entry_points[p]->create_shader_object_for_parameter(context, "params",
@@ -244,7 +269,11 @@ RenderRestirCGNS::process(const NodeIO& io, const NodeProcessInfo& info, Submiss
         ep->bind("scene", scene->get_shader_object(), cmd, pipe, obj_allocator);
         ep->bind("params", obj, cmd, pipe, obj_allocator);
         cmd->push_constant(pipe, pc);
-        cmd->dispatch(extent, 8, 8);
+        if (use_raygen && p == Initial) {
+            cmd->trace_rays(initial_sbt.get(), extent);
+        } else {
+            cmd->dispatch(extent, 8, 8);
+        }
     };
 
     const auto sync = [&](const std::initializer_list<BufferHandle> buffers) {
@@ -254,8 +283,11 @@ RenderRestirCGNS::process(const NodeIO& io, const NodeProcessInfo& info, Submiss
                 vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite,
                 vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite));
         }
-        cmd->barrier(vk::PipelineStageFlagBits::eComputeShader,
-                     vk::PipelineStageFlagBits::eComputeShader,
+        vk::PipelineStageFlags stage = vk::PipelineStageFlagBits::eComputeShader;
+        if (use_raygen) {
+            stage |= vk::PipelineStageFlagBits::eRayTracingShaderKHR;
+        }
+        cmd->barrier(stage, stage,
                      vk::ArrayProxy<const vk::BufferMemoryBarrier>(
                          static_cast<uint32_t>(barriers.size()), barriers.data()));
     };
@@ -382,6 +414,10 @@ RenderRestirCGNS::NodeStatusFlags RenderRestirCGNS::properties(Properties& confi
     }
 
     config.st_separate();
+    needs_reconnect |= config.config_bool(
+        "ray tracing pipeline", use_raygen,
+        "Trace from a raygen shader instead of a compute shader. The compute path avoids the "
+        "ray-tracing pipeline register cap.");
     needs_reconnect |=
         config.config_enum("irradiance format", irradiance_format, Properties::OptionsStyle::COMBO);
 
