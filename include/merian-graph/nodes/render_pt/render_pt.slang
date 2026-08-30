@@ -29,6 +29,7 @@ extern static const int merian_render_nee_bounces = 0;
 // resamples them by how much the shading function makes of each
 extern static const int merian_render_scatter_mode = SCATTER_MODE_MIS;
 extern static const int merian_render_scatter_candidates = 2;
+extern static const bool merian_render_russian_roulette = true;
 } // namespace merian
 
 // Thread reordering is a ray tracing pipeline feature, so the call may only exist in the raygen
@@ -135,7 +136,15 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
             }
         }
 
-        // 3. one scatter direction: from a light, or out of the mixture. The light technique
+        // 3. russian roulette: a path is dropped in proportion to the light it can still carry
+        if (merian_render_russian_roulette) {
+            const float survive = min(1.f, yuv_luminance(throughput));
+            if (rng.next_float() >= survive)
+                break;
+            throughput /= survive;
+        }
+
+        // 4. one scatter direction: from a light, or out of the mixture. The light technique
         // replaces the scatter sample, so it is one ray either way; its density joins the mixture
         // once the hit says which light the ray reached.
         // The mass the light technique holds, whichever technique the draw above landed on: it is
@@ -267,7 +276,7 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
             radiance += throughput * segment.incident * mis_weight;
         }
 
-        // 4. what the guiding learns, and the estimate it completes the path with
+        // 5. what the guiding learns, and the estimate it completes the path with
         const float3 tail =
             params.guiding.record_segment(guiding_state, frame_info, guiding_record, segment, rng);
         radiance += throughput * tail;

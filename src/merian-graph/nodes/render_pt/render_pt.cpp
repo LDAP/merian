@@ -334,6 +334,7 @@ void RenderPT::update_render_constants() {
                     "export static const int merian_render_nee_bounces = {};\n"
                     "export static const int merian_render_scatter_mode = {};\n"
                     "export static const int merian_render_scatter_candidates = {};\n"
+                    "export static const bool merian_render_russian_roulette = {};\n"
                     "export static const int merian_render_volume_spp = {};\n"
                     "export static const int merian_render_volume_nee_candidates = {};\n"
                     "export static const float merian_render_volume_forward_project_min_z "
@@ -342,7 +343,8 @@ void RenderPT::update_render_constants() {
                     emission_on_primary ? "true" : "false", spp, max_path_length, mask,
                     enable_ser ? "true" : "false", demodulate_albedo ? "true" : "false", nee_mode,
                     nee_probability, nee_candidates, nee_bounces, scatter_mode, scatter_candidates,
-                    volume_spp, volume_nee_candidates, volume_forward_project_min_z));
+                    russian_roulette ? "true" : "false", volume_spp, volume_nee_candidates,
+                    volume_forward_project_min_z));
 }
 
 RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
@@ -393,6 +395,9 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
             "NEE bounces", nee_bounces,
             "Path vertices (counted from the primary hit) that perform NEE; 0 = all.", 0, 16);
     }
+    constants_changed |=
+        config.config_bool("russian roulette", russian_roulette,
+                           "Terminate paths in proportion to the light they can still carry.");
     constants_changed |=
         config.config_bool("shader execution reordering", enable_ser,
                            "Reorder threads after the primary hit to improve coherence.");

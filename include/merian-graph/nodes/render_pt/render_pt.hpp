@@ -84,6 +84,7 @@ class RenderPT : public Node {
     bool emission_on_primary = true;
     bool enable_ser = false;
     bool use_raygen = true;
+    bool russian_roulette = true;
     bool demodulate_albedo = false;
     // NullGuidingModel while nothing is connected: the slot then compiles out entirely.
     GuidingModelHandle guiding;
