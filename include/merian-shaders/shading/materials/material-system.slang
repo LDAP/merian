@@ -39,6 +39,15 @@ struct MaterialSystem {
         return false;
     }
 
+    // Resolution of the alpha texture, or 0 where the material has none.
+    uint2 get_alpha_texture_dimensions(const MaterialID material_id) {
+        const MaterialHeader header = materials[material_id].header;
+        if (let texture_id = header.get_alpha_texture_id()) {
+            return texture_dimensions(texture_manager.get_sampler2D(texture_id), 0);
+        }
+        return uint2(0);
+    }
+
     // Sampled alpha (or 1.0 if the material has no alpha texture).
     float get_alpha(const MaterialID material_id,
                     const float2 uv,

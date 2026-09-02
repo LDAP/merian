@@ -1,0 +1,46 @@
+#pragma once
+
+// On the shader side GeometryData comes from the scene_data module; including it here would
+// re-expand it outside the imports it needs.
+#ifdef __cplusplus
+#include "merian-shaders/scene/scene-data.slangh"
+#include <cstdint>
+#endif
+
+namespace merian {
+
+// vk::OpacityMicromapFormatEXT::e4State. Two bits per micro-triangle: 0 transparent, 1 opaque,
+// 2 and 3 unknown, which is what still reaches the alpha test.
+#define MERIAN_OMM_FORMAT_4_STATE 2
+
+// One vk::MicromapTriangleEXT, written by the bake.
+struct OmmTriangle {
+    uint32_t data_offset;
+    uint16_t subdivision_level;
+    uint16_t format;
+};
+
+// The micromap of one mesh. The bake dispatch is flat over the words of every job.
+struct OmmBakeJob {
+    GeometryData geometry;
+
+    uint32_t subdivision_level;
+    // upper bound on the alpha samples taken along a micro-triangle edge
+    uint32_t max_samples_per_edge;
+
+    // this job's first word in the dispatch
+    uint32_t word_offset;
+    // this job's first word in the shared data buffer; where its micromap's data begins
+    uint32_t data_word_offset;
+    // this job's first entry in the shared triangle array
+    uint32_t triangle_offset;
+
+    uint32_t _pad[3];
+};
+
+#ifdef __cplusplus
+static_assert(sizeof(OmmTriangle) == 8, "OmmTriangle must match VkMicromapTriangleEXT");
+static_assert(sizeof(OmmBakeJob) == 64, "OmmBakeJob layout mismatch");
+#endif
+
+} // namespace merian

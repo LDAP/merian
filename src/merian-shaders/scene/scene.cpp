@@ -53,6 +53,10 @@ Scene::Scene(const ShaderCompileContextHandle& compile_context,
                        "NullAccelerationStructure; }");
     set_env(std::make_shared<EmptyEnvMap>());
 
+    if (as_supported && OpacityMicromaps::is_supported(context)) {
+        opacity_micromaps = std::make_unique<OpacityMicromaps>(compile_context, context, allocator);
+    }
+
     // register the hint modules up front so a runtime toggle replaces them instead of adding them
     set_enable_thin_lens(false);
     set_exterior_volume(std::make_shared<VacuumVolume>());
@@ -70,8 +74,8 @@ DeviceSupportInfo Scene::query_device_support(const DeviceSupportQueryInfo& quer
     const SpirvReflect transform_prev(merian_transform_prev_vertex_slang_spv(),
                                       merian_transform_prev_vertex_slang_spv_size());
     return DeviceSupportInfo::check(query_info, {},
-                                    {"accelerationStructure", "storageBuffer16BitAccess",
-                                     "storageBuffer8BitAccess",
+                                    {"accelerationStructure", "micromap",
+                                     "storageBuffer16BitAccess", "storageBuffer8BitAccess",
                                      "uniformAndStorageBuffer8BitAccess"}) &
            transform.query_device_support(query_info) &
            transform_prev.query_device_support(query_info);
@@ -768,6 +772,31 @@ void Scene::properties_settings(Properties& props) {
     }
     props.config_percent("BLAS Rebuild Fraction", blas_rebuild_fraction);
 
+    props.st_separate("Opacity Micromaps");
+    if (opacity_micromaps) {
+        opacity_micromaps_dirty |= props.config_bool(
+            "Opacity Micromaps", opacity_micromaps_enabled,
+            "Settle alpha-tested hits during traversal instead of invoking the alpha test");
+        int level = static_cast<int>(opacity_micromap_subdivision_level);
+        if (props.config_int("Subdivision Level", level, "4^level micro-triangles per triangle", 0,
+                             static_cast<int>(opacity_micromaps->max_subdivision_level()))) {
+            opacity_micromap_subdivision_level = static_cast<uint32_t>(level);
+            opacity_micromaps_dirty = true;
+        }
+        int samples = static_cast<int>(opacity_micromap_max_samples_per_edge);
+        if (props.config_int("Max Samples Per Edge", samples,
+                             "Upper bound on the alpha samples the bake takes along a "
+                             "micro-triangle edge; it otherwise follows the texel density, and "
+                             "is lowered further where the whole bake would not fit one dispatch",
+                             1, 64)) {
+            opacity_micromap_max_samples_per_edge = static_cast<uint32_t>(samples);
+            opacity_micromaps_dirty = true;
+        }
+        opacity_micromaps->properties(props);
+    } else {
+        props.output_text("not supported by the device");
+    }
+
     props.st_separate("Material System");
     float alpha_threshold = material_system->get_alpha_test_threshold();
     if (props.config_float("Alpha Test Threshold", alpha_threshold, "", 0.01F)) {
@@ -1038,6 +1067,9 @@ void Scene::properties(Properties& props) {
 // --- Scene update ---
 
 void Scene::compute_mesh_groups() {
+    // the set of alpha-tested meshes, and their buffers, may have changed with them
+    opacity_micromaps_dirty = true;
+
     MERIAN_PROFILE_SCOPE("Scene::compute_mesh_groups");
 
     auto prev_mesh_groups = std::move(mesh_groups);
@@ -1701,8 +1733,52 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
     }
 }
 
+void Scene::ensure_opacity_micromaps(const CommandBufferHandle& cmd) {
+    if (!opacity_micromaps)
+        return;
+
+    if (!opacity_micromaps_enabled) {
+        if (!opacity_micromaps->get_usage(0).count && opacity_micromaps_dirty)
+            return;
+        opacity_micromaps->clear();
+        opacity_micromaps_dirty = false;
+        return;
+    }
+    if (!opacity_micromaps_dirty)
+        return;
+    opacity_micromaps_dirty = false;
+
+    // A micromap encodes the alpha test, so it is wanted exactly where traversal would run it.
+    std::vector<OpacityMicromaps::MeshGeometry> alpha_tested;
+    for (MeshID mesh_id = 0; mesh_id < mesh_infos.size(); mesh_id++) {
+        const MeshInfo& info = mesh_infos[mesh_id];
+        if (!info.mesh)
+            continue;
+        const Mesh& mesh = *info.mesh;
+        if (mesh.is_opaque() || !material_system->has_alpha_texture(mesh.material_id))
+            continue;
+        assert(info.vertex_buffer);
+
+        GeometryData gd{};
+        gd.material_id = mesh.material_id;
+        gd.primitive_count = mesh.get_primitive_count();
+        gd.vertices = info.vertex_buffer.get_device_address();
+        gd.indices =
+            info.index_buffer ? info.index_buffer.get_device_address() : vk::DeviceAddress{0};
+        gd.flags = index_type_flag(mesh.index_type);
+        alpha_tested.push_back({mesh_id, gd});
+    }
+
+    const uint32_t level =
+        std::min(opacity_micromap_subdivision_level, opacity_micromaps->max_subdivision_level());
+    opacity_micromaps->build(cmd, alpha_tested, material_system, level,
+                             opacity_micromap_max_samples_per_edge, {});
+}
+
 void Scene::build_blas(const CommandBufferHandle& cmd) {
     MERIAN_PROFILE_SCOPE_GPU(cmd, "Scene::build_blas");
+
+    ensure_opacity_micromaps(cmd);
 
     blas_geometries.assign(mesh_groups.size(), {});
 
@@ -1717,6 +1793,9 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
         tlas_dirty = true;
 
         auto& blas_geometry = blas_geometries[group_id];
+        // taken by pointer into the geometries below
+        blas_geometry.micromaps.reserve(group.meshes.size());
+        blas_geometry.micromap_usages.reserve(group.meshes.size());
 
         for (MeshID mesh_id : group.meshes) {
             const MeshInfo& info = mesh_infos[mesh_id];
@@ -1737,6 +1816,21 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
 
             if (mesh.flags & MeshFlags::IsOpaque) {
                 geom.flags = vk::GeometryFlagBitsKHR::eOpaque;
+            } else if (opacity_micromaps) {
+                // The geometry stays non-opaque: the micromap decides per micro-triangle, and
+                // hands the ones it left unknown to the alpha test.
+                if (const MicromapHandle& micromap = opacity_micromaps->get(mesh_id)) {
+                    blas_geometry.micromap_usages.emplace_back(
+                        opacity_micromaps->get_usage(mesh_id));
+                    vk::AccelerationStructureTrianglesOpacityMicromapEXT& omm =
+                        blas_geometry.micromaps.emplace_back();
+                    // no index buffer: triangle i of the geometry uses micromap triangle i
+                    omm.indexType = vk::IndexType::eNoneKHR;
+                    omm.usageCountsCount = 1;
+                    omm.pUsageCounts = &blas_geometry.micromap_usages.back();
+                    omm.micromap = **micromap;
+                    geom.geometry.triangles.pNext = &omm;
+                }
             }
 
             vk::AccelerationStructureBuildRangeInfoKHR range{};

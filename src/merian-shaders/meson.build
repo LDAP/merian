@@ -2,6 +2,7 @@ merian_shaders_src = [
     'gbuffer.cpp',
     'light-cache/hashed_irradiance_cache.cpp',
     'scene/light_collection.cpp',
+    'scene/opacity_micromaps.cpp',
     'scene/scene.cpp',
     'shading/materials/material_system.cpp',
     'utils/hash_grid.cpp',
