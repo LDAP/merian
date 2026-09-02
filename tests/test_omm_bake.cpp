@@ -317,6 +317,40 @@ TEST(OmmBake, CommittedStateHoldsEverywhere) {
         << "opaque " << opaque << " transparent " << transparent << " unknown " << unknown;
 }
 
+// The bake settles a whole triangle in one go when the alpha test agrees over it. That is only
+// sound because a micro-triangle can read no texel its triangle cannot.
+TEST(OmmBake, TriangleTexelsCoverItsMicroTriangles) {
+    std::mt19937 rng(23);
+    std::uniform_real_distribution<float> coord(4.f, 40.f);
+
+    for (int trial = 0; trial < 100; trial++) {
+        const MicroTriangle t{
+            {coord(rng), coord(rng)}, {coord(rng), coord(rng)}, {coord(rng), coord(rng)}};
+        if (triangle_area(t) < 1.f) {
+            continue;
+        }
+        const auto whole = covered_texels(t, 1024);
+        ASSERT_FALSE(whole.empty());
+
+        for (uint32_t level = 1; level <= 3; level++) {
+            const uint32_t count = 1u << (2 * level);
+            for (uint32_t i = 0; i < count; i++) {
+                const MicroTriangle bary = index_to_bary(i, level);
+                const auto map = [&](const Vec2 b) {
+                    return t.p0 + (t.p1 - t.p0) * b.x + (t.p2 - t.p0) * b.y;
+                };
+                const MicroTriangle micro{map(bary.p0), map(bary.p1), map(bary.p2)};
+
+                for (const auto& texel : covered_texels(micro, 1024)) {
+                    EXPECT_NE(std::find(whole.begin(), whole.end(), texel), whole.end())
+                        << "micro-triangle " << i << " at level " << level
+                        << " reads a texel its triangle does not";
+                }
+            }
+        }
+    }
+}
+
 // Whatever the uvs do, one micro-triangle costs a bounded number of texels.
 TEST(OmmBake, WorkStaysBounded) {
     constexpr int max_span = 64;
