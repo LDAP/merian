@@ -17,14 +17,16 @@ constexpr uint32_t STATES_PER_WORD = 16;
 // device addresses of the micromap build inputs must be a multiple of this
 constexpr vk::DeviceSize INPUT_ALIGNMENT = MicromapBuilder::INPUT_ALIGNMENT;
 
-// What one micromap may cost. The subdivision level is raised until the next one would exceed it,
-// which is what keeps a micro-triangle down to a few texels without knowing the uv layout.
-constexpr vk::DeviceSize MAX_BYTES_PER_MESH = 4u << 20;
+// What one triangle's states may cost. Traversal reads this for every alpha-tested hit, and past a
+// point the traffic costs more than the alpha tests a finer subdivision saves: on Emerald Square
+// 64 bytes (level 4) renders in 44.59 ms against 51.46 at 1024 bytes (level 6), even though the
+// coarser one leaves twice as many micro-triangles unknown.
+constexpr vk::DeviceSize MAX_BYTES_PER_TRIANGLE = 64;
 
-// Micro-triangles one update may classify. Each costs at most OMM_MAX_TEXELS texel steps in the
-// shader, so this bounds a submission: long enough to get through a scene in a few seconds, short
-// enough that the driver never resets the device under it.
-constexpr uint32_t MAX_MICRO_TRIANGLES_PER_UPDATE = 1u << 16;
+// Texel steps one update may take, counted at the worst case a triangle can reach. Bounding the
+// work rather than the micro-triangle count keeps a submission the same length whatever
+// subdivision level the meshes end up at; the measured cost is around a tenth of the bound.
+constexpr uint64_t MAX_TEXEL_STEPS_PER_UPDATE = 400'000'000;
 
 uint32_t micro_triangles(const uint32_t subdivision_level) {
     return 1u << (2 * subdivision_level);
@@ -32,6 +34,14 @@ uint32_t micro_triangles(const uint32_t subdivision_level) {
 
 uint32_t words_per_triangle(const uint32_t subdivision_level) {
     return std::max(1u, micro_triangles(subdivision_level) / STATES_PER_WORD);
+}
+
+// What rasterizing one triangle's micro-triangles can cost at this level, in texel steps.
+uint64_t bake_cost(const uint32_t level, const vk::Extent2D texture_size) {
+    const uint64_t span =
+        (uint64_t(std::max(texture_size.width, texture_size.height)) >> level) + 3;
+    return uint64_t(micro_triangles(level)) *
+           std::min<uint64_t>(MERIAN_OMM_MAX_TEXELS, span * span);
 }
 
 // Subdividing past the point where a micro-triangle covers a texel buys nothing, and a triangle
@@ -46,14 +56,11 @@ uint32_t texel_subdivision_limit(const vk::Extent2D texture_size) {
 }
 
 // The finest subdivision that is still worth it and still fits the budget.
-uint32_t choose_subdivision_level(const uint32_t primitive_count,
-                                  const vk::Extent2D texture_size,
-                                  const uint32_t max_level) {
+uint32_t choose_subdivision_level(const vk::Extent2D texture_size, const uint32_t max_level) {
     const uint32_t limit = std::min(max_level, texel_subdivision_limit(texture_size));
     uint32_t level = 0;
     for (uint32_t next = 1; next <= limit; next++) {
-        if (vk::DeviceSize(primitive_count) * words_per_triangle(next) * sizeof(uint32_t) >
-            MAX_BYTES_PER_MESH) {
+        if (words_per_triangle(next) * sizeof(uint32_t) > MAX_BYTES_PER_TRIANGLE) {
             break;
         }
         level = next;
@@ -167,7 +174,7 @@ void OpacityMicromaps::update(const CommandBufferHandle& cmd,
     std::vector<OmmBakeJob> jobs;
     std::vector<OmmBakeTriangle> records;
     std::vector<Slice> slices;
-    uint32_t budget = MAX_MICRO_TRIANGLES_PER_UPDATE;
+    uint64_t budget = MAX_TEXEL_STEPS_PER_UPDATE;
 
     for (const MeshGeometry& mesh : pending) {
         if (budget == 0) {
@@ -181,9 +188,8 @@ void OpacityMicromaps::update(const CommandBufferHandle& cmd,
                                             ->get_texture(alpha_texture_of(mesh))
                                             ->get_image()
                                             ->get_extent();
-            const uint32_t level =
-                choose_subdivision_level(mesh.geometry.primitive_count,
-                                         vk::Extent2D{extent.width, extent.height}, max_level);
+            entry.texture_size = vk::Extent2D{extent.width, extent.height};
+            const uint32_t level = choose_subdivision_level(entry.texture_size, max_level);
             entry.usage = vk::MicromapUsageEXT{mesh.geometry.primitive_count, level,
                                                MERIAN_OMM_FORMAT_4_STATE};
             entry.vertices = mesh.geometry.vertices;
@@ -199,6 +205,8 @@ void OpacityMicromaps::update(const CommandBufferHandle& cmd,
                     vk::BufferUsageFlagBits::eShaderDeviceAddress |
                     vk::BufferUsageFlagBits::eMicromapBuildInputReadOnlyEXT,
                 MemoryMappingType::NONE, "micromap data", INPUT_ALIGNMENT);
+            // the bake only sets bits, so the states it leaves alone have to start transparent
+            cmd->fill(entry.data, 0);
 
             // where the build finds each triangle's states; a fixed stride, so the host knows it
             std::vector<vk::MicromapTriangleEXT> array(entry.primitive_count);
@@ -216,11 +224,11 @@ void OpacityMicromaps::update(const CommandBufferHandle& cmd,
         }
 
         const uint32_t level = entry.usage.subdivisionLevel;
-        const uint32_t per_triangle = micro_triangles(level);
+        const uint64_t per_triangle = bake_cost(level, entry.texture_size);
         const uint32_t first = entry.baked_triangles;
-        // at least one triangle, so a mesh subdivided past the budget still finishes eventually
-        const uint32_t count =
-            std::min(std::max(1u, budget / per_triangle), entry.primitive_count - first);
+        // at least one triangle, so a mesh whose triangles each exceed the budget still finishes
+        const uint32_t count = static_cast<uint32_t>(std::min<uint64_t>(
+            std::max<uint64_t>(1, budget / per_triangle), entry.primitive_count - first));
 
         OmmBakeJob job{};
         job.geometry = mesh.geometry;
@@ -240,7 +248,7 @@ void OpacityMicromaps::update(const CommandBufferHandle& cmd,
         }
 
         entry.baked_triangles = first + count;
-        budget -= std::min(budget, count * per_triangle);
+        budget -= std::min<uint64_t>(budget, uint64_t(count) * per_triangle);
     }
 
     // 3. the shared index buffer: micromap triangle i for geometry triangle i

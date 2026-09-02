@@ -109,6 +109,7 @@ class OpacityMicromaps {
         vk::DeviceAddress vertices;
         vk::DeviceAddress indices;
         uint32_t alpha_texture_id;
+        vk::Extent2D texture_size;
 
         uint32_t primitive_count;
         // how many of them carry a state already; the bake resumes here
