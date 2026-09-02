@@ -547,4 +547,56 @@ class AccelerationStructure : public std::enable_shared_from_this<AccelerationSt
                                               const BufferHandle& buffer);
 };
 
+class Micromap;
+using MicromapHandle = std::shared_ptr<Micromap>;
+
+class Micromap : public std::enable_shared_from_this<Micromap>, public Resource {
+  protected:
+    // Creates a Micromap object that automatically destroys `micromap` when destructed.
+    // The memory is not freed explicitly to let it free itself.
+    // It is asserted that the memory is already bound correctly.
+    Micromap(const vk::MicromapEXT& micromap, const BufferHandle& buffer);
+
+  public:
+    ~Micromap();
+
+    // -----------------------------------------------------------
+
+    operator const vk::MicromapEXT&() const {
+        return micromap;
+    }
+
+    const vk::MicromapEXT& operator*() const {
+        return micromap;
+    }
+
+    const BufferHandle& get_buffer() const {
+        return buffer;
+    }
+
+    const vk::MicromapEXT& get_micromap() const {
+        return micromap;
+    }
+
+    vk::DeviceSize get_size() const {
+        return buffer->get_size();
+    }
+
+    // -----------------------------------------------------------
+
+    // A barrier to insert between the micromap build and the blas build that reads it.
+    vk::BufferMemoryBarrier2 blas_read_barrier2() const;
+
+    // -----------------------------------------------------------
+
+    void properties(Properties& props);
+
+  private:
+    const vk::MicromapEXT micromap;
+    const BufferHandle buffer;
+
+  public:
+    static MicromapHandle create(const vk::MicromapEXT& micromap, const BufferHandle& buffer);
+};
+
 } // namespace merian

@@ -643,4 +643,35 @@ AccelerationStructureHandle AccelerationStructure::create(const vk::Acceleration
     return std::shared_ptr<AccelerationStructure>(new AccelerationStructure(as, buffer));
 }
 
+// --------------------------------------------------------------------------
+
+Micromap::Micromap(const vk::MicromapEXT& micromap, const BufferHandle& buffer)
+    : micromap(micromap), buffer(buffer) {
+    SPDLOG_TRACE("create micromap ({})", fmt::ptr(this));
+}
+
+Micromap::~Micromap() {
+    SPDLOG_TRACE("destroy micromap ({})", fmt::ptr(this));
+    buffer->get_memory()->get_context()->get_device()->get_device().destroyMicromapEXT(micromap);
+}
+
+vk::BufferMemoryBarrier2 Micromap::blas_read_barrier2() const {
+    return buffer->buffer_barrier2(vk::PipelineStageFlagBits2::eMicromapBuildEXT,
+                                   vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
+                                   vk::AccessFlagBits2::eMicromapWriteEXT,
+                                   vk::AccessFlagBits2::eMicromapReadEXT);
+}
+
+void Micromap::properties(Properties& props) {
+    props.output_text(fmt::format("Size: {}", format_size(get_size())));
+    if (props.st_begin_child("buffer_info", "Buffer")) {
+        buffer->properties(props);
+        props.st_end_child();
+    }
+}
+
+MicromapHandle Micromap::create(const vk::MicromapEXT& micromap, const BufferHandle& buffer) {
+    return std::shared_ptr<Micromap>(new Micromap(micromap, buffer));
+}
+
 } // namespace merian

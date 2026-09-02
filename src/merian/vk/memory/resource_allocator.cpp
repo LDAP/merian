@@ -509,6 +509,30 @@ AccelerationStructureHandle ResourceAllocator::create_acceleration_structure(
     return AccelerationStructure::create(as, buffer);
 }
 
+MicromapHandle ResourceAllocator::create_micromap(const vk::MicromapTypeEXT type,
+                                                  const vk::MicromapBuildSizesInfoEXT& size_info,
+                                                  const std::string& debug_name) {
+    BufferHandle buffer = create_buffer(size_info.micromapSize,
+                                        vk::BufferUsageFlagBits::eMicromapStorageEXT |
+                                            vk::BufferUsageFlagBits::eShaderDeviceAddress,
+                                        MemoryMappingType::NONE, debug_name);
+    vk::MicromapEXT micromap;
+    vk::MicromapCreateInfoEXT create_info{{}, *buffer, {}, size_info.micromapSize, type};
+    check_result(
+        context->get_device()->get_device().createMicromapEXT(&create_info, nullptr, &micromap),
+        "could not create micromap");
+
+#ifndef NDEBUG
+    if (debug_utils) {
+        debug_utils->set_object_name(context->get_device()->get_device(), **buffer,
+                                     debug_name + " buffer");
+        debug_utils->set_object_name(context->get_device()->get_device(), micromap, debug_name);
+    }
+#endif
+
+    return Micromap::create(micromap, buffer);
+}
+
 DescriptorSetHandle
 ResourceAllocator::allocate_descriptor_set(const DescriptorSetLayoutHandle& layout) {
     return descriptor_pool->allocate(layout);
