@@ -794,8 +794,7 @@ class Scene : public std::enable_shared_from_this<Scene> {
     // Opacity micromaps; only constructed where the device supports them.
     std::unique_ptr<OpacityMicromaps> opacity_micromaps;
     bool opacity_micromaps_enabled = true;
-    uint32_t opacity_micromap_subdivision_level = 4;
-    uint32_t opacity_micromap_max_samples_per_edge = 16;
+    uint32_t opacity_micromap_max_subdivision_level = 8;
     // set whenever a mesh that needs one appeared, changed or lost its micromap
     bool opacity_micromaps_dirty = true;
 

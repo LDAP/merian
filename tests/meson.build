@@ -30,6 +30,13 @@ test_versioned = executable(
 )
 test('versioned', test_versioned, timeout: 30)
 
+test_omm_bake = executable(
+    'test-omm-bake',
+    'test_omm_bake.cpp',
+    dependencies: [merian_dep, gtest_main_dep],
+)
+test('omm_bake', test_omm_bake, timeout: 60)
+
 test_slang_binding = executable(
     'test-slang-binding',
     'test_slang_binding.cpp',
