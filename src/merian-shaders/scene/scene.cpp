@@ -1860,6 +1860,10 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
         const auto& size_info = *group.cached_blas_size_info;
 
         if (!group.blas || group.blas->get_size() < size_info.accelerationStructureSize) {
+            // the tlas of the frames still in flight points at the old one
+            if (group.blas) {
+                cmd->keep_until_pool_reset(std::move(group.blas));
+            }
             group.blas = allocator->create_acceleration_structure(
                 vk::AccelerationStructureTypeKHR::eBottomLevel, size_info,
                 fmt::format("Scene::blas[{}]", group_id));
@@ -1902,8 +1906,13 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
             }
             const auto& size_info = *group.cached_blas_size_info;
 
-            if (i < rebuild_count) {
-                if (group.blas->get_size() < size_info.accelerationStructureSize) {
+            // an update keeps the size it was built with, so geometry that outgrew it has to go
+            // through a build
+            const bool outgrown = group.blas->get_size() < size_info.accelerationStructureSize;
+            if (i < rebuild_count || outgrown) {
+                if (outgrown) {
+                    // the tlas of the frames still in flight points at the old one
+                    cmd->keep_until_pool_reset(std::move(group.blas));
                     group.blas = allocator->create_acceleration_structure(
                         vk::AccelerationStructureTypeKHR::eBottomLevel, size_info,
                         fmt::format("Scene::blas[{}]", group_id));
