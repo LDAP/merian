@@ -32,8 +32,8 @@ static const uint OMM_STATES_PER_WORD = 32 / OMM_STATE_BITS;
 // Backstop for a uv mapping the chosen subdivision level does not tame - a degenerate or
 // non-finite one. A micro-triangle reaching further than this stays unknown, which costs nothing
 // but the alpha test that would have run anyway. The host picks the level so this rarely binds.
-static const uint OMM_MAX_TEXELS = 4096;
-static const int OMM_MAX_SPAN = 64;
+static const uint OMM_MAX_TEXELS = MERIAN_OMM_MAX_TEXELS;
+static const int OMM_MAX_SPAN = MERIAN_OMM_MAX_SPAN;
 
 static const uint OMM_GROUP_SIZE = 64;
 
@@ -255,22 +255,23 @@ void main(uint3 group_id: SV_GroupID,
         return;
     }
 
-    for (uint word = local_id.x; word < words; word += OMM_GROUP_SIZE) {
-        const uint first_state = word * OMM_STATES_PER_WORD;
-        const uint state_count = min(OMM_STATES_PER_WORD, micro_triangles - first_state);
+    // One micro-triangle per thread rather than one word: a word holds sixteen of them, so at the
+    // subdivisions this picks there would be fewer words than threads and most of the group would
+    // sit idle. The data buffer starts zeroed, so each thread only has to set its own two bits.
+    for (uint index = local_id.x; index < micro_triangles; index += OMM_GROUP_SIZE) {
+        float2 b0;
+        float2 b1;
+        float2 b2;
+        omm_index_to_bary(index, triangle.subdivision_level, b0, b1, b2);
 
-        uint packed = 0;
-        for (uint i = 0; i < state_count; i++) {
-            float2 b0;
-            float2 b1;
-            float2 b2;
-            omm_index_to_bary(first_state + i, triangle.subdivision_level, b0, b1, b2);
-
-            packed |= omm_classify(material_system, job.geometry.material_id, texture_size,
-                                   t_a + dt1 * b0.x + dt2 * b0.y, t_a + dt1 * b1.x + dt2 * b1.y,
-                                   t_a + dt1 * b2.x + dt2 * b2.y)
-                      << (i * OMM_STATE_BITS);
+        const uint state = omm_classify(material_system, job.geometry.material_id, texture_size,
+                                        t_a + dt1 * b0.x + dt2 * b0.y,
+                                        t_a + dt1 * b1.x + dt2 * b1.y,
+                                        t_a + dt1 * b2.x + dt2 * b2.y);
+        if (state != OMM_STATE_TRANSPARENT) {
+            uint dummy;
+            InterlockedOr(params.data[triangle.data_word_offset + index / OMM_STATES_PER_WORD],
+                          state << ((index % OMM_STATES_PER_WORD) * OMM_STATE_BITS), dummy);
         }
-        params.data[triangle.data_word_offset + word] = packed;
     }
 }

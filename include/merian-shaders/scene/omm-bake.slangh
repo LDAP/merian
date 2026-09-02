@@ -13,6 +13,11 @@ namespace merian {
 // 2 and 3 unknown, which is what still reaches the alpha test.
 #define MERIAN_OMM_FORMAT_4_STATE 2
 
+// Most texels one micro-triangle is rasterized over. Past this it stays unknown, which bounds both
+// the shader's work and what the host has to budget for.
+#define MERIAN_OMM_MAX_TEXELS 4096
+#define MERIAN_OMM_MAX_SPAN 192
+
 // Longest micro-triangle edge the bake aims for, in texels. Small enough that a micro-triangle
 // stays inside one cutout feature, large enough to keep the micromaps small.
 #define MERIAN_OMM_TARGET_EDGE_TEXELS 4.0
