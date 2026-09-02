@@ -265,6 +265,11 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
                                   const vk::AccelerationStructureBuildSizesInfoKHR& size_info,
                                   const std::string& debug_name = {});
 
+    [[nodiscard]]
+    MicromapHandle create_micromap(const vk::MicromapTypeEXT type,
+                                   const vk::MicromapBuildSizesInfoEXT& size_info,
+                                   const std::string& debug_name = {});
+
     //--------------------------------------------------------------------------------------------------
 
     // Shortcut for get_descriptor_pool()->allocate(...)
