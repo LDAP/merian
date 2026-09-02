@@ -147,6 +147,45 @@ struct TransformPrevVertexJob {
     uint32_t _pad[3];
 };
 
+#ifndef __cplusplus
+// Loads the vertex indices from memory via buffer device address, or
+// computes them from primitive_id for IndexType::None (no memory access).
+uint3 get_vertex_indices(const GeometryData geometry_data, const uint primitive_id) {
+    if (geometry_data.flags & GeometryDataFlags::IndexTypeUint32) {
+        uint3* p = (uint3*)geometry_data.indices;
+        return p[primitive_id];
+    }
+    if (geometry_data.flags & GeometryDataFlags::IndexTypeUint16) {
+        vector<uint16_t, 3>* p = (vector<uint16_t, 3>*)geometry_data.indices;
+        return uint3(p[primitive_id]);
+    }
+    if (geometry_data.flags & GeometryDataFlags::IndexTypeUint8) {
+        vector<uint8_t, 3>* p = (vector<uint8_t, 3>*)geometry_data.indices;
+        return uint3(p[primitive_id]);
+    }
+    const uint base = primitive_id * 3;
+    return uint3(base, base + 1, base + 2);
+}
+
+// Loads the vertex data from memory via buffer device address.
+PackedVertexData get_packed_vertex_data(const GeometryData geometry_data,
+                                        const uint vertex_index) {
+    return geometry_data.vertices[vertex_index];
+}
+
+// The uv of the three corners of a triangle.
+void get_triangle_uv(const GeometryData geometry_data,
+                     const uint primitive_id,
+                     out float2 uv0,
+                     out float2 uv1,
+                     out float2 uv2) {
+    const uint3 indices = get_vertex_indices(geometry_data, primitive_id);
+    uv0 = float2(geometry_data.vertices[indices.x].uv);
+    uv1 = float2(geometry_data.vertices[indices.y].uv);
+    uv2 = float2(geometry_data.vertices[indices.z].uv);
+}
+#endif
+
 #ifdef __cplusplus
 static_assert(sizeof(PackedVertexData) == 24, "PackedVertexData must match Slang scalar layout");
 static_assert(alignof(PackedVertexData) == 4, "PackedVertexData must be 4-byte aligned");

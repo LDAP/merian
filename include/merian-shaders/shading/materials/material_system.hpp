@@ -91,6 +91,12 @@ class MaterialSystem : public std::enable_shared_from_this<MaterialSystem> {
         return materials[id].emissive;
     }
 
+    // Whether the material's alpha test can reject: without a texture it always passes.
+    bool has_alpha_texture(const MaterialID id) const {
+        assert(id < materials.size());
+        return materials[id].header.alpha_texture_id != TextureID(-1);
+    }
+
     // Upload material buffer to GPU and update ShaderObject state.
     void update(const CommandBufferHandle& cmd);
 

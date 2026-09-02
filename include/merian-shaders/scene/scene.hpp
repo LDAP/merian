@@ -2,6 +2,7 @@
 
 #include "merian-shaders/scene/env_map.hpp"
 #include "merian-shaders/scene/light_collection.hpp"
+#include "merian-shaders/scene/opacity_micromaps.hpp"
 #include "merian-shaders/scene/scene-data.slangh"
 #include "merian-shaders/shading/homogeneous_volume.hpp"
 #include "merian-shaders/shading/materials/material_system.hpp"
@@ -704,6 +705,9 @@ class Scene : public std::enable_shared_from_this<Scene> {
     void upload_meshes(const CommandBufferHandle& cmd);
 
     void build_blas(const CommandBufferHandle& cmd);
+
+    // Rebuilds the opacity micromaps of every alpha-tested mesh, if they changed.
+    void ensure_opacity_micromaps(const CommandBufferHandle& cmd);
     void build_tlas(const CommandBufferHandle& cmd);
 
     // Grows one shared buffer: re-suballocates every live region into a new backing buffer and
@@ -787,6 +791,14 @@ class Scene : public std::enable_shared_from_this<Scene> {
     float blas_rebuild_fraction = 0.33f;
     uint32_t current_frame = 0;
 
+    // Opacity micromaps; only constructed where the device supports them.
+    std::unique_ptr<OpacityMicromaps> opacity_micromaps;
+    bool opacity_micromaps_enabled = true;
+    uint32_t opacity_micromap_subdivision_level = 4;
+    uint32_t opacity_micromap_max_samples_per_edge = 16;
+    // set whenever a mesh that needs one appeared, changed or lost its micromap
+    bool opacity_micromaps_dirty = true;
+
     UpdateChanges last_update_changes;
 
     struct FrameStats {
@@ -863,6 +875,9 @@ class Scene : public std::enable_shared_from_this<Scene> {
     struct BLASGeometry {
         std::vector<vk::AccelerationStructureGeometryKHR> geometries;
         std::vector<vk::AccelerationStructureBuildRangeInfoKHR> ranges;
+        // chained into the geometries, so these must not reallocate once a pointer was taken
+        std::vector<vk::AccelerationStructureTrianglesOpacityMicromapEXT> micromaps;
+        std::vector<vk::MicromapUsageEXT> micromap_usages;
     };
     std::vector<BLASGeometry> blas_geometries;
 
