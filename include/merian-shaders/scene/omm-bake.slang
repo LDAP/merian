@@ -205,6 +205,9 @@ uint omm_classify(const MaterialSystem material_system,
 }
 
 // One workgroup per triangle, walking the words of its own subdivision level.
+// the whole triangle's state, decided once for the group
+groupshared uint omm_group_state;
+
 [shader("compute")]
 [numthreads(OMM_GROUP_SIZE, 1, 1)]
 void main(uint3 group_id: SV_GroupID,
@@ -229,6 +232,28 @@ void main(uint3 group_id: SV_GroupID,
 
     const uint micro_triangles = 1u << (2 * triangle.subdivision_level);
     const uint words = max(1u, micro_triangles / OMM_STATES_PER_WORD);
+
+    // A micro-triangle can only read texels its triangle can, so a triangle the alpha test settles
+    // the same way everywhere settles every micro-triangle in it. Deciding that once costs one
+    // rasterization instead of 4^level of them, and the mixed case gives up as soon as it has seen
+    // both answers.
+    if (local_id.x == 0) {
+        omm_group_state = omm_classify(material_system, job.geometry.material_id, texture_size, t_a,
+                                       t_b, t_c);
+    }
+    GroupMemoryBarrierWithGroupSync();
+    const uint group_state = omm_group_state;
+
+    if (group_state != OMM_STATE_UNKNOWN_OPAQUE) {
+        uint packed = 0;
+        for (uint i = 0; i < OMM_STATES_PER_WORD; i++) {
+            packed |= group_state << (i * OMM_STATE_BITS);
+        }
+        for (uint word = local_id.x; word < words; word += OMM_GROUP_SIZE) {
+            params.data[triangle.data_word_offset + word] = packed;
+        }
+        return;
+    }
 
     for (uint word = local_id.x; word < words; word += OMM_GROUP_SIZE) {
         const uint first_state = word * OMM_STATES_PER_WORD;
