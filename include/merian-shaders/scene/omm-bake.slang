@@ -1,13 +1,16 @@
 // Bakes opacity micromaps for alpha-tested geometry.
 //
-// One thread per output word classifies the micro-triangles that share the word by evaluating the
-// material's alpha test over each one; a micro-triangle only becomes opaque or transparent where
-// every sample agrees, everything else stays unknown and still reaches the alpha test.
+// The alpha test runs at every texel a micro-triangle can read, and the state is only committed to
+// opaque or transparent where they all agree; traversal then settles the hit the way the alpha
+// test would have and the image does not change.
 //
-// The sampling follows the alpha texture's texel density, up to a budget per micro-triangle edge.
-// Where a micro-triangle covers more texels than that, the cutout can vary between samples and be
-// classified wrongly, which shows as a difference along cutout silhouettes; raising the
-// subdivision level shrinks the micro-triangles and with them the error.
+// Rasterizing a micro-triangle rather than sampling it is what keeps this affordable: its cost is
+// the texel footprint it covers, not a fixed sample count, and it is what makes the answer exact.
+// The approach is that of NVIDIA's Opacity Micro-Map SDK; the conservative edge test
+// is Akenine-Moeller and Aila 2005, "Conservative and Tiled Rasterization Using a Modified
+// Triangle Setup". The curve is the one the Vulkan specification defines under "Ray Opacity
+// Micromap"; `tests/test_omm_bake.cpp` holds the same functions and checks them against brute
+// force.
 
 __exported import merian_shaders.scene.scene_data;
 __exported import merian_shaders.shading.materials.material_system;
@@ -26,14 +29,21 @@ static const uint OMM_STATE_UNKNOWN_OPAQUE = 3;
 static const uint OMM_STATE_BITS = 2;
 static const uint OMM_STATES_PER_WORD = 32 / OMM_STATE_BITS;
 
-static const uint OMM_BAKE_GROUP_SIZE = 64;
+// Backstop for a uv mapping the chosen subdivision level does not tame - a degenerate or
+// non-finite one. A micro-triangle reaching further than this stays unknown, which costs nothing
+// but the alpha test that would have run anyway. The host picks the level so this rarely binds.
+static const uint OMM_MAX_TEXELS = 4096;
+static const int OMM_MAX_SPAN = 64;
+
+static const uint OMM_GROUP_SIZE = 64;
 
 struct OmmBakeBinding {
     StructuredBuffer<OmmBakeJob, ScalarDataLayout> jobs;
+    StructuredBuffer<OmmBakeTriangle, ScalarDataLayout> triangles;
+    // the micromap data of the one mesh this dispatch covers
     RWStructuredBuffer<uint> data;
-    RWStructuredBuffer<OmmTriangle, ScalarDataLayout> triangles;
-    uint job_count;
-    uint word_count;
+    uint first_triangle;
+    uint triangle_count;
 }
 
 uint omm_extract_even_bits(uint x) {
@@ -53,9 +63,7 @@ uint omm_prefix_eor(uint x) {
     return x;
 }
 
-// The three corner barycentrics of the micro-triangle a curve index addresses. Inverse of the
-// barycentric-to-index mapping the Vulkan specification gives for opacity micromaps ("Ray Opacity
-// Micromap"): the curve is defined so that both directions are bit-parallel.
+// The barycentric corners of the micro-triangle a curve index addresses.
 void omm_index_to_bary(const uint index,
                        const uint level,
                        out float2 uv0,
@@ -96,27 +104,88 @@ void omm_index_to_bary(const uint index,
     uv2 = float2(u, v + step);
 }
 
-// Opaque or transparent only where every sample of the micro-triangle agrees.
+// Signed area of the triangle, twice. Negative for the other winding.
+float omm_edge_area(const float2 a, const float2 b, const float2 c) {
+    return (c.x - a.x) * (b.y - a.y) - (c.y - a.y) * (b.x - a.x);
+}
+
+// Whether the axis-aligned box at `corner` with extent `extent` touches the half plane left of the
+// edge a -> b.
+bool omm_box_inside_edge(const float2 a, const float2 b, const float2 corner, const float2 extent) {
+    const float2 normal = float2(b.y - a.y, a.x - b.x);
+    const float offset = -dot(normal, a);
+    const float2 bias = float2(normal.x > 0.f ? 0.f : normal.x, normal.y > 0.f ? 0.f : normal.y);
+    return dot(normal, corner) + offset + dot(bias, extent) < 0.f;
+}
+
+// The corners of a triangle in texel space, where a texel centre sits on an integer.
+void omm_triangle_texel_space(const GeometryData geometry,
+                              const uint2 texture_size,
+                              const uint primitive_id,
+                              out float2 t0,
+                              out float2 t1,
+                              out float2 t2) {
+    float2 uv0;
+    float2 uv1;
+    float2 uv2;
+    get_triangle_uv(geometry, primitive_id, uv0, uv1, uv2);
+    const float2 size = float2(texture_size);
+    t0 = uv0 * size - 0.5f;
+    t1 = uv1 * size - 0.5f;
+    t2 = uv2 * size - 0.5f;
+}
+
+// The state of one micro-triangle, from every texel the alpha test can read inside it.
+//
+// A bilinear lookup reads the four lattice points around its position, so the texels to visit are
+// the lattice points whose two-by-two neighbourhood the micro-triangle touches.
 uint omm_classify(const MaterialSystem material_system,
                   const MaterialID material_id,
-                  const float2 triangle_uv0,
-                  const float2 duv1,
-                  const float2 duv2,
-                  const float2 b0,
-                  const float2 b1,
-                  const float2 b2,
-                  const uint samples_per_edge) {
+                  const uint2 texture_size,
+                  const float2 p0,
+                  const float2 p1,
+                  const float2 p2) {
+    const float2 aabb_min = min(p0, min(p1, p2));
+    const float2 aabb_max = max(p0, max(p1, p2));
+    if (!all(isfinite(aabb_min)) || !all(isfinite(aabb_max)))
+        return OMM_STATE_UNKNOWN_OPAQUE;
+
+    const int2 first = int2(floor(aabb_min));
+    const int2 last = int2(floor(aabb_max)) + 1;
+    const int2 span = max(int2(0), last - first) + 1;
+    if (span.x > OMM_MAX_SPAN || span.y > OMM_MAX_SPAN)
+        return OMM_STATE_UNKNOWN_OPAQUE;
+
+    // the edge tests assume counter-clockwise corners
+    const bool flip = omm_edge_area(p0, p1, p2) > 0.f;
+    const float2 a = p0;
+    const float2 b = flip ? p2 : p1;
+    const float2 c = flip ? p1 : p2;
+
     const LOD0Sampler lod = LOD0Sampler();
+    const float2 inv_size = 1.f / float2(texture_size);
+    const float2 extent = float2(2, 2);
 
     bool any_opaque = false;
     bool any_transparent = false;
-    for (uint i = 0; i <= samples_per_edge; i++) {
-        for (uint j = 0; i + j <= samples_per_edge; j++) {
-            const float wi = float(i) / float(samples_per_edge);
-            const float wj = float(j) / float(samples_per_edge);
-            const float2 bary = b0 + (b1 - b0) * wi + (b2 - b0) * wj;
-            const float2 uv = triangle_uv0 + duv1 * bary.x + duv2 * bary.y;
+    uint visited = 0;
+    for (int y = first.y; y <= last.y && visited < OMM_MAX_TEXELS; y++) {
+        bool was_inside = false;
+        for (int x = first.x; x <= last.x && visited < OMM_MAX_TEXELS; x++) {
+            visited++;
+            // the lattice point reads into the box one texel around it
+            const float2 corner = float2(float(x) - 1.f, float(y) - 1.f);
+            if (!omm_box_inside_edge(a, b, corner, extent) ||
+                !omm_box_inside_edge(b, c, corner, extent) ||
+                !omm_box_inside_edge(c, a, corner, extent)) {
+                if (was_inside)
+                    break;
+                continue;
+            }
+            was_inside = true;
 
+            // the same lookup the alpha test does, at the texel centre
+            const float2 uv = (float2(float(x), float(y)) + 0.5f) * inv_size;
             if (material_system.alpha_test(material_id, uv, lod)) {
                 any_transparent = true;
             } else {
@@ -127,68 +196,56 @@ uint omm_classify(const MaterialSystem material_system,
         }
     }
 
-    return any_opaque ? OMM_STATE_OPAQUE : OMM_STATE_TRANSPARENT;
+    if (any_opaque)
+        return OMM_STATE_OPAQUE;
+    if (any_transparent)
+        return OMM_STATE_TRANSPARENT;
+    // degenerate in texture space: no texel to go by
+    return OMM_STATE_UNKNOWN_OPAQUE;
 }
 
+// One workgroup per triangle, walking the words of its own subdivision level.
 [shader("compute")]
-[numthreads(64, 1, 1)]
-void main(uint3 thread_id: SV_DispatchThreadID,
+[numthreads(OMM_GROUP_SIZE, 1, 1)]
+void main(uint3 group_id: SV_GroupID,
+          uint3 local_id: SV_GroupThreadID,
           ParameterBlock<MaterialSystem> material_system,
           ParameterBlock<OmmBakeBinding> params) {
-    const uint word = thread_id.x;
-    if (word >= params.word_count)
+    if (group_id.x >= params.triangle_count)
         return;
 
-    // the dispatch is flat over the words of every job
-    uint job_index = 0;
-    while (job_index + 1 < params.job_count && word >= params.jobs[job_index + 1].word_offset)
-        job_index++;
-    const OmmBakeJob job = params.jobs[job_index];
+    const OmmBakeTriangle triangle = params.triangles[params.first_triangle + group_id.x];
+    const OmmBakeJob job = params.jobs[triangle.job_index];
 
-    const uint micro_triangles = 1u << (2 * job.subdivision_level);
-    const uint words_per_triangle = max(1u, micro_triangles / OMM_STATES_PER_WORD);
-    const uint job_word = word - job.word_offset;
-    const uint primitive_id = job_word / words_per_triangle;
-    const uint triangle_word = job_word - primitive_id * words_per_triangle;
+    const uint2 texture_size =
+        material_system.get_alpha_texture_dimensions(job.geometry.material_id);
 
-    float2 uv_a;
-    float2 uv_b;
-    float2 uv_c;
-    get_triangle_uv(job.geometry, primitive_id, uv_a, uv_b, uv_c);
-    const float2 duv1 = uv_b - uv_a;
-    const float2 duv2 = uv_c - uv_a;
+    float2 t_a;
+    float2 t_b;
+    float2 t_c;
+    omm_triangle_texel_space(job.geometry, texture_size, triangle.primitive_id, t_a, t_b, t_c);
+    const float2 dt1 = t_b - t_a;
+    const float2 dt2 = t_c - t_a;
 
-    // one sample per texel along a micro-triangle edge, within the budget
-    const float scale = 1.f / float(1u << job.subdivision_level);
-    const float2 texels = float2(material_system.get_alpha_texture_dimensions(
-        job.geometry.material_id));
-    const float edge = max(max(length(duv1 * texels), length(duv2 * texels)),
-                           length((duv2 - duv1) * texels)) * scale;
-    const uint samples_per_edge =
-        clamp(uint(ceil(edge)), 1u, max(1u, job.max_samples_per_edge));
+    const uint micro_triangles = 1u << (2 * triangle.subdivision_level);
+    const uint words = max(1u, micro_triangles / OMM_STATES_PER_WORD);
 
-    const uint first_state = triangle_word * OMM_STATES_PER_WORD;
-    const uint state_count = min(OMM_STATES_PER_WORD, micro_triangles - first_state);
+    for (uint word = local_id.x; word < words; word += OMM_GROUP_SIZE) {
+        const uint first_state = word * OMM_STATES_PER_WORD;
+        const uint state_count = min(OMM_STATES_PER_WORD, micro_triangles - first_state);
 
-    uint packed = 0;
-    for (uint i = 0; i < state_count; i++) {
-        float2 uv0;
-        float2 uv1;
-        float2 uv2;
-        omm_index_to_bary(first_state + i, job.subdivision_level, uv0, uv1, uv2);
-        packed |= omm_classify(material_system, job.geometry.material_id, uv_a, duv1, duv2, uv0,
-                               uv1, uv2, samples_per_edge)
-                  << (i * OMM_STATE_BITS);
-    }
-    params.data[job.data_word_offset + job_word] = packed;
+        uint packed = 0;
+        for (uint i = 0; i < state_count; i++) {
+            float2 b0;
+            float2 b1;
+            float2 b2;
+            omm_index_to_bary(first_state + i, triangle.subdivision_level, b0, b1, b2);
 
-    if (triangle_word == 0) {
-        OmmTriangle triangle;
-        // relative to where this job's micromap data begins
-        triangle.data_offset = 4 * primitive_id * words_per_triangle;
-        triangle.subdivision_level = uint16_t(job.subdivision_level);
-        triangle.format = uint16_t(MERIAN_OMM_FORMAT_4_STATE);
-        params.triangles[job.triangle_offset + primitive_id] = triangle;
+            packed |= omm_classify(material_system, job.geometry.material_id, texture_size,
+                                   t_a + dt1 * b0.x + dt2 * b0.y, t_a + dt1 * b1.x + dt2 * b1.y,
+                                   t_a + dt1 * b2.x + dt2 * b2.y)
+                      << (i * OMM_STATE_BITS);
+        }
+        params.data[triangle.data_word_offset + word] = packed;
     }
 }
-

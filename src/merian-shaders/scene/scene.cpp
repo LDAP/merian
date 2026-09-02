@@ -777,19 +777,12 @@ void Scene::properties_settings(Properties& props) {
         opacity_micromaps_dirty |= props.config_bool(
             "Opacity Micromaps", opacity_micromaps_enabled,
             "Settle alpha-tested hits during traversal instead of invoking the alpha test");
-        int level = static_cast<int>(opacity_micromap_subdivision_level);
-        if (props.config_int("Subdivision Level", level, "4^level micro-triangles per triangle", 0,
-                             static_cast<int>(opacity_micromaps->max_subdivision_level()))) {
-            opacity_micromap_subdivision_level = static_cast<uint32_t>(level);
-            opacity_micromaps_dirty = true;
-        }
-        int samples = static_cast<int>(opacity_micromap_max_samples_per_edge);
-        if (props.config_int("Max Samples Per Edge", samples,
-                             "Upper bound on the alpha samples the bake takes along a "
-                             "micro-triangle edge; it otherwise follows the texel density, and "
-                             "is lowered further where the whole bake would not fit one dispatch",
-                             1, 64)) {
-            opacity_micromap_max_samples_per_edge = static_cast<uint32_t>(samples);
+        int level = static_cast<int>(opacity_micromap_max_subdivision_level);
+        if (props.config_int("Max Subdivision Level", level,
+                             "upper bound on 4^level micro-triangles per triangle; each mesh takes "
+                             "the finest level its micromap budget allows",
+                             0, static_cast<int>(opacity_micromaps->max_subdivision_level()))) {
+            opacity_micromap_max_subdivision_level = static_cast<uint32_t>(level);
             opacity_micromaps_dirty = true;
         }
         opacity_micromaps->properties(props);
@@ -1734,45 +1727,58 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
 }
 
 void Scene::ensure_opacity_micromaps(const CommandBufferHandle& cmd) {
-    if (!opacity_micromaps)
+    if (!opacity_micromaps) {
         return;
+    }
 
-    if (!opacity_micromaps_enabled) {
-        if (!opacity_micromaps->get_usage(0).count && opacity_micromaps_dirty)
-            return;
+    if (opacity_micromaps_enabled) {
+        // A micromap encodes the alpha test, so it is wanted exactly where traversal would run it.
+        std::vector<OpacityMicromaps::MeshGeometry> alpha_tested;
+        for (MeshID mesh_id = 0; mesh_id < mesh_infos.size(); mesh_id++) {
+            const MeshInfo& info = mesh_infos[mesh_id];
+            if (!info.mesh) {
+                continue;
+            }
+            const Mesh& mesh = *info.mesh;
+            if (mesh.is_opaque() || !material_system->has_alpha_texture(mesh.material_id)) {
+                continue;
+            }
+            // a mesh whose geometry has not been uploaded yet is picked up by a later update
+            if (!info.vertex_buffer || mesh.get_primitive_count() == 0) {
+                continue;
+            }
+
+            GeometryData gd{};
+            gd.material_id = mesh.material_id;
+            gd.primitive_count = mesh.get_primitive_count();
+            gd.vertices = info.vertex_buffer.get_device_address();
+            gd.indices =
+                info.index_buffer ? info.index_buffer.get_device_address() : vk::DeviceAddress{0};
+            gd.flags = index_type_flag(mesh.index_type);
+            alpha_tested.push_back({mesh_id, gd});
+        }
+
+        const uint32_t level = std::min(opacity_micromap_max_subdivision_level,
+                                        opacity_micromaps->max_subdivision_level());
+        std::vector<MeshID> built;
+        opacity_micromaps->update(cmd, alpha_tested, material_system, level, {}, built);
+        // the geometry carries the micromap, so it has to be assembled again
+        for (const MeshID mesh_id : built) {
+            if (mesh_id < mesh_to_group.size() && mesh_to_group[mesh_id] != MESH_GROUP_ID_INVALID) {
+                MeshGroup& group = mesh_groups[mesh_to_group[mesh_id]];
+                group.blas_dirty = true;
+                // a micromap grows what the build needs
+                group.cached_blas_size_info.reset();
+            }
+        }
+    } else if (opacity_micromaps_dirty) {
         opacity_micromaps->clear();
-        opacity_micromaps_dirty = false;
-        return;
+        for (MeshGroup& group : mesh_groups) {
+            group.blas_dirty = true;
+            group.cached_blas_size_info.reset();
+        }
     }
-    if (!opacity_micromaps_dirty)
-        return;
     opacity_micromaps_dirty = false;
-
-    // A micromap encodes the alpha test, so it is wanted exactly where traversal would run it.
-    std::vector<OpacityMicromaps::MeshGeometry> alpha_tested;
-    for (MeshID mesh_id = 0; mesh_id < mesh_infos.size(); mesh_id++) {
-        const MeshInfo& info = mesh_infos[mesh_id];
-        if (!info.mesh)
-            continue;
-        const Mesh& mesh = *info.mesh;
-        if (mesh.is_opaque() || !material_system->has_alpha_texture(mesh.material_id))
-            continue;
-        assert(info.vertex_buffer);
-
-        GeometryData gd{};
-        gd.material_id = mesh.material_id;
-        gd.primitive_count = mesh.get_primitive_count();
-        gd.vertices = info.vertex_buffer.get_device_address();
-        gd.indices =
-            info.index_buffer ? info.index_buffer.get_device_address() : vk::DeviceAddress{0};
-        gd.flags = index_type_flag(mesh.index_type);
-        alpha_tested.push_back({mesh_id, gd});
-    }
-
-    const uint32_t level =
-        std::min(opacity_micromap_subdivision_level, opacity_micromaps->max_subdivision_level());
-    opacity_micromaps->build(cmd, alpha_tested, material_system, level,
-                             opacity_micromap_max_samples_per_edge, {});
 }
 
 void Scene::build_blas(const CommandBufferHandle& cmd) {
@@ -1824,8 +1830,10 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
                         opacity_micromaps->get_usage(mesh_id));
                     vk::AccelerationStructureTrianglesOpacityMicromapEXT& omm =
                         blas_geometry.micromaps.emplace_back();
-                    // no index buffer: triangle i of the geometry uses micromap triangle i
-                    omm.indexType = vk::IndexType::eNoneKHR;
+                    // triangle i of the geometry uses micromap triangle i
+                    omm.indexType = vk::IndexType::eUint32;
+                    omm.indexBuffer = opacity_micromaps->get_index_buffer()->get_device_address();
+                    omm.indexStride = sizeof(uint32_t);
                     omm.usageCountsCount = 1;
                     omm.pUsageCounts = &blas_geometry.micromap_usages.back();
                     omm.micromap = **micromap;
@@ -1906,8 +1914,8 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
             }
             const auto& size_info = *group.cached_blas_size_info;
 
-            // an update keeps the size it was built with, so geometry that outgrew it has to go
-            // through a build
+            // an update keeps the size it was built with, so anything that grew it - a micromap
+            // the mesh did not have before - has to go through a build
             const bool outgrown = group.blas->get_size() < size_info.accelerationStructureSize;
             if (i < rebuild_count || outgrown) {
                 if (outgrown) {
