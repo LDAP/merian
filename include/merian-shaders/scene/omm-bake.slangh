@@ -15,8 +15,10 @@ namespace merian {
 
 // Most texels one micro-triangle is rasterized over. Past this it stays unknown, which bounds both
 // the shader's work and what the host has to budget for.
-#define MERIAN_OMM_MAX_TEXELS 4096
-#define MERIAN_OMM_MAX_SPAN 192
+// The span cap and the texel cap have to agree: a micro-triangle that passes the span check must
+// fit the texel budget, or its scan is cut short and it can only be left unknown.
+#define MERIAN_OMM_MAX_SPAN 180
+#define MERIAN_OMM_MAX_TEXELS (MERIAN_OMM_MAX_SPAN * MERIAN_OMM_MAX_SPAN + 1)
 
 // Longest micro-triangle edge the bake aims for, in texels. Small enough that a micro-triangle
 // stays inside one cutout feature, large enough to keep the micromaps small.

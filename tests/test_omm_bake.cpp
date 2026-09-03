@@ -4,6 +4,8 @@
 // form that runs without a device so the curve and the rasterization can be checked against brute
 // force rather than against a render.
 
+#include "merian-shaders/scene/omm-bake.slangh"
+
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -349,6 +351,15 @@ TEST(OmmBake, TriangleTexelsCoverItsMicroTriangles) {
             }
         }
     }
+}
+
+// The scan is bounded, and a bound that cuts it short must leave the micro-triangle unknown rather
+// than commit on what it happened to see. Keeping the two caps in step is what makes that
+// unreachable: anything that passes the span check fits the texel budget.
+TEST(OmmBake, TexelBudgetCoversAnySpanThatPasses) {
+    EXPECT_GE(MERIAN_OMM_MAX_TEXELS, MERIAN_OMM_MAX_SPAN * MERIAN_OMM_MAX_SPAN)
+        << "a micro-triangle can pass the span check and still run out of texel budget, which "
+           "would let the bake commit a state it has not proven";
 }
 
 // Whatever the uvs do, one micro-triangle costs a bounded number of texels.

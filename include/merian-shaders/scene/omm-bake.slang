@@ -169,10 +169,13 @@ uint omm_classify(const MaterialSystem material_system,
     bool any_opaque = false;
     bool any_transparent = false;
     uint visited = 0;
-    for (int y = first.y; y <= last.y && visited < OMM_MAX_TEXELS; y++) {
+    for (int y = first.y; y <= last.y; y++) {
         bool was_inside = false;
-        for (int x = first.x; x <= last.x && visited < OMM_MAX_TEXELS; x++) {
-            visited++;
+        for (int x = first.x; x <= last.x; x++) {
+            // a scan that ran out of budget has not seen every texel, so it cannot commit to a
+            // state: the alpha test has to decide those the way it always did
+            if (visited++ >= OMM_MAX_TEXELS)
+                return OMM_STATE_UNKNOWN_OPAQUE;
             // the lattice point reads into the box one texel around it
             const float2 corner = float2(float(x) - 1.f, float(y) - 1.f);
             if (!omm_box_inside_edge(a, b, corner, extent) ||
