@@ -281,6 +281,13 @@ void OpacityMicromaps::update(const CommandBufferHandle& cmd,
     cmd->keep_until_pool_reset(job_buffer);
     cmd->keep_until_pool_reset(record_buffer);
 
+    // The bake only sets bits, so the states it leaves alone are the zeros filled above, and the
+    // jobs and records it reads were staged into this same command buffer.
+    cmd->barrier(vk::MemoryBarrier2{
+        vk::PipelineStageFlagBits2::eTransfer, vk::AccessFlagBits2::eTransferWrite,
+        vk::PipelineStageFlagBits2::eComputeShader,
+        vk::AccessFlagBits2::eShaderStorageRead | vk::AccessFlagBits2::eShaderStorageWrite});
+
     // 4. classify the slice, one workgroup per triangle and one dispatch per mesh
     {
         MERIAN_PROFILE_SCOPE_GPU(cmd, "bake");
