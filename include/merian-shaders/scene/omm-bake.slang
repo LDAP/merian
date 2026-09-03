@@ -150,8 +150,10 @@ uint omm_classify(const MaterialSystem material_system,
     if (!all(isfinite(aabb_min)) || !all(isfinite(aabb_max)))
         return OMM_STATE_UNKNOWN_OPAQUE;
 
-    const int2 first = int2(floor(aabb_min));
-    const int2 last = int2(floor(aabb_max)) + 1;
+    // one texel of slack around the bilinear support: the sampler resolves the coordinate in
+    // fixed point, so the texels it actually reads can sit a step outside the exact footprint
+    const int2 first = int2(floor(aabb_min)) - 1;
+    const int2 last = int2(floor(aabb_max)) + 2;
     const int2 span = max(int2(0), last - first) + 1;
     if (span.x > OMM_MAX_SPAN || span.y > OMM_MAX_SPAN)
         return OMM_STATE_UNKNOWN_OPAQUE;

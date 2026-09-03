@@ -7,8 +7,11 @@
 #include "merian/vk/utils/profiler.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <cstring>
 #include <numeric>
+#include <unordered_map>
 
 namespace merian {
 
@@ -66,6 +69,116 @@ uint32_t choose_subdivision_level(const vk::Extent2D texture_size, const uint32_
         level = next;
     }
     return level;
+}
+
+// Interleaves the low 16 bits of each axis, so blocks that are close in the texture end up close
+// in the buffer.
+uint32_t morton(const uint32_t x, const uint32_t y) {
+    const auto spread = [](uint32_t v) {
+        v &= 0xFFFF;
+        v = (v | (v << 8)) & 0x00FF00FF;
+        v = (v | (v << 4)) & 0x0F0F0F0F;
+        v = (v | (v << 2)) & 0x33333333;
+        v = (v | (v << 1)) & 0x55555555;
+        return v;
+    };
+    return spread(x) | (spread(y) << 1);
+}
+
+// Triangles whose texture coordinates are bit-identical produce the same states, so they can share
+// one block. Foliage instances its cards heavily, and the coordinates are stored at half precision,
+// which folds the nearly-identical ones together as well: Emerald Square's 1.5 M alpha-tested
+// triangles come down to some 2700 blocks. Following NVIDIA's Opacity Micro-Map SDK, which calls
+// this the reuse pre-pass.
+uint32_t build_blocks(const OpacityMicromaps::MeshGeometry& mesh,
+                      std::vector<uint32_t>& block_of_triangle,
+                      std::vector<uint32_t>& representative) {
+    const uint32_t count = mesh.geometry.primitive_count;
+    block_of_triangle.resize(count);
+    representative.clear();
+
+    if (true || mesh.host_vertices == nullptr) { // DIAGNOSTIC: dedup off
+        // nothing to compare on the host: every triangle keeps its own block
+        std::iota(block_of_triangle.begin(), block_of_triangle.end(), 0u);
+        representative.resize(count);
+        std::iota(representative.begin(), representative.end(), 0u);
+        return count;
+    }
+
+    const auto corner = [&](const uint32_t triangle, const uint32_t i) -> uint32_t {
+        uint32_t vertex = 3 * triangle + i;
+        if (mesh.host_indices != nullptr) {
+            vertex = mesh.host_index_type == vk::IndexType::eUint16
+                         ? static_cast<const uint16_t*>(mesh.host_indices)[vertex]
+                         : static_cast<const uint32_t*>(mesh.host_indices)[vertex];
+        }
+        // the uv pair sits in one dword, so its bits are the key
+        uint32_t bits;
+        std::memcpy(&bits, &mesh.host_vertices[vertex].uv, sizeof(bits));
+        return bits;
+    };
+
+    // the coordinates themselves are the key, never a digest of them: two triangles may only share
+    // a block when their states are certain to match
+    struct Key {
+        std::array<uint32_t, 3> uv;
+        bool operator==(const Key&) const = default;
+    };
+    struct KeyHash {
+        size_t operator()(const Key& k) const noexcept {
+            return size_t(k.uv[0] * 0x9E3779B9ull) ^ size_t(k.uv[1] * 0xC2B2AE3Dull) ^
+                   size_t(k.uv[2] * 0x165667B1ull);
+        }
+    };
+
+    std::unordered_map<Key, uint32_t, KeyHash> seen;
+    seen.reserve(count / 4 + 1);
+    for (uint32_t triangle = 0; triangle < count; triangle++) {
+        const Key key{{corner(triangle, 0), corner(triangle, 1), corner(triangle, 2)}};
+        const auto [it, inserted] = seen.try_emplace(key, static_cast<uint32_t>(seen.size()));
+        block_of_triangle[triangle] = it->second;
+        if (inserted) {
+            representative.push_back(triangle);
+        }
+    }
+
+    // Traversal reads a block for every alpha-tested hit, and rays that are near each other hit
+    // triangles that are near each other in the texture. Ordering the blocks along a curve over
+    // that domain is what keeps those reads together; sharing blocks scatters them otherwise.
+    const uint32_t blocks = static_cast<uint32_t>(representative.size());
+    std::vector<uint32_t> order(blocks);
+    std::iota(order.begin(), order.end(), 0u);
+    std::vector<uint32_t> code(blocks);
+    for (uint32_t block = 0; block < blocks; block++) {
+        const uint32_t triangle = representative[block];
+        float u = 0.f;
+        float v = 0.f;
+        for (uint32_t i = 0; i < 3; i++) {
+            const uint32_t bits = corner(triangle, i);
+            half2 uv;
+            std::memcpy(&uv, &bits, sizeof(bits));
+            u += float(uv.x);
+            v += float(uv.y);
+        }
+        const auto quantize = [](const float c) {
+            return static_cast<uint32_t>(std::clamp(c / 3.f, 0.f, 1.f) * 65535.f);
+        };
+        code[block] = morton(quantize(u), quantize(v));
+    }
+    std::sort(order.begin(), order.end(),
+              [&](const uint32_t a, const uint32_t b) { return code[a] < code[b]; });
+
+    std::vector<uint32_t> remap(blocks);
+    std::vector<uint32_t> sorted(blocks);
+    for (uint32_t i = 0; i < blocks; i++) {
+        remap[order[i]] = i;
+        sorted[i] = representative[order[i]];
+    }
+    representative = std::move(sorted);
+    for (uint32_t& block : block_of_triangle) {
+        block = remap[block];
+    }
+    return blocks;
 }
 
 } // namespace
@@ -140,7 +253,7 @@ void OpacityMicromaps::update(const CommandBufferHandle& cmd,
             it->second.alpha_texture_id == alpha_texture_of(mesh) &&
             it->second.primitive_count == mesh.geometry.primitive_count) {
             kept.emplace(mesh.mesh_id, it->second);
-            if (it->second.baked_triangles < it->second.primitive_count) {
+            if (it->second.baked_triangles < it->second.block_count) {
                 pending.push_back(mesh);
             }
             continue;
@@ -190,17 +303,26 @@ void OpacityMicromaps::update(const CommandBufferHandle& cmd,
                                             ->get_extent();
             entry.texture_size = vk::Extent2D{extent.width, extent.height};
             const uint32_t level = choose_subdivision_level(entry.texture_size, max_level);
-            entry.usage = vk::MicromapUsageEXT{mesh.geometry.primitive_count, level,
-                                               MERIAN_OMM_FORMAT_4_STATE};
+            std::vector<uint32_t> block_of_triangle;
+            entry.block_count = build_blocks(mesh, block_of_triangle, entry.block_representative);
+            entry.usage = vk::MicromapUsageEXT{entry.block_count, level, MERIAN_OMM_FORMAT_4_STATE};
+            entry.geometry_usage = vk::MicromapUsageEXT{mesh.geometry.primitive_count, level,
+                                                        MERIAN_OMM_FORMAT_4_STATE};
             entry.vertices = mesh.geometry.vertices;
             entry.indices = mesh.geometry.indices;
             entry.alpha_texture_id = alpha_texture_of(mesh);
             entry.primitive_count = mesh.geometry.primitive_count;
             entry.baked_triangles = 0;
 
+            entry.index_buffer = allocator->create_buffer(
+                cmd, block_of_triangle.size() * sizeof(uint32_t),
+                vk::BufferUsageFlagBits::eShaderDeviceAddress |
+                    vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR,
+                block_of_triangle.data(), MemoryMappingType::NONE, "micromap indices",
+                INPUT_ALIGNMENT);
+
             entry.data = allocator->create_buffer(
-                vk::DeviceSize(entry.primitive_count) * words_per_triangle(level) *
-                    sizeof(uint32_t),
+                vk::DeviceSize(entry.block_count) * words_per_triangle(level) * sizeof(uint32_t),
                 vk::BufferUsageFlagBits::eStorageBuffer |
                     vk::BufferUsageFlagBits::eShaderDeviceAddress |
                     vk::BufferUsageFlagBits::eMicromapBuildInputReadOnlyEXT,
@@ -209,8 +331,8 @@ void OpacityMicromaps::update(const CommandBufferHandle& cmd,
             cmd->fill(entry.data, 0);
 
             // where the build finds each triangle's states; a fixed stride, so the host knows it
-            std::vector<vk::MicromapTriangleEXT> array(entry.primitive_count);
-            for (uint32_t i = 0; i < entry.primitive_count; i++) {
+            std::vector<vk::MicromapTriangleEXT> array(entry.block_count);
+            for (uint32_t i = 0; i < entry.block_count; i++) {
                 array[i].dataOffset =
                     i * words_per_triangle(level) * static_cast<uint32_t>(sizeof(uint32_t));
                 array[i].subdivisionLevel = static_cast<uint16_t>(level);
@@ -228,7 +350,7 @@ void OpacityMicromaps::update(const CommandBufferHandle& cmd,
         const uint32_t first = entry.baked_triangles;
         // at least one triangle, so a mesh whose triangles each exceed the budget still finishes
         const uint32_t count = static_cast<uint32_t>(std::min<uint64_t>(
-            std::max<uint64_t>(1, budget / per_triangle), entry.primitive_count - first));
+            std::max<uint64_t>(1, budget / per_triangle), entry.block_count - first));
 
         OmmBakeJob job{};
         job.geometry = mesh.geometry;
@@ -241,7 +363,7 @@ void OpacityMicromaps::update(const CommandBufferHandle& cmd,
         for (uint32_t i = 0; i < count; i++) {
             OmmBakeTriangle record{};
             record.job_index = slices.back().job_index;
-            record.primitive_id = first + i;
+            record.primitive_id = entry.block_representative[first + i];
             record.subdivision_level = level;
             record.data_word_offset = (first + i) * words_per_triangle(level);
             records.emplace_back(record);
@@ -249,25 +371,6 @@ void OpacityMicromaps::update(const CommandBufferHandle& cmd,
 
         entry.baked_triangles = first + count;
         budget -= std::min<uint64_t>(budget, uint64_t(count) * per_triangle);
-    }
-
-    // 3. the shared index buffer: micromap triangle i for geometry triangle i
-    uint32_t max_primitive_count = 0;
-    for (const OmmBakeJob& job : jobs) {
-        max_primitive_count = std::max(max_primitive_count, job.primitive_count);
-    }
-    if (!index_buffer ||
-        index_buffer->get_size() < vk::DeviceSize(max_primitive_count) * sizeof(uint32_t)) {
-        if (index_buffer) {
-            cmd->keep_until_pool_reset(std::move(index_buffer));
-        }
-        std::vector<uint32_t> indices(max_primitive_count);
-        std::iota(indices.begin(), indices.end(), 0u);
-        index_buffer = allocator->create_buffer(
-            cmd, indices.size() * sizeof(uint32_t),
-            vk::BufferUsageFlagBits::eShaderDeviceAddress |
-                vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR,
-            indices.data(), MemoryMappingType::NONE, "micromap triangle indices", INPUT_ALIGNMENT);
     }
 
     const BufferHandle job_buffer = allocator->create_buffer(
@@ -281,14 +384,7 @@ void OpacityMicromaps::update(const CommandBufferHandle& cmd,
     cmd->keep_until_pool_reset(job_buffer);
     cmd->keep_until_pool_reset(record_buffer);
 
-    // The bake only sets bits, so the states it leaves alone are the zeros filled above, and the
-    // jobs and records it reads were staged into this same command buffer.
-    cmd->barrier(vk::MemoryBarrier2{
-        vk::PipelineStageFlagBits2::eTransfer, vk::AccessFlagBits2::eTransferWrite,
-        vk::PipelineStageFlagBits2::eComputeShader,
-        vk::AccessFlagBits2::eShaderStorageRead | vk::AccessFlagBits2::eShaderStorageWrite});
-
-    // 4. classify the slice, one workgroup per triangle and one dispatch per mesh
+    // 3. classify the slice, one workgroup per triangle and one dispatch per mesh
     {
         MERIAN_PROFILE_SCOPE_GPU(cmd, "bake");
         uint32_t used_bake_params = 0;
@@ -317,13 +413,13 @@ void OpacityMicromaps::update(const CommandBufferHandle& cmd,
         vk::PipelineStageFlagBits2::eComputeShader, vk::AccessFlagBits2::eShaderStorageWrite,
         vk::PipelineStageFlagBits2::eMicromapBuildEXT, vk::AccessFlagBits2::eMicromapReadEXT});
 
-    // 5. build the micromap of every mesh whose last triangle was just baked
+    // 4. build the micromap of every mesh whose last triangle was just baked
     {
         MERIAN_PROFILE_SCOPE_GPU(cmd, "build");
         bool any = false;
         for (const Slice& slice : slices) {
             Entry& entry = entries.at(slice.mesh_id);
-            if (entry.baked_triangles < entry.primitive_count) {
+            if (entry.baked_triangles < entry.block_count) {
                 continue;
             }
             entry.micromap =
@@ -357,7 +453,13 @@ const MicromapHandle& OpacityMicromaps::get(const uint32_t mesh_id) const {
 const vk::MicromapUsageEXT& OpacityMicromaps::get_usage(const uint32_t mesh_id) const {
     static const vk::MicromapUsageEXT none;
     const auto it = entries.find(mesh_id);
-    return it == entries.end() ? none : it->second.usage;
+    return it == entries.end() ? none : it->second.geometry_usage;
+}
+
+const BufferHandle& OpacityMicromaps::get_index_buffer(const uint32_t mesh_id) const {
+    static const BufferHandle none;
+    const auto it = entries.find(mesh_id);
+    return it == entries.end() ? none : it->second.index_buffer;
 }
 
 void OpacityMicromaps::clear() {
