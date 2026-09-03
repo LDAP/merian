@@ -34,10 +34,16 @@ class Properties;
  */
 class OpacityMicromaps {
   public:
-    // What one mesh needs to get a micromap. `geometry` addresses its vertices and indices.
+    // What one mesh needs to get a micromap. `geometry` addresses its vertices and indices on the
+    // device; the host pointers, where the mesh has them, let triangles that share texture
+    // coordinates share a micromap block.
     struct MeshGeometry {
         uint32_t mesh_id;
         GeometryData geometry;
+
+        const PackedVertexData* host_vertices = nullptr;
+        const void* host_indices = nullptr;
+        vk::IndexType host_index_type = vk::IndexType::eNoneKHR;
     };
 
     OpacityMicromaps(const ShaderCompileContextHandle& compile_context,
@@ -65,13 +71,12 @@ class OpacityMicromaps {
     // The micromap of a mesh, or an empty handle if it has none.
     const MicromapHandle& get(const uint32_t mesh_id) const;
 
-    // How many triangles a mesh's micromap covers, and at which level and format.
+    // How the geometry uses its micromap: one entry per triangle, at the level and format it was
+    // built with. This counts the geometry's triangles, not the blocks they share.
     const vk::MicromapUsageEXT& get_usage(const uint32_t mesh_id) const;
 
-    // Maps triangle i of a geometry to micromap triangle i. Empty while nothing was built.
-    const BufferHandle& get_index_buffer() const {
-        return index_buffer;
-    }
+    // Which micromap block each triangle of a mesh uses. Empty while the mesh has no micromap.
+    const BufferHandle& get_index_buffer(const uint32_t mesh_id) const;
 
     void clear();
 
@@ -98,13 +103,13 @@ class OpacityMicromaps {
     std::vector<Versioned<ShaderObject>> bake_params;
     ShaderObjectAllocatorHandle fallback_obj_allocator;
 
-    // 0, 1, 2, ... : triangle i of a geometry uses micromap triangle i, shared by all of them
-    BufferHandle index_buffer;
-
     struct Entry {
         // empty until every triangle has been baked
         MicromapHandle micromap;
+        // what the micromap holds: one entry per block
         vk::MicromapUsageEXT usage;
+        // how the geometry uses it: one entry per triangle
+        vk::MicromapUsageEXT geometry_usage;
         // what the micromap was built from; a change of any of it invalidates it
         vk::DeviceAddress vertices;
         vk::DeviceAddress indices;
@@ -112,11 +117,17 @@ class OpacityMicromaps {
         vk::Extent2D texture_size;
 
         uint32_t primitive_count;
-        // how many of them carry a state already; the bake resumes here
+        // the blocks they share: triangles with the same texture coordinates bake once
+        uint32_t block_count;
+        // one triangle per block, the one the bake reads
+        std::vector<uint32_t> block_representative;
+        // how many blocks carry a state already; the bake resumes here
         uint32_t baked_triangles;
         // the build inputs, alive until the micromap is built
         BufferHandle data;
         BufferHandle triangles;
+        // per triangle, the block it uses; an input to the acceleration structure build
+        BufferHandle index_buffer;
     };
     std::unordered_map<uint32_t, Entry> entries;
 

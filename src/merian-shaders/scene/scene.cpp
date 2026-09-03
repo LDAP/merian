@@ -1755,7 +1755,19 @@ void Scene::ensure_opacity_micromaps(const CommandBufferHandle& cmd) {
             gd.indices =
                 info.index_buffer ? info.index_buffer.get_device_address() : vk::DeviceAddress{0};
             gd.flags = index_type_flag(mesh.index_type);
-            alpha_tested.push_back({mesh_id, gd});
+
+            // host copies let triangles that share texture coordinates share a micromap block
+            OpacityMicromaps::MeshGeometry entry{mesh_id, gd};
+            const Mesh::MeshVertexData vertex_data = mesh.get_vertices();
+            if (const auto* host = std::get_if<Mesh::HostPacked<PackedVertexData>>(&vertex_data)) {
+                entry.host_vertices = host->data;
+            }
+            const Mesh::MeshIndexData index_data = mesh.get_indices();
+            if (const auto* host = std::get_if<Mesh::HostPacked<void>>(&index_data)) {
+                entry.host_indices = host->data;
+                entry.host_index_type = mesh.index_type;
+            }
+            alpha_tested.emplace_back(entry);
         }
 
         const uint32_t level = std::min(opacity_micromap_max_subdivision_level,
@@ -1832,7 +1844,8 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
                         blas_geometry.micromaps.emplace_back();
                     // triangle i of the geometry uses micromap triangle i
                     omm.indexType = vk::IndexType::eUint32;
-                    omm.indexBuffer = opacity_micromaps->get_index_buffer()->get_device_address();
+                    omm.indexBuffer =
+                        opacity_micromaps->get_index_buffer(mesh_id)->get_device_address();
                     omm.indexStride = sizeof(uint32_t);
                     omm.usageCountsCount = 1;
                     omm.pUsageCounts = &blas_geometry.micromap_usages.back();
