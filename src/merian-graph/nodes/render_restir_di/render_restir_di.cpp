@@ -47,14 +47,12 @@ void RenderRestirDI::update_render_constants() {
                     "export static const bool merian_render_demodulate_albedo = {};\n"
                     "export static const int merian_restir_spp = {};\n"
                     "export static const int merian_restir_spatial_iterations = {};\n"
-                    "export static const int merian_restir_temporal_bias_correction = {};\n"
-                    "export static const int merian_restir_spatial_bias_correction = {};\n"
                     "export static const bool merian_restir_apply_motion = {};\n"
                     "export static const bool merian_restir_visibility_shade = {};\n"
                     "export static const float merian_restir_boiling_filter_strength = {:f};\n"
                     "}}",
                     emission_on_primary ? "true" : "false", demodulate_albedo ? "true" : "false",
-                    spp, spatial_iterations, temporal_bias_correction, spatial_bias_correction,
+                    spp, spatial_iterations,
                     apply_mv ? "true" : "false", visibility_shade ? "true" : "false",
                     boiling_filter_strength));
 }
@@ -250,8 +248,6 @@ RenderRestirDI::NodeStatusFlags RenderRestirDI::properties(Properties& config) {
                           "Reject reprojections with depths farther apart (relative to the max).");
     config.config_int("clamp M", temporal_clamp_m,
                       "Clamp the temporal history length. 0 disables.");
-    constants_changed |= config.config_options(
-        "bias correction##temporal", temporal_bias_correction, {"none", "basic", "raytraced"});
     constants_changed |=
         config.config_bool("apply motion", apply_mv,
                            "Extrapolate the light position from its velocity. Reduces flicker on "
@@ -270,8 +266,6 @@ RenderRestirDI::NodeStatusFlags RenderRestirDI::properties(Properties& config) {
     config.config_percent("depth threshold##spatial", spatial_depth_reject,
                           "Reject neighbors with depths farther apart (relative to the max).");
     config.config_int("radius", spatial_radius, "Pixel radius for neighbor sampling.", 0, 100);
-    constants_changed |= config.config_options("bias correction##spatial", spatial_bias_correction,
-                                               {"none", "basic", "raytraced"});
 
     config.st_separate("Shade");
     constants_changed |=

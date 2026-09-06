@@ -19,12 +19,6 @@ enum RestirSampleFlags : uint32_t {
     RestirSampleDistant = 0x2,
 };
 
-enum RestirBiasCorrection : int32_t {
-    RestirBiasNone = 0,
-    RestirBiasBasic = 1,
-    RestirBiasRaytraced = 2,
-};
-
 struct RestirSample {
     float3 pos;
     float3 normal;
@@ -35,12 +29,14 @@ struct RestirSample {
 };
 
 struct RestirReservoir {
-    uint32_t M;       // number of samples that went into the reservoir
-    float w_sum_or_W; // sum of RIS weights (w_i = p_target / p_sample), or the reservoir weight W
-                      // (eq. 6) after resampling
-    float p_target;   // target function for the current sample (not really a PDF)
-    RestirSample y;   // current sample
-    // one-sample estimator: <L> = (f(y) / p_target) * (w_sum_or_W / M)
+    // samples this reservoir stands for, which is how much weight it carries into the next
+    // resampling step [Lin et al. 2022, 6.2]
+    float confidence;
+    // sum of the resampling weights, each already carrying its MIS weight
+    float weight_sum;
+    // target function of the selected sample, in this reservoir's own domain
+    float p_target;
+    RestirSample y;
 };
 
 #ifdef __cplusplus
@@ -82,8 +78,8 @@ RestirSample restir_sample_init() {
 
 RestirReservoir restir_reservoir_init() {
     RestirReservoir r;
-    r.M = 0;
-    r.w_sum_or_W = 0;
+    r.confidence = 0.f;
+    r.weight_sum = 0.f;
     r.p_target = 0;
     r.y = restir_sample_init();
     return r;
@@ -94,18 +90,22 @@ bool restir_sample_valid(const RestirSample y) {
 }
 
 extension RestirReservoir {
-    // Add a sample. p_sample can also be the effective PDF after MIS (ReSTIR DI, p. 3).
+    // Unbiased contribution weight of the selected sample [Lin et al. 2022, eq. 22].
+    float get_ucw() {
+        return p_target > 0.f ? weight_sum / p_target : 0.f;
+    }
+
+    // One candidate drawn from `p_sample`, during generation.
     [mutating]
     bool add_sample(inout RandomGenerator rng,
                     const RestirSample x,
                     const float p_sample,
                     const float p_target) {
-        const float ris_weight = p_target / p_sample;
-        M += 1;
-        w_sum_or_W += ris_weight;
+        const float weight = p_target / p_sample;
+        weight_sum += weight;
         // Weighted Reservoir Sampling (Chao 1982): select x_i with probability w_i / sum(w_i),
         // storing only the current sample.
-        if (rng.next_float() * w_sum_or_W < ris_weight) {
+        if (rng.next_float() * weight_sum < weight) {
             this.p_target = p_target;
             y = x;
             return true;
@@ -113,41 +113,27 @@ extension RestirReservoir {
         return false;
     }
 
-    // Combine an already finalized reservoir (w_sum_or_W holds W). p_target_xy is this pixel's
-    // target evaluated at the other reservoir's sample; reweighting is needed because each pixel
-    // uses a different target distribution.
+    // Another reservoir's sample, with the MIS weight of the technique that produced it and the
+    // target it reaches in this domain [Lin et al. 2022, eq. 19].
     [mutating]
-    bool combine(inout RandomGenerator rng,
-                 const RestirReservoir other,
-                 const float p_target_xy) {
-        const float ris_weight = p_target_xy * other.w_sum_or_W * other.M;
-        M += other.M;
-        w_sum_or_W += ris_weight;
-        if (rng.next_float() * w_sum_or_W < ris_weight) {
-            p_target = p_target_xy;
+    bool add(inout RandomGenerator rng,
+             const float mis,
+             const RestirReservoir other,
+             const float target_here) {
+        const float weight = mis * target_here * other.get_ucw();
+        confidence += other.confidence;
+        weight_sum += max(weight, 0.f);
+        if (rng.next_float() * weight_sum < weight) {
+            p_target = target_here;
             y = other.y;
             return true;
         }
         return false;
     }
 
-    // Normalize after resampling; w_sum_or_W then holds W (eq. 6).
-    [mutating]
-    void finalize() {
-        const float denominator = M * p_target;
-        w_sum_or_W = denominator > 0 ? w_sum_or_W / denominator : 0;
-    }
-
-    // Normalize with explicit MIS terms (numerator/denominator) for bias correction.
-    [mutating]
-    void finalize(const float numerator, const float denominator) {
-        const float d = p_target * denominator;
-        w_sum_or_W = d > 0 ? w_sum_or_W * numerator / d : 0;
-    }
-
     [mutating]
     void discard() {
-        w_sum_or_W = 0;
+        weight_sum = 0;
         y.flags = 0;
         y.radiance = float3(0);
     }
@@ -249,10 +235,10 @@ bool restir_is_distant(const ParameterBlock<Scene> scene, const Hit hit) {
 
 void restir_boiling_filter(inout RestirReservoir reservoir, const float strength) {
     const float multiplier = 10.0f / strength - 9.0f;
-    const float wave_sum = WaveActiveSum(reservoir.w_sum_or_W);
-    const uint wave_count = WaveActiveCountBits(reservoir.w_sum_or_W > 0);
+    const float wave_sum = WaveActiveSum(reservoir.weight_sum);
+    const uint wave_count = WaveActiveCountBits(reservoir.weight_sum > 0);
     const float average = wave_count > 0 ? wave_sum / float(wave_count) : 0;
-    if (reservoir.w_sum_or_W > average * multiplier)
+    if (reservoir.weight_sum > average * multiplier)
         reservoir.discard();
 }
 

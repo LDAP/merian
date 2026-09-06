@@ -81,7 +81,6 @@ class RenderRestirDI : public Node {
     float temporal_normal_reject_cos = 0.96f;
     float temporal_depth_reject = 0.1f;
     int32_t temporal_clamp_m = 32 * 20;
-    int32_t temporal_bias_correction = 2;
     bool apply_mv = false;
     float boiling_filter_strength = 0.0f;
 
@@ -89,7 +88,6 @@ class RenderRestirDI : public Node {
     float spatial_normal_reject_cos = 0.96f;
     float spatial_depth_reject = 0.1f;
     int32_t spatial_radius = 30;
-    int32_t spatial_bias_correction = 1;
 
     bool visibility_shade = true;
 

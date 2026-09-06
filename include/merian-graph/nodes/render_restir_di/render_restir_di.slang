@@ -7,8 +7,6 @@ extern static const bool merian_render_emission_on_primary = true;
 extern static const bool merian_render_demodulate_albedo = false;
 extern static const int merian_restir_spp = 4;
 extern static const int merian_restir_spatial_iterations = 1;
-extern static const int merian_restir_temporal_bias_correction = 2;
-extern static const int merian_restir_spatial_bias_correction = 1;
 extern static const bool merian_restir_apply_motion = false;
 extern static const bool merian_restir_visibility_shade = true;
 extern static const float merian_restir_boiling_filter_strength = 0.0;
@@ -80,8 +78,8 @@ void generate(ParameterBlock<Scene> scene, ParameterBlock<RestirBinding> params)
         }
     }
 
-    reservoir.finalize(1.0f, float(merian_restir_spp));
-    reservoir.M = 1;
+    reservoir.weight_sum /= float(merian_restir_spp);
+    reservoir.confidence = 1.f;
     pc.reservoirs_out[restir_index(pixel, dim)] = reservoir;
 }
 
@@ -95,9 +93,7 @@ void temporal(ParameterBlock<Scene> scene, ParameterBlock<RestirBinding> params)
     RandomGenerator rng = restir_rng(pixel);
     const RestirSurface surface = restir_surface(scene, params.gbuffer, pixel, dim);
 
-    RestirReservoir reservoir = restir_reservoir_init();
     const RestirReservoir current = pc.reservoirs_in[restir_index(pixel, dim)];
-    reservoir.combine(rng, current, current.p_target);
 
     const SurfaceData cur = params.gbuffer.get_surface(pixel);
     const int2 prev_pixel = int2(round(float2(pixel) + params.gbuffer.get_motion_vectors(pixel)));
@@ -110,39 +106,44 @@ void temporal(ParameterBlock<Scene> scene, ParameterBlock<RestirBinding> params)
     }
 
     RestirReservoir prev = restir_reservoir_init();
-    bool combined_prev = false;
+    RestirSurface prev_surface;
+    prev_surface.valid = false;
     if (reprojected) {
         prev = pc.reservoirs_prev[restir_index(uint2(prev_pixel), dim)];
-
         if (merian_restir_apply_motion) {
             prev.y.pos += prev.y.mv * (scene.time - prev.y.time);
             prev.y.time = scene.time;
         }
         if (pc.temporal_clamp_m > 0)
-            prev.M = min(prev.M, uint(pc.temporal_clamp_m));
-
-        combined_prev = reservoir.combine(rng, prev, restir_target_pdf(prev.y, surface, rng));
+            prev.confidence = min(prev.confidence, float(pc.temporal_clamp_m));
+        prev_surface = restir_surface(scene, params.prev_gbuffer, uint2(prev_pixel), dim);
     }
 
-    if (merian_restir_temporal_bias_correction == RestirBiasCorrection::RestirBiasNone) {
-        reservoir.finalize();
-    } else {
-        float pi = reservoir.p_target;
-        float pi_sum = reservoir.p_target * current.M;
-        if (reprojected) {
-            const RestirSurface prev_surface =
-                restir_surface(scene, params.prev_gbuffer, uint2(prev_pixel), dim);
-            float temporal_p = restir_target_pdf(reservoir.y, prev_surface, rng);
-            if (temporal_p > 0 &&
-                merian_restir_temporal_bias_correction == RestirBiasCorrection::RestirBiasRaytraced &&
-                !restir_trace_visibility(scene, surface, reservoir.y)) {
-                temporal_p = 0;
-            }
-            if (combined_prev)
-                pi = temporal_p;
-            pi_sum += temporal_p * prev.M;
-        }
-        reservoir.finalize(pi, pi_sum);
+    // Each domain is one technique, weighed by the target it reaches there and by how many
+    // samples it stands for [Lin et al. 2022, eq. 36]. Unlike a count-based correction this does
+    // not care how long the history is.
+    RestirReservoir reservoir = restir_reservoir_init();
+    const float c_here = current.confidence;
+    const float c_there = reprojected ? prev.confidence : 0.f;
+
+    float mis_here = c_here + c_there > 0.f ? c_here / (c_here + c_there) : 1.f;
+    if (current.p_target > 0.f) {
+        float target_there = reprojected ? restir_target_pdf(current.y, prev_surface, rng) : 0.f;
+        if (target_there > 0.f && !restir_trace_visibility(scene, prev_surface, current.y))
+            target_there = 0.f;
+        const float denominator = c_here * current.p_target + c_there * target_there;
+        mis_here = denominator > 0.f ? (c_here * current.p_target) / denominator : 0.f;
+    }
+    reservoir.add(rng, mis_here, current, current.p_target);
+
+    if (reprojected) {
+        float target_here = restir_target_pdf(prev.y, surface, rng);
+        if (target_here > 0.f && !restir_trace_visibility(scene, surface, prev.y))
+            target_here = 0.f;
+        const float denominator = c_here * target_here + c_there * prev.p_target;
+        const float mis_there =
+            denominator > 0.f ? (c_there * prev.p_target) / denominator : 0.f;
+        reservoir.add(rng, mis_there, prev, target_here);
     }
 
     if (merian_restir_boiling_filter_strength > 1e-6f)
@@ -162,16 +163,19 @@ void spatial(ParameterBlock<Scene> scene, ParameterBlock<RestirBinding> params) 
     const RestirSurface surface = restir_surface(scene, params.gbuffer, pixel, dim);
     const SurfaceData cur = params.gbuffer.get_surface(pixel);
 
-    RestirReservoir reservoir = restir_reservoir_init();
-    const RestirReservoir current = pc.reservoirs_in[restir_index(pixel, dim)];
-    reservoir.combine(rng, current, current.p_target);
+    const RestirReservoir central = pc.reservoirs_in[restir_index(pixel, dim)];
+    const float central_target = central.p_target;
+    const float central_confidence = central.confidence;
 
+    // 1. which neighbors survive, and the confidence they carry between them. The pairwise
+    // weights need that sum before the first pair is weighed, so acceptance cannot be decided
+    // inside the loop below.
     const int n_iter = min(merian_restir_spatial_iterations, RESTIR_MAX_SPATIAL);
-    int2 neighbors[RESTIR_MAX_SPATIAL];
-    for (int i = 0; i < RESTIR_MAX_SPATIAL; i++)
-        neighbors[i] = int2(-1);
+    int2 accepted_pixel[RESTIR_MAX_SPATIAL];
+    float accepted_confidence[RESTIR_MAX_SPATIAL];
+    int accepted = 0;
+    float confidence_sum = 0.f;
 
-    int selected = -1;
     for (int i = 0; i < n_iter; i++) {
         const int2 npix =
             int2(round(float2(pixel) + pc.spatial_radius * (rng.next_float2() * 2 - 1)));
@@ -183,34 +187,53 @@ void spatial(ParameterBlock<Scene> scene, ParameterBlock<RestirBinding> params) 
                                 pc.spatial_depth_reject))
             continue;
 
-        neighbors[i] = npix;
-        const RestirReservoir nr = pc.reservoirs_in[restir_index(uint2(npix), dim)];
-        if (reservoir.combine(rng, nr, restir_target_pdf(nr.y, surface, rng)))
-            selected = i;
+        accepted_pixel[accepted] = npix;
+        accepted_confidence[accepted] =
+            pc.reservoirs_in[restir_index(uint2(npix), dim)].confidence;
+        confidence_sum += accepted_confidence[accepted];
+        accepted++;
     }
 
-    if (merian_restir_spatial_bias_correction == RestirBiasCorrection::RestirBiasNone) {
-        reservoir.finalize();
-    } else {
-        float pi = reservoir.p_target;
-        float pi_sum = reservoir.p_target * current.M;
-        for (int i = 0; i < n_iter; i++) {
-            if (any(neighbors[i] < 0))
-                continue;
-            const RestirSurface nsurf =
-                restir_surface(scene, params.gbuffer, uint2(neighbors[i]), dim);
-            float spatial_p = restir_target_pdf(reservoir.y, nsurf, rng);
-            if (spatial_p > 0 &&
-                merian_restir_spatial_bias_correction == RestirBiasCorrection::RestirBiasRaytraced &&
-                !restir_trace_visibility(scene, nsurf, reservoir.y)) {
-                spatial_p = 0;
-            }
-            if (selected == i)
-                pi = spatial_p;
-            pi_sum += spatial_p * pc.reservoirs_in[restir_index(uint2(neighbors[i]), dim)].M;
+    const float total_confidence = confidence_sum + central_confidence;
+
+    // 2. resample the pair (central, neighbor) with the defensive pairwise MIS weights of
+    // [Lin et al. 2022, eq. 38] in the confidence-weighted form of [Hedstrom et al. 2026, eq. 11].
+    RestirReservoir reservoir = restir_reservoir_init();
+    float central_mis = total_confidence > 0.f ? central_confidence / total_confidence : 1.f;
+
+    for (int i = 0; i < accepted; i++) {
+        const uint2 npixel = uint2(accepted_pixel[i]);
+        const float nconfidence = accepted_confidence[i];
+        const RestirReservoir nres = pc.reservoirs_in[restir_index(npixel, dim)];
+        const RestirSurface nsurf = restir_surface(scene, params.gbuffer, npixel, dim);
+
+        // what this pixel's own sample is worth in the neighbor's domain, eq. 11b
+        float target_there = 0.f;
+        if (central_target > 0.f) {
+            target_there = restir_target_pdf(central.y, nsurf, rng);
+            if (target_there > 0.f && !restir_trace_visibility(scene, nsurf, central.y))
+                target_there = 0.f;
         }
-        reservoir.finalize(pi, pi_sum);
+        const float central_pair =
+            confidence_sum * target_there + central_confidence * central_target;
+        if (central_pair > 0.f) {
+            central_mis += (nconfidence / total_confidence) *
+                           (central_confidence * central_target) / central_pair;
+        }
+
+        // and the neighbor's sample here, eq. 11a
+        float target_here = restir_target_pdf(nres.y, surface, rng);
+        if (target_here > 0.f && !restir_trace_visibility(scene, surface, nres.y))
+            target_here = 0.f;
+        const float pair = confidence_sum * nres.p_target + central_confidence * target_here;
+        const float nmis =
+            pair > 0.f ? (confidence_sum / total_confidence) * (nconfidence * nres.p_target) / pair
+                       : 0.f;
+        reservoir.add(rng, nmis, nres, target_here);
     }
+
+    // the canonical sample needed the sum over the neighbors, so it goes in last
+    reservoir.add(rng, central_mis, central, central_target);
 
     pc.reservoirs_out[restir_index(pixel, dim)] = reservoir;
 }
@@ -227,7 +250,7 @@ void shade(ParameterBlock<Scene> scene, ParameterBlock<RestirBinding> params) {
 
     float3 irradiance = float3(0);
     if (surface.valid && surface.sp.has_surface_material && restir_sample_valid(reservoir.y) &&
-        !isnan(reservoir.w_sum_or_W) && !isinf(reservoir.w_sum_or_W)) {
+        isfinite(reservoir.get_ucw())) {
         const float3 to_light = reservoir.y.pos - surface.sp.pos;
         const float dist2 = dot(to_light, to_light);
         const float3 wo = to_light * rsqrt(dist2);
@@ -245,7 +268,7 @@ void shade(ParameterBlock<Scene> scene, ParameterBlock<RestirBinding> params) {
             const float geo = (reservoir.y.flags & RestirSampleFlags::RestirSampleDistant) != 0
                                   ? 1.0f
                                   : max(dot(reservoir.y.normal, -wo), 0.0f) / dist2;
-            irradiance = f_cos * reservoir.y.radiance * reservoir.w_sum_or_W * geo;
+            irradiance = f_cos * reservoir.y.radiance * reservoir.get_ucw() * geo;
         }
     }
 
