@@ -33,6 +33,25 @@ void cgns_write_irradiance(const CgnsBinding params,
     params.irradiance[pixel] = float4(irradiance, l * l);
 }
 
+void cgns_add_candidate(const ParameterBlock<Scene> scene,
+                        const CgnsVertex vertex,
+                        const uint2 pixel,
+                        const float2 subpixel,
+                        const float primary_jacobian,
+                        inout CgnsReservoir reservoir,
+                        inout CgnsReconnection reconnection,
+                        inout RandomGenerator rng) {
+    const CgnsCandidate candidate = cgns_trace_candidate(scene, vertex, pixel, rng);
+    const float weight = candidate.weight_sum / float(merian_cgns_spp);
+    reservoir.weight_sum += weight;
+    if (rng.next_float() * reservoir.weight_sum < weight) {
+        reservoir.integrand = candidate.integrand;
+        reservoir.subpixel = subpixel;
+        reconnection = candidate.reconnection;
+        reconnection.primary_jacobian = primary_jacobian;
+    }
+}
+
 // One path per sample, resampled into a single reservoir. All samples are independent, so each
 // enters with m_i = 1 / spp.
 void cgns_pass_initial(const uint2 pixel,
@@ -43,25 +62,39 @@ void cgns_pass_initial(const uint2 pixel,
         return;
 
     RandomGenerator rng = cgns_rng(pixel, 0);
-    const CgnsVertex vertex =
+    const CgnsVertex gbuffer_vertex =
         cgns_vertex(scene, params.gbuffer, scene.generate_camera_ray(pixel, dim), pixel);
 
     CgnsReservoir reservoir = CgnsReservoir();
     CgnsReconnection reconnection = CgnsReconnection();
-    if (vertex.valid) {
+    // Two loops rather than one over a vertex chosen per iteration: a shading point holds an
+    // interface-typed material, and reassigning one into a local crashes the compiler.
+    if (merian_cgns_area_integration) {
         for (int s = 0; s < merian_cgns_spp; s++) {
-            const CgnsCandidate candidate = cgns_trace_candidate(scene, vertex, pixel, rng);
-            const float weight = candidate.weight_sum / float(merian_cgns_spp);
-            reservoir.weight_sum += weight;
-            if (rng.next_float() * reservoir.weight_sum < weight) {
-                reservoir.integrand = candidate.integrand;
-                reconnection = candidate.reconnection;
-            }
+            // each sample owns the point of the pixel it was built through
+            const float2 subpixel = rng.next_float2();
+            float primary_jacobian = 1.f;
+            const CgnsVertex vertex =
+                cgns_area_vertex(scene, false, float2(pixel) + subpixel, dim, primary_jacobian);
+            if (vertex.valid)
+                cgns_add_candidate(scene, vertex, pixel, subpixel, primary_jacobian, reservoir,
+                                   reconnection, rng);
         }
+    } else if (gbuffer_vertex.valid) {
+        for (int s = 0; s < merian_cgns_spp; s++)
+            cgns_add_candidate(scene, gbuffer_vertex, pixel, float2(0.5f), 1.f, reservoir,
+                               reconnection, rng);
     }
     reservoir.confidence = 1.f;
 
     const uint index = cgns_index(pixel, dim);
+    // the surface the neighbor heuristics judge this pixel by, generated here rather than taken
+    // from the graph's GBuffer so the pass owns what it compares
+    pc.surfaces[index] =
+        gbuffer_vertex.valid && gbuffer_vertex.sp.has_surface_material
+            ? float4(gbuffer_vertex.sp.get_face_normal(),
+                     distance(scene.camera.position, gbuffer_vertex.sp.pos))
+            : float4(0);
     pc.reservoirs_out[index] = reservoir;
     pc.reconnection_out[index] = reconnection;
     if ((pc.flags & CgnsPassFlags::CgnsPassResolves) != 0)
@@ -123,6 +156,8 @@ float cgns_prev_confidence(const float2 prev_float, const uint2 dim) {
 // of [Lin et al. 2022, eq. 36] scaled by each reservoir's confidence [Lin et al. 2022, 6.2].
 void cgns_resample_prev(const ParameterBlock<Scene> scene,
                         const CgnsVertex vertex,
+                        const uint2 pixel,
+                        const uint2 dim,
                         const float current_confidence,
                         const bool prev_valid,
                         const CgnsReservoir prev,
@@ -133,23 +168,37 @@ void cgns_resample_prev(const ParameterBlock<Scene> scene,
     float mis = 0.f;
     float3 radiance = float3(0);
     float jacobian = 1.f;
-    if (prev_valid && any(prev.integrand > 0.f)) {
-        const CgnsShifted shifted = cgns_shift(scene, vertex, prev_rec, rng);
+    // the path keeps the point of the pixel it was built through, so this domain rebuilds its
+    // primary vertex there rather than at the one this pixel happens to hold
+    float primary_jacobian = prev_rec.primary_jacobian;
+    const CgnsVertex dst_vertex = cgns_domain_vertex(
+        scene, vertex, false, float2(pixel) + prev.subpixel, dim, primary_jacobian);
+
+    if (prev_valid && dst_vertex.valid && any(prev.integrand > 0.f)) {
+        const CgnsShifted shifted = cgns_shift(scene, dst_vertex, prev_rec, rng);
+        const float primary_ratio = merian_cgns_area_integration &&
+                                            prev_rec.primary_jacobian > 0.f
+                                        ? primary_jacobian / prev_rec.primary_jacobian
+                                        : 1.f;
         const float shifted_jacobian =
-            prev_rec.secondary_pdf > 0.f ? shifted.pdf / prev_rec.secondary_pdf : 0.f;
+            prev_rec.secondary_pdf > 0.f ? shifted.pdf / prev_rec.secondary_pdf * primary_ratio
+                                         : 0.f;
         const float m_here = yuv_luminance(shifted.radiance) * shifted_jacobian * current_confidence;
         if (isfinite(m_here) && m_here > 0.f) {
             radiance = shifted.radiance;
             jacobian = shifted_jacobian;
             // the path now lives in this domain
             prev_rec.secondary_pdf = shifted.pdf;
+            prev_rec.primary_jacobian = primary_jacobian;
         }
         const float m_there = yuv_luminance(prev.integrand) * prev.confidence;
         mis = m_here + m_there > 0.f ? m_there / (m_here + m_there) : 0.f;
         mis = isfinite(mis) ? mis : 0.f;
     }
-    if (dst.add(rng, mis, radiance, jacobian, prev))
+    if (dst.add(rng, mis, radiance, jacobian, prev)) {
         dst_rec = prev_rec;
+        dst.subpixel = prev.subpixel;
+    }
 }
 
 // Resamples this pixel's canonical path against the ones the previous frame left for it, each
@@ -206,8 +255,8 @@ void cgns_pass_temporal(const uint2 pixel,
         prev_vertex.valid = false;
         CgnsReservoir prev = CgnsReservoir();
         CgnsReconnection prev_rec = CgnsReconnection();
+        const uint2 prev_pixel = uint2(prev_index % dim.x, prev_index / dim.x);
         if (reprojects) {
-            const uint2 prev_pixel = uint2(prev_index % dim.x, prev_index / dim.x);
             prev_vertex =
                 cgns_vertex(scene, params.prev_gbuffer,
                             scene.prev_camera.generate_ray_pinhole(prev_pixel, dim), prev_pixel);
@@ -220,19 +269,33 @@ void cgns_pass_temporal(const uint2 pixel,
         if (any(current.integrand > 0.f)) {
             const float m_here = yuv_luminance(current.integrand) * current_confidence;
             float m_there = 0.f;
-            if (prev_vertex.valid) {
-                const CgnsShifted shifted = cgns_shift(scene, prev_vertex, current_rec, rng);
+            float there_jacobian = current_rec.primary_jacobian;
+            const CgnsVertex there =
+                reprojects ? cgns_domain_vertex(scene, prev_vertex, true,
+                                                float2(prev_pixel) + current.subpixel, dim,
+                                                there_jacobian)
+                           : prev_vertex;
+            if (there.valid) {
+                const CgnsShifted shifted = cgns_shift(scene, there, current_rec, rng);
+                const float primary_ratio = merian_cgns_area_integration &&
+                                                    current_rec.primary_jacobian > 0.f
+                                                ? there_jacobian / current_rec.primary_jacobian
+                                                : 1.f;
                 m_there = yuv_luminance(shifted.radiance) * prev.confidence *
-                          (current_rec.secondary_pdf > 0.f ? shifted.pdf / current_rec.secondary_pdf
-                                                           : 0.f);
+                          (current_rec.secondary_pdf > 0.f
+                               ? shifted.pdf / current_rec.secondary_pdf * primary_ratio
+                               : 0.f);
                 m_there = isfinite(m_there) ? m_there : 0.f;
             }
             current_mis = m_here + m_there > 0.f ? m_here / (m_here + m_there) : 0.f;
         }
-        if (dst.add(rng, current_mis, current.integrand, 1.f, current))
+        if (dst.add(rng, current_mis, current.integrand, 1.f, current)) {
             dst_rec = current_rec;
+            dst.subpixel = current.subpixel;
+        }
 
-        cgns_resample_prev(scene, vertex, current_confidence, prev_vertex.valid, prev, prev_rec,
+        cgns_resample_prev(scene, vertex, pixel, dim, current_confidence, prev_vertex.valid, prev,
+                           prev_rec,
                            dst, dst_rec, rng);
     } else {
         // The splatted reservoir and this pixel's canonical path are the pair that competes
@@ -266,14 +329,17 @@ void cgns_pass_temporal(const uint2 pixel,
             }
             current_mis = m_here + m_there > 0.f ? m_here / (m_here + m_there) : 0.f;
         }
-        if (dst.add(rng, current_mis, current.integrand, 1.f, current))
+        if (dst.add(rng, current_mis, current.integrand, 1.f, current)) {
             dst_rec = current_rec;
+            dst.subpixel = current.subpixel;
+        }
 
         if (splatted) {
             CgnsReservoir prev = pc.reservoirs_prev[source];
             prev.confidence = source_confidence;
-            cgns_resample_prev(scene, vertex, current_confidence, source_vertex.valid, prev,
-                               pc.reconnection_prev[source], dst, dst_rec, rng);
+            cgns_resample_prev(scene, vertex, pixel, dim, current_confidence,
+                               source_vertex.valid, prev, pc.reconnection_prev[source], dst,
+                               dst_rec, rng);
         }
 
         // the history a pixel inherits follows its motion vector, not what happened to land on it
@@ -296,7 +362,7 @@ void cgns_pass_select_neighbors(const uint2 pixel,
 
     RandomGenerator rng = cgns_rng(pixel, pc.spatial_round * 1337);
     const CgnsNeighbors neighbors =
-        cgns_select_neighbors(scene, params.gbuffer, pixel, dim, pc.spatial_radius,
+        cgns_select_neighbors(scene, pc.surfaces, pixel, dim, pc.spatial_radius,
                               pc.scale_solid_angle, pc.normal_beta, pc.early_stop_cutoff, rng);
 
     const uint base = cgns_index(pixel, dim) * uint(merian_cgns_neighbor_count);
@@ -319,8 +385,8 @@ void cgns_pass_spatial(const uint2 pixel,
 
     const CgnsVertex vertex =
         cgns_vertex(scene, params.gbuffer, scene.generate_camera_ray(pixel, dim), pixel);
-    const SurfaceData central = params.gbuffer.get_surface(pixel);
-    const bool central_surface = cgns_is_surface(central.linear_z);
+    const CgnsSurface central = cgns_load_surface(pc.surfaces, index);
+    const bool central_surface = central.is_surface();
 
     const CgnsReservoir central_res = pc.reservoirs_in[index];
     const CgnsReconnection central_rec = pc.reconnection_in[index];
@@ -341,13 +407,12 @@ void cgns_pass_spatial(const uint2 pixel,
             continue;
 
         if (merian_cgns_geometry_rejection) {
-            const SurfaceData ns = params.gbuffer.get_surface(uint2(npixel));
-            if (central_surface != cgns_is_surface(ns.linear_z))
+            const CgnsSurface ns = cgns_load_surface(pc.surfaces, cgns_index(uint2(npixel), dim));
+            if (central_surface != ns.is_surface())
                 continue;
             if (central_surface &&
                 (dot(central.normal, ns.normal) < merian_cgns_reject_normal ||
-                 abs(central.linear_z - ns.linear_z) >=
-                     merian_cgns_reject_depth * central.linear_z))
+                 abs(central.dist - ns.dist) >= merian_cgns_reject_depth * central.dist))
                 continue;
         }
 
@@ -378,12 +443,20 @@ void cgns_pass_spatial(const uint2 pixel,
         // the expensive half of the pair, so nothing loads it for a pixel that has no path.
         float target_there = 0.f;
         if (central_target > 0.f) {
-            const CgnsVertex nvertex = cgns_vertex(
-                scene, params.gbuffer, scene.generate_camera_ray(npixel, dim), npixel);
+            float there_jacobian = central_rec.primary_jacobian;
+            const CgnsVertex nvertex = cgns_domain_vertex(
+                scene,
+                cgns_vertex(scene, params.gbuffer, scene.generate_camera_ray(npixel, dim), npixel),
+                false, float2(npixel) + central_res.subpixel, dim, there_jacobian);
             const CgnsShifted shifted = cgns_shift(scene, nvertex, central_rec, rng);
-            target_there =
-                yuv_luminance(shifted.radiance) *
-                (central_rec.secondary_pdf > 0.f ? shifted.pdf / central_rec.secondary_pdf : 0.f);
+            const float primary_ratio = merian_cgns_area_integration &&
+                                                central_rec.primary_jacobian > 0.f
+                                            ? there_jacobian / central_rec.primary_jacobian
+                                            : 1.f;
+            target_there = yuv_luminance(shifted.radiance) *
+                           (central_rec.secondary_pdf > 0.f
+                                ? shifted.pdf / central_rec.secondary_pdf * primary_ratio
+                                : 0.f);
             target_there = isfinite(target_there) ? target_there : 0.f;
         }
         const float central_pair =
@@ -397,16 +470,26 @@ void cgns_pass_spatial(const uint2 pixel,
         float nmis = 0.f;
         float3 nradiance = float3(0);
         float njacobian = 1.f;
-        if (any(nres.integrand > 0.f)) {
-            const CgnsShifted shifted = cgns_shift(scene, vertex, nrec, rng);
+        float here_jacobian = nrec.primary_jacobian;
+        const CgnsVertex here = cgns_domain_vertex(scene, vertex, false,
+                                                   float2(pixel) + nres.subpixel, dim,
+                                                   here_jacobian);
+        if (here.valid && any(nres.integrand > 0.f)) {
+            const CgnsShifted shifted = cgns_shift(scene, here, nrec, rng);
+            const float primary_ratio = merian_cgns_area_integration &&
+                                                nrec.primary_jacobian > 0.f
+                                            ? here_jacobian / nrec.primary_jacobian
+                                            : 1.f;
             const float jacobian =
-                nrec.secondary_pdf > 0.f ? shifted.pdf / nrec.secondary_pdf : 0.f;
+                nrec.secondary_pdf > 0.f ? shifted.pdf / nrec.secondary_pdf * primary_ratio
+                                         : 0.f;
             float target_here = yuv_luminance(shifted.radiance) * jacobian;
             if (isfinite(target_here) && target_here > 0.f) {
                 nradiance = shifted.radiance;
                 njacobian = jacobian;
                 // the path now lives in this domain
                 nrec.secondary_pdf = shifted.pdf;
+                nrec.primary_jacobian = here_jacobian;
             } else {
                 target_here = 0.f;
             }
@@ -416,13 +499,17 @@ void cgns_pass_spatial(const uint2 pixel,
                 nmis = (confidence_sum / total_confidence) * (nconfidence * ntarget) / pair;
             }
         }
-        if (dst.add(rng, nmis, nradiance, njacobian, nres))
+        if (dst.add(rng, nmis, nradiance, njacobian, nres)) {
             dst_rec = nrec;
+            dst.subpixel = nres.subpixel;
+        }
     }
 
     // the canonical sample needed the sum over the neighbors, so it goes in last
-    if (dst.add(rng, central_mis, central_res.integrand, 1.f, central_res))
+    if (dst.add(rng, central_mis, central_res.integrand, 1.f, central_res)) {
         dst_rec = central_rec;
+        dst.subpixel = central_res.subpixel;
+    }
 
     pc.reservoirs_out[index] = dst;
     pc.reconnection_out[index] = dst_rec;

@@ -66,6 +66,14 @@ vk::BufferCreateInfo RenderRestirCGNS::splat_buffer_create_info() const {
                                     vk::BufferUsageFlagBits::eShaderDeviceAddress};
 }
 
+// world normal and camera distance per pixel, the surface the neighbor heuristics compare
+vk::BufferCreateInfo RenderRestirCGNS::surface_buffer_create_info() const {
+    return vk::BufferCreateInfo{{},
+                                vk::DeviceSize(extent.width) * extent.height * 16,
+                                vk::BufferUsageFlagBits::eStorageBuffer |
+                                    vk::BufferUsageFlagBits::eShaderDeviceAddress};
+}
+
 vk::BufferCreateInfo RenderRestirCGNS::splat_count_buffer_create_info() const {
     return vk::BufferCreateInfo{{},
                                 vk::DeviceSize(extent.width) * extent.height * 4,
@@ -88,6 +96,7 @@ void RenderRestirCGNS::update_render_constants() {
                     "export static const bool merian_cgns_demodulate_albedo = {};\n"
                     "export static const int merian_cgns_spp = {};\n"
                     "export static const int merian_cgns_max_path_length = {};\n"
+                    "export static const bool merian_cgns_area_integration = {};\n"
                     "export static const uint merian_cgns_instance_mask = {}u;\n"
                     "export static const bool merian_cgns_confidence_temporal = {};\n"
                     "export static const bool merian_cgns_confidence_spatial = {};\n"
@@ -101,7 +110,8 @@ void RenderRestirCGNS::update_render_constants() {
                     "export static const int merian_cgns_temporal_mode = {};\n"
                     "}}",
                     emission_on_primary ? "true" : "false", russian_roulette ? "true" : "false",
-                    demodulate_albedo ? "true" : "false", spp, max_path_length, mask,
+                    demodulate_albedo ? "true" : "false", spp, max_path_length,
+                    area_integration ? "true" : "false", mask,
                     confidence_temporal ? "true" : "false", confidence_spatial ? "true" : "false",
                     confidence_cap, geometry_rejection ? "true" : "false", reject_normal,
                     reject_depth, neighbor_count, candidates, early_stopping ? "true" : "false",
@@ -171,6 +181,8 @@ RenderRestirCGNS::on_connected(const NodeIOLayout& io_layout,
                                                "ReSTIR CGNS splats");
     splat_counts = resource_allocator->create_buffer(
         splat_count_buffer_create_info(), MemoryMappingType::NONE, "ReSTIR CGNS splat counts");
+    surfaces = resource_allocator->create_buffer(
+        surface_buffer_create_info(), MemoryMappingType::NONE, "ReSTIR CGNS surfaces");
 
     // the first temporal pass resamples from reservoirs that no pass has written yet
     submission.get_cmd()->fill(io[con_reservoirs]);
@@ -261,6 +273,7 @@ RenderRestirCGNS::process(const NodeIO& io, const NodeProcessInfo& info, Submiss
     pc.reservoirs_prev = io[con_prev_reservoirs]->get_device_address();
     pc.reconnection_prev = io[con_prev_reconnection]->get_device_address();
     pc.neighbors = neighbors->get_device_address();
+    pc.surfaces = surfaces->get_device_address();
     pc.splats = splats->get_device_address();
     pc.frame = static_cast<uint32_t>(info.get_iteration());
     pc.seed = seed;
@@ -342,7 +355,7 @@ RenderRestirCGNS::process(const NodeIO& io, const NodeProcessInfo& info, Submiss
     for (int32_t round = 0; round < spatial_rounds; round++) {
         const Set& write = current.reservoirs == out.reservoirs ? scratch : out;
         pc.spatial_round = static_cast<uint32_t>(round);
-        sync({current.reservoirs, current.reconnection, neighbors});
+        sync({current.reservoirs, current.reconnection, neighbors, surfaces});
         {
             MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "select neighbors");
             run(SelectNeighbors, current, write, 0);
@@ -380,6 +393,12 @@ RenderRestirCGNS::NodeStatusFlags RenderRestirCGNS::properties(Properties& confi
         "demodulate albedo", demodulate_albedo,
         "Divide the primary-hit albedo out of the output so a denoiser can re-modulate after "
         "filtering. Use with 'emission on primary' disabled (emission is albedo-independent).");
+
+    constants_changed |= config.config_bool(
+        "area integration", area_integration,
+        "Integrate over the pixel's area rather than its centre: every path draws its own point "
+        "of the pixel and a reuse rebuilds the primary vertex there, so resampling antialiases "
+        "instead of fighting the jitter.");
 
     config.st_separate("temporal reuse");
     int32_t mode = static_cast<int32_t>(temporal_mode);

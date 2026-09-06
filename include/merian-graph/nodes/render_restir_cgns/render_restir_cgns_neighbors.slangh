@@ -119,12 +119,6 @@ struct CgnsAES {
     }
 }
 
-// The GBuffer's depth saturates at the environment's distance, which is what marks a pixel where
-// the primary ray left the scene.
-bool cgns_is_surface(const float linear_z) {
-    return linear_z < MAX_LINEAR_Z;
-}
-
 // The M pixels this one resamples from.
 struct CgnsNeighbors {
     int2 pixels[CGNS_MAX_NEIGHBOR_COUNT];
@@ -133,7 +127,7 @@ struct CgnsNeighbors {
 // Draws K candidates from a quasi-random disk around `pixel`, scores each by how compatible its
 // primary hit is with this one, and keeps M of them proportional to that score.
 CgnsNeighbors cgns_select_neighbors(const ParameterBlock<Scene> scene,
-                                    const GBuffer gbuffer,
+                                    const CgnsSurfaceAddress surfaces,
                                     const uint2 pixel,
                                     const uint2 dim,
                                     const float radius,
@@ -141,11 +135,10 @@ CgnsNeighbors cgns_select_neighbors(const ParameterBlock<Scene> scene,
                                     const float normal_beta,
                                     const float early_stop_cutoff,
                                     inout RandomGenerator rng) {
-    const SurfaceData query = gbuffer.get_surface(pixel);
-    const bool query_valid = cgns_is_surface(query.linear_z);
-    const float3 query_pos =
-        scene.camera.position + scene.camera.get_pinhole_direction(pixel, dim) * query.linear_z;
-    const float scale = cgns_neighbor_scale(solid_angle, query.linear_z);
+    const CgnsSurface query = cgns_load_surface(surfaces, cgns_index(pixel, dim));
+    const bool query_valid = query.is_surface();
+    const float3 query_pos = query.position(scene.camera, pixel, dim);
+    const float scale = cgns_neighbor_scale(solid_angle, query.dist);
 
     const uint start = uint(rng.next_float() * CGNS_OFFSET_COUNT);
 
@@ -159,13 +152,12 @@ CgnsNeighbors cgns_select_neighbors(const ParameterBlock<Scene> scene,
         if (any(candidate < 0) || any(uint2(candidate) >= dim))
             continue;
 
-        const SurfaceData other = gbuffer.get_surface(uint2(candidate));
-        const float3 other_pos = scene.camera.position +
-                                 scene.camera.get_pinhole_direction(uint2(candidate), dim) *
-                                     other.linear_z;
-        const float score = cgns_neighbor_weight(query_valid, cgns_is_surface(other.linear_z),
-                                                 query_pos, query.normal, other_pos, other.normal,
-                                                 scale, normal_beta);
+        const CgnsSurface other =
+            cgns_load_surface(surfaces, cgns_index(uint2(candidate), dim));
+        const float3 other_pos = other.position(scene.camera, uint2(candidate), dim);
+        const float score = cgns_neighbor_weight(query_valid, other.is_surface(), query_pos,
+                                                 query.normal, other_pos, other.normal, scale,
+                                                 normal_beta);
 
         if (merian_cgns_neighbor_count == 1) {
             chao.add(candidate, score, rng);

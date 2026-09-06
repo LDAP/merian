@@ -11,6 +11,74 @@ namespace merian {
 
 extern static const uint merian_cgns_instance_mask = 0xFFu;
 
+// Ray through an arbitrary point of the image plane, in pixel units.
+RayDesc cgns_camera_ray(const Camera camera, const float2 image_pos, const uint2 dim) {
+    RayDesc ray;
+    ray.Origin = camera.position;
+    ray.Direction = camera.get_pinhole_direction_unjittered(image_pos - float2(0.5f, 0.5f), dim);
+    const float inv_cos = 1.f / dot(normalize(camera.W), ray.Direction);
+    ray.TMin = camera.near * inv_cos;
+    ray.TMax = camera.far * inv_cos;
+    return ray;
+}
+
+// Image-plane measure to area measure at the point the ray reaches: the surface cosine over
+// squared distance, over the cube of the sensor cosine. A point at infinity has neither.
+float cgns_image_to_area(const Camera camera,
+                         const float3 direction,
+                         const float cos_surface,
+                         const float dist,
+                         const bool distant) {
+    const float cos_sensor = dot(normalize(camera.W), direction);
+    const float sensor = abs(cos_sensor * cos_sensor * cos_sensor);
+    if (!(sensor > 0.f))
+        return 0.f;
+    return distant ? 1.f / sensor : abs(cos_surface) / (dist * dist * sensor);
+}
+
+// The primary vertex a path built through `image_pos` reaches. Its own ray, so every sample may
+// take a different point of the pixel; `jacobian` converts image-plane to area measure there.
+CgnsVertex cgns_area_vertex(const ParameterBlock<Scene> scene,
+                            const bool use_prev_camera,
+                            const float2 image_pos,
+                            const uint2 dim,
+                            out float jacobian) {
+    CgnsVertex v;
+    const RayDesc ray = use_prev_camera ? cgns_camera_ray(scene.prev_camera, image_pos, dim)
+                                        : cgns_camera_ray(scene.camera, image_pos, dim);
+    v.wi = -ray.Direction;
+    v.valid = all(image_pos >= float2(0)) && all(image_pos < float2(dim));
+    jacobian = 0.f;
+    if (!v.valid)
+        return v;
+
+    const Hit hit = scene.trace_ray(ray, RAY_FLAG_NONE, merian_cgns_instance_mask);
+    v.sp = scene.get_shading_point(ray, hit);
+    const bool distant = !hit.is_valid();
+    const float cos_surface = dot(-ray.Direction, v.sp.get_face_normal());
+    const float dist = distance(v.sp.pos, ray.Origin);
+    jacobian =
+        use_prev_camera
+            ? cgns_image_to_area(scene.prev_camera, ray.Direction, cos_surface, dist, distant)
+            : cgns_image_to_area(scene.camera, ray.Direction, cos_surface, dist, distant);
+    v.valid = jacobian > 0.f;
+    return v;
+}
+
+// The vertex a domain carries a path on: its own point of the pixel where the pixel's area is
+// integrated, otherwise whatever the GBuffer holds. Returned rather than assigned, because a
+// shading point holds an interface-typed material and reassigning one crashes the compiler.
+CgnsVertex cgns_domain_vertex(const ParameterBlock<Scene> scene,
+                              const CgnsVertex fallback,
+                              const bool use_prev_camera,
+                              const float2 image_pos,
+                              const uint2 dim,
+                              inout float jacobian) {
+    if (!merian_cgns_area_integration)
+        return fallback;
+    return cgns_area_vertex(scene, use_prev_camera, image_pos, dim, jacobian);
+}
+
 // A path moved into another pixel's domain.
 struct CgnsShifted {
     // contribution in the destination's primary sample space

@@ -49,6 +49,9 @@ static const uint CGNS_PATH_LENGTH_SHIFT = 8;
 // Bounds the relative weight a reused path can reach, which is what keeps the chain from
 // converging to the wrong result [Lin et al. 2022, 6.4].
 extern static const float merian_cgns_confidence_cap = 20.f;
+// Integrate over the pixel's area instead of its centre: the primary ray becomes part of the
+// sample, so a reuse rebuilds it at its own pixel [Chang et al. 2024].
+extern static const bool merian_cgns_area_integration = false;
 // the reconnection ray stops short of x2 so it does not hit it
 static const float CGNS_RECONNECT_SHORTEN = 0.999f;
 #endif
@@ -60,12 +63,16 @@ struct CgnsReservoir {
     float weight_sum;
     // contribution of the selected path, in the primary sample space of this pixel
     float3 integrand;
+    // where inside the pixel the path's primary ray went, in [0, 1)^2. A reuse rebuilds the
+    // primary vertex at its own pixel plus this offset [Chang et al. 2024].
+    float2 subpixel;
 
 #ifndef __cplusplus
     __init() {
         confidence = 0.f;
         weight_sum = 0.f;
         integrand = float3(0);
+        subpixel = float2(0.5f);
     }
 
     // Unbiased contribution weight of the selected path, [Lin et al. 2022, eq. 22].
@@ -116,6 +123,9 @@ struct CgnsReconnection {
     // density of the light vertex: area measure at x1 when it is x2, solid angle at x2 when it is
     // x3. Transported rather than re-evaluated so the MIS weights stay consistent across domains.
     float light_pdf;
+    // density of the primary vertex in area measure, so a shift that rebuilds it can divide the
+    // source's out again
+    float primary_jacobian;
     // path length in the upper bits, CgnsFlags in the lower ones
     uint32_t flags;
 
@@ -131,6 +141,7 @@ struct CgnsReconnection {
         irradiance = float3(0);
         secondary_pdf = 1.f;
         light_pdf = 0.f;
+        primary_jacobian = 1.f;
         flags = 0;
     }
 
@@ -171,11 +182,13 @@ using CgnsReservoirAddress = vk::DeviceAddress;
 using CgnsReconnectionAddress = vk::DeviceAddress;
 using CgnsNeighborAddress = vk::DeviceAddress;
 using CgnsSplatAddress = vk::DeviceAddress;
+using CgnsSurfaceAddress = vk::DeviceAddress;
 #else
 typealias CgnsReservoirAddress = CgnsReservoir*;
 typealias CgnsReconnectionAddress = CgnsReconnection*;
 typealias CgnsNeighborAddress = int2*;
 typealias CgnsSplatAddress = uint32_t*;
+typealias CgnsSurfaceAddress = float4*;
 #endif
 
 struct CgnsPushConstant {
@@ -192,6 +205,10 @@ struct CgnsPushConstant {
 
     // the previous-frame pixel whose reservoir landed on a pixel, one per pixel
     CgnsSplatAddress splats;
+
+    // the primary hit a pixel's paths are judged against: world normal and distance from the
+    // camera, distance 0 where the primary ray left the scene
+    CgnsSurfaceAddress surfaces;
 
     uint32_t frame;
     uint32_t seed;
@@ -282,6 +299,29 @@ CgnsVertex cgns_vertex(const ParameterBlock<Scene> scene,
 
 [vk::push_constant]
 ConstantBuffer<merian::CgnsPushConstant> pc;
+
+// The surface a pixel's paths reconnect against. Distance rather than depth, so a position is
+// the camera plus the pixel's direction scaled by it.
+struct CgnsSurface {
+    float3 normal;
+    float dist;
+
+    bool is_surface() {
+        return dist > 0.f;
+    }
+
+    float3 position(const Camera camera, const uint2 pixel, const uint2 dim) {
+        return camera.position + camera.get_pinhole_direction(pixel, dim) * dist;
+    }
+}
+
+CgnsSurface cgns_load_surface(const CgnsSurfaceAddress surfaces, const uint index) {
+    const float4 packed = surfaces[index];
+    CgnsSurface s;
+    s.normal = packed.xyz;
+    s.dist = packed.w;
+    return s;
+}
 
 uint cgns_index(const uint2 pixel, const uint2 dim) {
     return pixel.y * dim.x + pixel.x;

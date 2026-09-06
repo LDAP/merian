@@ -67,6 +67,7 @@ class RenderRestirCGNS : public Node {
     [[nodiscard]] vk::BufferCreateInfo splat_buffer_create_info() const;
 
     [[nodiscard]] vk::BufferCreateInfo splat_count_buffer_create_info() const;
+    [[nodiscard]] vk::BufferCreateInfo surface_buffer_create_info() const;
 
     ContextHandle context;
     ResourceAllocatorHandle resource_allocator;
@@ -91,6 +92,7 @@ class RenderRestirCGNS : public Node {
     bool emission_on_primary = true;
     bool russian_roulette = true;
     bool use_raygen = true;
+    bool area_integration = false;
     bool demodulate_albedo = false;
     std::array<bool, 8> mask_enabled{true, true, true, true, true, true, true, true};
 
@@ -127,6 +129,7 @@ class RenderRestirCGNS : public Node {
     BufferHandle neighbors;
     BufferHandle splats;
     BufferHandle splat_counts;
+    BufferHandle surfaces;
 };
 
 } // namespace merian
