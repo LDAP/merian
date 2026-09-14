@@ -361,6 +361,7 @@ struct ScatterMixture {
 
         ScatterSample selected;
         float target = 0.f;
+        float selected_pdf = 0.f;
         float weight_sum = 0.f;
 
         for (int i = 0; i < candidates; i++) {
@@ -397,15 +398,15 @@ struct ScatterMixture {
             if (w > 0.f && rng.next_float() * weight_sum < w) {
                 selected = c;
                 target = t;
+                selected_pdf = q;
             }
         }
 
         if (!(weight_sum > 0.f)) {
             return none;
         }
-        // f_cos / pdf stays the throughput factor: this is the density that reproduces the
-        // resampling weight
-        selected.pdf = target * candidates / weight_sum;
+        selected.f_cos *= selected_pdf * weight_sum / (target * candidates);
+        selected.pdf = selected_pdf;
         return selected;
     }
 }
