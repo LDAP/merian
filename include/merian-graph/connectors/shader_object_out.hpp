@@ -72,14 +72,14 @@ class ShaderObjectOut : public OutputConnector, public AccessibleConnector<Shade
         return create_info;
     }
 
-    GraphResourceHandle create_resource(
-        [[maybe_unused]] const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
-        const ConnectorAccess& combined_access,
-        const ResourceAllocatorHandle& allocator,
-        const ResourceAllocatorHandle& aliasing_allocator,
-        const uint32_t resource_index,
-        const uint32_t ring_size) override {
-        const std::shared_ptr<T> instance = std::make_shared<T>(create_info);
+    GraphResourceHandle
+    create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
+                    const ConnectorAccess& combined_access,
+                    const ResourceAllocatorHandle& allocator,
+                    const ResourceAllocatorHandle& aliasing_allocator,
+                    const uint32_t resource_index,
+                    const uint32_t ring_size) override {
+        const std::shared_ptr<T> instance = create_instance(inputs);
         const ContextHandle& context = allocator->get_context();
         instance->allocate(ShaderObjectAllocateInfo{
             .context = context,
@@ -122,6 +122,13 @@ class ShaderObjectOut : public OutputConnector, public AccessibleConnector<Shade
     static ShaderObjectOutHandle<T> create(const CreateInfo& create_info,
                                            const bool persistent = false) {
         return std::make_shared<ShaderObjectOut<T>>(create_info, persistent);
+    }
+
+  protected:
+    // The instance for one ring slot, before it is allocated.
+    virtual std::shared_ptr<T> create_instance(
+        [[maybe_unused]] const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs) {
+        return std::make_shared<T>(create_info);
     }
 
   private:

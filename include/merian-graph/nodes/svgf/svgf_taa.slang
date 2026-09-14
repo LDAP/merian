@@ -86,7 +86,7 @@ void main(const int2 ipos: SV_DispatchThreadID) {
         return;
     }
     if (DEBUG == 5) {
-        out_out.Store(ipos, float4(in_gbuffer.get_albedo(uint2(ipos)).reflection, 1));
+        out_out.Store(ipos, float4(in_gbuffer.get_albedo(uint2(ipos)), 1));
         return;
     }
     if (DEBUG == 6) {
@@ -99,7 +99,7 @@ void main(const int2 ipos: SV_DispatchThreadID) {
         return;
     }
     if (DEBUG == 8) {
-        const float2 size = texture_dimensions(in_gbuffer.tex2, 0);
+        const float2 size = float2(in_gbuffer.get_dimensions());
         out_out.Store(
             ipos,
             float4(abs(in_gbuffer.get_motion_vectors(uint2(ipos))) / max(size.x, size.y), 0, 0));

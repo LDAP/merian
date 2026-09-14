@@ -12,11 +12,11 @@
             ]
         },
         "render": {
-            "enabled": true,
-            "outputs": [
+            "$+$outputs": [
                 "irradiance->accumulate.src",
                 "reservoirs->render.prev_reservoirs"
             ],
+            "enabled": true,
             "properties": {
                 "emission on primary": true,
                 "samples per pixel": 4

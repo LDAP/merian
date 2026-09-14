@@ -1,0 +1,17 @@
+{
+    "cli": {
+        "denoiser": {
+            "default": "none",
+            "type": "variant",
+            "variants": {
+                "dlss": {
+                    "merge": "denoisers/dlss.json"
+                },
+                "none": {},
+                "svgf": {
+                    "merge": "denoisers/svgf.json"
+                }
+            }
+        }
+    }
+}

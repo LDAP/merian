@@ -16,6 +16,8 @@
 #include "merian/vk/extension/extension_vk_layer_settings.hpp"
 #include "merian/vk/extension/extension_vk_validation_layers.hpp"
 #include "merian/vk/extension/extension_vma.hpp"
+#include "merian/vk/extension/ngx/extension_dlss.hpp"
+#include "merian/vk/extension/ngx/extension_ngx.hpp"
 #include "merian/vk/imgui/extension_imgui.hpp"
 #include "merian/vk/memory/memory_allocator_provider.hpp"
 #include <spdlog/spdlog.h>
@@ -67,6 +69,9 @@ ExtensionRegistry::ExtensionRegistry() {
     register_extension<ExtensionVkValidationLayers>(ExtensionVkValidationLayers::name, false);
     register_extension<ExtensionDeviceFault>(ExtensionDeviceFault::name, false);
     register_extension<ExtensionImGui>(ExtensionImGui::name, true);
+    register_extension<ExtensionNGX>(ExtensionNGX::name);
+    register_extension<ExtensionDLSSSuperSampling>(ExtensionDLSSSuperSampling::name);
+    register_extension<ExtensionDLSSRayReconstruction>(ExtensionDLSSRayReconstruction::name);
 }
 
 void ExtensionRegistry::load_from_plugins() {

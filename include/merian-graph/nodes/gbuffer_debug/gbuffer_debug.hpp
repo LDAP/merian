@@ -50,13 +50,14 @@ class GBufferDebugNode : public Node {
 
     // Connectors
     PtrInHandle<Scene> con_scene = PtrIn<Scene>::create();
-    ShaderObjectInHandle<GBufferObject> con_gbuffer = ShaderObjectIn<GBufferObject>::create();
+    GBufferInHandle con_gbuffer;
     ManagedVkImageOutHandle con_output;
 
     vk::Extent3D extent = vk::Extent3D{1920, 1080, 1};
     int32_t selected_field = 0;
 
     // Slang program + pipeline; rebuilt when the scene composition changes.
+    SlangCompositionHandle gbuffer_composition;
     SlangCompositionHandle composition;
     Versioned<SlangProgram> program;
     Versioned<SlangProgramEntryPoint> entry_point;

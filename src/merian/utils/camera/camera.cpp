@@ -8,6 +8,7 @@
 #include <array>
 #include <cassert>
 #include <cmath>
+#include <limits>
 
 namespace merian {
 
@@ -285,17 +286,34 @@ void Camera::set_jitter(const float2& jitter) noexcept {
 
 namespace {
 
-const std::array<float2, 8> HALTON_SEQUENCE = {
-    float2(1.0f / 2.0f, 1.0f / 3.0f), float2(1.0f / 4.0f, 2.0f / 3.0f),
-    float2(3.0f / 4.0f, 1.0f / 9.0f), float2(1.0f / 8.0f, 4.0f / 9.0f),
-    float2(5.0f / 8.0f, 7.0f / 9.0f), float2(3.0f / 8.0f, 2.0f / 9.0f),
-    float2(7.0f / 8.0f, 5.0f / 9.0f), float2(1.0f / 16.0f, 8.0f / 9.0f),
-};
+float radical_inverse(uint32_t index, const uint32_t base) {
+    float result = 0.0f;
+    float denominator = 1.0f;
+    while (index > 0) {
+        denominator /= static_cast<float>(base);
+        result += denominator * static_cast<float>(index % base);
+        index /= base;
+    }
+    return result;
+}
 
-// length 16 is a Padovan number -> maximally isotropic plastic-constant (R2) lattice
-constexpr uint32_t R2_SEQUENCE_LENGTH = 16;
 constexpr float R2_ALPHA_X = 0.7548776662466927f; // 1 / g
 constexpr float R2_ALPHA_Y = 0.5698402909980532f; // 1 / g^2
+
+// A Padovan number of samples puts the plastic-constant (R2) lattice in its most isotropic
+// state, so the requested count rounds up to one.
+uint32_t padovan_at_least(const uint32_t phases) {
+    uint32_t a = 1;
+    uint32_t b = 1;
+    uint32_t c = 1;
+    while (c < phases && a <= std::numeric_limits<uint32_t>::max() - b) {
+        const uint32_t next = a + b;
+        a = b;
+        b = c;
+        c = next;
+    }
+    return c;
+}
 
 // importance sample the Blackman-Harris pixel filter with 1.5px radius support.
 float2 pixel_offset_blackman_harris(const float2& rand) {
@@ -319,11 +337,13 @@ void Camera::advance_jitter(const uint32_t frame_index) noexcept {
     switch (jitter_sequence) {
     case JitterSequence::None:
         return;
-    case JitterSequence::Halton:
-        jitter = HALTON_SEQUENCE[frame_index % HALTON_SEQUENCE.size()] - 0.5f;
+    case JitterSequence::Halton: {
+        const uint32_t n = (frame_index % jitter_phases) + 1;
+        jitter = float2(radical_inverse(n, 2), radical_inverse(n, 3)) - 0.5f;
         break;
+    }
     case JitterSequence::R2: {
-        const auto n = static_cast<float>(frame_index % R2_SEQUENCE_LENGTH);
+        const auto n = static_cast<float>(frame_index % padovan_at_least(jitter_phases));
         jitter = float2(std::fmod(0.5f + (R2_ALPHA_X * n), 1.0f),
                         std::fmod(0.5f + (R2_ALPHA_Y * n), 1.0f)) -
                  0.5f;
@@ -340,6 +360,14 @@ void Camera::advance_jitter(const uint32_t frame_index) noexcept {
 
 Camera::JitterSequence Camera::get_jitter_sequence() const noexcept {
     return jitter_sequence;
+}
+
+void Camera::set_jitter_phases(const uint32_t phases) noexcept {
+    jitter_phases = std::max(phases, 1u);
+}
+
+uint32_t Camera::get_jitter_phases() const noexcept {
+    return jitter_phases;
 }
 
 const float2& Camera::get_jitter() const noexcept {
@@ -583,6 +611,12 @@ void Camera::properties(Properties& props) {
     if (props.config_options("jitter", selected, jitter_sequences,
                              Properties::OptionsStyle::COMBO)) {
         set_jitter_sequence(static_cast<JitterSequence>(selected));
+    }
+    if (jitter_sequence == JitterSequence::Halton || jitter_sequence == JitterSequence::R2) {
+        uint32_t phases = jitter_phases;
+        if (props.config_uint("jitter phases", &phases, "samples before the pattern repeats")) {
+            set_jitter_phases(phases);
+        }
     }
 }
 

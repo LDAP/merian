@@ -18,6 +18,7 @@ RenderRestirDI::RenderRestirDI() = default;
 
 DeviceSupportInfo RenderRestirDI::query_device_support(const DeviceSupportQueryInfo& query_info) {
     const auto composition = Scene::query_device_support_composition(query_info);
+    composition->add_composition(GBufferLayout::complete()->get_composition());
     composition->add_module_from_path(SHADER_MODULE, true);
     const auto program = SlangProgram::create(query_info.compile_context, composition);
     return DeviceSupportInfo::check(query_info, {"rayTracingPipeline"}, {"rayQuery"}) &
@@ -60,6 +61,16 @@ void RenderRestirDI::update_render_constants() {
 }
 
 std::vector<InputConnectorDescriptor> RenderRestirDI::describe_inputs() {
+    const GBufferGroup surface = {
+        {GBufferField::Normal, GBufferField::LinearZ, GBufferField::GradZ, GBufferField::DeltaZ}};
+    std::vector<GBufferGroup> gbuffer_groups = {
+        surface, {{GBufferField::MotionVectors}}, {{GBufferField::Hit}}};
+    if (demodulate_albedo) {
+        gbuffer_groups.push_back({{GBufferField::Albedo}});
+    }
+    con_gbuffer = GBufferIn::create(gbuffer_groups);
+    con_prev_gbuffer = GBufferIn::create({surface});
+
     return {{"scene", con_scene},
             {"gbuffer", con_gbuffer, ConnectorAccess::ray_tracing_read},
             {"prev_gbuffer", con_prev_gbuffer, ConnectorAccess::ray_tracing_read, 1},
@@ -94,6 +105,8 @@ RenderRestirDI::on_connected(const NodeIOLayout& io_layout,
             return true;
         });
 
+    gbuffer_composition = io[con_gbuffer]->get_layout()->get_composition();
+
     pong_buffer = resource_allocator->create_buffer(
         reservoir_buffer_create_info(), MemoryMappingType::NONE, "ReSTIR DI reservoirs");
 
@@ -115,6 +128,7 @@ void RenderRestirDI::ensure_pipeline(const SceneHandle& scene) {
 
     composition = SlangComposition::create();
     composition->add_composition(scene->get_composition());
+    composition->add_composition(gbuffer_composition);
     composition->add_module_from_path(SHADER_MODULE, true);
     update_render_constants();
     program = SlangProgram::create(compile_context, composition);
@@ -235,7 +249,7 @@ RenderRestirDI::NodeStatusFlags RenderRestirDI::properties(Properties& config) {
         config.config_bool("emission on primary", emission_on_primary,
                            "Fold the primary hit's own emission (and the env map on a miss) into "
                            "the output. Otherwise it is the GBuffer emission texture's job.");
-    constants_changed |= config.config_bool(
+    needs_reconnect |= config.config_bool(
         "demodulate albedo", demodulate_albedo,
         "Divide the primary-hit albedo out of the output so a denoiser can re-modulate after "
         "filtering. Use with 'emission on primary' disabled (emission is albedo-independent).");

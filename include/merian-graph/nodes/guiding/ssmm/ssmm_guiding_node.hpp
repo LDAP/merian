@@ -29,6 +29,7 @@ class SSMMGuidingNode : public GuidingNode {
     // the fit is one lobe per pixel of whatever the path tracer renders into
     void configure(const NodeIOLayout& io_layout) override {
         ssmm().on_extent(io_layout[con_gbuffer]->get_create_info().extent);
+        ssmm().set_gbuffer_output(std::dynamic_pointer_cast<GBufferOut>(io_layout[con_gbuffer]));
     }
 
   private:
@@ -36,7 +37,10 @@ class SSMMGuidingNode : public GuidingNode {
         return static_cast<SSMMGuidingModel&>(*model);
     }
 
-    ShaderObjectInHandle<GBufferObject> con_gbuffer = ShaderObjectIn<GBufferObject>::create();
+    GBufferInHandle con_gbuffer = GBufferIn::create({
+        {{GBufferField::Normal, GBufferField::LinearZ}},
+        {{GBufferField::MotionVectors}},
+    });
 };
 
 } // namespace merian

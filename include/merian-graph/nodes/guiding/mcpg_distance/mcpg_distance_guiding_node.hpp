@@ -41,7 +41,7 @@ class MCPGDistanceGuidingNode : public GuidingNode {
     ResourceAllocatorHandle resource_allocator;
 
     PtrInHandle<Scene> con_scene = PtrIn<Scene>::create();
-    ShaderObjectInHandle<GBufferObject> con_gbuffer = ShaderObjectIn<GBufferObject>::create();
+    GBufferInHandle con_gbuffer = GBufferIn::create({});
 
     vk::Extent3D extent{};
 

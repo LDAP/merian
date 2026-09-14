@@ -48,14 +48,18 @@ struct LambertDiffuseBRDF : BSDF {
     }
 
     Albedo get_albedo(const float3 wi) {
-        return Albedo(albedo);
+        return Albedo::diffuse_only(albedo);
     }
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
         return float3(0.0f);
     }
 
-    property float alpha {
+    property float effective_alpha {
+        get { return 1.0f; }
+    }
+
+    property float specular_alpha {
         get { return 1.0f; }
     }
 }

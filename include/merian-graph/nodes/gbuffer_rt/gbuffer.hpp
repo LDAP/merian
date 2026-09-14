@@ -57,12 +57,19 @@ class GBufferRTNode : public Node {
 
     // Connectors
     PtrInHandle<Scene> con_scene = PtrIn<Scene>::create();
-    ShaderObjectOutHandle<GBufferObject> con_gbuffer;
+    GBufferOutHandle con_gbuffer;
     ManagedVkImageOutHandle con_emission;
 
-    // Resolution; the connected scene overrides it to match its camera aspect.
-    vk::Extent3D extent = vk::Extent3D{1920, 1080, 1};
+    // Resolution the image is for; the connected scene overrides it to match its camera aspect.
+    vk::Extent3D native_extent = vk::Extent3D{1920, 1080, 1};
     bool resolution_from_scene = false;
+    // index into RESOLUTION_SCALES
+    uint32_t resolution_scale = 0;
+    // in mip levels, negative sharpens
+    float texture_lod_bias = 0.f;
+
+    // traced resolution
+    vk::Extent3D extent = vk::Extent3D{1920, 1080, 1};
 
     std::array<bool, 8> mask_enabled{true, true, true, true, true, true, true, true};
 
@@ -70,6 +77,7 @@ class GBufferRTNode : public Node {
     vk::Format emission_format = vk::Format::eR32G32B32A32Sfloat;
 
     // Slang program + pipeline; rebuilt when the scene composition changes.
+    SlangCompositionHandle gbuffer_composition;
     SlangCompositionHandle composition;
     Versioned<SlangProgram> program;
     Versioned<SlangProgramEntryPoint> entry_point;

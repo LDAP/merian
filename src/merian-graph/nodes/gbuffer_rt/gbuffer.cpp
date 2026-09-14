@@ -5,12 +5,29 @@
 
 #include <fmt/format.h>
 
+#include <algorithm>
+#include <array>
+#include <cmath>
+
 namespace merian {
+
+namespace {
+// per axis, traced over native resolution
+constexpr std::array<float, 6> RESOLUTION_SCALES = {1.f,       3.f / 4.f, 2.f / 3.f,
+                                                    1.f / 2.f, 1.f / 3.f, 1.f / 4.f};
+const std::vector<std::string> RESOLUTION_SCALE_NAMES = {"1", "3/4", "2/3", "1/2", "1/3", "1/4"};
+
+vk::Extent3D scaled(const vk::Extent3D& extent, const float scale) {
+    return {std::max(static_cast<uint32_t>(std::lround(extent.width * scale)), 1u),
+            std::max(static_cast<uint32_t>(std::lround(extent.height * scale)), 1u), 1};
+}
+} // namespace
 
 GBufferRTNode::GBufferRTNode() {}
 
 DeviceSupportInfo GBufferRTNode::query_device_support(const DeviceSupportQueryInfo& query_info) {
     const auto composition = Scene::query_device_support_composition(query_info);
+    composition->add_composition(GBufferLayout::complete()->get_composition());
     composition->add_module_from_path("merian-graph/nodes/gbuffer_rt/gbuffer_rt.slang", true);
     const auto program = SlangProgram::create(query_info.compile_context, composition);
     return DeviceSupportInfo::check(query_info, {"rayTracingPipeline", "accelerationStructure"},
@@ -31,7 +48,7 @@ std::vector<InputConnectorDescriptor> GBufferRTNode::describe_inputs() {
 
 std::vector<OutputConnectorDescriptor>
 GBufferRTNode::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
-    con_gbuffer = ShaderObjectOut<GBufferObject>::create({extent});
+    con_gbuffer = GBufferOut::create(extent);
     con_emission = ManagedVkImageOut::create(emission_format, extent);
 
     return {
@@ -62,6 +79,7 @@ GBufferRTNode::on_connected(const NodeIOLayout& io_layout,
         });
 
     emission_connected = io_layout.is_connected(con_emission);
+    gbuffer_composition = con_gbuffer->get_layout()->get_composition();
 
     if (const SceneHandle& scene = io[con_scene]; scene && scene->is_ready()) {
         ensure_pipeline(scene);
@@ -77,6 +95,7 @@ void GBufferRTNode::ensure_pipeline(const SceneHandle& scene) {
 
     composition = SlangComposition::create();
     composition->add_composition(scene->get_composition());
+    composition->add_composition(gbuffer_composition);
     composition->add_module_from_path("merian-graph/nodes/gbuffer_rt/gbuffer_rt.slang", true);
     update_gbuffer_constants();
 
@@ -105,8 +124,12 @@ GBufferRTNode::pre_process(const NodeIO& io, [[maybe_unused]] const NodeProcessI
     const SceneHandle& scene = io[con_scene];
     const std::optional<vk::Extent3D> resolution = scene ? scene->get_resolution() : std::nullopt;
     resolution_from_scene = resolution.has_value();
-    if (resolution && *resolution != extent) {
-        extent = *resolution;
+    if (resolution) {
+        native_extent = *resolution;
+    }
+    if (const vk::Extent3D traced = scaled(native_extent, RESOLUTION_SCALES[resolution_scale]);
+        traced != extent) {
+        extent = traced;
         return NodeStatusFlagBits::NEEDS_RECONNECT;
     }
     return {};
@@ -146,20 +169,37 @@ GBufferRTNode::process(const NodeIO& io, const NodeProcessInfo& info, Submission
 }
 
 void GBufferRTNode::update_gbuffer_constants() {
-    composition->add_module_from_string("gbuffer_constants",
-                                        fmt::format("namespace merian {{ export static const bool "
-                                                    "merian_gbuffer_write_emission = {}; }}",
-                                                    emission_connected ? "true" : "false"));
+    composition->add_module_from_string(
+        "gbuffer_constants",
+        fmt::format("namespace merian {{ export static const bool "
+                    "merian_gbuffer_write_emission = {}; export static const float "
+                    "merian_gbuffer_texture_lod_scale = {:f}; }}",
+                    emission_connected ? "true" : "false", std::exp2(texture_lod_bias)));
 }
 
 GBufferRTNode::NodeStatusFlags GBufferRTNode::properties(Properties& config) {
     bool needs_reconnect = false;
     if (resolution_from_scene) {
-        config.output_text("resolution from scene camera: {}x{}", extent.width, extent.height);
+        config.output_text("resolution from scene camera: {}x{}", native_extent.width,
+                           native_extent.height);
     } else {
-        needs_reconnect |= config.config_uint("width", &extent.width);
-        needs_reconnect |= config.config_uint("height", &extent.height);
+        needs_reconnect |= config.config_uint("width", &native_extent.width);
+        needs_reconnect |= config.config_uint("height", &native_extent.height);
     }
+    if (config.config_float("texture lod bias", texture_lod_bias,
+                            "in mip levels; an upscaler asks for -1 on top of the scale", 0.05f)) {
+        if (composition) {
+            update_gbuffer_constants();
+        }
+    }
+    int scale_index = static_cast<int>(resolution_scale);
+    if (config.config_options("resolution scale", scale_index, RESOLUTION_SCALE_NAMES,
+                              Properties::OptionsStyle::COMBO,
+                              "per axis; an upscaler listening to the scene undoes it")) {
+        resolution_scale = static_cast<uint32_t>(scale_index);
+        needs_reconnect = true;
+    }
+    config.output_text("traced: {}x{}", extent.width, extent.height);
 
     config.st_separate("instance mask");
     for (uint32_t bit = 0; bit < 8; ++bit) {

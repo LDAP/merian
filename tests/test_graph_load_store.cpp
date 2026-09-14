@@ -343,3 +343,16 @@ TEST(GraphMerge, ScalarAndPlainArrayReplace) {
     GraphDescription::merge_into(arr, json::parse(R"({"a": [9]})"));
     EXPECT_EQ(arr["a"], json::parse("[9]"));
 }
+
+TEST(GraphMerge, AppendPrefix) {
+    json base = json::parse(R"({"nodes": {"gbuffer": {"outputs": ["a", "b"]}}})");
+    GraphDescription::merge_into(
+        base, json::parse(R"({"nodes": {"gbuffer": {"$+$outputs": ["b", "c"]}}})"));
+    EXPECT_EQ(base["nodes"]["gbuffer"]["outputs"], json::parse(R"(["a", "b", "c"])"));
+
+    // the appended-to key, and every object on the way to it, may be missing
+    json empty = json::parse("{}");
+    GraphDescription::merge_into(empty,
+                                 json::parse(R"({"nodes": {"gbuffer": {"$+$outputs": ["a"]}}})"));
+    EXPECT_EQ(empty, json::parse(R"({"nodes": {"gbuffer": {"outputs": ["a"]}}})"));
+}

@@ -1,4 +1,5 @@
 merian_shaders_src = [
+    'gbuffer.cpp',
     'light-cache/hashed_irradiance_cache.cpp',
     'scene/light_collection.cpp',
     'scene/scene.cpp',

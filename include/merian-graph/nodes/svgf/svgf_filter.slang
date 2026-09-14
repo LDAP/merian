@@ -165,8 +165,9 @@ void _tap(const int2 offset, const float kernel_weight) {
 #define grad_offset (offset * GAP)
 #else
     const float4 p_irr_var = load_irr_var(ipos + offset);
-    const float3 p_n = in_gbuffer.get_normal(uint2(ipos + offset));
-    const float p_z = in_gbuffer.get_linear_z(uint2(ipos + offset));
+    let p_texels = in_gbuffer.load(uint2(ipos + offset));
+    const float3 p_n = p_texels.normal;
+    const float p_z = p_texels.linear_z;
 #define grad_offset offset
 #endif
 

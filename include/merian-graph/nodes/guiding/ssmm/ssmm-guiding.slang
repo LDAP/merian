@@ -55,16 +55,16 @@ void ssmm_add(inout SSMCState s, const float3 x, const float w, const float3 dir
 
 // How much a neighbour's fit is worth here: its own score, discounted where the surface it was
 // fitted on does not match this one. SVGF-style normal and depth weights.
-float ssmm_reuse_weight(const SSMCState s,
-                        const ParameterBlock<GBuffer> gbuffer,
-                        const float3 cam_pos,
-                        const uint2 resolution,
-                        const float3 pos,
-                        const float3 normal,
-                        const int2 tc) {
-    const uint2 q = uint2(clamp(tc, int2(0), int2(resolution) - 1));
-    const float w_n = pow(max(0.0, dot(normal, gbuffer.get_normal(q))), 64.0);
-    const float w_d = exp(-abs(gbuffer.get_linear_z(q) - length(pos - cam_pos)) / 10.0);
+float ssmm_reuse_weight<G : IGBuffer>(const SSMCState s,
+                                      const ParameterBlock<G> gbuffer,
+                                      const float3 cam_pos,
+                                      const uint2 resolution,
+                                      const float3 pos,
+                                      const float3 normal,
+                                      const int2 tc) {
+    let texels = gbuffer.load(uint2(clamp(tc, int2(0), int2(resolution) - 1)));
+    const float w_n = pow(max(0.0, dot(normal, texels.normal)), 64.0);
+    const float w_d = exp(-abs(texels.linear_z - length(pos - cam_pos)) / 10.0);
     return s.f * w_n * w_d;
 }
 
@@ -96,8 +96,8 @@ struct SSMMDistribution : GuidingDistribution<float3> {
     }
 }
 
-struct SSMMGuiding : GuidingModel {
-    ParameterBlock<GBuffer> gbuffer;
+struct SSMMGuiding<G : IGBuffer> : GuidingModel {
+    ParameterBlock<G> gbuffer;
     StructuredBuffer<SSMCState, ScalarDataLayout> prev;
     RWStructuredBuffer<SSMCState, ScalarDataLayout> next;
 
@@ -135,7 +135,7 @@ struct SSMMGuiding : GuidingModel {
         }
 
         const uint2 resolution = gbuffer.get_dimensions();
-        const float2 mv = gbuffer.get_motion_vectors(vertex.pixel);
+        const float2 mv = gbuffer.load(vertex.pixel).motion_vectors;
         const int2 reprojected = int2(float2(vertex.pixel) + mv);
 
         // Resample the neighbourhood towards this vertex, walking outwards from the reprojected

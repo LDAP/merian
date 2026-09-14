@@ -1,5 +1,6 @@
 #pragma once
 
+#include "merian-graph/objects/gbuffer_object.hpp"
 #include "merian-shaders/sampling/guiding.hpp"
 
 #include "merian/vk/memory/resource_allocator.hpp"
@@ -27,6 +28,9 @@ class SSMMGuidingModel : public GuidingModel {
     // One fit per pixel of the render target.
     void on_extent(const vk::Extent3D& extent);
 
+    // Where the gbuffer the fits are reprojected through comes from.
+    void set_gbuffer_output(const std::weak_ptr<GBufferOut>& output);
+
     // The gbuffer the fits are reprojected through, for the frame about to be rendered.
     void set_gbuffer(const ShaderObjectHandle& gbuffer);
 
@@ -40,7 +44,11 @@ class SSMMGuidingModel : public GuidingModel {
     bool properties(Properties& props) override;
 
   private:
+    GBufferLayoutHandle get_gbuffer_layout() const;
+
     ResourceAllocatorHandle allocator;
+    std::weak_ptr<GBufferOut> gbuffer_output;
+    mutable GBufferLayoutHandle gbuffer_layout;
     ShaderObjectHandle gbuffer;
 
     vk::Extent3D extent{};

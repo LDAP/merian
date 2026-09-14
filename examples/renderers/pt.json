@@ -9,10 +9,10 @@
     },
     "nodes": {
         "render": {
-            "enabled": true,
-            "outputs": [
+            "$+$outputs": [
                 "irradiance->accumulate.src"
             ],
+            "enabled": true,
             "properties": {
                 "0": true,
                 "1": true,

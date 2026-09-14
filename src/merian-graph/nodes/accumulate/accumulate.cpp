@@ -19,6 +19,7 @@ DeviceSupportInfo Accumulate::query_device_support(const DeviceSupportQueryInfo&
     DeviceSupportInfo support{true};
     for (const char* module : {ACCUMULATE_MODULE, PERCENTILES_MODULE}) {
         const auto composition = SlangComposition::create();
+        composition->add_composition(GBufferLayout::complete()->get_composition());
         composition->add_module_from_path(module, true);
         support = support & SlangProgram::create(query_info.compile_context, composition)
                                 .get()
@@ -35,11 +36,23 @@ void Accumulate::initialize(const ContextHandle& context,
 
     percentile_kernel.emplace(context, allocator, compile_context, PERCENTILES_MODULE,
                               percentile_spec_info);
-    accumulate_kernel.emplace(context, allocator, compile_context, ACCUMULATE_MODULE,
-                              accumulate_spec_info);
+    accumulate_kernel.emplace(
+        context, allocator, compile_context,
+        [this] {
+            const auto composition = SlangComposition::create();
+            composition->add_composition(gbuffer_layout->get_composition());
+            composition->add_module_from_path(ACCUMULATE_MODULE, true);
+            return composition;
+        },
+        accumulate_spec_info);
 }
 
 std::vector<InputConnectorDescriptor> Accumulate::describe_inputs() {
+    con_gbuffer = GBufferIn::create({
+        {{GBufferField::Normal, GBufferField::LinearZ, GBufferField::GradZ, GBufferField::DeltaZ}},
+        {{GBufferField::MotionVectors}},
+    });
+
     return {
         {"src", con_src, ConnectorAccess::compute_read},
         {"gbuffer", con_gbuffer, ConnectorAccess::compute_read},
@@ -74,6 +87,12 @@ Accumulate::on_connected(const NodeIOLayout& io_layout,
                          const NodeIO& io,
                          [[maybe_unused]] const NodeConnectionInfo& info,
                          [[maybe_unused]] Submission& submission) {
+    if (const GBufferLayoutHandle& layout = io[con_gbuffer]->get_layout();
+        !gbuffer_layout || *layout != *gbuffer_layout) {
+        gbuffer_layout = layout;
+        accumulate_kernel->invalidate();
+    }
+
     io_layout.register_event_listener(
         "/graph/reload_shaders", [this](const GraphEvent::Info&, const GraphEvent::Data& force) {
             for (auto* kernel : {&percentile_kernel, &accumulate_kernel}) {

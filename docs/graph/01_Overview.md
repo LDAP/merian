@@ -51,6 +51,7 @@ The graph internally creates (delay + 1) resources and cycles them every iterati
 | `FXAA` | Fast approximate anti-aliasing |
 | `TAA` | Temporal anti-aliasing |
 | `SVGF` | Spatiotemporal variance-guided filtering |
+| `DLSSNode` | NVIDIA DLSS super sampling and ray reconstruction |
 | `Accumulate` | Temporal accumulation |
 | `DeviceASBuilder` | Acceleration structure builder |
 | `GBufferRTNode` | G-buffer via ray tracing |

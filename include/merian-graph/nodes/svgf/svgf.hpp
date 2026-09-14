@@ -74,7 +74,7 @@ class SVGF : public Node {
     VkSampledImageInHandle con_prev_out = VkSampledImageIn::create();
     VkSampledImageInHandle con_src = VkSampledImageIn::create();
     VkSampledImageInHandle con_history = VkSampledImageIn::create();
-    ShaderObjectInHandle<GBufferObject> con_gbuffer = ShaderObjectIn<GBufferObject>::create();
+    GBufferInHandle con_gbuffer;
     // Optional: overrides the gbuffer motion vectors, for signals that are not on the first hit.
     VkSampledImageInHandle con_mv = VkSampledImageIn::create();
 

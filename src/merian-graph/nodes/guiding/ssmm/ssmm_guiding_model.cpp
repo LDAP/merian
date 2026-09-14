@@ -20,12 +20,14 @@ void SSMMGuidingModel::initialize([[maybe_unused]] const ContextHandle& context,
 
 SlangCompositionHandle SSMMGuidingModel::query_device_support_composition() {
     const auto composition = SlangComposition::create();
+    composition->add_composition(GBufferLayout::complete()->get_composition());
     composition->add_module_from_path(GUIDING_MODULE);
     return composition;
 }
 
 SlangCompositionHandle SSMMGuidingModel::get_composition() const {
     const auto composition = SlangComposition::create();
+    composition->add_composition(get_gbuffer_layout()->get_composition());
     composition->add_module_from_path(GUIDING_MODULE);
     composition->add_module_from_string(
         "ssmm_guiding_constants",
@@ -44,11 +46,11 @@ SlangCompositionHandle SSMMGuidingModel::get_composition() const {
 }
 
 std::vector<std::string> SSMMGuidingModel::get_slang_imports() const {
-    return {GUIDING_MODULE};
+    return {fmt::format("\"{}\"", GUIDING_MODULE), get_gbuffer_layout()->get_module_name()};
 }
 
 std::string SSMMGuidingModel::get_type_name() const {
-    return "merian::SSMMGuiding";
+    return fmt::format("merian::SSMMGuiding<{}>", get_gbuffer_layout()->get_type_name(false));
 }
 
 void SSMMGuidingModel::on_extent(const vk::Extent3D& new_extent) {
@@ -64,6 +66,20 @@ void SSMMGuidingModel::on_extent(const vk::Extent3D& new_extent) {
         states[i] = allocator->create_buffer(size, usage, MemoryMappingType::NONE,
                                              fmt::format("SSMMGuidingModel::states[{}]", i));
     }
+}
+
+void SSMMGuidingModel::set_gbuffer_output(const std::weak_ptr<GBufferOut>& output) {
+    gbuffer_output = output;
+    gbuffer_layout.reset();
+}
+
+GBufferLayoutHandle SSMMGuidingModel::get_gbuffer_layout() const {
+    if (!gbuffer_layout) {
+        if (const GBufferOutHandle output = gbuffer_output.lock()) {
+            gbuffer_layout = output->get_layout();
+        }
+    }
+    return gbuffer_layout ? gbuffer_layout : GBufferLayout::complete();
 }
 
 void SSMMGuidingModel::set_gbuffer(const ShaderObjectHandle& gbuffer) {

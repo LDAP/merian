@@ -99,9 +99,9 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
                     texturewrap_mirror_repeat(global_index, texture_dimensions(in_src, 0));
                 shared_irr_moments[shared_index.y][shared_index.x] =
                     in_src.Load(uint3(halo_mirror_repeat_ipos, 0));
+                let halo = in_gbuffer.load(uint2(halo_mirror_repeat_ipos));
                 shared_normal_z[shared_index.y][shared_index.x] =
-                    float4(in_gbuffer.get_normal(uint2(halo_mirror_repeat_ipos)),
-                           in_gbuffer.get_linear_z(uint2(halo_mirror_repeat_ipos)));
+                    float4(halo.normal, halo.linear_z);
             }
 
             GroupMemoryBarrierWithGroupSync();

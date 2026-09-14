@@ -164,6 +164,11 @@ class Camera {
 
     JitterSequence get_jitter_sequence() const noexcept;
 
+    // Samples before the sequence repeats; Blackman-Harris ignores it.
+    void set_jitter_phases(uint32_t phases) noexcept;
+
+    uint32_t get_jitter_phases() const noexcept;
+
     const float2& get_jitter() const noexcept;
 
     void write_to(ShaderCursor cursor);
@@ -248,6 +253,7 @@ class Camera {
 
     float2 jitter = {0.0f, 0.0f};
     JitterSequence jitter_sequence = JitterSequence::None;
+    uint32_t jitter_phases = 16;
 
     void recompute_ray_basis();
 };

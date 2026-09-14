@@ -54,7 +54,7 @@ constexpr float PDF_REL_TOL = 1e-3f;
 constexpr float QUADRATURE_TOL = 1e-3f;
 
 // get_albedo only approximates the directional albedo (split-sum fit, single scattering); the
-// relative tolerance still catches gross errors (e.g. a missing eta^2 factor ~ 2x off).
+// relative tolerance still catches gross errors (a transmission weight missing eta^2 is ~2x off).
 constexpr float ALBEDO_REL_TOL = 0.15f;
 
 // Link-time config modules: each exports a concrete-typed make_test_bsdf, so the
@@ -121,8 +121,8 @@ import merian_shaders.shading.bsdfs.bsdf_iridescence;
 import bsdf.bsdf_test_common;
 namespace merian_test {
 export merian::IridescentRoughDielectricBSDF make_test_bsdf(BSDFParams p) {
-    // eta = 1/1.5 (air -> glass), film ior 1.3, 400 nm; albedo is the transmission tint.
-    return merian::IridescentRoughDielectricBSDF(p.alpha, 1.0f / 1.5f, p.albedo, float3(0.04f), 1.3f,
+    // film ior 1.3, 400 nm; albedo is the transmission tint.
+    return merian::IridescentRoughDielectricBSDF(p.alpha, p.eta, p.albedo, float3(0.04f), 1.3f,
                                                  400.0f, p.iridescence);
 }
 }
@@ -133,18 +133,7 @@ import merian_shaders.shading.bsdfs.bsdf_rough_dielectric;
 import bsdf.bsdf_test_common;
 namespace merian_test {
 export merian::RoughDielectricBSDF make_test_bsdf(BSDFParams p) {
-    return merian::RoughDielectricBSDF(p.alpha, 1.0f / 1.5f, p.albedo);
-}
-}
-)";
-
-const char* const CONFIG_ROUGH_DIELECTRIC_MATCHED = R"(
-import merian_shaders.shading.bsdfs.bsdf_rough_dielectric;
-import bsdf.bsdf_test_common;
-namespace merian_test {
-export merian::RoughDielectricBSDF make_test_bsdf(BSDFParams p) {
-    // index-matched interface: nothing bends the ray, whatever the roughness
-    return merian::RoughDielectricBSDF(p.alpha, 1.0f, p.albedo);
+    return merian::RoughDielectricBSDF(p.alpha, p.eta, p.albedo);
 }
 }
 )";
@@ -221,10 +210,11 @@ class BSDFTest : public ::testing::Test {
         float alpha_bitangent = 0.3f;
         float iridescence = 0.0f;
         float mix_weight = 0.5f;
+        float eta = 1.0f;
     };
 
     struct CheckResult {
-        float3 furnace;         // average sample_eval weight (directional albedo)
+        float3 furnace;         // mean sample_eval weight, eta^2 removed (directional albedo)
         float3 furnace_stderr;  // standard error of furnace
         float mean_cos;         // MC estimate of INT cos(theta) dwo
         float stderr_cos;       // standard error of mean_cos
@@ -278,6 +268,7 @@ class BSDFTest : public ::testing::Test {
         cursor["p"]["alpha_bitangent"] = p.alpha_bitangent;
         cursor["p"]["iridescence"] = p.iridescence;
         cursor["p"]["mix_weight"] = p.mix_weight;
+        cursor["p"]["eta"] = p.eta;
         cursor["output"] = output_buffer;
 
         queue->submit_wait([&](const CommandBufferHandle& cmd) {
@@ -366,9 +357,8 @@ class BSDFTest : public ::testing::Test {
     }
 
     // get_albedo is the demodulation guide a denoiser divides out; it must track the directional
-    // albedo (the furnace value) so all divisible throughput (tint, Fresnel, eta^2) is removed.
-    // It is an approximation (split-sum fit, single scattering), so a relative tolerance: this
-    // still catches gross errors like a missing eta^2 factor (which would be ~2x off).
+    // albedo (the furnace value) so all divisible throughput (tint, Fresnel) is removed.
+    // It is an approximation (split-sum fit, single scattering), so a relative tolerance.
     void expect_albedo_matches_furnace(const CheckResult& r) {
         const auto check = [&](float a, float f, float se, const char* ch) {
             const float tol = ALBEDO_REL_TOL * std::max(std::abs(f), 0.05f) + MC_SIGMA * se;
@@ -573,6 +563,7 @@ struct RoughDielectricCase {
     const char* config;
     float alpha;
     float iridescence;
+    float eta = 1.0f / 1.5f;
 };
 class RoughDielectricConsistency : public BSDFTest,
                                    public ::testing::WithParamInterface<RoughDielectricCase> {
@@ -582,6 +573,7 @@ class RoughDielectricConsistency : public BSDFTest,
         p.alpha = GetParam().alpha;
         p.iridescence = GetParam().iridescence;
         p.albedo = {0.9f, 0.95f, 1.0f};
+        p.eta = GetParam().eta;
         const auto r = run(GetParam().config, wi, p);
         expect_sample_eval_consistent(r);
         // The albedo guide is exact at facing incidence; at grazing it intentionally diverges (the
@@ -706,7 +698,8 @@ class IndexMatchedInterface : public BSDFTest, public ::testing::WithParamInterf
         BSDFParams p;
         p.alpha = GetParam();
         p.albedo = {0.9f, 0.95f, 1.0f}; // transmission tint
-        const auto r = run(CONFIG_ROUGH_DIELECTRIC_MATCHED, wi, p);
+        p.eta = 1.0f;
+        const auto r = run(CONFIG_ROUGH_DIELECTRIC_PLAIN, wi, p);
         expect_pure_delta(r);
         EXPECT_NEAR(r.furnace.x, p.albedo.x, FLOAT_EQ_TOL) << "pass-through carries only the tint";
         EXPECT_NEAR(r.furnace.y, p.albedo.y, FLOAT_EQ_TOL);

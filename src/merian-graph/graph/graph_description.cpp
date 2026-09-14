@@ -705,27 +705,31 @@ bool GraphDescription::resolve_includes(nlohmann::json& config,
 }
 
 void GraphDescription::merge_into(nlohmann::json& base, const nlohmann::json& overwrite) {
-    if (base.is_object() && overwrite.is_object()) {
-        static constexpr std::string_view append_prefix = "$+$";
-        for (const auto& [key, value] : overwrite.items()) {
-            // "$+$key": [..] appends its (deduplicated) elements to base["key"] instead of
-            // replacing it, so independent variant fragments can each contribute to the same array.
-            if (value.is_array() && key.starts_with(append_prefix)) {
-                nlohmann::json& target = base[key.substr(append_prefix.size())];
-                if (!target.is_array()) {
-                    target = nlohmann::json::array();
-                }
-                for (const auto& element : value) {
-                    if (std::ranges::find(target, element) == target.end()) {
-                        target.push_back(element);
-                    }
-                }
-            } else {
-                merge_into(base[key], value);
-            }
-        }
-    } else {
+    if (!overwrite.is_object()) {
         base = overwrite;
+        return;
+    }
+    if (!base.is_object()) {
+        base = nlohmann::json::object();
+    }
+
+    static constexpr std::string_view append_prefix = "$+$";
+    for (const auto& [key, value] : overwrite.items()) {
+        // "$+$key": [..] appends its (deduplicated) elements to base["key"] instead of
+        // replacing it, so independent variant fragments can each contribute to the same array.
+        if (value.is_array() && key.starts_with(append_prefix)) {
+            nlohmann::json& target = base[key.substr(append_prefix.size())];
+            if (!target.is_array()) {
+                target = nlohmann::json::array();
+            }
+            for (const auto& element : value) {
+                if (std::ranges::find(target, element) == target.end()) {
+                    target.push_back(element);
+                }
+            }
+        } else {
+            merge_into(base[key], value);
+        }
     }
 }
 

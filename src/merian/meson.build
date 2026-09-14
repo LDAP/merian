@@ -39,6 +39,9 @@ merian_src = files(
     'vk/extension/extension_resources.cpp',
     'vk/extension/extension_vk_debug_utils.cpp',
     'vk/extension/extension_vma.cpp',
+    'vk/extension/ngx/dlss.cpp',
+    'vk/extension/ngx/extension_dlss.cpp',
+    'vk/extension/ngx/extension_ngx.cpp',
     'vk/utils/vulkan_extensions.cpp',
     'vk/utils/vulkan_features.cpp',
     'vk/utils/vulkan_properties.cpp',
@@ -77,6 +80,10 @@ if get_option('glfw').enable_auto_if(glfw.found()).enabled()
     )
 endif
 
+if ngx.found()
+    merian_src += files('vk/extension/ngx/ngx.cpp')
+endif
+
 if get_option('sdl').enable_auto_if(sdl3.found()).enabled()
     merian_src += files(
         'vk/extension/sdl/extension_sdl.cpp',
@@ -101,6 +108,7 @@ merian_deps = [
     glm,
     glslang,
     imgui,
+    ngx,
     nlohmann_json,
     sdl3,
     slang,

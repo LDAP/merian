@@ -41,15 +41,19 @@ struct ConductorFresnelBSDF<Inner : BSDF> : BSDF {
     }
 
     Albedo get_albedo(const float3 wi) {
-        return Albedo(bsdf.get_preintegrated_specular(f0, wi));
+        return Albedo::specular_only(bsdf.get_preintegrated_specular(f0, wi));
     }
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
         return bsdf.get_preintegrated_specular(F0, wi);
     }
 
-    property float alpha {
-        get { return bsdf.alpha; }
+    property float effective_alpha {
+        get { return bsdf.effective_alpha; }
+    }
+
+    property float specular_alpha {
+        get { return bsdf.specular_alpha; }
     }
 }
 

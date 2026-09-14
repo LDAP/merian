@@ -124,7 +124,8 @@ General-purpose shader utilities.
 
 | Module | Content |
 |---|---|
-| `gbuffer.slang` | G-buffer layout and pack/unpack helpers |
+| `gbuffer.slang` | G-buffer accessors; the texture layout is generated per graph from the fields its consumers request (`GBufferLayout`) |
+| `gbuffer-data.slang` | G-buffer sample and packed hit types |
 
 ---
 

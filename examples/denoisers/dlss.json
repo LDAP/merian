@@ -1,0 +1,40 @@
+{
+    "nodes": {
+        "accumulate": {
+            "enabled": false,
+            "outputs": []
+        },
+        "dlss": {
+            "enabled": true,
+            "outputs": [
+                "out->exposure.src"
+            ],
+            "properties": {
+                "ray reconstruction": true
+            },
+            "type": "DLSS"
+        },
+        "gbuffer": {
+            "$+$outputs": [
+                "gbuffer->dlss.gbuffer"
+            ],
+            "properties": {
+                "texture lod bias": -1.0
+            }
+        },
+        "render": {
+            "$+$outputs": [
+                "irradiance->dlss.src",
+                "specular_hit_distance->dlss.specular_hit_distance"
+            ],
+            "properties": {
+                "demodulate albedo": false
+            }
+        },
+        "scene": {
+            "$+$outputs": [
+                "scene->dlss.scene"
+            ]
+        }
+    }
+}

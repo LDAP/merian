@@ -31,7 +31,8 @@ class GuidingModel {
 
     virtual SlangCompositionHandle get_composition() const = 0;
 
-    // Modules the renderer's slot module has to import for get_type_name() to resolve.
+    // Modules the renderer's slot module has to import for get_type_name() to resolve, as written
+    // after import: a quoted path or a module name.
     virtual std::vector<std::string> get_slang_imports() const = 0;
 
     virtual std::string get_type_name() const = 0;

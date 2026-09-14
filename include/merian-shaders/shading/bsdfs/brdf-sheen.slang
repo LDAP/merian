@@ -8,15 +8,15 @@ namespace merian {
 // Microfacet sheen BRDF (Estevez & Kulla 2017).
 struct SheenBRDF : BSDF {
     float3 color;
-    float alpha;
+    float sheen_alpha;
 
     __init(float3 color, float alpha) {
         this.color = color;
-        this.alpha = max(alpha, 1e-6f);
+        this.sheen_alpha = max(alpha, 1e-6f);
     }
 
     float sheen_D(const float ndoth) {
-        const float inv_alpha = 1.f / alpha;
+        const float inv_alpha = 1.f / sheen_alpha;
         const float cos2h = ndoth * ndoth;
         const float sin2h = max(1.f - cos2h, 0.0078125f);
         return (2.f + inv_alpha) * pow(sin2h, inv_alpha * 0.5f) * (0.5f * MERIAN_INV_PI);
@@ -24,7 +24,7 @@ struct SheenBRDF : BSDF {
 
     // Rational fit for the visibility lambda term, parameterised by (1 - alpha)^2.
     float sheen_L(const float x) {
-        const float r = (1.f - alpha) * (1.f - alpha);
+        const float r = (1.f - sheen_alpha) * (1.f - sheen_alpha);
         const float inv_r = 1.f - r;
         const float a = 25.3245f * r + 21.5473f * inv_r;
         const float b = 3.32435f * r + 3.82987f * inv_r;
@@ -81,11 +81,19 @@ struct SheenBRDF : BSDF {
     }
 
     Albedo get_albedo(const float3 wi) {
-        return Albedo(color * sheen_directional_albedo(wi.z, alpha));
+        return Albedo::diffuse_only(color * sheen_directional_albedo(wi.z, sheen_alpha));
     }
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
         return float3(0.f);
+    }
+
+    property float effective_alpha {
+        get { return sheen_alpha; }
+    }
+
+    property float specular_alpha {
+        get { return 1.0f; }
     }
 }
 

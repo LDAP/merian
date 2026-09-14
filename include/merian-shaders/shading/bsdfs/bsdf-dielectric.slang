@@ -52,18 +52,20 @@ struct SmoothDielectricBSDF : BSDF {
     }
 
     Albedo get_albedo(const float3 wi) {
-        // Directional albedo of the delta interface: reflected fraction + transmitted rest, the
-        // latter tinted and scaled by the eta^2 radiance factor.
         const float3 f0 = float3(pow2((1.0f - eta) / (1.0f + eta)));
         const float3 spec = fresnel_schlick(wi.z, f0);
-        return Albedo(spec + (1.0f - spec) * pow2(eta) * transmission_color);
+        return Albedo::specular_only(spec + (1.0f - spec) * transmission_color);
     }
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
         return fresnel_schlick(wi.z, F0);
     }
 
-    property float alpha {
+    property float effective_alpha {
+        get { return 0.0f; }
+    }
+
+    property float specular_alpha {
         get { return 0.0f; }
     }
 }

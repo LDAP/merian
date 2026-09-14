@@ -414,7 +414,7 @@ struct GGXBRDF : BSDF {
     }
 
     Albedo get_albedo(const float3 wi) {
-        return Albedo(get_preintegrated_specular(float3(1.0f), wi));
+        return Albedo::specular_only(get_preintegrated_specular(float3(1.0f), wi));
     }
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
@@ -423,8 +423,12 @@ struct GGXBRDF : BSDF {
     }
 
     // The narrower axis bounds how sharp the lobe gets.
-    property float alpha {
+    property float specular_alpha {
         get { return min(alpha_xy.x, alpha_xy.y); }
+    }
+
+    property float effective_alpha {
+        get { return specular_alpha; }
     }
 }
 
@@ -524,11 +528,19 @@ struct GGXBTDF : BSDF {
     }
 
     Albedo get_albedo(const float3 wi) {
-        return Albedo(pow2(eta) * tint);
+        return Albedo::specular_only(tint);
     }
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
         return float3(0.0f);
+    }
+
+    property float effective_alpha {
+        get { return alpha; }
+    }
+
+    property float specular_alpha {
+        get { return alpha; }
     }
 }
 

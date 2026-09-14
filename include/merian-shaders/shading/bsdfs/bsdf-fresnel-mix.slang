@@ -56,7 +56,8 @@ struct FresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
 
     Albedo get_albedo(const float3 wi) {
         const float3 spec = layer.get_preintegrated_specular(float3(ior_f0), wi);
-        return Albedo(spec + (1.0f - spec) * base.get_albedo(wi).reflection);
+        const Albedo transmitted = base.get_albedo(wi).scaled(1.0f - spec);
+        return Albedo(transmitted.diffuse, transmitted.specular + spec);
     }
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
@@ -64,8 +65,12 @@ struct FresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
     }
 
     // Weighted RMS, by the share of the response the layer takes at normal incidence.
-    property float alpha {
-        get { return sqrt(lerp(pow2(base.alpha), pow2(layer.alpha), ior_f0)); }
+    property float effective_alpha {
+        get { return sqrt(lerp(pow2(base.effective_alpha), pow2(layer.effective_alpha), ior_f0)); }
+    }
+
+    property float specular_alpha {
+        get { return layer.specular_alpha; }
     }
 }
 

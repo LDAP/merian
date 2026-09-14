@@ -73,16 +73,22 @@ struct SheenLayerBSDF<Base : BSDF> : BSDF {
     }
 
     Albedo get_albedo(const float3 wi) {
-        return Albedo(sheen.get_albedo(wi).reflection +
-                      albedo_scaling(wi.z) * base.get_albedo(wi).reflection);
+        const Albedo scaled_base = base.get_albedo(wi).scaled(float3(albedo_scaling(wi.z)));
+        const Albedo sheen_albedo = sheen.get_albedo(wi);
+        return Albedo(sheen_albedo.diffuse + scaled_base.diffuse,
+                      sheen_albedo.specular + scaled_base.specular);
     }
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
         return base.get_preintegrated_specular(F0, wi);
     }
 
-    property float alpha {
-        get { return base.alpha; }
+    property float effective_alpha {
+        get { return base.effective_alpha; }
+    }
+
+    property float specular_alpha {
+        get { return base.specular_alpha; }
     }
 }
 

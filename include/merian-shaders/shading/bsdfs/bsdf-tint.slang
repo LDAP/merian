@@ -32,16 +32,22 @@ struct TintBSDF<Base : BSDF> : BSDF {
     }
 
     Albedo get_albedo(const float3 wi) {
-        return Albedo(tint * base.get_albedo(wi).reflection);
+        return base.get_albedo(wi).scaled(tint);
     }
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
         return tint * base.get_preintegrated_specular(F0, wi);
     }
 
-    property float alpha {
+    property float effective_alpha {
         get {
-            return base.alpha;
+            return base.effective_alpha;
+        }
+    }
+
+    property float specular_alpha {
+        get {
+            return base.specular_alpha;
         }
     }
 }

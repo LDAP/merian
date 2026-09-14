@@ -54,7 +54,8 @@ float accumulate_err(const float acc, const float v) {
         float c = 0;
         if (let s = bsdf.sample_eval(wi, rng)) {
             valid++;
-            weight = s.weight;
+            // the albedo is the energy fraction; transmission also compresses radiance by eta^2
+            weight = s.wo.z < 0 ? s.weight / (params.p.eta * params.p.eta) : s.weight;
             c = s.wo.z / s.pdf;
 
             // weight and pdf must match the independent eval()/pdf() definition. pdf() rebuilds

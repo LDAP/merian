@@ -56,8 +56,10 @@ struct MixBSDF<B0 : BSDF, B1 : BSDF> : BSDF {
     }
 
     Albedo get_albedo(const float3 wi) {
-        return Albedo(
-            lerp(bsdf0.get_albedo(wi).reflection, bsdf1.get_albedo(wi).reflection, weight));
+        const Albedo a0 = bsdf0.get_albedo(wi);
+        const Albedo a1 = bsdf1.get_albedo(wi);
+        return Albedo(lerp(a0.diffuse, a1.diffuse, weight),
+                      lerp(a0.specular, a1.specular, weight));
     }
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
@@ -66,8 +68,16 @@ struct MixBSDF<B0 : BSDF, B1 : BSDF> : BSDF {
     }
 
     // Weighted RMS
-    property float alpha {
-        get { return sqrt(lerp(pow2(bsdf0.alpha), pow2(bsdf1.alpha), weight)); }
+    property float effective_alpha {
+        get {
+            return sqrt(lerp(pow2(bsdf0.effective_alpha), pow2(bsdf1.effective_alpha), weight));
+        }
+    }
+
+    property float specular_alpha {
+        get {
+            return sqrt(lerp(pow2(bsdf0.specular_alpha), pow2(bsdf1.specular_alpha), weight));
+        }
     }
 }
 

@@ -62,7 +62,7 @@ void main(uint3 tid: SV_DispatchThreadID,
         break;
     }
     case 2: { // Albedo
-        color = float4(params.gbuffer.get_albedo(pixel).reflection, 1);
+        color = float4(params.gbuffer.get_albedo(pixel), 1);
         break;
     }
 
@@ -258,6 +258,29 @@ void main(uint3 tid: SV_DispatchThreadID,
         } else {
             color = float4(MISS, 1);
         }
+        break;
+    }
+
+    // --- Lobes & depths ---
+
+    case 24: { // Diffuse Albedo
+        color = float4(params.gbuffer.get_diffuse_albedo(pixel), 1);
+        break;
+    }
+    case 25: { // Specular Albedo
+        color = float4(params.gbuffer.get_specular_albedo(pixel), 1);
+        break;
+    }
+    case 26: { // Specular Roughness (linear)
+        color = float4(float3(params.gbuffer.get_roughness(pixel)), 1);
+        break;
+    }
+    case 27: { // View Depth (plain)
+        color = float4(float3(params.gbuffer.get_view_depth(pixel)), 1);
+        break;
+    }
+    case 28: { // Projected Depth
+        color = float4(float3(params.gbuffer.get_projected_depth(pixel)), 1);
         break;
     }
     }

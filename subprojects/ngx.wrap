@@ -1,0 +1,11 @@
+[wrap-file]
+directory = DLSS-310.9.1
+
+source_url = https://codeload.github.com/NVIDIA/DLSS/tar.gz/refs/tags/v310.9.1
+source_filename = DLSS-310.9.1.tar.gz
+source_hash = 81b17f2f34bbd6b18b50df4c2a5632956b7feaba301567f29fcc5fbdd5c4ee06
+
+patch_directory = ngx
+
+[provide]
+ngx = ngx_dep

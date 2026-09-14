@@ -14,6 +14,7 @@ RenderPT::RenderPT()
 
 DeviceSupportInfo RenderPT::query_device_support(const DeviceSupportQueryInfo& query_info) {
     const auto composition = Scene::query_device_support_composition(query_info);
+    composition->add_composition(GBufferLayout::complete()->get_composition());
     composition->add_module_from_string(
         "render_pt_guiding",
         "module render_pt_guiding;\n"
@@ -36,6 +37,16 @@ void RenderPT::initialize(const ContextHandle& context, const ResourceAllocatorH
 }
 
 std::vector<InputConnectorDescriptor> RenderPT::describe_inputs() {
+    std::vector<GBufferGroup> gbuffer_groups = {{{GBufferField::Hit}}};
+    if (demodulate_albedo) {
+        gbuffer_groups.push_back({{GBufferField::Albedo}});
+    }
+    if (volume_available) {
+        gbuffer_groups.push_back({{GBufferField::LinearZ}});
+        gbuffer_groups.push_back({{GBufferField::MotionVectors}});
+    }
+    con_gbuffer = GBufferIn::create(gbuffer_groups);
+
     return {
         {.name = "scene", .connector = con_scene},
         {.name = "gbuffer", .connector = con_gbuffer, .access = ConnectorAccess::ray_tracing_read},
@@ -74,6 +85,7 @@ std::vector<OutputConnectorDescriptor> RenderPT::describe_outputs(const NodeIOLa
     adopt(con_distance_guiding, distance_guiding, distance_guiding_version,
           std::make_shared<NullDistanceGuidingModel>());
     con_irradiance = ManagedVkImageOut::create(irradiance_format, extent);
+    con_specular_hit_distance = ManagedVkImageOut::create(vk::Format::eR32Sfloat, extent);
     con_volume = ManagedVkImageOut::create(irradiance_format, extent);
     con_volume_depth = ManagedVkImageOut::create(volume_depth_format, extent);
     con_volume_mv = ManagedVkImageOut::create(vk::Format::eR16G16Sfloat, extent);
@@ -81,6 +93,9 @@ std::vector<OutputConnectorDescriptor> RenderPT::describe_outputs(const NodeIOLa
     const bool no_volume = !volume_available;
     return {{.name = "irradiance",
              .connector = con_irradiance,
+             .access = ConnectorAccess::ray_tracing_write},
+            {.name = "specular_hit_distance",
+             .connector = con_specular_hit_distance,
              .access = ConnectorAccess::ray_tracing_write},
             {.name = "volume",
              .connector = con_volume,
@@ -116,6 +131,9 @@ RenderPT::NodeStatusFlags RenderPT::on_connected(const NodeIOLayout& io_layout,
             return true;
         });
 
+    specular_hit_distance_connected = io_layout.is_connected(con_specular_hit_distance);
+    gbuffer_composition = io[con_gbuffer]->get_layout()->get_composition();
+
     if (const SceneHandle& scene = io[con_scene]; scene && scene->is_ready()) {
         ensure_pipeline(scene);
     }
@@ -128,7 +146,7 @@ void RenderPT::update_guiding_slot() {
     for (const GuidingModelHandle& model : {guiding, distance_guiding}) {
         composition->add_composition(model->get_composition());
         for (const std::string& import : model->get_slang_imports()) {
-            imports += fmt::format("import \"{}\";\n", import);
+            imports += fmt::format("import {};\n", import);
         }
     }
     composition->add_module_from_string(
@@ -147,6 +165,7 @@ void RenderPT::ensure_pipeline(const SceneHandle& scene) {
     }
     composition = SlangComposition::create();
     composition->add_composition(scene->get_composition());
+    composition->add_composition(gbuffer_composition);
     update_guiding_slot();
     composition->add_module_from_path("merian-graph/nodes/render_pt/render_pt.slang", true);
     composition->add_module_from_path("merian-graph/nodes/render_pt/render_pt_volume.slang", true);
@@ -230,6 +249,8 @@ RenderPT::process(const NodeIO& io, const NodeProcessInfo& info, Submission& sub
     auto cursor = params_obj->get_cursor();
     cursor["gbuffer"] = gbuf.r();
     cursor["irradiance"] = io[con_irradiance].get_texture();
+    if (specular_hit_distance_connected)
+        cursor["specular_hit_distance"] = io[con_specular_hit_distance].get_texture();
     if (io.is_connected(con_guiding)) {
         cursor["guiding"] = io[con_guiding].r();
     }
@@ -328,6 +349,10 @@ void RenderPT::update_render_constants() {
                     "export static const uint merian_render_instance_mask = {}u;\n"
                     "export static const bool merian_render_enable_ser = {};\n"
                     "export static const bool merian_render_demodulate_albedo = {};\n"
+                    "export static const bool merian_render_write_specular_hit_distance = "
+                    "{};\n"
+                    "export static const float merian_render_specular_hit_distance_roughness "
+                    "= {:f};\n"
                     "export static const int merian_render_nee_mode = {};\n"
                     "export static const float merian_render_nee_probability = {:f};\n"
                     "export static const int merian_render_nee_candidates = {};\n"
@@ -340,9 +365,11 @@ void RenderPT::update_render_constants() {
                     "= {:f};\n"
                     "}}",
                     emission_on_primary ? "true" : "false", spp, max_path_length, mask,
-                    enable_ser ? "true" : "false", demodulate_albedo ? "true" : "false", nee_mode,
-                    nee_probability, nee_candidates, nee_bounces, scatter_mode, scatter_candidates,
-                    volume_spp, volume_nee_candidates, volume_forward_project_min_z));
+                    enable_ser ? "true" : "false", demodulate_albedo ? "true" : "false",
+                    specular_hit_distance_connected ? "true" : "false",
+                    specular_hit_distance_roughness, nee_mode, nee_probability, nee_candidates,
+                    nee_bounces, scatter_mode, scatter_candidates, volume_spp,
+                    volume_nee_candidates, volume_forward_project_min_z));
 }
 
 RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
@@ -396,10 +423,14 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
     constants_changed |=
         config.config_bool("shader execution reordering", enable_ser,
                            "Reorder threads after the primary hit to improve coherence.");
-    constants_changed |= config.config_bool(
+    needs_reconnect |= config.config_bool(
         "demodulate albedo", demodulate_albedo,
         "Divide the primary-hit albedo out of the output so a denoiser can re-modulate after "
         "filtering. Use with 'emission on primary' disabled (emission is albedo-independent).");
+
+    constants_changed |= config.config_float(
+        "specular hit distance roughness", specular_hit_distance_roughness,
+        "linear roughness above which a surface has no reflection worth tracking", 0.01f);
 
     config.st_separate("volume");
     constants_changed |= config.config_int(

@@ -120,11 +120,19 @@ struct RoughDielectricBSDF : BSDF {
     Albedo get_albedo(const float3 wi) {
         const float3 f0 = float3(pow2((1.0f - eta) / (1.0f + eta)));
         const float3 spec = GGXBRDF(alpha).get_preintegrated_specular(f0, wi);
-        return Albedo(spec + (1.0f - spec) * pow2(eta) * tint);
+        return Albedo::specular_only(spec + (1.0f - spec) * tint);
     }
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
         return GGXBRDF(alpha).get_preintegrated_specular(F0, wi);
+    }
+
+    property float effective_alpha {
+        get { return alpha; }
+    }
+
+    property float specular_alpha {
+        get { return alpha; }
     }
 }
 

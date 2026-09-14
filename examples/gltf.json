@@ -4,16 +4,6 @@
             "pointer": "/nodes/scene/properties/file",
             "required": true
         },
-        "denoiser": {
-            "default": "none",
-            "type": "variant",
-            "variants": {
-                "none": {},
-                "svgf": {
-                    "merge": "denoisers/svgf.json"
-                }
-            }
-        },
         "env-map": {
             "pointer": "/nodes/scene/properties/env/Path",
             "set": {
@@ -29,6 +19,7 @@
         "time overwrite": "None"
     },
     "include": [
+        "denoisers.json",
         "renderers.json"
     ],
     "nodes": {

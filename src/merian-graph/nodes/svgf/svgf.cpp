@@ -19,11 +19,19 @@ DeviceSupportInfo SVGF::query_device_support(const DeviceSupportQueryInfo& query
         query_info.file_loader->get_search_paths(), query_info.physical_device);
     compilation_ctx->add_search_path("merian-graph/nodes/svgf");
 
+    const auto entry_point = [&](const std::string& module_path) {
+        const auto composition = SlangComposition::create();
+        composition->add_composition(GBufferLayout::complete()->get_composition());
+        composition->add_module_from_path(module_path, true);
+        return SlangProgramEntryPoint::create(SlangProgram::create(compilation_ctx, composition),
+                                              "main")
+            .get();
+    };
+
     // Compile the three SVGF shaders
-    auto filter_program = SlangProgramEntryPoint::create(compilation_ctx, "svgf_filter.slang");
-    auto variance_program =
-        SlangProgramEntryPoint::create(compilation_ctx, "svgf_variance_estimate.slang");
-    auto taa_program = SlangProgramEntryPoint::create(compilation_ctx, "svgf_taa.slang");
+    const auto filter_program = entry_point("svgf_filter.slang");
+    const auto variance_program = entry_point("svgf_variance_estimate.slang");
+    const auto taa_program = entry_point("svgf_taa.slang");
 
     // Get SPIR-V binaries and reflect to determine requirements
     auto filter_binary = filter_program->get_program()->get_binary();
@@ -49,6 +57,15 @@ void SVGF::initialize(const ContextHandle& context, const ResourceAllocatorHandl
 }
 
 std::vector<InputConnectorDescriptor> SVGF::describe_inputs() {
+    std::vector<GBufferGroup> gbuffer_groups = {
+        {{GBufferField::Normal, GBufferField::LinearZ, GBufferField::GradZ, GBufferField::DeltaZ}},
+        {{GBufferField::MotionVectors}},
+    };
+    if (taa_modulate_albedo || taa_debug == 5) {
+        gbuffer_groups.push_back({{GBufferField::Albedo}});
+    }
+    con_gbuffer = GBufferIn::create(gbuffer_groups);
+
     return {
         {"prev_out", con_prev_out, ConnectorAccess::compute_read, 1},
         {"src", con_src, ConnectorAccess::compute_read},
@@ -144,6 +161,7 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
             irr_create_info.format == vk::Format::eR16G16B16A16Sfloat ? "true" : "false");
         const auto entry_point = [&](const std::string& module_path) {
             const auto composition = SlangComposition::create();
+            composition->add_composition(io[con_gbuffer]->get_layout()->get_composition());
             composition->add_module_from_path(module_path, true);
             composition->add_module_from_string("svgf_constants", constants);
             return SlangProgramEntryPoint::create(

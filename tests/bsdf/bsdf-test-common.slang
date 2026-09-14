@@ -11,6 +11,7 @@ struct BSDFParams {
     float alpha_bitangent; // second GGX axis for anisotropic configs
     float iridescence;     // thin-film strength for iridescent configs
     float mix_weight;      // lobe selection weight for mixed configs
+    float eta;             // relative IOR (incident / transmitted) for dielectric configs
 }
 
 } // namespace merian_test

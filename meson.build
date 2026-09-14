@@ -123,6 +123,16 @@ tinybvh = dependency('tinybvh', required: false)
 if not tinybvh.found() and get_option('tinybvh').enabled()
     tinybvh = dependency('tinybvh', fallback: ['tinybvh', 'tinybvh_dep'])
 endif
+# The NGX SDK is a proprietary 717 MB download: auto takes it only if it is already present.
+ngx = dependency('', required: false)
+if get_option('dlss').allowed()
+    ngx_directory = fs.read('subprojects/ngx.wrap').split('directory = ')[1].split('\n')[0].strip()
+    ngx = dependency('ngx', required: get_option('dlss'),
+        allow_fallback: get_option('dlss').enabled() or fs.is_dir('subprojects' / ngx_directory))
+endif
+if ngx.found()
+    global_args += ['-DMERIAN_NGX_ENABLED']
+endif
 sdl3 = dependency('sdl3', version: ['>=3.4.0'], required: get_option('sdl'), fallback: ['sdl3', 'sdl3_dep'])
 if get_option('sdl').enable_auto_if(sdl3.found()).enabled()
     global_args += ['-DMERIAN_SDL_ENABLED']

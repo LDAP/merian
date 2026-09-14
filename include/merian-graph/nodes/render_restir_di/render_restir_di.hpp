@@ -64,8 +64,8 @@ class RenderRestirDI : public Node {
     ShaderCompileContextHandle compile_context;
 
     PtrInHandle<Scene> con_scene = PtrIn<Scene>::create();
-    ShaderObjectInHandle<GBufferObject> con_gbuffer = ShaderObjectIn<GBufferObject>::create();
-    ShaderObjectInHandle<GBufferObject> con_prev_gbuffer = ShaderObjectIn<GBufferObject>::create();
+    GBufferInHandle con_gbuffer;
+    GBufferInHandle con_prev_gbuffer;
     VkBufferInHandle con_prev_reservoirs = VkBufferIn::create();
     ManagedVkImageOutHandle con_irradiance;
     ManagedVkBufferOutHandle con_reservoirs;
@@ -93,6 +93,7 @@ class RenderRestirDI : public Node {
 
     bool visibility_shade = true;
 
+    SlangCompositionHandle gbuffer_composition;
     SlangCompositionHandle composition;
     Versioned<SlangProgram> program;
     std::array<Versioned<SlangProgramEntryPoint>, PassCount> entry_points;

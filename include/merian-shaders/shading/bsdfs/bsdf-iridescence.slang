@@ -66,17 +66,22 @@ struct IridescentConductorBSDF<Inner : BSDF> : BSDF {
     Albedo get_albedo(const float3 wi) {
         const float3 spec = bsdf.get_preintegrated_specular(f0, wi);
         if (iridescence <= 0.0f) {
-            return Albedo(spec);
+            return Albedo::specular_only(spec);
         }
-        return Albedo(spec * fresnel(wi.z) / max(fresnel_schlick(wi.z, f0), 1e-4f));
+        return Albedo::specular_only(spec * fresnel(wi.z) /
+                                     max(fresnel_schlick(wi.z, f0), 1e-4f));
     }
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
         return bsdf.get_preintegrated_specular(F0, wi);
     }
 
-    property float alpha {
-        get { return bsdf.alpha; }
+    property float effective_alpha {
+        get { return bsdf.effective_alpha; }
+    }
+
+    property float specular_alpha {
+        get { return bsdf.specular_alpha; }
     }
 }
 
@@ -175,7 +180,8 @@ struct IridescentFresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
             const float die = fresnel_dielectric(wi.z, eta);
             spec = clamp(spec * lerp(float3(1.0f), irf / max(die, 1e-4f), iridescence), 0.0f, 1.0f);
         }
-        return Albedo(spec + (1.0f - spec) * base.get_albedo(wi).reflection);
+        const Albedo transmitted = base.get_albedo(wi).scaled(1.0f - spec);
+        return Albedo(transmitted.diffuse, transmitted.specular + spec);
     }
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
@@ -183,8 +189,12 @@ struct IridescentFresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
     }
 
     // Weighted RMS, by the share of the response the layer takes at normal incidence.
-    property float alpha {
-        get { return sqrt(lerp(pow2(base.alpha), pow2(layer.alpha), ior_f0)); }
+    property float effective_alpha {
+        get { return sqrt(lerp(pow2(base.effective_alpha), pow2(layer.effective_alpha), ior_f0)); }
+    }
+
+    property float specular_alpha {
+        get { return layer.specular_alpha; }
     }
 }
 
@@ -338,19 +348,26 @@ struct IridescentRoughDielectricBSDF : BSDF {
     }
 
     Albedo get_albedo(const float3 wi) {
-        // Reflected fraction + transmitted rest; the latter carries the eta^2 radiance factor and
-        // tint. The thin-film hue (at the view angle) modulates the reflected fraction.
+        // The thin-film hue (at the view angle) modulates the reflected fraction.
         const float3 f0 = float3(pow2((1.0f - eta) / (1.0f + eta)));
         float3 spec = GGXBRDF(alpha).get_preintegrated_specular(f0, wi);
         if (iridescence > 0.0f) {
             spec = clamp(spec * reflectance(wi.z) / max(fresnel_dielectric(wi.z, eta), 1e-4f), 0.0f,
                          1.0f);
         }
-        return Albedo(spec + (1.0f - spec) * pow2(eta) * tint);
+        return Albedo::specular_only(spec + (1.0f - spec) * tint);
     }
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
         return GGXBRDF(alpha).get_preintegrated_specular(F0, wi);
+    }
+
+    property float effective_alpha {
+        get { return alpha; }
+    }
+
+    property float specular_alpha {
+        get { return alpha; }
     }
 }
 

@@ -3,6 +3,7 @@ merian_graph_src = []
 subdir('connectors')
 subdir('graph')
 subdir('nodes')
+subdir('objects')
 
 merian_graph_deps = [
     fmt,

@@ -84,7 +84,7 @@ class Accumulate : public Node {
 
     // Graph IO
     VkSampledImageInHandle con_src = VkSampledImageIn::create();
-    ShaderObjectInHandle<GBufferObject> con_gbuffer = ShaderObjectIn<GBufferObject>::create();
+    GBufferInHandle con_gbuffer;
     // Optional: overrides the gbuffer motion vectors, for signals that are not on the first hit.
     VkSampledImageInHandle con_mv = VkSampledImageIn::create();
     VkSampledImageInHandle con_prev_out = VkSampledImageIn::create();
@@ -104,6 +104,7 @@ class Accumulate : public Node {
 
     Versioned<SpecializationInfo> percentile_spec_info;
     Versioned<SpecializationInfo> accumulate_spec_info;
+    GBufferLayoutHandle gbuffer_layout;
     std::optional<ComputeKernel> percentile_kernel;
     std::optional<ComputeKernel> accumulate_kernel;
 

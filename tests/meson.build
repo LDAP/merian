@@ -62,6 +62,13 @@ test_scene = executable(
 )
 test('scene', test_scene, timeout: 120)
 
+test_gbuffer_layout = executable(
+    'test-gbuffer-layout',
+    'test_gbuffer_layout.cpp',
+    dependencies: [merian_dep, gtest_main_dep],
+)
+test('gbuffer_layout', test_gbuffer_layout, timeout: 120)
+
 test_graph_load_store = executable(
     'test-graph-load-store',
     'test_graph_load_store.cpp',

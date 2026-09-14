@@ -67,11 +67,12 @@ class RenderPT : public Node {
 
     // Connectors
     PtrInHandle<Scene> con_scene = PtrIn<Scene>::create();
-    ShaderObjectInHandle<GBufferObject> con_gbuffer = ShaderObjectIn<GBufferObject>::create();
+    GBufferInHandle con_gbuffer;
     ShaderObjectInHandle<GuidingObject> con_guiding = ShaderObjectIn<GuidingObject>::create();
     ShaderObjectInHandle<GuidingObject> con_distance_guiding =
         ShaderObjectIn<GuidingObject>::create();
     ManagedVkImageOutHandle con_irradiance;
+    ManagedVkImageOutHandle con_specular_hit_distance;
     ManagedVkImageOutHandle con_volume;
     ManagedVkImageOutHandle con_volume_depth;
     ManagedVkImageOutHandle con_volume_mv;
@@ -90,6 +91,9 @@ class RenderPT : public Node {
     uint32_t guiding_version = 0;
     GuidingModelHandle distance_guiding;
     uint32_t distance_guiding_version = 0;
+
+    bool specular_hit_distance_connected = false;
+    float specular_hit_distance_roughness = 0.25f;
 
     // Single scattering along the primary ray; compiled out where the scene has no medium.
     bool volume_available = false;
@@ -119,6 +123,7 @@ class RenderPT : public Node {
     VolumePass project;
 
     // Slang program + pipeline; rebuilt when the scene composition changes.
+    SlangCompositionHandle gbuffer_composition;
     SlangCompositionHandle composition;
     Versioned<SlangProgram> program;
     Versioned<SlangProgramEntryPoint> entry_point;

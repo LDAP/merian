@@ -58,6 +58,12 @@ option(
     value: 'auto',
     description: 'Build with tinybvh support.'
 )
+option(
+    'dlss',
+    type: 'feature',
+    value: 'auto',
+    description: 'Build with NVIDIA DLSS support. auto uses an NGX SDK that is already present; enabled downloads it (717 MB, proprietary license).'
+)
 
 # Tests
 option(

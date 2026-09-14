@@ -9,6 +9,7 @@
 #include "merian-graph/nodes/accumulate/accumulate.hpp"
 #include "merian-graph/nodes/bloom/bloom.hpp"
 #include "merian-graph/nodes/color_image/color_output.hpp"
+#include "merian-graph/nodes/dlss/dlss_node.hpp"
 #include "merian-graph/nodes/error_plot/error_plot.hpp"
 #include "merian-graph/nodes/exposure/exposure.hpp"
 #include "merian-graph/nodes/fbx_scene/fbx_scene_node.hpp"
@@ -16,8 +17,8 @@
 #include "merian-graph/nodes/gbuffer_debug/gbuffer_debug.hpp"
 #include "merian-graph/nodes/gbuffer_rt/gbuffer.hpp"
 #include "merian-graph/nodes/gltf_scene/gltf_scene_node.hpp"
-#include "merian-graph/nodes/guiding/mcpg_distance/mcpg_distance_guiding_node.hpp"
 #include "merian-graph/nodes/guiding/mcpg/mcpg_guiding_node.hpp"
+#include "merian-graph/nodes/guiding/mcpg_distance/mcpg_distance_guiding_node.hpp"
 #include "merian-graph/nodes/guiding/ssmm/ssmm_guiding_node.hpp"
 #include "merian-graph/nodes/image_read/hdr_image.hpp"
 #include "merian-graph/nodes/image_read/ldr_image.hpp"
@@ -65,6 +66,9 @@ NodeRegistry::NodeRegistry() {
     register_node_type<Bloom>("Bloom", "Selectively blurs pixels that surpass a threshold.");
     register_node_type<ColorImage>("Color",
                                    "Outputs a image filled cleared with the selected color.");
+    register_node_type<DLSSNode>(
+        "DLSS", "Antialias and upscale with NVIDIA DLSS, optionally denoising with Ray "
+                "Reconstruction.");
     register_node_type<ErrorPlot>(
         "Error Plot", "Computes MSE/RMSE/MAE of an input image against a reference and shows a "
                       "split view with an error-over-time plot.");

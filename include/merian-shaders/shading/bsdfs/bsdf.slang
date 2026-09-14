@@ -2,11 +2,30 @@ __exported import merian_shaders.shading.shading_function;
 
 namespace merian {
 
+// Directional albedo split by lobe.
 struct Albedo {
-    float3 reflection;
+    float3 diffuse;
+    float3 specular;
 
-    __init(const float3 reflected) {
-        reflection = reflected;
+    __init(const float3 diffuse, const float3 specular) {
+        this.diffuse = diffuse;
+        this.specular = specular;
+    }
+
+    static Albedo diffuse_only(const float3 diffuse) {
+        return Albedo(diffuse, float3(0.0f));
+    }
+
+    static Albedo specular_only(const float3 specular) {
+        return Albedo(float3(0.0f), specular);
+    }
+
+    Albedo scaled(const float3 factor) {
+        return Albedo(diffuse * factor, specular * factor);
+    }
+
+    property float3 reflection {
+        get { return diffuse + specular; }
     }
 }
 
@@ -30,9 +49,11 @@ interface BSDF : ShadingFunction {
     // Pre-integrated specular reflectance for the given F0.
     float3 get_preintegrated_specular(const float3 F0, const float3 wi);
 
-    // Effective GGX alpha in [0, 1] describing the lobe width; 0 for a perfectly specular (delta)
-    // lobe, 1 for ideal diffuse.
-    property float alpha { get; }
+    // GGX alpha (roughness^2) of the whole BSDF; a diffuse lobe counts as roughness 1.
+    property float effective_alpha { get; }
+
+    // GGX alpha (roughness^2) of the specular lobe.
+    property float specular_alpha { get; }
 }
 
 struct NullBSDF : BSDF {
@@ -42,9 +63,10 @@ struct NullBSDF : BSDF {
     Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
         return sample_eval_impl<This>(this, wi, rng);
     }
-    Albedo get_albedo(const float3 wi) { return Albedo(float3(0)); }
+    Albedo get_albedo(const float3 wi) { return Albedo(float3(0), float3(0)); }
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) { return float3(0); }
-    property float alpha { get { return 1.0f; } }
+    property float effective_alpha { get { return 1.0f; } }
+    property float specular_alpha { get { return 1.0f; } }
 }
 
 }
