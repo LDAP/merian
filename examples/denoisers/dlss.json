@@ -1,9 +1,22 @@
 {
+    "cli": {
+        "volume": {
+            "default": "off",
+            "type": "variant",
+            "variants": {
+                "off": {
+                    "merge": "denoisers/dlss_irradiance.json"
+                },
+                "on": {
+                    "merge": [
+                        "renderers/volume.json",
+                        "denoisers/dlss_volume.json"
+                    ]
+                }
+            }
+        }
+    },
     "nodes": {
-        "accumulate": {
-            "enabled": false,
-            "outputs": []
-        },
         "dlss": {
             "enabled": true,
             "outputs": [
@@ -24,7 +37,6 @@
         },
         "render": {
             "$+$outputs": [
-                "irradiance->dlss.src",
                 "specular_hit_distance->dlss.specular_hit_distance"
             ],
             "properties": {

@@ -68,6 +68,7 @@ class RenderRestirDI : public Node {
     GBufferInHandle con_prev_gbuffer;
     VkBufferInHandle con_prev_reservoirs = VkBufferIn::create();
     ManagedVkImageOutHandle con_irradiance;
+    ManagedVkImageOutHandle con_specular_hit_distance;
     ManagedVkBufferOutHandle con_reservoirs;
 
     vk::Extent3D extent = vk::Extent3D{1920, 1080, 1};

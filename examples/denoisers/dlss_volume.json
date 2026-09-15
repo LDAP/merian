@@ -1,0 +1,20 @@
+{
+    "nodes": {
+        "add": {
+            "enabled": true,
+            "outputs": [
+                "out->dlss.src"
+            ],
+            "properties": {
+                "number inputs": 2
+            },
+            "type": "Reduce"
+        },
+        "render": {
+            "$+$outputs": [
+                "irradiance->add.input_0",
+                "volume->add.input_1"
+            ]
+        }
+    }
+}

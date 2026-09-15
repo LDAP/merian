@@ -11,9 +11,10 @@
                         "denoisers/volume_svgf.json"
                     ],
                     "set": {
-                        "/nodes/svgf/outputs": [
-                            "out->add.input_0",
-                            "out->svgf.prev_out"
+                        "/nodes/accumulate/outputs": [
+                            "history->accumulate.prev_history",
+                            "out->accumulate.prev_out",
+                            "out->add.input_0"
                         ]
                     }
                 }
@@ -25,29 +26,28 @@
             "enabled": true,
             "outputs": [
                 "history->accumulate.prev_history",
-                "history->svgf.history",
                 "out->accumulate.prev_out",
-                "out->svgf.src"
+                "out->exposure.src"
             ],
             "properties": {
                 "IPR factor": 50.0,
-                "adaptivity": 0.95,
+                "adaptivity": 0.0,
                 "adaptivity IPR factor": 1.5,
                 "adaptivity percentile lower": 0.05000000074505806,
                 "adaptivity percentile upper": 0.949999988079071,
-                "alpha": 0.95,
-                "clear event pattern": "/user/clear",
-                "depth threshold": 0.05,
+                "alpha": 1.0,
+                "clear event pattern": "/user/clear,//geometry_changed,//transform_changed,//camera_changed,//bounces_changed",
+                "depth threshold": 1.0,
                 "extended search": true,
-                "filter mode": "stochastic bilinear",
+                "filter mode": "nearest",
                 "firefly filter bias": 0.20000000298023224,
-                "firefly filter enable": true,
+                "firefly filter enable": false,
                 "firefly percentile lower": 0.25,
                 "firefly percentile upper": 0.8999999761581421,
-                "gbuffer check": "always",
+                "gbuffer check": "only if moving",
                 "hard clamp": "inf",
                 "max history": "inf",
-                "normal threshold": 35.0,
+                "normal threshold": 3.1415927410125732,
                 "reuse border": false,
                 "use motion vectors": true
             },
@@ -55,29 +55,13 @@
         },
         "gbuffer": {
             "$+$outputs": [
-                "gbuffer->accumulate.gbuffer",
-                "gbuffer->svgf.gbuffer"
+                "gbuffer->accumulate.gbuffer"
             ]
         },
         "render": {
             "$+$outputs": [
                 "irradiance->accumulate.src"
-            ],
-            "properties": {
-                "demodulate albedo": true
-            }
-        },
-        "svgf": {
-            "enabled": true,
-            "outputs": [
-                "out->exposure.src",
-                "out->svgf.prev_out"
-            ],
-            "properties": {
-                "SVGF iterations": 5,
-                "TAA alpha": 0.9
-            },
-            "type": "Denoiser (SVGF)"
+            ]
         }
     }
 }

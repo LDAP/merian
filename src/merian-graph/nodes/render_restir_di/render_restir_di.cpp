@@ -81,8 +81,14 @@ std::vector<OutputConnectorDescriptor>
 RenderRestirDI::describe_outputs(const NodeIOLayout& io_layout) {
     extent = io_layout[con_gbuffer]->get_create_info().extent;
     con_irradiance = ManagedVkImageOut::create(irradiance_format, extent);
+    con_specular_hit_distance = ManagedVkImageOut::create(vk::Format::eR32Sfloat, extent);
     con_reservoirs = ManagedVkBufferOut::create(reservoir_buffer_create_info());
     return {{"irradiance", con_irradiance, ConnectorAccess::ray_tracing_write},
+            // no specular bounce is traced
+            {.name = "specular_hit_distance",
+             .connector = con_specular_hit_distance,
+             .access = ConnectorAccess::ray_tracing_write,
+             .disabled = true},
             {"reservoirs", con_reservoirs, ConnectorAccess::ray_tracing_read_write}};
 }
 

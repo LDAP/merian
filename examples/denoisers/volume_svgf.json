@@ -1,35 +1,27 @@
 {
     "nodes": {
         "add": {
-            "properties": {
-                "number inputs": 3
-            }
-        },
-        "distance_guiding": {
             "enabled": true,
             "outputs": [
-                "guiding->render.distance_guiding"
+                "out->exposure.src"
             ],
-            "type": "Guiding (MCPG Distance)"
+            "properties": {
+                "number inputs": 2
+            },
+            "type": "Reduce"
         },
         "gbuffer": {
             "$+$outputs": [
                 "gbuffer->volume_accumulate.gbuffer",
-                "gbuffer->volume_svgf.gbuffer",
-                "gbuffer->distance_guiding.gbuffer"
+                "gbuffer->volume_svgf.gbuffer"
             ]
         },
         "render": {
             "$+$outputs": [
                 "volume->volume_accumulate.src",
-                "volume_depth->render.prev_volume_depth",
                 "volume_mv->volume_accumulate.mv",
                 "volume_mv->volume_svgf.mv"
-            ],
-            "properties": {
-                "volume forward project": true,
-                "volume samples per pixel": 2
-            }
+            ]
         },
         "volume_accumulate": {
             "enabled": true,
@@ -66,7 +58,7 @@
         "volume_svgf": {
             "enabled": true,
             "outputs": [
-                "out->add.input_2",
+                "out->add.input_1",
                 "out->volume_svgf.prev_out"
             ],
             "properties": {

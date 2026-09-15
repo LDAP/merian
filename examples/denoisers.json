@@ -7,7 +7,9 @@
                 "dlss": {
                     "merge": "denoisers/dlss.json"
                 },
-                "none": {},
+                "none": {
+                    "merge": "denoisers/none.json"
+                },
                 "svgf": {
                     "merge": "denoisers/svgf.json"
                 }

@@ -1,0 +1,25 @@
+{
+    "nodes": {
+        "distance_guiding": {
+            "enabled": true,
+            "outputs": [
+                "guiding->render.distance_guiding"
+            ],
+            "type": "Guiding (MCPG Distance)"
+        },
+        "gbuffer": {
+            "$+$outputs": [
+                "gbuffer->distance_guiding.gbuffer"
+            ]
+        },
+        "render": {
+            "$+$outputs": [
+                "volume_depth->render.prev_volume_depth"
+            ],
+            "properties": {
+                "volume forward project": true,
+                "volume samples per pixel": 2
+            }
+        }
+    }
+}

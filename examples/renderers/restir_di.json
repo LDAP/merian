@@ -13,7 +13,6 @@
         },
         "render": {
             "$+$outputs": [
-                "irradiance->accumulate.src",
                 "reservoirs->render.prev_reservoirs"
             ],
             "enabled": true,

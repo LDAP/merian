@@ -56,9 +56,11 @@ Example graphs for `merian-graph-run` are in the [`examples`](https://github.com
 - [`shadertoy.json`](https://github.com/LDAP/merian/tree/main/examples/shadertoy.json): runs a Shadertoy-style shader — `merian-graph-run examples/shadertoy.json <shader.glsl>`.
 - [`gltf.json`](https://github.com/LDAP/merian/tree/main/examples/gltf.json) / [`fbx.json`](https://github.com/LDAP/merian/tree/main/examples/fbx.json) / [`pbrt.json`](https://github.com/LDAP/merian/tree/main/examples/pbrt.json): a glTF / FBX / PBRTv4 scene viewer — `merian-graph-run examples/gltf.json <scene.gltf> [options]`. Options:
     - `<scene>` (required): path to the glTF / FBX scene to load.
-    - `--renderer <pt|mcpg|restir_di>`: renderer, merged from [`examples/renderers`](https://github.com/LDAP/merian/tree/main/examples/renderers) (default: `pt`; the selection persists when the graph is stored). Also accepts a path to a custom renderer fragment, e.g. `--renderer my/renderer.json`.
+    - `--renderer <pt|pt_mcpg|pt_ssmm|restir_di>`: renderer, merged from [`examples/renderers`](https://github.com/LDAP/merian/tree/main/examples/renderers) (default: `pt`; the selection persists when the graph is stored). Also accepts a path to a custom renderer fragment, e.g. `--renderer my/renderer.json`.
+    - `--denoiser <none|svgf|dlss>`: denoiser, merged from [`examples/denoisers`](https://github.com/LDAP/merian/tree/main/examples/denoisers) (default: `none`, which accumulates). `dlss` needs merian built with the NGX SDK (`-Ddlss`).
+    - `--volume <off|on>`: traces the scene's volume and denoises it with the selected denoiser (path-traced renderers).
     - `--env-map <path>`: lat-long HDR environment map (sets the env type to `LatLong`).
-    - `--max-path-length <n>`: maximum path length (`pt`, `mcpg`).
+    - `--max-path-length <n>`: maximum path length (path-traced renderers).
     - `--spp <n>`: samples per pixel.
 
 ### Plugins
