@@ -10,7 +10,7 @@
                 "out->exposure.src"
             ],
             "properties": {
-                "ray reconstruction": true
+                "mode": "ray reconstruction"
             },
             "type": "DLSS"
         },

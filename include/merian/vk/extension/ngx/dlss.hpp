@@ -43,7 +43,7 @@ struct DLSSCreateInfo {
 struct DLSSEvalInfo {
     // linear HDR
     ImageViewHandle color;
-    // Ray reconstruction: view space depth. Super sampling: projected depth, 0 at the near plane.
+    // Ray reconstruction: view space depth. Super resolution: projected depth, 0 at the near plane.
     ImageViewHandle depth;
     // Pixels from this frame to the previous one, in the first two channels.
     ImageViewHandle motion_vectors;
@@ -81,7 +81,7 @@ class DLSS {
          const DLSSCreateInfo& create_info,
          const CommandBufferHandle& cmd);
 
-    void evaluate_super_sampling(const CommandBufferHandle& cmd, const DLSSEvalInfo& eval_info);
+    void evaluate_super_resolution(const CommandBufferHandle& cmd, const DLSSEvalInfo& eval_info);
 
     void evaluate_ray_reconstruction(const CommandBufferHandle& cmd, const DLSSEvalInfo& eval_info);
 

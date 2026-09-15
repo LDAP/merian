@@ -53,11 +53,11 @@ class ExtensionDLSS : public ContextExtension {
 };
 
 // Antialiases and upscales.
-class ExtensionDLSSSuperSampling : public ExtensionDLSS {
+class ExtensionDLSSSuperResolution : public ExtensionDLSS {
   public:
-    static constexpr const char* name = "dlss-super-sampling";
+    static constexpr const char* name = "dlss-super-resolution";
 
-    ExtensionDLSSSuperSampling();
+    ExtensionDLSSSuperResolution();
 };
 
 // Denoises, antialiases and upscales a noisy input with the guides of DLSSEvalInfo.

@@ -70,7 +70,7 @@ ExtensionRegistry::ExtensionRegistry() {
     register_extension<ExtensionDeviceFault>(ExtensionDeviceFault::name, false);
     register_extension<ExtensionImGui>(ExtensionImGui::name, true);
     register_extension<ExtensionNGX>(ExtensionNGX::name);
-    register_extension<ExtensionDLSSSuperSampling>(ExtensionDLSSSuperSampling::name);
+    register_extension<ExtensionDLSSSuperResolution>(ExtensionDLSSSuperResolution::name);
     register_extension<ExtensionDLSSRayReconstruction>(ExtensionDLSSRayReconstruction::name);
 }
 

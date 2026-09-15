@@ -90,13 +90,13 @@ DLSS::DLSS(const std::shared_ptr<ExtensionNGX>& ngx,
         params_dlss.InFeatureCreateFlags = FEATURE_CREATE_FLAGS;
         throw_if_failed(NGX_VULKAN_CREATE_DLSS_EXT1(device, cmd->get_command_buffer(), 1, 1,
                                                     &feature, params.get(), &params_dlss),
-                        "could not create the DLSS super sampling feature");
+                        "could not create the DLSS super resolution feature");
     }
 
     handle.reset(feature);
 
     SPDLOG_DEBUG("DLSS: {} {}x{} -> {}x{}",
-                 ray_reconstruction ? "ray reconstruction" : "super sampling",
+                 ray_reconstruction ? "ray reconstruction" : "super resolution",
                  create_info.render_extent.width, create_info.render_extent.height,
                  create_info.target_extent.width, create_info.target_extent.height);
 }
@@ -113,11 +113,12 @@ void DLSS::evaluate(const CommandBufferHandle& cmd, const DLSSEvalInfo& eval_inf
     if (ray_reconstruction) {
         evaluate_ray_reconstruction(cmd, eval_info);
     } else {
-        evaluate_super_sampling(cmd, eval_info);
+        evaluate_super_resolution(cmd, eval_info);
     }
 }
 
-void DLSS::evaluate_super_sampling(const CommandBufferHandle& cmd, const DLSSEvalInfo& eval_info) {
+void DLSS::evaluate_super_resolution(const CommandBufferHandle& cmd,
+                                     const DLSSEvalInfo& eval_info) {
     NVSDK_NGX_Resource_VK color = image_resource(eval_info.color, false);
     NVSDK_NGX_Resource_VK depth = image_resource(eval_info.depth, false);
     NVSDK_NGX_Resource_VK motion_vectors = image_resource(eval_info.motion_vectors, false);
@@ -138,7 +139,7 @@ void DLSS::evaluate_super_sampling(const CommandBufferHandle& cmd, const DLSSEva
 
     throw_if_failed(
         NGX_VULKAN_EVALUATE_DLSS_EXT(cmd->get_command_buffer(), handle.get(), params.get(), &eval),
-        "DLSS super sampling failed");
+        "DLSS super resolution failed");
 }
 
 void DLSS::evaluate_ray_reconstruction(const CommandBufferHandle& cmd,

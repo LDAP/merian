@@ -17,6 +17,12 @@ namespace merian {
 class DLSSNode : public Node {
 
   public:
+    enum class Mode : uint8_t {
+        Bypass,
+        SuperResolution,
+        RayReconstruction,
+    };
+
     DLSSNode() = default;
 
     ~DLSSNode() override = default;
@@ -46,7 +52,10 @@ class DLSSNode : public Node {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
-    std::shared_ptr<ExtensionDLSS> dlss_super_sampling;
+    // null while bypassed or where the device does not run the mode
+    const std::shared_ptr<ExtensionDLSS>& get_extension() const;
+
+    std::shared_ptr<ExtensionDLSS> dlss_super_resolution;
     std::shared_ptr<ExtensionDLSS> dlss_ray_reconstruction;
 
     // Connectors
@@ -59,7 +68,7 @@ class DLSSNode : public Node {
     // 0 follows the active camera's resolution, else the input's
     uint32_t out_width = 0;
     uint32_t out_height = 0;
-    bool ray_reconstruction = false;
+    Mode mode = Mode::SuperResolution;
     vk::Format out_format = vk::Format::eR16G16B16A16Sfloat;
     // applied to the active camera
     Camera::JitterSequence jitter_sequence = Camera::JitterSequence::Halton;

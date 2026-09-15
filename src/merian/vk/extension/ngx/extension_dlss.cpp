@@ -17,7 +17,7 @@ namespace merian {
 ExtensionDLSS::ExtensionDLSS(const bool ray_reconstruction)
     : ray_reconstruction(ray_reconstruction) {}
 
-ExtensionDLSSSuperSampling::ExtensionDLSSSuperSampling() : ExtensionDLSS(false) {}
+ExtensionDLSSSuperResolution::ExtensionDLSSSuperResolution() : ExtensionDLSS(false) {}
 
 ExtensionDLSSRayReconstruction::ExtensionDLSSRayReconstruction() : ExtensionDLSS(true) {}
 

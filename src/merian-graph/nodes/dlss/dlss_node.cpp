@@ -1,6 +1,7 @@
 #include "merian-graph/nodes/dlss/dlss_node.hpp"
 
 #include "merian-graph/graph/errors.hpp"
+#include "merian/vk/utils/blits.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -20,6 +21,9 @@ constexpr std::array<Camera::JitterSequence, 2> JITTER_SEQUENCES = {
     Camera::JitterSequence::R2,
 };
 const std::vector<std::string> JITTER_SEQUENCE_NAMES = {"Halton", "R2"};
+
+// indexed by DLSSNode::Mode
+const std::vector<std::string> MODE_NAMES = {"bypass", "super resolution", "ray reconstruction"};
 
 // Target over render resolution each mode is documented for, ordered by scale.
 constexpr std::array<std::pair<DLSSQuality, float>, 5> QUALITY_SCALES = {{
@@ -51,27 +55,37 @@ uint32_t recommended_jitter_phases(const float scale) {
 } // namespace
 
 std::vector<std::string> DLSSNode::request_context_extensions() {
-    return {ExtensionDLSSSuperSampling::name, ExtensionDLSSRayReconstruction::name};
+    return {ExtensionDLSSSuperResolution::name, ExtensionDLSSRayReconstruction::name};
 }
 
 DeviceSupportInfo DLSSNode::query_device_support(const DeviceSupportQueryInfo& query_info) {
     // ray reconstruction is checked on connect
-    const auto super_sampling =
-        query_info.extension_container.get_context_extension<ExtensionDLSSSuperSampling>(true);
-    if (!super_sampling) {
-        return {false, fmt::format("{} not available", ExtensionDLSSSuperSampling::name)};
+    const auto super_resolution =
+        query_info.extension_container.get_context_extension<ExtensionDLSSSuperResolution>(true);
+    if (!super_resolution) {
+        return {false, fmt::format("{} not available", ExtensionDLSSSuperResolution::name)};
     }
-    return super_sampling->query_device_support(query_info);
+    return super_resolution->query_device_support(query_info);
 }
 
 void DLSSNode::initialize(const ContextHandle& context,
                           [[maybe_unused]] const ResourceAllocatorHandle& allocator) {
-    dlss_super_sampling = context->get_context_extension<ExtensionDLSSSuperSampling>();
+    dlss_super_resolution = context->get_context_extension<ExtensionDLSSSuperResolution>();
     dlss_ray_reconstruction = context->get_context_extension<ExtensionDLSSRayReconstruction>(true);
 }
 
 std::vector<InputConnectorDescriptor> DLSSNode::describe_inputs() {
-    if (ray_reconstruction) {
+    switch (mode) {
+    case Mode::Bypass:
+        con_gbuffer = GBufferIn::create({});
+        break;
+    case Mode::SuperResolution:
+        con_gbuffer = GBufferIn::create({
+            {.fields = {GBufferField::ProjectedDepth}, .texture = true},
+            {.fields = {GBufferField::MotionVectors}, .texture = true},
+        });
+        break;
+    case Mode::RayReconstruction:
         con_gbuffer = GBufferIn::create({
             {.fields = {GBufferField::ViewDepth}, .texture = true},
             {.fields = {GBufferField::MotionVectors}, .texture = true},
@@ -79,17 +93,13 @@ std::vector<InputConnectorDescriptor> DLSSNode::describe_inputs() {
             {.fields = {GBufferField::DiffuseAlbedo}, .texture = true},
             {.fields = {GBufferField::SpecularAlbedo}, .texture = true},
         });
-    } else {
-        con_gbuffer = GBufferIn::create({
-            {.fields = {GBufferField::ProjectedDepth}, .texture = true},
-            {.fields = {GBufferField::MotionVectors}, .texture = true},
-        });
+        break;
     }
 
     return {
         {"scene", con_scene},
         {"gbuffer", con_gbuffer, ConnectorAccess::compute_read},
-        {"src", con_src, ConnectorAccess::compute_read},
+        {"src", con_src, ConnectorAccess::compute_read | ConnectorAccess::transfer_src},
         {.name = "specular_hit_distance",
          .connector = con_specular_hit_distance,
          .access = ConnectorAccess::compute_read,
@@ -112,15 +122,20 @@ std::vector<OutputConnectorDescriptor> DLSSNode::describe_outputs(const NodeIOLa
                                       });
 
     con_out = ManagedVkImageOut::create(out_format, target_extent);
-    return {{"out", con_out, ConnectorAccess::compute_write}};
+    return {{"out", con_out, ConnectorAccess::compute_write | ConnectorAccess::transfer_dst}};
 }
 
 DLSSNode::NodeStatusFlags DLSSNode::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
                                                  [[maybe_unused]] const NodeIO& io,
                                                  [[maybe_unused]] const NodeConnectionInfo& info,
                                                  Submission& submission) {
-    const std::shared_ptr<ExtensionDLSS>& dlss_extension =
-        ray_reconstruction ? dlss_ray_reconstruction : dlss_super_sampling;
+    // NGX refuses a second feature for the same slot while the old one is alive.
+    dlss.reset();
+    if (mode == Mode::Bypass) {
+        return {};
+    }
+
+    const std::shared_ptr<ExtensionDLSS>& dlss_extension = get_extension();
     if (!dlss_extension) {
         throw graph_errors::node_error{
             fmt::format("{} is not supported", ExtensionDLSSRayReconstruction::name)};
@@ -142,9 +157,6 @@ DLSSNode::NodeStatusFlags DLSSNode::on_connected([[maybe_unused]] const NodeIOLa
                     resolution->min.width, resolution->min.height, resolution->max.width,
                     resolution->max.height, resolution->optimal.width, resolution->optimal.height);
     }
-
-    // NGX refuses a second feature for the same slot while the old one is alive.
-    dlss.reset();
 
     const DLSSCreateInfo create_info{
         .render_extent = vk::Extent2D{render_extent.width, render_extent.height},
@@ -193,6 +205,14 @@ DLSSNode::pre_process(const NodeIO& io, [[maybe_unused]] const NodeProcessInfo& 
 
 [[nodiscard]] DLSSNode::NodeStatusFlags DLSSNode::process(
     const NodeIO& io, [[maybe_unused]] const NodeProcessInfo& info, Submission& submission) {
+    if (mode == Mode::Bypass) {
+        const ImageHandle& src = io[con_src].get_texture()->get_image();
+        const ImageHandle& out = io[con_out].get_texture()->get_image();
+        cmd_blit_stretch(submission.get_cmd(), src, vk::ImageLayout::eGeneral, src->get_extent(),
+                         out, vk::ImageLayout::eGeneral, out->get_extent());
+        return {};
+    }
+
     const SceneHandle& scene = io[con_scene];
     if (!scene || !scene->is_ready()) {
         return {};
@@ -205,14 +225,14 @@ DLSSNode::pre_process(const NodeIO& io, [[maybe_unused]] const NodeProcessInfo& 
     const auto gbuffer = io[con_gbuffer];
     DLSSEvalInfo eval_info{
         .color = io[con_src].get_texture()->get_view(),
-        .depth = gbuffer->get_view(ray_reconstruction ? GBufferField::ViewDepth
-                                                      : GBufferField::ProjectedDepth),
+        .depth = gbuffer->get_view(mode == Mode::RayReconstruction ? GBufferField::ViewDepth
+                                                                   : GBufferField::ProjectedDepth),
         .motion_vectors = gbuffer->get_view(GBufferField::MotionVectors),
         .output = io[con_out].get_texture()->get_view(),
         .jitter = camera->get_jitter(),
         .reset = reset,
     };
-    if (ray_reconstruction) {
+    if (mode == Mode::RayReconstruction) {
         eval_info.diffuse_albedo = gbuffer->get_view(GBufferField::DiffuseAlbedo);
         eval_info.specular_albedo = gbuffer->get_view(GBufferField::SpecularAlbedo);
         eval_info.normal_roughness = gbuffer->get_view(GBufferField::Normal);
@@ -234,14 +254,31 @@ DLSSNode::pre_process(const NodeIO& io, [[maybe_unused]] const NodeProcessInfo& 
     return {};
 }
 
+const std::shared_ptr<ExtensionDLSS>& DLSSNode::get_extension() const {
+    static const std::shared_ptr<ExtensionDLSS> BYPASSED;
+    switch (mode) {
+    case Mode::SuperResolution:
+        return dlss_super_resolution;
+    case Mode::RayReconstruction:
+        return dlss_ray_reconstruction;
+    case Mode::Bypass:
+        break;
+    }
+    return BYPASSED;
+}
+
 DLSSNode::NodeStatusFlags DLSSNode::properties(Properties& config) {
     bool needs_reconnect = false;
 
     needs_reconnect |= config.config_uint("width", &out_width, AUTO_RESOLUTION_HINT);
     needs_reconnect |= config.config_uint("height", &out_height, AUTO_RESOLUTION_HINT);
-    needs_reconnect |= config.config_bool(
-        "ray reconstruction", ray_reconstruction,
-        "replaces the denoiser with the unified model, which needs a noisy input");
+    int mode_index = static_cast<int>(mode);
+    if (config.config_options("mode", mode_index, MODE_NAMES, Properties::OptionsStyle::COMBO,
+                              "super resolution antialiases and upscales; ray reconstruction also "
+                              "denoises and takes the noisy input; bypass stretches the input")) {
+        mode = static_cast<Mode>(mode_index);
+        needs_reconnect = true;
+    }
     needs_reconnect |=
         config.config_enum("output format", out_format, Properties::OptionsStyle::COMBO);
 
@@ -264,8 +301,7 @@ DLSSNode::NodeStatusFlags DLSSNode::properties(Properties& config) {
     config.output_text("render: {}x{} -> output: {}x{} ({})", render_extent.width,
                        render_extent.height, target_extent.width, target_extent.height,
                        DLSS_QUALITY_NAMES[static_cast<uint32_t>(quality)]);
-    if (const std::shared_ptr<ExtensionDLSS>& dlss_extension =
-            ray_reconstruction ? dlss_ray_reconstruction : dlss_super_sampling) {
+    if (const std::shared_ptr<ExtensionDLSS>& dlss_extension = get_extension()) {
         if (const std::string& unsupported = dlss_extension->get_unsupported_reason();
             !unsupported.empty()) {
             config.output_text("unsupported: {}", unsupported);
