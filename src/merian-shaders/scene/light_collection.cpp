@@ -119,6 +119,7 @@ void LightCollection::ensure_pipelines(const SlangCompositionHandle& scene_compo
         make("grid_setup", setup_entry_point, setup_pipeline, setup_params);
         make("pool", pool_entry_point, pool_pipeline, pool_params);
         make("grid", grid_entry_point, grid_pipeline, grid_params);
+        make("env_split", env_split_entry_point, env_split_pipeline, env_split_params);
     }
 
     if (!env_composition) {
@@ -214,6 +215,7 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
         }
         ensure_buffer(env_pool_buffer, static_cast<uint32_t>(env_pool_size) * sizeof(uint32_t),
                       "LightCollection::env_pool", cmd);
+        ensure_buffer(env_split_buffer, sizeof(float), "LightCollection::env_split", cmd);
     }
 
     if (triangle_count > 0) {
@@ -474,6 +476,31 @@ void LightCollection::update(const CommandBufferHandle& cmd,
         }
     }
 
+    // after the prefix scan: its total is the triangles' side of the split
+    if (env_emissive && env_split_buffer) {
+        MERIAN_PROFILE_SCOPE_GPU(cmd, "env split");
+        const auto ep = env_split_entry_point.get();
+        const auto pipe = env_split_pipeline.get();
+        const auto params = env_split_params.get();
+        auto c = params->get_cursor();
+        c["cdf"] = cdf_buffer ? cdf_buffer : allocator->get_dummy_buffer();
+        c["env_split"] = env_split_buffer;
+        c["triangle_count"] = cdf_buffer ? triangle_count : 0u;
+        c["scene_radius"] = scene_radius;
+        c["manual_probability"] = env_probability;
+        c["from_power"] = static_cast<uint32_t>(env_probability_from_power ? 1 : 0);
+        c["min_probability"] = env_probability_min;
+        c["max_probability"] = env_probability_max;
+        auto env = c["env_importance"];
+        env["levels"] = env_importance_buffer;
+        env["size"] = env_importance_size();
+        env["level_count"] = level_count_for(env_importance_size());
+
+        cmd->bind(pipe);
+        ep->bind("params", params, cmd, pipe, obj_allocator);
+        cmd->dispatch(1, 1, 1);
+    }
+
     cmd->barrier(vk::MemoryBarrier2{
         vk::PipelineStageFlagBits2::eComputeShader,
         vk::AccessFlagBits2::eShaderWrite,
@@ -501,10 +528,10 @@ void LightCollection::write_to(ShaderCursor cursor) const {
     cursor["grid_jitter"] = grid_jitter;
     cursor["triangle_count"] = active ? triangle_count : 0u;
     cursor["geometry_count"] = active ? static_cast<uint32_t>(geometry_light_offsets.size()) : 0u;
-    cursor["p_env"] = enabled && env_emissive ? env_probability : 0.f;
     cursor["has_sky_portals"] = has_sky_portals;
 
-    const bool env_active = enabled && env_emissive && env_importance_buffer;
+    const bool env_active = enabled && env_emissive && env_importance_buffer && env_split_buffer;
+    cursor["env_split"] = env_active ? env_split_buffer : dummy;
     cursor["env_pool"] = env_active && env_pool_buffer ? env_pool_buffer : dummy;
     cursor["env_pool_size"] =
         env_active && env_pool_buffer && env_selection == EnvSelection::EnvSelectionPool
@@ -519,9 +546,20 @@ void LightCollection::write_to(ShaderCursor cursor) const {
 void LightCollection::properties(Properties& props) {
     props.config_bool("enable", enabled,
                       "Maintain the emissive triangle list for next event estimation.");
-    props.config_percent("env probability", env_probability,
-                         "Probability of sampling the environment map instead of an emissive "
-                         "triangle when both exist.");
+    props.config_bool("env probability from power", env_probability_from_power,
+                      "Derive the environment's share of the light samples from the power each "
+                      "side emits. The environment's power is the flux an infinite light of its "
+                      "mean radiance puts through the scene's bounding sphere, so it is blind to "
+                      "occlusion: the limits below keep an enclosed scene from spending "
+                      "everything on a sky it barely sees.");
+    if (env_probability_from_power) {
+        props.config_percent("env probability min", env_probability_min);
+        props.config_percent("env probability max", env_probability_max);
+    } else {
+        props.config_percent("env probability", env_probability,
+                             "Probability of sampling the environment map instead of an emissive "
+                             "triangle when both exist.");
+    }
     props.config_options("env selection", env_selection, {"warp", "pool"},
                          Properties::OptionsStyle::COMBO,
                          "How a direction towards the environment is chosen: a pyramid descent per "

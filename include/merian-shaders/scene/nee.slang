@@ -67,8 +67,8 @@ struct LightHit {
 }
 
 // Next event estimation over the scene's emissive triangles and the environment map. Triangles
-// are selected proportional to their flux, points uniformly by area; the environment is chosen
-// with probability p_env. All densities are per solid angle at the receiver.
+// are selected proportional to their flux, points uniformly by area; the environment takes the
+// share the preprocess wrote. All densities are per solid angle at the receiver.
 struct NEE {
     StructuredBuffer<EmissiveTriangle, ScalarDataLayout> triangles;
     // inclusive prefix sum of the flux
@@ -91,8 +91,8 @@ struct NEE {
     uint selection;
     uint triangle_count;
     uint geometry_count;
-    // 0 if the environment is not sampled
-    float p_env;
+    // share of the light samples the environment takes, written by the preprocess
+    StructuredBuffer<float> env_split;
     // UseEnvMap geometry exists: rays towards the environment must find the closest hit
     bool has_sky_portals;
     EnvImportance env_importance;
@@ -117,13 +117,14 @@ struct NEE {
     }
 
     bool has_lights() {
-        return p_env > 0.f || has_emissive_triangles();
+        return get_env_probability() > 0.f || has_emissive_triangles();
     }
 
     // Probability of choosing the environment over the triangles.
     float get_env_probability() {
         if (!merian_scene_has_env_light || !env_importance.is_valid())
             return 0.f;
+        const float p_env = env_split[0];
         return has_emissive_triangles() ? p_env : select(p_env > 0.f, 1.f, 0.f);
     }
 

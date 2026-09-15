@@ -72,13 +72,18 @@ class LightCollection {
         enabled = value;
     }
 
-    // Probability of sampling the environment instead of a triangle (if both exist).
+    // The manual environment share, used where it is not derived from the emitted power.
     float get_env_probability() const {
         return env_probability;
     }
 
     void set_env_probability(const float p) {
         env_probability = p;
+    }
+
+    // Bounding sphere the environment's power is measured through; 0 keeps the manual share.
+    void set_scene_radius(const float radius) {
+        scene_radius = radius;
     }
 
     // Whether the scene's environment map emits; false routes all samples to the triangles.
@@ -152,7 +157,12 @@ class LightCollection {
     float grid_jitter = 1.f;
     bool grid_visibility = true;
     float3 camera_position{0.f};
+    bool env_probability_from_power = true;
     float env_probability = 0.5f;
+    // Neither technique may lose its density where both can contribute.
+    float env_probability_min = 0.05f;
+    float env_probability_max = 0.95f;
+    float scene_radius = 0.f;
     bool env_emissive = false;
     bool has_sky_portals = false;
     int32_t flux_samples = 32;
@@ -172,6 +182,7 @@ class LightCollection {
     BufferHandle env_importance_buffer;
     BufferHandle env_importance_built_buffer;
     BufferHandle env_pool_buffer;
+    BufferHandle env_split_buffer;
     BufferHandle pool_buffer;
     BufferHandle pool_lights_buffer;
     BufferHandle grid_buffer;
@@ -194,12 +205,15 @@ class LightCollection {
     Versioned<SlangProgramEntryPoint> setup_entry_point;
     Versioned<SlangProgramEntryPoint> pool_entry_point;
     Versioned<SlangProgramEntryPoint> grid_entry_point;
+    Versioned<SlangProgramEntryPoint> env_split_entry_point;
     Versioned<Pipeline> setup_pipeline;
     Versioned<Pipeline> pool_pipeline;
     Versioned<Pipeline> grid_pipeline;
+    Versioned<Pipeline> env_split_pipeline;
     Versioned<ShaderObject> setup_params;
     Versioned<ShaderObject> pool_params;
     Versioned<ShaderObject> grid_params;
+    Versioned<ShaderObject> env_split_params;
 
     SlangCompositionHandle env_composition;
     Versioned<SlangProgram> env_program;

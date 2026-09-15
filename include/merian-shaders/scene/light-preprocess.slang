@@ -1,5 +1,6 @@
 #include "merian-shaders/utils/math-constants.slangh"
 
+import merian_shaders.scene.env_importance;
 import merian_shaders.scene.light_data;
 import merian_shaders.utils.hash;
 import merian_shaders.utils.random;
@@ -7,9 +8,9 @@ import merian_shaders.utils.sampling;
 
 using merian;
 
-// Per-frame preprocess for next event estimation: a pool of pre-resampled lights and a
-// world-space grid of short per-cell lists. Everything a sample needs afterwards is one or two
-// loads.
+// Per-frame preprocess for next event estimation: the share the environment takes of the light
+// samples, a pool of pre-resampled lights, and a world-space grid of short per-cell lists.
+// Everything a sample needs afterwards is one or two loads.
 
 struct LightPreprocessBinding {
     StructuredBuffer<EmissiveTriangle, ScalarDataLayout> triangles;
@@ -39,6 +40,43 @@ struct LightPreprocessBinding {
     uint selection;
     uint frame;
 };
+
+struct EnvSplitBinding {
+    // inclusive prefix sum of the triangle flux
+    StructuredBuffer<float> cdf;
+    EnvImportance env_importance;
+    RWStructuredBuffer<float> env_split;
+    uint triangle_count;
+    // 0 keeps the manual share
+    float scene_radius;
+    float manual_probability;
+    uint from_power;
+    float min_probability;
+    float max_probability;
+};
+
+/* The share of the light samples the environment takes, from the power each side emits.
+ *
+ * The environment's power is the flux an infinite light of that mean radiance puts through the
+ * scene's bounding sphere, 4 pi^2 r^2 L (pbrt-v4, ImageInfiniteLight::Phi). It is blind to
+ * occlusion, which the limits bound.
+ */
+[shader("compute")][numthreads(1, 1, 1)] void env_split(ParameterBlock<EnvSplitBinding> params) {
+    const float triangles =
+        params.triangle_count > 0 ? max(params.cdf[params.triangle_count - 1], 0.f) : 0.f;
+    const float radiance = params.env_importance.get_average();
+    const float env = 4.f * MERIAN_PI * MERIAN_PI * params.scene_radius * params.scene_radius *
+                      max(radiance, 0.f);
+
+    float p = params.manual_probability;
+    if (params.from_power != 0u && params.scene_radius > 0.f && env + triangles > 0.f) {
+        p = env / (env + triangles);
+        if (env > 0.f && triangles > 0.f) {
+            p = clamp(p, params.min_probability, params.max_probability);
+        }
+    }
+    params.env_split[0] = clamp(p, 0.f, 1.f);
+}
 
 // Squared distance to a triangle, clamped by its own size and by the radius the query stands for
 // (Conty and Kulla 2018 clamp on the node radius). Without the second clamp a light inside the
