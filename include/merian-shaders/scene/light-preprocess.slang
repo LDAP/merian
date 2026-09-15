@@ -118,7 +118,7 @@ groupshared float s_setup_distance[LIGHT_GRID_SETUP_GROUP];
 // with the spread of the lights as a floor for a camera standing among them. Every finer cascade
 // halves the cell size, so a cell covers a roughly constant angle from the camera at any scale.
 [shader("compute")][numthreads(LIGHT_GRID_SETUP_GROUP, 1, 1)] void
-grid_setup(uint local_id: SV_GroupIndex, ParameterBlock<LightPreprocessBinding> params) {
+grid_setup(uint local_id : SV_GroupIndex, ParameterBlock<LightPreprocessBinding> params) {
     const uint dim = params.grid_dimension;
     const uint cascades = max(params.grid_cascades, 1u);
     float cell = params.grid_cell_size;
@@ -159,8 +159,8 @@ grid_setup(uint local_id: SV_GroupIndex, ParameterBlock<LightPreprocessBinding> 
         const float extent = length(max(bmax - bmin, float3(0)));
         const float reach = params.grid_coverage * max(max_distance, 0.5f * extent);
         // the coarsest cascade spans 2 * reach, every finer one half of the one before
-        cell = reach > 0.f ? max(2.f * reach / (float(dim) * exp2(float(cascades - 1u))), 1e-4f)
-                           : 1.f;
+        cell =
+            reach > 0.f ? max(2.f * reach / (float(dim) * exp2(float(cascades - 1u))), 1e-4f) : 1.f;
     }
 
     for (uint cascade = local_id; cascade < cascades; cascade += LIGHT_GRID_SETUP_GROUP) {
@@ -245,10 +245,9 @@ uint select_light(const StructuredBuffer<float> cdf, const uint count, const flo
     light.centroid = proxy.centroid;
     light.flux = proxy.flux;
     light.scaled_normal = proxy.scaled_normal;
-    light.packed_index =
-        index | ((proxy.flags & uint(EmissiveTriangleFlags::EmissiveTwoSided)) != 0
-                     ? PooledLight::TWO_SIDED_BIT
-                     : 0u);
+    light.packed_index = index | ((proxy.flags & uint(EmissiveTriangleFlags::EmissiveTwoSided)) != 0
+                                      ? PooledLight::TWO_SIDED_BIT
+                                      : 0u);
     params.pool_lights_out[i] = light;
 }
 
@@ -273,8 +272,8 @@ groupshared float s_wave_total[LIGHT_GRID_BUILD_GROUP];
  * binary search it, and trace their visibility ray, in parallel.
  */
 [shader("compute")][numthreads(LIGHT_GRID_BUILD_GROUP, 1, 1)] void
-grid(uint3 group_id: SV_GroupID,
-     uint local_id: SV_GroupIndex,
+grid(uint3 group_id : SV_GroupID,
+     uint local_id : SV_GroupIndex,
      ParameterBlock<LightPreprocessBinding> params) {
     const uint dim = params.grid_info[0].dimension;
     const uint cells_per_cascade = dim * dim * dim;
@@ -295,8 +294,7 @@ grid(uint3 group_id: SV_GroupID,
     // jittered per frame, so a cell is not judged from one arbitrary point forever
     RandomGenerator point_rng = PCG(seed ^ 0xc2b2ae35u);
     const float3 point = center + (point_rng.next_float3() - 0.5f) * cell_size;
-    const uint candidates =
-        clamp(params.grid_candidates, 1u, LIGHT_GRID_MAX_CANDIDATES);
+    const uint candidates = clamp(params.grid_candidates, 1u, LIGHT_GRID_MAX_CANDIDATES);
     const uint grid_pool = max(min(params.pool_size, LIGHT_GRID_POOL), 1u);
 
     // 1. a contiguous chunk of candidates per thread

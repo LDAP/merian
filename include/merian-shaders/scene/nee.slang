@@ -143,8 +143,7 @@ struct NEE {
         // the cascade is picked from the unjittered position, so the jitter cannot walk the
         // lookup across cascades and change the cell size under it
         const float cell = 1.f / base.inv_cell_size;
-        const float3 to_center =
-            abs(pos - (base.origin + 0.5f * float(base.dimension) * cell));
+        const float3 to_center = abs(pos - (base.origin + 0.5f * float(base.dimension) * cell));
         const float distance = max(to_center.x, max(to_center.y, to_center.z));
         // snapping moves a cascade by up to one cell, so only dimension / 2 - 1 cells are certain
         const float reach = max(0.5f * float(base.dimension) - 1.f, 1.f) * cell;

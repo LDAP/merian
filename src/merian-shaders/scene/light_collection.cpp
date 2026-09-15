@@ -300,28 +300,28 @@ void LightCollection::update(const CommandBufferHandle& cmd,
         }
 
         if (!env_importance_built) {
-        const auto ep = env_reduce_entry_point.get();
-        const auto pipe = env_reduce_pipeline.get();
-        cmd->bind(pipe);
-        for (uint32_t level = 1; level < levels; level++) {
-            cmd->barrier(vk::MemoryBarrier2{
-                vk::PipelineStageFlagBits2::eComputeShader,
-                vk::AccessFlagBits2::eShaderWrite,
-                vk::PipelineStageFlagBits2::eComputeShader,
-                vk::AccessFlagBits2::eShaderRead,
-            });
-            const uint32_t level_size = size >> level;
-            const auto params = env_reduce_params[level - 1].get();
-            auto c = params->get_cursor();
-            c["levels"] = env_importance_buffer;
-            c["size"] = size;
-            c["level"] = level;
-            c["level_size"] = level_size;
-            ep->bind("params", params, cmd, pipe, obj_allocator);
-            cmd->dispatch((level_size + ENV_GROUP_SIZE - 1) / ENV_GROUP_SIZE,
-                          (level_size + ENV_GROUP_SIZE - 1) / ENV_GROUP_SIZE, 1);
-        }
-        env_importance_built = true;
+            const auto ep = env_reduce_entry_point.get();
+            const auto pipe = env_reduce_pipeline.get();
+            cmd->bind(pipe);
+            for (uint32_t level = 1; level < levels; level++) {
+                cmd->barrier(vk::MemoryBarrier2{
+                    vk::PipelineStageFlagBits2::eComputeShader,
+                    vk::AccessFlagBits2::eShaderWrite,
+                    vk::PipelineStageFlagBits2::eComputeShader,
+                    vk::AccessFlagBits2::eShaderRead,
+                });
+                const uint32_t level_size = size >> level;
+                const auto params = env_reduce_params[level - 1].get();
+                auto c = params->get_cursor();
+                c["levels"] = env_importance_buffer;
+                c["size"] = size;
+                c["level"] = level;
+                c["level_size"] = level_size;
+                ep->bind("params", params, cmd, pipe, obj_allocator);
+                cmd->dispatch((level_size + ENV_GROUP_SIZE - 1) / ENV_GROUP_SIZE,
+                              (level_size + ENV_GROUP_SIZE - 1) / ENV_GROUP_SIZE, 1);
+            }
+            env_importance_built = true;
         }
 
         if (env_selection == EnvSelection::EnvSelectionPool && env_pool_buffer) {
