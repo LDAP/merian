@@ -128,8 +128,10 @@ void DLSS::evaluate_super_sampling(const CommandBufferHandle& cmd, const DLSSEva
     eval.Feature.pInOutput = &output;
     eval.pInDepth = &depth;
     eval.pInMotionVectors = &motion_vectors;
-    eval.InJitterOffsetX = eval_info.jitter.x;
-    eval.InJitterOffsetY = eval_info.jitter.y;
+    // NGX takes the projection jitter, which moves the image opposite to the sample (DLSS
+    // Programming Guide 3.7.3).
+    eval.InJitterOffsetX = -eval_info.jitter.x;
+    eval.InJitterOffsetY = -eval_info.jitter.y;
     eval.InReset = static_cast<int>(eval_info.reset);
     eval.InRenderSubrectDimensions = {create_info.render_extent.width,
                                       create_info.render_extent.height};
@@ -166,8 +168,8 @@ void DLSS::evaluate_ray_reconstruction(const CommandBufferHandle& cmd,
         eval_info.specular_hit_distance ? &specular_hit_distance : nullptr;
     eval.pInWorldToViewMatrix = matrices.world_to_view.data();
     eval.pInViewToClipMatrix = matrices.view_to_clip.data();
-    eval.InJitterOffsetX = eval_info.jitter.x;
-    eval.InJitterOffsetY = eval_info.jitter.y;
+    eval.InJitterOffsetX = -eval_info.jitter.x;
+    eval.InJitterOffsetY = -eval_info.jitter.y;
     eval.InReset = static_cast<int>(eval_info.reset);
     eval.InRenderSubrectDimensions = {create_info.render_extent.width,
                                       create_info.render_extent.height};
