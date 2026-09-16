@@ -131,6 +131,7 @@ std::vector<InputConnectorDescriptor> DLSSNode::describe_inputs() {
             {.fields = {GBufferField::Normal, GBufferField::Roughness}, .texture = true},
             {.fields = {GBufferField::DiffuseAlbedo}, .texture = true},
             {.fields = {GBufferField::SpecularAlbedo}, .texture = true},
+            {.fields = {GBufferField::SpecularHitDistance}, .texture = true},
         });
         break;
     }
@@ -139,10 +140,6 @@ std::vector<InputConnectorDescriptor> DLSSNode::describe_inputs() {
         {"scene", con_scene},
         {"gbuffer", con_gbuffer, ConnectorAccess::compute_read},
         {"src", con_src, ConnectorAccess::compute_read | ConnectorAccess::transfer_src},
-        {.name = "specular_hit_distance",
-         .connector = con_specular_hit_distance,
-         .access = ConnectorAccess::compute_read,
-         .optional = true},
     };
 }
 
@@ -297,10 +294,7 @@ DLSSNode::pre_process(const NodeIO& io, [[maybe_unused]] const NodeProcessInfo& 
         eval_info.diffuse_albedo = gbuffer->get_view(GBufferField::DiffuseAlbedo);
         eval_info.specular_albedo = gbuffer->get_view(GBufferField::SpecularAlbedo);
         eval_info.normal_roughness = gbuffer->get_view(GBufferField::Normal);
-        if (io.is_connected(con_specular_hit_distance)) {
-            eval_info.specular_hit_distance =
-                io[con_specular_hit_distance].get_texture()->get_view();
-        }
+        eval_info.specular_hit_distance = gbuffer->get_view(GBufferField::SpecularHitDistance);
         eval_info.world_to_view = camera->get_view_matrix();
         eval_info.view_to_clip = camera->get_projection_matrix();
 

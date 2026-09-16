@@ -3,6 +3,8 @@ import merian_shaders.gbuffer;
 import merian_shaders.utils.textures;
 import merian_shaders.utils.ray_differential;
 import merian_shaders.colors.debug;
+import merian_shaders.utils.hash;
+import merian_shaders.utils.random;
 
 namespace merian {
 
@@ -14,8 +16,87 @@ struct GBufferParams {
 ConstantBuffer<GBufferParams> params;
 
 extern static const bool merian_gbuffer_write_emission = true;
+extern static const bool merian_gbuffer_write_specular_hit_distance = false;
+// 0 samples, 1 reflects, 2 transmits, 3 follows Fresnel
+extern static const int merian_gbuffer_specular_lobe = 3;
+extern static const float merian_gbuffer_specular_max_roughness = 0.25;
+extern static const int merian_gbuffer_specular_max_bounces = 2;
+
 // exp2 of the texture LOD bias
 extern static const float merian_gbuffer_texture_lod_scale = 1.0;
+
+// A fixed sample decides the lobe of a delta BSDF.
+struct ConstantRandom : RandomGenerator {
+    float value;
+
+    typealias CloneType = ConstantRandom;
+
+    CloneType clone() {
+        return this;
+    }
+
+    [mutating]
+    uint next() {
+        return uint(value * 4294967295.0);
+    }
+
+    [mutating]
+    override float next_float() {
+        return value;
+    }
+}
+
+// 0 where `sp` is rough, MAX_LINEAR_Z where the chain leaves the scene.
+float trace_specular_chain(const ParameterBlock<Scene> scene,
+                           const uint instance_mask,
+                           RayDesc ray,
+                           ShadingPoint sp,
+                           inout RandomGenerator rng) {
+    float travelled = 0.f;
+    for (int bounce = 0; bounce < merian_gbuffer_specular_max_bounces; bounce++) {
+        if (!sp.has_surface_material) {
+            return bounce == 0 ? 0.f : MAX_LINEAR_Z;
+        }
+        let bsdf = sp.surface_material.get_bsdf();
+        if (sqrt(bsdf.specular_alpha) >= merian_gbuffer_specular_max_roughness) {
+            return travelled;
+        }
+
+        const OrthonormalFrame frame = sp.shading_frame;
+        const float3 wi_local = frame.to_local(-ray.Direction);
+        const Optional<float3> wo_local = bsdf.sample(wi_local, rng);
+        if (!wo_local.hasValue) {
+            return travelled;
+        }
+        const Optional<RayDesc> next = sp.make_ray(-ray.Direction, frame.to_world(wo_local.value),
+                                                   wi_local.z * wo_local.value.z < 0.f);
+        if (!next.hasValue) {
+            return travelled;
+        }
+
+        const float3 from = sp.pos;
+        ray = next.value;
+        sp = scene.get_shading_point(ray, scene.trace_ray(ray, RAY_FLAG_NONE, instance_mask),
+                                     RenderContext(uint16_t(bounce + 1)), DefaultLODSampler(), true);
+        travelled += distance(from, sp.pos);
+    }
+    return min(travelled, MAX_LINEAR_Z);
+}
+
+float specular_hit_distance(const ParameterBlock<Scene> scene,
+                            const uint instance_mask,
+                            const RayDesc ray,
+                            const ShadingPoint sp,
+                            const uint2 pixel) {
+    if (merian_gbuffer_specular_lobe == 0) {
+        RandomGenerator rng = XorShift32(pcg3d16(uint3(pixel, scene.frame)));
+        return trace_specular_chain(scene, instance_mask, ray, sp, rng);
+    }
+    RandomGenerator rng = ConstantRandom(merian_gbuffer_specular_lobe == 1   ? 0.f
+                                         : merian_gbuffer_specular_lobe == 2 ? 1.f
+                                                                             : 0.5f);
+    return trace_specular_chain(scene, instance_mask, ray, sp, rng);
+}
 
 GBufferSample make_sample(const Camera camera,
                           const float3 pos,
@@ -101,6 +182,12 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<WGBuffer> gbuffer) {
             sample.diffuse_albedo = albedo.diffuse;
             sample.specular_albedo = albedo.specular;
             sample.roughness = sqrt(bsdf.specular_alpha);
+            if (merian_gbuffer_write_specular_hit_distance) {
+                sample.specular_hit_distance = specular_hit_distance(
+                    scene, params.instance_mask, ray,
+                    scene.get_shading_point(ray, hit, RenderContext(), GradLODSampler(ddx, ddy)),
+                    pixel);
+            }
             gbuffer.store(pixel, sample);
             // The emission output bypasses the renderer, so it carries the attenuation of the
             // primary segment itself. The albedo stays a pure material property.
@@ -123,6 +210,7 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<WGBuffer> gbuffer) {
     sample.diffuse_albedo = float3(0.5f);
     sample.specular_albedo = float3(0.f);
     sample.roughness = 0.f;
+    sample.specular_hit_distance = MAX_LINEAR_Z;
     gbuffer.store(pixel, sample);
     if (merian_gbuffer_write_emission)
         emission[pixel] = float4(sp.emission * scene.exterior_volume.transmittance(linear_z), 0);

@@ -36,9 +36,6 @@
             }
         },
         "render": {
-            "$+$outputs": [
-                "specular_hit_distance->dlss.specular_hit_distance"
-            ],
             "properties": {
                 "demodulate albedo": false
             }

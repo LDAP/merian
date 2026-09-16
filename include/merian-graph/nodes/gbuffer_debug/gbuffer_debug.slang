@@ -275,11 +275,15 @@ void main(uint3 tid: SV_DispatchThreadID,
         color = float4(float3(params.gbuffer.get_roughness(pixel)), 1);
         break;
     }
-    case 27: { // View Depth (plain)
+    case 27: { // Specular Hit Distance
+        color = float4(float3(params.gbuffer.get_specular_hit_distance(pixel)), 1);
+        break;
+    }
+    case 28: { // View Depth (plain)
         color = float4(float3(params.gbuffer.get_view_depth(pixel)), 1);
         break;
     }
-    case 28: { // Projected Depth
+    case 29: { // Projected Depth
         color = float4(float3(params.gbuffer.get_projected_depth(pixel)), 1);
         break;
     }

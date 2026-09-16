@@ -48,6 +48,7 @@ const std::vector<DebugField> FIELDS = {
     {"Diffuse Albedo", {GBufferField::DiffuseAlbedo}},
     {"Specular Albedo", {GBufferField::SpecularAlbedo}},
     {"Specular Roughness", {GBufferField::Roughness}},
+    {"Specular Hit Distance", {GBufferField::SpecularHitDistance}},
     {"View Depth", {GBufferField::ViewDepth}},
     {"Projected Depth", {GBufferField::ProjectedDepth}},
 };

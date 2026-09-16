@@ -62,7 +62,6 @@ class DLSSNode : public Node {
     PtrInHandle<Scene> con_scene = PtrIn<Scene>::create();
     GBufferInHandle con_gbuffer;
     VkSampledImageInHandle con_src = VkSampledImageIn::create();
-    VkSampledImageInHandle con_specular_hit_distance = VkSampledImageIn::create();
     ManagedVkImageOutHandle con_out;
 
     // 0 follows the active camera's resolution, else the input's

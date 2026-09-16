@@ -18,9 +18,7 @@ extern static const int merian_render_max_path_length = 8;
 extern static const uint merian_render_instance_mask = 0xFFu;
 extern static const bool merian_render_enable_ser = false;
 extern static const bool merian_render_demodulate_albedo = false;
-extern static const bool merian_render_write_specular_hit_distance = false;
 // linear roughness of the primary surface below which the specular hit distance is written
-extern static const float merian_render_specular_hit_distance_roughness = 0.25;
 extern static const int merian_render_nee_mode = NEE_MODE_RESAMPLED;
 // probability of replacing the scatter sample with a light sample (NEE_MODE_MIXTURE)
 extern static const float merian_render_nee_probability = 0.5;
@@ -55,7 +53,6 @@ struct SerThreadReorder : IThreadReorder {
 struct RenderBinding {
     ParameterBlock<GBuffer> gbuffer;
     RWTexture2D<float4> irradiance;
-    RWTexture2D<float> specular_hit_distance;
     ParameterBlock<RenderGuiding> guiding;
 }
 
@@ -65,10 +62,7 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
                                             RayDesc ray,
                                             ShadingPoint sp,
                                             const uint16_t sample_index,
-                                            out float specular_hit_distance,
                                             inout RandomGenerator rng) {
-    // negative where there is none
-    specular_hit_distance = -1.f;
     // Medium the ray is travelling through; updated on transmission events.
     var medium = scene.make_path_medium();
 
@@ -264,12 +258,6 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
             segment.next_pos = sp.pos;
             segment.next_normal = sp.shading_normal;
             segment.next_mv = half3((sp.pos - sp.prev_pos) / scene.time_diff);
-            // https://github.com/blender/blender/blob/c6d56f33b9d44fa5175ed6dffdf00d5911268605/intern/cycles/kernel/film/denoising_passes.h#L92-L95
-            if (merian_render_write_specular_hit_distance && bounce == 1 && !transmission &&
-                sqrt(bsdf.specular_alpha) < merian_render_specular_hit_distance_roughness) {
-                specular_hit_distance = min(distance(vertex.pos, sp.pos), MAX_LINEAR_Z);
-            }
-
             segment.incident = sp.emission * segment_transmittance;
             segment.nee_weight = mis_weight;
             segment.weight = segment.pdf > 0.f ? f_cos / segment.pdf : float3(0);
@@ -312,24 +300,16 @@ void render_pixel<Reorder : IThreadReorder>(const uint2 pixel,
 
     float3 irradiance = float3(0);
     float second_moment = 0.f;
-    float hit_distance_sum = 0.f;
-    int hit_distance_count = 0;
-
     for (int s = 0; s < merian_render_spp; s++) {
         RandomGenerator rng = PCG(pcg4d16(uint4(pixel, scene.frame, s)));
 
-        float specular_hit_distance;
         const float3 contrib = trace_path<Reorder>(scene, params, pixel, primary_ray, primary_sp,
-                                                   uint16_t(s), specular_hit_distance, rng) /
+                                                   uint16_t(s), rng) /
                                demod_albedo;
         if (!any(isnan(contrib)) && !any(isinf(contrib))) {
             irradiance += contrib;
             const float l = yuv_luminance(contrib);
             second_moment += l * l;
-        }
-        if (merian_render_write_specular_hit_distance && specular_hit_distance >= 0.f) {
-            hit_distance_sum += specular_hit_distance;
-            hit_distance_count++;
         }
     }
 
@@ -339,10 +319,6 @@ void render_pixel<Reorder : IThreadReorder>(const uint2 pixel,
     }
 
     params.irradiance[pixel] = float4(irradiance, second_moment);
-    if (merian_render_write_specular_hit_distance)
-        params.specular_hit_distance[pixel] =
-            hit_distance_count > 0 ? hit_distance_sum / float(hit_distance_count)
-                                   : (primary_sp.has_surface_material ? 0.f : MAX_LINEAR_Z);
 }
 
 // Two entry points over the same body: compute is faster (no RT-pipeline VGPR cap), while the

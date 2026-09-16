@@ -74,6 +74,10 @@ class GBufferRTNode : public Node {
     std::array<bool, 8> mask_enabled{true, true, true, true, true, true, true, true};
 
     bool emission_connected = true;
+    bool specular_hit_distance_requested = false;
+    int specular_lobe = 3;
+    float specular_max_roughness = 0.25f;
+    int32_t specular_max_bounces = 2;
     vk::Format emission_format = vk::Format::eR32G32B32A32Sfloat;
 
     // Slang program + pipeline; rebuilt when the scene composition changes.

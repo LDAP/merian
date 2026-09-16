@@ -79,6 +79,8 @@ GBufferRTNode::on_connected(const NodeIOLayout& io_layout,
         });
 
     emission_connected = io_layout.is_connected(con_emission);
+    specular_hit_distance_requested =
+        con_gbuffer->get_layout()->contains(GBufferField::SpecularHitDistance);
     gbuffer_composition = con_gbuffer->get_layout()->get_composition();
 
     if (const SceneHandle& scene = io[con_scene]; scene && scene->is_ready()) {
@@ -172,8 +174,14 @@ void GBufferRTNode::update_gbuffer_constants() {
     composition->add_module_from_string(
         "gbuffer_constants",
         fmt::format("namespace merian {{ export static const bool "
+                    "merian_gbuffer_write_specular_hit_distance = {}; export static const int "
+                    "merian_gbuffer_specular_lobe = {}; export static const float "
+                    "merian_gbuffer_specular_max_roughness = {}; export static const int "
+                    "merian_gbuffer_specular_max_bounces = {}; export static const bool "
                     "merian_gbuffer_write_emission = {}; export static const float "
                     "merian_gbuffer_texture_lod_scale = {:f}; }}",
+                    specular_hit_distance_requested ? "true" : "false", specular_lobe,
+                    specular_max_roughness, specular_max_bounces,
                     emission_connected ? "true" : "false", std::exp2(texture_lod_bias)));
 }
 
@@ -211,6 +219,15 @@ GBufferRTNode::NodeStatusFlags GBufferRTNode::properties(Properties& config) {
     config.st_separate();
     needs_reconnect |=
         config.config_enum("emission format", emission_format, Properties::OptionsStyle::COMBO);
+
+    config.st_separate("Specular hit distance");
+    needs_reconnect |=
+        config.config_options("lobe", specular_lobe, {"sample", "reflect", "transmit", "fresnel"},
+                              Properties::OptionsStyle::COMBO);
+    needs_reconnect |= config.config_float("max roughness", specular_max_roughness,
+                                           "surfaces above it close the chain", 0.01f, 0.f, 1.f);
+    needs_reconnect |= config.config_int("max bounces", specular_max_bounces,
+                                         "entering and leaving a closed surface takes two", 1, 8);
 
     if (needs_reconnect) {
         return NEEDS_RECONNECT;

@@ -33,6 +33,8 @@ namespace merian {
     X(SpecularAlbedo, "specular_albedo", "float3", 3, Float16, 0)                                  \
     /* linear roughness of the specular lobe */                                                    \
     X(Roughness, "roughness", "float", 1, Float16, 0)                                              \
+    /* world space length of the specular chain, 0 where the surface has none */                   \
+    X(SpecularHitDistance, "specular_hit_distance", "float", 1, Float16, 0)                        \
     /* distance from the camera along its view axis */                                             \
     X(ViewDepth, "view_depth", "float", 1, Float32, 1)                                             \
     /* perspective depth, 0 at the near and 1 at the far plane */                                  \
