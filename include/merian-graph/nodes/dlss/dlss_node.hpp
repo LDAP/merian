@@ -69,6 +69,9 @@ class DLSSNode : public Node {
     uint32_t out_width = 0;
     uint32_t out_height = 0;
     Mode mode = Mode::SuperResolution;
+    DLSSPreset super_resolution_preset = DLSSPreset::Default;
+    DLSSPreset ray_reconstruction_preset = DLSSPreset::Default;
+    float responsivity = 0.0;
     vk::Format out_format = vk::Format::eR16G16B16A16Sfloat;
     // applied to the active camera
     Camera::JitterSequence jitter_sequence = Camera::JitterSequence::Halton;
@@ -85,6 +88,9 @@ class DLSSNode : public Node {
     bool reset = false;
 
     DLSSHandle dlss;
+
+    ResourceAllocatorHandle allocator;
+    TextureHandle responsivity_mask;
 };
 
 } // namespace merian

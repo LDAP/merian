@@ -17,9 +17,29 @@ namespace merian {
 
 namespace {
 
-constexpr int FEATURE_CREATE_FLAGS = NVSDK_NGX_DLSS_Feature_Flags_IsHDR |
-                                     NVSDK_NGX_DLSS_Feature_Flags_MVLowRes |
-                                     NVSDK_NGX_DLSS_Feature_Flags_AutoExposure;
+constexpr int FEATURE_CREATE_FLAGS =
+    NVSDK_NGX_DLSS_Feature_Flags_IsHDR | NVSDK_NGX_DLSS_Feature_Flags_MVLowRes;
+
+constexpr int SUPER_RESOLUTION_CREATE_FLAGS =
+    FEATURE_CREATE_FLAGS | NVSDK_NGX_DLSS_Feature_Flags_AutoExposure;
+
+constexpr std::array<const char*, 6> SUPER_RESOLUTION_PRESET_HINTS = {
+    NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_DLAA,
+    NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_UltraQuality,
+    NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_Quality,
+    NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_Balanced,
+    NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_Performance,
+    NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_UltraPerformance,
+};
+
+constexpr std::array<const char*, 6> RAY_RECONSTRUCTION_PRESET_HINTS = {
+    NVSDK_NGX_Parameter_RayReconstruction_Hint_Render_Preset_DLAA,
+    NVSDK_NGX_Parameter_RayReconstruction_Hint_Render_Preset_UltraQuality,
+    NVSDK_NGX_Parameter_RayReconstruction_Hint_Render_Preset_Quality,
+    NVSDK_NGX_Parameter_RayReconstruction_Hint_Render_Preset_Balanced,
+    NVSDK_NGX_Parameter_RayReconstruction_Hint_Render_Preset_Performance,
+    NVSDK_NGX_Parameter_RayReconstruction_Hint_Render_Preset_UltraPerformance,
+};
 
 NVSDK_NGX_Resource_VK image_resource(const ImageViewHandle& view, const bool read_write) {
     const Image& image = *view->get_image();
@@ -63,6 +83,11 @@ DLSS::DLSS(const std::shared_ptr<ExtensionNGX>& ngx,
     throw_if_failed(NVSDK_NGX_VULKAN_AllocateParameters(&allocated_params),
                     "could not allocate the DLSS parameters");
     params.reset(allocated_params);
+    for (const char* hint :
+         ray_reconstruction ? RAY_RECONSTRUCTION_PRESET_HINTS : SUPER_RESOLUTION_PRESET_HINTS) {
+        NVSDK_NGX_Parameter_SetUI(params.get(), hint,
+                                  static_cast<unsigned int>(create_info.preset));
+    }
 
     NVSDK_NGX_Handle* feature = nullptr;
 
@@ -87,7 +112,7 @@ DLSS::DLSS(const std::shared_ptr<ExtensionNGX>& ngx,
         params_dlss.Feature.InTargetWidth = create_info.target_extent.width;
         params_dlss.Feature.InTargetHeight = create_info.target_extent.height;
         params_dlss.Feature.InPerfQualityValue = ngx_perf_quality(create_info.quality);
-        params_dlss.InFeatureCreateFlags = FEATURE_CREATE_FLAGS;
+        params_dlss.InFeatureCreateFlags = SUPER_RESOLUTION_CREATE_FLAGS;
         throw_if_failed(NGX_VULKAN_CREATE_DLSS_EXT1(device, cmd->get_command_buffer(), 1, 1,
                                                     &feature, params.get(), &params_dlss),
                         "could not create the DLSS super resolution feature");
@@ -155,6 +180,10 @@ void DLSS::evaluate_ray_reconstruction(const CommandBufferHandle& cmd,
     if (eval_info.specular_hit_distance) {
         specular_hit_distance = image_resource(eval_info.specular_hit_distance, false);
     }
+    NVSDK_NGX_Resource_VK responsivity{};
+    if (eval_info.responsivity) {
+        responsivity = image_resource(eval_info.responsivity, false);
+    }
     NGXMatrices matrices(eval_info);
 
     NVSDK_NGX_VK_DLSSD_Eval_Params eval{};
@@ -167,6 +196,7 @@ void DLSS::evaluate_ray_reconstruction(const CommandBufferHandle& cmd,
     eval.pInNormals = &normal_roughness;
     eval.pInSpecularHitDistance =
         eval_info.specular_hit_distance ? &specular_hit_distance : nullptr;
+    eval.pInResponsivityMask = eval_info.responsivity ? &responsivity : nullptr;
     eval.pInWorldToViewMatrix = matrices.world_to_view.data();
     eval.pInViewToClipMatrix = matrices.view_to_clip.data();
     eval.InJitterOffsetX = -eval_info.jitter.x;

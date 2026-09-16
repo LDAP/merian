@@ -25,6 +25,45 @@ const std::vector<std::string> JITTER_SEQUENCE_NAMES = {"Halton", "R2"};
 // indexed by DLSSNode::Mode
 const std::vector<std::string> MODE_NAMES = {"bypass", "super resolution", "ray reconstruction"};
 
+struct PresetOption {
+    DLSSPreset preset;
+    std::string name;
+};
+
+const std::vector<PresetOption> SUPER_RESOLUTION_PRESETS = {
+    {DLSSPreset::Default, "default"},
+    {DLSSPreset::J, "J"},
+    {DLSSPreset::K, "K"},
+    {DLSSPreset::L, "L"},
+    {DLSSPreset::M, "M"},
+};
+
+const std::vector<PresetOption> RAY_RECONSTRUCTION_PRESETS = {
+    {DLSSPreset::Default, "default"},
+    {DLSSPreset::D, "D"},
+    {DLSSPreset::E, "E"},
+    {DLSSPreset::F, "F"},
+};
+
+bool config_preset(Properties& config,
+                   DLSSPreset& preset,
+                   const std::vector<PresetOption>& presets) {
+    std::vector<std::string> names;
+    int selected = 0;
+    for (const auto& [option, name] : presets) {
+        if (option == preset) {
+            selected = static_cast<int>(names.size());
+        }
+        names.emplace_back(name);
+    }
+    if (!config.config_options("preset", selected, names, Properties::OptionsStyle::COMBO,
+                               "model weights; default lets NGX pick per quality mode")) {
+        return false;
+    }
+    preset = presets[selected].preset;
+    return true;
+}
+
 // Target over render resolution each mode is documented for, ordered by scale.
 constexpr std::array<std::pair<DLSSQuality, float>, 5> QUALITY_SCALES = {{
     {DLSSQuality::DLAA, 1.f},
@@ -68,8 +107,8 @@ DeviceSupportInfo DLSSNode::query_device_support(const DeviceSupportQueryInfo& q
     return super_resolution->query_device_support(query_info);
 }
 
-void DLSSNode::initialize(const ContextHandle& context,
-                          [[maybe_unused]] const ResourceAllocatorHandle& allocator) {
+void DLSSNode::initialize(const ContextHandle& context, const ResourceAllocatorHandle& allocator) {
+    this->allocator = allocator;
     dlss_super_resolution = context->get_context_extension<ExtensionDLSSSuperResolution>();
     dlss_ray_reconstruction = context->get_context_extension<ExtensionDLSSRayReconstruction>(true);
 }
@@ -162,6 +201,8 @@ DLSSNode::NodeStatusFlags DLSSNode::on_connected([[maybe_unused]] const NodeIOLa
         .render_extent = vk::Extent2D{render_extent.width, render_extent.height},
         .target_extent = target,
         .quality = quality,
+        .preset =
+            mode == Mode::RayReconstruction ? ray_reconstruction_preset : super_resolution_preset,
     };
     try {
         dlss = dlss_extension->create(create_info, submission.get_cmd());
@@ -169,6 +210,26 @@ DLSSNode::NodeStatusFlags DLSSNode::on_connected([[maybe_unused]] const NodeIOLa
         throw graph_errors::node_error{e.what()};
     }
     reset = true;
+
+    if (mode == Mode::RayReconstruction) {
+        const vk::ImageCreateInfo create_info{
+            {},
+            vk::ImageType::e2D,
+            vk::Format::eR16Sfloat,
+            render_extent,
+            1,
+            1,
+            vk::SampleCountFlagBits::e1,
+            vk::ImageTiling::eOptimal,
+            vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+        };
+        const ImageHandle image =
+            allocator->create_image(create_info, MemoryMappingType::NONE, "DLSS responsivity");
+        submission.get_cmd()->barrier(vk::PipelineStageFlagBits::eTopOfPipe,
+                                      vk::PipelineStageFlagBits::eTransfer,
+                                      image->barrier(vk::ImageLayout::eGeneral));
+        responsivity_mask = allocator->create_texture(image);
+    }
 
     return {};
 }
@@ -242,6 +303,18 @@ DLSSNode::pre_process(const NodeIO& io, [[maybe_unused]] const NodeProcessInfo& 
         }
         eval_info.world_to_view = camera->get_view_matrix();
         eval_info.view_to_clip = camera->get_projection_matrix();
+
+        if (responsivity != 0.0f) {
+            const CommandBufferHandle& cmd = submission.get_cmd();
+            const ImageHandle& image = responsivity_mask->get_image();
+            cmd->clear(image, vk::ImageLayout::eGeneral,
+                       vk::ClearColorValue{responsivity, 0.f, 0.f, 0.f});
+            cmd->barrier(
+                vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eComputeShader,
+                image->barrier(vk::ImageLayout::eGeneral, vk::AccessFlagBits::eTransferWrite,
+                               vk::AccessFlagBits::eShaderRead));
+            eval_info.responsivity = responsivity_mask->get_view();
+        }
     }
 
     try {
@@ -278,6 +351,16 @@ DLSSNode::NodeStatusFlags DLSSNode::properties(Properties& config) {
                               "denoises and takes the noisy input; bypass stretches the input")) {
         mode = static_cast<Mode>(mode_index);
         needs_reconnect = true;
+    }
+    if (mode == Mode::SuperResolution) {
+        needs_reconnect |= config_preset(config, super_resolution_preset, SUPER_RESOLUTION_PRESETS);
+    } else if (mode == Mode::RayReconstruction) {
+        needs_reconnect |=
+            config_preset(config, ray_reconstruction_preset, RAY_RECONSTRUCTION_PRESETS);
+        config.config_float("responsivity", responsivity,
+                            "follows the input over the history everywhere; preset F only, "
+                            "nominally in [-1, 1]",
+                            0.1f);
     }
     needs_reconnect |=
         config.config_enum("output format", out_format, Properties::OptionsStyle::COMBO);

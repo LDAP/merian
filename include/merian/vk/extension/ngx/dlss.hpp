@@ -27,6 +27,17 @@ inline const std::vector<std::string> DLSS_QUALITY_NAMES = {
     "ultra performance", "performance", "balanced", "quality", "DLAA",
 };
 
+enum class DLSSPreset : uint32_t {
+    Default = 0,
+    D = 4,
+    E = 5,
+    F = 6,
+    J = 10,
+    K = 11,
+    L = 12,
+    M = 13,
+};
+
 struct DLSSResolution {
     vk::Extent2D optimal;
     vk::Extent2D min;
@@ -37,6 +48,7 @@ struct DLSSCreateInfo {
     vk::Extent2D render_extent;
     vk::Extent2D target_extent;
     DLSSQuality quality = DLSSQuality::Quality;
+    DLSSPreset preset = DLSSPreset::Default;
 };
 
 // All inputs are read in eGeneral. Guides and color at render resolution.
@@ -62,6 +74,8 @@ struct DLSSEvalInfo {
     ImageViewHandle normal_roughness;
     // Optional: world space distance from the primary hit to the specular hit.
     ImageViewHandle specular_hit_distance;
+    // Optional, one channel in [-1, 1]: positive follows the input over the history.
+    ImageViewHandle responsivity;
     float4x4 world_to_view = identity();
     float4x4 view_to_clip = identity();
 };
