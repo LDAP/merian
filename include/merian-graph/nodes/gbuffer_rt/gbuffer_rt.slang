@@ -21,6 +21,7 @@ extern static const bool merian_gbuffer_write_specular_hit_distance = false;
 extern static const int merian_gbuffer_specular_lobe = 3;
 extern static const float merian_gbuffer_specular_max_roughness = 0.25;
 extern static const int merian_gbuffer_specular_max_bounces = 2;
+extern static const bool merian_gbuffer_specular_psr = false;
 
 // exp2 of the texture LOD bias
 extern static const float merian_gbuffer_texture_lod_scale = 1.0;
@@ -46,32 +47,39 @@ struct ConstantRandom : RandomGenerator {
     }
 }
 
-// 0 where `sp` is rough, MAX_LINEAR_Z where the chain leaves the scene.
-float trace_specular_chain(const ParameterBlock<Scene> scene,
-                           const uint instance_mask,
-                           RayDesc ray,
-                           ShadingPoint sp,
-                           inout RandomGenerator rng) {
+// The surface the chain of smooth surfaces ends on. `travelled` is 0 and `sp` the one it started
+// from where that surface is rough already.
+struct SpecularChain {
+    ShadingPoint sp;
+    RayDesc ray;
+    float travelled;
+}
+
+SpecularChain trace_specular_chain(const ParameterBlock<Scene> scene,
+                                   const uint instance_mask,
+                                   RayDesc ray,
+                                   ShadingPoint sp,
+                                   inout RandomGenerator rng) {
     float travelled = 0.f;
     for (int bounce = 0; bounce < merian_gbuffer_specular_max_bounces; bounce++) {
         if (!sp.has_surface_material) {
-            return bounce == 0 ? 0.f : MAX_LINEAR_Z;
+            return {sp, ray, bounce == 0 ? 0.f : MAX_LINEAR_Z};
         }
         let bsdf = sp.surface_material.get_bsdf();
         if (sqrt(bsdf.specular_alpha) >= merian_gbuffer_specular_max_roughness) {
-            return travelled;
+            return {sp, ray, travelled};
         }
 
         const OrthonormalFrame frame = sp.shading_frame;
         const float3 wi_local = frame.to_local(-ray.Direction);
         const Optional<float3> wo_local = bsdf.sample(wi_local, rng);
         if (!wo_local.hasValue) {
-            return travelled;
+            return {sp, ray, travelled};
         }
         const Optional<RayDesc> next = sp.make_ray(-ray.Direction, frame.to_world(wo_local.value),
                                                    wi_local.z * wo_local.value.z < 0.f);
         if (!next.hasValue) {
-            return travelled;
+            return {sp, ray, travelled};
         }
 
         const float3 from = sp.pos;
@@ -80,14 +88,14 @@ float trace_specular_chain(const ParameterBlock<Scene> scene,
                                      RenderContext(uint16_t(bounce + 1)), DefaultLODSampler(), true);
         travelled += distance(from, sp.pos);
     }
-    return min(travelled, MAX_LINEAR_Z);
+    return {sp, ray, min(travelled, MAX_LINEAR_Z)};
 }
 
-float specular_hit_distance(const ParameterBlock<Scene> scene,
-                            const uint instance_mask,
-                            const RayDesc ray,
-                            const ShadingPoint sp,
-                            const uint2 pixel) {
+SpecularChain specular_chain(const ParameterBlock<Scene> scene,
+                             const uint instance_mask,
+                             const RayDesc ray,
+                             const ShadingPoint sp,
+                             const uint2 pixel) {
     if (merian_gbuffer_specular_lobe == 0) {
         RandomGenerator rng = XorShift32(pcg3d16(uint3(pixel, scene.frame)));
         return trace_specular_chain(scene, instance_mask, ray, sp, rng);
@@ -182,11 +190,38 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<WGBuffer> gbuffer) {
             sample.diffuse_albedo = albedo.diffuse;
             sample.specular_albedo = albedo.specular;
             sample.roughness = sqrt(bsdf.specular_alpha);
-            if (merian_gbuffer_write_specular_hit_distance) {
-                sample.specular_hit_distance = specular_hit_distance(
+            if (merian_gbuffer_write_specular_hit_distance || merian_gbuffer_specular_psr) {
+                const SpecularChain chain = specular_chain(
                     scene, params.instance_mask, ray,
                     scene.get_shading_point(ray, hit, RenderContext(), GradLODSampler(ddx, ddy)),
                     pixel);
+                sample.specular_hit_distance = chain.travelled;
+
+                if (merian_gbuffer_specular_psr && chain.travelled > 0.f) {
+                    const float virtual_z = linear_z + chain.travelled;
+                    const float3 virtual_pos = ray.Origin + virtual_z * ray.Direction;
+                    if (chain.sp.has_surface_material) {
+                        let chain_bsdf = chain.sp.surface_material.get_bsdf();
+                        const OrthonormalFrame chain_frame = chain.sp.shading_frame;
+                        const Albedo chain_albedo =
+                            chain_bsdf.get_albedo(chain_frame.to_local(-chain.ray.Direction));
+                        sample = make_sample(scene.camera, virtual_pos, chain_frame.get_normal(),
+                                             virtual_z, grad_z, delta_z, mv, hit);
+                        sample.albedo = chain_albedo.reflection;
+                        sample.diffuse_albedo = chain_albedo.diffuse;
+                        sample.specular_albedo = chain_albedo.specular;
+                        sample.roughness = sqrt(chain_bsdf.specular_alpha);
+                    } else {
+                        sample = make_sample(scene.camera, virtual_pos, chain.sp.shading_normal,
+                                             virtual_z, grad_z, delta_z, mv, hit);
+                        sample.albedo = chain.sp.emission;
+                        sample.diffuse_albedo = float3(0.5f);
+                        sample.specular_albedo = float3(0.f);
+                        sample.roughness = 0.f;
+                    }
+                    // the distance starts at the surface the guides describe
+                    sample.specular_hit_distance = 0.f;
+                }
             }
             gbuffer.store(pixel, sample);
             // The emission output bypasses the renderer, so it carries the attenuation of the

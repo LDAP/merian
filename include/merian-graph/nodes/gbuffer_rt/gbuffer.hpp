@@ -78,6 +78,7 @@ class GBufferRTNode : public Node {
     int specular_lobe = 3;
     float specular_max_roughness = 0.25f;
     int32_t specular_max_bounces = 2;
+    bool specular_psr = false;
     vk::Format emission_format = vk::Format::eR32G32B32A32Sfloat;
 
     // Slang program + pipeline; rebuilt when the scene composition changes.
