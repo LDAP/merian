@@ -119,7 +119,10 @@ void LightCollection::ensure_pipelines(const SlangCompositionHandle& scene_compo
         make("grid_setup", setup_entry_point, setup_pipeline, setup_params);
         make("pool", pool_entry_point, pool_pipeline, pool_params);
         make("grid", grid_entry_point, grid_pipeline, grid_params);
+        make("grid_probe", grid_probe_entry_point, grid_probe_pipeline, grid_probe_params);
         make("env_split", env_split_entry_point, env_split_pipeline, env_split_params);
+        make("geometry_proxy", geometry_proxy_entry_point, geometry_proxy_pipeline,
+             geometry_proxy_params);
     }
 
     if (!env_composition) {
@@ -219,17 +222,30 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
     }
 
     if (triangle_count > 0) {
+        ensure_buffer(pool_geometry_buffer,
+                      std::min(static_cast<uint32_t>(pool_size), LIGHT_GRID_POOL) *
+                          sizeof(uint32_t),
+                      "LightCollection::pool_geometry", cmd);
+        ensure_buffer(geometry_proxies_buffer,
+                      std::max<uint32_t>(static_cast<uint32_t>(light_geometries.size()), 1u) *
+                          sizeof(EmissiveLightProxy),
+                      "LightCollection::geometry_proxies", cmd);
         ensure_buffer(pool_buffer, static_cast<uint32_t>(pool_size) * sizeof(uint32_t),
                       "LightCollection::pool", cmd);
-        ensure_buffer(pool_lights_buffer,
-                      std::min(static_cast<uint32_t>(pool_size), LIGHT_GRID_POOL) *
-                          sizeof(PooledLight),
-                      "LightCollection::pool_lights", cmd);
-        ensure_buffer(grid_buffer, grid_cell_count() * LIGHT_GRID_SLOTS * sizeof(uint32_t),
-                      "LightCollection::grid", cmd);
-        ensure_buffer(grid_info_buffer,
-                      static_cast<uint32_t>(grid_cascades) * sizeof(LightGridInfo),
-                      "LightCollection::grid_info", cmd);
+        const vk::DeviceSize grid_size = grid_cell_count() * LIGHT_GRID_SLOTS * sizeof(uint32_t);
+        for (uint32_t i = 0; i < 2; i++) {
+            const bool grew = !grid_buffer[i] || grid_buffer[i]->get_size() < grid_size;
+            ensure_buffer(grid_buffer[i], grid_size, "LightCollection::grid", cmd);
+            ensure_buffer(grid_weight_buffer[i], grid_size, "LightCollection::grid_weight", cmd);
+            ensure_buffer(grid_info_buffer[i],
+                          static_cast<uint32_t>(grid_cascades) * sizeof(LightGridInfo),
+                          "LightCollection::grid_info", cmd);
+            grid_reset |= grew;
+        }
+    }
+
+    if (tables_dirty) {
+        grid_reset = true;
     }
 
     if (triangle_count > 0 && tables_dirty) {
@@ -389,10 +405,18 @@ void LightCollection::update(const CommandBufferHandle& cmd,
             c["proxies"] = proxies_buffer;
             c["cdf"] = cdf_buffer;
             c["pool"] = pool_buffer;
-            c["pool_lights_out"] = pool_lights_buffer;
-            c["pool_lights"] = pool_lights_buffer;
-            c["grid"] = grid_buffer;
-            c["grid_info"] = grid_info_buffer;
+            c["light_geometries"] = light_geometries_buffer;
+            c["light_geometry_count"] = static_cast<uint32_t>(light_geometries.size());
+            c["geometry_proxies_out"] = geometry_proxies_buffer;
+            c["pool_geometry_out"] = pool_geometry_buffer;
+            c["pool_geometry"] = pool_geometry_buffer;
+            c["geometry_proxies"] = geometry_proxies_buffer;
+            c["grid"] = grid_buffer[grid_slot];
+            c["grid_weight"] = grid_weight_buffer[grid_slot];
+            c["grid_weight_prev"] = grid_weight_buffer[grid_slot ^ 1];
+            c["grid_prev"] = grid_buffer[grid_slot ^ 1];
+            c["grid_info"] = grid_info_buffer[grid_slot];
+            c["grid_info_prev"] = grid_info_buffer[grid_slot ^ 1];
             c["grid_coverage"] = grid_coverage;
             c["camera_position"] = camera_position;
             c["triangle_count"] = triangle_count;
@@ -404,10 +428,12 @@ void LightCollection::update(const CommandBufferHandle& cmd,
             c["grid_jitter"] = grid_jitter;
             c["grid_visibility"] =
                 static_cast<uint32_t>(grid_visibility && acceleration_structure ? 1 : 0);
+            c["grid_probes"] = static_cast<uint32_t>(grid_probes);
+            c["grid_max_age"] = static_cast<uint32_t>(grid_max_age);
+            c["grid_reset"] = static_cast<uint32_t>(grid_reset ? 1 : 0);
             if (acceleration_structure) {
                 c["as"] = acceleration_structure;
             }
-            c["selection"] = static_cast<uint32_t>(selection);
             c["frame"] = frame;
             return params;
         };
@@ -445,6 +471,16 @@ void LightCollection::update(const CommandBufferHandle& cmd,
         if (selection != LightSelection::LightSelectionPower) {
             barrier();
             {
+                MERIAN_PROFILE_SCOPE_GPU(cmd, "geometry proxies");
+                const auto ep = geometry_proxy_entry_point.get();
+                const auto pipe = geometry_proxy_pipeline.get();
+                cmd->bind(pipe);
+                ep->bind("params", write_preprocess(geometry_proxy_params.get()), cmd, pipe,
+                         obj_allocator);
+                cmd->dispatch(static_cast<uint32_t>(light_geometries.size()), 1, 1);
+            }
+            barrier();
+            {
                 MERIAN_PROFILE_SCOPE_GPU(cmd, "pool");
                 const auto ep = pool_entry_point.get();
                 const auto pipe = pool_pipeline.get();
@@ -473,6 +509,20 @@ void LightCollection::update(const CommandBufferHandle& cmd,
                 // one group per cell
                 cmd->dispatch(grid_cell_count(), 1, 1);
             }
+            if (grid_visibility && acceleration_structure) {
+                barrier();
+                MERIAN_PROFILE_SCOPE_GPU(cmd, "grid probe");
+                const auto ep = grid_probe_entry_point.get();
+                const auto pipe = grid_probe_pipeline.get();
+                cmd->bind(pipe);
+                ep->bind("params", write_preprocess(grid_probe_params.get()), cmd, pipe,
+                         obj_allocator);
+                const uint32_t probes =
+                    std::clamp(static_cast<uint32_t>(grid_probes), 1u, LIGHT_GRID_SLOTS);
+                cmd->dispatch((grid_cell_count() * probes + 63) / 64, 1, 1);
+            }
+            grid_reset = false;
+            grid_slot ^= 1u;
         }
     }
 
@@ -512,35 +562,45 @@ void LightCollection::update(const CommandBufferHandle& cmd,
 void LightCollection::write_to(ShaderCursor cursor) const {
     const bool active = enabled && triangle_count > 0 && triangles_buffer && cdf_buffer;
     const BufferHandle& dummy = allocator->get_dummy_buffer();
-    cursor["triangles"] = active ? triangles_buffer : dummy;
-    cursor["cdf"] = active ? cdf_buffer : dummy;
-    cursor["pool"] = active ? pool_buffer : dummy;
-    cursor["grid"] = active ? grid_buffer : dummy;
-    cursor["geometry_light_offsets"] = active ? geometry_light_offsets_buffer : dummy;
-    cursor["grid_info"] = active && grid_info_buffer ? grid_info_buffer : dummy;
-    cursor["pool_size"] = active && selection != LightSelection::LightSelectionPower
-                              ? static_cast<uint32_t>(pool_size)
-                              : 0u;
-    cursor["pool_tile_size"] =
+    auto table = cursor["table"];
+    table["triangles"] = active ? triangles_buffer : dummy;
+    table["cdf"] = active ? cdf_buffer : dummy;
+    table["geometries"] = active ? light_geometries_buffer : dummy;
+    table["geometry_offsets"] = active ? geometry_light_offsets_buffer : dummy;
+    table["triangle_count"] = active ? triangle_count : 0u;
+    table["geometry_count"] = active ? static_cast<uint32_t>(light_geometries.size()) : 0u;
+    table["geometry_offset_count"] =
+        active ? static_cast<uint32_t>(geometry_light_offsets.size()) : 0u;
+
+    auto pool = cursor["pool"];
+    pool["entries"] = active ? pool_buffer : dummy;
+    pool["size"] = active && selection != LightSelection::LightSelectionPower
+                       ? static_cast<uint32_t>(pool_size)
+                       : 0u;
+    pool["tile_size"] =
         std::min(static_cast<uint32_t>(pool_tile_size), static_cast<uint32_t>(pool_size));
-    cursor["selection"] = static_cast<uint32_t>(selection);
-    cursor["grid_probability"] = grid_probability;
-    cursor["grid_jitter"] = grid_jitter;
-    cursor["triangle_count"] = active ? triangle_count : 0u;
-    cursor["geometry_count"] = active ? static_cast<uint32_t>(geometry_light_offsets.size()) : 0u;
+
+    auto grid = cursor["grid"];
+    grid["slots"] = active ? grid_buffer[grid_slot] : dummy;
+    grid["cascades"] = active && grid_info_buffer[grid_slot] ? grid_info_buffer[grid_slot] : dummy;
+    grid["jitter"] = grid_jitter;
+
+    cursor["selection"] =
+        active ? static_cast<uint32_t>(selection) : static_cast<uint32_t>(LightSelectionPower);
     cursor["has_sky_portals"] = has_sky_portals;
 
     const bool env_active = enabled && env_emissive && env_importance_buffer && env_split_buffer;
-    cursor["env_split"] = env_active ? env_split_buffer : dummy;
-    cursor["env_pool"] = env_active && env_pool_buffer ? env_pool_buffer : dummy;
-    cursor["env_pool_size"] =
+    auto env = cursor["env"];
+    env["split"] = env_active ? env_split_buffer : dummy;
+    env["pool"] = env_active && env_pool_buffer ? env_pool_buffer : dummy;
+    env["pool_size"] =
         env_active && env_pool_buffer && env_selection == EnvSelection::EnvSelectionPool
             ? static_cast<uint32_t>(env_pool_size)
             : 0u;
-    auto env = cursor["env_importance"];
-    env["levels"] = env_active ? env_importance_buffer : dummy;
-    env["size"] = env_active ? env_importance_size() : 0u;
-    env["level_count"] = env_active ? level_count_for(env_importance_size()) : 0u;
+    auto importance = env["importance"];
+    importance["levels"] = env_active ? env_importance_buffer : dummy;
+    importance["size"] = env_active ? env_importance_size() : 0u;
+    importance["level_count"] = env_active ? level_count_for(env_importance_size()) : 0u;
 }
 
 void LightCollection::properties(Properties& props) {
@@ -571,7 +631,7 @@ void LightCollection::properties(Properties& props) {
     props.config_options("selection", selection, {"power", "pool", "grid"},
                          Properties::OptionsStyle::COMBO,
                          "How a light is chosen: a search over the whole scene, one load from a "
-                         "pre-resampled pool, or one load from a per-frame world-space grid.");
+                         "per-frame pool, or one load from a per-frame world-space grid.");
     if (selection != LightSelection::LightSelectionPower) {
         props.config_int("pool tile size", pool_tile_size,
                          "Lights a screen tile draws from. Smaller keeps the entries in cache; the "
@@ -591,12 +651,9 @@ void LightCollection::properties(Properties& props) {
                          "before, so the resolution follows the distance to the camera.",
                          1, 16);
         props.config_int("grid candidates", grid_candidates,
-                         "Pool draws resampled into the cell's slots. Below the slot count the "
-                         "list is the raw pool draw and the cell is never resampled towards.",
+                         "Pool draws a cell ranks each frame. The list carries across frames, "
+                         "so a few are enough.",
                          1, 256);
-        props.config_percent("grid probability", grid_probability,
-                             "How often the cell list is used; the rest falls back to the pool so "
-                             "that every light stays reachable.");
         props.config_float("grid cell size", grid_cell_size,
                            "World units per cell of the finest cascade; 0 derives it from the "
                            "distance to the lights.",
@@ -609,7 +666,18 @@ void LightCollection::properties(Properties& props) {
                            "Cells the lookup is offset by, so the cell boundaries do not show.",
                            0.05f, 0.f, 2.f);
         props.config_bool("grid visibility", grid_visibility,
-                          "Drop cell entries the cell cannot see. Costs one ray per slot.");
+                          "Trace whether a cell can see the light in a slot, and free the slot "
+                          "where it cannot. Pays where a sample is all the budget allows.");
+        if (grid_visibility) {
+            props.config_int("grid probes", grid_probes,
+                             "Slots a cell re-tests per frame. Clearing more than one at a "
+                             "time stops the list settling.",
+                             1, static_cast<int32_t>(LIGHT_GRID_SLOTS));
+        }
+        props.config_int("grid max age", grid_max_age,
+                         "Frames over which a light that stopped earning its slot is overtaken by "
+                         "a fresh candidate.",
+                         1, 256);
     }
     props.config_int("flux samples", flux_samples,
                      "Emission evaluations per triangle for the flux estimate.", 1, 256);

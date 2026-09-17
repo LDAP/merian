@@ -345,6 +345,7 @@ void RenderPT::update_render_constants() {
                     "export static const int merian_render_nee_mode = {};\n"
                     "export static const float merian_render_nee_probability = {:f};\n"
                     "export static const int merian_render_nee_candidates = {};\n"
+                    "export static const int merian_render_nee_grid_candidates = {};\n"
                     "export static const int merian_render_nee_bounces = {};\n"
                     "export static const int merian_render_scatter_mode = {};\n"
                     "export static const int merian_render_scatter_candidates = {};\n"
@@ -355,8 +356,9 @@ void RenderPT::update_render_constants() {
                     "}}",
                     emission_on_primary ? "true" : "false", spp, max_path_length, mask,
                     enable_ser ? "true" : "false", demodulate_albedo ? "true" : "false", nee_mode,
-                    nee_probability, nee_candidates, nee_bounces, scatter_mode, scatter_candidates,
-                    volume_spp, volume_nee_candidates, volume_forward_project_min_z));
+                    nee_probability, nee_candidates, nee_grid_candidates, nee_bounces, scatter_mode,
+                    scatter_candidates, volume_spp, volume_nee_candidates,
+                    volume_forward_project_min_z));
 }
 
 RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
@@ -393,14 +395,22 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
         constants_changed |= config.config_percent(
             "NEE probability", nee_probability,
             "Fraction of scatter samples drawn from the lights. A light sample replaces the "
-            "scatter sample, so this is taken out of the budget the indirect signal lives on: "
-            "past roughly a tenth the direct gain stops paying for the indirect noise.");
+            "scatter sample, so this is taken out of the budget the indirect signal lives on. How "
+            "far it pays depends on how good the light samples are: a tenth with the pool, most of "
+            "the budget once a cell list picks them.");
     }
-    if (nee_mode == 2) {
+    if (nee_mode != 0) {
         constants_changed |= config.config_int(
             "NEE candidates", nee_candidates,
-            "Light samples resampled into the one shadow ray by unshadowed contribution (RIS).", 1,
-            32);
+            "Light samples drawn from the pool. Resampled into the one shadow ray by unshadowed "
+            "contribution (RIS); the mixture draws one of them. 0 leaves the lights to the grid.",
+            0, 32);
+        constants_changed |= config.config_int(
+            "NEE grid candidates", nee_grid_candidates,
+            "Candidates drawn from the light grid's cell list, alongside the ones above. A "
+            "separate technique, so a cell that holds the wrong lights costs a candidate and "
+            "never density.",
+            0, 32);
     }
     if (nee_mode != 0) {
         constants_changed |= config.config_int(

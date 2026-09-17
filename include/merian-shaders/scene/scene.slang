@@ -493,23 +493,30 @@ struct Scene {
         // one offset per 16 x 16 pixels, so a tile shares its cell and the loads stay coherent
         const uint tile = xxhash32(uint3(pixel >> 4, frame));
         RandomGenerator tile_rng = PCG(tile);
-        const uint cell =
-            nee.get_grid_cell(pos, nee.grid_jitter * (tile_rng.next_float3() - 0.5f));
+        const uint cell = nee.get_grid_cell(pos, nee.grid.jitter * (tile_rng.next_float3() - 0.5f));
         if (cell != LIGHT_INVALID_INDEX)
             return cell;
         return LIGHT_BUCKET_TILE | tile;
     }
 
-    // Next event estimation: one light sample for the receiver at pos (unshadowed).
+    // One unshadowed light candidate from a technique.
     Optional<LightSample>
-    sample_light(const uint cell, const float3 pos, inout RandomGenerator rng) {
-        return nee.sample(cell, pos, rng, material_system, env_map, time);
+    sample_light_pool(const uint bucket, const float3 pos, inout RandomGenerator rng) {
+        return nee.sample_light(bucket, pos, rng, material_system, env_map, time, false);
+    }
+
+    Optional<LightSample>
+    sample_light_grid(const uint cell, const float3 pos, inout RandomGenerator rng) {
+        return nee.sample_light(cell, pos, rng, material_system, env_map, time, true);
     }
 
     // A point on a light without its radiance, for the mixture estimator.
-    Optional<LightPoint>
-    sample_light_point(const uint cell, const float3 pos, inout RandomGenerator rng) {
-        return nee.sample_point(cell, pos, rng);
+    Optional<LightPoint> sample_light_point(const uint cell,
+                                            const float3 pos,
+                                            inout RandomGenerator rng,
+                                            const uint m_pool,
+                                            const uint m_grid) {
+        return nee.sample_point(cell, pos, rng, m_pool, m_grid);
     }
 
     // Ray from the receiver (offset along its face normal) towards a point on a light. Distant
@@ -570,20 +577,29 @@ struct Scene {
     }
 
     // Which light the ray from origin along dir ended on, and the density with which
-    // sample_light would have generated that point. For MIS against scatter sampling;
+    // the light techniques would have generated that point with. For MIS against scatter
     // independent of the shading point, so it can run before the hit is shaded.
-    LightHit get_light_hit(const uint cell, const float3 origin, const float3 dir, const Hit hit) {
+    LightHit get_light_hit(const uint cell,
+                           const float3 origin,
+                           const float3 dir,
+                           const Hit hit,
+                           const uint m_pool,
+                           const uint m_grid) {
+        LightHit lh = LightHit();
         bool distant = !hit.is_valid();
         if (!distant) {
             const GeometryData gd = get_geometry_data(hit.instance_id, hit.geometry_index);
             distant = (gd.flags & GeometryDataFlags::UseEnvMap) != 0;
-            if (!distant)
-                return nee.get_light_hit(cell, hit.get_geometry_id(), hit.primitive_id, origin,
-                                         dir);
+            if (!distant) {
+                if (let index = nee.get_triangle_index(hit.get_geometry_id(), hit.primitive_id)) {
+                    lh.index = index;
+                    lh.pdf = nee.pdf_lights(cell, index, origin, dir, m_pool, m_grid);
+                }
+                return lh;
+            }
         }
-        LightHit lh;
         lh.index = LIGHT_ENV_INDEX;
-        lh.pdf = nee.pdf_env(dir);
+        lh.pdf = nee.pdf_lights(cell, LIGHT_ENV_INDEX, origin, dir, m_pool, m_grid);
         return lh;
     }
 

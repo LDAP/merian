@@ -105,7 +105,8 @@ class RenderPT : public Node {
 
     int32_t nee_mode = 2;
     float nee_probability = 0.1f;
-    int32_t nee_candidates = 1;
+    int32_t nee_candidates = 3;
+    int32_t nee_grid_candidates = 2;
     int32_t nee_bounces = 0;
     std::array<bool, 8> mask_enabled{true, true, true, true, true, true, true, true};
 

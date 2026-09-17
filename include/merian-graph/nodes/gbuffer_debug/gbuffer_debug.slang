@@ -3,6 +3,9 @@ import merian_shaders.scene.scene;
 import merian_shaders.shading.materials.gltf_material;
 import merian_shaders.utils.textures;
 import merian_shaders.colors.debug;
+import merian_shaders.colors.colorspaces;
+import merian_shaders.utils.random;
+import merian_shaders.utils.hash;
 
 using merian;
 
@@ -15,18 +18,14 @@ struct PushConstant {
     int selected_field;
 };
 
-[vk::push_constant]
-ConstantBuffer<PushConstant> pc;
+[vk::push_constant] ConstantBuffer<PushConstant> pc;
 
 static const float3 MISS = float3(1, 0, 1);
 static const float3 CAST_FAIL = float3(1, 1, 0);
 
-[shader("compute")]
-[numthreads(16, 16, 1)]
-void main(uint3 tid: SV_DispatchThreadID,
-          ParameterBlock<Scene> scene,
-          ParameterBlock<GBufferDebugBinding> params) {
-
+[shader("compute")][numthreads(16, 16, 1)] void main(uint3 tid : SV_DispatchThreadID,
+                                                     ParameterBlock<Scene> scene,
+                                                     ParameterBlock<GBufferDebugBinding> params) {
     const uint2 pixel = tid.xy;
     if (not_on_texture(pixel, params.output))
         return;
@@ -36,7 +35,7 @@ void main(uint3 tid: SV_DispatchThreadID,
 
     switch (pc.selected_field) {
 
-    // --- Shaded preview ---
+        // --- Shaded preview ---
 
     case 0: { // Simple Shading (N dot L, fixed light)
         const float3 n = params.gbuffer.get_normal(pixel);
@@ -66,7 +65,8 @@ void main(uint3 tid: SV_DispatchThreadID,
         break;
     }
 
-    // --- Normals & tangent frame (world space; Normal Texture is the only tangent-space view) ---
+        // --- Normals & tangent frame (world space; Normal Texture is the only tangent-space view)
+        // ---
 
     case 3: { // Normal (shading, post normal-map, world space)
         const float3 n = params.gbuffer.get_normal(pixel);
@@ -124,8 +124,9 @@ void main(uint3 tid: SV_DispatchThreadID,
         if (let gd = scene.get_geometry_data(hit)) {
             const TriangleHit tri = scene.get_triangle_hit(hit, gd);
             const Surface surface = scene.get_surface(hit, tri);
-            const float h = sign(dot(surface.frame.get_bitangent(),
-                                     cross(surface.frame.get_normal(), surface.frame.get_tangent())));
+            const float h =
+                sign(dot(surface.frame.get_bitangent(),
+                         cross(surface.frame.get_normal(), surface.frame.get_tangent())));
             color = float4(float3(0.5f + 0.5f * h), 1);
         } else {
             color = float4(MISS, 1);
@@ -133,7 +134,7 @@ void main(uint3 tid: SV_DispatchThreadID,
         break;
     }
 
-    // --- Material ---
+        // --- Material ---
 
     case 9: { // Alpha
         const Hit hit = params.gbuffer.get_hit(pixel);
@@ -150,8 +151,8 @@ void main(uint3 tid: SV_DispatchThreadID,
         const Hit hit = params.gbuffer.get_hit(pixel);
         if (let gd = scene.get_geometry_data(hit)) {
             const RayDesc ray = scene.generate_camera_ray(pixel, dim);
-            const ShadingPoint sp = scene.get_shading_point(ray, hit, gd, RenderContext(),
-                                                            DefaultLODSampler(), false);
+            const ShadingPoint sp =
+                scene.get_shading_point(ray, hit, gd, RenderContext(), DefaultLODSampler(), false);
             color = float4(sp.emission, 1);
         } else {
             color = float4(MISS, 1);
@@ -165,7 +166,9 @@ void main(uint3 tid: SV_DispatchThreadID,
             const TriangleHit tri = scene.get_triangle_hit(hit, gd);
             const MaterialModel m = scene.material_system.get_material(gd.material_id);
             if (let g = m as GltfMaterial) {
-                color = float4(float3(g.get_metallic(scene.material_system.texture_manager, tri.get_uv(hit))), 1);
+                color = float4(
+                    float3(g.get_metallic(scene.material_system.texture_manager, tri.get_uv(hit))),
+                    1);
             } else {
                 color = float4(CAST_FAIL, 1);
             }
@@ -181,7 +184,9 @@ void main(uint3 tid: SV_DispatchThreadID,
             const TriangleHit tri = scene.get_triangle_hit(hit, gd);
             const MaterialModel m = scene.material_system.get_material(gd.material_id);
             if (let g = m as GltfMaterial) {
-                color = float4(float3(g.get_roughness(scene.material_system.texture_manager, tri.get_uv(hit))), 1);
+                color = float4(
+                    float3(g.get_roughness(scene.material_system.texture_manager, tri.get_uv(hit))),
+                    1);
             } else {
                 color = float4(CAST_FAIL, 1);
             }
@@ -191,7 +196,7 @@ void main(uint3 tid: SV_DispatchThreadID,
         break;
     }
 
-    // --- IDs & barycentrics ---
+        // --- IDs & barycentrics ---
 
     case 13: { // Instance ID
         const uint id = params.gbuffer.get_hit(pixel).instance_id;
@@ -225,7 +230,7 @@ void main(uint3 tid: SV_DispatchThreadID,
         break;
     }
 
-    // --- Depth & motion ---
+        // --- Depth & motion ---
 
     case 19: { // Linear Z (plain)
         color = float4(float3(params.gbuffer.get_linear_z(pixel)), 1);
@@ -248,7 +253,7 @@ void main(uint3 tid: SV_DispatchThreadID,
         break;
     }
 
-    // --- Flags ---
+        // --- Flags ---
 
     case 23: { // Flat Shading Flag (1 = flat, 0 = smooth)
         const Hit hit = params.gbuffer.get_hit(pixel);
@@ -261,7 +266,7 @@ void main(uint3 tid: SV_DispatchThreadID,
         break;
     }
 
-    // --- Lobes & depths ---
+        // --- Lobes & depths ---
 
     case 24: { // Diffuse Albedo
         color = float4(params.gbuffer.get_diffuse_albedo(pixel), 1);
@@ -285,6 +290,108 @@ void main(uint3 tid: SV_DispatchThreadID,
     }
     case 29: { // Projected Depth
         color = float4(float3(params.gbuffer.get_projected_depth(pixel)), 1);
+        break;
+    }
+
+    // What the light grid's cell list is worth where the camera looks: every emitter's
+    // unshadowed contribution against the share the cell's slots hold, and against the share the
+    // strongest few hold at all.
+    case 30: { // Light Grid Coverage
+        const Hit hit = params.gbuffer.get_hit(pixel);
+        if (!hit.is_valid()) {
+            color = float4(MISS, 1);
+            break;
+        }
+        const RayDesc ray = scene.generate_camera_ray(pixel, dim);
+        const ShadingPoint sp = scene.get_shading_point(ray, hit);
+        if (!sp.has_surface_material) {
+            color = float4(MISS, 1);
+            break;
+        }
+        let bsdf = sp.surface_material.get_bsdf();
+        const OrthonormalFrame frame = sp.shading_frame;
+        const float3 wi_local = frame.to_local(-ray.Direction);
+        RandomGenerator rng = PCG(pcg4d16(uint4(pixel, scene.frame, 0)));
+        const uint cell = scene.get_light_bucket(pixel, sp.pos);
+        const bool in_grid = (cell & LIGHT_BUCKET_TILE) == 0;
+        if (!in_grid) {
+            color = float4(0, 0, 0, 1);
+            break;
+        }
+
+        float top[LIGHT_GRID_SLOTS];
+        float cell_rank[LIGHT_GRID_SLOTS];
+        float cell_true[LIGHT_GRID_SLOTS];
+        for (uint k = 0; k < LIGHT_GRID_SLOTS; k++) {
+            top[k] = 0.f;
+            cell_rank[k] = 0.f;
+            cell_true[k] = 0.f;
+        }
+
+        // A slot names a light source, so the comparison is per source: what it delivers here,
+        // and what a cell can rank it by (no receiver, so no BSDF term).
+        const uint base = light_bucket_base(cell);
+        float total = 0.f;
+        float in_cell = 0.f;
+        for (uint g = 0; g < scene.nee.table.geometry_count; g++) {
+            const LightGeometry lg = scene.nee.table.geometries[g];
+            float gw = 0.f;
+            float gcw = 0.f;
+            for (uint t = 0; t < lg.primitive_count; t++) {
+                const uint i = lg.first_triangle + t;
+                if (let ls = scene.nee.sample_triangle(i, sp.pos, rng, scene.material_system,
+                                                       scene.time)) {
+                    const float inv_pdf = 1.f / max(ls.pdf, 1e-30f);
+                    const float w =
+                        yuv_luminance(bsdf.eval(wi_local, frame.to_local(ls.wo), rng) * ls.Li) *
+                        inv_pdf;
+                    if (!(w > 0.f))
+                        continue;
+                    gw += w;
+                    gcw += yuv_luminance(ls.Li) * inv_pdf;
+                }
+            }
+            if (!(gw > 0.f))
+                continue;
+            total += gw;
+            for (uint slot = 0; slot < LIGHT_GRID_SLOTS; slot++) {
+                if (scene.nee.grid.slots[base + slot] == g) {
+                    in_cell += gw;
+                    break;
+                }
+            }
+            if (gw > top[LIGHT_GRID_SLOTS - 1]) {
+                uint s = LIGHT_GRID_SLOTS - 1;
+                while (s > 0 && top[s - 1] < gw) {
+                    top[s] = top[s - 1];
+                    s--;
+                }
+                top[s] = gw;
+            }
+            if (gcw > cell_rank[LIGHT_GRID_SLOTS - 1]) {
+                uint s = LIGHT_GRID_SLOTS - 1;
+                while (s > 0 && cell_rank[s - 1] < gcw) {
+                    cell_rank[s] = cell_rank[s - 1];
+                    cell_true[s] = cell_true[s - 1];
+                    s--;
+                }
+                cell_rank[s] = gcw;
+                cell_true[s] = gw;
+            }
+        }
+        if (!(total > 0.f)) {
+            color = float4(0, 0, 0, 1);
+            break;
+        }
+        float top_sum = 0.f;
+        float cell_best = 0.f;
+        for (uint k = 0; k < LIGHT_GRID_SLOTS; k++) {
+            top_sum += top[k];
+            cell_best += cell_true[k];
+        }
+        // r: the best LIGHT_GRID_SLOTS sources there are, g: the best a cell's own ranking can
+        // pick, b: what the cell holds
+        color = float4(max(top_sum / total, 1.f / 255.f), cell_best / total, in_cell / total, 1);
         break;
     }
     }

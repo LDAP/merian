@@ -24,6 +24,8 @@ extern static const int merian_render_nee_mode = NEE_MODE_RESAMPLED;
 extern static const float merian_render_nee_probability = 0.5;
 // light samples resampled into one shadow ray (NEE_MODE_RESAMPLED)
 extern static const int merian_render_nee_candidates = 1;
+// candidates drawn from the light grid's cell list, alongside the ones above
+extern static const int merian_render_nee_grid_candidates = 0;
 // vertices (from the primary) that perform NEE; 0 = all
 extern static const int merian_render_nee_bounces = 0;
 // SCATTER_MODE_MIS draws the direction once from the mixture; SCATTER_MODE_RIS draws several and
@@ -37,9 +39,11 @@ extern static const int merian_render_scatter_candidates = 2;
 interface IThreadReorder {
     static void reorder();
 }
+
 struct NoThreadReorder : IThreadReorder {
     static void reorder() {}
 }
+
 struct SerThreadReorder : IThreadReorder {
     static void reorder() {
 #if defined(MERIAN_SPIRV_CAP_SUPPORTED_ShaderInvocationReorderEXT)
@@ -56,13 +60,14 @@ struct RenderBinding {
     ParameterBlock<RenderGuiding> guiding;
 }
 
-float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
-                                            const ParameterBlock<RenderBinding> params,
-                                            const uint2 pixel,
-                                            RayDesc ray,
-                                            ShadingPoint sp,
-                                            const uint16_t sample_index,
-                                            inout RandomGenerator rng) {
+float3
+trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
+                                     const ParameterBlock<RenderBinding> params,
+                                     const uint2 pixel,
+                                     RayDesc ray,
+                                     ShadingPoint sp,
+                                     const uint16_t sample_index,
+                                     inout RandomGenerator rng) {
     // Medium the ray is travelling through; updated on transmission events.
     var medium = scene.make_path_medium();
 
@@ -74,7 +79,9 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
     var guiding_state = params.guiding.begin_path();
 
     const bool nee = merian_render_nee_mode != NEE_MODE_OFF && scene.nee.has_lights();
-    const uint candidates = uint(max(merian_render_nee_candidates, 1));
+    const uint grid_candidates = uint(max(merian_render_nee_grid_candidates, 0));
+    // the mixture makes one draw, so a vertex always needs a technique to draw it from
+    const uint candidates = uint(max(merian_render_nee_candidates, grid_candidates > 0 ? 0 : 1));
 
     for (uint16_t bounce = 1; bounce < merian_render_max_path_length; bounce++) {
         // the ray left the scene: nothing to scatter from, emission is already accumulated
@@ -93,7 +100,8 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
         uint sampled_light = LIGHT_INVALID_INDEX;
         float3 light_dir = float3(0, 0, 1);
         if (light_technique) {
-            if (let lp = scene.sample_light_point(light_bucket, sp.pos, rng)) {
+            if (let lp = scene.sample_light_point(light_bucket, sp.pos, rng, candidates,
+                                                  grid_candidates)) {
                 // aimed from where the ray will start: a direction taken from the unoffset point
                 // misses the sampled triangle near its edges
                 const float3 ng = sp.get_face_normal();
@@ -121,17 +129,24 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
         // survives to the trace below; the candidates die here.
         DirectLightReservoir reservoir = DirectLightReservoir();
         if (merian_render_nee_mode == NEE_MODE_RESAMPLED && nee_surface) {
-            for (uint i = 0; i < candidates; i++) {
-                if (let ls = scene.sample_light(light_bucket, sp.pos, rng)) {
+            for (uint i = 0; i < candidates + grid_candidates; i++) {
+                Optional<LightSample> candidate;
+                if (i < candidates) {
+                    candidate = scene.sample_light_pool(light_bucket, sp.pos, rng);
+                } else {
+                    candidate = scene.sample_light_grid(light_bucket, sp.pos, rng);
+                }
+                if (let ls = candidate) {
                     const float3 wo_l = frame.to_local(ls.wo);
                     // A light the geometry hides is not reachable from this surface, however the
                     // shading frame tilts: the shadow ray would start behind it and escape.
                     if (!sp.geometric_side_matches_shading(ls.wo))
                         continue;
+                    const float lights = scene.nee.pdf_lights(light_bucket, ls.index, ls.pdf,
+                                                              candidates, grid_candidates);
                     reservoir.add_light(
                         ls, bsdf.eval(wi_local, wo_l, rng) * ls.Li * medium.transmittance(ls.dist),
-                        candidates * ls.pdf + mixture.pdf(bsdf, guiding, wi_local, wo_l, ls.wo),
-                        rng);
+                        lights + mixture.pdf(bsdf, guiding, wi_local, wo_l, ls.wo), rng);
                 }
             }
         }
@@ -231,13 +246,12 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
             // drew no light sample owes the emission it found in full.
             float mis_weight = 1.f;
             if (nee_surface && !delta) {
-                const LightHit lh =
-                    scene.get_light_hit(light_bucket, ray.Origin, ray.Direction, hit);
+                const LightHit lh = scene.get_light_hit(light_bucket, ray.Origin, ray.Direction,
+                                                        hit, candidates, grid_candidates);
                 if (merian_render_nee_mode == NEE_MODE_RESAMPLED) {
-                    // the candidates above sampled this vertex M times
-                    mis_weight = segment.pdf / (candidates * lh.pdf + segment.pdf);
+                    mis_weight = segment.pdf / (lh.pdf + segment.pdf);
                 } else {
-                    segment.pdf += p_light * lh.pdf;
+                    segment.pdf += p_light * lh.pdf / float(max(candidates + grid_candidates, 1u));
                     // a light sample that reached something else is occluded: the vertex the ray
                     // found was generated by neither technique
                     if (sampled_light != LIGHT_INVALID_INDEX && sampled_light != lh.index) {
@@ -329,7 +343,7 @@ void render_pixel<Reorder : IThreadReorder>(const uint2 pixel,
     render_pixel<NoThreadReorder>(thread_id.xy, scene, params);
 }
 
-[shader("raygeneration")] void main(ParameterBlock<Scene> scene,
-                                    ParameterBlock<RenderBinding> params) {
+    [shader("raygeneration")] void main(ParameterBlock<Scene> scene,
+                                        ParameterBlock<RenderBinding> params) {
     render_pixel<SerThreadReorder>(DispatchRaysIndex().xy, scene, params);
 }

@@ -18,20 +18,6 @@ struct LightUpdateBinding {
     uint flux_samples;
 };
 
-// light geometry containing triangle index i (upper_bound over first_triangle)
-uint find_light_geometry(const ParameterBlock<LightUpdateBinding> params, const uint i) {
-    uint lo = 0;
-    uint hi = params.light_geometry_count - 1;
-    while (lo < hi) {
-        const uint mid = (lo + hi + 1) >> 1;
-        if (params.light_geometries[mid].first_triangle <= i)
-            lo = mid;
-        else
-            hi = mid - 1;
-    }
-    return lo;
-}
-
 // Rebuilds every emissive triangle record (world-space positions, uvs, flux) from the scene.
 [shader("compute")][numthreads(64, 1, 1)] void main(uint3 thread_id : SV_DispatchThreadID,
                                                     ParameterBlock<Scene> scene,
@@ -40,7 +26,8 @@ uint find_light_geometry(const ParameterBlock<LightUpdateBinding> params, const 
     if (i >= params.triangle_count)
         return;
 
-    const LightGeometry lg = params.light_geometries[find_light_geometry(params, i)];
+    const LightGeometry lg = params.light_geometries[merian::find_light_geometry(
+        params.light_geometries, params.light_geometry_count, i)];
     const uint primitive_id = i - lg.first_triangle;
     const GeometryData gd = scene.get_geometry_data(lg.geometry_id);
 

@@ -99,13 +99,13 @@ void render_pixel(const uint2 pixel,
         DirectLightReservoir reservoir = DirectLightReservoir();
         const uint light_bucket = scene.get_light_bucket(pixel, scatter_pos);
         for (int i = 0; i < merian_render_volume_nee_candidates; i++) {
-            if (let ls = scene.sample_light(light_bucket, scatter_pos, rng)) {
+            if (let ls = scene.sample_light_pool(light_bucket, scatter_pos, rng)) {
                 const float3 wo_l = frame.to_local(ls.wo);
+                const float lights = scene.nee.pdf_lights(light_bucket, ls.index, ls.pdf,
+                                                          merian_render_volume_nee_candidates, 0);
                 reservoir.add_light(
                     ls, phase.eval(wi_local, wo_l, rng) * ls.Li * medium.transmittance(ls.dist),
-                    merian_render_volume_nee_candidates * ls.pdf +
-                        mixture.pdf(phase, guiding, wi_local, wo_l, ls.wo),
-                    rng);
+                    lights + mixture.pdf(phase, guiding, wi_local, wo_l, ls.wo), rng);
             }
         }
 
@@ -153,9 +153,9 @@ void render_pixel(const uint2 pixel,
             const Hit hit = scene.trace_ray(ray, RAY_FLAG_NONE, merian_render_instance_mask);
 
             // the light sampler above could have generated this vertex too
-            const LightHit lh = scene.get_light_hit(light_bucket, ray.Origin, ray.Direction, hit);
-            const float mis_weight =
-                segment.pdf / (merian_render_volume_nee_candidates * lh.pdf + segment.pdf);
+            const LightHit lh = scene.get_light_hit(light_bucket, ray.Origin, ray.Direction, hit,
+                                                    merian_render_volume_nee_candidates, 0);
+            const float mis_weight = segment.pdf / (lh.pdf + segment.pdf);
 
             // single scattering never scatters again, so the material sample would be dead
             const ShadingPoint sp = scene.get_shading_point(ray, hit, RenderContext(uint16_t(1)),

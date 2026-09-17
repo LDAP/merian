@@ -140,22 +140,26 @@ class LightCollection {
     ResourceAllocatorHandle allocator;
 
     bool enabled = true;
-    int32_t selection = LightSelection::LightSelectionPool;
+    int32_t selection = LightSelection::LightSelectionGrid;
     int32_t env_selection = EnvSelection::EnvSelectionPool;
     int32_t env_pool_size = 8192;
     int32_t pool_size = 4096;
     int32_t pool_tile_size = 256;
     int32_t grid_dimension = 16;
     int32_t grid_cascades = 6;
-    // Where the cell list stops improving on a level with well separated lights; a scene whose
-    // emitters crowd one cell keeps gaining past this, at a cost the frame has to afford.
-    int32_t grid_candidates = 64;
-    float grid_probability = 0.7f;
+    // Candidates a cell races each frame. The list carries across frames, so a few are enough
+    // and more only churn it.
+    int32_t grid_candidates = 16;
     AccelerationStructureHandle acceleration_structure;
     float grid_cell_size = 0.f; // 0: derived from the distance to the lights
     float grid_coverage = 1.f;
     float grid_jitter = 1.f;
     bool grid_visibility = true;
+    // Slots a cell re-tests per frame. Clearing more than one at a time stops the list settling.
+    int32_t grid_probes = 1;
+    int32_t grid_max_age = 8;
+    // set for a frame the carried-over grid cannot describe
+    bool grid_reset = true;
     float3 camera_position{0.f};
     bool env_probability_from_power = true;
     float env_probability = 0.5f;
@@ -184,9 +188,12 @@ class LightCollection {
     BufferHandle env_pool_buffer;
     BufferHandle env_split_buffer;
     BufferHandle pool_buffer;
-    BufferHandle pool_lights_buffer;
-    BufferHandle grid_buffer;
-    BufferHandle grid_info_buffer;
+    BufferHandle grid_buffer[2];
+    BufferHandle grid_weight_buffer[2];
+    BufferHandle geometry_proxies_buffer;
+    BufferHandle pool_geometry_buffer;
+    BufferHandle grid_info_buffer[2];
+    uint32_t grid_slot = 0;
     BufferHandle triangles_buffer;
     BufferHandle proxies_buffer;
     BufferHandle cdf_buffer;
@@ -205,15 +212,21 @@ class LightCollection {
     Versioned<SlangProgramEntryPoint> setup_entry_point;
     Versioned<SlangProgramEntryPoint> pool_entry_point;
     Versioned<SlangProgramEntryPoint> grid_entry_point;
+    Versioned<SlangProgramEntryPoint> grid_probe_entry_point;
     Versioned<SlangProgramEntryPoint> env_split_entry_point;
+    Versioned<SlangProgramEntryPoint> geometry_proxy_entry_point;
     Versioned<Pipeline> setup_pipeline;
     Versioned<Pipeline> pool_pipeline;
     Versioned<Pipeline> grid_pipeline;
+    Versioned<Pipeline> grid_probe_pipeline;
     Versioned<Pipeline> env_split_pipeline;
+    Versioned<Pipeline> geometry_proxy_pipeline;
     Versioned<ShaderObject> setup_params;
     Versioned<ShaderObject> pool_params;
     Versioned<ShaderObject> grid_params;
+    Versioned<ShaderObject> grid_probe_params;
     Versioned<ShaderObject> env_split_params;
+    Versioned<ShaderObject> geometry_proxy_params;
 
     SlangCompositionHandle env_composition;
     Versioned<SlangProgram> env_program;

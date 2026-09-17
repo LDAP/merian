@@ -13,11 +13,10 @@ enum LightSelection : uint32_t {
     // Proportional to emitted power. One binary search over the whole scene, blind to where the
     // shading point is.
     LightSelectionPower = 0,
-    // The same distribution drawn from a per-frame pool of pre-resampled lights: one load, and
-    // the pool is small enough to stay in cache.
+    // The same distribution, drawn once per frame into a pool: a sample is one load.
     LightSelectionPool = 1,
-    // Per-frame world-space grid: each cell keeps a short list resampled towards that cell, so
-    // the choice follows the shading point. One load plus a scan of the list for the density.
+    // Per-frame world-space grid: each cell holds the light sources that reach it, so the choice
+    // follows the shading point.
     LightSelectionGrid = 2,
 };
 
@@ -29,22 +28,25 @@ enum EnvSelection : uint32_t {
     EnvSelectionPool = 1,
 };
 
-// Lights per grid cell. The density of a cell sample is the number of slots holding that light
-// divided by this, so the scan that evaluates it stays inside one cache line.
+// Light sources a cell holds, one slot each.
 #ifdef __cplusplus
 static constexpr uint32_t LIGHT_GRID_SLOTS = 8;
-// One thread per candidate builds a cell, so this is both the candidate ceiling and the group size.
+// Most candidates a cell may rank in one frame.
 static constexpr uint32_t LIGHT_GRID_MAX_CANDIDATES = 256;
-// Pre-resampled lights the cells draw their candidates from. Small enough to stay in cache
-// whatever the scene holds: every cell reads it scattered, once per candidate.
+// Pool entries the cells draw their candidates from.
 static constexpr uint32_t LIGHT_GRID_POOL = 1024;
 #else
 static const uint LIGHT_GRID_SLOTS = 8;
-// One thread per candidate builds a cell, so this is both the candidate ceiling and the group size.
+// Most candidates a cell may race in one frame.
 static const uint LIGHT_GRID_MAX_CANDIDATES = 256;
-// Pre-resampled lights the cells draw their candidates from. Small enough to stay in cache
-// whatever the scene holds: every cell reads it scattered, once per candidate.
+// Pool entries the cells draw their candidates from; every cell reads it scattered.
 static const uint LIGHT_GRID_POOL = 1024;
+#endif
+
+#ifndef __cplusplus
+uint light_bucket_base(const uint bucket) {
+    return bucket * LIGHT_GRID_SLOTS;
+}
 #endif
 
 // One cascade of the light grid. Every cascade holds dimension^3 cells and is snapped to the
@@ -56,5 +58,9 @@ struct LightGridInfo {
     uint32_t dimension; // cells per side, 0 while the grid is unused
     uint32_t cascade_count;
 };
+
+#ifdef __cplusplus
+static_assert(sizeof(LightGridInfo) == 24, "LightGridInfo layout mismatch");
+#endif
 
 } // namespace merian
