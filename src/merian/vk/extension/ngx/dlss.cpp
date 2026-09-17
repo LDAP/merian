@@ -55,15 +55,16 @@ void throw_if_failed(const NVSDK_NGX_Result result, const std::string& what) {
     }
 }
 
-// NGX multiplies row major matrices from the left (DLSS-RR Integration Guide 3.4.9) and takes
-// mutable pointers.
+// NGX multiplies row major matrices from the left (DLSS-RR Integration Guide 3.4.9), expects a
+// left handed view space and takes mutable pointers.
 struct NGXMatrices {
     std::array<float, 16> world_to_view;
     std::array<float, 16> view_to_clip;
 
     explicit NGXMatrices(const DLSSEvalInfo& eval_info) {
-        const float4x4 view = transpose(eval_info.world_to_view);
-        const float4x4 clip = transpose(eval_info.view_to_clip);
+        const float4x4 mirror_z = scale(float3(1.f, 1.f, -1.f));
+        const float4x4 view = transpose(mul(mirror_z, eval_info.world_to_view));
+        const float4x4 clip = transpose(mul(eval_info.view_to_clip, mirror_z));
         std::memcpy(world_to_view.data(), value_ptr(view), sizeof(world_to_view));
         std::memcpy(view_to_clip.data(), value_ptr(clip), sizeof(view_to_clip));
     }
