@@ -123,6 +123,11 @@ TEST(GBufferLayout, EqualGroupsEqualLayouts) {
     EXPECT_FALSE(GBufferLayout(SURFACE_DENOISER) == GBufferLayout(RAY_RECONSTRUCTION));
 }
 
+// ROUND_TRIP_SOURCE writes one result per field in GBufferField order, then the derived
+// accessors and the dimensions flag.
+static_assert(GBUFFER_FIELD_COUNT == 13,
+              "a field was added or removed, update ROUND_TRIP_SOURCE to match");
+
 const char* const ROUND_TRIP_SOURCE = R"(
 import merian_shaders.gbuffer;
 import merian_shaders.utils.encoding;
@@ -143,6 +148,7 @@ GBufferSample make_sample() {
     sample.diffuse_albedo = float3(0.375, 0.125, 0.0625);
     sample.specular_albedo = float3(0.125, 0.125, 0.0625);
     sample.roughness = 0.625;
+    sample.specular_hit_distance = 4.75;
     sample.view_depth = 10.25;
     sample.projected_depth = 0.875;
     return sample;
@@ -174,13 +180,15 @@ void read(uint3 tid: SV_DispatchThreadID, ParameterBlock<GBuffer> gbuffer) {
     results[7] = distance(gbuffer.get_diffuse_albedo(p), expected.diffuse_albedo);
     results[8] = distance(gbuffer.get_specular_albedo(p), expected.specular_albedo);
     results[9] = abs(gbuffer.get_roughness(p) - expected.roughness);
-    results[10] = abs(gbuffer.get_view_depth(p) - expected.view_depth);
-    results[11] = abs(gbuffer.get_projected_depth(p) - expected.projected_depth);
+    results[10] =
+        abs(gbuffer.get_specular_hit_distance(p) - expected.specular_hit_distance);
+    results[11] = abs(gbuffer.get_view_depth(p) - expected.view_depth);
+    results[12] = abs(gbuffer.get_projected_depth(p) - expected.projected_depth);
 
-    results[12] = abs(gbuffer.get_surface(p).linear_z - expected.linear_z);
-    results[13] = distance(gbuffer.get_motion_vectors_dilated(int2(p), 1), expected.motion_vectors);
-    results[14] = distance(decode_normal(gbuffer.get_encoded_normal(p)), expected.normal);
-    results[15] = float(all(gbuffer.get_dimensions() == uint2(1)));
+    results[13] = abs(gbuffer.get_surface(p).linear_z - expected.linear_z);
+    results[14] = distance(gbuffer.get_motion_vectors_dilated(int2(p), 1), expected.motion_vectors);
+    results[15] = distance(decode_normal(gbuffer.get_encoded_normal(p)), expected.normal);
+    results[16] = float(all(gbuffer.get_dimensions() == uint2(1)));
 }
 )";
 
@@ -263,7 +271,7 @@ class GBufferLayoutDevice : public ::testing::Test {
             cmd->dispatch(1, 1, 1);
         });
 
-        constexpr uint32_t result_count = 16;
+        constexpr uint32_t result_count = GBUFFER_FIELD_COUNT + 4;
         const BufferHandle results = allocator->create_buffer(
             result_count * sizeof(float), vk::BufferUsageFlagBits::eStorageBuffer,
             MemoryMappingType::HOST_ACCESS_RANDOM, "results");
@@ -300,16 +308,16 @@ class GBufferLayoutDevice : public ::testing::Test {
             }
         }
         constexpr std::array<std::pair<uint32_t, Field>, 3> DERIVED = {{
-            {12, Field::LinearZ},
-            {13, Field::MotionVectors},
-            {14, Field::Normal},
+            {GBUFFER_FIELD_COUNT, Field::LinearZ},
+            {GBUFFER_FIELD_COUNT + 1, Field::MotionVectors},
+            {GBUFFER_FIELD_COUNT + 2, Field::Normal},
         }};
         for (const auto& [index, field] : DERIVED) {
             if (layout->contains(field)) {
                 EXPECT_LT(errors[index], 1e-3f) << "accessor " << index;
             }
         }
-        EXPECT_EQ(errors[15], 1.f) << "dimensions";
+        EXPECT_EQ(errors[GBUFFER_FIELD_COUNT + 3], 1.f) << "dimensions";
     }
 };
 
