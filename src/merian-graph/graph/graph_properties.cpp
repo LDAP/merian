@@ -22,26 +22,36 @@ void Graph::graph_properties(Properties& props) {
     if (props.config_uint("iterations in flight", desired_iterations_in_flight)) {
         request_reconnect();
     }
-    if (props.config_options("time overwrite", time_overwrite, {"None", "Time", "Delta"},
-                             Properties::OptionsStyle::COMBO)) {
-        if (time_overwrite == TIME_OVERWRITE_NONE) {
-            // move reference to prevent jump
-            const auto now = std::chrono::high_resolution_clock::now();
-            time_reference = now - duration_elapsed;
-            time_connect_reference = now - duration_elapsed_since_connect;
+    props.serialize_string("time source", time_source);
+    if (props.is_ui()) {
+        std::vector<std::string> sources = {TIME_SOURCE_AUTO, TIME_SOURCE_SYSTEM, TIME_SOURCE_TIME,
+                                            TIME_SOURCE_DELTA};
+        for (const NodeHandle& provider : time_providers()) {
+            sources.emplace_back(node_data.at(provider).identifier);
+        }
+        // a selected source that is currently not providing stays visible
+        if (std::find(sources.begin(), sources.end(), time_source) == sources.end()) {
+            sources.emplace_back(time_source);
+        }
+        int selected = static_cast<int>(
+            std::distance(sources.begin(), std::find(sources.begin(), sources.end(), time_source)));
+        if (props.config_options("time source", selected, sources, Properties::OptionsStyle::COMBO,
+                                 "Which node or overwrite drives the graph clock. Auto picks the "
+                                 "first time provider in topological order.")) {
+            time_source = sources[selected];
         }
     }
-    if (time_overwrite == TIME_OVERWRITE_TIME) {
+    if (time_source == TIME_SOURCE_TIME) {
         float time_s = to_seconds(duration_elapsed);
         props.config_float("time (s)", time_s, "", 0.1);
         float delta_s = time_s - to_seconds(duration_elapsed);
         props.config_float("offset (s)", delta_s, "", 0.01);
-        time_delta_overwrite_ms += delta_s * 1000.;
-    } else if (time_overwrite == TIME_OVERWRITE_DELTA) {
-        props.config_float("delta (ms)", time_delta_overwrite_ms, "", 0.001);
-        float fps = 1000. / time_delta_overwrite_ms;
+        time_overwrite_delta_ms += delta_s * 1000.;
+    } else if (time_source == TIME_SOURCE_DELTA) {
+        props.config_float("delta (ms)", time_overwrite_delta_ms, "", 0.001);
+        float fps = 1000. / time_overwrite_delta_ms;
         props.config_float("fps", fps, "", 0.01);
-        time_delta_overwrite_ms = 1000 / fps;
+        time_overwrite_delta_ms = 1000 / fps;
     }
 
     props.st_separate();

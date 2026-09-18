@@ -245,7 +245,7 @@ int main(const int argc, const char** argv) {
     }
 
     if (options->time_delta_ms) {
-        graph->set_time_delta_overwrite(*options->time_delta_ms);
+        graph->set_time_source_delta(*options->time_delta_ms);
     }
     if (options->print_times) {
         // Suppress the periodic report, so the one taken at the end spans every iteration.

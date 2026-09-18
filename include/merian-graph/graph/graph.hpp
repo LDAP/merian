@@ -10,6 +10,7 @@
 #include "node.hpp"
 #include "node_process_info.hpp"
 #include "resource.hpp"
+#include "time_provider.hpp"
 
 #include "graph_data.hpp"
 
@@ -209,7 +210,7 @@ class Graph : public std::enable_shared_from_this<Graph> {
     // --- Time ---
 
     // Advances the graph time by a fixed delta per iteration instead of following the wall clock.
-    void set_time_delta_overwrite(const float delta_ms);
+    void set_time_source_delta(const float delta_ms);
 
     // --- Profiling ---
 
@@ -242,6 +243,11 @@ class Graph : public std::enable_shared_from_this<Graph> {
     void io_props_for_node(Properties& config, NodeHandle& node, NodeData& data);
 
     // --- Graph run sub-tasks ---
+
+    void advance_time();
+
+    // In topological order.
+    std::vector<NodeHandle> time_providers() const;
 
     // Creates the profiler if necessary
     ProfilerHandle prepare_profiler_for_run(InFlightData& in_flight_data);
@@ -372,23 +378,18 @@ class Graph : public std::enable_shared_from_this<Graph> {
 
     uint64_t total_iteration = 0;
     uint64_t run_iteration = 0;
-    // assert(overwrite_time || elapsed == now() - time_reference)
-    // to prevent divergence
     std::chrono::high_resolution_clock::time_point time_reference;
     std::chrono::high_resolution_clock::time_point time_connect_reference;
     std::chrono::nanoseconds duration_elapsed_since_connect;
     std::chrono::nanoseconds duration_elapsed;
-    // Kept as an int for config_options.
-    enum TimeOverwrite {
-        TIME_OVERWRITE_NONE,
-        TIME_OVERWRITE_TIME,
-        TIME_OVERWRITE_DELTA,
-        TIME_OVERWRITE_COUNT,
-    };
-    int time_overwrite = TIME_OVERWRITE_NONE;
-    // this is also used for overwrite time. In this case this should only be applied once and
-    // then reset.
-    float time_delta_overwrite_ms = 0.;
+    static constexpr const char* TIME_SOURCE_AUTO = "Auto";
+    static constexpr const char* TIME_SOURCE_SYSTEM = "System";
+    static constexpr const char* TIME_SOURCE_TIME = "Time";
+    static constexpr const char* TIME_SOURCE_DELTA = "Delta";
+    // Identifier of the node that drives the clock, or one of the TIME_SOURCE_* names.
+    std::string time_source = TIME_SOURCE_AUTO;
+    // Applied once per run for Delta, once and then reset for Time.
+    float time_overwrite_delta_ms = 0.;
     // across builds. Might be not 0 at begin of run.
     std::chrono::nanoseconds time_delta = 0ns;
     std::chrono::nanoseconds cpu_time = 0ns;
