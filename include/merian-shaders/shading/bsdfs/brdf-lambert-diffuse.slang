@@ -36,7 +36,7 @@ struct LambertDiffuseBRDF : BSDF {
             return none;
         }
 
-        return ShadingFunctionSample(wo, MERIAN_INV_PI * wo.z, albedo, BSDFLobe::Diffuse);
+        return ShadingFunctionSample(wo, MERIAN_INV_PI * wo.z, albedo, BSDFLobe::DiffuseReflection);
     }
 
     float pdf(const float3 wi, const float3 wo) {
@@ -56,12 +56,20 @@ struct LambertDiffuseBRDF : BSDF {
     }
 
     property float effective_alpha {
-        get { return 1.0f; }
+        get {
+            return 1.0f;
+        }
     }
 
     property float specular_alpha {
-        get { return 1.0f; }
+        get {
+            return 1.0f;
+        }
+    }
+
+    uint get_lobe_types() {
+        return uint(BSDFLobe::DiffuseReflection);
     }
 }
 
-}
+} // namespace merian

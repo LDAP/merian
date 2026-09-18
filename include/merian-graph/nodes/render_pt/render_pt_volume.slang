@@ -16,7 +16,41 @@ namespace merian {
 extern static const uint merian_render_instance_mask = 0xFFu;
 extern static const int merian_render_volume_spp = 1;
 // light samples resampled into one shadow ray at the scattering vertex; 0 disables volume NEE
-extern static const int merian_render_volume_nee_candidates = 1;
+// share of the distance samples the distance guiding gets
+extern static const float merian_guiding_distance_share = 0.5;
+
+// What a light candidate is worth at a scattering vertex in a medium.
+struct PhaseTarget<P : ShadingFunction, G : GuidingDistribution<float3>, V : HomogeneousVolume>
+    : IDirectLightTarget {
+    P phase;
+    G guiding;
+    ScatterMixture mixture;
+    V medium;
+    OrthonormalFrame frame;
+    float3 wi_local;
+
+    float3 unshadowed(const LightSample ls, inout RandomGenerator rng) {
+        return phase.eval(wi_local, frame.to_local(ls.wo), rng) * ls.Li *
+               medium.transmittance(ls.dist);
+    }
+
+    float scatter_pdf(const LightSample ls) {
+        return mixture.pdf(phase, guiding, wi_local, frame.to_local(ls.wo), ls.wo);
+    }
+}
+
+PhaseTarget<P, G, V>
+make_phase_target<P : ShadingFunction, G : GuidingDistribution<float3>, V : HomogeneousVolume>(
+    const P phase,
+    const G guiding,
+    const ScatterMixture mixture,
+    const V medium,
+    const OrthonormalFrame frame,
+    const float3 wi_local) {
+    PhaseTarget<P, G, V> target = {phase, guiding, mixture, medium, frame, wi_local};
+    return target;
+}
+
 // Below this scattering distance the surface motion vector is the better estimate, so the forward
 // projection leaves it alone.
 extern static const float merian_render_volume_forward_project_min_z = 50.0;
@@ -73,7 +107,7 @@ void render_pixel(const uint2 pixel,
         let distances =
             params.distance_guiding.get_distribution(distance_state, frame_info, ray_vertex, rng);
         const float p_guided_distance =
-            distances.is_valid() ? distances.get_selection_probability(1.f) : 0.f;
+            distances.is_valid() ? merian_guiding_distance_share * distances.get_confidence() : 0.f;
 
         const bool guided_distance = rng.next_float() < p_guided_distance;
         const float t = guided_distance ? distances.sample(rng)
@@ -81,7 +115,8 @@ void render_pixel(const uint2 pixel,
         if (guided_distance && (t >= max_t || t <= 0.f)) {
             continue;
         }
-        let distance_record = params.distance_guiding.record_scatter(distances, guided_distance);
+        let distance_record =
+            params.distance_guiding.record_scatter(distances, t, guided_distance, rng);
         const float p_distance = (1.f - p_guided_distance) * transmittance_pdf2(t, mu_t, xi_max) +
                                  p_guided_distance * distances.pdf(t);
 
@@ -90,24 +125,17 @@ void render_pixel(const uint2 pixel,
 
         // 2. the guiding lobes around this vertex, mixed with the phase function
         var guiding_state = params.guiding.begin_path();
-        const PathVertex vertex = {scatter_pos, scatter_pos, frame, 1.f,
-                                   uint16_t(1), s,           pixel, true};
+        const PathVertex vertex = {scatter_pos,        scatter_pos, frame, 1.f,
+                                   uint16_t(1),        s,           pixel, true,
+                                   frame.get_normal(), true};
         let guiding = params.guiding.get_distribution(guiding_state, frame_info, vertex, rng);
-        const ScatterMixture mixture = ScatterMixture(guiding, 1.f);
+        const ScatterMixture mixture = ScatterMixture(merian::guiding_share(guiding, 1.f));
 
-        // 3. resampled direct light: the candidates share one shadow ray and die here
-        DirectLightReservoir reservoir = DirectLightReservoir();
-        const uint light_bucket = scene.get_light_bucket(pixel, scatter_pos);
-        for (int i = 0; i < merian_render_volume_nee_candidates; i++) {
-            if (let ls = scene.sample_light_pool(light_bucket, scatter_pos, rng)) {
-                const float3 wo_l = frame.to_local(ls.wo);
-                const float lights = scene.nee.pdf_lights(light_bucket, ls.index, ls.pdf,
-                                                          merian_render_volume_nee_candidates, 0);
-                reservoir.add_light(
-                    ls, phase.eval(wi_local, wo_l, rng) * ls.Li * medium.transmittance(ls.dist),
-                    lights + mixture.pdf(phase, guiding, wi_local, wo_l, ls.wo), rng);
-            }
-        }
+        // 3. resampled direct light: the scene resamples its candidates and only the survivor
+        // reaches the shadow ray below
+        let lights = scene.begin_direct_light(scatter_pos, rng);
+        const Optional<DirectLightSample> direct = scene.sample_direct_light(
+            lights, make_phase_target(phase, guiding, mixture, medium, frame, wi_local), rng);
 
         // 4. one scattered direction out of the mixture
         bool scattered = false;
@@ -134,15 +162,16 @@ void render_pixel(const uint2 pixel,
         segment.is_last = true;
         segment.traced = false;
         segment.next_pos = scatter_pos;
+        segment.aim_pos = scatter_pos;
         segment.next_normal = segment.normal;
         segment.next_mv = half3(0);
         segment.incident = float3(0);
 
         // the record is what crosses the traversal, so it is taken while the candidates are dead
-        let guiding_record = params.guiding.record_scatter(guiding, guided);
+        let guiding_record = params.guiding.record_scatter(guiding, segment, guided, rng);
 
-        float3 contribution = scene.resolve_direct_light(scatter_pos, float3(0), reservoir,
-                                                         merian_render_instance_mask);
+        float3 contribution =
+            scene.resolve_direct_light(scatter_pos, float3(0), direct, merian_render_instance_mask);
 
         if (scattered && any(f_cos > 0.f)) {
             RayDesc ray;
@@ -153,8 +182,7 @@ void render_pixel(const uint2 pixel,
             const Hit hit = scene.trace_ray(ray, RAY_FLAG_NONE, merian_render_instance_mask);
 
             // the light sampler above could have generated this vertex too
-            const LightHit lh = scene.get_light_hit(light_bucket, ray.Origin, ray.Direction, hit,
-                                                    merian_render_volume_nee_candidates, 0);
+            const LightHit lh = scene.get_light_hit(lights, ray.Origin, ray.Direction, hit);
             const float mis_weight = segment.pdf / (lh.pdf + segment.pdf);
 
             // single scattering never scatters again, so the material sample would be dead
@@ -163,6 +191,7 @@ void render_pixel(const uint2 pixel,
 
             segment.traced = true;
             segment.next_pos = sp.pos;
+            segment.aim_pos = sp.pos;
             segment.next_normal = sp.shading_normal;
             segment.next_mv = half3((sp.pos - sp.prev_pos) / scene.time_diff);
             segment.incident = sp.emission * medium.transmittance(distance(ray.Origin, sp.pos));

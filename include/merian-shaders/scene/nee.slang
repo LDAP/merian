@@ -23,6 +23,8 @@ static const float NEE_MIN_ALPHA = 0.05f;
 
 // Scenes whose environment does not emit compile the importance warp out entirely.
 extern static const bool merian_scene_has_env_light = false;
+extern static const int merian_nee_pool_candidates = 1;
+extern static const int merian_nee_cell_candidates = 0;
 
 struct LightSample {
     float3 wo;  // from the receiver towards the light
@@ -70,12 +72,10 @@ struct LightTable {
     uint geometry_offset_count;
 }
 
-// Lights drawn from the flux distribution once per frame, in tiles: every pixel of a screen tile
-// draws from the same one, so the entries it touches stay in cache.
+// Lights drawn from the flux distribution once per frame.
 struct LightPool {
     StructuredBuffer<uint> entries;
     uint size;
-    uint tile_size;
 }
 
 // Per-frame world-space lists of the light sources that reach a cell.
@@ -84,6 +84,8 @@ struct LightGrid {
     StructuredBuffer<LightGridInfo, ScalarDataLayout> cascades;
     // cells the lookup is offset by, so the cell boundaries do not show
     float jitter;
+    // how often a draw takes the cell's list; the rest falls back to the pool
+    float share;
 }
 
 // The environment map as a light.
@@ -123,11 +125,11 @@ struct NEE {
     }
 
     bool has_lights() {
-        return get_env_probability() > 0.f || has_emissive_triangles();
+        return get_env_share() > 0.f || has_emissive_triangles();
     }
 
-    // Probability of choosing the environment over the triangles.
-    float get_env_probability() {
+    // How often the environment is chosen over the triangles.
+    float get_env_share() {
         if (!merian_scene_has_env_light || !env.importance.is_valid())
             return 0.f;
         const float p_env = env.split[0];
@@ -136,9 +138,8 @@ struct NEE {
 
     // --- lights ---
 
-    // Cell holding pos, or LIGHT_INVALID_INDEX beyond the last cascade. jitter is a per-tile
-    // offset in cells that softens the cell boundaries; the caller has to reuse the cell it
-    // returns for the density, so both see the same list.
+    // Cell holding pos, or LIGHT_INVALID_INDEX beyond the last cascade. jitter softens the cell
+    // boundaries; the caller has to reuse the cell it returns for the density.
     uint get_grid_cell(const float3 pos, const float3 jitter = float3(0)) {
         if (selection != LightSelection::LightSelectionGrid)
             return LIGHT_INVALID_INDEX;
@@ -171,8 +172,24 @@ struct NEE {
         return LIGHT_INVALID_INDEX;
     }
 
+    // A vertex always needs a technique to draw from, so the pool covers a split of nothing.
+    uint pool_candidates() {
+        const uint cell = cell_candidates();
+        return uint(max(merian_nee_pool_candidates, cell > 0 ? 0 : 1));
+    }
+
+    uint cell_candidates() {
+        return selection == LightSelection::LightSelectionGrid
+                   ? uint(max(merian_nee_cell_candidates, 0))
+                   : 0u;
+    }
+
+    uint candidate_count() {
+        return pool_candidates() + cell_candidates();
+    }
+
     bool is_grid_cell(const uint bucket) {
-        return (bucket & LIGHT_BUCKET_TILE) == 0;
+        return bucket != LIGHT_INVALID_INDEX;
     }
 
     // Flux of a geometry, and of the triangles before it, from the prefix sum.
@@ -180,15 +197,6 @@ struct NEE {
         const LightGeometry lg = table.geometries[geometry];
         base = select(lg.first_triangle > 0, table.cdf[max(lg.first_triangle, 1u) - 1u], 0.f);
         total = table.cdf[lg.first_triangle + lg.primitive_count - 1u] - base;
-    }
-
-    // First entry of the tile a shading point draws from. Every entry is an independent draw
-    // from the same distribution, so which tile it is does not change the density.
-    uint pool_offset(const uint bucket) {
-        if (pool.size <= pool.tile_size)
-            return 0;
-        const uint tiles = pool.size / pool.tile_size;
-        return ((bucket & ~LIGHT_BUCKET_TILE) % tiles) * pool.tile_size;
     }
 
     Optional<uint> get_triangle_index(const GeometryID geometry_id, const uint primitive_id) {
@@ -207,12 +215,11 @@ struct NEE {
     // the density of both.
 
     // One draw from the pool: a light anywhere in the scene, by flux.
-    uint draw_pool(const uint bucket, inout RandomGenerator rng) {
+    uint draw_pool(inout RandomGenerator rng) {
         if (selection == LightSelection::LightSelectionPower || pool.size == 0)
             return merian::search_flux(table.cdf, rng.next_float() * get_total_flux(), 0,
                                        table.triangle_count - 1);
-        return pool.entries[pool_offset(bucket) +
-                            min(uint(rng.next_float() * pool.tile_size), pool.tile_size - 1)];
+        return pool.entries[min(uint(rng.next_float() * pool.size), pool.size - 1)];
     }
 
     // Its density, from the stored prefix sums: with many lights a sum loses the flux in
@@ -229,12 +236,13 @@ struct NEE {
     // triangle of it by flux.
     uint draw_grid(const uint cell, inout RandomGenerator rng) {
         uint geometry = LIGHT_INVALID_INDEX;
-        if (is_grid_cell(cell)) {
+        if (is_grid_cell(cell) && rng.next_float() < grid.share) {
             const uint base = light_bucket_base(cell);
             uint occupied = 0;
             for (uint slot = 0; slot < LIGHT_GRID_SLOTS; slot++) {
                 const uint held = grid.slots[base + slot];
-                if (held == LIGHT_INVALID_INDEX)
+                // a slot the preprocess never wrote indexes the table out of bounds
+                if (held >= table.geometry_count)
                     continue;
                 occupied++;
                 if (rng.next_float() * float(occupied) < 1.f)
@@ -242,7 +250,7 @@ struct NEE {
             }
         }
         if (geometry == LIGHT_INVALID_INDEX)
-            return draw_pool(cell, rng);
+            return draw_pool(rng);
 
         float flux_base, flux_total;
         geometry_flux(geometry, flux_base, flux_total);
@@ -259,6 +267,7 @@ struct NEE {
         if (!is_grid_cell(cell))
             return pdf_pool(index);
 
+        const float pool = (1.f - grid.share) * pdf_pool(index);
         const uint base = light_bucket_base(cell);
         const uint geometry =
             merian::find_light_geometry(table.geometries, table.geometry_count, index);
@@ -266,7 +275,7 @@ struct NEE {
         uint hits = 0;
         for (uint slot = 0; slot < LIGHT_GRID_SLOTS; slot++) {
             const uint held = grid.slots[base + slot];
-            if (held == LIGHT_INVALID_INDEX)
+            if (held >= table.geometry_count)
                 continue;
             occupied++;
             hits += select(held == geometry, 1u, 0u);
@@ -274,7 +283,7 @@ struct NEE {
         if (occupied == 0)
             return pdf_pool(index);
         if (hits == 0)
-            return 0.f;
+            return pool;
 
         float flux_base, flux_total;
         geometry_flux(geometry, flux_base, flux_total);
@@ -282,7 +291,8 @@ struct NEE {
             return 0.f;
         const float triangle =
             table.cdf[index] - select(index > 0, table.cdf[max(index, 1u) - 1u], 0.f);
-        return (float(hits) / float(occupied)) * max(triangle, 0.f) / flux_total;
+        return pool +
+               grid.share * (float(hits) / float(occupied)) * max(triangle, 0.f) / flux_total;
     }
 
     // Uniform point on triangle index; Li is the material emission at the point.
@@ -369,12 +379,16 @@ struct NEE {
                      const float point_pdf,
                      const uint m_pool,
                      const uint m_grid) {
-        const float p_e = get_env_probability();
+        const float p_e = get_env_share();
         if (index == LIGHT_ENV_INDEX)
             return float(m_pool) * p_e * point_pdf;
         const float from_pool = m_pool > 0 ? float(m_pool) * (1.f - p_e) * pdf_pool(index) : 0.f;
         const float from_grid = m_grid > 0 ? float(m_grid) * pdf_grid(cell, index) : 0.f;
         return (from_pool + from_grid) * point_pdf;
+    }
+
+    float pdf_lights(const uint cell, const uint index, const float point_pdf) {
+        return pdf_lights(cell, index, point_pdf, pool_candidates(), cell_candidates());
     }
 
     // The same where the ray from origin along dir meets the light.
@@ -398,7 +412,7 @@ struct NEE {
                                                       const float time,
                                                       const bool from_grid) {
         // the environment is the pool's to offer; a cell holds the lights that reach it
-        if (!from_grid && rng.next_float() < get_env_probability()) {
+        if (!from_grid && rng.next_float() < get_env_share()) {
             if (let es = sample_env(rng)) {
                 LightSample ls;
                 ls.wo = es.dir;
@@ -415,7 +429,7 @@ struct NEE {
         if (!has_emissive_triangles())
             return none;
 
-        const uint index = from_grid ? draw_grid(bucket, rng) : draw_pool(bucket, rng);
+        const uint index = from_grid ? draw_grid(bucket, rng) : draw_pool(rng);
         if (index == LIGHT_INVALID_INDEX)
             return none;
         return sample_triangle(index, pos, rng, material_system, time);
@@ -434,7 +448,7 @@ struct NEE {
 
         LightPoint lp;
         const bool from_grid = rng.next_float() * float(draws) >= float(m_pool);
-        if (!from_grid && rng.next_float() < get_env_probability()) {
+        if (!from_grid && rng.next_float() < get_env_share()) {
             if (let es = sample_env(rng)) {
                 lp.pos = pos + es.dir * ENV_MAP_DISTANCE;
                 lp.index = LIGHT_ENV_INDEX;
@@ -445,7 +459,7 @@ struct NEE {
         if (!has_emissive_triangles())
             return none;
 
-        const uint index = from_grid ? draw_grid(cell, rng) : draw_pool(cell, rng);
+        const uint index = from_grid ? draw_grid(cell, rng) : draw_pool(rng);
         if (index == LIGHT_INVALID_INDEX)
             return none;
         const EmissiveTriangle tri = table.triangles[index];
@@ -502,6 +516,30 @@ struct DirectLightReservoir {
         const float target = yuv_luminance(value);
         return target > 0.f ? value * (weight_sum / target) : float3(0);
     }
+}
+
+// What the integrator says a candidate is worth, for the resampling to rank it by.
+interface IDirectLightTarget {
+    float3 unshadowed(const LightSample ls, inout RandomGenerator rng);
+
+    float scatter_pdf(const LightSample ls);
+}
+
+// The sample that survived the resampling, already carrying its unbiased weight.
+struct DirectLightSample {
+    float3 value;
+    float3 light_pos;
+    uint light_index;
+
+    bool needs_shadow_ray() {
+        return light_index != LIGHT_INVALID_INDEX;
+    }
+}
+
+// Which light selection serves one path vertex; opaque to the integrator.
+struct DirectLightVertex {
+    uint bucket;
+    float3 pos;
 }
 
 } // namespace merian

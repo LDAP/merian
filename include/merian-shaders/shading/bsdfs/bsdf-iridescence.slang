@@ -68,8 +68,7 @@ struct IridescentConductorBSDF<Inner : BSDF> : BSDF {
         if (iridescence <= 0.0f) {
             return Albedo::specular_only(spec);
         }
-        return Albedo::specular_only(spec * fresnel(wi.z) /
-                                     max(fresnel_schlick(wi.z, f0), 1e-4f));
+        return Albedo::specular_only(spec * fresnel(wi.z) / max(fresnel_schlick(wi.z, f0), 1e-4f));
     }
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
@@ -77,11 +76,19 @@ struct IridescentConductorBSDF<Inner : BSDF> : BSDF {
     }
 
     property float effective_alpha {
-        get { return bsdf.effective_alpha; }
+        get {
+            return bsdf.effective_alpha;
+        }
     }
 
     property float specular_alpha {
-        get { return bsdf.specular_alpha; }
+        get {
+            return bsdf.specular_alpha;
+        }
+    }
+
+    uint get_lobe_types() {
+        return bsdf.get_lobe_types();
     }
 }
 
@@ -162,7 +169,7 @@ struct IridescentFresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
             take_layer ? layer.sample_eval(wi, rng) : base.sample_eval(wi, rng);
         if (let s = sub) {
             // The Fresnel cancels against the probability of having picked that lobe.
-            if (s.lobe == BSDFLobe::Delta) {
+            if (bsdf_lobe_is_delta(s.lobe)) {
                 return ShadingFunctionSample(s.wo, (take_layer ? f : 1.0f - f) * s.pdf, s.weight,
                                              s.lobe);
             }
@@ -190,11 +197,19 @@ struct IridescentFresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
 
     // Weighted RMS, by the share of the response the layer takes at normal incidence.
     property float effective_alpha {
-        get { return sqrt(lerp(pow2(base.effective_alpha), pow2(layer.effective_alpha), ior_f0)); }
+        get {
+            return sqrt(lerp(pow2(base.effective_alpha), pow2(layer.effective_alpha), ior_f0));
+        }
     }
 
     property float specular_alpha {
-        get { return layer.specular_alpha; }
+        get {
+            return layer.specular_alpha;
+        }
+    }
+
+    uint get_lobe_types() {
+        return layer.get_lobe_types() | base.get_lobe_types();
     }
 }
 
@@ -302,15 +317,16 @@ struct IridescentRoughDielectricBSDF : BSDF {
             const float p_delta = max3(R_delta);
             if (rng.next_float() < p_delta) {
                 return ShadingFunctionSample(reflect_z(wi), p_delta, R_delta / p_delta,
-                                             BSDFLobe::Delta);
+                                             BSDFLobe::DeltaReflection);
             }
             const float3 wt = refract(-wi, float3(0.0f, 0.0f, 1.0f), eta);
             if (all(wt == float3(0.0f))) {
-                return ShadingFunctionSample(reflect_z(wi), 1.0f, float3(1.0f), BSDFLobe::Delta);
+                return ShadingFunctionSample(reflect_z(wi), 1.0f, float3(1.0f),
+                                             BSDFLobe::DeltaReflection);
             }
             return ShadingFunctionSample(wt, 1.0f - p_delta,
                                          ((1.0f - R_delta) / (1.0f - p_delta)) * pow2(eta) * tint,
-                                         BSDFLobe::Delta);
+                                         BSDFLobe::DeltaTransmission);
         }
         const float alpha_squared = pow2(alpha);
         const float3 wm = ggx_VNDF_sample_H(wi, alpha, rng.next_float2());
@@ -327,7 +343,7 @@ struct IridescentRoughDielectricBSDF : BSDF {
             const float g = smith_g2_over_widotn(wo.z, wi.z, alpha_squared) /
                             smith_g1_over_widotn(wi.z, alpha_squared);
             const float pdf = p * ggx_VNDF_pdf_wo(wi.z, wm, alpha_squared);
-            return ShadingFunctionSample(wo, pdf, (R / p) * g, BSDFLobe::Glossy);
+            return ShadingFunctionSample(wo, pdf, (R / p) * g, BSDFLobe::GlossyReflection);
         }
 
         // Refraction. Real TIR was already routed to reflection (p == 1); a refraction failure here
@@ -344,7 +360,7 @@ struct IridescentRoughDielectricBSDF : BSDF {
         const float g = smith_g2_over_widotn(abs(wo.z), wi.z, alpha_squared) /
                         smith_g1_over_widotn(wi.z, alpha_squared);
         return ShadingFunctionSample(wo, pdf, ((1.0f - R) / (1.0f - p)) * pow2(eta) * tint * g,
-                                     BSDFLobe::Glossy);
+                                     BSDFLobe::GlossyTransmission);
     }
 
     Albedo get_albedo(const float3 wi) {
@@ -363,11 +379,22 @@ struct IridescentRoughDielectricBSDF : BSDF {
     }
 
     property float effective_alpha {
-        get { return alpha; }
+        get {
+            return alpha;
+        }
     }
 
     property float specular_alpha {
-        get { return alpha; }
+        get {
+            return alpha;
+        }
+    }
+
+    uint get_lobe_types() {
+        if (is_delta()) {
+            return uint(BSDFLobe::DeltaReflection) | uint(BSDFLobe::DeltaTransmission);
+        }
+        return uint(BSDFLobe::GlossyReflection) | uint(BSDFLobe::GlossyTransmission);
     }
 }
 

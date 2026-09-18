@@ -98,7 +98,7 @@ struct RoughDielectricBSDF : BSDF {
             const float weight = smith_g2_over_widotn(wo.z, wi.z, alpha_squared) /
                                  smith_g1_over_widotn(wi.z, alpha_squared);
             const float pdf = R * ggx_VNDF_pdf_wo(wi.z, wm, alpha_squared);
-            return ShadingFunctionSample(wo, pdf, float3(weight), BSDFLobe::Glossy);
+            return ShadingFunctionSample(wo, pdf, float3(weight), BSDFLobe::GlossyReflection);
         }
 
         // Refraction. Real TIR was already routed to reflection (R == 1); a refraction failure here
@@ -114,7 +114,7 @@ struct RoughDielectricBSDF : BSDF {
         // (1 - R) cancels; the eta^2 radiance factor stays.
         const float weight = pow2(eta) * smith_g2_over_widotn(abs(wo.z), wi.z, alpha_squared) /
                              smith_g1_over_widotn(wi.z, alpha_squared);
-        return ShadingFunctionSample(wo, pdf, tint * weight, BSDFLobe::Glossy);
+        return ShadingFunctionSample(wo, pdf, tint * weight, BSDFLobe::GlossyTransmission);
     }
 
     Albedo get_albedo(const float3 wi) {
@@ -128,11 +128,22 @@ struct RoughDielectricBSDF : BSDF {
     }
 
     property float effective_alpha {
-        get { return alpha; }
+        get {
+            return alpha;
+        }
     }
 
     property float specular_alpha {
-        get { return alpha; }
+        get {
+            return alpha;
+        }
+    }
+
+    uint get_lobe_types() {
+        if (is_delta()) {
+            return uint(BSDFLobe::DeltaReflection) | uint(BSDFLobe::DeltaTransmission);
+        }
+        return uint(BSDFLobe::GlossyReflection) | uint(BSDFLobe::GlossyTransmission);
     }
 }
 

@@ -76,13 +76,18 @@ struct HashGrid<typename T,
             InterlockedExchange(data[index].key[0].y, locked, old);
     }
 
-    // Payload before key so a concurrent probe never matches an unwritten payload.
-    void store_slot(const uint index, const uint2 key, const T t) {
-        data[index].t = t;
+    // Publishes a slot whose payload is already written.
+    void store_key(const uint index, const uint2 key) {
         if (SPLIT_STORAGE)
             keys[index] = key;
         else
             data[index].key[0] = key;
+    }
+
+    // Payload before key so a concurrent probe never matches an unwritten payload.
+    void store_slot(const uint index, const uint2 key, const T t) {
+        data[index].t = t;
+        store_key(index, key);
     }
 
     float grid_tan_alpha_half;
@@ -138,9 +143,8 @@ struct HashGrid<typename T,
     // The lattice math only needs pos in cell widths, so no access has to divide.
     float grid_inv_width_for_level(const uint level) {
         return (0.5 / grid_tan_alpha_half) *
-               pow(GRID_POWER, MERIAN_HASH_GRID_LEVEL_OFFSET -
-                                   (float(level) - grid_level_bias) /
-                                       float(GRID_STEPS_PER_UNIT_SIZE));
+               pow(GRID_POWER, MERIAN_HASH_GRID_LEVEL_OFFSET - (float(level) - grid_level_bias) /
+                                                                   float(GRID_STEPS_PER_UNIT_SIZE));
     }
 
     int3 grid_idx(const float3 pos, const float inv_width, const float xi) {
@@ -339,8 +343,8 @@ struct HashGrid<typename T,
         const float first = ceil(n * lo - xi.y);
         const float share = max(1.0, ceil(n * hi - xi.y) - first);
 
-        const int3 gidx = grid_idx(pos, grid_inv_width_for_level(level),
-                                   (float(index) - first + xi.z) / share);
+        const int3 gidx =
+            grid_idx(pos, grid_inv_width_for_level(level), (float(index) - first + xi.z) / share);
         return find(get_hash_grid_pos(gidx, level, normal));
     }
 
@@ -407,6 +411,9 @@ struct HashGrid<typename T,
         var t = data[target].t;
 
         if (!matched) {
+            // the slot now describes a different cell, and a running mean kept from the last one
+            // starts saturated at a stranger's value
+            t = T();
             const uint prev_level = target_level_for_pos(pos, prev_cam_pos, rng);
             if (level != prev_level) {
                 Optional<T> r;
@@ -425,9 +432,7 @@ struct HashGrid<typename T,
     }
 
     // Does not probe, so grid_pos must still locate the cell.
-    void update_at(const HashGridPos grid_pos,
-                      const uint frame,
-                      HashGridUpdateFunction<T> update) {
+    void update_at(const HashGridPos grid_pos, const uint frame, HashGridUpdateFunction<T> update) {
         if (!LOCK_FREE) {
             const uint locked = frame | MERIAN_HASH_GRID_LOCK_BIT;
             uint old;

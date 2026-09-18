@@ -34,14 +34,11 @@ SlangCompositionHandle SSMMGuidingModel::get_composition() const {
         fmt::format("namespace merian {{\n"
                     "export static const int merian_ssmm_group_size = {};\n"
                     "export static const float merian_ssmm_reuse_radius = {};\n"
-                    "export static const float merian_ssmm_probability = {};\n"
-                    "export static const float merian_ssmm_alpha_threshold = {};\n"
                     "export static const uint merian_ssmm_max_n = {}u;\n"
                     "export static const float merian_ssmm_min_alpha = {};\n"
                     "export static const float merian_ssmm_prior_n = {};\n"
                     "}}",
-                    group_size, reuse_radius, probability, alpha_threshold, max_n, min_alpha,
-                    prior_n));
+                    group_size, reuse_radius, max_n, min_alpha, prior_n));
     return composition;
 }
 
@@ -126,14 +123,6 @@ bool SSMMGuidingModel::properties(Properties& props) {
         "reuse radius", reuse_radius,
         "Standard deviation of the neighbourhood the resampling reaches into, in pixels.", 1.f,
         64.f);
-    constants_changed |= props.config_percent(
-        "probability", probability,
-        "Probability the integrator gives the fitted lobe over the BSDF. The fit describes "
-        "where the emitters are, so this comes out of the budget the rest of the path lives "
-        "on; the 0.85 of the original single-bounce renderer starves it.");
-    constants_changed |= props.config_float(
-        "alpha threshold", alpha_threshold,
-        "No guiding below this GGX alpha: the BSDF is more peaked than any fitted lobe.", 0.f, 1.f);
     constants_changed |=
         props.config_uint("max N", max_n, "Samples folded into the exponentially weighted fit.");
     constants_changed |= props.config_float("min alpha", min_alpha,

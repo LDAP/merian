@@ -113,6 +113,8 @@ class Accumulate : public Node {
     QuartilePushConstant percentile_pc;
 
     bool clear = false;
+    // clears once at this iteration, so a run can hold what it learned and start the image over
+    int32_t clear_at_iteration = 0;
     int filter_mode = 0;
     VkBool32 extended_search = VK_TRUE;
     VkBool32 reuse_border = VK_FALSE;

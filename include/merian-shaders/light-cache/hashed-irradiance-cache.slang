@@ -1,3 +1,4 @@
+import merian_shaders.colors.colorspaces;
 import merian_shaders.utils.hash_grid;
 import merian_shaders.utils.random;
 
@@ -9,6 +10,8 @@ static const float HASHED_IRR_CACHE_MAX_VALUE = float16_t.maxValue;
 struct HashedIrradianceCacheData {
     half3 irr;
     uint16_t N;
+    // second moment of the accumulated luminance; full precision, half loses the tail
+    float m2;
 }
 
 half3 hashed_irradiance_cache_sanitize(const half3 irr) {
@@ -29,10 +32,14 @@ struct HashedIrradianceCacheUpdate : HashGridUpdateFunction<HashedIrradianceCach
         if (any(isinf(mean)) || any(isnan(mean))) {
             mean = sample;
             data.N = uint16_t(0);
+            data.m2 = 0.0;
         }
 
         data.N = min(uint16_t(data.N + uint16_t(1)), HASHED_IRR_CACHE_MAX_N);
-        data.irr = half3(lerp(mean, sample, 1.0 / float(data.N)));
+        const float rate = 1.0 / float(data.N);
+        data.irr = half3(lerp(mean, sample, rate));
+        const float l = yuv_luminance(sample);
+        data.m2 = lerp(data.m2, l * l, rate);
     }
 }
 
@@ -41,8 +48,15 @@ struct HashedIrradianceCache<let BUFFER_SIZE : uint,
                              let STOCHASTIC_INTERPOLATION : bool = false,
                              let SPLIT_STORAGE : bool = true,
                              let LOCALITY_BITS : uint = 0> {
-    HashGrid<HashedIrradianceCacheData, BUFFER_SIZE, PROBE_COUNT, STOCHASTIC_INTERPOLATION, false,
-             SPLIT_STORAGE, 2, 1, LOCALITY_BITS>
+    HashGrid<HashedIrradianceCacheData,
+             BUFFER_SIZE,
+             PROBE_COUNT,
+             STOCHASTIC_INTERPOLATION,
+             false,
+             SPLIT_STORAGE,
+             2,
+             1,
+             LOCALITY_BITS>
         grid;
 
     half3
@@ -66,6 +80,39 @@ struct HashedIrradianceCache<let BUFFER_SIZE : uint,
         return half3(0);
     }
 
+    // How many samples stand behind the value.
+    half3 get(const float3 pos,
+              const float3 normal,
+              const float3 cam_pos,
+              const float3 prev_cam_pos,
+              inout RandomGenerator rng,
+              out HashGridPos grid_pos,
+              out uint samples) {
+        samples = 0;
+        if (let r = grid.get(pos, normal, cam_pos, prev_cam_pos, rng, grid_pos)) {
+            samples = uint(r.N);
+            return hashed_irradiance_cache_sanitize(r.irr);
+        }
+        return half3(0);
+    }
+
+    // Mean of the accumulated luminance and the squared standard error of that mean; a cell with
+    // nothing behind it reports an unbounded error.
+    bool estimate(const HashGridPos grid_pos, out float mean, out float se2) {
+        mean = 0.0;
+        se2 = 1e30;
+        if (let r = grid.load(grid_pos)) {
+            mean = yuv_luminance(float3(r.irr));
+            const float n = float(r.N);
+            if (n < 2.0) {
+                return true;
+            }
+            se2 = max(r.m2 - mean * mean, 0.0) / n;
+            return true;
+        }
+        return false;
+    }
+
     // A valid grid_pos skips the probe, so it must locate the same cell.
     void update(const float3 pos,
                 const float3 normal,
@@ -75,7 +122,7 @@ struct HashedIrradianceCache<let BUFFER_SIZE : uint,
                 const uint frame,
                 inout RandomGenerator rng,
                 const HashGridPos grid_pos = HashGridPos()) {
-        HashedIrradianceCacheUpdate fn = { irr };
+        HashedIrradianceCacheUpdate fn = {irr};
         if (grid_pos.is_valid()) {
             grid.update_at(grid_pos, frame, fn);
         } else {

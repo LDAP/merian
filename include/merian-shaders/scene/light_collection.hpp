@@ -15,6 +15,7 @@
 #include "merian/vk/pipeline/pipeline.hpp"
 
 #include <limits>
+#include <unordered_map>
 #include <vector>
 
 namespace merian {
@@ -45,6 +46,8 @@ class LightCollection {
 
     // Records the update passes. The scene object must already hold this frame's geometry,
     // transforms and materials and must not be written afterwards (it is bound here).
+    void update_constants(const SlangCompositionHandle& scene_composition);
+
     void update(const CommandBufferHandle& cmd,
                 const SlangCompositionHandle& scene_composition,
                 const ShaderObjectHandle& scene_object,
@@ -73,12 +76,12 @@ class LightCollection {
     }
 
     // The manual environment share, used where it is not derived from the emitted power.
-    float get_env_probability() const {
-        return env_probability;
+    float get_env_share() const {
+        return env_share;
     }
 
-    void set_env_probability(const float p) {
-        env_probability = p;
+    void set_env_share(const float p) {
+        env_share = p;
     }
 
     // Bounding sphere the environment's power is measured through; 0 keeps the manual share.
@@ -135,25 +138,33 @@ class LightCollection {
                        const std::string& name,
                        const CommandBufferHandle& cmd);
 
+    void update_light_remap(const CommandBufferHandle& cmd);
+
     ShaderCompileContextHandle compile_context;
     ContextHandle context;
     ResourceAllocatorHandle allocator;
 
     bool enabled = true;
     int32_t selection = LightSelection::LightSelectionGrid;
+    bool pool_presampled = true;
+    bool grid_enabled = true;
     int32_t env_selection = EnvSelection::EnvSelectionPool;
     int32_t env_pool_size = 8192;
     int32_t pool_size = 4096;
-    int32_t pool_tile_size = 256;
+    int32_t pool_candidates = 3;
     int32_t grid_dimension = 16;
     int32_t grid_cascades = 6;
     // Candidates a cell races each frame. The list carries across frames, so a few are enough
     // and more only churn it.
     int32_t grid_candidates = 16;
+    int32_t cell_candidates = 2;
     AccelerationStructureHandle acceleration_structure;
     float grid_cell_size = 0.f; // 0: derived from the distance to the lights
     float grid_coverage = 1.f;
     float grid_jitter = 1.f;
+    bool debug_jitter = true;
+    bool constants_dirty = true;
+    float grid_share = 1.f;
     bool grid_visibility = true;
     // Slots a cell re-tests per frame. Clearing more than one at a time stops the list settling.
     int32_t grid_probes = 1;
@@ -161,11 +172,11 @@ class LightCollection {
     // set for a frame the carried-over grid cannot describe
     bool grid_reset = true;
     float3 camera_position{0.f};
-    bool env_probability_from_power = true;
-    float env_probability = 0.5f;
+    bool env_share_from_power = true;
+    float env_share = 0.5f;
     // Neither technique may lose its density where both can contribute.
-    float env_probability_min = 0.05f;
-    float env_probability_max = 0.95f;
+    float env_share_min = 0.05f;
+    float env_share_max = 0.95f;
     float scene_radius = 0.f;
     bool env_emissive = false;
     bool has_sky_portals = false;
@@ -178,6 +189,11 @@ class LightCollection {
 
     std::vector<LightGeometry> light_geometries;
     std::vector<uint32_t> geometry_light_offsets;
+    // the table the grid was ranked against, and where its entries sit now
+    std::vector<uint64_t> grid_table_keys;
+    std::vector<uint32_t> light_remap;
+    std::unordered_map<uint64_t, uint32_t> light_index_of_key;
+    bool light_remap_identity = true;
     uint32_t triangle_count = 0;
     bool tables_dirty = false;
 
@@ -200,6 +216,7 @@ class LightCollection {
     BufferHandle cdf_block_sums_buffer;
     BufferHandle light_geometries_buffer;
     BufferHandle geometry_light_offsets_buffer;
+    BufferHandle light_remap_buffer;
 
     SlangCompositionHandle update_composition;
     Versioned<SlangProgram> update_program;

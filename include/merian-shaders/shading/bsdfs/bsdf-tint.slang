@@ -50,6 +50,10 @@ struct TintBSDF<Base : BSDF> : BSDF {
             return base.specular_alpha;
         }
     }
+
+    uint get_lobe_types() {
+        return base.get_lobe_types();
+    }
 }
 
 } // namespace merian

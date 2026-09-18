@@ -61,7 +61,7 @@ struct SheenLayerBSDF<Base : BSDF> : BSDF {
             take_sheen ? sheen.sample_eval(wi, rng) : base.sample_eval(wi, rng);
         if (let s = sub) {
             // Only the scaled base reaches a delta direction, and its scaling does not cancel.
-            if (s.lobe == BSDFLobe::Delta) {
+            if (bsdf_lobe_is_delta(s.lobe)) {
                 const float scaling = min(albedo_scaling(wi.z), albedo_scaling(s.wo.z));
                 return ShadingFunctionSample(s.wo, (1.0f - p) * s.pdf,
                                              scaling * s.weight / (1.0f - p), s.lobe);
@@ -84,12 +84,20 @@ struct SheenLayerBSDF<Base : BSDF> : BSDF {
     }
 
     property float effective_alpha {
-        get { return base.effective_alpha; }
+        get {
+            return base.effective_alpha;
+        }
     }
 
     property float specular_alpha {
-        get { return base.specular_alpha; }
+        get {
+            return base.specular_alpha;
+        }
+    }
+
+    uint get_lobe_types() {
+        return uint(BSDFLobe::DiffuseReflection) | base.get_lobe_types();
     }
 }
 
-}
+} // namespace merian

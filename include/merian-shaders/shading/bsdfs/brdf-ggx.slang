@@ -84,9 +84,7 @@ float smith_g2_over_widotn(const float3 wo, const float3 wi, const float2 alpha)
 
 // Returns D(h). sin_theta_squared must come from the tangential components of h: for a narrow
 // lobe 1 - (n.h)^2 cancels away every significant digit in fp32.
-float ggx_NDF(const float ndoth_squared,
-              const float sin_theta_squared,
-              const float alpha_squared) {
+float ggx_NDF(const float ndoth_squared, const float sin_theta_squared, const float alpha_squared) {
     return alpha_squared / (MERIAN_PI * pow2((ndoth_squared * alpha_squared) + sin_theta_squared));
 }
 
@@ -397,7 +395,8 @@ struct GGXBRDF : BSDF {
             return none;
         }
         if (is_delta()) {
-            return ShadingFunctionSample(reflect_z(wi), 1.0f, float3(1.0f), BSDFLobe::Delta);
+            return ShadingFunctionSample(reflect_z(wi), 1.0f, float3(1.0f),
+                                         BSDFLobe::DeltaReflection);
         }
 
         const float3 h = ggx_VNDF_sample_H(wi, alpha_xy, rng.next_float2());
@@ -410,7 +409,7 @@ struct GGXBRDF : BSDF {
         const float pdf = ggx_VNDF_pdf_wo(wi, h, alpha_xy);
         const float weight =
             smith_g2_over_widotn(wo, wi, alpha_xy) / smith_g1_over_widotn(wi, alpha_xy);
-        return ShadingFunctionSample(wo, pdf, float3(weight), BSDFLobe::Glossy);
+        return ShadingFunctionSample(wo, pdf, float3(weight), BSDFLobe::GlossyReflection);
     }
 
     Albedo get_albedo(const float3 wi) {
@@ -424,11 +423,19 @@ struct GGXBRDF : BSDF {
 
     // The narrower axis bounds how sharp the lobe gets.
     property float specular_alpha {
-        get { return min(alpha_xy.x, alpha_xy.y); }
+        get {
+            return min(alpha_xy.x, alpha_xy.y);
+        }
     }
 
     property float effective_alpha {
-        get { return specular_alpha; }
+        get {
+            return specular_alpha;
+        }
+    }
+
+    uint get_lobe_types() {
+        return uint(is_delta() ? BSDFLobe::DeltaReflection : BSDFLobe::GlossyReflection);
     }
 }
 
@@ -474,8 +481,8 @@ struct GGXBTDF : BSDF {
             return none;
         }
 
-        const float3 h = is_delta() ? float3(0.0f, 0.0f, 1.0f)
-                                    : ggx_VNDF_sample_H(wi, alpha, rng.next_float2());
+        const float3 h =
+            is_delta() ? float3(0.0f, 0.0f, 1.0f) : ggx_VNDF_sample_H(wi, alpha, rng.next_float2());
         const float3 wo = refract(-wi, h, eta);
         if (all(wo == float3(0.0f)) || wo.z > -BSDF_MIN_COS_THETA) {
             return none; // total internal reflection
@@ -507,7 +514,7 @@ struct GGXBTDF : BSDF {
             if (all(wt == float3(0.0f))) {
                 return none; // total internal reflection
             }
-            return ShadingFunctionSample(wt, 1.0f, pow2(eta) * tint, BSDFLobe::Delta);
+            return ShadingFunctionSample(wt, 1.0f, pow2(eta) * tint, BSDFLobe::DeltaTransmission);
         }
 
         const float alpha_squared = pow2(alpha);
@@ -524,7 +531,7 @@ struct GGXBTDF : BSDF {
         // refraction adds an eta^2 radiance factor. It stays finite even at alpha -> 0.
         const float weight = pow2(eta) * smith_g2_over_widotn(abs(wo.z), wi.z, alpha_squared) /
                              smith_g1_over_widotn(wi.z, alpha_squared);
-        return ShadingFunctionSample(wo, pdf, tint * weight, BSDFLobe::Glossy);
+        return ShadingFunctionSample(wo, pdf, tint * weight, BSDFLobe::GlossyTransmission);
     }
 
     Albedo get_albedo(const float3 wi) {
@@ -536,11 +543,19 @@ struct GGXBTDF : BSDF {
     }
 
     property float effective_alpha {
-        get { return alpha; }
+        get {
+            return alpha;
+        }
     }
 
     property float specular_alpha {
-        get { return alpha; }
+        get {
+            return alpha;
+        }
+    }
+
+    uint get_lobe_types() {
+        return uint(is_delta() ? BSDFLobe::DeltaTransmission : BSDFLobe::GlossyTransmission);
     }
 }
 

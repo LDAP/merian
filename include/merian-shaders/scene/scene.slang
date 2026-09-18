@@ -325,6 +325,32 @@ struct Scene {
         return tri;
     }
 
+    /* Radius of curvature of the smooth surface at a hit, signed against its own normals.
+     *
+     * On a sphere p = c + R n, so an edge and the turn of the vertex normals across it are
+     * proportional and R falls out of their ratio; both edges are used at once, in the
+     * least-squares sense. Positive where the surface curves away from the side its normals point
+     * to, zero where it is flat or flat-shaded.
+     */
+    float get_curvature_radius(const Hit hit, const TriangleHit tri) {
+        if (tri.gd.flags & GeometryDataFlags::FlatShading) {
+            return 0.f;
+        }
+        const float3 n0 = decode_normal(tri.v0.encoded_normal);
+        const float3 dn01 = decode_normal(tri.v1.encoded_normal) - n0;
+        const float3 dn02 = decode_normal(tri.v2.encoded_normal) - n0;
+        const float turn = dot(dn01, dn01) + dot(dn02, dn02);
+        if (turn < 1e-10f) {
+            return 0.f;
+        }
+        const float3 e01 = tri.get_triangle_edge01();
+        const float3 e02 = tri.get_triangle_edge02();
+        // the edges are object space, so a scaled instance needs its edge scale putting back
+        const float scale =
+            length(to_world_vector(tri.gd, hit.instance_index, e01)) / max(length(e01), 1e-20f);
+        return scale * (dot(e01, dn01) + dot(e02, dn02)) / turn;
+    }
+
     Surface get_surface(const Hit hit, const TriangleHit tri) {
         const float3 bary = hit.get_barycentrics3();
 
@@ -486,28 +512,53 @@ struct Scene {
 
     // -----------------------------------------
 
-    // Which pre-resampled bucket a shading point draws from: a grid cell where the grid covers
-    // the point, otherwise the light tile its screen tile shares. Sampling and density evaluation
-    // must agree, so it is taken once per vertex and passed to both.
-    uint get_light_bucket(const uint2 pixel, const float3 pos) {
-        // one offset per 16 x 16 pixels, so a tile shares its cell and the loads stay coherent
-        const uint tile = xxhash32(uint3(pixel >> 4, frame));
-        RandomGenerator tile_rng = PCG(tile);
-        const uint cell = nee.get_grid_cell(pos, nee.grid.jitter * (tile_rng.next_float3() - 0.5f));
-        if (cell != LIGHT_INVALID_INDEX)
-            return cell;
-        return LIGHT_BUCKET_TILE | tile;
+    // The cell is drawn once here, so that sampling and density evaluation agree on it.
+    DirectLightVertex begin_direct_light(const float3 pos, inout RandomGenerator rng) {
+        DirectLightVertex vertex;
+        vertex.pos = pos;
+        vertex.bucket = nee.get_grid_cell(pos, nee.grid.jitter * (rng.next_float3() - 0.5f));
+        return vertex;
+    }
+
+    // One direction towards a light, resampled against what the integrator says it is worth.
+    Optional<DirectLightSample> sample_direct_light<T : IDirectLightTarget>(
+        const DirectLightVertex vertex, const T target, inout RandomGenerator rng) {
+        DirectLightReservoir reservoir = DirectLightReservoir();
+        const uint pool = nee.pool_candidates();
+        for (uint i = 0; i < pool + nee.cell_candidates(); i++) {
+            if (let ls = nee.sample_light(vertex.bucket, vertex.pos, rng, material_system, env_map,
+                                          time, i >= pool)) {
+                reservoir.add_light(
+                    ls, target.unshadowed(ls, rng),
+                    nee.pdf_lights(vertex.bucket, ls.index, ls.pdf) + target.scatter_pdf(ls), rng);
+            }
+        }
+        if (!reservoir.needs_shadow_ray()) {
+            return none;
+        }
+        DirectLightSample s;
+        s.value = reservoir.resolve();
+        s.light_pos = reservoir.light_pos;
+        s.light_index = reservoir.light_index;
+        return s;
+    }
+
+    // A point on a light for the mixture estimator.
+    Optional<LightPoint> sample_direct_light_point(const DirectLightVertex vertex,
+                                                   inout RandomGenerator rng) {
+        return nee.sample_point(vertex.bucket, vertex.pos, rng, nee.pool_candidates(),
+                                nee.cell_candidates());
+    }
+
+    // Share of the mixture's density that the light technique accounts for.
+    float direct_light_mixture_pdf(const float hit_pdf) {
+        return hit_pdf / float(max(nee.candidate_count(), 1u));
     }
 
     // One unshadowed light candidate from a technique.
     Optional<LightSample>
     sample_light_pool(const uint bucket, const float3 pos, inout RandomGenerator rng) {
         return nee.sample_light(bucket, pos, rng, material_system, env_map, time, false);
-    }
-
-    Optional<LightSample>
-    sample_light_grid(const uint cell, const float3 pos, inout RandomGenerator rng) {
-        return nee.sample_light(cell, pos, rng, material_system, env_map, time, true);
     }
 
     // A point on a light without its radiance, for the mixture estimator.
@@ -565,20 +616,28 @@ struct Scene {
     // Contribution of the reservoir's winner; traces the shadow ray if a light sample won.
     float3 resolve_direct_light(const float3 pos,
                                 const float3 face_normal,
-                                const DirectLightReservoir reservoir,
+                                const Optional<DirectLightSample> direct,
                                 const uint instances_mask = 0xff) {
-        if (!(reservoir.weight_sum > 0.f))
+        if (!direct.hasValue)
             return float3(0);
-        if (reservoir.needs_shadow_ray() &&
-            !trace_light_visibility(pos, face_normal, reservoir.light_pos,
-                                    reservoir.light_index == LIGHT_ENV_INDEX, instances_mask))
+        const DirectLightSample s = direct.value;
+        if (!trace_light_visibility(pos, face_normal, s.light_pos, s.light_index == LIGHT_ENV_INDEX,
+                                    instances_mask))
             return float3(0);
-        return reservoir.resolve();
+        return s.value;
     }
 
     // Which light the ray from origin along dir ended on, and the density with which
     // the light techniques would have generated that point with. For MIS against scatter
     // independent of the shading point, so it can run before the hit is shaded.
+    LightHit get_light_hit(const DirectLightVertex vertex,
+                           const float3 origin,
+                           const float3 dir,
+                           const Hit hit) {
+        return get_light_hit(vertex.bucket, origin, dir, hit, nee.pool_candidates(),
+                             nee.cell_candidates());
+    }
+
     LightHit get_light_hit(const uint cell,
                            const float3 origin,
                            const float3 dir,

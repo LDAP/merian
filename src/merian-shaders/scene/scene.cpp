@@ -2052,6 +2052,7 @@ void Scene::update(const CommandBufferHandle& cmd,
     if (const bool thin_lens = cam->get_aperture_radius() > 0.f; thin_lens != thin_lens_enabled) {
         set_enable_thin_lens(thin_lens);
     }
+    lights.update_constants(composition);
 
     auto c = shader_object->get_cursor();
 

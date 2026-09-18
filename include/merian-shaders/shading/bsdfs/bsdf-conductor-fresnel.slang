@@ -30,7 +30,8 @@ struct ConductorFresnelBSDF<Inner : BSDF> : BSDF {
         return bsdf.pdf(wi, wo);
     }
 
-    override Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
+    override Optional<ShadingFunctionSample> sample_eval(const float3 wi,
+                                                         inout RandomGenerator rng) {
         if (let s = bsdf.sample_eval(wi, rng)) {
             ShadingFunctionSample r = s;
             const float3 h = normalize(wi + r.wo);
@@ -49,12 +50,20 @@ struct ConductorFresnelBSDF<Inner : BSDF> : BSDF {
     }
 
     property float effective_alpha {
-        get { return bsdf.effective_alpha; }
+        get {
+            return bsdf.effective_alpha;
+        }
     }
 
     property float specular_alpha {
-        get { return bsdf.specular_alpha; }
+        get {
+            return bsdf.specular_alpha;
+        }
+    }
+
+    uint get_lobe_types() {
+        return bsdf.get_lobe_types();
     }
 }
 
-}
+} // namespace merian

@@ -25,7 +25,9 @@ struct Albedo {
     }
 
     property float3 reflection {
-        get { return diffuse + specular; }
+        get {
+            return diffuse + specular;
+        }
     }
 }
 
@@ -50,23 +52,51 @@ interface BSDF : ShadingFunction {
     float3 get_preintegrated_specular(const float3 F0, const float3 wi);
 
     // GGX alpha (roughness^2) of the whole BSDF; a diffuse lobe counts as roughness 1.
-    property float effective_alpha { get; }
+    property float effective_alpha {
+        get;
+    }
 
     // GGX alpha (roughness^2) of the specular lobe.
-    property float specular_alpha { get; }
+    property float specular_alpha {
+        get;
+    }
+    // The lobes this BSDF can scatter into, as BSDFLobe flags.
+    uint get_lobe_types();
 }
 
 struct NullBSDF : BSDF {
-    float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) { return float3(0); }
-    Optional<float3> sample(const float3 wi, inout RandomGenerator rng) { return none; }
-    float pdf(const float3 wi, const float3 wo) { return 0; }
+    float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) {
+        return float3(0);
+    }
+    Optional<float3> sample(const float3 wi, inout RandomGenerator rng) {
+        return none;
+    }
+    float pdf(const float3 wi, const float3 wo) {
+        return 0;
+    }
     Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
         return sample_eval_impl<This>(this, wi, rng);
     }
-    Albedo get_albedo(const float3 wi) { return Albedo(float3(0), float3(0)); }
-    float3 get_preintegrated_specular(const float3 F0, const float3 wi) { return float3(0); }
-    property float effective_alpha { get { return 1.0f; } }
-    property float specular_alpha { get { return 1.0f; } }
+    Albedo get_albedo(const float3 wi) {
+        return Albedo(float3(0), float3(0));
+    }
+    float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
+        return float3(0);
+    }
+    property float effective_alpha {
+        get {
+            return 1.0f;
+        }
+    }
+    property float specular_alpha {
+        get {
+            return 1.0f;
+        }
+    }
+
+    uint get_lobe_types() {
+        return uint(BSDFLobe::None);
+    }
 }
 
-}
+} // namespace merian

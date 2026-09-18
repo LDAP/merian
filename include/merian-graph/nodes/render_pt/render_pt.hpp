@@ -79,6 +79,8 @@ class RenderPT : public Node {
 
     vk::Extent3D extent = vk::Extent3D{1920, 1080, 1};
     int32_t spp = 1;
+    // Decorrelates a run from another of the same configuration.
+    uint32_t seed = 0;
     int32_t max_path_length = 5;
     int32_t emitted_max_path_length = max_path_length;
     bool emission_on_primary = true;
@@ -94,20 +96,28 @@ class RenderPT : public Node {
     // Single scattering along the primary ray; compiled out where the scene has no medium.
     bool volume_available = false;
     int32_t volume_spp = 1;
-    int32_t volume_nee_candidates = 0;
     bool volume_forward_project = true;
     float volume_forward_project_min_z = 50.f;
     vk::Format volume_depth_format = vk::Format::eR32Sfloat;
 
     // 0 = one draw from the mixture (MIS), 1 = resample several (RIS)
+    int32_t guiding_debug_view = 0;
+    bool scatter_stats = false;
+    bool follow_specular = true;
+    float specular_alpha = 0.f;
     int32_t scatter_mode = 0;
     int32_t scatter_candidates = 2;
 
     int32_t nee_mode = 2;
     float nee_probability = 0.1f;
-    int32_t nee_candidates = 3;
-    int32_t nee_grid_candidates = 2;
     int32_t nee_bounces = 0;
+
+    // How the one scatter sample is split with a guiding method.
+    float guiding_share = 0.5f;
+    bool guiding_scale_with_alpha = true;
+    float guiding_alpha_threshold = 0.05f;
+    int32_t guiding_direct_target = 0;
+    float guiding_distance_share = 0.9f;
     std::array<bool, 8> mask_enabled{true, true, true, true, true, true, true, true};
 
     struct VolumePass {

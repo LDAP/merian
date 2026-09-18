@@ -2,10 +2,38 @@ __exported import merian_shaders.utils.random;
 
 namespace merian {
 
-enum BSDFLobe {
-    Delta,   // singular (perfect mirror / refraction)
-    Glossy,  // microfacet reflection or transmission
-    Diffuse, // Lambertian / ideal-rough
+// Reflection and transmission occupy separate nibbles.
+enum BSDFLobe : uint {
+    None = 0x00,
+
+    DiffuseReflection = 0x01,  // Lambertian / ideal-rough
+    GlossyReflection = 0x02,   // microfacet
+    DeltaReflection = 0x04,    // singular (perfect mirror)
+
+    DiffuseTransmission = 0x10,
+    GlossyTransmission = 0x20,
+    DeltaTransmission = 0x40, // singular (perfect refraction)
+
+    Reflection = 0x07,
+    Transmission = 0x70,
+    Delta = 0x44,
+    NonDelta = 0x33,
+    All = 0x77,
+}
+
+// The BSDF can scatter to the far side of the surface.
+bool bsdf_is_transmissive(const uint lobes) {
+    return (lobes & uint(BSDFLobe::Transmission)) != 0;
+}
+
+// Every lobe is singular, so no finite-density sampling strategy can hit this BSDF.
+bool bsdf_is_delta_only(const uint lobes) {
+    return lobes != 0 && (lobes & uint(BSDFLobe::NonDelta)) == 0;
+}
+
+// The sample came from a singular lobe, whichever side it scattered to.
+bool bsdf_lobe_is_delta(const BSDFLobe lobe) {
+    return (uint(lobe) & uint(BSDFLobe::Delta)) != 0;
 }
 
 // A sample from a BSDF or PhaseFunction.
@@ -23,7 +51,7 @@ struct ShadingFunctionSample {
         this.wo = wo;
         this.pdf = pdf;
         this.weight = weight;
-        this.lobe = BSDFLobe::Glossy;
+        this.lobe = BSDFLobe::GlossyReflection;
     }
 
     __init(const float3 wo, const float pdf, const float3 weight, const BSDFLobe lobe) {
@@ -73,7 +101,8 @@ interface ShadingFunction {
     Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng);
 }
 
-// Utility for default implementations of sample_eval (Slang issue prevents a default implementation)
+// Utility for default implementations of sample_eval (Slang issue prevents a default
+// implementation)
 Optional<ShadingFunctionSample>
 sample_eval_impl<T : ShadingFunction>(const T sf, const float3 wi, inout RandomGenerator rng) {
     const Optional<float3> optional_wo = sf.sample(wi, rng);
@@ -84,4 +113,4 @@ sample_eval_impl<T : ShadingFunction>(const T sf, const float3 wi, inout RandomG
     return none;
 }
 
-}
+} // namespace merian

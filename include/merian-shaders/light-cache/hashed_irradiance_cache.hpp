@@ -35,8 +35,8 @@ class HashedIrradianceCache {
         grid.write_to(cursor["grid"]);
     }
 
-    void properties(Properties& props) {
-        grid.properties(props);
+    void set_grid_params(const HashGrid::Params& p) {
+        grid.set_params(p);
     }
 
     uint32_t get_buffer_size() const {

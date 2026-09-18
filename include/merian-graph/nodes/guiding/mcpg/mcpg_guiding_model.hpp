@@ -1,5 +1,7 @@
 #pragma once
 
+#include "merian-shaders/utils/hash_grid.hpp"
+
 #include "merian-graph/nodes/guiding/mcpg/mcpg.hpp"
 #include "merian-shaders/light-cache/hashed_irradiance_cache.hpp"
 #include "merian-shaders/sampling/guiding.hpp"
@@ -30,6 +32,9 @@ class MCPGGuidingModel : public GuidingModel {
     bool properties(Properties& props) override;
 
   private:
+    HashGrid::Params grid_params;
+    HashGrid::Params lc_params;
+
     void recreate_grids();
 
     ShaderCompileContextHandle compile_context;
@@ -52,11 +57,9 @@ class MCPGGuidingModel : public GuidingModel {
     int32_t mc_samples = 5;
     float dir_guide_prior = 0.2f;
     float mc_conf_z = 1.6449f;
-    float probability = 0.5f;
-    bool scale_with_alpha = true;
-    float alpha_threshold = 0.05f;
+    bool mc_welford_chord = true;
+    float weight_exponent = 1.0f;
     bool missing_light_heuristic = true;
-    int32_t direct_target = 0;
     bool light_cache_tail = false;
     float lc_min_pdf = 1.0f;
 };

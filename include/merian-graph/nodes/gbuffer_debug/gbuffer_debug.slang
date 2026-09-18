@@ -312,9 +312,8 @@ static const float3 CAST_FAIL = float3(1, 1, 0);
         const OrthonormalFrame frame = sp.shading_frame;
         const float3 wi_local = frame.to_local(-ray.Direction);
         RandomGenerator rng = PCG(pcg4d16(uint4(pixel, scene.frame, 0)));
-        const uint cell = scene.get_light_bucket(pixel, sp.pos);
-        const bool in_grid = (cell & LIGHT_BUCKET_TILE) == 0;
-        if (!in_grid) {
+        const uint cell = scene.get_light_bucket(sp.pos, rng);
+        if (cell == LIGHT_INVALID_INDEX) {
             color = float4(0, 0, 0, 1);
             break;
         }

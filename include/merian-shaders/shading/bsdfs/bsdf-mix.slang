@@ -35,7 +35,7 @@ struct MixBSDF<B0 : BSDF, B1 : BSDF> : BSDF {
         if (weight > 0.0f && rng.next_float() < weight) {
             if (let s = bsdf1.sample_eval(wi, rng)) {
                 // The mix weight cancels against the probability of having picked that lobe.
-                if (s.lobe == BSDFLobe::Delta) {
+                if (bsdf_lobe_is_delta(s.lobe)) {
                     return ShadingFunctionSample(s.wo, weight * s.pdf, s.weight, s.lobe);
                 }
                 const float mix_pdf = lerp(bsdf0.pdf(wi, s.wo), s.pdf, weight);
@@ -45,7 +45,7 @@ struct MixBSDF<B0 : BSDF, B1 : BSDF> : BSDF {
             return none;
         }
         if (let s = bsdf0.sample_eval(wi, rng)) {
-            if (s.lobe == BSDFLobe::Delta) {
+            if (bsdf_lobe_is_delta(s.lobe)) {
                 return ShadingFunctionSample(s.wo, (1.0f - weight) * s.pdf, s.weight, s.lobe);
             }
             const float mix_pdf = lerp(s.pdf, bsdf1.pdf(wi, s.wo), weight);
@@ -58,8 +58,7 @@ struct MixBSDF<B0 : BSDF, B1 : BSDF> : BSDF {
     Albedo get_albedo(const float3 wi) {
         const Albedo a0 = bsdf0.get_albedo(wi);
         const Albedo a1 = bsdf1.get_albedo(wi);
-        return Albedo(lerp(a0.diffuse, a1.diffuse, weight),
-                      lerp(a0.specular, a1.specular, weight));
+        return Albedo(lerp(a0.diffuse, a1.diffuse, weight), lerp(a0.specular, a1.specular, weight));
     }
 
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
@@ -79,6 +78,19 @@ struct MixBSDF<B0 : BSDF, B1 : BSDF> : BSDF {
             return sqrt(lerp(pow2(bsdf0.specular_alpha), pow2(bsdf1.specular_alpha), weight));
         }
     }
+
+    // A branch the weight never selects contributes none: ORing unconditionally would report
+    // transmission on every opaque surface built by weighting a lobe to zero.
+    uint get_lobe_types() {
+        uint lobes = 0;
+        if (weight < 1.0f) {
+            lobes |= bsdf0.get_lobe_types();
+        }
+        if (weight > 0.0f) {
+            lobes |= bsdf1.get_lobe_types();
+        }
+        return lobes;
+    }
 }
 
-}
+} // namespace merian

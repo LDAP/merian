@@ -37,6 +37,11 @@ struct PathVertex {
     // a medium vertex has no surface: the frame is built around the view direction and the lobe
     // width is the phase function's
     bool in_volume;
+    // The geometric normal, turned to the shading frame's side. A direction below it would start
+    // the continuation ray inside the geometry.
+    float3 geo_normal;
+    // The surface scatters to its far side, so a direction below either normal is not dead there.
+    bool transmissive;
 
     property float3 normal {
         get {
@@ -71,15 +76,18 @@ struct PathSegment {
     // False where the surface refused the direction. A ray that left the scene did trace: it
     // reached the environment.
     bool traced;
+    // the vertex the ray ended on
     float3 next_pos;
+    // Where the light along wo appears to come from: behind every surface the path was followed
+    // through, at the distance the whole way there. Equal to next_pos where nothing was followed.
+    float3 aim_pos;
     float3 next_normal;
     // worldspace velocity of the geometry at next_pos
     half3 next_mv;
     // radiance arriving from the next vertex
     float3 incident;
-    // share of that radiance the scatter technique is the one that pays for: 1 where no light
-    // sampler could have found it
-    float nee_weight;
+    // what a guiding method learns of that radiance, after the direct light policy
+    float direct_scale;
 }
 
 // What a guiding method offers at one vertex: directions in worldspace (solid angle) for a
@@ -90,13 +98,19 @@ interface GuidingDistribution<T : IFloat> : Distribution<T> {
     // False where nothing was found; the integrator then samples the BSDF alone.
     bool is_valid();
 
-    // Probability the integrator gives this distribution in the one-sample mixture.
-    float get_selection_probability(const float alpha);
+    // Scales the share the integrator gives this distribution; may exceed 1.
+    float get_confidence();
+}
+
+// What a method can show of its own state, for one point on screen.
+interface GuidingDebugModel {
+    bool debug_view(const int selector, const RenderFrameInfo frame_info, const PathVertex vertex,
+                    inout RandomGenerator rng, out float4 color);
 }
 
 // A directional guiding method: a resource-holding object in the shader binding that hands out
 // one GuidingDistribution per vertex and learns from the continuation.
-interface GuidingModel {
+interface GuidingModel : GuidingDebugModel {
     // Carried along a path, for methods that reuse what a lookup found one vertex earlier.
     associatedtype PathState;
     associatedtype DistributionImpl : GuidingDistribution<float3>;
@@ -112,8 +126,11 @@ interface GuidingModel {
     /* Narrows the distribution down to what the update needs, once the direction is known.
      *
      * Called before the continuation ray is traced, so that the distribution itself dies there.
+     * The segment carries the direction but not yet what came back along it: only pos, wo, pdf
+     * and the delta flag are set. A zero pdf means the vertex generated no direction at all.
      */
-    UpdateRecord record_scatter(const DistributionImpl dist, const bool guided);
+    UpdateRecord record_scatter(const DistributionImpl dist, const PathSegment segment,
+                                const bool guided, inout RandomGenerator rng);
 
     /* Learns from the resolved continuation.
      *
@@ -158,7 +175,8 @@ interface DistanceGuidingModel {
                                       const RayVertex vertex, inout RandomGenerator rng);
 
     // Narrows the distribution down to what the update needs, once the distance is known.
-    UpdateRecord record_scatter(const DistributionImpl dist, const bool guided);
+    UpdateRecord record_scatter(const DistributionImpl dist, const float wo, const bool guided,
+                                inout RandomGenerator rng);
 
     // Learns from the resolved scattering event.
     void record_segment(inout PathState state, const RenderFrameInfo frame_info,
@@ -179,8 +197,8 @@ struct NullGuidingDistribution : GuidingDistribution<float3> {
     bool is_valid() {
         return false;
     }
-    float get_selection_probability(const float alpha) {
-        return 0.f;
+    float get_confidence() {
+        return 1.f;
     }
 }
 
@@ -203,7 +221,10 @@ struct NullGuidingModel : GuidingModel {
         return {};
     }
 
-    State record_scatter(const NullGuidingDistribution dist, const bool guided) {
+    State record_scatter(const NullGuidingDistribution dist,
+                         const PathSegment segment,
+                         const bool guided,
+                         inout RandomGenerator rng) {
         return {};
     }
 
@@ -213,6 +234,15 @@ struct NullGuidingModel : GuidingModel {
                           const PathSegment segment,
                           inout RandomGenerator rng) {
         return float3(0);
+    }
+
+    bool debug_view(const int selector,
+                    const RenderFrameInfo frame_info,
+                    const PathVertex vertex,
+                    inout RandomGenerator rng,
+                    out float4 color) {
+        color = float4(0);
+        return false;
     }
 }
 
@@ -229,8 +259,8 @@ struct NullDistanceGuidingDistribution : GuidingDistribution<float> {
     bool is_valid() {
         return false;
     }
-    float get_selection_probability(const float alpha) {
-        return 0.f;
+    float get_confidence() {
+        return 1.f;
     }
 }
 
@@ -253,7 +283,10 @@ struct NullDistanceGuidingModel : DistanceGuidingModel {
         return {};
     }
 
-    State record_scatter(const NullDistanceGuidingDistribution dist, const bool guided) {
+    State record_scatter(const NullDistanceGuidingDistribution dist,
+                         const float wo,
+                         const bool guided,
+                         inout RandomGenerator rng) {
         return {};
     }
 
@@ -278,6 +311,28 @@ struct ScatterSample {
     bool guided;
 }
 
+// What a guiding method learns from a vertex that ended on a light.
+static const int GUIDING_DIRECT_FULL = 0; // the emission as the continuation found it
+static const int GUIDING_DIRECT_MIS = 1;  // only the share the scatter technique pays for
+static const int GUIDING_DIRECT_NONE = 2; // nothing
+
+// How the integrator splits its one scatter sample with a guiding method.
+extern static const float merian_guiding_share = 0.5;
+extern static const bool merian_guiding_scale_with_alpha = true;
+// below this lobe width the guiding lobes are broader than the shading function itself
+extern static const float merian_guiding_alpha_threshold = 0.05;
+extern static const int merian_guiding_direct_target = GUIDING_DIRECT_FULL;
+
+// The share of the scatter samples a guiding distribution gets at a vertex of this width.
+float guiding_share<G : GuidingDistribution<float3>>(const G guiding, const float alpha) {
+    if (!guiding.is_valid() || alpha < merian_guiding_alpha_threshold) {
+        return 0.f;
+    }
+    const float share =
+        merian_guiding_scale_with_alpha ? merian_guiding_share * alpha : merian_guiding_share;
+    return clamp(share * guiding.get_confidence(), 0.f, 1.f);
+}
+
 // One-sample MIS between a shading function and a guiding distribution: a BSDF at a surface, a
 // phase function in a medium. Both are passed in per call so that neither stays live across the
 // continuation ray.
@@ -285,8 +340,8 @@ struct ScatterMixture {
     // 0 where the guiding distribution has nothing to offer
     float p_guiding;
 
-    __init<G : GuidingDistribution<float3>>(const G guiding, const float alpha) {
-        p_guiding = guiding.is_valid() ? guiding.get_selection_probability(alpha) : 0.f;
+    __init(const float share) {
+        p_guiding = share;
     }
 
     // The guiding term comes first on purpose: it consumes the candidates, and the material pdf
@@ -323,7 +378,7 @@ struct ScatterMixture {
             }
             wo_local = bs.value.wo;
             s.wo = frame.to_world(wo_local);
-            if (bs.value.lobe == BSDFLobe::Delta) {
+            if (bsdf_lobe_is_delta(bs.value.lobe)) {
                 // a delta direction has no density under the guiding lobe, so all that is left of
                 // the mixture is the chance of having drawn from the BSDF at all
                 s.f_cos = bs.value.weight;
@@ -380,7 +435,7 @@ struct ScatterMixture {
                 }
                 wo_local = bs.value.wo;
                 c.wo = frame.to_world(wo_local);
-                if (bs.value.lobe == BSDFLobe::Delta) {
+                if (bsdf_lobe_is_delta(bs.value.lobe)) {
                     // a delta direction has no density to resample against, so it leaves the pool
                     // the way the single draw takes it
                     c.f_cos = bs.value.weight;

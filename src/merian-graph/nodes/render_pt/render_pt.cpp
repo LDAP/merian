@@ -5,6 +5,7 @@
 #include "merian/vk/utils/profiler.hpp"
 
 #include <fmt/format.h>
+#include <spdlog/spdlog.h>
 
 namespace merian {
 
@@ -333,41 +334,55 @@ void RenderPT::update_render_constants() {
             mask |= (1u << bit);
     }
 
-    composition->add_module_from_string(
-        "render_pt_constants",
+    const std::string constants =
         fmt::format("namespace merian {{\n"
                     "export static const bool merian_render_emission_on_primary = {};\n"
+                    "export static const int merian_render_guiding_debug_view = {};\n"
+                    "export static const bool merian_render_scatter_stats = {};\n"
+                    "export static const bool merian_render_follow_specular = {};\n"
+                    "export static const float merian_render_specular_alpha = {:f};\n"
                     "export static const int merian_render_spp = {};\n"
+                    "export static const uint merian_render_seed = {}u;\n"
                     "export static const int merian_render_max_path_length = {};\n"
                     "export static const uint merian_render_instance_mask = {}u;\n"
                     "export static const bool merian_render_enable_ser = {};\n"
                     "export static const bool merian_render_demodulate_albedo = {};\n"
                     "export static const int merian_render_nee_mode = {};\n"
                     "export static const float merian_render_nee_probability = {:f};\n"
-                    "export static const int merian_render_nee_candidates = {};\n"
-                    "export static const int merian_render_nee_grid_candidates = {};\n"
                     "export static const int merian_render_nee_bounces = {};\n"
                     "export static const int merian_render_scatter_mode = {};\n"
                     "export static const int merian_render_scatter_candidates = {};\n"
                     "export static const int merian_render_volume_spp = {};\n"
-                    "export static const int merian_render_volume_nee_candidates = {};\n"
                     "export static const float merian_render_volume_forward_project_min_z "
                     "= {:f};\n"
+                    "export static const float merian_guiding_share = {:f};\n"
+                    "export static const bool merian_guiding_scale_with_alpha = {};\n"
+                    "export static const float merian_guiding_alpha_threshold = {:f};\n"
+                    "export static const int merian_guiding_direct_target = {};\n"
+                    "export static const float merian_guiding_distance_share = {:f};\n"
                     "}}",
-                    emission_on_primary ? "true" : "false", spp, max_path_length, mask,
-                    enable_ser ? "true" : "false", demodulate_albedo ? "true" : "false", nee_mode,
-                    nee_probability, nee_candidates, nee_grid_candidates, nee_bounces, scatter_mode,
-                    scatter_candidates, volume_spp, volume_nee_candidates,
-                    volume_forward_project_min_z));
+                    emission_on_primary ? "true" : "false", guiding_debug_view,
+                    scatter_stats ? "true" : "false", follow_specular ? "true" : "false",
+                    specular_alpha, spp, seed, max_path_length, mask, enable_ser ? "true" : "false",
+                    demodulate_albedo ? "true" : "false", nee_mode, nee_probability, nee_bounces,
+                    scatter_mode, scatter_candidates, volume_spp, volume_forward_project_min_z,
+                    guiding_share, guiding_scale_with_alpha ? "true" : "false",
+                    guiding_alpha_threshold, guiding_direct_target, guiding_distance_share);
+    SPDLOG_INFO("render_pt constants:\n{}", constants);
+    composition->add_module_from_string("render_pt_constants", constants);
 }
 
 RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
     bool needs_reconnect = false;
     bool constants_changed = false;
 
-    config.st_separate("surface");
     constants_changed |=
         config.config_int("samples per pixel", spp, "Number of paths per pixel.", 1, 16);
+    constants_changed |= config.config_uint(
+        "seed", seed,
+        "Decorrelates this run from another run of the same configuration. The sample stream "
+        "is a function of the pixel, the frame and the sample index alone, so a reference and "
+        "the images judged against it must not share it.");
     constants_changed |=
         config.config_int("max path length", max_path_length,
                           "Maximum number of path segments, including the primary hit.", 1, 16);
@@ -375,99 +390,156 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
         config.config_bool("emission on primary", emission_on_primary,
                            "Fold primary-hit emission into irradiance (self-contained). "
                            "Otherwise it is the GBuffer emission texture's job.");
-    constants_changed |= config.config_options(
-        "scatter sampling", scatter_mode, {"mixture (MIS)", "resampled (RIS)"},
-        Properties::OptionsStyle::COMBO,
-        "How one direction comes out of the guiding lobes and the shading function. 'resampled' "
-        "draws several and keeps one by how much the shading function makes of it, at the cost of "
-        "the extra evaluations; it still traces one ray.");
-    if (scatter_mode == 1) {
-        constants_changed |= config.config_int("scatter candidates", scatter_candidates,
-                                               "Directions drawn before one is kept.", 1, 16);
-    }
-    constants_changed |=
-        config.config_options("next event estimation", nee_mode, {"off", "mixture", "resampled"},
-                              Properties::OptionsStyle::COMBO,
-                              "Direct light sampling. 'mixture' replaces the "
-                              "scatter sample with a light sample and costs no "
-                              "extra ray; 'resampled' adds a shadow ray.");
-    if (nee_mode == 1) {
-        constants_changed |= config.config_percent(
-            "NEE probability", nee_probability,
-            "Fraction of scatter samples drawn from the lights. A light sample replaces the "
-            "scatter sample, so this is taken out of the budget the indirect signal lives on. How "
-            "far it pays depends on how good the light samples are: a tenth with the pool, most of "
-            "the budget once a cell list picks them.");
-    }
-    if (nee_mode != 0) {
-        constants_changed |= config.config_int(
-            "NEE candidates", nee_candidates,
-            "Light samples drawn from the pool. Resampled into the one shadow ray by unshadowed "
-            "contribution (RIS); the mixture draws one of them. 0 leaves the lights to the grid.",
-            0, 32);
-        constants_changed |= config.config_int(
-            "NEE grid candidates", nee_grid_candidates,
-            "Candidates drawn from the light grid's cell list, alongside the ones above. A "
-            "separate technique, so a cell that holds the wrong lights costs a candidate and "
-            "never density.",
-            0, 32);
-    }
-    if (nee_mode != 0) {
-        constants_changed |= config.config_int(
-            "NEE bounces", nee_bounces,
-            "Path vertices (counted from the primary hit) that perform NEE; 0 = all.", 0, 16);
-    }
-    constants_changed |=
-        config.config_bool("shader execution reordering", enable_ser,
-                           "Reorder threads after the primary hit to improve coherence.");
-    needs_reconnect |= config.config_bool(
-        "demodulate albedo", demodulate_albedo,
-        "Divide the primary-hit albedo out of the output so a denoiser can re-modulate after "
-        "filtering. Use with 'emission on primary' disabled (emission is albedo-independent).");
 
-    config.st_separate("volume");
-    constants_changed |= config.config_int(
-        "volume samples per pixel", volume_spp,
-        "Single-scattering samples along the primary ray; 0 disables the volume pass, and with it "
-        "every node that consumes its outputs.",
-        0, 16);
-    if (volume_spp > 0) {
-        constants_changed |= config.config_int(
-            "volume NEE candidates", volume_nee_candidates,
-            "Light samples resampled into the one shadow ray at the scattering vertex (RIS). "
-            "Costs a shadow ray per sample; worth it where the medium is lit by sources the phase "
-            "function rarely finds.",
-            0, 32);
-        needs_reconnect |= config.config_bool(
-            "volume forward project", volume_forward_project,
-            "Reproject the mean scattering distance into this frame's motion vectors instead of "
-            "keeping the surface ones, which describe the first opaque hit.");
-        if (volume_forward_project) {
-            constants_changed |= config.config_float(
-                "volume forward project min z", volume_forward_project_min_z,
-                "Below this scattering distance the surface motion vector is the better estimate.",
-                0.f);
+    if (config.st_begin_child("scatter", "Scatter")) {
+        constants_changed |= config.config_options(
+            "sampling", scatter_mode, {"mixture (MIS)", "resampled (RIS)"},
+            Properties::OptionsStyle::COMBO,
+            "How one direction comes out of the guiding lobes and the shading function. "
+            "'resampled' draws several and keeps one by how much the shading function makes of "
+            "it, at the cost of the extra evaluations; it still traces one ray.");
+        if (scatter_mode == 1) {
+            constants_changed |= config.config_int("candidates", scatter_candidates,
+                                                   "Directions drawn before one is kept.", 1, 16);
         }
+        constants_changed |= config.config_bool(
+            "follow specular", follow_specular,
+            "Follow a surface that scatters singularly instead of making it a path vertex: it "
+            "cannot be guided and no light sampler can reach it, so it costs a guiding query and "
+            "a write for nothing, and leaves the vertex before it aiming at the surface rather "
+            "than at the light behind it.");
+        if (follow_specular) {
+            constants_changed |= config.config_float(
+                "follow below alpha", specular_alpha,
+                "Also follow surfaces narrower than this, which do not scatter singularly. 0 "
+                "follows only the singular ones.",
+                0.01f, 0.f, 1.f);
+        }
+        config.st_end_child();
     }
 
-    config.st_separate("instance mask");
-    for (uint32_t bit = 0; bit < 8; ++bit) {
-        constants_changed |= config.config_bool(std::to_string(bit), mask_enabled[bit]);
-        if ((bit & 3u) != 3u)
-            config.st_no_space();
+    if (config.st_begin_child("nee", "Next event estimation")) {
+        constants_changed |= config.config_options(
+            "mode", nee_mode, {"off", "mixture", "resampled"}, Properties::OptionsStyle::COMBO,
+            "Direct light sampling. 'mixture' replaces the scatter sample "
+            "with a light sample and costs no extra ray; 'resampled' adds a "
+            "shadow ray. How a light is chosen is the scene's to set.");
+        if (nee_mode == 1) {
+            constants_changed |= config.config_percent(
+                "direct light share", nee_probability,
+                "Fraction of scatter samples drawn from the lights. A light sample replaces the "
+                "scatter sample, so this is taken out of the budget the indirect signal lives on. "
+                "How far it pays depends on how good the light samples are.");
+        }
+        if (nee_mode != 0) {
+            constants_changed |= config.config_int(
+                "bounces", nee_bounces,
+                "Path vertices (counted from the primary hit) that sample lights; 0 = all.", 0, 16);
+            if (nee_mode == 1) {
+                config.output_text(fmt::format("one draw: {:.0f} % light, {:.0f} % scatter",
+                                               nee_probability * 100.f,
+                                               (1.f - nee_probability) * 100.f));
+            } else {
+                config.output_text("candidates into one shadow ray: the scene's to split");
+            }
+        }
+        config.st_end_child();
+    }
+
+    if (config.st_begin_child("guiding", "Guiding")) {
+        if (!guiding) {
+            config.output_text("connect a guiding method to the guiding slot");
+        } else {
+            constants_changed |= config.config_percent(
+                "share", guiding_share,
+                "Fraction of the scatter samples the guiding method gets, where it found "
+                "something. The rest go to the shading function.");
+            constants_changed |= config.config_bool(
+                "scale with roughness", guiding_scale_with_alpha,
+                "Scale that share with the lobe width, so a narrow lobe keeps its own sampling.");
+            constants_changed |= config.config_float(
+                "roughness threshold", guiding_alpha_threshold,
+                "Below this lobe width the guiding lobes are broader than the shading function "
+                "itself, so nothing is guided.",
+                0.01f, 0.f, 1.f);
+            constants_changed |= config.config_options(
+                "direct light target", guiding_direct_target, {"full", "MIS", "none"},
+                Properties::OptionsStyle::COMBO,
+                "What a method learns from a vertex that ended on a light: the emission whole, "
+                "only the share the scatter technique pays for, or nothing.");
+            const float effective = guiding_scale_with_alpha ? guiding_share * 0.5f : guiding_share;
+            config.output_text(
+                fmt::format("at a lobe width of 0.5: {:.0f} % guided, {:.0f} % shading function",
+                            effective * 100.f, (1.f - effective) * 100.f));
+        }
+        config.st_end_child();
+    }
+
+    if (config.st_begin_child("volume", "Volume")) {
+        constants_changed |= config.config_int(
+            "samples per pixel", volume_spp,
+            "Single-scattering samples along the primary ray; 0 disables the volume pass, and "
+            "with it every node that consumes its outputs.",
+            0, 16);
+        if (volume_spp > 0) {
+            if (distance_guiding) {
+                constants_changed |= config.config_percent(
+                    "distance guiding share", guiding_distance_share,
+                    "Fraction of the distance samples the distance guiding method gets.");
+            }
+            needs_reconnect |= config.config_bool(
+                "forward project", volume_forward_project,
+                "Reproject the mean scattering distance into this frame's motion vectors instead "
+                "of keeping the surface ones, which describe the first opaque hit.");
+            if (volume_forward_project) {
+                constants_changed |= config.config_float(
+                    "forward project min z", volume_forward_project_min_z,
+                    "Below this scattering distance the surface motion vector is the better "
+                    "estimate.",
+                    0.f);
+            }
+        }
+        config.st_end_child();
+    }
+
+    if (config.st_begin_child("instance_mask", "Instance mask")) {
+        for (uint32_t bit = 0; bit < 8; ++bit) {
+            constants_changed |= config.config_bool(std::to_string(bit), mask_enabled[bit]);
+            if ((bit & 3u) != 3u)
+                config.st_no_space();
+        }
+        config.st_end_child();
+    }
+
+    if (config.st_begin_child("output", "Output")) {
+        needs_reconnect |= config.config_bool(
+            "demodulate albedo", demodulate_albedo,
+            "Divide the primary-hit albedo out of the output so a denoiser can re-modulate after "
+            "filtering. Use with 'emission on primary' disabled (emission is albedo-independent).");
+        constants_changed |= config.config_int(
+            "guiding debug view", guiding_debug_view,
+            "Render the guiding method's own view of its state instead of the image. 0 is off; "
+            "what each index shows is listed by the guiding node.",
+            0, 16);
+        constants_changed |= config.config_bool(
+            "scatter statistics", scatter_stats,
+            "Replace the image with per-pixel counts of the scatter samples the guiding drew and "
+            "the ones nothing could be traced from.");
+        needs_reconnect |= config.config_enum("irradiance format", irradiance_format,
+                                              Properties::OptionsStyle::COMBO);
+        constants_changed |=
+            config.config_bool("shader execution reordering", enable_ser,
+                               "Reorder threads after the primary hit to improve coherence.");
+        needs_reconnect |= config.config_bool(
+            "ray tracing pipeline", use_raygen,
+            "Trace from a raygen shader instead of a compute shader. The compute path avoids the "
+            "ray-tracing pipeline register cap.");
+        config.st_end_child();
     }
 
     if (constants_changed && composition) {
         update_render_constants();
     }
-
-    config.st_separate();
-    needs_reconnect |= config.config_bool(
-        "ray tracing pipeline", use_raygen,
-        "Trace from a raygen shader instead of a compute shader. The compute path avoids the "
-        "ray-tracing pipeline register cap.");
-    needs_reconnect |=
-        config.config_enum("irradiance format", irradiance_format, Properties::OptionsStyle::COMBO);
 
     if (needs_reconnect) {
         return NEEDS_RECONNECT;

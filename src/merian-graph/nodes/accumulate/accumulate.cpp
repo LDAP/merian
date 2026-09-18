@@ -166,7 +166,8 @@ Accumulate::process(const NodeIO& io, const NodeProcessInfo& info, Submission& s
                  vk::PipelineStageFlagBits::eComputeShader, bar);
 
     {
-        if (info.get_iteration() == 0 || clear) {
+        if (info.get_iteration() == 0 || clear ||
+            (clear_at_iteration > 0 && info.get_iteration() == uint64_t(clear_at_iteration))) {
             accumulate_pc.clear = VK_TRUE;
             io.send_event("clear");
             clear = false;
@@ -197,6 +198,10 @@ Accumulate::NodeStatusFlags Accumulate::properties(Properties& config) {
     accumulate_pc.accum_max_hist =
         config.config_bool("inf history") ? INFINITY : accumulate_pc.accum_max_hist;
     clear |= config.config_bool("clear");
+    config.config_int("clear at iteration", clear_at_iteration,
+                      "Clear once when this iteration is reached, so that what the renderer has "
+                      "learned up to it is kept while the image starts over. 0 never does.");
+    clear_at_iteration = std::max(clear_at_iteration, 0);
     needs_rebuild |= events.properties(config);
 
     config.st_separate("Reproject");

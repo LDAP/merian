@@ -44,7 +44,7 @@ struct FresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
             take_layer ? layer.sample_eval(wi, rng) : base.sample_eval(wi, rng);
         if (let s = sub) {
             // The Fresnel cancels against the probability of having picked that lobe.
-            if (s.lobe == BSDFLobe::Delta) {
+            if (bsdf_lobe_is_delta(s.lobe)) {
                 return ShadingFunctionSample(s.wo, (take_layer ? F : 1.0f - F) * s.pdf, s.weight,
                                              s.lobe);
             }
@@ -66,12 +66,20 @@ struct FresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
 
     // Weighted RMS, by the share of the response the layer takes at normal incidence.
     property float effective_alpha {
-        get { return sqrt(lerp(pow2(base.effective_alpha), pow2(layer.effective_alpha), ior_f0)); }
+        get {
+            return sqrt(lerp(pow2(base.effective_alpha), pow2(layer.effective_alpha), ior_f0));
+        }
     }
 
     property float specular_alpha {
-        get { return layer.specular_alpha; }
+        get {
+            return layer.specular_alpha;
+        }
+    }
+
+    uint get_lobe_types() {
+        return layer.get_lobe_types() | base.get_lobe_types();
     }
 }
 
-}
+} // namespace merian

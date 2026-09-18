@@ -13,19 +13,27 @@ using merian;
 
 namespace merian {
 extern static const bool merian_render_emission_on_primary = true;
+// which of the guiding method's own views to render instead of the image; 0 renders the image
+extern static const int merian_render_guiding_debug_view = 0;
 extern static const int merian_render_spp = 1;
+// Decorrelates a run from another of the same configuration: the sample stream is otherwise a
+// function of the pixel, the frame and the sample index alone.
+extern static const uint merian_render_seed = 0;
 extern static const int merian_render_max_path_length = 8;
 extern static const uint merian_render_instance_mask = 0xFFu;
 extern static const bool merian_render_enable_ser = false;
 extern static const bool merian_render_demodulate_albedo = false;
-// linear roughness of the primary surface below which the specular hit distance is written
+// Follow a surface that only passes light on, instead of making it a path vertex: no lobe
+// represents a delta BSDF and no light sampler can reach it.
+extern static const bool merian_render_follow_specular = true;
+// Also follow surfaces narrower than this; 0 follows only the singular ones.
+extern static const float merian_render_specular_alpha = 0.f;
+// Replace the image with per-pixel counts of the guided draws and the dead ones.
+extern static const bool merian_render_scatter_stats = false;
 extern static const int merian_render_nee_mode = NEE_MODE_RESAMPLED;
 // probability of replacing the scatter sample with a light sample (NEE_MODE_MIXTURE)
 extern static const float merian_render_nee_probability = 0.5;
 // light samples resampled into one shadow ray (NEE_MODE_RESAMPLED)
-extern static const int merian_render_nee_candidates = 1;
-// candidates drawn from the light grid's cell list, alongside the ones above
-extern static const int merian_render_nee_grid_candidates = 0;
 // vertices (from the primary) that perform NEE; 0 = all
 extern static const int merian_render_nee_bounces = 0;
 // SCATTER_MODE_MIS draws the direction once from the mixture; SCATTER_MODE_RIS draws several and
@@ -60,14 +68,57 @@ struct RenderBinding {
     ParameterBlock<RenderGuiding> guiding;
 }
 
-float3
-trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
-                                     const ParameterBlock<RenderBinding> params,
-                                     const uint2 pixel,
-                                     RayDesc ray,
-                                     ShadingPoint sp,
-                                     const uint16_t sample_index,
-                                     inout RandomGenerator rng) {
+// What a light candidate is worth here: its unshadowed contribution and the density the scatter
+// techniques would have had for it.
+struct ScatterTarget<B : ShadingFunction, G : GuidingDistribution<float3>, V : HomogeneousVolume>
+    : IDirectLightTarget {
+    B bsdf;
+    G guiding;
+    ScatterMixture mixture;
+    PathMedium<V> medium;
+    OrthonormalFrame frame;
+    float3 wi_local;
+    float3 shading_normal;
+    float3 face_normal;
+
+    float3 unshadowed(const LightSample ls, inout RandomGenerator rng) {
+        // a shadow ray towards a light the geometry hides would start behind the surface
+        const float3 ng = dot(face_normal, shading_normal) < 0.f ? -face_normal : face_normal;
+        if ((dot(ls.wo, shading_normal) < 0.f) != (dot(ls.wo, ng) < 0.f)) {
+            return float3(0);
+        }
+        return bsdf.eval(wi_local, frame.to_local(ls.wo), rng) * ls.Li *
+               medium.transmittance(ls.dist);
+    }
+
+    float scatter_pdf(const LightSample ls) {
+        return mixture.pdf(bsdf, guiding, wi_local, frame.to_local(ls.wo), ls.wo);
+    }
+}
+
+ScatterTarget<B, G, V>
+make_scatter_target<B : ShadingFunction, G : GuidingDistribution<float3>, V : HomogeneousVolume>(
+    const B bsdf,
+    const G guiding,
+    const ScatterMixture mixture,
+    const PathMedium<V> medium,
+    const OrthonormalFrame frame,
+    const float3 wi_local,
+    const float3 shading_normal,
+    const float3 face_normal) {
+    ScatterTarget<B, G, V> target = {bsdf,  guiding,  mixture,        medium,
+                                     frame, wi_local, shading_normal, face_normal};
+    return target;
+}
+
+float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
+                                            const ParameterBlock<RenderBinding> params,
+                                            const uint2 pixel,
+                                            RayDesc ray,
+                                            ShadingPoint sp,
+                                            const uint16_t sample_index,
+                                            inout RandomGenerator rng,
+                                            inout float3 scatter_stats) {
     // Medium the ray is travelling through; updated on transmission events.
     var medium = scene.make_path_medium();
 
@@ -79,9 +130,6 @@ trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
     var guiding_state = params.guiding.begin_path();
 
     const bool nee = merian_render_nee_mode != NEE_MODE_OFF && scene.nee.has_lights();
-    const uint grid_candidates = uint(max(merian_render_nee_grid_candidates, 0));
-    // the mixture makes one draw, so a vertex always needs a technique to draw it from
-    const uint candidates = uint(max(merian_render_nee_candidates, grid_candidates > 0 ? 0 : 1));
 
     for (uint16_t bounce = 1; bounce < merian_render_max_path_length; bounce++) {
         // the ray left the scene: nothing to scatter from, emission is already accumulated
@@ -91,8 +139,7 @@ trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
 
         const bool nee_here =
             nee && (merian_render_nee_bounces <= 0 || bounce <= merian_render_nee_bounces);
-        const uint light_bucket =
-            nee_here ? scene.get_light_bucket(pixel, sp.pos) : LIGHT_INVALID_INDEX;
+        let lights = scene.begin_direct_light(sp.pos, rng);
         // Drawn before the mixture below is built: the triangle record would otherwise be live
         // across the guiding candidates and the material sample at once.
         const bool light_technique = merian_render_nee_mode == NEE_MODE_MIXTURE && nee_here &&
@@ -100,8 +147,7 @@ trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
         uint sampled_light = LIGHT_INVALID_INDEX;
         float3 light_dir = float3(0, 0, 1);
         if (light_technique) {
-            if (let lp = scene.sample_light_point(light_bucket, sp.pos, rng, candidates,
-                                                  grid_candidates)) {
+            if (let lp = scene.sample_direct_light_point(lights, rng)) {
                 // aimed from where the ray will start: a direction taken from the unoffset point
                 // misses the sampled triangle near its edges
                 const float3 ng = sp.get_face_normal();
@@ -115,40 +161,33 @@ trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
         const OrthonormalFrame frame = sp.shading_frame;
         let bsdf = sp.surface_material.get_bsdf();
         const float3 wi_local = frame.to_local(-ray.Direction);
-        const PathVertex vertex = {sp.pos, sp.prev_pos,  frame, bsdf.effective_alpha,
-                                   bounce, sample_index, pixel};
+        const float3 ns = frame.get_normal();
+        const float3 ng = sp.get_face_normal();
+        const PathVertex vertex = {sp.pos,
+                                   sp.prev_pos,
+                                   frame,
+                                   bsdf.effective_alpha,
+                                   bounce,
+                                   sample_index,
+                                   pixel,
+                                   false,
+                                   dot(ng, ns) < 0.f ? -ng : ng,
+                                   bsdf_is_transmissive(bsdf.get_lobe_types())};
 
         // 1. the guiding lobes around this vertex, mixed with the BSDF
         let guiding = params.guiding.get_distribution(guiding_state, frame_info, vertex, rng);
-        const ScatterMixture mixture = ScatterMixture(guiding, bsdf.effective_alpha);
+        const ScatterMixture mixture =
+            ScatterMixture(merian::guiding_share(guiding, bsdf.effective_alpha));
 
         // light sampling is wasted on a near-specular lobe: it is far more peaked than any light
         const bool nee_surface = nee_here && bsdf.effective_alpha >= NEE_MIN_ALPHA;
 
-        // 2. resampled direct light: M candidates share one shadow ray. Only the reservoir
-        // survives to the trace below; the candidates die here.
-        DirectLightReservoir reservoir = DirectLightReservoir();
+        // 2. resampled direct light: only the survivor reaches the shadow ray below
+        Optional<DirectLightSample> direct = none;
         if (merian_render_nee_mode == NEE_MODE_RESAMPLED && nee_surface) {
-            for (uint i = 0; i < candidates + grid_candidates; i++) {
-                Optional<LightSample> candidate;
-                if (i < candidates) {
-                    candidate = scene.sample_light_pool(light_bucket, sp.pos, rng);
-                } else {
-                    candidate = scene.sample_light_grid(light_bucket, sp.pos, rng);
-                }
-                if (let ls = candidate) {
-                    const float3 wo_l = frame.to_local(ls.wo);
-                    // A light the geometry hides is not reachable from this surface, however the
-                    // shading frame tilts: the shadow ray would start behind it and escape.
-                    if (!sp.geometric_side_matches_shading(ls.wo))
-                        continue;
-                    const float lights = scene.nee.pdf_lights(light_bucket, ls.index, ls.pdf,
-                                                              candidates, grid_candidates);
-                    reservoir.add_light(
-                        ls, bsdf.eval(wi_local, wo_l, rng) * ls.Li * medium.transmittance(ls.dist),
-                        lights + mixture.pdf(bsdf, guiding, wi_local, wo_l, ls.wo), rng);
-                }
-            }
+            direct = scene.sample_direct_light(
+                lights,
+                make_scatter_target(bsdf, guiding, mixture, medium, frame, wi_local, ns, ng), rng);
         }
 
         // 3. one scatter direction: from a light, or out of the mixture. The light technique
@@ -207,18 +246,19 @@ trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
         segment.traced = false;
         segment.is_last = bounce + uint16_t(1) >= merian_render_max_path_length;
         segment.next_pos = vertex.pos;
+        segment.aim_pos = vertex.pos;
         segment.next_normal = segment.normal;
         segment.next_mv = half3(0);
         segment.incident = float3(0);
-        segment.nee_weight = 1.f;
+        segment.direct_scale = merian_guiding_direct_target == GUIDING_DIRECT_NONE ? 0.f : 1.f;
 
         // Last thing before the ray: the record is what crosses the traversal, so it must not be
         // taken while the mixture densities above are still live.
-        let guiding_record = params.guiding.record_scatter(guiding, guided);
+        let guiding_record = params.guiding.record_scatter(guiding, segment, guided, rng);
 
         // The shadow ray goes out once the guiding candidates are dead: only the reservoir and
         // the narrowed record cross this traversal.
-        radiance += throughput * scene.resolve_direct_light(sp.pos, sp.get_face_normal(), reservoir,
+        radiance += throughput * scene.resolve_direct_light(sp.pos, sp.get_face_normal(), direct,
                                                             merian_render_instance_mask);
 
         Reorder.reorder();
@@ -230,6 +270,11 @@ trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
             next_ray = sp.make_ray(-ray.Direction, wo_world, transmission);
         }
 
+        if (merian_render_scatter_stats && guided) {
+            scatter_stats += float3(1.f, select(all(f_cos <= 0.f), 1.f, 0.f),
+                                    select(any(f_cos > 0.f) && !next_ray.hasValue, 1.f, 0.f));
+        }
+
         if (let next = next_ray) {
             if (merian_material_system_any_interior_volume && transmission) {
                 // leaving a surface puts the ray back into the medium enclosing the scene
@@ -238,48 +283,128 @@ trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
             }
             ray = next;
 
-            // the last vertex is never scattered from, so its material sample would be dead
-            const Hit hit = scene.trace_ray(ray, RAY_FLAG_NONE, merian_render_instance_mask);
-
-            // resolved before the hit is shaded, so neither the hit nor the ray stay live across
-            // it. A delta direction is one no light sampler could have produced, and a vertex that
-            // drew no light sample owes the emission it found in full.
             float mis_weight = 1.f;
-            if (nee_surface && !delta) {
-                const LightHit lh = scene.get_light_hit(light_bucket, ray.Origin, ray.Direction,
-                                                        hit, candidates, grid_candidates);
-                if (merian_render_nee_mode == NEE_MODE_RESAMPLED) {
-                    mis_weight = segment.pdf / (lh.pdf + segment.pdf);
-                } else {
-                    segment.pdf += p_light * lh.pdf / float(max(candidates + grid_candidates, 1u));
-                    // a light sample that reached something else is occluded: the vertex the ray
-                    // found was generated by neither technique
-                    if (sampled_light != LIGHT_INVALID_INDEX && sampled_light != lh.index) {
-                        segment.pdf = 0.f;
+            // what the surfaces followed through cost, and how far the light behind them is
+            float3 chain_bsdf = float3(1);
+            float3 chain_transmittance = float3(1);
+            float unfolded = 0.f;
+            // an interface compresses what is behind it, so every segment past one counts for less
+            float unfold_scale = 1.f;
+            // focal length of the mirror the last segment reflected off, 0 where it was flat
+            float pending_focal = 0.f;
+            bool through_specular = false;
+
+            for (;;) {
+                // the last vertex is never scattered from, so its material sample would be dead
+                const Hit hit = scene.trace_ray(ray, RAY_FLAG_NONE, merian_render_instance_mask);
+
+                // Resolved before the hit is shaded, so neither stays live across it. Only the
+                // first segment is weighed: no light sampler reaches past a singular surface.
+                if (!through_specular && nee_surface && !delta) {
+                    const LightHit lh = scene.get_light_hit(lights, ray.Origin, ray.Direction, hit);
+                    if (merian_render_nee_mode == NEE_MODE_RESAMPLED) {
+                        mis_weight = segment.pdf / (lh.pdf + segment.pdf);
+                    } else {
+                        segment.pdf += p_light * scene.direct_light_mixture_pdf(lh.pdf);
+                        // a light sample that reached something else is occluded
+                        if (sampled_light != LIGHT_INVALID_INDEX && sampled_light != lh.index) {
+                            segment.pdf = 0.f;
+                        }
                     }
                 }
+
+                sp = scene.get_shading_point(ray, hit, RenderContext(bounce), DefaultLODSampler(),
+                                             !segment.is_last);
+
+                // Beer-Lambert attenuation over the segment just travelled; no in-scattering.
+                const float distance_travelled = distance(ray.Origin, sp.pos);
+                chain_transmittance *= medium.transmittance(distance_travelled);
+                // A curved mirror puts the image at its focal length R/2, not at the arc length.
+                // One focusing in front of itself has no virtual image and keeps the distance.
+                float segment_length = distance_travelled;
+                if (pending_focal != 0.f) {
+                    const float denominator = segment_length + pending_focal;
+                    if (denominator > 1e-4f) {
+                        segment_length *= pending_focal / denominator;
+                    }
+                    pending_focal = 0.f;
+                }
+                unfolded += unfold_scale * segment_length;
+
+                if (!merian_render_follow_specular || !sp.has_surface_material ||
+                    bounce + uint16_t(2) >= merian_render_max_path_length) {
+                    break;
+                }
+                // a surface that emits is a source, not a window onto one
+                if (any(sp.emission > 0.f)) {
+                    break;
+                }
+                let follow_bsdf = sp.surface_material.get_bsdf();
+                if (!bsdf_is_delta_only(follow_bsdf.get_lobe_types()) &&
+                    follow_bsdf.effective_alpha >= merian_render_specular_alpha) {
+                    break;
+                }
+
+                // follow it through: the BSDF alone, no guiding and no light sampling
+                const OrthonormalFrame chain_frame = sp.shading_frame;
+                const float3 chain_wi = chain_frame.to_local(-ray.Direction);
+                const Optional<ShadingFunctionSample> chain_sample =
+                    follow_bsdf.sample_eval(chain_wi, rng);
+                if (!chain_sample.hasValue) {
+                    break;
+                }
+                const float3 chain_wo_local = chain_sample.value.wo;
+                const float3 chain_wo = chain_frame.to_world(chain_wo_local);
+                const bool chain_transmission = chain_wi.z * chain_wo_local.z < 0.f;
+                const Optional<RayDesc> chain_ray =
+                    sp.make_ray(-ray.Direction, chain_wo, chain_transmission);
+                if (!chain_ray.hasValue) {
+                    break;
+                }
+
+                chain_bsdf *= chain_sample.value.weight;
+                if (!chain_transmission) {
+                    // the focal length of a mirror is half its radius, towards the side the ray is
+                    const float radius =
+                        scene.get_curvature_radius(hit, scene.get_triangle_hit(hit));
+                    pending_focal = 0.5f * (chain_wi.z < 0.f ? -radius : radius);
+                }
+                // Apparent-depth factor of a refraction (Ruppert et al. 2020): it needs only the
+                // relative index, so a dielectric enclosing no volume still gets it.
+                if (chain_transmission) {
+                    let interior = sp.surface_material.get_interior_volume();
+                    // eta here is incident over transmitted, so it multiplies: entering
+                    // glass the image is nearer, leaving it the image is farther
+                    unfold_scale *= interior.eta * abs(chain_wi.z / chain_wo_local.z);
+                    if (merian_material_system_any_interior_volume) {
+                        medium.cross_boundary(interior,
+                                              dot(-ray.Direction, sp.get_face_normal()) >= 0.f);
+                    }
+                }
+                ray = chain_ray.value;
+                through_specular = true;
+                bounce++;
             }
 
-            sp = scene.get_shading_point(ray, hit, RenderContext(bounce), DefaultLODSampler(),
-                                         !segment.is_last);
-
-            // Beer-Lambert attenuation over the segment just travelled inside the medium.
-            // In-scattering is not accounted for here; that is the volume renderer's job. Folded
-            // into the incident radiance so that the guiding sees the attenuated signal.
-            const float3 segment_transmittance = medium.transmittance(distance(ray.Origin, sp.pos));
-
             segment.traced = true;
+            // aimed at where the light is, not at the surface that passed it on
             segment.next_pos = sp.pos;
+            segment.aim_pos = through_specular ? segment.pos + wo_world * unfolded : sp.pos;
             segment.next_normal = sp.shading_normal;
             segment.next_mv = half3((sp.pos - sp.prev_pos) / scene.time_diff);
-            segment.incident = sp.emission * segment_transmittance;
-            segment.nee_weight = mis_weight;
+            // what arrived along this direction, the surfaces followed through included
+            segment.incident = chain_bsdf * chain_transmittance * sp.emission;
+            const float direct_mis = through_specular ? 1.f : mis_weight;
+            segment.direct_scale = merian_guiding_direct_target == GUIDING_DIRECT_MIS ? direct_mis
+                                   : merian_guiding_direct_target == GUIDING_DIRECT_NONE ? 0.f
+                                                                                         : 1.f;
             segment.weight = segment.pdf > 0.f ? f_cos / segment.pdf : float3(0);
 
             throughput *= segment.weight;
-            // the guiding learns the plain incident radiance; only the image estimate weighs the
-            // emission against the light samples
-            radiance += throughput * segment.incident * mis_weight;
+            // the guiding learns what the direct light policy allows, the image always weighs
+            radiance += throughput * segment.incident * direct_mis;
+            // the surfaces followed through are already in the radiance above
+            throughput *= chain_bsdf;
         }
 
         // 4. what the guiding learns, and the estimate it completes the path with
@@ -314,11 +439,13 @@ void render_pixel<Reorder : IThreadReorder>(const uint2 pixel,
 
     float3 irradiance = float3(0);
     float second_moment = 0.f;
+    float3 scatter_stats = float3(0);
+
     for (int s = 0; s < merian_render_spp; s++) {
-        RandomGenerator rng = PCG(pcg4d16(uint4(pixel, scene.frame, s)));
+        RandomGenerator rng = PCG(pcg4d16(uint4(pixel, scene.frame, s)) ^ merian_render_seed);
 
         const float3 contrib = trace_path<Reorder>(scene, params, pixel, primary_ray, primary_sp,
-                                                   uint16_t(s), rng) /
+                                                   uint16_t(s), rng, scatter_stats) /
                                demod_albedo;
         if (!any(isnan(contrib)) && !any(isinf(contrib))) {
             irradiance += contrib;
@@ -330,6 +457,38 @@ void render_pixel<Reorder : IThreadReorder>(const uint2 pixel,
     if (merian_render_spp > 0) {
         irradiance /= float(merian_render_spp);
         second_moment /= float(merian_render_spp);
+    }
+
+    if (merian_render_scatter_stats) {
+        // guided, refused by the shading function, refused a ray by the geometry
+        params.irradiance[pixel] = float4(scatter_stats, 1);
+        return;
+    }
+
+    if (merian_render_guiding_debug_view > 0) {
+        // the method answers for the primary hit
+        const RenderFrameInfo frame_info = {scene.camera.position, scene.prev_camera.position,
+                                            scene.time, scene.time_diff, scene.frame};
+        RandomGenerator debug_rng = PCG(pcg4d16(uint4(pixel, scene.frame, 0xDEB0)));
+
+        PathVertex vertex;
+        vertex.pos = primary_sp.pos;
+        vertex.prev_pos = primary_sp.prev_pos;
+        vertex.shading_frame = primary_sp.shading_frame;
+        vertex.alpha = 1.f;
+        vertex.bounce = uint16_t(1);
+        vertex.sample_index = uint16_t(0);
+        vertex.pixel = pixel;
+        vertex.in_volume = false;
+        vertex.geo_normal = primary_sp.shading_frame.get_normal();
+        vertex.transmissive = false;
+
+        float4 view;
+        if (params.guiding.debug_view(merian_render_guiding_debug_view, frame_info, vertex,
+                                      debug_rng, view)) {
+            params.irradiance[pixel] = view;
+            return;
+        }
     }
 
     params.irradiance[pixel] = float4(irradiance, second_moment);

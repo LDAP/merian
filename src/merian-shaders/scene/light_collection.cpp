@@ -240,12 +240,26 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
             ensure_buffer(grid_info_buffer[i],
                           static_cast<uint32_t>(grid_cascades) * sizeof(LightGridInfo),
                           "LightCollection::grid_info", cmd);
-            grid_reset |= grew;
+            if (grew) {
+                // the sampler reads the slot filled a frame earlier, so a fresh allocation is
+                // read once before anything writes it
+                cmd->fill(grid_buffer[i], LIGHT_INVALID_INDEX);
+                cmd->fill(grid_info_buffer[i]);
+                grid_reset = true;
+            }
+        }
+        if (grid_reset) {
+            cmd->barrier(vk::MemoryBarrier2{
+                vk::PipelineStageFlagBits2::eTransfer,
+                vk::AccessFlagBits2::eTransferWrite,
+                vk::PipelineStageFlagBits2::eComputeShader,
+                vk::AccessFlagBits2::eShaderRead,
+            });
         }
     }
 
-    if (tables_dirty) {
-        grid_reset = true;
+    if (triangle_count > 0) {
+        update_light_remap(cmd);
     }
 
     if (triangle_count > 0 && tables_dirty) {
@@ -273,6 +287,70 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
         });
         tables_dirty = false;
     }
+}
+
+// A rebuilt table can move an entry that survived; mapping it is what lets a cell's list carry.
+void LightCollection::update_light_remap(const CommandBufferHandle& cmd) {
+    const auto key = [](const LightGeometry& g) {
+        return (static_cast<uint64_t>(g.geometry_id) << 32) | g.instance_index;
+    };
+
+    if (selection != LightSelection::LightSelectionGrid) {
+        grid_table_keys.clear();
+        light_remap.clear();
+        light_remap_identity = true;
+        ensure_buffer(light_remap_buffer, sizeof(uint32_t), "LightCollection::light_remap", cmd);
+        return;
+    }
+
+    light_remap.assign(grid_table_keys.size(), LIGHT_INVALID_INDEX);
+    light_remap_identity = grid_table_keys.size() == light_geometries.size();
+    if (!grid_table_keys.empty()) {
+        light_index_of_key.clear();
+        light_index_of_key.reserve(light_geometries.size());
+        for (uint32_t i = 0; i < light_geometries.size(); i++) {
+            light_index_of_key.try_emplace(key(light_geometries[i]), i);
+        }
+        for (uint32_t i = 0; i < grid_table_keys.size(); i++) {
+            const auto it = light_index_of_key.find(grid_table_keys[i]);
+            light_remap[i] = it == light_index_of_key.end() ? LIGHT_INVALID_INDEX : it->second;
+            light_remap_identity &= light_remap[i] == i;
+        }
+    }
+
+    grid_table_keys.resize(light_geometries.size());
+    for (uint32_t i = 0; i < light_geometries.size(); i++) {
+        grid_table_keys[i] = key(light_geometries[i]);
+    }
+
+    const vk::DeviceSize remap_size = std::max<size_t>(light_remap.size(), 1) * sizeof(uint32_t);
+    ensure_buffer(light_remap_buffer, remap_size, "LightCollection::light_remap", cmd);
+    if (light_remap_identity) {
+        return;
+    }
+    allocator->get_staging()->cmd_to_device(cmd, light_remap_buffer, light_remap.data(), 0,
+                                            light_remap.size() * sizeof(uint32_t));
+    cmd->barrier(vk::MemoryBarrier2{
+        vk::PipelineStageFlagBits2::eTransfer,
+        vk::AccessFlagBits2::eTransferWrite,
+        vk::PipelineStageFlagBits2::eComputeShader,
+        vk::AccessFlagBits2::eShaderRead,
+    });
+}
+
+// Changes the composition, so it has to settle before the scene's shader object is fetched.
+void LightCollection::update_constants(const SlangCompositionHandle& scene_composition) {
+    if (!constants_dirty) {
+        return;
+    }
+    scene_composition->add_module_from_string(
+        "scene_light_constants",
+        fmt::format("namespace merian {{\n"
+                    "export static const int merian_nee_pool_candidates = {};\n"
+                    "export static const int merian_nee_cell_candidates = {};\n"
+                    "}}",
+                    pool_candidates, cell_candidates));
+    constants_dirty = false;
 }
 
 void LightCollection::update(const CommandBufferHandle& cmd,
@@ -407,6 +485,9 @@ void LightCollection::update(const CommandBufferHandle& cmd,
             c["pool"] = pool_buffer;
             c["light_geometries"] = light_geometries_buffer;
             c["light_geometry_count"] = static_cast<uint32_t>(light_geometries.size());
+            c["light_remap"] = light_remap_buffer;
+            c["light_remap_count"] =
+                light_remap_identity ? 0u : static_cast<uint32_t>(light_remap.size());
             c["geometry_proxies_out"] = geometry_proxies_buffer;
             c["pool_geometry_out"] = pool_geometry_buffer;
             c["pool_geometry"] = pool_geometry_buffer;
@@ -537,10 +618,10 @@ void LightCollection::update(const CommandBufferHandle& cmd,
         c["env_split"] = env_split_buffer;
         c["triangle_count"] = cdf_buffer ? triangle_count : 0u;
         c["scene_radius"] = scene_radius;
-        c["manual_probability"] = env_probability;
-        c["from_power"] = static_cast<uint32_t>(env_probability_from_power ? 1 : 0);
-        c["min_probability"] = env_probability_min;
-        c["max_probability"] = env_probability_max;
+        c["manual_probability"] = env_share;
+        c["from_power"] = static_cast<uint32_t>(env_share_from_power ? 1 : 0);
+        c["min_probability"] = env_share_min;
+        c["max_probability"] = env_share_max;
         auto env = c["env_importance"];
         env["levels"] = env_importance_buffer;
         env["size"] = env_importance_size();
@@ -577,13 +658,12 @@ void LightCollection::write_to(ShaderCursor cursor) const {
     pool["size"] = active && selection != LightSelection::LightSelectionPower
                        ? static_cast<uint32_t>(pool_size)
                        : 0u;
-    pool["tile_size"] =
-        std::min(static_cast<uint32_t>(pool_tile_size), static_cast<uint32_t>(pool_size));
 
     auto grid = cursor["grid"];
     grid["slots"] = active ? grid_buffer[grid_slot] : dummy;
     grid["cascades"] = active && grid_info_buffer[grid_slot] ? grid_info_buffer[grid_slot] : dummy;
-    grid["jitter"] = grid_jitter;
+    grid["jitter"] = debug_jitter ? grid_jitter : 0.f;
+    grid["share"] = grid_share;
 
     cursor["selection"] =
         active ? static_cast<uint32_t>(selection) : static_cast<uint32_t>(LightSelectionPower);
@@ -606,89 +686,119 @@ void LightCollection::write_to(ShaderCursor cursor) const {
 void LightCollection::properties(Properties& props) {
     props.config_bool("enable", enabled,
                       "Maintain the emissive triangle list for next event estimation.");
-    props.config_bool("env probability from power", env_probability_from_power,
-                      "Derive the environment's share of the light samples from the power each "
-                      "side emits. The environment's power is the flux an infinite light of its "
-                      "mean radiance puts through the scene's bounding sphere, so it is blind to "
-                      "occlusion: the limits below keep an enclosed scene from spending "
-                      "everything on a sky it barely sees.");
-    if (env_probability_from_power) {
-        props.config_percent("env probability min", env_probability_min);
-        props.config_percent("env probability max", env_probability_max);
-    } else {
-        props.config_percent("env probability", env_probability,
-                             "Probability of sampling the environment map instead of an emissive "
-                             "triangle when both exist.");
-    }
-    props.config_options("env selection", env_selection, {"warp", "pool"},
-                         Properties::OptionsStyle::COMBO,
-                         "How a direction towards the environment is chosen: a pyramid descent per "
-                         "sample, or one load from a per-frame pool of texels it drew.");
-    if (env_selection == EnvSelection::EnvSelectionPool) {
-        props.config_int("env pool size", env_pool_size, "Environment texels pre-drawn per frame.",
-                         64, 262144);
-    }
-    props.config_options("selection", selection, {"power", "pool", "grid"},
-                         Properties::OptionsStyle::COMBO,
-                         "How a light is chosen: a search over the whole scene, one load from a "
-                         "per-frame pool, or one load from a per-frame world-space grid.");
-    if (selection != LightSelection::LightSelectionPower) {
-        props.config_int("pool tile size", pool_tile_size,
-                         "Lights a screen tile draws from. Smaller keeps the entries in cache; the "
-                         "density does not depend on it.",
-                         16, 65536);
-        props.config_int("pool size", pool_size,
-                         "Lights pre-resampled per frame; a sample is one load from it.", 64,
-                         65536);
-    }
-    if (selection == LightSelection::LightSelectionGrid) {
-        props.config_int("grid dimension", grid_dimension,
-                         "Cells per side of every cascade. Also sets how much of the view a cell "
-                         "covers, since a cascade is placed by the distance it has to reach.",
-                         4, 128);
-        props.config_int("grid cascades", grid_cascades,
-                         "Camera-anchored cascades. Each one doubles the cell size of the one "
-                         "before, so the resolution follows the distance to the camera.",
-                         1, 16);
-        props.config_int("grid candidates", grid_candidates,
-                         "Pool draws a cell ranks each frame. The list carries across frames, "
-                         "so a few are enough.",
-                         1, 256);
-        props.config_float("grid cell size", grid_cell_size,
-                           "World units per cell of the finest cascade; 0 derives it from the "
-                           "distance to the lights.",
-                           0.1f, 0.f);
-        props.config_float("grid coverage", grid_coverage,
-                           "Fraction of the distance to the farthest light that the coarsest "
-                           "cascade spans, when the cell size is derived.",
-                           0.05f, 0.01f, 16.f);
-        props.config_float("grid jitter", grid_jitter,
-                           "Cells the lookup is offset by, so the cell boundaries do not show.",
-                           0.05f, 0.f, 2.f);
-        props.config_bool("grid visibility", grid_visibility,
-                          "Trace whether a cell can see the light in a slot, and free the slot "
-                          "where it cannot. Pays where a sample is all the budget allows.");
-        if (grid_visibility) {
-            props.config_int("grid probes", grid_probes,
-                             "Slots a cell re-tests per frame. Clearing more than one at a "
-                             "time stops the list settling.",
-                             1, static_cast<int32_t>(LIGHT_GRID_SLOTS));
-        }
-        props.config_int("grid max age", grid_max_age,
-                         "Frames over which a light that stopped earning its slot is overtaken by "
-                         "a fresh candidate.",
-                         1, 256);
-    }
     props.config_int("flux samples", flux_samples,
                      "Emission evaluations per triangle for the flux estimate.", 1, 256);
-    int32_t env_size_option = env_importance_log2 - 6;
-    if (props.config_options("env importance map", env_size_option, {"64", "128", "256", "512"},
+
+    if (props.st_begin_child("environment", "Environment")) {
+        props.config_bool("share from power", env_share_from_power,
+                          "Derive the environment's share of the light samples from the power each "
+                          "side emits. The environment's power is the flux an infinite light of "
+                          "its mean radiance puts through the scene's bounding sphere, so it is "
+                          "blind to occlusion: the limits below keep an enclosed scene from "
+                          "spending everything on a sky it barely sees.");
+        if (env_share_from_power) {
+            props.config_percent("share min", env_share_min);
+            props.config_percent("share max", env_share_max);
+        } else {
+            props.config_percent("share", env_share,
+                                 "How often the environment is sampled instead of an emissive "
+                                 "triangle, where both exist.");
+        }
+        props.config_options("sampling", env_selection, {"warp", "pool"},
                              Properties::OptionsStyle::COMBO,
-                             "Side length of the environment importance map, rebuilt every "
-                             "frame.")) {
-        env_importance_log2 = env_size_option + 6;
-        env_importance_resized = true;
+                             "A pyramid descent per sample, or one load from a per-frame pool of "
+                             "texels it drew.");
+        if (env_selection == EnvSelection::EnvSelectionPool) {
+            props.config_int("pool size", env_pool_size, "Texels pre-drawn per frame.", 64, 262144);
+        }
+        int32_t env_size_option = env_importance_log2 - 6;
+        if (props.config_options("importance map", env_size_option, {"64", "128", "256", "512"},
+                                 Properties::OptionsStyle::COMBO,
+                                 "Side length of the importance map, rebuilt every frame.")) {
+            env_importance_log2 = env_size_option + 6;
+            env_importance_resized = true;
+        }
+        props.st_end_child();
     }
+
+    if (props.st_begin_child("pool", "Pool")) {
+        props.config_bool("presampled", pool_presampled,
+                          "Draw the lights of a frame into a pool, so a sample is one load. Off "
+                          "searches the whole scene per sample.");
+        constants_dirty |= props.config_int(
+            "candidates", pool_candidates,
+            "Draws a vertex takes from the pool. Resampled into the one shadow ray by unshadowed "
+            "contribution (RIS); the mixture draws one of them.",
+            0, 32);
+        if (pool_presampled) {
+            props.config_int("size", pool_size, "Lights drawn per frame.", 64, 65536);
+        }
+        props.st_end_child();
+    }
+
+    if (props.st_begin_child("cell_grid", "Cell grid")) {
+        props.config_bool("enable", grid_enabled,
+                          "Keep a per-cell list of the light sources that reach it, so a shading "
+                          "point draws from the few lights that matter where it stands.");
+        if (grid_enabled) {
+            constants_dirty |= props.config_int(
+                "candidates", cell_candidates,
+                "Draws a vertex takes from the cell's list, alongside the ones the pool offers.", 0,
+                32);
+            props.config_percent("share", grid_share,
+                                 "How often a draw takes the cell's list. The rest falls back to "
+                                 "the pool, so a light the cell does not hold keeps a density.");
+            props.config_int("ranked per frame", grid_candidates,
+                             "Pool draws a cell ranks each frame. The list carries across frames, "
+                             "so a few are enough.",
+                             1, 256);
+            props.config_int("dimension", grid_dimension,
+                             "Cells per side of every cascade. Also sets how much of the view a "
+                             "cell covers, since a cascade is placed by the distance it has to "
+                             "reach.",
+                             4, 128);
+            props.config_int("cascades", grid_cascades,
+                             "Camera-anchored cascades. Each one doubles the cell size of the one "
+                             "before, so the resolution follows the distance to the camera.",
+                             1, 16);
+            props.config_float("cell size", grid_cell_size,
+                               "World units per cell of the finest cascade; 0 derives it from the "
+                               "distance to the lights.",
+                               0.1f, 0.f);
+            props.config_float("coverage", grid_coverage,
+                               "Fraction of the distance to the farthest light that the coarsest "
+                               "cascade spans, when the cell size is derived.",
+                               0.05f, 0.01f, 16.f);
+            props.config_float("jitter", grid_jitter,
+                               "Cells the lookup is offset by, so the cell boundaries do not show.",
+                               0.05f, 0.f, 2.f);
+            props.config_int("max age", grid_max_age,
+                             "Frames over which a light that stopped earning its slot is overtaken "
+                             "by a fresh candidate.",
+                             1, 256);
+            props.config_bool("visibility", grid_visibility,
+                              "Trace whether a cell can see the light in a slot, and free the slot "
+                              "where it cannot. Pays where a sample is all the budget allows.");
+            if (grid_visibility) {
+                props.config_int("probes", grid_probes,
+                                 "Slots a cell re-tests per frame. Clearing more than one at a "
+                                 "time stops the list settling.",
+                                 1, static_cast<int32_t>(LIGHT_GRID_SLOTS));
+            }
+        }
+        props.st_end_child();
+    }
+
+    if (props.st_begin_child("debug", "Debug")) {
+        props.config_bool("enable jitter", debug_jitter,
+                          "Off shows the cell structure the lookup actually sees.");
+        props.st_end_child();
+    }
+
+    selection = grid_enabled ? LightSelection::LightSelectionGrid
+                             : (pool_presampled ? LightSelection::LightSelectionPool
+                                                : LightSelection::LightSelectionPower);
+
     props.output_text(fmt::format("emissive geometries: {}\nemissive triangles: {}",
                                   light_geometries.size(), triangle_count));
 }

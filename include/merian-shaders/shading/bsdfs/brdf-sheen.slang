@@ -74,7 +74,7 @@ struct SheenBRDF : BSDF {
     Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
         if (let s = sample_eval_impl<This>(this, wi, rng)) {
             ShadingFunctionSample r = s;
-            r.lobe = BSDFLobe::Diffuse;
+            r.lobe = BSDFLobe::DiffuseReflection;
             return r;
         }
         return none;
@@ -84,16 +84,23 @@ struct SheenBRDF : BSDF {
         return Albedo::diffuse_only(color * sheen_directional_albedo(wi.z, sheen_alpha));
     }
 
+    uint get_lobe_types() {
+        return uint(BSDFLobe::DiffuseReflection);
+    }
     float3 get_preintegrated_specular(const float3 F0, const float3 wi) {
         return float3(0.f);
     }
 
     property float effective_alpha {
-        get { return sheen_alpha; }
+        get {
+            return sheen_alpha;
+        }
     }
 
     property float specular_alpha {
-        get { return 1.0f; }
+        get {
+            return 1.0f;
+        }
     }
 }
 

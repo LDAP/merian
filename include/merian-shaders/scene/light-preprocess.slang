@@ -18,6 +18,9 @@ struct LightPreprocessBinding {
     StructuredBuffer<float> cdf;
     RWStructuredBuffer<uint> pool;
     StructuredBuffer<LightGeometry, ScalarDataLayout> light_geometries;
+    // where the entries the grid was ranked against sit now; empty while the table is unchanged
+    StructuredBuffer<uint> light_remap;
+    uint light_remap_count;
     RWStructuredBuffer<EmissiveLightProxy, ScalarDataLayout> geometry_proxies_out;
     // light source each pool entry landed in
     RWStructuredBuffer<uint> pool_geometry_out;
@@ -329,6 +332,15 @@ bool cell_sees_light(const RaytracingAccelerationStructure as,
         find_light_geometry(params.light_geometries, params.light_geometry_count, index);
 }
 
+// Where an entry the grid was ranked against sits in this frame's table.
+uint remap_carried(const LightPreprocessBinding params, const uint index) {
+    const uint mapped =
+        params.light_remap_count == 0
+            ? index
+            : (index < params.light_remap_count ? params.light_remap[index] : LIGHT_INVALID_INDEX);
+    return mapped < params.light_geometry_count ? mapped : LIGHT_INVALID_INDEX;
+}
+
 // Threads that build one cell.
 static const uint LIGHT_GRID_BUILD_GROUP = 64;
 
@@ -433,8 +445,9 @@ grid(uint3 group_id : SV_GroupID,
             const uint neighbour =
                 cascade * cells_per_cascade + uint(n.x) + dim * (uint(n.y) + dim * uint(n.z));
             const uint slot = min(uint(rng.next_float() * LIGHT_GRID_SLOTS), LIGHT_GRID_SLOTS - 1);
-            const uint index = params.grid_prev[neighbour * LIGHT_GRID_SLOTS + slot];
-            if (index < params.light_geometry_count) {
+            const uint index =
+                remap_carried(params, params.grid_prev[neighbour * LIGHT_GRID_SLOTS + slot]);
+            if (index != LIGHT_INVALID_INDEX) {
                 s_neighbour[n_id] = index;
                 // judged for this cell, not the one it came from
                 s_neighbour_weight[n_id] =
@@ -452,12 +465,9 @@ grid(uint3 group_id : SV_GroupID,
             const uint prev_cell = cascade * cells_per_cascade + prev_coord.x +
                                    dim * (prev_coord.y + dim * prev_coord.z);
             const uint entry = prev_cell * LIGHT_GRID_SLOTS + local_id;
-            held = params.grid_prev[entry];
-            // a rebuilt light table renumbers the geometries, so an index past its end is not ours
-            if (held < params.light_geometry_count) {
+            held = remap_carried(params, params.grid_prev[entry]);
+            if (held != LIGHT_INVALID_INDEX) {
                 draw = params.grid_weight_prev[entry] * ageing;
-            } else {
-                held = LIGHT_INVALID_INDEX;
             }
         }
         s_slot_index[local_id] = held;

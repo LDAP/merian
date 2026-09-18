@@ -12,10 +12,6 @@ namespace merian {
 extern static const int merian_ssmm_group_size = 5;
 // standard deviation of the neighbourhood the resampling reaches into, in pixels
 extern static const float merian_ssmm_reuse_radius = 15.0;
-// probability the integrator gives the fitted lobe
-extern static const float merian_ssmm_probability = 0.85;
-// no guiding below this lobe width: the BSDF is far more peaked than any fitted lobe
-extern static const float merian_ssmm_alpha_threshold = 0.05;
 // samples folded into the exponentially weighted fit
 extern static const uint merian_ssmm_max_n = 1024u;
 extern static const float merian_ssmm_min_alpha = 0.01;
@@ -91,8 +87,8 @@ struct SSMMDistribution : GuidingDistribution<float3> {
         return vmf.w > 0.0;
     }
 
-    float get_selection_probability(const float alpha) {
-        return alpha < merian_ssmm_alpha_threshold ? 0.0 : merian_ssmm_probability;
+    float get_confidence() {
+        return 1.f;
     }
 }
 
@@ -169,11 +165,23 @@ struct SSMMGuiding<G : IGBuffer> : GuidingModel {
         return dist;
     }
 
-    Record record_scatter(const SSMMDistribution dist, const bool guided) {
+    Record record_scatter(const SSMMDistribution dist,
+                          const PathSegment segment,
+                          const bool guided,
+                          inout RandomGenerator rng) {
         Record r;
         r.selected = dist.selected;
         r.guided = guided;
         return r;
+    }
+
+    bool debug_view(const int selector,
+                    const RenderFrameInfo frame_info,
+                    const PathVertex vertex,
+                    inout RandomGenerator rng,
+                    out float4 color) {
+        color = float4(0);
+        return false;
     }
 
     float3 record_segment(inout State state,
@@ -194,7 +202,7 @@ struct SSMMGuiding<G : IGBuffer> : GuidingModel {
         // a direction the fit did not propose explores: it starts a fit rather than continuing one
         SSMCState fit = record.guided ? record.selected : SSMCState(float3(0), 0.0, 0, 0.0, 0.0);
         fit.f = f;
-        ssmm_add(fit, segment.pos, f, segment.wo, segment.next_pos);
+        ssmm_add(fit, segment.pos, f, segment.wo, segment.aim_pos);
 
         next[ssmm_index(int2(state.pixel), gbuffer.get_dimensions())] = fit;
         return float3(0);

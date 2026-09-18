@@ -75,19 +75,19 @@ void HashGrid::write_to(ShaderCursor cursor) const {
         keys_cursor = keys;
     }
     cursor["data"] = data;
-    cursor["grid_tan_alpha_half"] = grid_tan_alpha_half;
-    cursor["grid_level_bias"] = grid_level_bias;
-    cursor["grid_distribution_dimension"] = grid_distribution_dimension;
+    cursor["grid_tan_alpha_half"] = params.tan_alpha_half;
+    cursor["grid_level_bias"] = params.level_bias;
+    cursor["grid_distribution_dimension"] = params.distribution_dimension;
 }
 
-void HashGrid::properties(Properties& props) {
-    props.config_float("grid tan(alpha/2)", grid_tan_alpha_half,
+void HashGrid::Params::properties(Properties& props) {
+    props.config_float("grid tan(alpha/2)", tan_alpha_half,
                        "Cache resolution, lower means higher resolution.", 0.0001F);
-    props.config_float("grid level bias", grid_level_bias,
+    props.config_float("grid level bias", level_bias,
                        "SHARC-style LOD bias; shifts level quantization / near-camera detail "
                        "(0 = neutral, fractional values shift the phase).",
                        0.05F);
-    props.config_float("grid distribution dimension", grid_distribution_dimension,
+    props.config_float("grid distribution dimension", distribution_dimension,
                        "Spatial dimensionality the distributed levels are spread over "
                        "(2 = surface, 3 = volume). Smaller widens the spread.",
                        0.01F);

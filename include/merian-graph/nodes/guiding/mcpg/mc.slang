@@ -14,6 +14,9 @@ extern static const float dir_guide_prior = 0.2;
 // Standard normal quantile of the lobe width's upper confidence limit, see width_upper_limit.
 // 0 samples the maximum likelihood width instead.
 extern static const float mc_conf_z = 1.6449;
+// Weighted Welford: the chord is measured against the mean both before and after the fold, since
+// the updated mean has already been pulled towards the sample.
+extern static const bool mc_welford_chord = true;
 // Width an undetermined chain falls back to. 1 - 2/3 is the mean resultant length deficit of a
 // cosine lobe, so such a chain proposes what the BSDF would and costs nothing.
 static const float ML_MAX_ONE_MINUS_COS = 1.0 / 3.0;
@@ -122,27 +125,30 @@ struct MCState {
         return VonMisesFisher3<false>(k, dir);
     }
 
-    [mutating]
-    void reweight(const float factor) {
+    [mutating] void reweight(const float factor) {
         sum_w *= factor;
         w_tgt *= factor;
         w_chord2 *= factor;
     }
 
-    // add sample to lobe via maximum likelihood estimator and exponentially weighted average
-    [mutating]
-    void add_sample(const float3 pos,    // position where the ray started
-                    const float w,       // goodness
-                    const float3 target, // ray hit point
-                    const half3 target_mv,
-                    const float time) {
+        [mutating] void add_sample(const float3 pos,
+                                   const float w,
+                                   const float3 target,
+                                   const half3 target_mv,
+                                   const float time) {
         N = min(uint16_t(N + uint16_t(1)), ML_MAX_N);
         const float alpha = max(1.0 / float(N), ML_MIN_ALPHA);
 
+        const bool had_aim = sum_w > 0.0;
+        const float3 dir_before = had_aim ? get_dir(pos) : float3(0);
+
         sum_w = lerp(sum_w, w, alpha);
         w_tgt = lerp(w_tgt, w * target, alpha);
-        const float3 chord = normalize(target - pos) - get_dir(pos);
-        w_chord2 = lerp(w_chord2, w * dot(chord, chord), alpha);
+        const float3 wi = normalize(target - pos);
+        const float3 chord = wi - get_dir(pos);
+        const float chord2 =
+            mc_welford_chord && had_aim ? dot(wi - dir_before, chord) : dot(chord, chord);
+        w_chord2 = lerp(w_chord2, w * max(chord2, 0.0), alpha);
 
         mv = target_mv;
         T = time;
@@ -152,10 +158,7 @@ struct MCState {
         return sum_w > 0.0;
     }
 
-    [mutating]
-    void set_w_tgt(const float3 w_tgt) {
-        this.w_tgt = w_tgt;
-    }
+    [mutating] void set_w_tgt(const float3 w_tgt) { this.w_tgt = w_tgt; }
 };
 
 struct MCPG<let ADAPTIVE_BUFFER_SIZE : uint,
@@ -163,8 +166,16 @@ struct MCPG<let ADAPTIVE_BUFFER_SIZE : uint,
             let SPLIT_STORAGE : bool = true,
             let LOCALITY_BITS : uint = 0> {
 
-    HashGrid<MCState, ADAPTIVE_BUFFER_SIZE, PROBE_COUNT, true, true, SPLIT_STORAGE, 2, 1,
-             LOCALITY_BITS, true>
+    HashGrid<MCState,
+             ADAPTIVE_BUFFER_SIZE,
+             PROBE_COUNT,
+             true,
+             true,
+             SPLIT_STORAGE,
+             2,
+             1,
+             LOCALITY_BITS,
+             true>
         grid;
 
     // The chain in a cell, its target carried to the current time. An empty cell reads invalid.

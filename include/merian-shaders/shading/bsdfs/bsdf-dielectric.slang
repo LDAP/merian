@@ -40,15 +40,15 @@ struct SmoothDielectricBSDF : BSDF {
         // the pdf of a delta lobe is the discrete probability of picking it
         const float R = fresnel_dielectric(wi.z, eta);
         if (rng.next_float() < R) {
-            return ShadingFunctionSample(reflect_z(wi), R, float3(1.0f), BSDFLobe::Delta);
+            return ShadingFunctionSample(reflect_z(wi), R, float3(1.0f), BSDFLobe::DeltaReflection);
         }
         const float3 wt = refract(-wi, float3(0.0f, 0.0f, 1.0f), eta);
         if (all(wt == float3(0.0f))) {
             return ShadingFunctionSample(reflect_z(wi), 1.0f, float3(1.0f),
-                                         BSDFLobe::Delta); // total internal reflection
+                                         BSDFLobe::DeltaReflection); // total internal reflection
         }
         return ShadingFunctionSample(wt, 1.0f - R, pow2(eta) * transmission_color,
-                                     BSDFLobe::Delta);
+                                     BSDFLobe::DeltaTransmission);
     }
 
     Albedo get_albedo(const float3 wi) {
@@ -62,11 +62,19 @@ struct SmoothDielectricBSDF : BSDF {
     }
 
     property float effective_alpha {
-        get { return 0.0f; }
+        get {
+            return 0.0f;
+        }
     }
 
     property float specular_alpha {
-        get { return 0.0f; }
+        get {
+            return 0.0f;
+        }
+    }
+
+    uint get_lobe_types() {
+        return uint(BSDFLobe::DeltaReflection) | uint(BSDFLobe::DeltaTransmission);
     }
 }
 

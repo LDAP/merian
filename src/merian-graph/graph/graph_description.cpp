@@ -799,9 +799,15 @@ bool GraphDescription::apply_cli(nlohmann::json& config,
     // join into one string.
     std::vector<std::string> positionals;
     for (size_t i = 0; i < cli_args.size(); i++) {
-        if (!consumed[i]) {
-            positionals.push_back(cli_args[i]);
+        if (consumed[i]) {
+            continue;
         }
+        if (cli_args[i].starts_with("--") && cli_args[i].size() > 2) {
+            SPDLOG_ERROR("unknown override '{}' (see --help)", cli_args[i]);
+            ok = false;
+            continue;
+        }
+        positionals.push_back(cli_args[i]);
     }
     std::string joined;
     if (positionals.size() == 1) {

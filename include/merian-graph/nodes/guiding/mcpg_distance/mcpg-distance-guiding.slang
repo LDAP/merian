@@ -53,8 +53,8 @@ struct DistanceMCDistribution : GuidingDistribution<float> {
         return score_sum > 0.0;
     }
 
-    float get_selection_probability(const float alpha) {
-        return merian_distance_guiding_probability;
+    float get_confidence() {
+        return 1.f;
     }
 }
 
@@ -119,7 +119,10 @@ struct MCPGDistanceGuiding : DistanceGuidingModel {
         return dist;
     }
 
-    Record record_scatter(const DistanceMCDistribution dist, const bool guided) {
+    Record record_scatter(const DistanceMCDistribution dist,
+                          const float wo,
+                          const bool guided,
+                          inout RandomGenerator rng) {
         Record r;
         r.selected = dist.selected;
         r.level = dist.selected_level;

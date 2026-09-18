@@ -1,15 +1,17 @@
 namespace merian {
 
-// 32-bit normal encoding from Journal of Computer Graphics Techniques Vol. 3, No. 2, 2014
-// A Survey of Efficient Representations for Independent Unit Vectors,
-// almost like oct30
-float3 decode_normal(uint enc) {
-    float2 projected = unpackSnorm2x16ToFloat(enc);
+// Inverse of octahedral_project.
+// A Survey of Efficient Representations for Independent Unit Vectors, JCGT Vol. 3, No. 2, 2014.
+float3 octahedral_unproject(float2 projected) {
     float3 vec = float3(projected, (1.0f - abs(projected.x)) - abs(projected.y));
     if (vec.z < 0.0f) {
         vec.xy = copysign(1.0 - abs(vec.yx), vec.xy);
     }
     return normalize(vec);
+}
+
+float3 decode_normal(uint enc) {
+    return octahedral_unproject(unpackSnorm2x16ToFloat(enc));
 }
 
 // Octahedral projection of a unit vector onto [-1, 1]^2.
@@ -54,4 +56,4 @@ float4 decode_tangent(uint enc) {
     return float4(decode_normal(enc & ~1u), w);
 }
 
-}
+} // namespace merian

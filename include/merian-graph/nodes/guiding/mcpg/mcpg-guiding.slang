@@ -3,6 +3,7 @@ __exported import merian_shaders.light_cache.hashed_irradiance_cache;
 __exported import mc;
 
 import merian_shaders.colors.colorspaces;
+import merian_shaders.colors.debug;
 
 using merian;
 
@@ -11,21 +12,16 @@ namespace merian {
 // What the chains make of an emitter the continuation found, where next event estimation covers
 // the same light. In the mixture mode the density already carries the light technique, so the
 // middle one is a no-op there and only separates the two in the resampled mode.
-static const int GUIDING_DIRECT_FULL = 0; // the emission as the continuation found it
-static const int GUIDING_DIRECT_MIS = 1;  // only the share the scatter technique pays for
-static const int GUIDING_DIRECT_NONE = 2; // nothing: the light sampler owns it
 
 extern static const int merian_guiding_mc_samples = 5;
 extern static const float merian_guiding_probability = 0.9;
-// scale the guiding probability with the lobe width
-extern static const bool merian_guiding_scale_with_alpha = true;
-// no guiding below this alpha: the BSDF is far more peaked than any lobe
-extern static const float merian_guiding_alpha_threshold = 0.05;
+// Exponent on a chain's weight where it selects among the candidates; the fixed point makes the
+// probability proportional to the square root of the mass a chain represents.
+extern static const float merian_guiding_weight_exponent = 1.0;
 extern static const bool merian_guiding_missing_light_heuristic = true;
 // The three direct illumination strategies of Rath et al., Variance-Aware Path Guiding
 // (SIGGRAPH 2020). Their MIS compensation is a different weight again — the guiding's own share
 // against the BSDF, on a squared target — and the chains do not carry it.
-extern static const int merian_guiding_direct_target = GUIDING_DIRECT_FULL;
 // complete a truncated path with the cached irradiance at its last vertex
 extern static const bool merian_guiding_light_cache_tail = false;
 // floor on the density the irradiance cache divides by, bounding the variance it stores
@@ -45,6 +41,8 @@ struct MCPGDistribution : GuidingDistribution<float3> {
     VonMisesFisher3<false> vmfs[merian_guiding_mc_samples];
     float scores[merian_guiding_mc_samples];
     float score_sum;
+    // sum of the raw chain weights, what a sample's own value is judged against
+    float raw_sum;
 
     // the resampled chain, and the cell it was read from
     MCState selected;
@@ -72,12 +70,8 @@ struct MCPGDistribution : GuidingDistribution<float3> {
         return score_sum > 0.0;
     }
 
-    float get_selection_probability(const float alpha) {
-        if (alpha < merian_guiding_alpha_threshold) {
-            return 0.0;
-        }
-        return merian_guiding_scale_with_alpha ? merian_guiding_probability * alpha
-                                               : merian_guiding_probability;
+    float get_confidence() {
+        return 1.f;
     }
 }
 
@@ -125,6 +119,7 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
 
         MCPGDistribution dist;
         dist.score_sum = 0.0;
+        dist.raw_sum = 0.0;
         dist.selected = MCState();
         dist.selected_pos = HashGridPos();
 
@@ -138,17 +133,21 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
             const MCState s =
                 mcpg.load(lookup_pos, vertex.normal, frame_info.cam_pos, frame_info.time, uint(i),
                           uint(merian_guiding_mc_samples), xi, grid_pos, level);
-            dist.score_sum += s.sum_w;
+            const float score = merian_guiding_weight_exponent == 1.f
+                                    ? s.sum_w
+                                    : pow(s.sum_w, merian_guiding_weight_exponent);
+            dist.score_sum += score;
+            dist.raw_sum += s.sum_w;
             // comparison with NaN is false (when s.sum_w == 0 and score_sum == 0)
-            if (rng.next_float() < s.sum_w / dist.score_sum) {
+            if (rng.next_float() < score / dist.score_sum) {
                 dist.selected = s;
                 dist.selected_pos = grid_pos;
                 dist.vmfs[i] = dist.vmfs[0];
                 dist.scores[i] = dist.scores[0];
-                dist.scores[0] = s.sum_w;
+                dist.scores[0] = score;
                 dist.vmfs[0] = s.get_vmf(vertex.pos);
             } else {
-                dist.scores[i] = s.sum_w;
+                dist.scores[i] = score;
                 dist.vmfs[i] = s.get_vmf(vertex.pos);
             }
         }
@@ -156,14 +155,70 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
         return dist;
     }
 
-    MCPGRecord record_scatter(const MCPGDistribution dist, const bool guided) {
+    MCPGRecord record_scatter(const MCPGDistribution dist,
+                              const PathSegment segment,
+                              const bool guided,
+                              inout RandomGenerator rng) {
         MCPGRecord record;
         // a direction the guiding did not propose starts a fresh chain, and must not invalidate
         // the cell the candidates came from
         record.selected = guided ? dist.selected : MCState();
         record.selected_pos = guided ? dist.selected_pos : HashGridPos();
-        record.score_sum = dist.score_sum;
+        record.score_sum = dist.raw_sum;
         return record;
+    }
+
+    // What the chains currently believe at this point; magenta where the grid holds nothing.
+    bool debug_view(const int selector,
+                    const RenderFrameInfo frame_info,
+                    const PathVertex vertex,
+                    inout RandomGenerator rng,
+                    out float4 color) {
+        color = float4(1, 0, 1, 1);
+        if (selector <= 0) {
+            return false;
+        }
+
+        const float3 cam = frame_info.cam_pos;
+        if (selector == 1) { // the cell a lookup lands in
+            const uint level = mcpg.grid.distributed_level_for_pos(vertex.pos, cam, rng);
+            const int3 gidx =
+                mcpg.grid.grid_idx(vertex.pos, mcpg.grid.grid_inv_width_for_level(level), rng);
+            color = float4(random_color(mcpg.grid.buffer_index(gidx, level)), 1);
+            return true;
+        }
+        if (selector == 2) { // its resolution level
+            color = float4(
+                debug_color(mcpg.grid.distributed_level_for_pos(vertex.pos, cam, rng) / 63.0), 1);
+            return true;
+        }
+
+        const MCState s = mcpg.load(vertex.pos, vertex.shading_frame, cam, frame_info.time, rng);
+        if (selector == 9) { // share of lookups that resolve no state at all
+            color = float4(s.is_valid() ? 0.0 : 1.0);
+            return true;
+        }
+        if (!s.is_valid()) {
+            return true;
+        }
+        switch (selector) {
+        case 3: // chain weight
+            color = float4(debug_color(s.sum_w * 0.1), 1);
+            return true;
+        case 4: // aim
+            color = float4((s.get_dir(vertex.pos) + 1) * 0.5, 1);
+            return true;
+        case 5: // lobe width, 1 - mean cos
+            color = float4(debug_color(s.one_minus_mean_cos(vertex.pos)), 1);
+            return true;
+        case 6: // samples behind the fit
+            color = float4(debug_color(float(s.N) / float(ML_MAX_N)), 1);
+            return true;
+        case 7: // motion of the target
+            color = float4(abs(float3(s.mv)), 1);
+            return true;
+        }
+        return false;
     }
 
     float3 record_segment(inout State state,
@@ -212,14 +267,7 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
 
         // What the chains are worth steering towards. The cache above keeps the emitter whole
         // either way: it stands in for the whole path tail, not for the part the chains steer.
-        float direct_scale = 1.f;
-        if (emissive) {
-            if (merian_guiding_direct_target == GUIDING_DIRECT_MIS) {
-                direct_scale = segment.nee_weight;
-            } else if (merian_guiding_direct_target == GUIDING_DIRECT_NONE) {
-                direct_scale = 0.f;
-            }
-        }
+        const float direct_scale = emissive ? segment.direct_scale : 1.f;
         if (!(direct_scale > 0.f)) {
             // nothing to teach and nothing to hold against the cell either
             return merian_guiding_light_cache_tail && segment.traced && segment.is_last && !emissive
@@ -230,7 +278,7 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
 
         if (rng.next_float() * record.score_sum < guide_f * merian_guiding_mc_samples) {
             MCState chain = record.selected;
-            chain.add_sample(segment.pos, guide_f, segment.next_pos, segment.next_mv,
+            chain.add_sample(segment.pos, guide_f, segment.aim_pos, segment.next_mv,
                              frame_info.time);
             mcpg.store(chain, segment.pos, segment.normal, frame_info.cam_pos, frame_info.index,
                        rng);

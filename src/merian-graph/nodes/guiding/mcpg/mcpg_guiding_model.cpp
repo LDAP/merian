@@ -43,19 +43,17 @@ SlangCompositionHandle MCPGGuidingModel::get_composition() const {
         "mcpg_guiding_constants",
         fmt::format("namespace merian {{\n"
                     "export static const int merian_guiding_mc_samples = {};\n"
-                    "export static const float merian_guiding_probability = {};\n"
-                    "export static const bool merian_guiding_scale_with_alpha = {};\n"
-                    "export static const float merian_guiding_alpha_threshold = {};\n"
+                    "export static const float merian_guiding_weight_exponent = {};\n"
                     "export static const bool merian_guiding_missing_light_heuristic = {};\n"
-                    "export static const int merian_guiding_direct_target = {};\n"
                     "export static const bool merian_guiding_light_cache_tail = {};\n"
                     "export static const float merian_guiding_lc_min_pdf = {};\n"
                     "}}\n"
                     "export static const float dir_guide_prior = {};\n"
-                    "export static const float mc_conf_z = {};",
-                    mc_samples, probability, scale_with_alpha ? "true" : "false", alpha_threshold,
-                    missing_light_heuristic ? "true" : "false", direct_target,
-                    light_cache_tail ? "true" : "false", lc_min_pdf, dir_guide_prior, mc_conf_z));
+                    "export static const float mc_conf_z = {};\n"
+                    "export static const bool mc_welford_chord = {};",
+                    mc_samples, weight_exponent, missing_light_heuristic ? "true" : "false",
+                    light_cache_tail ? "true" : "false", lc_min_pdf, dir_guide_prior, mc_conf_z,
+                    mc_welford_chord ? "true" : "false"));
     return composition;
 }
 
@@ -72,6 +70,8 @@ std::string MCPGGuidingModel::get_type_name() const {
 }
 
 void MCPGGuidingModel::write_to(ShaderCursor cursor) {
+    mcpg->set_grid_params(grid_params);
+    irr_cache->set_grid_params(lc_params);
     mcpg->write_to(cursor["mcpg"]);
     irr_cache->write_to(cursor["irr_cache"]);
 }
@@ -95,23 +95,13 @@ bool MCPGGuidingModel::properties(Properties& props) {
             "instead of the maximum likelihood width, so a chain with little behind it proposes a "
             "wide lobe rather than a confident one. 0 disables, 1.6449 is the 95 % limit.",
             0.01f, 0.f, 4.f);
+        constants_changed |= props.config_bool(
+            "welford chord", mc_welford_chord,
+            "Measure a new sample's chord against the mean direction before and after it is folded "
+            "in; on its own the updated mean reports too small a spread.");
         constants_changed |= props.config_float(
-            "guiding probability", probability,
-            "Probability of drawing the scatter direction from the guiding lobes.", 0.01f, 0.f,
-            1.f);
-        constants_changed |=
-            props.config_bool("scale with alpha", scale_with_alpha,
-                              "Scale the guiding probability with the lobe width.");
-        constants_changed |=
-            props.config_float("alpha threshold", alpha_threshold,
-                               "Do not guide below this lobe width.", 0.01f, 0.f, 1.f);
-        constants_changed |= props.config_options(
-            "direct light target", direct_target, {"full", "MIS weighted", "none"},
-            Properties::OptionsStyle::COMBO,
-            "What the chains make of an emitter the continuation found, where NEE covers the same "
-            "light. 'full' takes the emission as found, 'MIS weighted' only the share the scatter "
-            "technique pays for, 'none' leaves direct light to NEE entirely. In the mixture mode "
-            "the density already carries the light technique, so the middle one is a no-op.");
+            "weight exponent", weight_exponent,
+            "Exponent on a chain's weight where it selects among candidates.", 0.1f, 0.25f, 4.f);
         constants_changed |= props.config_bool(
             "missing light heuristic", missing_light_heuristic,
             "Flood the Markov chains with invalidated states when no light is detected.");
@@ -128,9 +118,7 @@ bool MCPGGuidingModel::properties(Properties& props) {
             "Give each 2^n-wide cell tile a contiguous Morton-ordered slot range so nearby "
             "cells share cache lines (0 = scatter every cell).",
             0u, 5u);
-        if (mcpg) {
-            mcpg->properties(props);
-        }
+        grid_params.properties(props);
         props.st_end_child();
     }
 
@@ -158,9 +146,7 @@ bool MCPGGuidingModel::properties(Properties& props) {
             "Increase to reduce fireflies in the irradiance cache and bias the guiding towards "
             "direct light, especially useful for short maximum path lengths.",
             0.1f, 0.0f);
-        if (irr_cache) {
-            irr_cache->properties(props);
-        }
+        lc_params.properties(props);
         props.st_end_child();
     }
 

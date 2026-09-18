@@ -14,6 +14,15 @@ class Properties;
 
 class HashGrid {
   public:
+    // The grid's resolution, kept apart from the buffers so that it survives a rebuild.
+    struct Params {
+        float tan_alpha_half = 0.006F;
+        float level_bias = 0.0F;
+        float distribution_dimension = 2.0F;
+
+        void properties(Properties& props);
+    };
+
     HashGrid(const ShaderCompileContextHandle& compile_context,
              const ResourceAllocatorHandle& allocator,
              const SlangCompositionHandle& composition,
@@ -25,7 +34,9 @@ class HashGrid {
 
     void write_to(ShaderCursor cursor) const;
 
-    void properties(Properties& props);
+    void set_params(const Params& p) {
+        params = p;
+    }
 
     uint32_t get_buffer_size() const {
         return buffer_size;
@@ -39,9 +50,7 @@ class HashGrid {
     const uint32_t buffer_size;
     const bool split_storage;
 
-    float grid_tan_alpha_half = 0.006F;
-    float grid_level_bias = 0.0F;
-    float grid_distribution_dimension = 2.0F;
+    Params params;
 
     BufferHandle keys;
     BufferHandle data;
