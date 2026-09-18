@@ -90,8 +90,8 @@ GLTFSceneNode::NodeStatusFlags GLTFSceneNode::properties([[maybe_unused]] Proper
         file_path = path_str;
         // Load synchronously so the stored camera is restored onto a populated scene.
         if (scene && !file_path.empty()) {
-            context->get_queue_GCT()->submit_wait(
-                [&](const CommandBufferHandle& cmd) { scene->load(cmd, file_path); });
+            context->get_queue(vk::QueueFlagBits::eGraphics)
+                ->submit_wait([&](const CommandBufferHandle& cmd) { scene->load(cmd, file_path); });
         }
     }
 

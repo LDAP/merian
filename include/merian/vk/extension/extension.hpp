@@ -118,7 +118,8 @@ struct DeviceSupportInfo {
 struct DeviceSupportQueryInfo {
     const FileLoaderHandle file_loader;
     const PhysicalDeviceHandle& physical_device;
-    const QueueInfo& queue_info;
+    // The queues this device would get; requests it cannot satisfy are absent.
+    const QueueAssignment& queues;
     const ExtensionContainer& extension_container;
     const ShaderCompileContextHandle compile_context;
 
@@ -246,8 +247,7 @@ class ContextExtension {
     virtual void on_create_instance([[maybe_unused]] const InstanceSupportQueryInfo& support_info,
                                     [[maybe_unused]] const vk::ApplicationInfo& application_info,
                                     [[maybe_unused]] std::vector<const char*>& layer_names,
-                                    [[maybe_unused]] std::vector<const char*>& extension_names) {
-    }
+                                    [[maybe_unused]] std::vector<const char*>& extension_names) {}
 
     virtual void on_instance_created(const InstanceHandle& /*unused*/,
                                      const ExtensionContainer& /*extension_container*/) {}
@@ -257,10 +257,14 @@ class ContextExtension {
     virtual void on_physical_device_selected(const PhysicalDeviceHandle& /*unused*/,
                                              const ExtensionContainer& /*extension_container*/) {}
 
-    virtual bool accept_graphics_queue([[maybe_unused]] const InstanceHandle& instance,
-                                       [[maybe_unused]] const PhysicalDeviceHandle& physical_device,
-                                       [[maybe_unused]] std::size_t queue_family_index) {
-        return true;
+    /**
+     * @brief Request queues this extension needs.
+     *
+     * Called for every physical device that is considered, and again before device creation.
+     */
+    virtual std::vector<QueueRequest>
+    request_queues([[maybe_unused]] const PhysicalDeviceHandle& physical_device) {
+        return {};
     }
 
     /**

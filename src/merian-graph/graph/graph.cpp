@@ -24,7 +24,9 @@ const ContextHandle& check_requirements_and_get_context(const ContextHandle& con
 
 Graph::Graph(const GraphCreateInfo& create_info)
     : context(check_requirements_and_get_context(create_info.context)),
-      resource_allocator(create_info.resource_allocator), queue(context->get_queue_GCT()),
+      resource_allocator(create_info.resource_allocator),
+      queue(context->get_queue(vk::QueueFlagBits::eGraphics | vk::QueueFlagBits::eCompute |
+                               vk::QueueFlagBits::eTransfer)),
       thread_pool(std::make_shared<ThreadPool>()),
       cpu_queue(std::make_shared<CPUQueue>(context, thread_pool)),
       registry(NodeRegistry::get_instance()),

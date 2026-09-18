@@ -44,7 +44,7 @@ class SlangBindingTest : public ::testing::Test {
         context = Context::create(info);
         auto resources = context->get_context_extension<ExtensionResources>();
         allocator = resources->resource_allocator();
-        queue = context->get_queue_GCT();
+        queue = context->get_queue(vk::QueueFlagBits::eGraphics);
         compile_context = ShaderCompileContext::create(context);
         compile_context->add_search_path(SLANG_BINDING_TEST_SHADER_DIR);
     }

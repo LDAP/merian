@@ -34,19 +34,18 @@ class SlangHotReloadTest : public ::testing::Test {
         ContextCreateInfo info{
             // Materials store fp16 (half3 tint/emission), so the shaders declare 16-bit
             // StorageBuffer variables; without these the validation layer rejects them.
-            .features =
-                VulkanFeatures({"scalarBlockLayout", "shaderInt64", "shaderInt16", "shaderFloat16",
-                                "storageBuffer16BitAccess", "uniformAndStorageBuffer16BitAccess",
-                                "storageBuffer8BitAccess", "uniformAndStorageBuffer8BitAccess",
-                                "shaderSampledImageArrayNonUniformIndexing",
-                                "runtimeDescriptorArray"}),
+            .features = VulkanFeatures(
+                {"scalarBlockLayout", "shaderInt64", "shaderInt16", "shaderFloat16",
+                 "storageBuffer16BitAccess", "uniformAndStorageBuffer16BitAccess",
+                 "storageBuffer8BitAccess", "uniformAndStorageBuffer8BitAccess",
+                 "shaderSampledImageArrayNonUniformIndexing", "runtimeDescriptorArray"}),
             .context_extensions = {ExtensionVkValidationLayers::name, ExtensionResources::name},
             .application_name = "test-slang-hot-reload",
         };
         context = Context::create(info);
         auto resources = context->get_context_extension<ExtensionResources>();
         allocator = resources->resource_allocator();
-        queue = context->get_queue_GCT();
+        queue = context->get_queue(vk::QueueFlagBits::eGraphics);
         compile_context = ShaderCompileContext::create(context);
         compile_context->add_search_path(TEST_SHADER_DIR);
         obj_allocator = std::make_shared<SimpleShaderObjectAllocator>(allocator);

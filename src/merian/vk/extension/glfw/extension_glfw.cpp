@@ -53,36 +53,43 @@ ExtensionGLFW::query_instance_support(const InstanceSupportQueryInfo& /*query_in
 }
 
 DeviceSupportInfo ExtensionGLFW::query_device_support(const DeviceSupportQueryInfo& query_info) {
-    DeviceSupportInfo info;
-
     if (glfw_vulkan_support == GLFW_FALSE) {
-        info.supported = false;
+        return DeviceSupportInfo{false, "GLFW has no Vulkan support"};
+    }
+
+    DeviceSupportInfo info =
+        DeviceSupportInfo::check(query_info, {}, {}, {VK_KHR_SWAPCHAIN_EXTENSION_NAME});
+    if (!info.supported) {
         return info;
     }
 
-    info.required_extensions = {
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-    };
-
-    // Check presentation support
-    info.supported =
-        glfwGetPhysicalDevicePresentationSupport(
-            **(query_info.physical_device->get_instance()), **query_info.physical_device,
-            query_info.queue_info.queue_family_idx_GCT) == GLFW_TRUE;
+    const std::optional<QueueInfo> queue = query_info.queues.get(vk::QueueFlagBits::eGraphics);
+    if (!queue || glfwGetPhysicalDevicePresentationSupport(
+                      **query_info.physical_device->get_instance(), **query_info.physical_device,
+                      queue->family_index) != GLFW_TRUE) {
+        return DeviceSupportInfo{false, "no graphics queue family can present"};
+    }
 
     return info;
 }
 
-bool ExtensionGLFW::accept_graphics_queue(const InstanceHandle& instance,
-                                          const PhysicalDeviceHandle& physical_device,
-                                          std::size_t queue_family_index) {
-    return glfw_vulkan_support == GLFW_FALSE ||
-           glfwGetPhysicalDevicePresentationSupport(**instance, **physical_device,
-                                                    queue_family_index) == GLFW_TRUE;
+std::vector<QueueRequest>
+ExtensionGLFW::request_queues([[maybe_unused]] const PhysicalDeviceHandle& physical_device) {
+    if (glfw_vulkan_support == GLFW_FALSE) {
+        return {};
+    }
+    return {{
+        .capabilities = vk::QueueFlagBits::eGraphics,
+        .prefer_family =
+            [](const PhysicalDeviceHandle& device, const uint32_t family_index) {
+                return glfwGetPhysicalDevicePresentationSupport(**device->get_instance(), **device,
+                                                                family_index) == GLFW_TRUE;
+            },
+    }};
 }
 
 WindowHandle ExtensionGLFW::create_window(const DeviceHandle& device,
-                                           const WindowCreateInfo& create_info) const {
+                                          const WindowCreateInfo& create_info) const {
     return std::shared_ptr<GLFWWindow>(new GLFWWindow(device, create_info));
 }
 

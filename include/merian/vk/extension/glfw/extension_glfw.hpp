@@ -11,7 +11,7 @@
 namespace merian {
 
 /*
- * @brief      Initializes GLFW and makes sure the graphics queue supports present.
+ * @brief      Initializes GLFW and prefers a graphics queue that supports present.
  */
 class ExtensionGLFW : public ContextExtension, public WindowProvider {
   public:
@@ -43,9 +43,7 @@ class ExtensionGLFW : public ContextExtension, public WindowProvider {
 
     DeviceSupportInfo query_device_support(const DeviceSupportQueryInfo& query_info) override;
 
-    bool accept_graphics_queue(const InstanceHandle& instance,
-                               const PhysicalDeviceHandle& physical_device,
-                               std::size_t queue_family_indext) override;
+    std::vector<QueueRequest> request_queues(const PhysicalDeviceHandle& physical_device) override;
 
     // ----------------------------------------
 

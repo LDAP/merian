@@ -150,6 +150,46 @@ class ExtensionContainer {
 
 using ConfigureExtensionsCallback = std::function<void(ExtensionContainer&)>;
 
+// A queue the context should create. Requests share a queue whenever one of them already provides
+// what the other needs.
+struct QueueRequest {
+    vk::QueueFlags capabilities;
+    // Create a queue of its own instead of sharing one that already provides the capabilities.
+    bool dedicated = false;
+    // Number of queues to create. Fewer are created if the family is smaller.
+    uint32_t count = 1;
+    // A device that cannot satisfy this request is not considered.
+    bool required = true;
+    // Preferred, not required. For support that is not a Vulkan queue capability, such as the
+    // presentation support of a window backend.
+    std::function<bool(const PhysicalDeviceHandle& physical_device, uint32_t family_index)>
+        prefer_family{};
+};
+
+struct QueueInfo {
+    // The capabilities the queue was requested with. The family may support more.
+    vk::QueueFlags capabilities;
+    uint32_t family_index;
+    // Indices within the family, not family indices.
+    std::vector<uint32_t> queue_indices;
+};
+
+// The queues the context created, looked up by the capabilities the caller needs.
+class QueueAssignment {
+  public:
+    void add(const QueueInfo& queue);
+
+    // Exactly `capabilities` if such a queue was created, else the closest that provides them.
+    std::optional<QueueInfo> get(const vk::QueueFlags capabilities) const;
+
+    bool supports(const vk::QueueFlags capabilities) const;
+
+    uint32_t queues_in_family(const uint32_t family_index) const;
+
+  private:
+    std::vector<QueueInfo> queues;
+};
+
 struct ContextCreateInfo {
     // Set your desired Vulkan features.
     VulkanFeatures features{};
@@ -171,31 +211,19 @@ struct ContextCreateInfo {
     std::string application_name = "";
     // Your application version.
     uint32_t application_vk_version = VK_MAKE_VERSION(1, 0, 0);
-    // Merian prepares a graphics+compute+transfer and a dedicated transfer queue, this sets the
-    // number of additional compute queues.
-    uint32_t preferred_number_compute_queues = 1;
+    // Queues the context creates.
+    std::vector<QueueRequest> queues = {
+        {.capabilities = vk::QueueFlagBits::eGraphics | vk::QueueFlagBits::eCompute |
+                         vk::QueueFlagBits::eTransfer},
+        {.capabilities = vk::QueueFlagBits::eTransfer, .dedicated = true, .required = false},
+        {.capabilities = vk::QueueFlagBits::eCompute, .dedicated = true, .required = false},
+    };
     // Set to a number greater or equal to 0 to only consider devices with this vendor id.
     uint32_t filter_vendor_id = (uint32_t)-1;
     // Set to a number greater or equal to 0 to only consider devices with this device id.
     uint32_t filter_device_id = (uint32_t)-1;
     // Set to a non-empty string to only consider devices with this name.
     std::string filter_device_name = "";
-};
-
-struct QueueInfo {
-    // A queue family index guaranteed to support graphics+compute+transfer (or -1)
-    int32_t queue_family_idx_GCT = -1;
-    // A queue family index guaranteed to support compute (or -1)
-    int32_t queue_family_idx_C = -1;
-    // A queue family index guaranteed to support transfer (or -1)
-    int32_t queue_family_idx_T = -1;
-
-    // The queue indices (not family!) used for the graphics queue
-    int32_t queue_idx_GCT = -1;
-    // The queue indices (not family!) used for the compute queue
-    std::vector<uint32_t> queue_idx_C;
-    // The queue indices (not family!) used for the transfer queue
-    int32_t queue_idx_T = -1;
 };
 
 /* Initializes the Vulkan instance and device and holds core objects.
@@ -247,41 +275,32 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
                            uint32_t filter_device_id,
                            std::string filter_device_name,
                            const VulkanFeatures& desired_additional_features,
-                           const std::vector<const char*>& desired_additional_extensions);
+                           const std::vector<const char*>& desired_additional_extensions,
+                           const std::vector<QueueRequest>& queue_requests);
     struct FeatureExtensionCheckResult;
     FeatureExtensionCheckResult
     determine_features_extensions(const VulkanFeatures& desired_additional_features,
                                   const std::vector<const char*>& desired_additional_extensions,
                                   const DeviceSupportCache& support_cache);
-    QueueInfo determine_queues(const PhysicalDeviceHandle& physical_device);
+    std::vector<QueueRequest> collect_queue_requests(const PhysicalDeviceHandle& physical_device,
+                                                     const std::vector<QueueRequest>& requests);
 
-    void create_device_and_queues(uint32_t preferred_number_compute_queues,
+    // nullopt if the device cannot satisfy a required request.
+    std::optional<QueueAssignment>
+    determine_queues(const PhysicalDeviceHandle& physical_device,
+                     const std::vector<QueueRequest>& requests) const;
+
+    void create_device_and_queues(const std::vector<QueueRequest>& requests,
                                   VulkanFeatures& features,
                                   std::vector<const char*>& extensions);
     void prepare_file_loader(const ContextCreateInfo& create_info);
 
   public: // Getter
-    // The actual number of compute queues (< preffered_number_compute_queues).
-    uint32_t get_number_compute_queues() const noexcept;
-
-    // A queue guaranteed to support graphics+compute+transfer.
-    // Can be nullptr if unavailable, you can check that with if (shrd_ptr) {...}
-    // Make sure to keep a reference, else the pool and its buffers are destroyed
-    std::shared_ptr<Queue> get_queue_GCT();
-
-    // A queue guaranteed to support transfer.
-    // Can be nullptr if unavailable, you can check that with if (shrd_ptr) {...}
+    // nullptr if no queue provides `capabilities`.
     // Make sure to keep a reference, else the pool and its buffers are destroyed.
-    // Might fall back to the GCT queue if fallback is true.
-    std::shared_ptr<Queue> get_queue_T(const bool fallback = false);
+    std::shared_ptr<Queue> get_queue(const vk::QueueFlags capabilities, const uint32_t index = 0);
 
-    // A queue guaranteed to support compute.
-    // Can be nullptr if unavailable, you can check that with if (shrd_ptr) {...}
-    // Make sure to keep a reference, else the pool and its buffers are destroyed.
-    // Might fall back to a different compute queue or the GCT queue, if fallback is true.
-    // In this case index may be invalid, else it must be < get_number_compute_queues() and or
-    // nullptr is returned.
-    std::shared_ptr<Queue> get_queue_C(uint32_t index = 0, const bool fallback = false);
+    uint32_t get_queue_count(const vk::QueueFlags capabilities) const;
 
     // Convenience command pool for graphics and compute (can be nullptr in very rare occasions)
     // Make sure to keep a reference, else the pool and its buffers are destroyed
@@ -303,7 +322,7 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
 
     const FileLoaderHandle& get_file_loader() const;
 
-    const QueueInfo& get_queue_info() const;
+    const QueueAssignment& get_queue_info() const;
 
     const ShaderCompileContextHandle& get_shader_compile_context() const;
 
@@ -340,16 +359,11 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
     // A shared file_loader for convenience.
     FileLoaderHandle file_loader;
 
-    // in find_queues. Indexes are -1 if no suitable queue was found!
+    // The queues that were created. Requests that could not be satisfied are absent.
+    QueueAssignment queue_info;
 
-    QueueInfo queue_info;
-
-    // can be nullptr in very rare occasions, you can check that with if (shrd_ptr) {...}
-    std::weak_ptr<Queue> queue_GCT;
-    // can be nullptr in very rare occasions, you can check that with if (shrd_ptr) {...}
-    std::weak_ptr<Queue> queue_T;
-    // resized in create_device_and_queues
-    std::vector<std::weak_ptr<Queue>> queues_C;
+    // Keyed by family and queue index, so requests resolving to the same queue share its mutex.
+    std::unordered_map<uint64_t, std::weak_ptr<Queue>> queues;
 
     // in make_context
 

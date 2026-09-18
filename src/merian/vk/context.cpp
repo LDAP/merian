@@ -8,8 +8,9 @@
 #include "merian/vk/utils/vulkan_extensions.hpp"
 #include "merian/vk/utils/vulkan_spirv.hpp"
 
+#include <algorithm>
+#include <bit>
 #include <fmt/ranges.h>
-#include <numeric>
 #include <queue>
 #include <ranges>
 #include <spdlog/spdlog.h>
@@ -305,9 +306,10 @@ Target API Version: {}\n\
         create_instance(target_vk_api_version, additional_instance_extensions,
                         create_info.instance_layers);
 
-        support_cache = select_physical_device(
-            create_info.filter_vendor_id, create_info.filter_device_id,
-            create_info.filter_device_name, create_info.features, create_info.device_extensions);
+        support_cache =
+            select_physical_device(create_info.filter_vendor_id, create_info.filter_device_id,
+                                   create_info.filter_device_name, create_info.features,
+                                   create_info.device_extensions, create_info.queues);
 
         feat_ext_result = determine_features_extensions(
             create_info.features, create_info.device_extensions, support_cache);
@@ -334,7 +336,7 @@ Target API Version: {}\n\
         }
     }
 
-    create_device_and_queues(create_info.preferred_number_compute_queues, feat_ext_result.features,
+    create_device_and_queues(create_info.queues, feat_ext_result.features,
                              feat_ext_result.extensions);
 
     shader_compile_context = ShaderCompileContext::create(file_loader->get_search_paths(), device);
@@ -508,7 +510,8 @@ Context::select_physical_device(uint32_t filter_vendor_id,
                                 uint32_t filter_device_id,
                                 std::string filter_device_name,
                                 const VulkanFeatures& desired_additional_features,
-                                const std::vector<const char*>& desired_additional_extensions) {
+                                const std::vector<const char*>& desired_additional_extensions,
+                                const std::vector<QueueRequest>& queue_requests) {
     const std::vector<PhysicalDeviceHandle> physical_devices = instance->get_physical_devices();
     if (physical_devices.empty()) {
         throw MerianException("No vulkan device found!");
@@ -528,7 +531,8 @@ Context::select_physical_device(uint32_t filter_vendor_id,
         filter_device_name = env_device_name;
     }
 
-    std::vector<std::pair<PhysicalDeviceHandle, QueueInfo>> matches;
+    std::vector<std::pair<PhysicalDeviceHandle, QueueAssignment>> matches;
+    uint32_t rejected_for_queues = 0;
     for (std::size_t i = 0; i < physical_devices.size(); i++) {
         vk::PhysicalDeviceProperties2 props = physical_devices[i]->get_properties();
         SPDLOG_INFO("found {} {}, vendor id: {}, device id: {}, Vulkan: {}.{}.{}",
@@ -542,12 +546,25 @@ Context::select_physical_device(uint32_t filter_vendor_id,
             (filter_device_id == (uint32_t)-1 || filter_device_id == props.properties.deviceID) &&
             (filter_device_name == "" || filter_device_name == props.properties.deviceName)) {
 
-            QueueInfo q_info = determine_queues(physical_devices[i]);
-            matches.emplace_back(physical_devices[i], std::move(q_info));
+            std::optional<QueueAssignment> queues = determine_queues(
+                physical_devices[i], collect_queue_requests(physical_devices[i], queue_requests));
+            if (queues) {
+                matches.emplace_back(physical_devices[i], std::move(*queues));
+            } else {
+                rejected_for_queues++;
+                SPDLOG_INFO("skipping {}: cannot provide the requested queues",
+                            props.properties.deviceName.data());
+            }
         }
     }
 
     if (matches.empty()) {
+        if (rejected_for_queues > 0) {
+            throw std::runtime_error{
+                fmt::format("none of the {} matching vulkan devices can provide the required "
+                            "queues.",
+                            rejected_for_queues)};
+        }
         throw std::runtime_error(fmt::format(
             "no vulkan device found with vendor id: {}, device id: {}, device name: {}.",
             filter_vendor_id == (uint32_t)-1 ? "any" : std::to_string(filter_vendor_id),
@@ -556,8 +573,8 @@ Context::select_physical_device(uint32_t filter_vendor_id,
     }
 
     std::unordered_map<PhysicalDeviceHandle, DeviceSupportCache> support_cache;
-    auto query_support =
-        [&](const std::pair<PhysicalDeviceHandle, QueueInfo>& match) -> const DeviceSupportCache& {
+    auto query_support = [&](const std::pair<PhysicalDeviceHandle, QueueAssignment>& match)
+        -> const DeviceSupportCache& {
         if (auto it = support_cache.find(match.first); it != support_cache.end())
             return it->second;
 
@@ -581,7 +598,7 @@ Context::select_physical_device(uint32_t filter_vendor_id,
     };
 
     auto count_extensions_supported =
-        [&](const std::pair<PhysicalDeviceHandle, QueueInfo>& match) -> uint32_t {
+        [&](const std::pair<PhysicalDeviceHandle, QueueAssignment>& match) -> uint32_t {
         uint32_t count = 0;
         for (const auto& ext : desired_additional_extensions)
             count += static_cast<uint32_t>(match.first->extension_supported(ext));
@@ -592,7 +609,7 @@ Context::select_physical_device(uint32_t filter_vendor_id,
     };
 
     auto count_features_supported =
-        [&](const std::pair<PhysicalDeviceHandle, QueueInfo>& match) -> uint32_t {
+        [&](const std::pair<PhysicalDeviceHandle, QueueAssignment>& match) -> uint32_t {
         uint32_t count = 0;
         for (const auto& name : desired_additional_features.get_enabled_features())
             count += static_cast<uint32_t>(match.first->get_supported_features().get_feature(name));
@@ -624,7 +641,6 @@ Context::select_physical_device(uint32_t filter_vendor_id,
     });
 
     physical_device = best->first;
-    queue_info = std::move(best->second);
 
     std::string driver_id;
     const char* driver_info;
@@ -642,134 +658,147 @@ Context::select_physical_device(uint32_t filter_vendor_id,
                 props.deviceName.data(), props.vendorID, props.deviceID, driver_id, driver_info);
 
     const auto support = query_support(*best);
+    queue_info = std::move(best->second);
 
     return support;
 }
 
-QueueInfo Context::determine_queues(const PhysicalDeviceHandle& physical_device) {
-    QueueInfo q_info;
+namespace {
+// Requests for the same capabilities, collapsed into the family the context has to find.
+struct MergedQueueRequest {
+    vk::QueueFlags capabilities{};
+    bool dedicated = false;
+    uint32_t count = 0;
+    bool required = false;
+    std::vector<std::function<bool(const PhysicalDeviceHandle&, uint32_t)>> prefer_family;
+};
 
-    std::vector<vk::QueueFamilyProperties> queue_family_props =
+uint32_t capability_count(const vk::QueueFlags capabilities) {
+    return std::popcount(static_cast<uint32_t>(static_cast<VkQueueFlags>(capabilities)));
+}
+
+uint64_t queue_key(const uint32_t family_index, const uint32_t queue_index) {
+    return (static_cast<uint64_t>(family_index) << 32U) | queue_index;
+}
+
+std::vector<MergedQueueRequest> merge_queue_requests(const std::vector<QueueRequest>& requests) {
+    // Widest first, so a request that only needs a subset of another one finds it. Never widen an
+    // entry: a combination can be unsatisfiable where each request alone is not.
+    std::vector<QueueRequest> widest_first = requests;
+    std::stable_sort(widest_first.begin(), widest_first.end(),
+                     [](const QueueRequest& a, const QueueRequest& b) {
+                         return capability_count(a.capabilities) > capability_count(b.capabilities);
+                     });
+
+    std::vector<MergedQueueRequest> merged;
+    for (const QueueRequest& request : widest_first) {
+        const auto it =
+            std::find_if(merged.begin(), merged.end(), [&](const MergedQueueRequest& other) {
+                if (other.dedicated != request.dedicated) {
+                    return false;
+                }
+                return request.dedicated
+                           ? other.capabilities == request.capabilities
+                           : (other.capabilities & request.capabilities) == request.capabilities;
+            });
+        auto entry = it;
+        if (entry == merged.end()) {
+            entry = merged.emplace(merged.end());
+            entry->capabilities = request.capabilities;
+            entry->dedicated = request.dedicated;
+        }
+        entry->count = std::max(entry->count, request.count);
+        entry->required |= request.required;
+        if (request.prefer_family) {
+            entry->prefer_family.emplace_back(request.prefer_family);
+        }
+    }
+    return merged;
+}
+
+} // namespace
+
+std::vector<QueueRequest>
+Context::collect_queue_requests(const PhysicalDeviceHandle& physical_device,
+                                const std::vector<QueueRequest>& requests) {
+    std::vector<QueueRequest> all_requests = requests;
+    for (const auto& ext : get_extensions()) {
+        insert_all(all_requests, ext->request_queues(physical_device));
+    }
+    return all_requests;
+}
+
+std::optional<QueueAssignment>
+Context::determine_queues(const PhysicalDeviceHandle& physical_device,
+                          const std::vector<QueueRequest>& requests) const {
+    const std::vector<vk::QueueFamilyProperties> families =
         physical_device->get_physical_device().getQueueFamilyProperties();
-
-    if (queue_family_props.empty()) {
+    if (families.empty()) {
         throw std::runtime_error{"no queue families available!"};
     }
-    SPDLOG_DEBUG("number of queue families available: {}", queue_family_props.size());
-
-    using Flags = vk::QueueFlagBits;
-
-    // We calculate all possible index candidates then sort descending the list to get the best
-    // match. (GCT found, GCT extension_accept, additional T found, additional C found, T family
-    // distinct from GCT, C family distinct from GCT, T family distinct from C, number remaining
-    // compute queues, GCT family index, T family index, C family index)
-    std::vector<std::tuple<bool, uint32_t, bool, bool, bool, bool, bool, uint32_t, uint32_t,
-                           uint32_t, uint32_t>>
-        candidates;
 
 #ifndef NDEBUG
-    for (std::size_t i = 0; i < queue_family_props.size(); i++) {
-        const bool supports_graphics =
-            static_cast<bool>(queue_family_props[i].queueFlags & Flags::eGraphics);
-        const bool supports_transfer =
-            static_cast<bool>(queue_family_props[i].queueFlags & Flags::eTransfer);
-        const bool supports_compute =
-            static_cast<bool>(queue_family_props[i].queueFlags & Flags::eCompute);
-        SPDLOG_DEBUG("queue family {}: supports graphics: {} transfer: {} compute: {}, count {}", i,
-                     supports_graphics, supports_transfer, supports_compute,
-                     queue_family_props[i].queueCount);
+    for (uint32_t family = 0; family < families.size(); family++) {
+        SPDLOG_DEBUG("queue family {}: {} queues, {}", family, families[family].queueCount,
+                     vk::to_string(families[family].queueFlags));
     }
 #endif
 
-    std::vector<uint32_t> queue_counts(queue_family_props.size());
-    for (uint32_t i = 0; i < queue_family_props.size(); i++)
-        queue_counts[i] = queue_family_props[i].queueCount;
+    QueueAssignment assignment;
+    std::vector<uint32_t> used_per_family(families.size(), 0);
 
-    for (uint32_t queue_family_idx_GCT = 0; queue_family_idx_GCT < queue_family_props.size();
-         queue_family_idx_GCT++) {
-        for (uint32_t queue_family_idx_T = 0; queue_family_idx_T < queue_family_props.size();
-             queue_family_idx_T++) {
-            for (uint32_t queue_family_idx_C = 0; queue_family_idx_C < queue_family_props.size();
-                 queue_family_idx_C++) {
+    // Requests are satisfied in order, so the ones listed first get the better family.
+    for (const MergedQueueRequest& request : merge_queue_requests(requests)) {
+        // (preferences met, family not taken yet, capabilities that were not asked for, free
+        // queues, family index), larger is better.
+        std::optional<std::tuple<uint32_t, bool, int32_t, uint32_t, int32_t>> best_score;
+        std::optional<uint32_t> best_family;
 
-                // Make sure we do not request more queues that are available!
-                std::vector<uint32_t> remaining_queue_count = queue_counts;
-                bool found_GCT = false;
-                bool found_T = false;
-                bool found_C = false;
-                uint32_t num_compute_queues = 0;
+        for (uint32_t family = 0; family < families.size(); family++) {
+            const uint32_t free_queues = families[family].queueCount - used_per_family[family];
+            if ((families[family].queueFlags & request.capabilities) != request.capabilities ||
+                free_queues == 0) {
+                continue;
+            }
 
-                // Prio 1: GCT
-                if ((queue_family_props[queue_family_idx_GCT].queueFlags & Flags::eGraphics) &&
-                    (queue_family_props[queue_family_idx_GCT].queueFlags & Flags::eCompute) &&
-                    (queue_family_props[queue_family_idx_GCT].queueFlags & Flags::eTransfer) &&
-                    remaining_queue_count[queue_family_idx_GCT] > 0) {
-                    found_GCT = true;
-                    remaining_queue_count[queue_family_idx_GCT]--;
-                }
-                // Prio 2: GCT accepted by extensions
-                const auto& extensions = get_extensions();
-                uint32_t GCT_accepts =
-                    !found_GCT ? 0
-                               : std::accumulate(extensions.begin(), extensions.end(), 0,
-                                                 [&](uint32_t accum, const auto& ext) {
-                                                     return accum + ext->accept_graphics_queue(
-                                                                        instance, physical_device,
-                                                                        queue_family_idx_GCT);
-                                                 });
-                // Prio 2: T (additional)
-                if ((queue_family_props[queue_family_idx_T].queueFlags & Flags::eTransfer) &&
-                    remaining_queue_count[queue_family_idx_T] > 0) {
-                    found_T = true;
-                    remaining_queue_count[queue_family_idx_T]--;
-                }
-                // Prio 3: C (additional)
-                if ((queue_family_props[queue_family_idx_C].queueFlags & Flags::eCompute) &&
-                    remaining_queue_count[queue_family_idx_C] > 0) {
-                    found_C = true;
-                    // we do not need to reduce remaining_queue_count[queue_family_idx_C] since its
-                    // the last prio get number remaining instead
-                    num_compute_queues = remaining_queue_count[queue_family_idx_C];
-                }
+            uint32_t preferences_met = 0;
+            for (const auto& prefer : request.prefer_family) {
+                preferences_met += static_cast<uint32_t>(prefer(physical_device, family));
+            }
+            const auto unrelated = static_cast<uint32_t>(
+                static_cast<VkQueueFlags>(families[family].queueFlags & ~request.capabilities));
+            const std::tuple score{
+                preferences_met, used_per_family[family] == 0,  -std::popcount(unrelated),
+                free_queues,     -static_cast<int32_t>(family),
+            };
 
-                const bool T_distinct_from_GCT =
-                    found_T && found_GCT && queue_family_idx_T != queue_family_idx_GCT;
-                const bool C_distinct_from_GCT =
-                    found_C && found_GCT && queue_family_idx_C != queue_family_idx_GCT;
-                const bool T_distinct_from_C =
-                    found_T && found_C && queue_family_idx_T != queue_family_idx_C;
-
-                candidates.emplace_back(found_GCT, GCT_accepts, found_T, found_C,
-                                        T_distinct_from_GCT, C_distinct_from_GCT, T_distinct_from_C,
-                                        num_compute_queues, queue_family_idx_GCT,
-                                        queue_family_idx_T, queue_family_idx_C);
+            if (!best_score || score > *best_score) {
+                best_score = score;
+                best_family = family;
             }
         }
+
+        if (!best_family) {
+            if (request.required) {
+                SPDLOG_DEBUG("no queue family supports the required queue {}",
+                             vk::to_string(request.capabilities));
+                return std::nullopt;
+            }
+            continue;
+        }
+
+        const uint32_t count = std::min(request.count, families[*best_family].queueCount -
+                                                           used_per_family[*best_family]);
+        std::vector<uint32_t> queue_indices;
+        for (uint32_t i = 0; i < count; i++) {
+            queue_indices.emplace_back(used_per_family[*best_family]++);
+        }
+        SPDLOG_DEBUG("queue {}: family {}, indices [{}]", vk::to_string(request.capabilities),
+                     *best_family, fmt::join(queue_indices, ", "));
+        assignment.add({request.capabilities, *best_family, std::move(queue_indices)});
     }
 
-    // Descending order
-    std::sort(candidates.begin(), candidates.end(), std::greater<>());
-    auto best = candidates[0];
-
-    const bool found_GCT = std::get<0>(best);
-    const bool found_T = std::get<2>(best);
-    const bool found_C = std::get<3>(best);
-
-    if (!found_GCT || !found_T || !found_C) {
-        SPDLOG_WARN("not all requested queue families found! GCT: {} T: {} C: {}", found_GCT,
-                    found_T, found_C);
-    }
-
-    q_info.queue_family_idx_GCT = found_GCT ? std::get<8>(best) : -1;
-    q_info.queue_family_idx_T = found_T ? std::get<9>(best) : -1;
-    q_info.queue_family_idx_C = found_C ? std::get<10>(best) : -1;
-
-    SPDLOG_DEBUG("determined queue families indices: GCT: {} ({}/{} accept votes), T: {} C: {}",
-                 q_info.queue_family_idx_GCT, std::get<1>(best),
-                 found_GCT ? get_extensions().size() : 0, q_info.queue_family_idx_T,
-                 q_info.queue_family_idx_C);
-
-    return q_info;
+    return assignment;
 }
 
 Context::FeatureExtensionCheckResult Context::determine_features_extensions(
@@ -866,51 +895,38 @@ Context::FeatureExtensionCheckResult Context::determine_features_extensions(
     return result;
 }
 
-void Context::create_device_and_queues(uint32_t preferred_number_compute_queues,
+void Context::create_device_and_queues(const std::vector<QueueRequest>& requests,
                                        VulkanFeatures& features,
                                        std::vector<const char*>& extensions) {
 
     // -------------------------------
     // PREPARE QUEUES
 
-    std::vector<vk::QueueFamilyProperties> queue_family_props =
+    // Re-assign: extensions that turned out to be unsupported were removed since the physical
+    // device was selected, and their queues must not be created.
+    std::optional<QueueAssignment> assignment =
+        determine_queues(physical_device, collect_queue_requests(physical_device, requests));
+    if (!assignment) {
+        throw MerianException{"the selected device can no longer provide the required queues"};
+    }
+    queue_info = std::move(*assignment);
+
+    const std::vector<vk::QueueFamilyProperties> families =
         physical_device->get_physical_device().getQueueFamilyProperties();
-    std::vector<uint32_t> count_per_family(queue_family_props.size());
-    uint32_t actual_number_compute_queues = 0;
-
-    if (queue_info.queue_family_idx_GCT >= 0) {
-        queue_info.queue_idx_GCT = (int32_t)count_per_family[queue_info.queue_family_idx_GCT]++;
-        SPDLOG_DEBUG("queue index GCT: {}", queue_info.queue_idx_GCT);
+    std::vector<uint32_t> count_per_family(families.size());
+    for (uint32_t family = 0; family < families.size(); family++) {
+        count_per_family[family] = queue_info.queues_in_family(family);
     }
-    if (queue_info.queue_family_idx_T >= 0) {
-        queue_info.queue_idx_T = (int32_t)count_per_family[queue_info.queue_family_idx_T]++;
-        SPDLOG_DEBUG("queue index T: {}", queue_info.queue_idx_T);
-    }
-    if (queue_info.queue_family_idx_C >= 0) {
-        uint32_t remaining_compute_queues =
-            queue_family_props[queue_info.queue_family_idx_C].queueCount -
-            count_per_family[queue_info.queue_family_idx_C];
-        actual_number_compute_queues =
-            std::min(remaining_compute_queues, preferred_number_compute_queues);
 
-        for (uint32_t i = 0; i < actual_number_compute_queues; i++) {
-            queue_info.queue_idx_C.emplace_back(count_per_family[queue_info.queue_family_idx_C]++);
-        }
-        SPDLOG_DEBUG("queue indices C: [{}]", fmt::join(queue_info.queue_idx_C, ", "));
-    }
-    queues_C.resize(actual_number_compute_queues);
-
-    uint32_t max_queue_count = *std::max_element(count_per_family.begin(), count_per_family.end());
-    std::vector<float> queue_priorities(max_queue_count, 1.0f);
+    const uint32_t max_queue_count =
+        *std::max_element(count_per_family.begin(), count_per_family.end());
+    const std::vector<float> queue_priorities(max_queue_count, 1.0f);
 
     std::vector<vk::DeviceQueueCreateInfo> queue_create_infos;
-    for (uint32_t queue_familiy_idx = 0; queue_familiy_idx < queue_family_props.size();
-         queue_familiy_idx++) {
-        if (count_per_family[queue_familiy_idx] > 0) {
-            queue_create_infos.push_back({{},
-                                          queue_familiy_idx,
-                                          count_per_family[queue_familiy_idx],
-                                          queue_priorities.data()});
+    for (uint32_t family = 0; family < families.size(); family++) {
+        if (count_per_family[family] > 0) {
+            queue_create_infos.push_back(
+                {{}, family, count_per_family[family], queue_priorities.data()});
         }
     }
 
@@ -987,72 +1003,68 @@ void Context::prepare_file_loader(const ContextCreateInfo& create_info) {
 // GETTER
 ///////////////
 
-uint32_t Context::get_number_compute_queues() const noexcept {
-    return queues_C.size();
+void QueueAssignment::add(const QueueInfo& queue) {
+    queues.emplace_back(queue);
 }
 
-std::shared_ptr<Queue> Context::get_queue_GCT() {
-    if (!queue_GCT.expired()) {
-        return queue_GCT.lock();
+std::optional<QueueInfo> QueueAssignment::get(const vk::QueueFlags capabilities) const {
+    std::optional<QueueInfo> best;
+    for (const QueueInfo& queue : queues) {
+        if (queue.queue_indices.empty() || (queue.capabilities & capabilities) != capabilities) {
+            continue;
+        }
+        if (queue.capabilities == capabilities) {
+            return queue;
+        }
+        if (!best || capability_count(queue.capabilities) < capability_count(best->capabilities)) {
+            best = queue;
+        }
     }
-    if (queue_info.queue_family_idx_GCT < 0) {
+    return best;
+}
+
+bool QueueAssignment::supports(const vk::QueueFlags capabilities) const {
+    return get(capabilities).has_value();
+}
+
+uint32_t QueueAssignment::queues_in_family(const uint32_t family_index) const {
+    uint32_t count = 0;
+    for (const QueueInfo& queue : queues) {
+        if (queue.family_index == family_index) {
+            count += static_cast<uint32_t>(queue.queue_indices.size());
+        }
+    }
+    return count;
+}
+
+std::shared_ptr<Queue> Context::get_queue(const vk::QueueFlags capabilities, const uint32_t index) {
+    const std::optional<QueueInfo> info = queue_info.get(capabilities);
+    if (!info || index >= info->queue_indices.size()) {
         return nullptr;
     }
-    const auto queue = std::make_shared<Queue>(shared_from_this(), queue_info.queue_family_idx_GCT,
-                                               queue_info.queue_idx_GCT);
-    queue_GCT = queue;
+
+    const uint64_t key = queue_key(info->family_index, info->queue_indices[index]);
+    if (const auto cached = queues.find(key); cached != queues.end() && !cached->second.expired()) {
+        return cached->second.lock();
+    }
+
+    const auto queue =
+        std::make_shared<Queue>(shared_from_this(), info->family_index, info->queue_indices[index]);
+    queues[key] = queue;
     return queue;
 }
 
-std::shared_ptr<Queue> Context::get_queue_T(const bool fallback) {
-    if (queue_info.queue_family_idx_T < 0) {
-        if (fallback)
-            return get_queue_GCT();
-        return nullptr;
-    }
-    if (!queue_T.expired()) {
-        return queue_T.lock();
-    }
-    const auto queue = std::make_shared<Queue>(shared_from_this(), queue_info.queue_family_idx_T,
-                                               queue_info.queue_idx_T);
-    queue_T = queue;
-    return queue;
-}
-
-std::shared_ptr<Queue> Context::get_queue_C(uint32_t index, const bool fallback) {
-    assert(fallback || index < queues_C.size());
-
-    if (index < queues_C.size()) {
-        if (!queues_C[index].expired()) {
-            return queues_C[index].lock();
-        }
-        const auto queue = std::make_shared<Queue>(
-            shared_from_this(), queue_info.queue_family_idx_C, queue_info.queue_idx_C[index]);
-        queues_C[index] = queue;
-        return queue;
-    }
-    if (!fallback) {
-        // early out, fallback is not allowed
-        return nullptr;
-    }
-    if (!queues_C.empty()) {
-        auto unused_queue = std::find_if(queues_C.begin(), queues_C.end(),
-                                         [](auto& queue) { return queue.expired(); });
-        if (unused_queue == queues_C.end()) {
-            // there is no unused queue, use first
-            return get_queue_C(0);
-        }
-        return get_queue_C(unused_queue - queues_C.begin());
-    }
-    // there are no extra compute queues, maybe at least a graphics queue with compute support
-    return get_queue_GCT();
+uint32_t Context::get_queue_count(const vk::QueueFlags capabilities) const {
+    const std::optional<QueueInfo> info = queue_info.get(capabilities);
+    return info ? static_cast<uint32_t>(info->queue_indices.size()) : 0;
 }
 
 std::shared_ptr<CommandPool> Context::get_cmd_pool_GCT() {
     if (!cmd_pool_GCT.expired()) {
         return cmd_pool_GCT.lock();
     }
-    const auto cmd = CommandPool::create(get_queue_GCT());
+    const auto cmd = CommandPool::create(get_queue(
+        vk::QueueFlagBits::eGraphics | vk::QueueFlagBits::eCompute | vk::QueueFlagBits::eTransfer));
     cmd_pool_GCT = cmd;
     return cmd;
 }
@@ -1061,7 +1073,7 @@ std::shared_ptr<CommandPool> Context::get_cmd_pool_T() {
     if (!cmd_pool_T.expired()) {
         return cmd_pool_T.lock();
     }
-    const auto cmd = CommandPool::create(get_queue_T());
+    const auto cmd = CommandPool::create(get_queue(vk::QueueFlagBits::eTransfer));
     cmd_pool_T = cmd;
     return cmd;
 }
@@ -1070,7 +1082,7 @@ std::shared_ptr<CommandPool> Context::get_cmd_pool_C() {
     if (!cmd_pool_C.expired()) {
         return cmd_pool_C.lock();
     }
-    const auto cmd = CommandPool::create(get_queue_C());
+    const auto cmd = CommandPool::create(get_queue(vk::QueueFlagBits::eCompute));
     cmd_pool_C = cmd;
     return cmd;
 }
@@ -1091,7 +1103,7 @@ const FileLoaderHandle& Context::get_file_loader() const {
     return file_loader;
 }
 
-const QueueInfo& Context::get_queue_info() const {
+const QueueAssignment& Context::get_queue_info() const {
     return queue_info;
 }
 
