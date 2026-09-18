@@ -151,11 +151,7 @@ std::vector<OutputConnectorDescriptor> DLSSNode::describe_outputs(const NodeIOLa
     quality = quality_for_scale(static_cast<float>(target_extent.width) /
                                 static_cast<float>(render_extent.width));
 
-    io_layout.register_event_listener(reset_event_pattern,
-                                      [this](const GraphEvent::Info&, const GraphEvent::Data&) {
-                                          reset = true;
-                                          return true;
-                                      });
+    events.register_listeners(io_layout);
 
     con_out = ManagedVkImageOut::create(out_format, target_extent);
     return {{"out", con_out, ConnectorAccess::compute_write | ConnectorAccess::transfer_dst}};
@@ -371,8 +367,7 @@ DLSSNode::NodeStatusFlags DLSSNode::properties(Properties& config) {
     }
     config.config_uint("jitter phases", &jitter_phases,
                        "0 takes the count DLSS asks for at this scale");
-    needs_reconnect |= config.config_text("reset event pattern", reset_event_pattern, false,
-                                          "drops the temporal history, for cuts and teleports");
+    needs_reconnect |= events.properties(config);
 
     config.st_separate();
     config.output_text("render: {}x{} -> output: {}x{} ({})", render_extent.width,

@@ -126,3 +126,16 @@ io.is_connected(input_connector)              // Is the input wired?
 io.register_event_listener("", callback)      // Listen to events (empty = any)
 // Pattern format: "NodeType/identifier/eventName"  (empty field = wildcard)
 ```
+
+Send a fixed event name and let the receiver pick what listens to it. For a node that offers
+several actions, hold a `NodeEvents` and declare them with their handlers:
+
+```cpp
+NodeEvents events{{
+    {"play", [this] { playing = true; }},
+    {"pause", [this] { playing = false; }},
+}};
+```
+
+`events.register_listeners(io_layout)` in `describe_outputs` registers the patterns and
+`events.properties(config)` draws them; a changed pattern needs a reconnect.

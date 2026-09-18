@@ -101,7 +101,7 @@ cmd->write_timestamp(query_pool, query, pipeline_stage);
 The simplest one-shot pattern uses the `submit_wait` lambda overload (creates, records, submits, and waits internally):
 
 ```cpp
-context->get_queue_GCT()->submit_wait([&](const merian::CommandBufferHandle& cmd) {
+context->get_queue(vk::QueueFlagBits::eGraphics)->submit_wait([&](const merian::CommandBufferHandle& cmd) {
     // ... record work ...
 });
 ```
@@ -115,6 +115,6 @@ auto cmd  = pool->create_and_begin();
 // ... record work ...
 
 cmd->end();
-context->get_queue_GCT()->submit_wait({cmd});
+context->get_queue(vk::QueueFlagBits::eGraphics)->submit_wait({cmd});
 pool->reset();
 ```

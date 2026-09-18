@@ -36,8 +36,10 @@
                 "adaptivity percentile lower": 0.05000000074505806,
                 "adaptivity percentile upper": 0.949999988079071,
                 "alpha": 1.0,
-                "clear event pattern": "/user/clear,//geometry_changed,//transform_changed,//camera_changed,//bounces_changed",
                 "depth threshold": 1.0,
+                "events": {
+                    "clear": "/user/clear,//geometry_changed,//transform_changed,//camera_changed,//bounces_changed"
+                },
                 "extended search": true,
                 "filter mode": "nearest",
                 "firefly filter bias": 0.20000000298023224,

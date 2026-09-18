@@ -206,7 +206,7 @@ class GBufferLayoutDevice : public ::testing::Test {
         };
         context = Context::create(info);
         allocator = context->get_context_extension<ExtensionResources>()->resource_allocator();
-        queue = context->get_queue_GCT();
+        queue = context->get_queue(vk::QueueFlagBits::eGraphics);
         compile_context = ShaderCompileContext::create(context);
     }
 

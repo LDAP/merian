@@ -70,11 +70,7 @@ std::vector<OutputConnectorDescriptor> Accumulate::describe_outputs(const NodeIO
         irr_create_info.extent);
     con_history = ManagedVkImageOut::create(vk::Format::eR32G32Uint, irr_create_info.extent);
 
-    io_layout.register_event_listener(clear_event_listener_pattern,
-                                      [this](const GraphEvent::Info&, const GraphEvent::Data&) {
-                                          request_clear();
-                                          return true;
-                                      });
+    events.register_listeners(io_layout);
 
     return {
         {"out", con_out, ConnectorAccess::compute_write},
@@ -201,10 +197,7 @@ Accumulate::NodeStatusFlags Accumulate::properties(Properties& config) {
     accumulate_pc.accum_max_hist =
         config.config_bool("inf history") ? INFINITY : accumulate_pc.accum_max_hist;
     clear |= config.config_bool("clear");
-    config.st_no_space();
-    needs_rebuild |= config.config_text(
-        "clear event pattern", clear_event_listener_pattern, true,
-        "Comma separated list of event patterns which trigger a clear. Press enter to confirm.");
+    needs_rebuild |= events.properties(config);
 
     config.st_separate("Reproject");
     needs_rebuild |= config.config_bool("use motion vectors", enable_mv,

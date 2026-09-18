@@ -38,6 +38,10 @@ void print_usage() {
         "  --merge <file.json>           deep-merge a JSON file into the config (repeatable,\n"
         "                                last wins)\n"
         "  --max-iterations=<N>          quit after N graph iterations\n"
+        "  --exit-on-event=<pattern>     quit when a node sends a matching event (default:\n"
+        "                                //end, sent by a video that ran out; empty to stay.\n"
+        "                                A writer sends stop, so --exit-on-event=/write/stop\n"
+        "                                ends a fixed-length render)\n"
         "  --time-delta=<ms>             advance the graph time by a fixed delta per iteration\n"
         "                                instead of following the wall clock\n"
         "  --print-times                 print the profiler report after the last iteration,\n"
@@ -57,6 +61,7 @@ struct Options {
     bool help = false;
     std::optional<uint64_t> max_iterations;
     std::optional<float> time_delta_ms;
+    std::string exit_on_event = "//end";
     bool print_times = false;
     // Non-runner tokens in command-line order; classified against the graph's cli block once
     // the config is loaded. A pre-config override's value is kept adjacent to its --name.
@@ -90,6 +95,8 @@ std::optional<Options> parse(const std::vector<std::string>& args) {
             return std::nullopt;
         } else if (arg.starts_with("--max-iterations=")) {
             options.max_iterations = std::stoull(arg.substr(arg.find('=') + 1));
+        } else if (arg.starts_with("--exit-on-event=")) {
+            options.exit_on_event = arg.substr(arg.find('=') + 1);
         } else if (arg.starts_with("--time-delta=")) {
             options.time_delta_ms = std::stof(arg.substr(arg.find('=') + 1));
         } else if (arg == "--print-times") {
@@ -245,11 +252,21 @@ int main(const int argc, const char** argv) {
     }
 
     if (options->time_delta_ms) {
-        graph->set_time_delta_overwrite(*options->time_delta_ms);
+        graph->set_time_source_delta(*options->time_delta_ms);
     }
     if (options->print_times) {
         // Suppress the periodic report, so the one taken at the end spans every iteration.
         graph->set_profiler_report_interval(std::numeric_limits<uint32_t>::max());
+    }
+
+    if (!options->exit_on_event.empty()) {
+        graph->register_event_listener(
+            options->exit_on_event,
+            [](const merian::GraphEvent::Info& info, const merian::GraphEvent::Data&) {
+                SPDLOG_INFO("exiting on event {}/{}", info.identifier, info.event_name);
+                stop.store(true);
+                return true;
+            });
     }
 
     std::signal(SIGINT, signal_handler);

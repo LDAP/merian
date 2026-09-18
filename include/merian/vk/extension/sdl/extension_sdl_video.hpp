@@ -25,9 +25,7 @@ class ExtensionSDLVideo : public ContextExtension, public WindowProvider {
 
     DeviceSupportInfo query_device_support(const DeviceSupportQueryInfo& query_info) override;
 
-    bool accept_graphics_queue(const InstanceHandle& instance,
-                               const PhysicalDeviceHandle& physical_device,
-                               std::size_t queue_family_index) override;
+    std::vector<QueueRequest> request_queues(const PhysicalDeviceHandle& physical_device) override;
 
     WindowHandle create_window(const DeviceHandle& device,
                                const WindowCreateInfo& create_info = {}) const override;

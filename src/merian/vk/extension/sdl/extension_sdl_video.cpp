@@ -72,23 +72,30 @@ ExtensionSDLVideo::query_device_support(const DeviceSupportQueryInfo& query_info
     if (!info.supported)
         return info;
 
-    const bool present_supported = SDL_Vulkan_GetPresentationSupport(
-        **(query_info.physical_device->get_instance()), **query_info.physical_device,
-        query_info.queue_info.queue_family_idx_GCT);
-    if (!present_supported) {
+    const std::optional<QueueInfo> queue = query_info.queues.get(vk::QueueFlagBits::eGraphics);
+    if (!queue ||
+        !SDL_Vulkan_GetPresentationSupport(**query_info.physical_device->get_instance(),
+                                           **query_info.physical_device, queue->family_index)) {
         info.supported = false;
-        info.unsupported_reason = "Queue family does not support SDL surface presentation";
+        info.unsupported_reason = "no graphics queue family can present";
     }
 
     return info;
 }
 
-bool ExtensionSDLVideo::accept_graphics_queue(const InstanceHandle& instance,
-                                              const PhysicalDeviceHandle& physical_device,
-                                              std::size_t queue_family_index) {
-    return !sdl_vulkan_support ||
-           SDL_Vulkan_GetPresentationSupport(**instance, **physical_device,
-                                             static_cast<Uint32>(queue_family_index));
+std::vector<QueueRequest>
+ExtensionSDLVideo::request_queues([[maybe_unused]] const PhysicalDeviceHandle& physical_device) {
+    if (!sdl_vulkan_support) {
+        return {};
+    }
+    return {{
+        .capabilities = vk::QueueFlagBits::eGraphics,
+        .prefer_family =
+            [](const PhysicalDeviceHandle& device, const uint32_t family_index) {
+                return SDL_Vulkan_GetPresentationSupport(**device->get_instance(), **device,
+                                                         family_index) != 0;
+            },
+    }};
 }
 
 WindowHandle ExtensionSDLVideo::create_window(const DeviceHandle& device,

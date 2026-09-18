@@ -15,7 +15,7 @@
         "flush thread pool": true,
         "fps limiter": false,
         "iterations in flight": 2,
-        "time overwrite": "None"
+        "time source": "Auto"
     },
     "include": [
         "denoisers.json",

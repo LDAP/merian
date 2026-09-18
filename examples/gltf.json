@@ -16,7 +16,7 @@
         "fps limiter": false,
         "imgui event": "ui",
         "iterations in flight": 2,
-        "time overwrite": "None"
+        "time source": "Auto"
     },
     "include": [
         "denoisers.json",

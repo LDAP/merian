@@ -24,7 +24,9 @@ const ContextHandle& check_requirements_and_get_context(const ContextHandle& con
 
 Graph::Graph(const GraphCreateInfo& create_info)
     : context(check_requirements_and_get_context(create_info.context)),
-      resource_allocator(create_info.resource_allocator), queue(context->get_queue_GCT()),
+      resource_allocator(create_info.resource_allocator),
+      queue(context->get_queue(vk::QueueFlagBits::eGraphics | vk::QueueFlagBits::eCompute |
+                               vk::QueueFlagBits::eTransfer)),
       thread_pool(std::make_shared<ThreadPool>()),
       cpu_queue(std::make_shared<CPUQueue>(context, thread_pool)),
       registry(NodeRegistry::get_instance()),
@@ -113,32 +115,17 @@ void Graph::run() {
 
     in_flight_data.submission->reset();
 
-    // Compute time stuff
-    assert(time_overwrite < TIME_OVERWRITE_COUNT);
-    const std::chrono::nanoseconds last_elapsed_ns = duration_elapsed;
-    if (time_overwrite == TIME_OVERWRITE_TIME) {
-        const auto delta = std::chrono::duration_cast<std::chrono::nanoseconds>(
-            std::chrono::duration<double>(time_delta_overwrite_ms / 1000.));
-        duration_elapsed += delta;
-        duration_elapsed_since_connect += delta;
-        time_delta_overwrite_ms = 0;
-    } else if (time_overwrite == TIME_OVERWRITE_DELTA) {
-        const auto delta = std::chrono::duration_cast<std::chrono::nanoseconds>(
-            std::chrono::duration<double>(time_delta_overwrite_ms / 1000.));
-        duration_elapsed += delta;
-        duration_elapsed_since_connect += delta;
-    } else {
-        const auto now = std::chrono::high_resolution_clock::now();
-        duration_elapsed = now - time_reference;
-        duration_elapsed_since_connect = now - time_connect_reference;
-    }
-    time_delta = duration_elapsed - last_elapsed_ns;
-
     const ProfilerHandle& profiler = prepare_profiler_for_run(in_flight_data);
     const ScopedDefaultProfiler scoped_default_profiler{profiler};
     const auto run_start = std::chrono::high_resolution_clock::now();
 
     // CONNECT and PREPROCESS
+    // the time source may be a node, so the topology has to exist before the clock advances
+    while (needs_reconnect) {
+        connect();
+    }
+    advance_time();
+
     do {
         // While connection nodes can signalize that they need to reconnect
         while (needs_reconnect) {
@@ -276,9 +263,72 @@ void Graph::request_reconnect() {
     needs_reconnect = true;
 }
 
-void Graph::set_time_delta_overwrite(const float delta_ms) {
-    time_overwrite = TIME_OVERWRITE_DELTA;
-    time_delta_overwrite_ms = delta_ms;
+void Graph::set_time_source_delta(const float delta_ms) {
+    time_source = TIME_SOURCE_DELTA;
+    time_overwrite_delta_ms = delta_ms;
+}
+
+std::vector<NodeHandle> Graph::time_providers() const {
+    std::vector<NodeHandle> providers;
+    for (const auto& layer : layers) {
+        for (const auto& node : layer.nodes) {
+            const auto provider = std::dynamic_pointer_cast<TimeProvider>(node);
+            if (provider && provider->provides_time()) {
+                providers.emplace_back(node);
+            }
+        }
+    }
+    return providers;
+}
+
+void Graph::advance_time() {
+    const std::chrono::nanoseconds last_elapsed = duration_elapsed;
+    std::optional<std::chrono::nanoseconds> elapsed;
+
+    if (time_source == TIME_SOURCE_TIME || time_source == TIME_SOURCE_DELTA) {
+        elapsed =
+            duration_elapsed + std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                   std::chrono::duration<double>(time_overwrite_delta_ms / 1000.));
+        if (time_source == TIME_SOURCE_TIME) {
+            time_overwrite_delta_ms = 0;
+        }
+    } else if (time_source != TIME_SOURCE_SYSTEM) {
+        // an identifier that is no longer a live provider behaves like Auto, which takes the
+        // first provider that answers
+        const std::vector<NodeHandle> providers = time_providers();
+        const auto selected =
+            std::find_if(providers.begin(), providers.end(), [&](const NodeHandle& node) {
+                return time_source == node_data.at(node).identifier;
+            });
+        if (selected != providers.end()) {
+            elapsed = std::dynamic_pointer_cast<TimeProvider>(*selected)->provide_time();
+        } else {
+            for (const NodeHandle& node : providers) {
+                elapsed = std::dynamic_pointer_cast<TimeProvider>(node)->provide_time();
+                if (elapsed) {
+                    break;
+                }
+            }
+        }
+    }
+
+    if (elapsed) {
+        const std::chrono::nanoseconds next = std::max(*elapsed, 0ns);
+        duration_elapsed_since_connect =
+            std::max(duration_elapsed_since_connect + (next - duration_elapsed), 0ns);
+        duration_elapsed = next;
+        // keep the references current so falling back to the system clock does not jump
+        const auto now = std::chrono::high_resolution_clock::now();
+        time_reference = now - duration_elapsed;
+        time_connect_reference = now - duration_elapsed_since_connect;
+    } else {
+        const auto now = std::chrono::high_resolution_clock::now();
+        duration_elapsed = now - time_reference;
+        duration_elapsed_since_connect = now - time_connect_reference;
+    }
+
+    // a seek or a loop moves the source's time backwards; nodes integrate over the delta
+    time_delta = std::max(duration_elapsed - last_elapsed, 0ns);
 }
 
 void Graph::set_profiler_report_interval(const uint32_t millis) {

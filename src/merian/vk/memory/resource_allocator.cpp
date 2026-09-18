@@ -25,25 +25,28 @@ ResourceAllocator::ResourceAllocator(const ContextHandle& context,
     const uint32_t black_rgba = merian::uint32_from_rgba(0, 0, 0, 1);
     const std::vector<uint32_t> data = {missing_rgba, missing_rgba, missing_rgba, missing_rgba};
     const std::vector<uint32_t> checker = {missing_rgba, black_rgba, black_rgba, missing_rgba};
-    context->get_queue_GCT()->submit_wait([&](const CommandBufferHandle& cmd) {
-        const ImageHandle dummy_storage_image =
-            create_image_from_rgba8(cmd, data.data(), 2, 2, vk::ImageUsageFlagBits::eStorage, false,
-                                    1, "ResourceAllocator::dummy_storage_image");
-        dummy_storage_image_view = ImageView::create(dummy_storage_image);
+    context
+        ->get_queue(vk::QueueFlagBits::eGraphics | vk::QueueFlagBits::eCompute |
+                    vk::QueueFlagBits::eTransfer)
+        ->submit_wait([&](const CommandBufferHandle& cmd) {
+            const ImageHandle dummy_storage_image =
+                create_image_from_rgba8(cmd, data.data(), 2, 2, vk::ImageUsageFlagBits::eStorage,
+                                        false, 1, "ResourceAllocator::dummy_storage_image");
+            dummy_storage_image_view = ImageView::create(dummy_storage_image);
 
-        const auto img_transition = dummy_storage_image->barrier2(vk::ImageLayout::eGeneral);
-        dummy_texture = create_texture_from_rgba8(
-            cmd, checker.data(), 2, 2, vk::SamplerAddressMode::eRepeat, vk::Filter::eNearest,
-            vk::Filter::eNearest, true, "ResourceAllocator::dummy_texture");
-        const auto tex_transition =
-            dummy_texture->get_image()->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal);
+            const auto img_transition = dummy_storage_image->barrier2(vk::ImageLayout::eGeneral);
+            dummy_texture = create_texture_from_rgba8(
+                cmd, checker.data(), 2, 2, vk::SamplerAddressMode::eRepeat, vk::Filter::eNearest,
+                vk::Filter::eNearest, true, "ResourceAllocator::dummy_texture");
+            const auto tex_transition =
+                dummy_texture->get_image()->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal);
 
-        cmd->barrier({img_transition, tex_transition});
+            cmd->barrier({img_transition, tex_transition});
 
-        dummy_buffer = create_buffer(cmd, data.size() * sizeof(uint32_t),
-                                     vk::BufferUsageFlagBits::eStorageBuffer, data.data(),
-                                     MemoryMappingType::NONE, "ResourceAllocator::dummy_buffer");
-    });
+            dummy_buffer = create_buffer(
+                cmd, data.size() * sizeof(uint32_t), vk::BufferUsageFlagBits::eStorageBuffer,
+                data.data(), MemoryMappingType::NONE, "ResourceAllocator::dummy_buffer");
+        });
 
     SPDLOG_DEBUG("Uploaded dummy texture and buffer");
 }

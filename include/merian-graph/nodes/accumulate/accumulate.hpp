@@ -6,6 +6,7 @@
 
 #include "merian-graph/connectors/image/vk_image_out_managed.hpp"
 #include "merian-graph/graph/node.hpp"
+#include "merian-graph/graph/node_events.hpp"
 #include "merian-graph/nodes/compute_node/compute_kernel.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/specialization_info.hpp"
@@ -118,7 +119,7 @@ class Accumulate : public Node {
     bool enable_mv = VK_TRUE;
     int gbuffer_check_mode = 0;
 
-    std::string clear_event_listener_pattern = "/user/clear";
+    NodeEvents events{{{"clear", [this] { request_clear(); }, "/user/clear"}}};
 };
 
 } // namespace merian
