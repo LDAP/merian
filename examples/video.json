@@ -1,0 +1,63 @@
+{
+    "cli": {
+        "--": {
+            "pointer": "/nodes/video/properties/path",
+            "required": true
+        }
+    },
+    "graph_properties": {
+        "time source": "Auto"
+    },
+    "nodes": {
+        "blit": {
+            "enabled": true,
+            "outputs": [
+                "acquire->imgui.acquire"
+            ],
+            "type": "Swapchain Blit"
+        },
+        "imgui": {
+            "enabled": true,
+            "type": "ImGui"
+        },
+        "tonemap": {
+            "enabled": true,
+            "outputs": [
+                "out->blit.src"
+            ],
+            "properties": {
+                "tonemap": "Clamp"
+            },
+            "type": "Tonemap"
+        },
+        "video": {
+            "enabled": true,
+            "outputs": [
+                "out->tonemap.src"
+            ],
+            "properties": {
+                "loop": true,
+                "path": ""
+            },
+            "type": "Video Read"
+        },
+        "window": {
+            "enabled": true,
+            "outputs": [
+                "acquire->blit.acquire",
+                "window->imgui.window"
+            ],
+            "properties": {
+                "blit mode": "FIT",
+                "on_should_close_actions": {
+                    "remove node": false,
+                    "send sigint": true,
+                    "send sigterm": false
+                },
+                "present mode": "Fifo"
+            },
+            "type": "Window"
+        }
+    },
+    "version": 4
+}
