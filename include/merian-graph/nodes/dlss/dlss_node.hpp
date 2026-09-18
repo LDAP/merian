@@ -4,6 +4,7 @@
 #include "merian-graph/connectors/image/vk_image_out_managed.hpp"
 #include "merian-graph/connectors/ptr_in.hpp"
 #include "merian-graph/graph/node.hpp"
+#include "merian-graph/graph/node_events.hpp"
 #include "merian-graph/objects/gbuffer_object.hpp"
 #include "merian-shaders/scene/scene.hpp"
 
@@ -76,7 +77,8 @@ class DLSSNode : public Node {
     Camera::JitterSequence jitter_sequence = Camera::JitterSequence::Halton;
     // 0 takes the count DLSS asks for at this scale
     uint32_t jitter_phases = 0;
-    std::string reset_event_pattern = "/user/clear";
+    NodeEvents events{{{"reset", [this] { reset = true; }, "/user/clear",
+                        "Drops the temporal history, for cuts and teleports."}}};
 
     // 0 until the scene is ready or where it names none
     vk::Extent3D camera_extent{};
