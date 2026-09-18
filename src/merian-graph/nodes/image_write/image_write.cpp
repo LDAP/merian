@@ -60,6 +60,23 @@ void ImageWrite::record(const std::chrono::nanoseconds& current_graph_time) {
         callback();
 }
 
+bool ImageWrite::provides_time() const {
+    return time_provider != TimeProviderMode::OFF;
+}
+
+std::optional<std::chrono::nanoseconds> ImageWrite::provide_time() {
+    if (time_provider == TimeProviderMode::WHEN_ACTIVE && !record_enable) {
+        // the timeline starts at zero once this node starts providing
+        provided_frames = 0;
+        return std::nullopt;
+    }
+    if (provided_frames == 0) {
+        provided_frametime_millis = record_frametime_millis;
+    }
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(
+        static_cast<double>(provided_frames++) * provided_frametime_millis / 1000.));
+}
+
 ImageWrite::NodeStatusFlags ImageWrite::pre_process(const NodeIO& io, const NodeProcessInfo& info) {
     // START TRIGGER
     if (!record_enable &&
@@ -69,6 +86,8 @@ ImageWrite::NodeStatusFlags ImageWrite::pre_process(const NodeIO& io, const Node
         io.send_event("start");
     }
 
+    // the graph clock jumps back when a provider takes it over, and on a seek or a loop
+    record_graph_time_point = std::min(record_graph_time_point, info.get_elapsed_duration());
     const std::chrono::nanoseconds time_since_record =
         info.get_elapsed_duration() - record_graph_time_point;
 
@@ -125,19 +144,20 @@ ImageWrite::process(const NodeIO& io, const NodeProcessInfo& info, Submission& s
 
     //--------- RECORD TRIGGER
     // RECORD TRIGGER 0: Iteration
-    record_next |= record_enable && (trigger == 0) && record_iteration == iteration;
+    record_next |=
+        record_enable && (trigger == ImageWriteTrigger::ITERATION) && record_iteration == iteration;
 
     // RECORD TRIGGER 1: Frametime
     const double time_millis = to_milliseconds(time_since_record);
     const double optimal_timing = last_record_time_millis + record_frametime_millis;
-    if (record_enable && (trigger == 1) && last_frame_time_millis <= 0) {
+    if (record_enable && (trigger == ImageWriteTrigger::FRAMETIME) && last_frame_time_millis <= 0) {
         record_next = true;
     } else {
         // estimate how long a frame takes and reduce stutter
         const double frametime_millis = time_millis - last_frame_time_millis;
 
         // am I this time closer to the optimal point or next frame?
-        if (record_enable && (trigger == 1) &&
+        if (record_enable && (trigger == ImageWriteTrigger::FRAMETIME) &&
             std::abs(time_millis - optimal_timing) <
                 std::abs(time_millis + frametime_millis - optimal_timing)) {
             record_next = true;
@@ -313,11 +333,12 @@ ImageWrite::NodeStatusFlags ImageWrite::properties([[maybe_unused]] Properties& 
                                    undersampling));
     bool prop_record_enable = record_enable;
     start_stop_record = config.config_bool("enable", prop_record_enable);
+    config.config_enum("time provider", time_provider, Properties::OptionsStyle::COMBO,
+                       TIME_PROVIDER_DESCRIPTION);
     config.st_separate();
 
-    config.config_options("trigger", trigger, {"iteration", "frametime"},
-                          Properties::OptionsStyle::COMBO);
-    if (trigger == 0) {
+    config.config_enum("trigger", trigger, Properties::OptionsStyle::COMBO);
+    if (trigger == ImageWriteTrigger::ITERATION) {
         config.config_int(
             "iteration", record_iteration,
             "Save the result of of the the specified iteration. Iterations are 1-indexed.");
@@ -333,12 +354,16 @@ ImageWrite::NodeStatusFlags ImageWrite::properties([[maybe_unused]] Properties& 
             "resets the record iteration to the value it had when recording started.");
         config.output_text("note: Iterations are 1-indexed");
     }
-    if (trigger == 1) {
+    if (trigger == ImageWriteTrigger::FRAMETIME) {
         config.config_options("time reference", time_reference, {"system", "graph"},
                               Properties::OptionsStyle::COMBO);
+    }
+    if (trigger == ImageWriteTrigger::FRAMETIME || time_provider != TimeProviderMode::OFF) {
         config.config_float("framerate", record_framerate, "", 0.01);
+        record_framerate = std::max(record_framerate, 0.01f);
         record_frametime_millis = 1000 / record_framerate;
         config.config_float("frametime", record_frametime_millis, "", 0.01);
+        record_frametime_millis = std::max(record_frametime_millis, 0.01f);
         record_framerate = 1000 / record_frametime_millis;
     }
     config.st_separate();

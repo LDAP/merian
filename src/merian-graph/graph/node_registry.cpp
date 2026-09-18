@@ -35,6 +35,8 @@
 #include "merian-graph/nodes/swapchain_blit/swapchain_blit.hpp"
 #include "merian-graph/nodes/taa/taa.hpp"
 #include "merian-graph/nodes/tonemap/tonemap.hpp"
+#include "merian-graph/nodes/video_read/video_read.hpp"
+#include "merian-graph/nodes/video_write/video_write.hpp"
 #include "merian-graph/nodes/vkdt_filmcurv/vkdt_filmcurv.hpp"
 #include "merian-graph/nodes/window/window_node.hpp"
 
@@ -116,6 +118,10 @@ NodeRegistry::NodeRegistry() {
         "Swapchain Blit", "Blits a graph image onto a Window node's acquired swapchain image.");
     register_node_type<TAA>("TAA", "Temporal Anti-Aliasing.");
     register_node_type<Tonemap>("Tonemap", "Convert a HDR image to LDR using various tonemaps.");
+    register_node_type<VideoRead>("Video Read",
+                                  "Decodes a video file with the Vulkan hardware decoder.");
+    register_node_type<VideoWrite>("Video Write",
+                                   "Encodes a graph output with the Vulkan hardware encoder.");
     register_node_type<VKDTFilmcurv>("Curves", "Adjust brightness and contrast. Ported from VKDT.");
 
     register_node<Reduce>(

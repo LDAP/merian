@@ -65,6 +65,13 @@ option(
     description: 'Build with NVIDIA DLSS support. auto uses an NGX SDK that is already present; enabled downloads it (717 MB, proprietary license).'
 )
 
+option(
+    'ffmpeg',
+    type: 'feature',
+    value: 'auto',
+    description: 'Build with FFmpeg video read/write nodes using Vulkan hardware en-/decoding.'
+)
+
 # Tests
 option(
     'tests',

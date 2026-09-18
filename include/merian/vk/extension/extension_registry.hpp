@@ -3,6 +3,7 @@
 #include "merian/utils/pointer.hpp"
 #include "merian/vk/extension/extension.hpp"
 
+#include <algorithm>
 #include <functional>
 #include <memory>
 #include <string>
@@ -97,6 +98,25 @@ class ExtensionRegistry {
                             std::initializer_list<ProviderPriorityEntry> provider_priorities = {}) {
         register_extension<EXTENSION_TYPE>(name, create_extension<EXTENSION_TYPE>, auto_load,
                                            provider_priorities);
+    }
+
+    // Names of registered extensions implementing the interface, highest priority first.
+    template <typename InterfaceType> std::vector<std::string> get_provider_names() const {
+        const std::type_index interface_type = typeid(InterfaceType);
+        std::vector<std::pair<int, std::string>> with_priority;
+        for (const auto& [name, priorities] : name_to_provider_priority) {
+            if (const auto it = priorities.find(interface_type); it != priorities.end()) {
+                with_priority.emplace_back(it->second, name);
+            }
+        }
+        std::sort(with_priority.begin(), with_priority.end(), std::greater<>());
+
+        std::vector<std::string> names;
+        names.reserve(with_priority.size());
+        for (auto& [_, name] : with_priority) {
+            names.emplace_back(std::move(name));
+        }
+        return names;
     }
 
     // Names of extensions registered with auto_load=true, in registration order.

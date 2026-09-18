@@ -2,12 +2,16 @@
 
 #include "merian-graph/connectors/image/vk_image_in_sampled.hpp"
 #include "merian-graph/graph/node.hpp"
+#include "merian-graph/graph/time_provider.hpp"
+#include "merian/utils/enums.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 
 namespace merian {
 
+MERIAN_ENUM(ImageWriteTrigger, ITERATION, FRAMETIME)
+
 // Writes to images files.
-class ImageWrite : public Node {
+class ImageWrite : public Node, public TimeProvider {
     class FrameData {
       public:
         std::optional<ImageHandle> intermediate_image;
@@ -29,6 +33,10 @@ class ImageWrite : public Node {
     process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) override;
 
     virtual NodeStatusFlags properties(Properties& config) override;
+
+    bool provides_time() const override;
+
+    [[nodiscard]] std::optional<std::chrono::nanoseconds> provide_time() override;
 
     // Set a callback that can be called on capture or record.
     void set_callback(const std::function<void()>& callback);
@@ -87,7 +95,7 @@ class ImageWrite : public Node {
 
     bool record_enable = false;
     int start_at_run = -1;
-    int trigger = 0;
+    ImageWriteTrigger trigger = ImageWriteTrigger::ITERATION;
     int record_iteration = 1;
     int record_iteration_at_start = 1;
     int num_captures_since_record = 0;
@@ -96,6 +104,10 @@ class ImageWrite : public Node {
     int time_reference = 0; // system, graph
     float record_framerate = 30;
     float record_frametime_millis = 1000.f / 30.f;
+    TimeProviderMode time_provider = TimeProviderMode::OFF;
+    uint64_t provided_frames = 0;
+    // the rate must not change within a timeline
+    float provided_frametime_millis = 1000.f / 30.f;
 
     bool record_next = false;
     bool rebuild_after_capture = false;

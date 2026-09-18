@@ -133,6 +133,16 @@ endif
 if ngx.found()
     global_args += ['-DMERIAN_NGX_ENABLED']
 endif
+libavcodec = dependency('libavcodec', version: ['>=61.0.0'], required: get_option('ffmpeg'))
+libavformat = dependency('libavformat', version: ['>=61.0.0'], required: get_option('ffmpeg'))
+libavutil = dependency('libavutil', version: ['>=59.0.0'], required: get_option('ffmpeg'))
+ffmpeg = []
+ffmpeg_enabled = get_option('ffmpeg').enable_auto_if(
+    libavcodec.found() and libavformat.found() and libavutil.found()).enabled()
+if ffmpeg_enabled
+    ffmpeg = [libavcodec, libavformat, libavutil]
+    global_args += ['-DMERIAN_FFMPEG_ENABLED']
+endif
 sdl3 = dependency('sdl3', version: ['>=3.4.0'], required: get_option('sdl'), fallback: ['sdl3', 'sdl3_dep'])
 if get_option('sdl').enable_auto_if(sdl3.found()).enabled()
     global_args += ['-DMERIAN_SDL_ENABLED']
@@ -250,6 +260,7 @@ merian_dep = declare_dependency(
         tinybvh,
         tgltf,
         tol,
+        ffmpeg,
         vma,
         vulkan,
     ]
