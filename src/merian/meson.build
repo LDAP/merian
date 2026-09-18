@@ -84,6 +84,16 @@ if ngx.found()
     merian_src += files('vk/extension/ngx/ngx.cpp')
 endif
 
+if ffmpeg_enabled
+    merian_src += files(
+        'vk/extension/ffmpeg/extension_ffmpeg.cpp',
+        'vk/extension/ffmpeg/ffmpeg_video_decoder.cpp',
+        'vk/extension/ffmpeg/ffmpeg_video_device.cpp',
+        'vk/extension/ffmpeg/ffmpeg_video_encoder.cpp',
+        'vk/extension/ffmpeg/ffmpeg_video_frame.cpp',
+    )
+endif
+
 if get_option('sdl').enable_auto_if(sdl3.found()).enabled()
     merian_src += files(
         'vk/extension/sdl/extension_sdl.cpp',
@@ -103,6 +113,7 @@ dl_dep = ccx.find_library('dl', required: false)
 
 merian_deps = [
     dl_dep,
+    ffmpeg,
     fmt,
     glfw,
     glm,

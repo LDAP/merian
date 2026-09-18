@@ -76,6 +76,21 @@ class Submission {
         signal_values.push_back(value);
     }
 
+    // Wait on / signal a timeline semaphore owned elsewhere. The caller keeps it alive until the
+    // submission finished.
+    void add_wait_semaphore(const vk::Semaphore wait_semaphore,
+                            const vk::PipelineStageFlags& wait_stage_flags,
+                            const uint64_t value) noexcept {
+        wait_semaphores.push_back(wait_semaphore);
+        wait_stages.push_back(wait_stage_flags);
+        wait_values.push_back(value);
+    }
+
+    void add_signal_semaphore(const vk::Semaphore signal_semaphore, const uint64_t value) noexcept {
+        signal_semaphores.push_back(signal_semaphore);
+        signal_values.push_back(value);
+    }
+
     // Called after every submit of this Submission.
     void add_submit_callback(const std::function<void(const QueueHandle& queue,
                                                       Submission& submission)>& callback) noexcept {

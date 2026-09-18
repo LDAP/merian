@@ -22,6 +22,10 @@
 #include "merian/vk/memory/memory_allocator_provider.hpp"
 #include <spdlog/spdlog.h>
 
+#ifdef MERIAN_FFMPEG_ENABLED
+#include "merian/vk/extension/ffmpeg/extension_ffmpeg.hpp"
+#endif
+
 #ifdef MERIAN_GLFW_ENABLED
 #include "merian/vk/extension/glfw/extension_glfw.hpp"
 #endif
@@ -40,6 +44,10 @@ ExtensionRegistry& ExtensionRegistry::get_instance() {
 }
 
 ExtensionRegistry::ExtensionRegistry() {
+#ifdef MERIAN_FFMPEG_ENABLED
+    register_extension<ExtensionFFmpeg>(ExtensionFFmpeg::name, false,
+                                        {ProviderPriority<VideoDeviceProvider>{50}});
+#endif
 #ifdef MERIAN_GLFW_ENABLED
     register_extension<ExtensionGLFW>(ExtensionGLFW::name, true,
                                       {ProviderPriority<WindowProvider>{40}});

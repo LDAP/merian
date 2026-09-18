@@ -94,6 +94,15 @@ class Queue : public std::enable_shared_from_this<Queue> {
 
     void wait_idle();
 
+    // Hold while submitting to the underlying vk::Queue from outside this wrapper.
+    void lock() {
+        mutex.lock();
+    }
+
+    void unlock() {
+        mutex.unlock();
+    }
+
     const ContextHandle& get_context() const {
         return context;
     }
