@@ -103,11 +103,6 @@ class LightCollection {
         env_emissive = value;
     }
 
-    // The grid's visibility probe traces against it.
-    void set_acceleration_structure(const AccelerationStructureHandle& as) {
-        acceleration_structure = as;
-    }
-
     // The grid follows the camera.
     void set_camera(const float3& position) {
         camera_position = position;
@@ -158,16 +153,12 @@ class LightCollection {
     // and more only churn it.
     int32_t grid_candidates = 16;
     int32_t cell_candidates = 2;
-    AccelerationStructureHandle acceleration_structure;
     float grid_cell_size = 0.f; // 0: derived from the distance to the lights
     float grid_coverage = 1.f;
     float grid_jitter = 1.f;
     bool debug_jitter = true;
     bool constants_dirty = true;
     float grid_share = 1.f;
-    bool grid_visibility = false;
-    // Slots a cell re-tests per frame. Clearing more than one at a time stops the list settling.
-    int32_t grid_probes = 1;
     int32_t grid_max_age = 8;
     // set for a frame the carried-over grid cannot describe
     bool grid_reset = true;
@@ -229,19 +220,16 @@ class LightCollection {
     Versioned<SlangProgramEntryPoint> setup_entry_point;
     Versioned<SlangProgramEntryPoint> pool_entry_point;
     Versioned<SlangProgramEntryPoint> grid_entry_point;
-    Versioned<SlangProgramEntryPoint> grid_probe_entry_point;
     Versioned<SlangProgramEntryPoint> env_split_entry_point;
     Versioned<SlangProgramEntryPoint> geometry_proxy_entry_point;
     Versioned<Pipeline> setup_pipeline;
     Versioned<Pipeline> pool_pipeline;
     Versioned<Pipeline> grid_pipeline;
-    Versioned<Pipeline> grid_probe_pipeline;
     Versioned<Pipeline> env_split_pipeline;
     Versioned<Pipeline> geometry_proxy_pipeline;
     Versioned<ShaderObject> setup_params;
     Versioned<ShaderObject> pool_params;
     Versioned<ShaderObject> grid_params;
-    Versioned<ShaderObject> grid_probe_params;
     Versioned<ShaderObject> env_split_params;
     Versioned<ShaderObject> geometry_proxy_params;
 

@@ -33,7 +33,6 @@ struct LightPreprocessBinding {
     StructuredBuffer<float> grid_weight_prev;
     RWStructuredBuffer<LightGridInfo, ScalarDataLayout> grid_info;
     StructuredBuffer<LightGridInfo, ScalarDataLayout> grid_info_prev;
-    RaytracingAccelerationStructure as;
 
     // fraction of the light bounds the grid spans around the camera
     float grid_coverage;
@@ -45,9 +44,6 @@ struct LightPreprocessBinding {
     uint grid_cascades;
     float grid_cell_size;
     float grid_jitter;
-    uint grid_visibility;
-    // visibility rays a cell spends per frame
-    uint grid_probes;
     // frames over which a key that stopped earning its slot is overtaken
     uint grid_max_age;
     // drop everything carried over, for a frame the previous grid cannot describe
@@ -244,8 +240,6 @@ grid_setup(uint local_id : SV_GroupIndex, ParameterBlock<LightPreprocessBinding>
 // Where a cell sits and the sphere it stands for.
 struct CellGeometry {
     float3 center;
-    // jittered per frame, so a cell is not judged from one arbitrary point forever
-    float3 point;
     float radius;
     uint cascade;
     uint3 coord;
@@ -253,8 +247,7 @@ struct CellGeometry {
 
 CellGeometry cell_geometry(const RWStructuredBuffer<LightGridInfo, ScalarDataLayout> grid_info,
                            const uint cell,
-                           const float jitter,
-                           const uint seed) {
+                           const float jitter) {
     const uint dim = grid_info[0].dimension;
     const uint cells_per_cascade = dim * dim * dim;
     const uint local = cell % cells_per_cascade;
@@ -267,43 +260,7 @@ CellGeometry cell_geometry(const RWStructuredBuffer<LightGridInfo, ScalarDataLay
     cg.center = info.origin + (float3(cg.coord) + 0.5f) * cell_size;
     // the sphere the cell stands for: its circumradius, grown by the jitter the lookup adds
     cg.radius = 0.5f * sqrt(3.f) * cell_size * (jitter + 1.f);
-    RandomGenerator point_rng = PCG(seed ^ 0xc2b2ae35u);
-    cg.point = cg.center + (point_rng.next_float3() - 0.5f) * cell_size;
     return cg;
-}
-
-// Whether the light reaches the cell, tested against one point on the triangle. Every triangle
-// blocks, whichever way it faces and whatever its alpha.
-bool cell_sees_light(const RaytracingAccelerationStructure as,
-                     const EmissiveTriangle tri,
-                     const float3 from,
-                     const float radius,
-                     inout RandomGenerator rng) {
-    const float3 bary = sample_triangle(rng);
-    const float3 target = bary.x * tri.p0 + bary.y * tri.p1 + bary.z * tri.p2;
-    const float3 to_target = target - from;
-    const float dist = length(to_target);
-    if (!(dist > 0.f))
-        return true;
-
-    // a light that does not face the cell delivers nothing to it, clear path or not
-    float facing = dot(tri.get_scaled_normal(), -to_target);
-    if (tri.is_two_sided())
-        facing = abs(facing);
-    if (!(facing > 0.f))
-        return false;
-
-    // the verdict stands for the whole cell, so the ray only has to reach the cell's sphere
-    RayDesc ray;
-    ray.Origin = target;
-    ray.Direction = -to_target / dist;
-    ray.TMin = 1e-3f * dist;
-    ray.TMax = max(dist - radius, 1e-3f * dist);
-
-    RayQuery<RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_FORCE_OPAQUE> rq;
-    rq.TraceRayInline(as, RAY_FLAG_NONE, 0xff, ray);
-    rq.Proceed();
-    return rq.CommittedStatus() == COMMITTED_NOTHING;
 }
 
 // Independent draws from the flux distribution, so a sample is one load and its density is still
@@ -395,7 +352,7 @@ grid(uint3 group_id : SV_GroupID,
         return;
 
     const uint seed = xxhash32(uint3(cell, params.frame, 0x9e3779b9u));
-    const CellGeometry cg = cell_geometry(params.grid_info, cell, params.grid_jitter, seed);
+    const CellGeometry cg = cell_geometry(params.grid_info, cell, params.grid_jitter);
     const uint cascade = cg.cascade;
     const uint3 coord = cg.coord;
     const float3 center = cg.center;
@@ -532,38 +489,4 @@ grid(uint3 group_id : SV_GroupID,
     const uint entry = cell * LIGHT_GRID_SLOTS + local_id;
     params.grid[entry] = s_slot_index[local_id];
     params.grid_weight[entry] = s_slot_draw[local_id];
-}
-
-    // A light the cell cannot see delivers nothing, so it makes way for the next draw. One thread
-    // per probed slot: the rays are unrelated, and packing them is what keeps the traversal busy.
-    [shader("compute")][numthreads(64, 1, 1)] void grid_probe(
-        uint3 thread_id : SV_DispatchThreadID, ParameterBlock<LightPreprocessBinding> params) {
-    const uint dim = params.grid_info[0].dimension;
-    if (dim == 0 || params.grid_visibility == 0)
-        return;
-
-    const uint probes = clamp(params.grid_probes, 1u, LIGHT_GRID_SLOTS);
-    const uint cells = dim * dim * dim * params.grid_info[0].cascade_count;
-    if (thread_id.x >= cells * probes)
-        return;
-
-    const uint cell = thread_id.x / probes;
-    // Always the lowest slots: clearing one frees the weakest key, which the next frame refills,
-    // so the probe keeps testing freshly arrived lights instead of unsettling the whole list.
-    const uint slot = thread_id.x % probes;
-    const uint entry = cell * LIGHT_GRID_SLOTS + slot;
-    const uint sample = params.grid[entry];
-    if (sample >= params.light_geometry_count)
-        return;
-
-    const uint seed = xxhash32(uint3(cell, params.frame, 0x9e3779b9u));
-    const CellGeometry cg = cell_geometry(params.grid_info, cell, params.grid_jitter, seed);
-    RandomGenerator rng = PCG(xxhash32(uint2(seed ^ 0x27d4eb2fu, slot)));
-    const LightGeometry geometry = params.light_geometries[sample];
-    const uint probe_triangle =
-        geometry.first_triangle + min(uint(rng.next_float() * float(geometry.primitive_count)),
-                                      geometry.primitive_count - 1u);
-    if (!cell_sees_light(params.as, params.triangles[probe_triangle], cg.point, cg.radius, rng)) {
-        params.grid[entry] = LIGHT_INVALID_INDEX;
-    }
 }

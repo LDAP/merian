@@ -119,7 +119,6 @@ void LightCollection::ensure_pipelines(const SlangCompositionHandle& scene_compo
         make("grid_setup", setup_entry_point, setup_pipeline, setup_params);
         make("pool", pool_entry_point, pool_pipeline, pool_params);
         make("grid", grid_entry_point, grid_pipeline, grid_params);
-        make("grid_probe", grid_probe_entry_point, grid_probe_pipeline, grid_probe_params);
         make("env_split", env_split_entry_point, env_split_pipeline, env_split_params);
         make("geometry_proxy", geometry_proxy_entry_point, geometry_proxy_pipeline,
              geometry_proxy_params);
@@ -507,14 +506,8 @@ void LightCollection::update(const CommandBufferHandle& cmd,
             c["grid_cascades"] = static_cast<uint32_t>(grid_cascades);
             c["grid_cell_size"] = grid_cell_size;
             c["grid_jitter"] = grid_jitter;
-            c["grid_visibility"] =
-                static_cast<uint32_t>(grid_visibility && acceleration_structure ? 1 : 0);
-            c["grid_probes"] = static_cast<uint32_t>(grid_probes);
             c["grid_max_age"] = static_cast<uint32_t>(grid_max_age);
             c["grid_reset"] = static_cast<uint32_t>(grid_reset ? 1 : 0);
-            if (acceleration_structure) {
-                c["as"] = acceleration_structure;
-            }
             c["frame"] = frame;
             return params;
         };
@@ -589,18 +582,6 @@ void LightCollection::update(const CommandBufferHandle& cmd,
                 ep->bind("params", write_preprocess(grid_params.get()), cmd, pipe, obj_allocator);
                 // one group per cell
                 cmd->dispatch(grid_cell_count(), 1, 1);
-            }
-            if (grid_visibility && acceleration_structure) {
-                barrier();
-                MERIAN_PROFILE_SCOPE_GPU(cmd, "grid probe");
-                const auto ep = grid_probe_entry_point.get();
-                const auto pipe = grid_probe_pipeline.get();
-                cmd->bind(pipe);
-                ep->bind("params", write_preprocess(grid_probe_params.get()), cmd, pipe,
-                         obj_allocator);
-                const uint32_t probes =
-                    std::clamp(static_cast<uint32_t>(grid_probes), 1u, LIGHT_GRID_SLOTS);
-                cmd->dispatch((grid_cell_count() * probes + 63) / 64, 1, 1);
             }
             grid_reset = false;
             grid_slot ^= 1u;
@@ -776,15 +757,6 @@ void LightCollection::properties(Properties& props) {
                              "Frames over which a light that stopped earning its slot is overtaken "
                              "by a fresh candidate.",
                              1, 256);
-            props.config_bool("visibility", grid_visibility,
-                              "Trace whether a cell can see the light in a slot, and free the slot "
-                              "where it cannot. Pays where a sample is all the budget allows.");
-            if (grid_visibility) {
-                props.config_int("probes", grid_probes,
-                                 "Slots a cell re-tests per frame. Clearing more than one at a "
-                                 "time stops the list settling.",
-                                 1, static_cast<int32_t>(LIGHT_GRID_SLOTS));
-            }
         }
         props.st_end_child();
     }
