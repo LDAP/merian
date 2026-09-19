@@ -165,7 +165,7 @@ class LightCollection {
     bool debug_jitter = true;
     bool constants_dirty = true;
     float grid_share = 1.f;
-    bool grid_visibility = true;
+    bool grid_visibility = false;
     // Slots a cell re-tests per frame. Clearing more than one at a time stops the list settling.
     int32_t grid_probes = 1;
     int32_t grid_max_age = 8;
