@@ -159,6 +159,7 @@ class LightCollection {
     bool debug_jitter = true;
     bool constants_dirty = true;
     float grid_share = 1.f;
+    bool grid_a_res = true;
     int32_t grid_max_age = 8;
     // set for a frame the carried-over grid cannot describe
     bool grid_reset = true;

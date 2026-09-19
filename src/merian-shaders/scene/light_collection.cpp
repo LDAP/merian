@@ -507,6 +507,7 @@ void LightCollection::update(const CommandBufferHandle& cmd,
             c["grid_cell_size"] = grid_cell_size;
             c["grid_jitter"] = grid_jitter;
             c["grid_max_age"] = static_cast<uint32_t>(grid_max_age);
+            c["grid_a_res"] = static_cast<uint32_t>(grid_a_res ? 1 : 0);
             c["grid_reset"] = static_cast<uint32_t>(grid_reset ? 1 : 0);
             c["frame"] = frame;
             return params;
@@ -753,6 +754,10 @@ void LightCollection::properties(Properties& props) {
             props.config_float("jitter", grid_jitter,
                                "Cells the lookup is offset by, so the cell boundaries do not show.",
                                0.05f, 0.f, 2.f);
+            props.config_bool("without replacement", grid_a_res,
+                              "Draw the slots in proportion to what a source is worth here rather "
+                              "than keeping the largest. Off suits a cell that sees fewer sources "
+                              "than it has slots.");
             props.config_int("max age", grid_max_age,
                              "Frames over which a light that stopped earning its slot is overtaken "
                              "by a fresh candidate.",

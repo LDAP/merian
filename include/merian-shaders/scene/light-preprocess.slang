@@ -46,6 +46,8 @@ struct LightPreprocessBinding {
     float grid_jitter;
     // frames over which a key that stopped earning its slot is overtaken
     uint grid_max_age;
+    // 1 draws the slots without replacement, 0 keeps the largest importances
+    uint grid_a_res;
     // drop everything carried over, for a frame the previous grid cannot describe
     uint grid_reset;
     uint frame;
@@ -453,7 +455,12 @@ grid(uint3 group_id : SV_GroupID,
             }
             if (index == LIGHT_INVALID_INDEX || !(weight > 0.f))
                 continue;
-            const float draw = 1.f / weight;
+            // without replacement, so a cell that sees more sources than it has slots does not
+            // collapse onto the largest (A-Res, Efraimidis and Spirakis 2006)
+            RandomGenerator key_rng = PCG(xxhash32(uint3(seed, c, 0x85ebca6bu)));
+            const float draw = params.grid_a_res != 0u
+                                   ? -log(max(key_rng.next_float(), 1e-7f)) / weight
+                                   : 1.f / weight;
 
             if (draw >= worst_draw)
                 continue;
