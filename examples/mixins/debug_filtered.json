@@ -1,0 +1,58 @@
+{
+    "nodes": {
+        "accum_filtered": {
+            "enabled": true,
+            "outputs": [
+                "history->accum_filtered.prev_history",
+                "out->accum_filtered.prev_out",
+                "out->exposure_filtered.src"
+            ],
+            "properties": {
+                "alpha": 1.0,
+                "events": {
+                    "clear": "/user/clear,//geometry_changed,//transform_changed,//camera_changed"
+                }
+            },
+            "type": "Accumulate"
+        },
+        "debug": {
+            "outputs": [
+                "acquire->imgui.acquire",
+                "filtered->accum_filtered.src"
+            ],
+            "properties": {
+                "overlay": {
+                    "max paths": 1
+                },
+                "maps": {
+                    "show panels": false
+                },
+                "selection": {
+                    "expression A": ".{1,2}"
+                },
+                "backdrop": {
+                    "show": "the backdrop input"
+                }
+            }
+        },
+        "exposure_filtered": {
+            "enabled": true,
+            "outputs": [
+                "out->tonemap_filtered.src"
+            ],
+            "type": "Exposure"
+        },
+        "gbuffer": {
+            "$+$outputs": [
+                "gbuffer->accum_filtered.gbuffer"
+            ]
+        },
+        "tonemap_filtered": {
+            "enabled": true,
+            "outputs": [
+                "out->debug.backdrop"
+            ],
+            "type": "Tonemap"
+        }
+    }
+}

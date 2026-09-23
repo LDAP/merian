@@ -8,6 +8,9 @@
   <img src="images/ABeautifulGame.png" width="400" /> 
   <img src="images/tears.png" width="400" /> 
 </p>
+<p align="middle">
+  <img src="images/path_debugger.png" width="800" />
+</p>
 
 Merian is split into multiple components:
 

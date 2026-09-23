@@ -7,6 +7,7 @@
 #include "merian-graph/graph/node.hpp"
 #include "merian-graph/objects/gbuffer_object.hpp"
 #include "merian-graph/objects/guiding_object.hpp"
+#include "merian-graph/objects/path_record_sink.hpp"
 #include "merian-shaders/gbuffer.hpp"
 #include "merian-shaders/sampling/guiding.hpp"
 #include "merian-shaders/scene/scene.hpp"
@@ -59,6 +60,7 @@ class RenderPT : public Node {
 
     void ensure_pipeline(const SceneHandle& scene);
     void update_render_constants();
+    uint32_t recorded_vertices_per_path() const;
     void update_guiding_slot();
 
     ContextHandle context;
@@ -72,6 +74,7 @@ class RenderPT : public Node {
     ShaderObjectInHandle<GuidingObject> con_distance_guiding =
         ShaderObjectIn<GuidingObject>::create();
     ManagedVkImageOutHandle con_irradiance;
+    PathRecordSink path_records;
     ManagedVkImageOutHandle con_volume;
     ManagedVkImageOutHandle con_volume_depth;
     ManagedVkImageOutHandle con_volume_mv;

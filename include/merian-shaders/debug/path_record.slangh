@@ -1,0 +1,71 @@
+#pragma once
+
+#ifdef __cplusplus
+#include "merian-shaders/types.slang.h"
+#endif
+
+namespace merian {
+
+// One uint buffer with three regions:
+// [0, HEADER_UINTS)  header: counters (producer) + control words (consumer)
+// [paths]            PATH_RECORD_UINTS per path
+// [vertices]         PATH_RECORD_VERTEX_UINTS per vertex, one contiguous block per path
+static const uint32_t PATH_RECORD_HEADER_UINTS = 16;
+static const uint32_t PATH_RECORD_REGION_RATIO = 17;
+static const uint32_t PATH_RECORD_UINTS = 4;
+static const uint32_t PATH_RECORD_VERTEX_UINTS = 10;
+
+// the counters may exceed the capacity; the overshoot measures demand
+static const uint32_t PATH_RECORD_HDR_PATH_COUNT = 0;
+static const uint32_t PATH_RECORD_HDR_VERTEX_COUNT = 1;
+static const uint32_t PATH_RECORD_HDR_ENABLE = 2;
+static const uint32_t PATH_RECORD_HDR_PIXEL_FILTER = 3;
+static const uint32_t PATH_RECORD_HDR_KEEP_PROB = 4;
+static const uint32_t PATH_RECORD_HDR_FRAME = 5;
+
+static const uint32_t PATH_RECORD_ALL_PIXELS = 0xFFFFFFFFu;
+
+static const uint32_t PATH_RECORD_PATH_PIXEL = 0;
+static const uint32_t PATH_RECORD_PATH_VERTEX_OFFSET = 1;
+static const uint32_t PATH_RECORD_PATH_COUNT_SAMPLE = 2; // vertex count | sample << 16
+static const uint32_t PATH_RECORD_PATH_LUMINANCE = 3;
+
+static const uint32_t PATH_RECORD_VERTEX_POS = 0;
+static const uint32_t PATH_RECORD_VERTEX_WO = 3;
+static const uint32_t PATH_RECORD_VERTEX_CONTRIB = 4;
+static const uint32_t PATH_RECORD_VERTEX_PDF = 7;
+static const uint32_t PATH_RECORD_VERTEX_THROUGHPUT = 8;
+static const uint32_t PATH_RECORD_VERTEX_META = 9;
+
+// meta word: bounce | lobe << 8 | flags | method << 16 | material << 20
+static const uint32_t PATH_RECORD_BOUNCE_MASK = 0xFFu;
+static const uint32_t PATH_RECORD_LOBE_SHIFT = 8;
+static const uint32_t PATH_RECORD_LOBE_MASK = 0xFu;
+static const uint32_t PATH_RECORD_LOBE_DELTA = 1u;
+static const uint32_t PATH_RECORD_LOBE_GLOSSY = 2u;
+static const uint32_t PATH_RECORD_LOBE_DIFFUSE = 4u;
+static const uint32_t PATH_RECORD_LOBE_TRANSMISSION = 8u;
+static const uint32_t PATH_RECORD_FLAG_TERMINAL = 1u << 12;
+// a next-event connection branching off the vertex before it, not part of the chain; pdf 0 marks
+// a draw that produced no sample
+static const uint32_t PATH_RECORD_FLAG_NEE = 1u << 13;
+// pdf holds 1/W of a sample reused across pixels or frames, so draws are correlated
+static const uint32_t PATH_RECORD_FLAG_REUSED = 1u << 14;
+// part of a path resampling selected as a whole: no density of its own; the first vertex holds 1/W
+static const uint32_t PATH_RECORD_FLAG_RESAMPLED = 1u << 15;
+static const uint32_t PATH_RECORD_METHOD_SHIFT = 16;
+static const uint32_t PATH_RECORD_METHOD_MASK = 0xFu;
+static const uint32_t PATH_RECORD_MATERIAL_SHIFT = 20;
+static const uint32_t PATH_RECORD_MATERIAL_MASK = 0xFFFu;
+static const uint32_t PATH_RECORD_MATERIAL_NONE = 0xFFFu;
+
+static const uint32_t PATH_RECORD_METHOD_UNKNOWN = 0;
+static const uint32_t PATH_RECORD_METHOD_UNIFORM = 1;
+static const uint32_t PATH_RECORD_METHOD_COSINE = 2;
+static const uint32_t PATH_RECORD_METHOD_BSDF = 3;
+static const uint32_t PATH_RECORD_METHOD_GUIDING = 4;
+static const uint32_t PATH_RECORD_METHOD_RESTIR = 5;
+static const uint32_t PATH_RECORD_METHOD_LIGHT = 6;
+static const uint32_t PATH_RECORD_METHOD_COUNT = 7;
+
+} // namespace merian

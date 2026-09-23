@@ -19,6 +19,7 @@ RenderRestirDI::RenderRestirDI() = default;
 DeviceSupportInfo RenderRestirDI::query_device_support(const DeviceSupportQueryInfo& query_info) {
     const auto composition = Scene::query_device_support_composition(query_info);
     composition->add_composition(GBufferLayout::complete()->get_composition());
+    path_records.add_constants(composition);
     composition->add_module_from_path(SHADER_MODULE, true);
     const auto program = SlangProgram::create(query_info.compile_context, composition);
     return DeviceSupportInfo::check(query_info, {"rayTracingPipeline"}, {"rayQuery"}) &
@@ -55,6 +56,7 @@ void RenderRestirDI::update_render_constants() {
                     emission_on_primary ? "true" : "false", demodulate_albedo ? "true" : "false",
                     spp, spatial_iterations, apply_mv ? "true" : "false",
                     visibility_shade ? "true" : "false", boiling_filter_strength));
+    path_records.add_constants(composition);
 }
 
 std::vector<InputConnectorDescriptor> RenderRestirDI::describe_inputs() {
@@ -80,7 +82,8 @@ RenderRestirDI::describe_outputs(const NodeIOLayout& io_layout) {
     con_irradiance = ManagedVkImageOut::create(irradiance_format, extent);
     con_reservoirs = ManagedVkBufferOut::create(reservoir_buffer_create_info());
     return {{"irradiance", con_irradiance, ConnectorAccess::ray_tracing_write},
-            {"reservoirs", con_reservoirs, ConnectorAccess::ray_tracing_read_write}};
+            {"reservoirs", con_reservoirs, ConnectorAccess::ray_tracing_read_write},
+            path_records.describe_output(context, extent, 1, 2)};
 }
 
 RenderRestirDI::NodeStatusFlags
@@ -89,6 +92,9 @@ RenderRestirDI::on_connected(const NodeIOLayout& io_layout,
                              [[maybe_unused]] const NodeConnectionInfo& info,
                              Submission& submission) {
     composition = nullptr;
+    if (path_records.update_connected(io_layout)) {
+        return NEEDS_RECONNECT;
+    }
 
     io_layout.register_event_listener(
         "/graph/reload_shaders", [this](const GraphEvent::Info&, const GraphEvent::Data& force) {
@@ -193,6 +199,7 @@ RenderRestirDI::process(const NodeIO& io, const NodeProcessInfo& info, Submissio
         cursor["gbuffer"] = gbuf.r();
         cursor["prev_gbuffer"] = prev_gbuf.r();
         cursor["irradiance"] = io[con_irradiance].get_texture();
+        path_records.process(cmd, io, info.get_iteration(), cursor.find("path_records"));
         return obj;
     };
 
@@ -293,6 +300,8 @@ RenderRestirDI::NodeStatusFlags RenderRestirDI::properties(Properties& config) {
     if (constants_changed && composition) {
         update_render_constants();
     }
+
+    needs_reconnect |= path_records.properties(config, 1, 2);
 
     if (needs_reconnect)
         return NEEDS_RECONNECT;

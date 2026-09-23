@@ -1,0 +1,412 @@
+// Kernels import merian_shaders.scene.camera, merian_shaders.debug.path_record and
+// merian_shaders.utils.hash and open `using merian;` before including this.
+#pragma once
+
+#ifdef __cplusplus
+#include "merian-shaders/debug/path_record.hpp"
+#include "merian-shaders/types.slang.h"
+#endif
+
+namespace merian {
+
+static const uint32_t PATH_DEBUG_WG = 256;
+
+static const uint32_t PATH_DEBUG_PANEL_MARGIN = 10;
+static const uint32_t PATH_DEBUG_PANEL_GAP = 24;
+static const uint32_t PATH_DEBUG_PANEL_CLOSE = 14;
+
+static const uint32_t PATH_DEBUG_HIST_BINS = 128;
+static const float PATH_DEBUG_HIST_MIN_LOG = -20.f;
+static const float PATH_DEBUG_HIST_MAX_LOG = 20.f;
+
+static const float PATH_DEBUG_ENV_DISTANCE = 1e6f;
+
+static const uint32_t PATH_DEBUG_MAX_SEGMENTS = 64;
+
+// resampled: a record stream with one path per slot, then the slot keys (0 = empty)
+static const uint32_t PATH_DEBUG_RESAMPLED_SLOTS = 16;
+static const uint32_t PATH_DEBUG_RESAMPLED_VERTICES =
+    PATH_RECORD_HEADER_UINTS + PATH_DEBUG_RESAMPLED_SLOTS * PATH_RECORD_UINTS;
+static const uint32_t PATH_DEBUG_RESAMPLED_KEYS =
+    PATH_DEBUG_RESAMPLED_VERTICES +
+    PATH_DEBUG_RESAMPLED_SLOTS * PATH_DEBUG_MAX_SEGMENTS * PATH_RECORD_VERTEX_UINTS;
+static const uint32_t PATH_DEBUG_RESAMPLED_UINTS =
+    PATH_DEBUG_RESAMPLED_KEYS + PATH_DEBUG_RESAMPLED_SLOTS;
+
+// --- state: scratch, cleared every frame ---
+static const uint32_t PATH_DEBUG_STATE_DRAW_COUNT = 0;
+static const uint32_t PATH_DEBUG_STATE_MATCHED = 1;
+static const uint32_t PATH_DEBUG_STATE_HEAT_MAX = 2;
+static const uint32_t PATH_DEBUG_STATE_BAND_LO = 3;
+static const uint32_t PATH_DEBUG_STATE_BAND_HI = 4;
+static const uint32_t PATH_DEBUG_STATE_BAND_KEEP = 5;
+static const uint32_t PATH_DEBUG_STATE_GRID_CELLS = 6;
+static const uint32_t PATH_DEBUG_STATE_GRID_DROPPED = 7;
+// pick resolved from the records: [0] the click sequence answered (0 = none), [1..3] position of
+// the clicked pixel's primary hit, [4] the pixel footprint there
+static const uint32_t PATH_DEBUG_STATE_PICK = 8;
+static const uint32_t PATH_DEBUG_PICK_UINTS = 5;
+static const uint32_t PATH_DEBUG_STATE_HIST = PATH_DEBUG_STATE_PICK + PATH_DEBUG_PICK_UINTS;
+// per resampled slot: the frame's largest key, then whether a winner claimed the slot
+static const uint32_t PATH_DEBUG_STATE_RESAMPLE_KEY = PATH_DEBUG_STATE_HIST + PATH_DEBUG_HIST_BINS;
+static const uint32_t PATH_DEBUG_STATE_RESAMPLE_CLAIM =
+    PATH_DEBUG_STATE_RESAMPLE_KEY + PATH_DEBUG_RESAMPLED_SLOTS;
+static const uint32_t PATH_DEBUG_STATE_DRAW_LIST =
+    PATH_DEBUG_STATE_RESAMPLE_CLAIM + PATH_DEBUG_RESAMPLED_SLOTS;
+
+static const uint32_t PATH_DEBUG_MAX_DRAW = 4096;
+
+static const uint32_t PATH_DEBUG_STATE_UINTS = PATH_DEBUG_STATE_DRAW_LIST + PATH_DEBUG_MAX_DRAW;
+
+// --- out_state: the frame's result for the host, mirrors PathDebugNode::Readback ---
+static const uint32_t PATH_DEBUG_OUT_DRAW_COUNT = 0;
+static const uint32_t PATH_DEBUG_OUT_MATCHED = 1;
+static const uint32_t PATH_DEBUG_OUT_PATHS = 2;
+static const uint32_t PATH_DEBUG_OUT_VERTICES = 3;
+static const uint32_t PATH_DEBUG_OUT_FRAME = 4;
+static const uint32_t PATH_DEBUG_OUT_KEEP = 5;
+static const uint32_t PATH_DEBUG_OUT_GRID_CELLS = 6;
+static const uint32_t PATH_DEBUG_OUT_GRID_DROPPED = 7;
+// cursor probe: [0] PATH_DEBUG_PROBE_*, [1..3] values, [4] count, [5..8] picked-pixel mean,
+// relative error, count and variance
+static const uint32_t PATH_DEBUG_OUT_PROBE = 8;
+static const uint32_t PATH_DEBUG_PROBE_UINTS = 9;
+static const uint32_t PATH_DEBUG_PROBE_NONE = 0;
+static const uint32_t PATH_DEBUG_PROBE_PIXEL = 1;
+static const uint32_t PATH_DEBUG_PROBE_PANEL = 2;
+// the isolated path: [0] valid, [1] pixel, [2] sample | vertex count << 16, [3] luminance, then
+// the raw vertex words
+static const uint32_t PATH_DEBUG_OUT_ISOLATE = PATH_DEBUG_OUT_PROBE + PATH_DEBUG_PROBE_UINTS;
+static const uint32_t PATH_DEBUG_ISOLATE_HEADER = 4;
+static const uint32_t PATH_DEBUG_ISOLATE_UINTS =
+    PATH_DEBUG_ISOLATE_HEADER + PATH_DEBUG_MAX_SEGMENTS * PATH_RECORD_VERTEX_UINTS;
+static const uint32_t PATH_DEBUG_NO_ISOLATE = 0xFFFFFFFFu;
+// candidates for the host path list: [0] record index, [1] pixel, [2] luminance,
+// [3] sample | scatter count << 16, [4] the first 8 event classes as nibbles
+static const uint32_t PATH_DEBUG_OUT_TOP = PATH_DEBUG_OUT_ISOLATE + PATH_DEBUG_ISOLATE_UINTS;
+static const uint32_t PATH_DEBUG_TOP_UINTS = 5;
+static const uint32_t PATH_DEBUG_TOP_COUNT = 32;
+static const uint32_t PATH_DEBUG_OUT_PICK =
+    PATH_DEBUG_OUT_TOP + PATH_DEBUG_TOP_UINTS * PATH_DEBUG_TOP_COUNT;
+static const uint32_t PATH_DEBUG_OUT_UINTS = PATH_DEBUG_OUT_PICK + PATH_DEBUG_PICK_UINTS;
+
+static const uint32_t PATH_DEBUG_SLOT_COUNT = 2;
+
+static const uint32_t PATH_DEBUG_SOURCE_A = 0;
+static const uint32_t PATH_DEBUG_SOURCE_B = 1;
+static const uint32_t PATH_DEBUG_SOURCE_ALL = 2;
+
+static const uint32_t PATH_DEBUG_RESTRICT_NONE = 0;
+static const uint32_t PATH_DEBUG_RESTRICT_PIXEL = 1;
+static const uint32_t PATH_DEBUG_RESTRICT_THROUGH = 2;
+static const uint32_t PATH_DEBUG_RESTRICT_FROM = 3;
+static const uint32_t PATH_DEBUG_RESTRICT_TO = 4;
+
+static const uint32_t PATH_DEBUG_FINITE_ANY = 0;
+static const uint32_t PATH_DEBUG_FINITE_ONLY = 1;
+static const uint32_t PATH_DEBUG_FINITE_NONFINITE = 2;
+
+static const uint32_t PATH_DEBUG_METHOD_ANY_VERTEX = 0;
+static const uint32_t PATH_DEBUG_METHOD_EVERY_VERTEX = 1;
+
+static const uint32_t PATH_DEBUG_RANK_ANY = 0;
+static const uint32_t PATH_DEBUG_RANK_BRIGHTEST = 1;
+static const uint32_t PATH_DEBUG_RANK_FIREFLIES = 2;
+static const uint32_t PATH_DEBUG_RANK_RESAMPLED = 3;
+
+static const uint32_t PATH_DEBUG_NO_PIXEL = 0xFFFFFFFFu;
+
+static const uint32_t PATH_DEBUG_STATS_COUNT = 0;
+static const uint32_t PATH_DEBUG_STATS_SAMPLES = 1;
+static const uint32_t PATH_DEBUG_STATS_MAX_DENSITY = 2;
+static const uint32_t PATH_DEBUG_STATS_MAX_CONTRIB = 3;
+static const uint32_t PATH_DEBUG_STATS_MAX_MEAN = 4;
+static const uint32_t PATH_DEBUG_STATS_MAX_PDF = 5;
+static const uint32_t PATH_DEBUG_STATS_PDF_INTEGRAL = 6;
+static const uint32_t PATH_DEBUG_STATS_CHI2 = 7;
+static const uint32_t PATH_DEBUG_STATS_CHI2_DOF = 8;
+static const uint32_t PATH_DEBUG_STATS_OMEGA = 9;
+static const uint32_t PATH_DEBUG_STATS_PDF_NORM = 10;
+static const uint32_t PATH_DEBUG_STATS_TESTED = 11;
+static const uint32_t PATH_DEBUG_STATS_DRAWS = 12;
+static const uint32_t PATH_DEBUG_STATS_SPIKE_MASS = 13;
+static const uint32_t PATH_DEBUG_STATS_SPIKE_BINS = 14;
+static const uint32_t PATH_DEBUG_STATS_CHECK_SAMPLES = 15;
+static const uint32_t PATH_DEBUG_STATS_MAX_CHECK = 16;
+static const uint32_t PATH_DEBUG_STATS_EVAL_INTEGRAL = 17;
+static const uint32_t PATH_DEBUG_STATS_EVAL_NORM = 18;
+static const uint32_t PATH_DEBUG_STATS_MAX_EVAL = 19;
+static const uint32_t PATH_DEBUG_STATS_TV_EVAL = 20;
+static const uint32_t PATH_DEBUG_STATS_TV_CHECK = 21;
+static const uint32_t PATH_DEBUG_STATS_TV_RECORDS = 22;
+
+static const uint32_t PATH_DEBUG_CHECK = 24;
+static const uint32_t PATH_DEBUG_CHECK_DRAWS = PATH_DEBUG_CHECK + 0;
+static const uint32_t PATH_DEBUG_CHECK_VALID = PATH_DEBUG_CHECK + 1;
+static const uint32_t PATH_DEBUG_CHECK_BAD = PATH_DEBUG_CHECK + 2;
+static const uint32_t PATH_DEBUG_CHECK_TRANSMITTED = PATH_DEBUG_CHECK + 3;
+static const uint32_t PATH_DEBUG_CHECK_WEIGHT = PATH_DEBUG_CHECK + 4;
+static const uint32_t PATH_DEBUG_CHECK_WEIGHT_M2 = PATH_DEBUG_CHECK + 7;
+static const uint32_t PATH_DEBUG_CHECK_PDF_INTEGRAL = PATH_DEBUG_CHECK + 8;
+static const uint32_t PATH_DEBUG_CHECK_EVAL_INTEGRAL = PATH_DEBUG_CHECK + 9;
+static const uint32_t PATH_DEBUG_CHECK_ERR_WEIGHT = PATH_DEBUG_CHECK + 12;
+static const uint32_t PATH_DEBUG_CHECK_ERR_PDF = PATH_DEBUG_CHECK + 13;
+static const uint32_t PATH_DEBUG_CHECK_ERR_RECIPROCITY = PATH_DEBUG_CHECK + 14;
+static const uint32_t PATH_DEBUG_CHECK_ALBEDO = PATH_DEBUG_CHECK + 15;
+static const uint32_t PATH_DEBUG_CHECK_ALPHA = PATH_DEBUG_CHECK + 18;
+static const uint32_t PATH_DEBUG_CHECK_OFF_WEIGHT = PATH_DEBUG_CHECK + 19;
+static const uint32_t PATH_DEBUG_CHECK_OFF_PDF = PATH_DEBUG_CHECK + 20;
+static const uint32_t PATH_DEBUG_CHECK_OFF_RECIPROCITY = PATH_DEBUG_CHECK + 21;
+static const uint32_t PATH_DEBUG_CHECK_RECIPROCITY_CELLS = PATH_DEBUG_CHECK + 22;
+static const uint32_t PATH_DEBUG_CHECK_BAD_CELLS = PATH_DEBUG_CHECK + 23;
+static const uint32_t PATH_DEBUG_CHECK_UINTS = 24;
+static const uint32_t PATH_DEBUG_CHECK_DIM = 1024;
+static const uint32_t PATH_DEBUG_CHECK_SAMPLES_PER_CELL = 16;
+
+static const uint32_t PATH_DEBUG_STATS_LUM = PATH_DEBUG_CHECK + PATH_DEBUG_CHECK_UINTS;
+static const uint32_t PATH_DEBUG_STATS_PDF = PATH_DEBUG_STATS_LUM + 64;
+static const uint32_t PATH_DEBUG_STATS_BOUNCE = PATH_DEBUG_STATS_PDF + 64;
+static const uint32_t PATH_DEBUG_HIST_SMALL_BINS = 64;
+static const uint32_t PATH_DEBUG_LENGTH_BINS = 32;
+// per theta band: [0] record count, [1] pdf * dOmega (float), [2] dOmega (float)
+static const uint32_t PATH_DEBUG_STATS_THETA = PATH_DEBUG_STATS_BOUNCE + PATH_DEBUG_LENGTH_BINS;
+static const uint32_t PATH_DEBUG_THETA_BANDS = 32;
+static const uint32_t PATH_DEBUG_STATS_LEN_CONTRIB =
+    PATH_DEBUG_STATS_THETA + 3 * PATH_DEBUG_THETA_BANDS;
+// batch means: [0] completed batches, [1] samples and [2] draws at the last batch start,
+// [3] sum of residual products of consecutive batches and [4] of the earlier's squares (float),
+// [5] PATH_DEBUG_SEEN_* of the binned draws
+static const uint32_t PATH_DEBUG_STATS_BATCH = PATH_DEBUG_STATS_LEN_CONTRIB + PATH_DEBUG_LENGTH_BINS;
+static const uint32_t PATH_DEBUG_STATS_BATCHES = PATH_DEBUG_STATS_BATCH + 0;
+static const uint32_t PATH_DEBUG_STATS_BATCH_SAMPLES = PATH_DEBUG_STATS_BATCH + 1;
+static const uint32_t PATH_DEBUG_STATS_BATCH_DRAWS = PATH_DEBUG_STATS_BATCH + 2;
+static const uint32_t PATH_DEBUG_STATS_LAG_PRODUCT = PATH_DEBUG_STATS_BATCH + 3;
+static const uint32_t PATH_DEBUG_STATS_LAG_SQUARE = PATH_DEBUG_STATS_BATCH + 4;
+static const uint32_t PATH_DEBUG_STATS_SEEN = PATH_DEBUG_STATS_BATCH + 5;
+static const uint32_t PATH_DEBUG_STATS_UINTS = PATH_DEBUG_STATS_BATCH + 6;
+
+static const uint32_t PATH_DEBUG_SEEN_CONNECTION = 1;
+static const uint32_t PATH_DEBUG_SEEN_REUSED = 2;
+static const uint32_t PATH_DEBUG_SEEN_RESAMPLED = 4;
+static const uint32_t PATH_DEBUG_MIN_BATCHES = 8;
+static const uint32_t PATH_DEBUG_MAP_REGIONS = 13;
+
+static const uint32_t PATH_DEBUG_PDF_REF_BSDF = 0;
+static const uint32_t PATH_DEBUG_PDF_REF_RECORDED = 1;
+
+static const uint32_t PATH_DEBUG_WI_CAMERA = 0;
+static const uint32_t PATH_DEBUG_WI_MANUAL = 1;
+
+static const uint32_t PATH_DEBUG_FRAME_WORLD = 0;
+static const uint32_t PATH_DEBUG_FRAME_LOCAL = 1;
+
+// path expression token (Heckbert 1990; OSL LPE): scattering | side << 4 | repeat range
+static const uint32_t PATH_DEBUG_CLS_DELTA = PATH_RECORD_LOBE_DELTA;
+static const uint32_t PATH_DEBUG_CLS_GLOSSY = PATH_RECORD_LOBE_GLOSSY;
+static const uint32_t PATH_DEBUG_CLS_DIFFUSE = PATH_RECORD_LOBE_DIFFUSE;
+static const uint32_t PATH_DEBUG_CLS_UNKNOWN = 8;
+static const uint32_t PATH_DEBUG_CLS_ANY =
+    PATH_DEBUG_CLS_DELTA | PATH_DEBUG_CLS_GLOSSY | PATH_DEBUG_CLS_DIFFUSE | PATH_DEBUG_CLS_UNKNOWN;
+static const uint32_t PATH_DEBUG_SIDE_SHIFT = 4;
+static const uint32_t PATH_DEBUG_SIDE_REFLECT = 1;
+static const uint32_t PATH_DEBUG_SIDE_TRANSMIT = 2;
+static const uint32_t PATH_DEBUG_MIN_SHIFT = 6;
+static const uint32_t PATH_DEBUG_MAX_SHIFT = 9;
+static const uint32_t PATH_DEBUG_REPEAT_INF = 15;
+static const uint32_t PATH_DEBUG_MAX_TOKENS = 8;
+// expr_*_count: token count | PATH_DEBUG_EXPR_NEE
+static const uint32_t PATH_DEBUG_EXPR_COUNT_MASK = 0xFFu;
+static const uint32_t PATH_DEBUG_EXPR_NEE = 1u << 8;
+
+static const uint32_t PATH_DEBUG_MAP_DENSITY = 0;
+static const uint32_t PATH_DEBUG_MAP_CONTRIB = 1;
+static const uint32_t PATH_DEBUG_MAP_CONTRIB_COLOR = 2;
+static const uint32_t PATH_DEBUG_MAP_MEAN = 3;
+static const uint32_t PATH_DEBUG_MAP_PDF = 4;
+static const uint32_t PATH_DEBUG_MAP_RATIO = 5;
+static const uint32_t PATH_DEBUG_MAP_ZSCORE = 6;
+static const uint32_t PATH_DEBUG_MAP_CHECK = 7;
+static const uint32_t PATH_DEBUG_MAP_EVAL = 8;
+static const uint32_t PATH_DEBUG_MAP_CHANNEL_COUNT = 9;
+static const uint32_t PATH_DEBUG_MAP_NONE = 0xFFFFFFFFu;
+static const uint32_t PATH_DEBUG_MAP_SURFACE_MASK =
+    (1u << PATH_DEBUG_MAP_PDF) | (1u << PATH_DEBUG_MAP_RATIO) | (1u << PATH_DEBUG_MAP_ZSCORE) |
+    (1u << PATH_DEBUG_MAP_CHECK) | (1u << PATH_DEBUG_MAP_EVAL);
+
+static const uint32_t PATH_DEBUG_ALL_BOUNCES = 0xFFFFFFFFu;
+
+static const uint32_t PATH_DEBUG_DRAWS_SCATTER = 0;
+static const uint32_t PATH_DEBUG_DRAWS_LIGHT = 1;
+
+static const float PATH_DEBUG_PDF_MIN_LOG = -10.f;
+static const float PATH_DEBUG_PDF_MAX_LOG = 30.f;
+
+static const uint32_t PATH_DEBUG_HEAT_OFF = 0;
+static const uint32_t PATH_DEBUG_HEAT_DENSITY = 1;
+static const uint32_t PATH_DEBUG_HEAT_CONTRIBUTION = 2;
+static const uint32_t PATH_DEBUG_HEAT_THROUGHPUT = 3;
+
+// heat grid: [0, slots) cell keys (0 = empty), [slots, 2 * slots) weights
+static const uint32_t PATH_DEBUG_GRID_PROBES = 8;
+static const uint32_t PATH_DEBUG_GRID_INVALID = 0xFFFFFFFFu;
+static const uint32_t PATH_DEBUG_GRID_TOMBSTONE = 0xFFFFFFFFu;
+
+static const uint32_t PATH_DEBUG_DEPTH_XRAY = 0;
+static const uint32_t PATH_DEBUG_DEPTH_HIDE = 1;
+static const uint32_t PATH_DEBUG_DEPTH_DASH = 2;
+
+static const uint32_t PATH_DEBUG_COLOR_LUMINANCE = 0;
+static const uint32_t PATH_DEBUG_COLOR_BOUNCES = 1;
+static const uint32_t PATH_DEBUG_COLOR_RANDOM = 2;
+static const uint32_t PATH_DEBUG_COLOR_TECHNIQUE = 3;
+
+// 0xRRGGBB per PATH_RECORD_METHOD_*
+static const uint32_t PATH_DEBUG_METHOD_COLORS[PATH_RECORD_METHOD_COUNT] = {
+    0x9a9a9a, 0x9a9a9a, 0x9a9a9a, 0x5ec8f0, 0xc080ff, 0xff9a3c, 0xffd83c};
+
+static const uint32_t PATH_DEBUG_BACKDROP_RENDER = 0;
+static const uint32_t PATH_DEBUG_BACKDROP_FILTERED_A = 1;
+static const uint32_t PATH_DEBUG_BACKDROP_FILTERED_B = 2;
+static const uint32_t PATH_DEBUG_BACKDROP_REFERENCE = 3;
+static const uint32_t PATH_DEBUG_BACKDROP_DIFFERENCE = 4;
+static const uint32_t PATH_DEBUG_BACKDROP_SPLIT_REFERENCE = 5;
+static const uint32_t PATH_DEBUG_BACKDROP_SPLIT_FILTERED = 6;
+static const uint32_t PATH_DEBUG_BACKDROP_INPUT = 7;
+
+static const uint32_t PATH_DEBUG_PIXEL_STAT_OFF = 0;
+static const uint32_t PATH_DEBUG_PIXEL_STAT_REL_ERROR = 1;
+static const uint32_t PATH_DEBUG_PIXEL_STAT_VARIANCE = 2;
+static const uint32_t PATH_DEBUG_PIXEL_STAT_MEAN = 3;
+
+// scalars only: a vector would pad to its alignment and the two sides would drift apart
+struct PathDebugParams {
+    uint32_t dim_x;
+    uint32_t dim_y;
+
+    uint32_t sel_pixel_x;
+    uint32_t sel_pixel_y;
+    float sel_region_x;
+    float sel_region_y;
+    float sel_region_z;
+    float sel_region_radius;
+    uint32_t sel_restrict;
+    uint32_t sel_scatters_min;
+    uint32_t sel_scatters_max;
+    uint32_t sel_method_mask;
+    uint32_t sel_method_mode;
+    uint32_t sel_material;
+    uint32_t sel_finite;
+    uint32_t expr_a_0;
+    uint32_t expr_a_1;
+    uint32_t expr_a_2;
+    uint32_t expr_a_3;
+    uint32_t expr_a_count;
+    uint32_t expr_b_0;
+    uint32_t expr_b_1;
+    uint32_t expr_b_2;
+    uint32_t expr_b_3;
+    uint32_t expr_b_count;
+
+    uint32_t overlay_source;
+    uint32_t overlay_rank;
+    uint32_t overlay_max_paths;
+    uint32_t overlay_sample_max;
+    float overlay_brightest_fraction;
+    float overlay_alpha;
+    uint32_t overlay_depth_mode;
+    float overlay_thickness;
+    uint32_t overlay_color;
+    float overlay_color_scale;
+    uint32_t overlay_isolate;
+    uint32_t overlay_resample;
+
+    uint32_t backdrop;
+    float backdrop_split;
+    float difference_gain;
+    float filtered_exposure;
+    uint32_t reference_ready;
+
+    uint32_t map_source;
+    uint32_t map_res;
+    uint32_t map_transform;
+    uint32_t map_frame;
+    uint32_t map_pdf_ref;
+    uint32_t map_bounce;
+    uint32_t map_draws;
+    uint32_t map_batch_end;
+    uint32_t map_panel_mask;
+    uint32_t map_panel_size;
+    uint32_t map_panel_scroll;
+    uint32_t want_top_list;
+    float map_exposure;
+    uint32_t stats_stride;
+    uint32_t sphere_channel;
+    float sphere_radius;
+    uint32_t check_seq;
+    uint32_t wi_mode;
+    float wi_theta;
+    float wi_phi;
+
+    uint32_t heat_source;
+    uint32_t heat_mode;
+    uint32_t heat_bounce_min;
+    uint32_t heat_bounce_max;
+    float heat_decay;
+    float heat_cell_size;
+    float heat_exposure;
+    float heat_opacity;
+    uint32_t heat_smooth;
+    uint32_t grid_slots;
+
+    uint32_t pixel_stats_source;
+    uint32_t pixel_stats_accumulate;
+    uint32_t filtered_active;
+    uint32_t pixel_stats_view;
+    float pixel_stats_scale;
+
+    uint32_t freeze;
+    float keep_prob;
+    uint32_t record_pixel;
+
+    uint32_t cursor_x;
+    uint32_t cursor_y;
+    uint32_t probe_channel;
+    uint32_t probe_bin;
+    uint32_t pick_x;
+    uint32_t pick_y;
+    uint32_t pick_seq;
+};
+
+} // namespace merian
+
+#ifndef __cplusplus
+
+extern static const bool merian_path_debug_gbuffer = false;
+
+RWStructuredBuffer<uint, ScalarDataLayout> in_records;
+Sampler2D<float4> in_src;
+RWTexture2D<float4> out_out;
+RWTexture2D<float4> out_filtered;
+RWTexture2D<float4> out_filtered_b;
+
+RWStructuredBuffer<uint, ScalarDataLayout> state;
+RWStructuredBuffer<uint, ScalarDataLayout> out_state;
+RWStructuredBuffer<uint, ScalarDataLayout> stats;
+RWStructuredBuffer<uint, ScalarDataLayout> maps;
+RWStructuredBuffer<uint, ScalarDataLayout> grid;
+RWStructuredBuffer<float, ScalarDataLayout> stats_f;
+RWStructuredBuffer<float, ScalarDataLayout> maps_f;
+RWStructuredBuffer<float, ScalarDataLayout> grid_f;
+// per pixel: sum, sum of squares and count of the luminance over every path, then the same
+// triple over the paths of pixel_stats_source
+RWStructuredBuffer<uint, ScalarDataLayout> moments;
+RWStructuredBuffer<float, ScalarDataLayout> moments_f;
+// filtered re-render: rgb + pad per pixel, one region per slot, then the accumulated path count
+RWStructuredBuffer<uint, ScalarDataLayout> filtered;
+RWStructuredBuffer<float, ScalarDataLayout> filtered_f;
+RWStructuredBuffer<uint, ScalarDataLayout> matches;
+RWStructuredBuffer<uint, ScalarDataLayout> resampled;
+uniform merian::Camera camera;
+uniform PathDebugParams params;
+
+#endif

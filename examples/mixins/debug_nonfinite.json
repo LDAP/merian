@@ -1,0 +1,25 @@
+{
+    "nodes": {
+        "debug": {
+            "properties": {
+                "selection": {
+                    "contribution": "NaN or infinite only",
+                    "restrict to": "nothing"
+                },
+                "overlay": {
+                    "keep": "spread over the image",
+                    "max paths": 256,
+                    "color": "bounces",
+                    "alpha": 0.9
+                },
+                "heat": {
+                    "mode": "density",
+                    "paths from": "selection A"
+                },
+                "maps": {
+                    "show panels": false
+                }
+            }
+        }
+    }
+}

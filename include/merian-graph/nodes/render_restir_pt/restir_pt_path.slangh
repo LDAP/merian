@@ -752,12 +752,48 @@ RestirPTReservoir restir_pt_candidate(const uint seed,
     return r;
 }
 
+uint restir_pt_record_lobe(const RestirPTLobe lobe, const bool transmission) {
+    const uint smoothness = lobe == RestirPTLobeDelta    ? PATH_RECORD_LOBE_DELTA
+                            : lobe == RestirPTLobeGlossy ? PATH_RECORD_LOBE_GLOSSY
+                                                         : PATH_RECORD_LOBE_DIFFUSE;
+    return smoothness | (transmission ? PATH_RECORD_LOBE_TRANSMISSION : 0u);
+}
+
+// The light sample of a vertex, kept until the vertex it branches off is recorded.
+struct RestirPTLightRecord {
+    bool drawn;
+    float3 pos;
+    float pdf;
+    float3 throughput;
+    float3 contribution;
+
+    __init() {
+        drawn = false;
+        pos = float3(0);
+        pdf = 0.f;
+        throughput = float3(0);
+        contribution = float3(0);
+    }
+
+    void record(inout PathRecorder rec,
+                const PathRecordStream records,
+                const float3 from,
+                const uint bounce,
+                const uint material) {
+        if (drawn)
+            rec.connection(records, from, pdf > 0.f ? pos : from, pdf, throughput, contribution,
+                           bounce, PATH_RECORD_METHOD_LIGHT, material);
+    }
+}
+
 // Traces one path from `primary` and resamples its light-carrying subpaths into `candidates`.
 // Returns the emission of the primary vertex where it is not resampled.
 float3 restir_pt_trace_candidates(const ParameterBlock<Scene> scene,
                                   const RestirPTPrimary primary,
                                   inout RestirPTCandidates candidates,
-                                  inout RandomGenerator rng) {
+                                  inout RandomGenerator rng,
+                                  const PathRecordStream records,
+                                  inout PathRecorder rec) {
     const uint seed = candidates.seed;
     const RestirPTRandom random = {seed};
     const RestirPTThresholds thresholds = RestirPTThresholds(seed);
@@ -795,10 +831,13 @@ float3 restir_pt_trace_candidates(const ParameterBlock<Scene> scene,
             } else if (merian_restir_pt_emission_on_primary) {
                 primary_emission = sp.emission;
             }
+            if (merian_restir_pt_emission_on_primary)
+                rec.emission(sp.emission);
         } else if (any(sp.emission > 0.f)) {
             const float light_pdf = restir_pt_emitter_light_pdf(scene, from, -wi, hit);
             const float mis = from.pdf / (from.pdf + light_pdf);
             const float3 contribution = throughput * sp.emission * mis;
+            rec.emission(contribution);
             if (candidates.select(contribution, rng)) {
                 if (rc.k != 0) {
                     candidates.write_running(
@@ -819,21 +858,30 @@ float3 restir_pt_trace_candidates(const ParameterBlock<Scene> scene,
         }
 
         if (i >= max_length || !sp.has_surface_material ||
-            all(throughput < SCENE_THROUGHPUT_THRESHOLD))
+            all(throughput < SCENE_THROUGHPUT_THRESHOLD)) {
+            rec.terminal(records, sp.pos);
             break;
+        }
 
         const OrthonormalFrame frame = sp.shading_frame;
         let bsdf = sp.surface_material.get_bsdf();
         const float3 wi_local = frame.to_local(wi);
         const float3 ng = sp.get_face_normal();
         const bool samples_lights = restir_pt_samples_lights(scene, bsdf);
+        const uint material = path_record_pack_material(sp.material_id);
+        RestirPTLightRecord light_record = RestirPTLightRecord();
 
         // 2. next event estimation towards x_{i+1}
         if (samples_lights) {
+            light_record.drawn = true;
             if (let direct = restir_pt_direct(scene, bsdf, sp, wi, random, i, rng)) {
                 const RestirPTLightSample ls = direct.ls;
                 const float3 contribution = throughput * direct.contribution();
                 const bool env = ls.index == LIGHT_ENV_INDEX;
+                light_record.pos = ls.pos;
+                light_record.pdf = ls.pdf;
+                light_record.throughput = throughput * direct.f * (direct.mis / ls.pdf);
+                light_record.contribution = contribution;
                 if (candidates.select(contribution, rng)) {
                     if (rc.k != 0) {
                         candidates.write_running(i + 1, rc.k, true, env,
@@ -868,22 +916,35 @@ float3 restir_pt_trace_candidates(const ParameterBlock<Scene> scene,
                             ls.Le, geometry, 0.f));
                     }
                 }
+            } else if (merian_path_record) {
+                // a blocked light sample is still a draw of the light techniques
+                RandomGenerator light_rng = random.light(i);
+                if (let ls = restir_pt_sample_light(scene, sp.pos, light_rng)) {
+                    light_record.pos = ls.pos;
+                    light_record.pdf = ls.pdf;
+                }
             }
         }
 
         // 3. russian roulette, which the target function leaves out [Lin et al. 2022, 7.4]
         if (merian_restir_pt_russian_roulette && i > 1) {
             const float survive = min(1.f, yuv_luminance(throughput));
-            if (!(rng.next_float() < survive))
+            if (!(rng.next_float() < survive)) {
+                rec.terminal(records, sp.pos);
+                light_record.record(rec, records, sp.pos, i - 1, material);
                 break;
+            }
             throughput /= survive;
             roulette *= survive;
         }
 
         // 4. the scatter direction, replayable from the path's seed
         const Optional<RestirPTScatter> sampled = restir_pt_scatter(bsdf, sp, wi, random, i, rng);
-        if (!sampled.hasValue)
+        if (!sampled.hasValue) {
+            rec.terminal(records, sp.pos);
+            light_record.record(rec, records, sp.pos, i - 1, material);
             break;
+        }
         const RestirPTScatter scatter = sampled.value;
 
         // 5. x_i is where the candidates after it reconnect
@@ -903,6 +964,10 @@ float3 restir_pt_trace_candidates(const ParameterBlock<Scene> scene,
 
         throughput *= scatter.f / scatter.pdf;
         from = restir_pt_from(scene, bsdf, sp, scatter, thresholds.roughness);
+        rec.vertex(records, sp.pos, scatter.wo, scatter.pdf, throughput, i - 1,
+                   restir_pt_record_lobe(scatter.lobe, scatter.transmission),
+                   PATH_RECORD_METHOD_BSDF, material);
+        light_record.record(rec, records, sp.pos, i - 1, material);
 
         const bool last = i + 1 >= max_length;
         hit = scene.trace_ray(scatter.ray, RAY_FLAG_NONE, merian_restir_pt_instance_mask);
@@ -911,6 +976,7 @@ float3 restir_pt_trace_candidates(const ParameterBlock<Scene> scene,
         wi = -scatter.ray.Direction;
     }
 
+    rec.finish(records);
     return primary_emission;
 }
 

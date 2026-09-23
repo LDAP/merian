@@ -1,4 +1,5 @@
 #include "merian-graph/nodes/render_restir_pt/restir_pt_neighbors.slangh"
+#include "merian-graph/nodes/render_restir_pt/restir_pt_record.slangh"
 #include "merian-graph/nodes/render_restir_pt/restir_pt_shift.slangh"
 
 using merian;
@@ -20,6 +21,7 @@ extern static const uint merian_restir_pt_temporal_mode = RestirPTTemporalBackpr
 extern static const bool merian_restir_pt_specular_motion = false;
 extern static const float merian_restir_pt_specular_motion_roughness = 0.1f;
 extern static const uint merian_restir_pt_debug_view = RestirPTDebugNone;
+extern static const uint merian_restir_pt_record = RestirPTRecordCandidates;
 } // namespace merian
 
 struct RestirPTBinding {
@@ -28,6 +30,7 @@ struct RestirPTBinding {
     RWTexture2D<float4> irradiance;
     // RestirPTQueueHeader followed by the queued shifts
     RWStructuredBuffer<uint> queue;
+    RWStructuredBuffer<uint, ScalarDataLayout> path_records;
 };
 
 [vk::push_constant] ConstantBuffer<RestirPTPushConstant> pc;
@@ -164,8 +167,15 @@ void restir_pt_pass_initial(const uint2 pixel,
             scene, params.gbuffer, false,
             float2(pixel) + restir_pt_unpack_unorm(RestirPTRandom(candidates.seed).film()), dim,
             candidates.seed);
+        var rec = PathRecorder::disabled();
+        if (merian_restir_pt_record == RestirPTRecordCandidates)
+            rec = PathRecorder::begin(params.path_records, pixel, uint(s), pc.frame,
+                                      2 * uint(merian_restir_pt_max_path_length) + 1);
         if (primary.valid)
-            primary_emission += restir_pt_trace_candidates(scene, primary, candidates, rng);
+            primary_emission += restir_pt_trace_candidates(scene, primary, candidates, rng,
+                                                           params.path_records, rec);
+        else
+            rec.finish(params.path_records);
     }
 
     RestirPTReservoir r = restir_pt_empty_reservoir();
@@ -180,6 +190,25 @@ void restir_pt_pass_initial(const uint2 pixel,
     params.irradiance[pixel] = float4(all(isfinite(emission)) ? emission : float3(0), 0);
     if ((pc.flags & RestirPTPassResolves) != 0)
         restir_pt_resolve(params, pixel, r, r.integrand * r.W);
+}
+
+// The path each pixel shades this frame, replayed in its own domain.
+void restir_pt_pass_record(const uint2 pixel,
+                           const ParameterBlock<Scene> scene,
+                           const ParameterBlock<RestirPTBinding> params) {
+    const uint2 dim = params.gbuffer.get_dimensions();
+    if (!merian_path_record || any(pixel >= dim))
+        return;
+    const RestirPTReservoir r = pc.reservoirs_in[restir_pt_index(pixel, dim)];
+    var rec = PathRecorder::begin(params.path_records, pixel, 0, pc.frame,
+                                  uint(merian_restir_pt_max_path_length) + 2);
+    const RestirPTPrimary primary = restir_pt_primary(
+        scene, params.gbuffer, false, restir_pt_image_pos(float2(pixel), r), dim, r.seed);
+    RandomGenerator rng = restir_pt_rng(pixel, RestirPTPassRecord);
+    if (primary.valid)
+        restir_pt_record_shaded(scene, primary, r, params.path_records, rec, rng);
+    else
+        rec.finish(params.path_records);
 }
 
 // The history cap of the reservoir at a previous pixel, lowered where the previous frame's path
@@ -1005,6 +1034,9 @@ void restir_pt_pass_duplication(const uint2 pixel,
         break;
     case RestirPTPassCoverageNeighbors:
         restir_pt_pass_coverage_neighbors(thread_id.xy, params);
+        break;
+    case RestirPTPassRecord:
+        restir_pt_pass_record(thread_id.xy, scene, params);
         break;
     default:
         break;

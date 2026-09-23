@@ -76,6 +76,13 @@ test_graph_load_store = executable(
 )
 test('graph_load_store', test_graph_load_store, timeout: 120)
 
+test_path_expression = executable(
+    'test-path-expression',
+    'test_path_expression.cpp',
+    dependencies: [merian_dep, gtest_main_dep],
+)
+test('path_expression', test_path_expression, timeout: 30)
+
 test_slang_hot_reload = executable(
     'test-slang-hot-reload',
     'test_slang_hot_reload.cpp',

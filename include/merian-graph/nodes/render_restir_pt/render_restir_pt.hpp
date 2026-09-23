@@ -6,6 +6,7 @@
 #include "merian-graph/connectors/ptr_in.hpp"
 #include "merian-graph/graph/node.hpp"
 #include "merian-graph/objects/gbuffer_object.hpp"
+#include "merian-graph/objects/path_record_sink.hpp"
 #include "merian-shaders/gbuffer.hpp"
 #include "merian-shaders/scene/scene.hpp"
 
@@ -38,7 +39,8 @@ class RenderRestirPT : public Node {
         Splat = 7,
         SubpixelBackprojection = 8,
         CoverageNeighbors = 9,
-        PassCount = 10
+        Record = 10,
+        PassCount = 11
     };
 
     RenderRestirPT();
@@ -68,6 +70,8 @@ class RenderRestirPT : public Node {
     void ensure_pipeline(const SceneHandle& scene);
     void update_render_constants();
     void upload_pairing(Submission& submission);
+    uint32_t recorded_paths_per_pixel() const;
+    uint32_t recorded_vertices_per_path() const;
 
     ContextHandle context;
     ResourceAllocatorHandle resource_allocator;
@@ -133,6 +137,9 @@ class RenderRestirPT : public Node {
     float early_stop_cutoff = 0.5f;
 
     int32_t debug_view = 0;
+
+    PathRecordSink path_records;
+    int32_t record_mode = 0;
 
     SlangCompositionHandle gbuffer_composition;
     SlangCompositionHandle composition;

@@ -1,0 +1,29 @@
+{
+    "nodes": {
+        "debug": {
+            "properties": {
+                "selection": {
+                    "pixel picked": true,
+                    "pixel": [
+                        960,
+                        540
+                    ]
+                },
+                "capture": {
+                    "picked pixel only": true
+                },
+                "maps": {
+                    "show panels": true,
+                    "paths from": "selection A",
+                    "frame": "local shading frame",
+                    "transform": "hemisphere (equal-area)",
+                    "resolution (log2)": 4,
+                    "BSDF pdf": true,
+                    "density / pdf": true,
+                    "density": true,
+                    "z-score": true
+                }
+            }
+        }
+    }
+}

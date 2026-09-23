@@ -1,0 +1,504 @@
+// Include after layout.slangh.
+#pragma once
+
+uint2 path_debug_dim() {
+    return uint2(params.dim_x, params.dim_y);
+}
+
+uint2 path_debug_picked_pixel() {
+    if (params.sel_pixel_x == PATH_DEBUG_NO_PIXEL) {
+        return path_debug_dim() / 2;
+    }
+    return uint2(params.sel_pixel_x, params.sel_pixel_y);
+}
+
+bool path_debug_has_pixel() {
+    return params.sel_pixel_x != PATH_DEBUG_NO_PIXEL;
+}
+
+bool path_debug_restricts_pixel() {
+    return params.sel_restrict == PATH_DEBUG_RESTRICT_PIXEL && path_debug_has_pixel();
+}
+
+bool path_debug_shared_support(const bool needs_camera_wi) {
+    return path_debug_restricts_pixel() && params.map_bounce == 0 &&
+           (!needs_camera_wi || params.wi_mode == PATH_DEBUG_WI_CAMERA);
+}
+
+bool path_debug_restricts_region() {
+    return params.sel_restrict >= PATH_DEBUG_RESTRICT_THROUGH && params.sel_region_radius > 0.f;
+}
+
+uint path_debug_filtered_slot_stride() {
+    return 4 * params.dim_x * params.dim_y;
+}
+
+uint path_debug_filtered_paths_at() {
+    return PATH_DEBUG_SLOT_COUNT * path_debug_filtered_slot_stride();
+}
+
+uint path_debug_moments_base(const uint2 pixel) {
+    return 6 * (pixel.y * params.dim_x + pixel.x);
+}
+
+struct PixelMoments {
+    float mean;
+    float variance;
+    float rel_error;
+    uint count;
+}
+
+PixelMoments path_debug_pixel_moments(const uint2 pixel) {
+    const uint base = path_debug_moments_base(pixel) +
+                      (params.pixel_stats_source == PATH_DEBUG_SOURCE_ALL ? 0 : 3);
+    PixelMoments m;
+    m.count = moments[base + 2];
+    m.mean = m.count > 0 ? asfloat(moments[base + 0]) / float(m.count) : 0.f;
+    m.variance =
+        m.count > 1 ? max(asfloat(moments[base + 1]) / float(m.count) - m.mean * m.mean, 0.f) : 0.f;
+    m.rel_error = (m.count > 1 && m.mean > 0.f) ? sqrt(m.variance / float(m.count)) / m.mean : 0.f;
+    return m;
+}
+
+float path_debug_pixel_footprint(const uint2 pixel, const float range) {
+    const uint2 dim = path_debug_dim();
+    return range * distance(camera.get_pinhole_direction(pixel, dim),
+                            camera.get_pinhole_direction(pixel + uint2(1, 0), dim));
+}
+
+// maps buffer, regions of N = map_res^2:
+// [0, N)      direction sample count
+// [N, 4N)     contribution RGB (float)
+// [4N, 5N)    BSDF pdf at the primary hit (float; negative = under-resolved)
+// [5N, 6N)    sum of 1/pdf over continuous-density samples (float)
+// [6N, 7N)    sum of 1/pdf^2 (float)
+// [7N, 8N)    BSDF check sample count
+// [8N, 9N)    BSDF eval f * cos (float)
+// [9N, 10N)   sample count at the batch start
+// [10N, 11N)  sum of 1/pdf at the batch start (float)
+// [11N, 12N)  sum of squared batch residuals (float)
+// [12N, 13N)  the last batch residual (float)
+uint path_debug_map_count_at(const uint index) {
+    return index;
+}
+uint path_debug_map_contrib_at(const uint index) {
+    return params.map_res * params.map_res + 3 * index;
+}
+uint path_debug_map_pdf_at(const uint index) {
+    return 4 * params.map_res * params.map_res + index;
+}
+uint path_debug_map_recip_at(const uint index) {
+    return 5 * params.map_res * params.map_res + index;
+}
+uint path_debug_map_recip2_at(const uint index) {
+    return 6 * params.map_res * params.map_res + index;
+}
+uint path_debug_map_check_at(const uint index) {
+    return 7 * params.map_res * params.map_res + index;
+}
+uint path_debug_map_eval_at(const uint index) {
+    return 8 * params.map_res * params.map_res + index;
+}
+uint path_debug_map_count_start_at(const uint index) {
+    return 9 * params.map_res * params.map_res + index;
+}
+uint path_debug_map_recip_start_at(const uint index) {
+    return 10 * params.map_res * params.map_res + index;
+}
+uint path_debug_map_residual2_at(const uint index) {
+    return 11 * params.map_res * params.map_res + index;
+}
+uint path_debug_map_residual_prev_at(const uint index) {
+    return 12 * params.map_res * params.map_res + index;
+}
+
+float3 path_debug_wi_local(const float3 camera_wi_local) {
+    if (params.wi_mode == PATH_DEBUG_WI_CAMERA) {
+        return camera_wi_local;
+    }
+    const float st = sin(params.wi_theta);
+    return float3(st * cos(params.wi_phi), st * sin(params.wi_phi), cos(params.wi_theta));
+}
+
+uint path_debug_cell_key(const int3 cell) {
+    const uint h =
+        merian::pcg(merian::pcg(merian::pcg(asuint(cell.x)) ^ asuint(cell.y)) ^ asuint(cell.z));
+    return max(h, 1u);
+}
+
+uint path_debug_grid_find(const uint key, const bool insert) {
+    // a tombstone does not end the sequence, the key may live past it
+    uint slot = key % params.grid_slots;
+    for (uint p = 0; p < PATH_DEBUG_GRID_PROBES; p++) {
+        const uint stored = grid[slot];
+        if (stored == key) {
+            return slot;
+        }
+        if (stored == 0) {
+            break;
+        }
+        slot = (slot + 1) % params.grid_slots;
+    }
+    if (!insert) {
+        return PATH_DEBUG_GRID_INVALID;
+    }
+
+    slot = key % params.grid_slots;
+    for (uint p = 0; p < PATH_DEBUG_GRID_PROBES; p++) {
+        const uint stored = grid[slot];
+        if (stored == key) {
+            return slot;
+        }
+        if (stored == 0 || stored == PATH_DEBUG_GRID_TOMBSTONE) {
+            uint orig;
+            InterlockedCompareExchange(grid[slot], stored, key, orig);
+            if (orig == stored || orig == key) {
+                return slot;
+            }
+        }
+        slot = (slot + 1) % params.grid_slots;
+    }
+    InterlockedAdd(state[PATH_DEBUG_STATE_GRID_DROPPED], 1);
+    return PATH_DEBUG_GRID_INVALID;
+}
+
+float path_debug_grid_weight_at(const float3 pos) {
+    const int3 cell = int3(floor(pos / params.heat_cell_size));
+    const uint slot = path_debug_grid_find(path_debug_cell_key(cell), false);
+    return slot == PATH_DEBUG_GRID_INVALID ? 0.f : asfloat(grid[params.grid_slots + slot]);
+}
+
+uint path_debug_token(const uint slot, const uint index) {
+    uint word = slot == 0 ? params.expr_a_0 : params.expr_b_0;
+    if (index >= 6) {
+        word = slot == 0 ? params.expr_a_3 : params.expr_b_3;
+    } else if (index >= 4) {
+        word = slot == 0 ? params.expr_a_2 : params.expr_b_2;
+    } else if (index >= 2) {
+        word = slot == 0 ? params.expr_a_1 : params.expr_b_1;
+    }
+    return (word >> (16 * (index & 1))) & 0xFFFFu;
+}
+
+bool path_debug_token_matches(const uint token, const uint meta) {
+    const uint lobe = (meta >> PATH_RECORD_LOBE_SHIFT) & PATH_RECORD_LOBE_MASK;
+    const uint smoothness =
+        lobe & (PATH_DEBUG_CLS_DELTA | PATH_DEBUG_CLS_GLOSSY | PATH_DEBUG_CLS_DIFFUSE);
+    const uint cls = smoothness != 0 ? smoothness : PATH_DEBUG_CLS_UNKNOWN;
+    const uint side = (lobe & PATH_RECORD_LOBE_TRANSMISSION) != 0 ? PATH_DEBUG_SIDE_TRANSMIT
+                                                                  : PATH_DEBUG_SIDE_REFLECT;
+    return (cls & (token & 0xFu)) != 0 && (side & ((token >> PATH_DEBUG_SIDE_SHIFT) & 0x3u)) != 0;
+}
+
+bool path_debug_is_connection(const uint meta) {
+    return (meta & PATH_RECORD_FLAG_NEE) != 0;
+}
+
+bool path_debug_is_empty_draw(const PathRecordVertex v) {
+    return v.nee && !v.resampled && !(v.pdf > 0.f);
+}
+
+bool path_debug_is_event(const uint meta) {
+    return (meta & (PATH_RECORD_FLAG_NEE | PATH_RECORD_FLAG_TERMINAL)) == 0;
+}
+
+uint path_debug_scatter_count(PathRecordStream records,
+                              const PathRecordPath p,
+                              const uint vertex_region) {
+    uint count = 0;
+    for (uint v = 0; v < p.vertex_count; v++) {
+        count += path_debug_is_event(
+                     path_record_load_vertex_meta(records, vertex_region, p.vertex_offset + v))
+                     ? 1
+                     : 0;
+    }
+    return count;
+}
+
+bool path_debug_region_hit(const PathRecordPath p, const uint vertex_region) {
+    const float3 q = float3(params.sel_region_x, params.sel_region_y, params.sel_region_z);
+    const float r2 = params.sel_region_radius * params.sel_region_radius;
+    if (params.sel_restrict == PATH_DEBUG_RESTRICT_FROM) {
+        const float3 pos = path_record_load_vertex(in_records, vertex_region, p.vertex_offset).pos;
+        return dot(pos - q, pos - q) <= r2;
+    }
+    if (params.sel_restrict == PATH_DEBUG_RESTRICT_TO) {
+        const float3 pos =
+            path_record_load_vertex(in_records, vertex_region, p.vertex_offset + p.vertex_count - 1)
+                .pos;
+        return dot(pos - q, pos - q) <= r2;
+    }
+    float3 chain = path_record_load_vertex(in_records, vertex_region, p.vertex_offset).pos;
+    if (dot(chain - q, chain - q) <= r2) {
+        return true;
+    }
+    for (uint v = 1; v < p.vertex_count; v++) {
+        const PathRecordVertex vertex =
+            path_record_load_vertex(in_records, vertex_region, p.vertex_offset + v);
+        const float3 edge = vertex.pos - chain;
+        const float len2 = dot(edge, edge);
+        const float t = len2 > 0.f ? clamp(dot(q - chain, edge) / len2, 0.f, 1.f) : 0.f;
+        const float3 nearest = chain + t * edge;
+        if (dot(nearest - q, nearest - q) <= r2) {
+            return true;
+        }
+        if (!vertex.nee) {
+            chain = vertex.pos;
+        }
+    }
+    return false;
+}
+
+bool path_debug_selection_matches(const PathRecordPath p,
+                                  const uint vertex_region,
+                                  const uint scatter) {
+    if (params.sel_finite != PATH_DEBUG_FINITE_ANY) {
+        const bool finite = !isnan(p.luminance) && !isinf(p.luminance);
+        if (finite != (params.sel_finite == PATH_DEBUG_FINITE_ONLY)) {
+            return false;
+        }
+    }
+    if (path_debug_restricts_pixel() && any(p.pixel != path_debug_picked_pixel())) {
+        return false;
+    }
+    if (scatter < params.sel_scatters_min || scatter > params.sel_scatters_max) {
+        return false;
+    }
+    if (path_debug_restricts_region() && !path_debug_region_hit(p, vertex_region)) {
+        return false;
+    }
+    if (params.sel_method_mask != 0 || params.sel_material != PATH_RECORD_MATERIAL_NONE) {
+        bool any_method = false;
+        bool all_methods = false;
+        bool any_material = false;
+        bool first = true;
+        for (uint v = 0; v < p.vertex_count; v++) {
+            const uint meta =
+                path_record_load_vertex_meta(in_records, vertex_region, p.vertex_offset + v);
+            if ((meta & PATH_RECORD_FLAG_TERMINAL) != 0) {
+                continue;
+            }
+            const uint method = (meta >> PATH_RECORD_METHOD_SHIFT) & PATH_RECORD_METHOD_MASK;
+            const bool in_mask = (params.sel_method_mask & (1u << method)) != 0;
+            any_method |= in_mask;
+            all_methods = (first || all_methods) && in_mask;
+            first = false;
+            any_material |= ((meta >> PATH_RECORD_MATERIAL_SHIFT) & PATH_RECORD_MATERIAL_MASK) ==
+                            params.sel_material;
+        }
+        if (params.sel_method_mask != 0 &&
+            !(params.sel_method_mode == PATH_DEBUG_METHOD_EVERY_VERTEX ? all_methods
+                                                                       : any_method)) {
+            return false;
+        }
+        if (params.sel_material != PATH_RECORD_MATERIAL_NONE && !any_material) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static const uint32_t PATH_DEBUG_MATCH_STEPS = 4096;
+bool path_debug_expression_matches(const uint slot,
+                                   const PathRecordPath p,
+                                   const uint vertex_region,
+                                   const uint scatter) {
+    const uint encoded = slot == 0 ? params.expr_a_count : params.expr_b_count;
+    const uint tokens = encoded & PATH_DEBUG_EXPR_COUNT_MASK;
+    const bool nee = (encoded & PATH_DEBUG_EXPR_NEE) != 0;
+    if (tokens == 0) {
+        return true;
+    }
+
+    uint chain[PATH_DEBUG_MAX_SEGMENTS];
+    uint chain_count = 0;
+    uint nee_parent_bits[PATH_DEBUG_MAX_SEGMENTS / 32] = {};
+    for (uint v = 0; v < p.vertex_count && chain_count < PATH_DEBUG_MAX_SEGMENTS; v++) {
+        const uint meta =
+            path_record_load_vertex_meta(in_records, vertex_region, p.vertex_offset + v);
+        if (!path_debug_is_connection(meta)) {
+            chain[chain_count++] = meta;
+        } else if (chain_count > 0 &&
+                   !path_debug_is_empty_draw(
+                       path_record_load_vertex(in_records, vertex_region, p.vertex_offset + v))) {
+            nee_parent_bits[(chain_count - 1) >> 5] |= 1u << ((chain_count - 1) & 31u);
+        }
+    }
+    const uint length = nee ? chain_count : scatter;
+
+    uint taken[PATH_DEBUG_MAX_TOKENS] = {};
+    uint start[PATH_DEBUG_MAX_TOKENS] = {};
+    int t = 0;
+    uint v = 0;
+    for (uint step = 0; step < PATH_DEBUG_MATCH_STEPS; step++) {
+        bool matched = false;
+        if (uint(t) == tokens) {
+            matched = nee ? v > 0 && (nee_parent_bits[(v - 1) >> 5] & (1u << ((v - 1) & 31u))) != 0
+                          : v == scatter;
+        } else {
+            const uint token = path_debug_token(slot, uint(t));
+            const uint repeat_min = (token >> PATH_DEBUG_MIN_SHIFT) & 0x7u;
+            const uint repeat_max = (token >> PATH_DEBUG_MAX_SHIFT) & 0xFu;
+            const uint limit = repeat_max == PATH_DEBUG_REPEAT_INF ? length : repeat_max;
+            start[t] = v;
+            uint count = 0;
+            while (count < limit && v < length && path_debug_token_matches(token, chain[v])) {
+                v++;
+                count++;
+            }
+            taken[t] = count;
+            if (count >= repeat_min) {
+                t++;
+                continue;
+            }
+        }
+        if (matched) {
+            return true;
+        }
+
+        bool resumed = false;
+        for (int b = t - 1; b >= 0; b--) {
+            const uint token = path_debug_token(slot, uint(b));
+            if (taken[b] > ((token >> PATH_DEBUG_MIN_SHIFT) & 0x7u)) {
+                taken[b]--;
+                v = start[b] + taken[b];
+                t = b + 1;
+                resumed = true;
+                break;
+            }
+        }
+        if (!resumed) {
+            return false;
+        }
+    }
+    return false;
+}
+
+uint path_debug_match_stride() {
+    return (path_record_path_capacity(in_records) + 31) >> 5;
+}
+
+void path_debug_set_match(const uint path_index, const uint slot) {
+    InterlockedOr(matches[slot * path_debug_match_stride() + (path_index >> 5)],
+                  1u << (path_index & 31u));
+}
+
+bool path_debug_matched(const uint path_index, const uint slot) {
+    return (matches[slot * path_debug_match_stride() + (path_index >> 5)] &
+            (1u << (path_index & 31u))) != 0;
+}
+
+bool path_debug_in_source(const uint path_index, const uint source) {
+    return source == PATH_DEBUG_SOURCE_ALL || path_debug_matched(path_index, source);
+}
+
+// weighted reservoir sampling (Efraimidis and Spirakis 2006)
+float path_debug_resample_key(const uint path_index, const uint slot, const float weight) {
+    const uint h = pcg(pcg(pcg(in_records[PATH_RECORD_HDR_FRAME]) ^ path_index) ^ slot);
+    const float u = (float(h >> 8) + 0.5f) / 16777216.f;
+    return weight / -log(u);
+}
+
+bool path_debug_resample_weight_valid(const float luminance) {
+    return luminance > 0.f && !isinf(luminance);
+}
+
+void path_debug_resample_offer(const uint path_index, const float luminance) {
+    if (params.overlay_resample == 0 || !path_debug_resample_weight_valid(luminance)) {
+        return;
+    }
+    for (uint slot = 0; slot < params.overlay_max_paths; slot++) {
+        InterlockedMax(state[PATH_DEBUG_STATE_RESAMPLE_KEY + slot],
+                       asuint(path_debug_resample_key(path_index, slot, luminance)));
+    }
+}
+
+void path_debug_resample_commit(const uint path_index, const PathRecordPath p) {
+    if (params.overlay_resample == 0 || !path_debug_resample_weight_valid(p.luminance)) {
+        return;
+    }
+    const uint vertex_region = path_record_vertex_region_offset(in_records);
+    const uint vertices = min(p.vertex_count, PATH_DEBUG_MAX_SEGMENTS);
+    for (uint slot = 0; slot < params.overlay_max_paths; slot++) {
+        const uint key = asuint(path_debug_resample_key(path_index, slot, p.luminance));
+        if (key != state[PATH_DEBUG_STATE_RESAMPLE_KEY + slot] ||
+            key <= resampled[PATH_DEBUG_RESAMPLED_KEYS + slot]) {
+            continue;
+        }
+        uint claimed;
+        InterlockedExchange(state[PATH_DEBUG_STATE_RESAMPLE_CLAIM + slot], 1, claimed);
+        if (claimed != 0) {
+            continue;
+        }
+        const uint dst = PATH_RECORD_HEADER_UINTS + slot * PATH_RECORD_UINTS;
+        resampled[dst + PATH_RECORD_PATH_PIXEL] = path_record_pack_pixel(p.pixel);
+        resampled[dst + PATH_RECORD_PATH_VERTEX_OFFSET] = slot * PATH_DEBUG_MAX_SEGMENTS;
+        resampled[dst + PATH_RECORD_PATH_COUNT_SAMPLE] = vertices | (p.sample_idx << 16);
+        resampled[dst + PATH_RECORD_PATH_LUMINANCE] = asuint(p.luminance);
+        const uint src_vertices = vertex_region + p.vertex_offset * PATH_RECORD_VERTEX_UINTS;
+        const uint dst_vertices = PATH_DEBUG_RESAMPLED_VERTICES +
+                                  slot * PATH_DEBUG_MAX_SEGMENTS * PATH_RECORD_VERTEX_UINTS;
+        for (uint w = 0; w < vertices * PATH_RECORD_VERTEX_UINTS; w++) {
+            resampled[dst_vertices + w] = in_records[src_vertices + w];
+        }
+        resampled[PATH_DEBUG_RESAMPLED_KEYS + slot] = key;
+    }
+}
+
+uint path_debug_log_bin(const float value,
+                        const float min_log,
+                        const float max_log,
+                        const uint bins) {
+    if (!(value > 0.f)) {
+        return 0;
+    }
+    const float normalized = (log2(value) - min_log) / (max_log - min_log);
+    // clamped as int: a negative float converted to uint is undefined
+    return uint(clamp(int(normalized * (bins - 2)) + 1, 1, int(bins - 1)));
+}
+
+uint path_debug_lum_bin(const float lum) {
+    if (isnan(lum) || isinf(lum)) {
+        return PATH_DEBUG_HIST_BINS - 1;
+    }
+    return path_debug_log_bin(lum, PATH_DEBUG_HIST_MIN_LOG, PATH_DEBUG_HIST_MAX_LOG,
+                              PATH_DEBUG_HIST_BINS);
+}
+
+#if defined(MERIAN_SPIRV_CAP_SUPPORTED_AtomicFloat32AddEXT)
+void path_debug_atomic_add_float(RWStructuredBuffer<uint, ScalarDataLayout> buf,
+                                 RWStructuredBuffer<float, ScalarDataLayout> buf_f,
+                                 const uint index,
+                                 const float value) {
+    InterlockedAdd(buf_f[index], value);
+}
+#else
+void path_debug_atomic_add_float(RWStructuredBuffer<uint, ScalarDataLayout> buf,
+                                 RWStructuredBuffer<float, ScalarDataLayout> buf_f,
+                                 const uint index,
+                                 const float value) {
+    uint expected = buf[index];
+    for (;;) {
+        uint orig;
+        InterlockedCompareExchange(buf[index], expected, asuint(asfloat(expected) + value), orig);
+        if (orig == expected) {
+            break;
+        }
+        expected = orig;
+    }
+}
+#endif
+
+void path_debug_atomic_max_float(RWStructuredBuffer<uint, ScalarDataLayout> buf,
+                                 const uint index,
+                                 const float value) {
+    InterlockedMax(buf[index], asuint(max(value, 0.f))); // positive floats order as uints
+}
+
+float path_debug_log_decades(const float value, const float vmax, const float exposure) {
+    return saturate(log(1.f + exposure * 999.f * value / vmax) / log(1000.f));
+}
+
+bool path_debug_is_spike(const float count, const float expected) {
+    return count >= 16.f && count > 10.f * expected;
+}

@@ -1,3 +1,4 @@
+import merian_shaders.debug.path_record;
 import merian_shaders.gbuffer;
 import merian_shaders.scene.scene;
 import merian_shaders.utils.random;
@@ -67,6 +68,7 @@ struct RenderBinding {
     ParameterBlock<GBuffer> gbuffer;
     RWTexture2D<float4> irradiance;
     ParameterBlock<RenderGuiding> guiding;
+    RWStructuredBuffer<uint, ScalarDataLayout> path_records;
 }
 
 // What a light candidate is worth here: its unshadowed contribution and the density the scatter
@@ -112,6 +114,24 @@ make_scatter_target<B : ShadingFunction, G : GuidingDistribution<float3>, V : Ho
     return target;
 }
 
+void record_connection(inout PathRecorder rec,
+                       const ParameterBlock<RenderBinding> params,
+                       const float3 from,
+                       const bool attempted,
+                       const Optional<DirectLightSample> direct,
+                       const float3 throughput,
+                       const float3 contrib,
+                       const uint bounce,
+                       const uint material) {
+    if (let d = direct) {
+        rec.connection(params.path_records, from, d.light_pos, d.realized_pdf, throughput * d.value,
+                       contrib, bounce, PATH_RECORD_METHOD_LIGHT, material);
+    } else if (attempted) {
+        rec.connection(params.path_records, from, from, 0.f, float3(0.f), float3(0.f), bounce,
+                       PATH_RECORD_METHOD_LIGHT, material);
+    }
+}
+
 float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
                                             const ParameterBlock<RenderBinding> params,
                                             const uint2 pixel,
@@ -119,12 +139,14 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
                                             ShadingPoint sp,
                                             const uint16_t sample_index,
                                             inout RandomGenerator rng,
-                                            inout float3 scatter_stats) {
+                                            inout float3 scatter_stats,
+                                            inout PathRecorder rec) {
     // Medium the ray is travelling through; updated on transmission events.
     var medium = scene.make_path_medium();
 
     float3 throughput = medium.transmittance(distance(ray.Origin, sp.pos));
     float3 radiance = merian_render_emission_on_primary ? throughput * sp.emission : float3(0);
+    rec.emission(radiance);
 
     const RenderFrameInfo frame_info = {scene.camera.position, scene.prev_camera.position,
                                         scene.time, scene.time_diff, scene.frame};
@@ -163,6 +185,7 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
         const float3 wi_local = frame.to_local(-ray.Direction);
         const float3 ns = frame.get_normal();
         const float3 ng = sp.get_face_normal();
+        const float spawn_offset = sp.spawn_offset;
         const PathVertex vertex = {sp.pos,
                                    sp.prev_pos,
                                    frame,
@@ -209,9 +232,11 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
         // the same path as one whose ray finds nothing: zero throughput, no continuation.
         bool scattered = false;
         bool guided = false;
+        BSDFLobe scatter_lobe = BSDFLobe::None;
         float3 wo_world = float3(0, 0, 1);
         float3 f_cos = float3(0);
         float scatter_pdf = 0.f;
+        float realized_pdf = 0.f;
         bool delta = false;
         if (light_technique && p_light > 0.f) {
             scattered = sampled_light != LIGHT_INVALID_INDEX;
@@ -220,6 +245,7 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
                 const float3 wo_l = frame.to_local(wo_world);
                 f_cos = bsdf.eval(wi_local, wo_l, rng);
                 scatter_pdf = mixture.pdf(bsdf, guiding, wi_local, wo_l, wo_world);
+                realized_pdf = scatter_pdf;
             }
         } else {
             sampled_light = LIGHT_INVALID_INDEX;
@@ -232,8 +258,10 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
                 wo_world = s.wo;
                 f_cos = s.f_cos;
                 scatter_pdf = s.pdf;
+                realized_pdf = s.realized_pdf;
                 delta = s.delta;
                 guided = s.guided;
+                scatter_lobe = s.lobe;
                 scattered = true;
             }
         }
@@ -265,14 +293,36 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
 
         // The shadow ray goes out once the guiding candidates are dead: only the reservoir and
         // the narrowed record cross this traversal.
-        radiance +=
+        const float3 direct_light =
             throughput * scene.resolve_direct_light(sp.pos, sp.get_face_normal(), sp.spawn_offset,
                                                     direct, merian_render_instance_mask);
+        radiance += direct_light;
 
         Reorder.reorder();
 
         // A transmission event crosses the surface; update the medium we are now in.
         const bool transmission = wi_local.z * wo_local.z < 0.f;
+
+        // the density of every technique that could draw wo
+        const float record_pdf = delta ? realized_pdf : (1.f - p_light) * realized_pdf;
+        const float3 record_f_cos = throughput * f_cos;
+        const uint record_lobe = path_record_pack_lobe(scatter_lobe) |
+                                 (transmission ? PATH_RECORD_LOBE_TRANSMISSION : 0u);
+        const uint record_method = light_technique && p_light > 0.f ? PATH_RECORD_METHOD_LIGHT
+                                   : guided                         ? PATH_RECORD_METHOD_GUIDING
+                                                                    : PATH_RECORD_METHOD_BSDF;
+        const uint record_material = path_record_pack_material(sp.material_id);
+        bool record_waits = p_light > 0.f && scattered && !delta;
+        if (!record_waits) {
+            rec.vertex(params.path_records, vertex.pos, wo_world, record_pdf,
+                       segment.pdf > 0.f ? record_f_cos / segment.pdf : float3(0),
+                       uint(bounce) - 1u, record_lobe, record_method, record_material);
+            record_connection(rec, params, vertex.pos,
+                              merian_render_nee_mode == NEE_MODE_RESAMPLED && nee_surface, direct,
+                              throughput, direct_light,
+                              uint(bounce) - 1u, record_material);
+        }
+
         Optional<RayDesc> next_ray = none;
         if (scattered && any(f_cos > 0.f)) {
             next_ray = sp.make_ray(-ray.Direction, wo_world, transmission);
@@ -313,7 +363,15 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
                     if (merian_render_nee_mode == NEE_MODE_RESAMPLED) {
                         mis_weight = segment.pdf / (lh.pdf + segment.pdf);
                     } else {
-                        segment.pdf += p_light * scene.direct_light_mixture_pdf(lh.pdf);
+                        const float light_pdf = p_light * scene.direct_light_mixture_pdf(lh.pdf);
+                        segment.pdf += light_pdf;
+                        if (record_waits) {
+                            rec.vertex(
+                                params.path_records, vertex.pos, wo_world, record_pdf + light_pdf,
+                                segment.pdf > 0.f ? record_f_cos / segment.pdf : float3(0),
+                                uint(bounce) - 1u, record_lobe, record_method, record_material);
+                            record_waits = false;
+                        }
                         // a light sample that reached something else is occluded
                         if (sampled_light != LIGHT_INVALID_INDEX && sampled_light != lh.index) {
                             segment.pdf = 0.f;
@@ -370,6 +428,12 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
                     break;
                 }
 
+                rec.vertex(params.path_records, sp.pos, chain_wo, chain_sample.value.pdf,
+                           throughput * chain_bsdf * chain_sample.value.weight, uint(bounce),
+                           path_record_pack_lobe(chain_sample.value.lobe) |
+                               (chain_transmission ? PATH_RECORD_LOBE_TRANSMISSION : 0u),
+                           PATH_RECORD_METHOD_BSDF, path_record_pack_material(sp.material_id));
+
                 chain_bsdf *= chain_sample.value.weight;
                 if (!chain_transmission) {
                     // the focal length of a mirror is half its radius, towards the side the ray is
@@ -411,20 +475,38 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
             throughput *= segment.weight;
             // the guiding learns what the direct light policy allows, the image always weighs
             radiance += throughput * segment.incident * direct_mis;
+            rec.emission(throughput * segment.incident * direct_mis);
             // the surfaces followed through are already in the radiance above
             throughput *= chain_bsdf;
+        }
+
+        if (merian_path_record && record_waits) {
+            RayDesc probe;
+            probe.Origin = offset_ray_origin(vertex.pos, ng, spawn_offset, wo_world);
+            probe.Direction = wo_world;
+            probe.TMin = SCENE_RAY_TMIN;
+            probe.TMax = SCENE_RAY_TMAX;
+            const Hit hit = scene.trace_ray(probe, RAY_FLAG_NONE, merian_render_instance_mask);
+            const LightHit lh = scene.get_light_hit(lights, probe.Origin, wo_world, hit);
+            const float light_pdf = p_light * scene.direct_light_mixture_pdf(lh.pdf);
+            const float mixed_pdf = segment.pdf + light_pdf;
+            rec.vertex(params.path_records, vertex.pos, wo_world, record_pdf + light_pdf,
+                       mixed_pdf > 0.f ? record_f_cos / mixed_pdf : float3(0), uint(bounce) - 1u,
+                       record_lobe, record_method, record_material);
         }
 
         // 4. what the guiding learns, and the estimate it completes the path with
         const float3 tail =
             params.guiding.record_segment(guiding_state, frame_info, guiding_record, segment, rng);
         radiance += throughput * tail;
+        rec.emission(throughput * tail);
 
         if (!next_ray.hasValue || !any(segment.weight > 0.f)) {
             break;
         }
     }
 
+    rec.end(params.path_records, sp.pos);
     return radiance;
 }
 
@@ -452,8 +534,13 @@ void render_pixel<Reorder : IThreadReorder>(const uint2 pixel,
     for (int s = 0; s < merian_render_spp; s++) {
         RandomGenerator rng = PCG(pcg4d16(uint4(pixel, scene.frame, s)) ^ merian_render_seed);
 
+        var rec = PathRecorder::begin(
+            params.path_records, pixel, uint(s), scene.frame,
+            uint(merian_render_max_path_length) *
+                    (merian_render_nee_mode == NEE_MODE_RESAMPLED ? 2u : 1u) +
+                1u);
         const float3 contrib = trace_path<Reorder>(scene, params, pixel, primary_ray, primary_sp,
-                                                   uint16_t(s), rng, scatter_stats) /
+                                                   uint16_t(s), rng, scatter_stats, rec) /
                                demod_albedo;
         if (!any(isnan(contrib)) && !any(isinf(contrib))) {
             irradiance += contrib;

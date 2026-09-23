@@ -26,6 +26,7 @@
 #include "merian-graph/nodes/imgui/imgui_node.hpp"
 #include "merian-graph/nodes/mean/mean.hpp"
 #include "merian-graph/nodes/median_approx/median.hpp"
+#include "merian-graph/nodes/path_debug/path_debug.hpp"
 #include "merian-graph/nodes/pbrt_scene/pbrt_scene_node.hpp"
 #include "merian-graph/nodes/reduce/reduce.hpp"
 #include "merian-graph/nodes/render_pt/render_pt.hpp"
@@ -97,6 +98,10 @@ NodeRegistry::NodeRegistry() {
         "Mean", "Computes the mean of an image and outputs it as a single buffer element.");
     register_node_type<MedianApproxNode>("Median (Approximation)",
                                          "Computes an approximation of the median of a component.");
+    register_node_type<PathDebugNode>(
+        "Path Debugger",
+        "Inspects the paths a renderer records: path overlay and inspector, directional sampling "
+        "maps against BSDF and recorded-pdf references, a scene heatmap and filtered re-renders.");
     register_node_type<Reduce>("Reduce", "Reduce values of multiple input images.");
     register_node_type<MCPGDistanceGuidingNode>(
         "Guiding (MCPG Distance)",

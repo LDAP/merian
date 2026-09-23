@@ -4,6 +4,7 @@
 #include "merian-shaders/types.slang.h"
 #include <vulkan/vulkan.hpp>
 #else
+import merian_shaders.debug.path_record;
 import merian_shaders.gbuffer;
 import merian_shaders.scene.scene;
 import merian_shaders.utils.encoding;
@@ -39,7 +40,16 @@ RESTIR_PT_UNSCOPED enum RestirPTPass : uint32_t {
     RestirPTPassSubpixelBackprojection = 8,
     // queues the one-pixel shifts of every previous reservoir into its eight neighbors
     RestirPTPassCoverageNeighbors = 9,
-    RestirPTPassCount = 10,
+    // replays every pixel's final path into the path record stream
+    RestirPTPassRecord = 10,
+    RestirPTPassCount = 11,
+};
+
+RESTIR_PT_UNSCOPED enum RestirPTRecord : uint32_t {
+    // the paths the initial pass traces, with their densities
+    RestirPTRecordCandidates = 0,
+    // the path each pixel shades, as resampling selected it
+    RestirPTRecordShaded = 1,
 };
 
 RESTIR_PT_UNSCOPED enum RestirPTPassFlags : uint32_t {

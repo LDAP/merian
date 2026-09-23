@@ -583,9 +583,9 @@ struct Scene {
         for (uint i = 0; i < pool + nee.cell_candidates(); i++) {
             if (let ls = nee.sample_light(vertex.bucket, vertex.pos, rng, material_system, env_map,
                                           time, i >= pool)) {
-                reservoir.add_light(
-                    ls, target.unshadowed(ls, rng),
-                    nee.pdf_lights(vertex.bucket, ls.index, ls.pdf) + target.scatter_pdf(ls), rng);
+                reservoir.add_light(ls, target.unshadowed(ls, rng),
+                                    nee.pdf_lights(vertex.bucket, ls.index, ls.pdf),
+                                    target.scatter_pdf(ls), rng);
             }
         }
         if (!reservoir.needs_shadow_ray()) {
@@ -595,6 +595,7 @@ struct Scene {
         s.value = reservoir.resolve();
         s.light_pos = reservoir.light_pos;
         s.light_index = reservoir.light_index;
+        s.realized_pdf = reservoir.realized_pdf();
         return s;
     }
 

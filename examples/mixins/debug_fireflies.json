@@ -1,0 +1,18 @@
+{
+    "nodes": {
+        "debug": {
+            "properties": {
+                "overlay": {
+                    "keep": "brightest fraction",
+                    "brightest fraction": 0.0001,
+                    "max paths": 64,
+                    "color": "luminance",
+                    "alpha": 0.9
+                },
+                "maps": {
+                    "show panels": false
+                }
+            }
+        }
+    }
+}

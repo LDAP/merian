@@ -306,9 +306,12 @@ struct ScatterSample {
     // density of the mixture at wo; for a delta lobe the probability of the strategy that
     // produced it, so that f_cos / pdf is the throughput factor either way
     float pdf;
+    // the density the draw realizes: pdf, or 1/W for a resampled one
+    float realized_pdf;
     // no other technique can generate this direction
     bool delta;
     bool guided;
+    BSDFLobe lobe;
 }
 
 // What a guiding method learns from a vertex that ended on a light.
@@ -365,6 +368,7 @@ struct ScatterMixture {
                                                                  inout RandomGenerator rng) {
         ScatterSample s;
         s.delta = false;
+        s.lobe = BSDFLobe::None;
         s.guided = p_guiding > 0.f && rng.next_float() < p_guiding;
 
         float3 wo_local;
@@ -378,11 +382,13 @@ struct ScatterMixture {
             }
             wo_local = bs.value.wo;
             s.wo = frame.to_world(wo_local);
+            s.lobe = bs.value.lobe;
             if (bsdf_lobe_is_delta(bs.value.lobe)) {
                 // a delta direction has no density under the guiding lobe, so all that is left of
                 // the mixture is the chance of having drawn from the BSDF at all
                 s.f_cos = bs.value.weight;
                 s.pdf = 1.f - p_guiding;
+                s.realized_pdf = s.pdf;
                 s.delta = true;
                 return s;
             }
@@ -390,6 +396,7 @@ struct ScatterMixture {
 
         s.f_cos = bsdf.eval(wi_local, wo_local, rng);
         s.pdf = pdf(bsdf, guiding, wi_local, wo_local, s.wo);
+        s.realized_pdf = s.pdf;
         return s;
     }
 
@@ -422,6 +429,7 @@ struct ScatterMixture {
         for (int i = 0; i < candidates; i++) {
             ScatterSample c;
             c.delta = false;
+            c.lobe = BSDFLobe::None;
             c.guided = rng.next_float() < p_guiding;
 
             float3 wo_local;
@@ -435,11 +443,13 @@ struct ScatterMixture {
                 }
                 wo_local = bs.value.wo;
                 c.wo = frame.to_world(wo_local);
+                c.lobe = bs.value.lobe;
                 if (bsdf_lobe_is_delta(bs.value.lobe)) {
                     // a delta direction has no density to resample against, so it leaves the pool
                     // the way the single draw takes it
                     c.f_cos = bs.value.weight;
                     c.pdf = 1.f - p_guiding;
+                    c.realized_pdf = c.pdf;
                     c.delta = true;
                     return c;
                 }
@@ -462,6 +472,7 @@ struct ScatterMixture {
         }
         selected.f_cos *= selected_pdf * weight_sum / (target * candidates);
         selected.pdf = selected_pdf;
+        selected.realized_pdf = target * candidates / weight_sum;
         return selected;
     }
 }

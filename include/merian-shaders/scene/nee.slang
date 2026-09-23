@@ -483,6 +483,8 @@ struct NEE {
 struct DirectLightReservoir {
     float weight_sum;
     float3 value;
+    // the winner's p_light / (p_light + p_scatter)
+    float light_share;
     float3 light_pos;
     // LIGHT_INVALID_INDEX while the continuation leads (no shadow ray)
     uint light_index;
@@ -490,19 +492,22 @@ struct DirectLightReservoir {
     __init() {
         weight_sum = 0.f;
         value = float3(0);
+        light_share = 0.f;
         light_index = LIGHT_INVALID_INDEX;
     }
 
     [mutating] void add_light(const LightSample ls,
                               const float3 candidate_value,
-                              const float pdf_denominator,
+                              const float light_pdf,
+                              const float scatter_pdf,
                               inout RandomGenerator rng) {
-        const float weight = yuv_luminance(candidate_value) / pdf_denominator;
+        const float weight = yuv_luminance(candidate_value) / (light_pdf + scatter_pdf);
         if (!(weight > 0.f))
             return;
         weight_sum += weight;
         if (rng.next_float() * weight_sum < weight) {
             value = candidate_value;
+            light_share = light_pdf / (light_pdf + scatter_pdf);
             light_pos = ls.pos;
             light_index = ls.index;
         }
@@ -516,6 +521,12 @@ struct DirectLightReservoir {
     float3 resolve() {
         const float target = yuv_luminance(value);
         return target > 0.f ? value * (weight_sum / target) : float3(0);
+    }
+
+    // 1/W for the target the weights select by, the unshadowed value times the light share
+    // (Lin et al. 2022, GRIS)
+    float realized_pdf() {
+        return weight_sum > 0.f ? yuv_luminance(value) * light_share / weight_sum : 0.f;
     }
 }
 
@@ -531,6 +542,8 @@ struct DirectLightSample {
     float3 value;
     float3 light_pos;
     uint light_index;
+    // 1/W of the resampling
+    float realized_pdf;
 
     bool needs_shadow_ray() {
         return light_index != LIGHT_INVALID_INDEX;

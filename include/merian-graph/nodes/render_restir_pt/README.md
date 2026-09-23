@@ -82,6 +82,12 @@ moved into the previous frame on that frame's vertex positions and transforms. R
 frame are traced in the current scene, so the reuse stays biased where the visibility of an emitter
 changes between frames, such as around animated flames.
 
+## Path debugger
+
+Connected to the Path Debugger, `debugger records` writes either the `candidates` of the initial
+pass, with their per-vertex densities and light samples, or the `shaded paths`: the path each
+pixel shades, replayed in its own domain.
+
 ## Not supported
 
 The depth-of-field reconnection shift, a previous-frame acceleration structure, reservoir

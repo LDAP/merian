@@ -22,6 +22,7 @@ DeviceSupportInfo RenderPT::query_device_support(const DeviceSupportQueryInfo& q
         "import \"merian-shaders/sampling/guiding.slang\";\n"
         "public typealias RenderGuiding = merian::NullGuidingModel;\n"
         "public typealias RenderDistanceGuiding = merian::NullDistanceGuidingModel;");
+    path_records.add_constants(composition);
     composition->add_module_from_path("merian-graph/nodes/render_pt/render_pt.slang", true);
     composition->add_module_from_path("merian-graph/nodes/render_pt/render_pt_volume.slang", true);
     const auto program = SlangProgram::create(query_info.compile_context, composition);
@@ -106,7 +107,9 @@ std::vector<OutputConnectorDescriptor> RenderPT::describe_outputs(const NodeIOLa
             {.name = "volume_mv",
              .connector = con_volume_mv,
              .access = ConnectorAccess::compute_read_write,
-             .disabled = no_volume}};
+             .disabled = no_volume},
+            path_records.describe_output(context, extent, static_cast<uint32_t>(spp),
+                                         recorded_vertices_per_path())};
 }
 
 RenderPT::NodeStatusFlags RenderPT::on_connected(const NodeIOLayout& io_layout,
@@ -116,6 +119,10 @@ RenderPT::NodeStatusFlags RenderPT::on_connected(const NodeIOLayout& io_layout,
 
     // force the program graph to be rewired next process()
     composition = nullptr;
+
+    if (path_records.update_connected(io_layout)) {
+        return NEEDS_RECONNECT;
+    }
 
     io_layout.register_event_listener(
         "/graph/reload_shaders", [this](const GraphEvent::Info&, const GraphEvent::Data& force) {
@@ -249,6 +256,7 @@ RenderPT::process(const NodeIO& io, const NodeProcessInfo& info, Submission& sub
     if (io.is_connected(con_guiding)) {
         cursor["guiding"] = io[con_guiding].r();
     }
+    path_records.process(cmd, io, info.get_iteration(), cursor.find("path_records"));
 
     cmd->bind(pipe);
     ep->bind("scene", scene->get_shader_object(), cmd, pipe, obj_allocator);
@@ -372,6 +380,7 @@ void RenderPT::update_render_constants() {
         guiding_alpha_threshold, guiding_direct_target, guiding_distance_share);
     SPDLOG_INFO("render_pt constants:\n{}", constants);
     composition->add_module_from_string("render_pt_constants", constants);
+    path_records.add_constants(composition);
 }
 
 RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
@@ -542,6 +551,9 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
         config.st_end_child();
     }
 
+    needs_reconnect |=
+        path_records.properties(config, static_cast<uint32_t>(spp), recorded_vertices_per_path());
+
     if (constants_changed && composition) {
         update_render_constants();
     }
@@ -550,6 +562,11 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
         return NEEDS_RECONNECT;
     }
     return {};
+}
+
+uint32_t RenderPT::recorded_vertices_per_path() const {
+    const auto length = static_cast<uint32_t>(max_path_length);
+    return (nee_mode == 2 ? 2 * length : length) + 1;
 }
 
 } // namespace merian

@@ -101,6 +101,7 @@ RenderRestirPT::RenderRestirPT() = default;
 DeviceSupportInfo RenderRestirPT::query_device_support(const DeviceSupportQueryInfo& query_info) {
     const auto composition = Scene::query_device_support_composition(query_info);
     composition->add_composition(GBufferLayout::complete()->get_composition());
+    path_records.add_constants(composition);
     composition->add_module_from_path(SHADER_MODULE, true);
     const auto program = SlangProgram::create(query_info.compile_context, composition);
     return DeviceSupportInfo::check(query_info, {"rayTracingPipeline"}, {"rayQuery"}) &
@@ -155,6 +156,7 @@ void RenderRestirPT::update_render_constants() {
                     "export static const bool merian_restir_pt_specular_motion = {};\n"
                     "export static const float merian_restir_pt_specular_motion_roughness = {:f};\n"
                     "export static const uint merian_restir_pt_debug_view = {}u;\n"
+                    "export static const uint merian_restir_pt_record = {}u;\n"
                     "}}",
                     spp, max_path_length, b(russian_roulette), shift_mapping,
                     b(emission_on_primary), b(area), mask, min_footprint / 100.f, footprint_jitter,
@@ -163,7 +165,17 @@ void RenderRestirPT::update_render_constants() {
                     reject_depth, b(demodulate_albedo), b(stochastic_backprojection),
                     b(disocclusion_motion), b(duplication_cap), b(decoupled_shading),
                     b(dynamic_scene), temporal_mode, b(specular_motion), specular_motion_roughness,
-                    debug_view));
+                    debug_view, record_mode));
+    path_records.add_constants(composition);
+}
+
+uint32_t RenderRestirPT::recorded_paths_per_pixel() const {
+    return record_mode == RestirPTRecordShaded ? 1 : static_cast<uint32_t>(std::max(spp, 1));
+}
+
+uint32_t RenderRestirPT::recorded_vertices_per_path() const {
+    const auto length = static_cast<uint32_t>(std::max(max_path_length, 1));
+    return record_mode == RestirPTRecordShaded ? length + 2 : (2 * length) + 1;
 }
 
 std::vector<InputConnectorDescriptor> RenderRestirPT::describe_inputs() {
@@ -204,7 +216,9 @@ RenderRestirPT::describe_outputs(const NodeIOLayout& io_layout) {
              .access = ConnectorAccess::compute_read_write},
             {.name = "reservoirs",
              .connector = con_reservoirs,
-             .access = ConnectorAccess::compute_read_write}};
+             .access = ConnectorAccess::compute_read_write},
+            path_records.describe_output(context, extent, recorded_paths_per_pixel(),
+                                         recorded_vertices_per_path())};
 }
 
 RenderRestirPT::NodeStatusFlags
@@ -213,6 +227,9 @@ RenderRestirPT::on_connected(const NodeIOLayout& io_layout,
                              [[maybe_unused]] const NodeConnectionInfo& info,
                              Submission& submission) {
     composition = nullptr;
+    if (path_records.update_connected(io_layout)) {
+        return NEEDS_RECONNECT;
+    }
 
     io_layout.register_event_listener(
         "/graph/reload_shaders", [this](const GraphEvent::Info&, const GraphEvent::Data& force) {
@@ -361,6 +378,7 @@ RenderRestirPT::process(const NodeIO& io, const NodeProcessInfo& info, Submissio
     }
 
     ensure_pipeline(scene);
+    path_records.process(cmd, io, info.get_iteration(), {});
     if (pairing_dirty) {
         upload_pairing(submission);
     }
@@ -425,6 +443,7 @@ RenderRestirPT::process(const NodeIO& io, const NodeProcessInfo& info, Submissio
         cursor["prev_gbuffer"] = io[con_prev_gbuffer].r();
         cursor["irradiance"] = io[con_irradiance].get_texture();
         cursor["queue"] = queue;
+        path_records.bind(io, cursor.find("path_records"));
     }
 
     const auto run = [&](const Pass p, const BufferHandle& in, const BufferHandle& target,
@@ -515,6 +534,12 @@ RenderRestirPT::process(const NodeIO& io, const NodeProcessInfo& info, Submissio
         const BufferHandle target = next_target();
         run(Spatial, current, target, write == writes ? RestirPTPassResolves : 0u);
         current = target;
+        sync();
+    }
+
+    if (path_records.connected() && record_mode == RestirPTRecordShaded) {
+        MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "record");
+        run(Record, current, nullptr, 0u);
         sync();
     }
 
@@ -720,6 +745,16 @@ RenderRestirPT::NodeStatusFlags RenderRestirPT::properties(Properties& config) {
             "ray tracing pipeline", use_raygen,
             "Trace the candidates from a raygen shader instead of a compute shader.");
         config.st_end_child();
+    }
+
+    needs_reconnect |=
+        path_records.properties(config, recorded_paths_per_pixel(), recorded_vertices_per_path());
+    if (config.config_options("debugger records", record_mode, {"candidates", "shaded paths"},
+                              Properties::OptionsStyle::COMBO,
+                              "'candidates' are the paths the initial pass traces, with their "
+                              "densities. 'shaded paths' replays the path each pixel shades.")) {
+        constants_changed = true;
+        needs_reconnect = true;
     }
 
     if (constants_changed && composition) {

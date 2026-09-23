@@ -1,0 +1,45 @@
+// Include after common.slangh; needs merian_shaders.utils.dir_map.
+#pragma once
+
+bool path_debug_maps_hold(const uint seen) {
+    return (stats[PATH_DEBUG_STATS_SEEN] & seen) != 0;
+}
+
+// light draws cover only the light, so a bin next to an empty one straddles the support's edge
+bool path_debug_support_interior(const uint2 cell) {
+    if (!path_debug_maps_hold(PATH_DEBUG_SEEN_CONNECTION)) {
+        return true;
+    }
+    for (int dy = -1; dy <= 1; dy++) {
+        for (int dx = -1; dx <= 1; dx++) {
+            const int2 n = int2(cell) + int2(dx, dy);
+            if (any(n < 0) || any(n >= int(params.map_res))) {
+                continue;
+            }
+            if (dir_map_bin_solid_angle(params.map_transform, uint2(n), params.map_res) > 0.f &&
+                maps[path_debug_map_count_at(n.y * params.map_res + n.x)] == 0) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+// Variance of a bin's residual against its reference: `independent` for independent draws, batch
+// means once reused draws are correlated; negative while too few batches completed.
+float path_debug_residual_variance(const uint bin,
+                                   const bool recorded,
+                                   const float independent,
+                                   const bool batch_end) {
+    if (!path_debug_maps_hold(PATH_DEBUG_SEEN_REUSED)) {
+        return independent;
+    }
+    if (stats[PATH_DEBUG_STATS_BATCHES] + (batch_end ? 1 : 0) < PATH_DEBUG_MIN_BATCHES) {
+        return -1.f;
+    }
+    const uint total = stats[recorded ? PATH_DEBUG_STATS_DRAWS : PATH_DEBUG_STATS_SAMPLES];
+    const uint covered =
+        batch_end ? total
+                  : stats[recorded ? PATH_DEBUG_STATS_BATCH_DRAWS : PATH_DEBUG_STATS_BATCH_SAMPLES];
+    return asfloat(maps[path_debug_map_residual2_at(bin)]) * float(total) / float(max(covered, 1u));
+}

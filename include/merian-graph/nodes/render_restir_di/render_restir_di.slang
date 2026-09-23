@@ -239,7 +239,25 @@ void shade(ParameterBlock<Scene> scene, ParameterBlock<RestirBinding> params) {
     const RestirSurface surface = restir_surface(scene, params.gbuffer, pixel, dim);
     const RestirReservoir reservoir = pc.reservoirs_in[restir_index(pixel, dim)];
 
+    if (!surface.valid && !merian_render_emission_on_primary) {
+        params.irradiance[pixel] = float4(0);
+        return;
+    }
+
     float3 irradiance = float3(0);
+    var rec = PathRecorder::begin(params.path_records, pixel, 0, scene.frame, 2);
+    float3 end_pos = surface.valid ? surface.sp.pos : float3(0);
+
+    if (merian_render_emission_on_primary) {
+        const RayDesc ray = scene.generate_camera_ray(pixel, dim);
+        const ShadingPoint primary = scene.get_shading_point(ray, params.gbuffer.get_hit(pixel));
+        irradiance += primary.emission;
+        rec.emission(primary.emission);
+        end_pos = primary.pos;
+    }
+    rec.terminal(params.path_records, end_pos);
+    const uint reuse = reservoir.confidence > 1.f ? PATH_RECORD_FLAG_REUSED : 0u;
+
     if (surface.valid && surface.sp.has_surface_material && restir_sample_valid(reservoir.y) &&
         isfinite(reservoir.get_ucw())) {
         const float3 to_light = reservoir.y.pos - surface.sp.pos;
@@ -252,22 +270,28 @@ void shade(ParameterBlock<Scene> scene, ParameterBlock<RestirBinding> params) {
         const bool visible = !merian_restir_visibility_shade ||
                              restir_trace_visibility(scene, surface, reservoir.y);
 
+        const float geo = (reservoir.y.flags & RestirSampleFlags::RestirSampleDistant) != 0
+                              ? 1.0f
+                              : max(dot(reservoir.y.normal, -wo), 0.0f) / dist2;
+        float3 f_cos = float3(0);
         if (wo_local.z > 0 && wi_local.z > 0 && visible) {
             RandomGenerator rng = restir_rng(pixel);
-            const float3 f_cos =
-                surface.sp.surface_material.get_bsdf().eval(wi_local, wo_local, rng);
-            const float geo = (reservoir.y.flags & RestirSampleFlags::RestirSampleDistant) != 0
-                                  ? 1.0f
-                                  : max(dot(reservoir.y.normal, -wo), 0.0f) / dist2;
-            irradiance = f_cos * reservoir.y.radiance * reservoir.get_ucw() * geo;
+            f_cos = surface.sp.surface_material.get_bsdf().eval(wi_local, wo_local, rng);
         }
-    }
+        const float3 direct = f_cos * reservoir.y.radiance * reservoir.get_ucw() * geo;
+        irradiance += direct;
 
-    if (merian_render_emission_on_primary) {
-        const RayDesc ray = scene.generate_camera_ray(pixel, dim);
-        const ShadingPoint primary = scene.get_shading_point(ray, params.gbuffer.get_hit(pixel));
-        irradiance += primary.emission;
+        const float weight = reservoir.get_ucw() * geo;
+        rec.connection(params.path_records, surface.sp.pos, reservoir.y.pos,
+                       weight > 0.f ? 1.f / weight : 0.f, f_cos * weight, direct, 0,
+                       PATH_RECORD_METHOD_RESTIR, path_record_pack_material(surface.sp.material_id),
+                       reuse);
+    } else if (surface.valid && surface.sp.has_surface_material) {
+        rec.connection(params.path_records, surface.sp.pos, surface.sp.pos, 0.f, float3(0.f),
+                       float3(0.f), 0, PATH_RECORD_METHOD_RESTIR,
+                       path_record_pack_material(surface.sp.material_id), reuse);
     }
+    rec.finish(params.path_records);
 
     if (merian_render_demodulate_albedo) {
         irradiance /= params.gbuffer.get_demodulation_albedo(pixel);
