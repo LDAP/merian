@@ -16,6 +16,7 @@
 
 #include <array>
 #include <deque>
+#include <fstream>
 #include <mutex>
 #include <optional>
 
@@ -25,10 +26,11 @@ enum class ErrorMetric : uint32_t {
     MSE,
     RMSE,
     MAE,
+    RelMSE,
 };
 
-static constexpr std::array<ErrorMetric, 3> ERROR_METRIC_VALUES = {
-    ErrorMetric::MSE, ErrorMetric::RMSE, ErrorMetric::MAE};
+static constexpr std::array<ErrorMetric, 4> ERROR_METRIC_VALUES = {
+    ErrorMetric::MSE, ErrorMetric::RMSE, ErrorMetric::MAE, ErrorMetric::RelMSE};
 
 template <> inline uint32_t enum_size<ErrorMetric>() {
     return ERROR_METRIC_VALUES.size();
@@ -44,6 +46,8 @@ template <> inline std::string enum_to_string<ErrorMetric>(const ErrorMetric val
         return "RMSE";
     case ErrorMetric::MAE:
         return "MAE";
+    case ErrorMetric::RelMSE:
+        return "relative MSE";
     }
     return "unknown";
 }
@@ -65,6 +69,8 @@ class ErrorPlot : public Node {
         int32_t count;
 
         uint32_t squared;
+        uint32_t relative;
+        float epsilon;
     };
 
   public:
@@ -94,6 +100,26 @@ class ErrorPlot : public Node {
   private:
     // Per-channel error of the latest reduction, already converted for the selected metric.
     float4 metric_error() const;
+    // The reference is another node's output, an image on disk, or a snapshot of the input.
+    void load_reference(const NodeIO& io, Submission& submission);
+    void take_snapshot(const NodeIO& io, Submission& submission);
+    void reset_history();
+    void record_output(const NodeIO& io, const NodeProcessInfo& info, Submission& submission);
+
+    std::string reference_path;
+    bool reference_dirty = false;
+    bool reference_owned = false; // a file or snapshot stands in for the connected image
+    bool reference_is_snapshot = false;
+    bool snapshot_requested = false;
+    TextureHandle reference_texture;
+    // measurements dispatched since the last reset
+    uint32_t submitted = 0;
+    // bumped on reset so readbacks against the previous reference are dropped
+    uint32_t generation = 0;
+    // floor under the reference's magnitude, below which a black pixel cannot dominate relMSE
+    float relative_epsilon = 1e-2f;
+    std::string csv_path;
+    std::ofstream csv_stream;
 
     void draw_overlay(uint32_t width, uint32_t height) const;
 
@@ -125,9 +151,13 @@ class ErrorPlot : public Node {
     // sync_to_cpu callback has run
     std::vector<BufferHandle> readback_buffers;
 
+    struct Readback {
+        uint32_t generation;
+        uint32_t sample;
+        float4 sum; // raw per-channel mean error
+    };
     std::mutex result_mutex;
-    float4 latest_sum{}; // raw per-channel mean error, written by the readback callback
-    bool latest_valid = false;
+    std::vector<Readback> readbacks;
 
     // graph-thread copy of the latest readback, safe to read without locking
     float4 current_sum{};

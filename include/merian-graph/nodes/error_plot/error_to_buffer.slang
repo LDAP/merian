@@ -11,11 +11,16 @@ groupshared float4[workgroup_size_x * workgroup_size_y] subgroup_sums;
 [shader("compute")]
 void main(int2 ipos: SV_DispatchThreadID, uint local_index: SV_GroupIndex, uint2 group_id: SV_GroupID) {
     float4 v;
-    if (!is_on_texture(ipos, in_reference) || !is_on_texture(ipos, in_input)) {
+    if (!is_on_texture(ipos, ref_image) || !is_on_texture(ipos, in_input)) {
         v = float4(0);
     } else {
-        const float4 d = in_reference[ipos] - in_input[ipos];
-        v = (params.squared == 1 ? d * d : abs(d)) / params.divisor;
+        const float4 reference = ref_image[ipos];
+        const float4 d = reference - in_input[ipos];
+        float4 e = params.squared == 1 ? d * d : abs(d);
+        if (params.relative == 1) {
+            e /= reference * reference + params.epsilon;
+        }
+        v = e / params.divisor;
     }
 
     v = WaveActiveSum(v);
@@ -35,7 +40,8 @@ void main(int2 ipos: SV_DispatchThreadID, uint local_index: SV_GroupIndex, uint2
             sum += subgroup_sums[i];
         }
 
-        const int2 tex_size = texture_dimensions(in_reference);
+        // sized and dispatched from the input; a file reference need not share its size
+        const int2 tex_size = texture_dimensions(in_input);
         const uint num_groups_y = (tex_size.y + workgroup_size_y - 1) / workgroup_size_y;
         out_error[group_id.y + num_groups_y * group_id.x] = sum;
     }

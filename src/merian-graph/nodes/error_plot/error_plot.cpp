@@ -2,6 +2,7 @@
 
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 #include "merian/vk/utils/blits.hpp"
+#include "merian/vk/utils/image_export.hpp"
 
 #include "merian-graph/graph/errors.hpp"
 
@@ -57,22 +58,25 @@ void ErrorPlot::initialize(const ContextHandle& context, const ResourceAllocator
     imgui_ctx = std::make_shared<ImGuiContext>();
     imgui_renderer = std::make_shared<ImGuiRenderer>(context, allocator, imgui_ctx);
     imgui_backend = std::make_shared<ImGuiMerianBackend>(imgui_ctx);
-    ImGui::SetCurrentContext(prev_imgui_ctx);
+    ImGuiContext::set_current(prev_imgui_ctx);
 }
 
 std::vector<InputConnectorDescriptor> ErrorPlot::describe_inputs() {
-    return {
-        {"reference", con_reference, ConnectorAccess::compute_read | ConnectorAccess::transfer_src},
-        {"input", con_input, ConnectorAccess::compute_read | ConnectorAccess::transfer_src}};
+    return {{"reference", con_reference,
+             ConnectorAccess::compute_read | ConnectorAccess::transfer_src, 0, true},
+            {"input", con_input, ConnectorAccess::compute_read | ConnectorAccess::transfer_src}};
 }
 
 std::vector<OutputConnectorDescriptor> ErrorPlot::describe_outputs(const NodeIOLayout& io_layout) {
-    const vk::ImageCreateInfo reference_info = io_layout[con_reference]->get_create_info_or_throw();
     const vk::ImageCreateInfo input_info = io_layout[con_input]->get_create_info_or_throw();
-    if (reference_info.extent != input_info.extent) {
-        throw graph_errors::node_error{"reference and input image extents mismatch"};
+    if (io_layout.is_connected(con_reference)) {
+        const vk::ImageCreateInfo reference_info =
+            io_layout[con_reference]->get_create_info_or_throw();
+        if (reference_info.extent != input_info.extent) {
+            throw graph_errors::node_error{"reference and input image extents mismatch"};
+        }
     }
-    const vk::Extent3D extent = reference_info.extent;
+    const vk::Extent3D extent = input_info.extent;
 
     const auto group_count_x = (extent.width + local_size_x - 1) / local_size_x;
     const auto group_count_y = (extent.height + local_size_y - 1) / local_size_y;
@@ -86,7 +90,7 @@ std::vector<OutputConnectorDescriptor> ErrorPlot::describe_outputs(const NodeIOL
     const vk::ImageCreateInfo out_info{
         {},
         vk::ImageType::e2D,
-        reference_info.format,
+        input_info.format,
         extent,
         1,
         1,
@@ -132,31 +136,61 @@ ErrorPlot::NodeStatusFlags ErrorPlot::on_connected(const NodeIOLayout& io_layout
 [[nodiscard]] ErrorPlot::NodeStatusFlags
 ErrorPlot::process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) {
     const CommandBufferHandle& cmd = submission.get_cmd();
+    load_reference(io, submission);
+    if (snapshot_requested) {
+        snapshot_requested = false;
+        take_snapshot(io, submission);
+    }
+    if (!reference_texture && !io.is_connected(con_reference)) {
+        record_output(io, info, submission); // nothing to compare against yet, still pass through
+        return {};
+    }
 
-    // 1. pull the latest async readback into the plot history (graph thread only)
-    bool new_sample = false;
+    // 1. pull the finished async readbacks into the plot history (graph thread only)
+    std::vector<Readback> finished;
     {
         const std::scoped_lock lock(result_mutex);
-        if (latest_valid) {
-            current_sum = latest_sum;
-            latest_valid = false;
-            new_sample = true;
-        }
+        finished.swap(readbacks);
     }
-    if (new_sample) {
+    for (const Readback& readback : finished) {
+        if (readback.generation != generation) {
+            continue;
+        }
+        current_sum = readback.sum;
         const float4 e = metric_error();
-        history.push_back((e.x + e.y + e.z) / 3.0f);
+        const float value = (e.x + e.y + e.z) / 3.0f;
+        history.push_back(value);
         while (history.size() > history_size) {
             history.pop_front();
         }
+        if (!csv_path.empty()) {
+            if (!csv_stream.is_open()) {
+                csv_stream.open(csv_path, std::ios::trunc);
+                csv_stream << "samples,error\n";
+            }
+            csv_stream << readback.sample << ',' << value << '\n';
+        }
     }
 
-    const vk::Extent3D extent = io[con_reference]->get_extent();
+    const vk::Extent3D extent = io[con_input]->get_extent();
     const auto group_count_x = (extent.width + local_size_x - 1) / local_size_x;
     const auto group_count_y = (extent.height + local_size_y - 1) / local_size_y;
 
+    {
+        auto cursor = error_to_buffer_kernel->globals_cursor();
+        if (auto c = cursor.find("ref_image"); c.is_valid()) {
+            if (reference_texture) {
+                c = reference_texture;
+            } else {
+                c = io[con_reference].get_texture(0);
+            }
+        }
+    }
+
     pc.divisor = extent.width * extent.height;
     pc.squared = metric == ErrorMetric::MAE ? 0u : 1u;
+    pc.relative = metric == ErrorMetric::RelMSE ? 1u : 0u;
+    pc.epsilon = relative_epsilon;
 
     // 2. per-pixel error into the reduction buffer
     {
@@ -195,16 +229,28 @@ ErrorPlot::process(const NodeIO& io, const NodeProcessInfo& info, Submission& su
                  io[con_error]->buffer_barrier(vk::AccessFlagBits::eShaderWrite,
                                                vk::AccessFlagBits::eTransferRead));
     cmd->copy(static_cast<const BufferHandle&>(io[con_error]), readback);
-    submission.sync_to_cpu([this, readback]() {
+    submission.sync_to_cpu([this, readback, generation = generation, sample = ++submitted]() {
         const float4 value = *readback->get_memory()->map_as<float4>();
         readback->get_memory()->unmap();
         const std::scoped_lock lock(result_mutex);
-        latest_sum = value;
-        latest_valid = true;
+        readbacks.push_back({generation, sample, value});
     });
 
-    // 5. split view: input fills the output, reference overwrites the left half
-    const ImageHandle reference_img = io[con_reference];
+    record_output(io, info, submission);
+    return {};
+}
+
+void ErrorPlot::record_output(const NodeIO& io,
+                              const NodeProcessInfo& info,
+                              Submission& submission) {
+    const CommandBufferHandle& cmd = submission.get_cmd();
+
+    // 5. split view: input fills the output, the reference the metric uses overwrites the left
+    // half
+    const ImageHandle reference_img = reference_texture ? reference_texture->get_image()
+                                      : io.is_connected(con_reference)
+                                          ? io[con_reference].get_image()
+                                          : io[con_input].get_image();
     const ImageHandle input_img = io[con_input];
     const ImageHandle out_img = io[con_out];
     {
@@ -239,7 +285,74 @@ ErrorPlot::process(const NodeIO& io, const NodeProcessInfo& info, Submission& su
         imgui_ctx->with_context([&] { draw_overlay(out_extent.width, out_extent.height); });
         imgui_renderer->render(cmd, io[con_out].get_texture(0)->get_view());
     }
-    return {};
+}
+
+void ErrorPlot::reset_history() {
+    history.clear();
+    submitted = 0;
+    generation++;
+    csv_stream.close();
+}
+
+void ErrorPlot::load_reference(const NodeIO& io, Submission& submission) {
+    if (!reference_dirty) {
+        return;
+    }
+    reference_dirty = false;
+    reference_owned = false;
+    reference_is_snapshot = false;
+
+    reference_texture = reference_path.empty()
+                            ? nullptr
+                            : image_load_texture(allocator, submission, reference_path,
+                                                 vk::ImageUsageFlagBits::eTransferSrc);
+    if (!reference_texture) {
+        return;
+    }
+    const vk::Extent3D reference_extent = reference_texture->get_image()->get_extent();
+    const vk::Extent3D input_extent = io[con_input]->get_extent();
+    if (reference_extent != input_extent) {
+        SPDLOG_ERROR("error plot: reference {} is {}x{}, the input {}x{}", reference_path,
+                     reference_extent.width, reference_extent.height, input_extent.width,
+                     input_extent.height);
+        reference_texture = nullptr;
+        return;
+    }
+    reference_owned = true;
+    reset_history();
+}
+
+void ErrorPlot::take_snapshot(const NodeIO& io, Submission& submission) {
+    const CommandBufferHandle& cmd = submission.get_cmd();
+    const ImageHandle source = io[con_input].get_image();
+    const vk::ImageCreateInfo info{
+        {},
+        vk::ImageType::e2D,
+        source->get_format(),
+        source->get_extent(),
+        1,
+        1,
+        vk::SampleCountFlagBits::e1,
+        vk::ImageTiling::eOptimal,
+        vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst |
+            vk::ImageUsageFlagBits::eTransferSrc,
+        vk::SharingMode::eExclusive,
+        {},
+        {},
+        vk::ImageLayout::eUndefined,
+    };
+    const ImageHandle image =
+        allocator->create_image(info, MemoryMappingType::NONE, "error_plot snapshot");
+
+    cmd->barrier(image->barrier2(vk::ImageLayout::eTransferDstOptimal, true));
+    cmd_blit_stretch(cmd, source, source->get_current_layout(), source->get_extent(), image,
+                     vk::ImageLayout::eTransferDstOptimal, image->get_extent());
+    cmd->barrier(image->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal));
+    reference_texture = allocator->create_texture(image, "error_plot reference");
+    reference_owned = true;
+    reference_is_snapshot = true;
+    reference_path.clear();
+    reset_history();
 }
 
 float4 ErrorPlot::metric_error() const {
@@ -335,7 +448,31 @@ ErrorPlot::NodeStatusFlags ErrorPlot::properties(Properties& config) {
         }
     }
     if (config.config_bool("Reset history")) {
-        history.clear();
+        reset_history();
+    }
+    if (metric == ErrorMetric::RelMSE) {
+        config.config_float("Relative floor", relative_epsilon,
+                            "Added to the reference's square before dividing. Pixels that are "
+                            "legitimately black would otherwise dominate.",
+                            0.001f);
+    }
+
+    config.st_separate("Reference");
+    config.output_text(reference_is_snapshot ? "snapshot of this session"
+                       : reference_owned     ? "loaded from file"
+                                             : "the connected input");
+    if (config.config_text("Reference image", reference_path, true,
+                           "Any format the image loader reads. Empty falls back to the "
+                           "connected reference.")) {
+        reference_dirty = true;
+    }
+    if (config.config_bool("Snapshot the input",
+                           "Freezes the current input as the reference and restarts the plot.")) {
+        snapshot_requested = true;
+    }
+    if (config.config_text("Convergence csv", csv_path, false,
+                           "Appends samples,error once per sample while set.")) {
+        csv_stream.close();
     }
 
     config.st_separate("Axes");
