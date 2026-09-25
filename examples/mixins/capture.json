@@ -1,0 +1,59 @@
+{
+    "cli": {
+        "capture-file": {
+            "pointer": "/nodes/capture/properties/filename"
+        },
+        "capture-iteration": {
+            "pointer": "/nodes/capture/properties/iteration"
+        },
+        "capture-power": {
+            "pointer": "/nodes/capture/properties/iteration power"
+        },
+        "capture-start": {
+            "pointer": "/nodes/capture/properties/advanced/start at run"
+        },
+        "capture-quit": {
+            "pointer": "/nodes/capture/properties/advanced/exit at iteration"
+        },
+        "capture-format": {
+            "pointer": "/nodes/capture/properties/format"
+        }
+    },
+    "graph_properties": {
+        "fps limiter": false
+    },
+    "nodes": {
+        "accumulate": {
+            "$+$outputs": [
+                "out->capture.src"
+            ],
+            "properties": {
+                "events": {
+                    "clear": "/user/clear,//geometry_changed,//transform_changed,//camera_changed,//bounces_changed,/capture/start"
+                }
+            }
+        },
+        "capture": {
+            "enabled": true,
+            "type": "Image Write",
+            "properties": {
+                "trigger": "iteration",
+                "format": "PFM",
+                "filename": "capture/{record_iteration:05}",
+                "iteration": 1,
+                "iteration offset": 0,
+                "iteration power": 2,
+                "advanced": {
+                    "embed metadata": false,
+                    "exit at iteration": 4096,
+                    "start at run": 1
+                }
+            }
+        },
+        "output": {
+            "properties": {
+                "acquire timeout": 5000000000
+            }
+        }
+    }
+}
