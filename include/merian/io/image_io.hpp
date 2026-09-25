@@ -4,6 +4,9 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace merian {
 
@@ -29,15 +32,17 @@ struct ImageInfo {
 // Load as 8-bit per channel. Any file format; HDR/PFM source values are tonemapped by the
 // loader. desired_channels = 0 keeps the source channel count, 1..4 forces conversion.
 // Throws std::runtime_error on failure.
-BlobHandle image_load_u8(const std::filesystem::path& path,
-                         ImageInfo& info,
-                         int desired_channels = 4);
+BlobHandle
+image_load_u8(const std::filesystem::path& path, ImageInfo& info, int desired_channels = 4);
 
 // Load as 32-bit float per channel. Any file format; LDR source values are mapped to [0, 1].
 // Throws std::runtime_error on failure.
-BlobHandle image_load_f32(const std::filesystem::path& path,
-                          ImageInfo& info,
-                          int desired_channels = 4);
+BlobHandle
+image_load_f32(const std::filesystem::path& path, ImageInfo& info, int desired_channels = 4);
+
+// Key/value pairs embedded into the file where the format has a metadata slot: PNG tEXt chunks,
+// JPG COM markers, HDR header variables. BMP/TGA/PFM drop them.
+using ImageMetadata = std::vector<std::pair<std::string, std::string>>;
 
 // Write 8-bit-per-channel data. format=AUTO infers from path. Must be PNG/JPG/BMP/TGA.
 // Throws std::runtime_error on failure.
@@ -46,7 +51,8 @@ void image_save_u8(const std::filesystem::path& path,
                    int width,
                    int height,
                    int channels,
-                   ImageFormat format = ImageFormat::AUTO);
+                   ImageFormat format = ImageFormat::AUTO,
+                   const ImageMetadata& metadata = {});
 
 // Write 32-bit-float-per-channel data. format=AUTO infers from path. Must be HDR/PFM.
 // Neither format stores alpha, a 4-channel source is written as RGB.
@@ -56,9 +62,13 @@ void image_save_f32(const std::filesystem::path& path,
                     int width,
                     int height,
                     int channels,
-                    ImageFormat format = ImageFormat::AUTO);
+                    ImageFormat format = ImageFormat::AUTO,
+                    const ImageMetadata& metadata = {});
 
 // Infer ImageFormat from a file extension (case-insensitive). Returns AUTO for unknown.
 ImageFormat image_format_from_extension(const std::filesystem::path& path) noexcept;
+
+// The file extension a format is written with, including the dot; "" for AUTO.
+const char* image_format_extension(ImageFormat format) noexcept;
 
 } // namespace merian

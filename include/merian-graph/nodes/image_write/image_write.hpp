@@ -92,6 +92,8 @@ class ImageWrite : public Node, public TimeProvider {
 
     bool start_stop_record = false;
     int format = 0;
+    bool keep_alpha = false;
+    bool embed_metadata = true;
 
     bool record_enable = false;
     int start_at_run = -1;
