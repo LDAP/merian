@@ -9,6 +9,7 @@
 #include "merian-shaders/utils/math-constants.slangh"
 
 import merian_shaders.shading.bsdfs.bsdf;
+import merian_shaders.shading.bsdfs.bsdf_validate;
 import merian_shaders.utils.random;
 import bsdf.bsdf_test_common;
 import bsdf_config;
@@ -20,12 +21,6 @@ struct Params {
     merian_test::BSDFParams p;
     RWStructuredBuffer<uint> output;
 };
-
-// Folds a non-finite value into a sticky sentinel, since max(acc, NaN) would
-// otherwise keep acc and silently hide a NaN/Inf from the error checks.
-float accumulate_err(const float acc, const float v) {
-    return isfinite(v) ? max(acc, v) : 1e30f;
-}
 
 [shader("compute")][numthreads(1, 1, 1)] void main(ParameterBlock<Params> params) {
     let bsdf = merian_test::make_test_bsdf(params.p);
@@ -50,47 +45,24 @@ float accumulate_err(const float acc, const float v) {
     for (uint i = 0; i < params.n_samples; ++i) {
         // A below-horizon / clamped draw contributes zero and is still counted
         // in the N average, so the estimators stay unbiased.
-        float3 weight = float3(0);
-        float c = 0;
-        if (let s = bsdf.sample_eval(wi, rng)) {
-            valid++;
-            // the albedo is the energy fraction; transmission also compresses radiance by eta^2
-            weight = s.wo.z < 0 ? s.weight / (params.p.eta * params.p.eta) : s.weight;
-            c = s.wo.z / s.pdf;
+        const merian::BSDFSampleCheck check = merian::bsdf_validate_sample(bsdf, wi, rng);
+        valid += check.valid ? 1 : 0;
+        delta_samples += check.delta ? 1 : 0;
+        max_delta_err = merian::bsdf_validate_err(max_delta_err, check.err_delta);
+        max_pdf_err = merian::bsdf_validate_err(max_pdf_err, check.err_pdf);
+        max_weight_err = merian::bsdf_validate_err(max_weight_err, check.err_weight);
 
-            // weight and pdf must match the independent eval()/pdf() definition. pdf() rebuilds
-            // the half-vector via normalize(wi + wo) while sample_eval may reuse the sampled h;
-            // the NDF amplifies that round-off near the specular peak, so the pdf is compared in
-            // relative terms.
-            const float pdf_ref = bsdf.pdf(wi, s.wo);
-            const float3 eval_ref = bsdf.eval(wi, s.wo, rng);
-            if (s.lobe == merian::BSDFLobe::Delta) {
-                // a delta direction carries no solid-angle density, so eval() and pdf() vanish
-                // there and the reported weight is the whole estimator
-                delta_samples++;
-                max_delta_err = accumulate_err(max_delta_err, pdf_ref);
-                max_delta_err = accumulate_err(max_delta_err,
-                                               max(max(eval_ref.x, eval_ref.y), eval_ref.z));
-                max_delta_err =
-                    accumulate_err(max_delta_err, all(isfinite(s.weight)) ? 0.0f : 1e30f);
-            } else {
-                max_pdf_err =
-                    accumulate_err(max_pdf_err, abs(s.pdf - pdf_ref) /
-                                                    (max(abs(s.pdf), abs(pdf_ref)) + 1e-6f));
-                if (pdf_ref > 0) {
-                    max_weight_err =
-                        accumulate_err(max_weight_err, length(s.weight - (eval_ref / pdf_ref)));
-                }
-            }
-        }
+        // the albedo is the energy fraction; transmission also compresses radiance by eta^2
+        const float3 weight =
+            check.transmitted ? check.weight / (params.p.eta * params.p.eta) : check.weight;
 
         const float inv_i = 1.0f / float(i + 1);
         const float3 delta_weight = weight - mean_weight;
         mean_weight += delta_weight * inv_i;
         m2_weight += delta_weight * (weight - mean_weight);
-        const float delta_cos = c - mean_cos;
+        const float delta_cos = check.cos_over_pdf - mean_cos;
         mean_cos += delta_cos * inv_i;
-        m2_cos += delta_cos * (c - mean_cos);
+        m2_cos += delta_cos * (check.cos_over_pdf - mean_cos);
     }
 
     // stderr of the mean = sqrt(population_variance / N) = sqrt(M2) / N.
@@ -106,6 +78,7 @@ float accumulate_err(const float acc, const float v) {
     const float dphi = MERIAN_TWO_PI / float(NP);
     float pdf_integral = 0;
     float max_recip_err = 0;
+    bool quadrature_sane = true;
 
     for (uint ti = 0; ti < NT; ++ti) {
         const float theta = (float(ti) + 0.5f) * dtheta;
@@ -115,15 +88,11 @@ float accumulate_err(const float acc, const float v) {
             const float phi = (float(pi) + 0.5f) * dphi;
             const float3 wo = float3(st * cos(phi), st * sin(phi), ct);
 
-            pdf_integral += bsdf.pdf(wi, wo) * st * dtheta * dphi;
-
-            // eval() carries the cos(theta_o) factor, so divide it out to compare the BRDF.
-            const float3 f_io = bsdf.eval(wi, wo, rng) / wo.z;
-            const float3 f_oi = bsdf.eval(wo, wi, rng) / wi.z;
-            const float3 d = abs(f_io - f_oi);
-            const float3 m = max(abs(f_io), abs(f_oi)) + 1e-6f;
-            max_recip_err =
-                accumulate_err(max_recip_err, max(max(d.x / m.x, d.y / m.y), d.z / m.z));
+            const merian::BSDFDirectionCheck check =
+                merian::bsdf_validate_direction(bsdf, wi, wo, rng);
+            pdf_integral += check.pdf * st * dtheta * dphi;
+            max_recip_err = merian::bsdf_validate_err(max_recip_err, check.err_reciprocity);
+            quadrature_sane = quadrature_sane && check.sane;
         }
     }
 
@@ -142,7 +111,7 @@ float accumulate_err(const float acc, const float v) {
     // a denoiser divides out, so the maximal divisible (high-frequency) content belongs in it.
     const float3 albedo = bsdf.get_albedo(wi).reflection;
 
-    params.output[11] = asuint(pdf_integral);
+    params.output[11] = asuint(quadrature_sane ? pdf_integral : merian::BSDF_VALIDATE_SENTINEL);
     params.output[12] = asuint(max_recip_err);
     params.output[13] = asuint(albedo.r);
     params.output[14] = asuint(albedo.g);

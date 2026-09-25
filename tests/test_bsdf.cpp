@@ -41,13 +41,14 @@ constexpr float MC_SIGMA = 6.0f;
 // Welford reduction over 2^18 terms.
 constexpr float MC_NUMERIC_FLOOR = 1e-3f;
 
-// Identities that hold exactly in real arithmetic (weight==eval/pdf, pdf round-trips,
-// reciprocity) differ only by float round-off accumulated over a handful of operations.
+// Identities that hold exactly in real arithmetic (pdf round-trips, reciprocity) differ only by
+// float round-off accumulated over a handful of operations.
 constexpr float FLOAT_EQ_TOL = 1e-4f;
 
-// sample_eval reuses the sampled half-vector for its pdf, while pdf() reconstructs it from
-// normalize(wi+wo); the two differ only by round-off, but the NDF amplifies it near the
-// specular peak, so the pdf consistency is checked relatively rather than absolutely.
+// sample_eval reuses the sampled half-vector while pdf() and eval() reconstruct it from
+// normalize(wi+wo), so both identities are measured relatively; the pdf enters the weight
+// through a division and is the more sensitive of the two.
+constexpr float WEIGHT_REL_TOL = 1e-4f;
 constexpr float PDF_REL_TOL = 1e-3f;
 
 // Midpoint quadrature error of a smooth pdf on the 256x512 grid.
@@ -219,8 +220,8 @@ class BSDFTest : public ::testing::Test {
         float mean_cos;         // MC estimate of INT cos(theta) dwo
         float stderr_cos;       // standard error of mean_cos
         uint32_t valid;         // number of accepted samples
-        float max_weight_err;   // max |sample_eval.weight - eval/pdf|
-        float max_pdf_err;      // max |sample_eval.pdf - pdf(wi,wo)|
+        float max_weight_err;   // max relative |sample_eval.weight - eval/pdf|
+        float max_pdf_err;      // max relative |sample_eval.pdf - pdf(wi,wo)|
         float pdf_integral;     // deterministic quadrature of INT pdf dwo
         float max_recip_err;    // max relative |f(wi,wo) - f(wo,wi)|
         float3 albedo;          // get_albedo(wi).reflection (should equal the directional albedo)
@@ -318,7 +319,7 @@ class BSDFTest : public ::testing::Test {
     // definitions up to float round-off.
     void expect_sample_eval_consistent(const CheckResult& r) {
         EXPECT_LT(r.max_pdf_err, PDF_REL_TOL) << "sample_eval.pdf vs pdf() (relative)";
-        EXPECT_LT(r.max_weight_err, FLOAT_EQ_TOL) << "sample_eval.weight vs eval/pdf";
+        EXPECT_LT(r.max_weight_err, WEIGHT_REL_TOL) << "sample_eval.weight vs eval/pdf (relative)";
     }
 
     // Helmholtz reciprocity f(wi,wo) == f(wo,wi); the two eval() paths differ only by
@@ -592,9 +593,18 @@ TEST_P(RoughDielectricConsistency, Grazing) {
     check(WI_GRAZING);
 }
 
+// Known failing: at the alpha the pbrt importer floors roughness to, sample_eval returns NaN for
+// some directions, INT pdf dwo reads 0.036 instead of 1 and the MC estimate of INT cos dwo goes
+// negative.
+INSTANTIATE_TEST_SUITE_P(
+    DISABLED_NearSpecular,
+    RoughDielectricConsistency,
+    ::testing::Values(RoughDielectricCase{CONFIG_ROUGH_DIELECTRIC_PLAIN, 0.001f, 0.0f},
+                      RoughDielectricCase{CONFIG_ROUGH_DIELECTRIC_PLAIN, 0.01f, 0.0f}));
+
 // Moderate alpha only: at a near-specular alpha the coupled refraction Jacobian reconstructed by
 // eval()/pdf() diverges from the sampled microfacet by roundoff that the sharp NDF amplifies past
-// the absolute weight tolerance (the same sensitivity the pdf check handles relatively).
+// the weight tolerance.
 INSTANTIATE_TEST_SUITE_P(
     AlphaIrid,
     RoughDielectricConsistency,
@@ -628,7 +638,9 @@ TEST_P(ConductorRoughness, Grazing) {
     check(WI_GRAZING);
 }
 
-INSTANTIATE_TEST_SUITE_P(Alpha, ConductorRoughness, ::testing::Values(0.05f, 0.3f, 0.8f));
+INSTANTIATE_TEST_SUITE_P(Alpha,
+                         ConductorRoughness,
+                         ::testing::Values(0.001f, 0.01f, 0.05f, 0.3f, 0.8f));
 
 // A perfectly smooth interface is the delta lobe it approximates. The mix weight of a delta
 // sub-lobe cancels against the probability of picking it, so the directional albedo stays the
