@@ -510,6 +510,13 @@ class CommandBuffer : public std::enable_shared_from_this<CommandBuffer> {
         keep_until_pool_reset(buffer);
     }
 
+    void draw(const uint32_t vertex_count,
+              const uint32_t instance_count = 1,
+              const uint32_t first_vertex = 0,
+              const uint32_t first_instance = 0) {
+        cmd.draw(vertex_count, instance_count, first_vertex, first_instance);
+    }
+
     void draw_indexed(const uint32_t index_count,
                       const uint32_t instance_count = 1,
                       const uint32_t first_index = 0,
@@ -538,6 +545,10 @@ class CommandBuffer : public std::enable_shared_from_this<CommandBuffer> {
     // computes the group count from the extent and local size.
     void
     dispatch(const vk::Extent2D& extent, const uint32_t local_size_x, const uint32_t local_size_y);
+
+    // Group count from a vk::DispatchIndirectCommand at offset; buffer needs eIndirectBuffer
+    // usage and a barrier to eDrawIndirect.
+    void dispatch_indirect(const BufferHandle& buffer, const vk::DeviceSize offset = 0);
 
     // Dispatch ray tracing. Pipeline must already be bound via bind().
     void trace_rays(const ShaderBindingTableHandle& sbt,

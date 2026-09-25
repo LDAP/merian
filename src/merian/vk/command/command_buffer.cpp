@@ -258,6 +258,15 @@ void CommandBuffer::dispatch(const vk::Extent2D& extent,
              (extent.height + local_size_y - 1) / local_size_y, 1);
 }
 
+void CommandBuffer::dispatch_indirect(const BufferHandle& buffer, const vk::DeviceSize offset) {
+    if (current_pipeline->supports_descriptor_buffer()) {
+        update_descriptor_buffer_bindings(current_pipeline);
+    }
+
+    cmd.dispatchIndirect(*buffer, offset);
+    keep_until_pool_reset(buffer);
+}
+
 void CommandBuffer::trace_rays(const ShaderBindingTableHandle& sbt,
                                uint32_t width,
                                uint32_t height,
