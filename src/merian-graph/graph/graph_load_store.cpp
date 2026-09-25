@@ -29,14 +29,20 @@ void Graph::load_from_json(const nlohmann::json& json) {
 }
 
 void Graph::store_to_file(const std::filesystem::path& path) {
-    SPDLOG_DEBUG("Storing graph to {}", path.string());
     GraphDescription description = to_description();
     description.to_file(path);
+    SPDLOG_INFO("stored graph with {} nodes to {}", node_for_identifier.size(), path.string());
 }
 
 nlohmann::json Graph::store_to_json() {
     GraphDescription description = to_description();
     return description.to_json();
+}
+
+std::vector<std::pair<std::string, std::string>> Graph::metadata() {
+    // tEXt and COM are latin-1, so keep the config ascii-escaped
+    return {{"Software", "merian " MERIAN_VERSION},
+            {"merian.graph", store_to_json().dump(-1, ' ', true)}};
 }
 
 // -----------------------------------------------------------------
@@ -168,7 +174,7 @@ GraphDescription Graph::to_description() {
 
     description.set_cli(loaded_description.get_cli());
 
-    SPDLOG_INFO("Graph stored successfully with {} nodes", node_for_identifier.size());
+    SPDLOG_DEBUG("described graph with {} nodes", node_for_identifier.size());
 
     return description;
 }

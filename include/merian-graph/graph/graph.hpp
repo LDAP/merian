@@ -197,6 +197,9 @@ class Graph : public std::enable_shared_from_this<Graph> {
     void store_to_file(const std::filesystem::path& path);
     nlohmann::json store_to_json();
 
+    // Key/value description of this run for a node to embed into what it writes.
+    std::vector<std::pair<std::string, std::string>> metadata();
+
     // Sets the default path for the load/store controls in the graph properties. load_from_file
     // sets this automatically; a host that loads via load_from_json should set it explicitly.
     void set_store_path(const std::filesystem::path& path);
