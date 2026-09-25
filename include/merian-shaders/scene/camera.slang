@@ -55,8 +55,16 @@ struct Camera {
         return ray;
     }
 
+    // World position from the distance along the camera ray.
+    float3 position_from_linear_z(const uint2 pixel, const uint2 frame_dimensions,
+                                  const float linear_z) {
+        return position + get_pinhole_direction(pixel, frame_dimensions) * linear_z;
+    }
+
     // Project a world-space position to fractional pixel coordinates using pinhole model.
     // U, V, W must be orthogonal (standard pinhole camera).
+    // In the grid generate_ray_pinhole traces through: a point on the ray of pixel p comes back
+    // as p + jitter.
     float2 project_pinhole(const float3 world_pos, const uint2 frame_dimensions) {
         float3 d = world_pos - position;
         // t such that t*d lies on the focal plane (where W lives)
