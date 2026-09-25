@@ -32,6 +32,8 @@ class Properties {
     enum ChildFlagBits : uint32_t {
         DEFAULT_OPEN = 0b1,
         FRAMED = 0b10,
+        // lay this child's own children out as tabs; presentation only
+        TABS = 0b100,
     };
 
     using ChildFlags = uint32_t;

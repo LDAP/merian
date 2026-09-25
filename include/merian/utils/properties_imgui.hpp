@@ -88,6 +88,11 @@ class ImGuiProperties : public Properties {
     virtual bool is_ui() override;
     virtual bool serialize_json(const std::string& id, nlohmann::json& json) override;
     virtual bool serialize_string(const std::string& id, std::string& s) override;
+
+  private:
+    // what st_end_child has to close, since a child inside a TABS parent is a tab item
+    enum class OpenChild { TREE, TAB_BAR, TAB_ITEM };
+    std::vector<OpenChild> open_children;
 };
 
 } // namespace merian

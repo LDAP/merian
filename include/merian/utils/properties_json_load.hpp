@@ -88,6 +88,9 @@ class JSONLoadProperties : public Properties {
   private:
     std::string object_name;
     std::vector<nlohmann::json> o;
+
+  private:
+    std::vector<bool> transparent;
 };
 
 } // namespace merian

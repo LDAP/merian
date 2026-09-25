@@ -101,6 +101,9 @@ class JSONDumpProperties : public Properties {
   private:
     const std::optional<std::filesystem::path> filename;
     std::vector<std::pair<std::string, nlohmann::json>> o;
+
+  private:
+    std::vector<bool> transparent;
 };
 
 } // namespace merian

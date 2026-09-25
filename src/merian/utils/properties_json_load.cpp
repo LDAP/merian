@@ -84,15 +84,25 @@ JSONLoadProperties::~JSONLoadProperties() {}
 
 bool JSONLoadProperties::st_begin_child(const std::string& id,
                                         const std::string& /*label*/,
-                                        const ChildFlags /*flags*/) {
+                                        const ChildFlags flags) {
+    // a TABS child groups for a UI only, so it is not a level here
+    if ((flags & ChildFlagBits::TABS) != 0) {
+        transparent.push_back(true);
+        return true;
+    }
     if (o.back().contains(id)) {
+        transparent.push_back(false);
         o.push_back(o.back()[id]);
         return true;
     }
     return false;
 }
 void JSONLoadProperties::st_end_child() {
-    o.pop_back();
+    const bool was_transparent = transparent.back();
+    transparent.pop_back();
+    if (!was_transparent) {
+        o.pop_back();
+    }
 }
 std::vector<std::string> JSONLoadProperties::st_list_children() {
     std::vector<std::string> children;

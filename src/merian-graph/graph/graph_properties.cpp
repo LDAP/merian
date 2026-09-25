@@ -333,19 +333,22 @@ void Graph::properties(Properties& props) {
                 }
 
                 props.st_separate();
-                if (props.st_begin_child("properties", "Properties",
-                                         Properties::ChildFlagBits::DEFAULT_OPEN)) {
-                    const Node::NodeStatusFlags flags = node->properties(props);
-                    if ((flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT) != 0u) {
-                        SPDLOG_DEBUG("node {} requested reconnect", data.identifier);
-                        request_reconnect();
+                if (props.st_begin_child("sections", "", Properties::ChildFlagBits::TABS)) {
+                    if (props.st_begin_child("properties", "Properties",
+                                             Properties::ChildFlagBits::DEFAULT_OPEN)) {
+                        const Node::NodeStatusFlags flags = node->properties(props);
+                        if ((flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT) != 0u) {
+                            SPDLOG_DEBUG("node {} requested reconnect", data.identifier);
+                            request_reconnect();
+                        }
+                        if ((flags & Node::NodeStatusFlagBits::REMOVE_NODE) != 0u) {
+                            remove_node(data.identifier);
+                        }
+                        props.st_end_child();
                     }
-                    if ((flags & Node::NodeStatusFlagBits::REMOVE_NODE) != 0u) {
-                        remove_node(data.identifier);
-                    }
+                    io_props_for_node(props, node, data);
                     props.st_end_child();
                 }
-                io_props_for_node(props, node, data);
                 props.st_end_child();
             }
         }

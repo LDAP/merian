@@ -6,6 +6,7 @@
 #include <fmt/format.h>
 
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 #include <stdexcept>
 
@@ -47,6 +48,21 @@ ImGuiProperties::~ImGuiProperties() {}
 bool ImGuiProperties::st_begin_child(const std::string& id,
                                      const std::string& label,
                                      const ChildFlags flags) {
+    if (!open_children.empty() && open_children.back() == OpenChild::TAB_BAR) {
+        if (!ImGui::BeginTabItem(label.empty() ? id.c_str() : label.c_str())) {
+            return false;
+        }
+        open_children.push_back(OpenChild::TAB_ITEM);
+        return true;
+    }
+    if ((flags & ChildFlagBits::TABS) != 0) {
+        if (!ImGui::BeginTabBar(id.c_str())) {
+            return false;
+        }
+        open_children.push_back(OpenChild::TAB_BAR);
+        return true;
+    }
+
     ImGuiTreeNodeFlags imgui_flags{};
     if (flags & ChildFlagBits::DEFAULT_OPEN) {
         imgui_flags |= ImGuiTreeNodeFlags_DefaultOpen;
@@ -54,10 +70,27 @@ bool ImGuiProperties::st_begin_child(const std::string& id,
     if (flags & ChildFlagBits::FRAMED) {
         imgui_flags |= ImGuiTreeNodeFlags_Framed;
     }
-    return ImGui::TreeNodeEx(id.c_str(), imgui_flags, "%s", label.c_str());
+    if (!ImGui::TreeNodeEx(id.c_str(), imgui_flags, "%s", label.c_str())) {
+        return false;
+    }
+    open_children.push_back(OpenChild::TREE);
+    return true;
 }
 void ImGuiProperties::st_end_child() {
-    ImGui::TreePop();
+    assert(!open_children.empty());
+    const OpenChild open = open_children.back();
+    open_children.pop_back();
+    switch (open) {
+    case OpenChild::TAB_BAR:
+        ImGui::EndTabBar();
+        break;
+    case OpenChild::TAB_ITEM:
+        ImGui::EndTabItem();
+        break;
+    case OpenChild::TREE:
+        ImGui::TreePop();
+        break;
+    }
 }
 void ImGuiProperties::st_separate(const std::string& label) {
     if (label.empty())

@@ -51,11 +51,21 @@ JSONDumpProperties::~JSONDumpProperties() {
 
 bool JSONDumpProperties::st_begin_child(const std::string& id,
                                         const std::string& /*label*/,
-                                        const ChildFlags /*flags*/) {
+                                        const ChildFlags flags) {
+    // a TABS child groups for a UI only, so it is not a level here
+    transparent.push_back((flags & ChildFlagBits::TABS) != 0);
+    if (transparent.back()) {
+        return true;
+    }
     o.emplace_back(id, nlohmann::json());
     return true;
 }
 void JSONDumpProperties::st_end_child() {
+    const bool was_transparent = transparent.back();
+    transparent.pop_back();
+    if (was_transparent) {
+        return;
+    }
     if (!current().empty())
         o[o.size() - 2].second[o.back().first] = current();
     o.pop_back();
