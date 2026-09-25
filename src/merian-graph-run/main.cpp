@@ -271,6 +271,20 @@ int main(const int argc, const char** argv) {
 
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
+    // an exception escaping any other thread fails fast without a word otherwise
+    std::set_terminate([] {
+        if (const std::exception_ptr e = std::current_exception()) {
+            try {
+                std::rethrow_exception(e);
+            } catch (const std::exception& ex) {
+                fmt::print(stderr, "terminating on: {}{}", ex.what(), '\n');
+            } catch (...) {
+                fmt::print(stderr, "terminating on a non-std exception{}", '\n');
+            }
+        }
+        std::fflush(stderr); // a redirected stderr is fully buffered and abort() does not flush
+        std::abort();
+    });
 
     try {
         for (uint64_t iteration = 0;
@@ -285,6 +299,12 @@ int main(const int argc, const char** argv) {
         if (fault_ext) {
             fault_ext->dump();
         }
+        // teardown after a device loss only throws again, on waitIdle of the dead device
+        spdlog::shutdown();
+        std::fflush(nullptr);
+        std::_Exit(1);
+    } catch (const std::exception& e) {
+        SPDLOG_ERROR("aborting on: {}", e.what());
         return 1;
     }
 
