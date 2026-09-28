@@ -147,7 +147,19 @@ struct TransformPrevVertexJob {
     uint32_t _pad[3];
 };
 
+struct GeometryRemap {
+    GeometryID geometry_id;
+    uint32_t instance_index;
+};
+
 #ifdef __cplusplus
+static constexpr GeometryID GEOMETRY_ID_GONE = 0xFFFFFFFFu;
+#else
+static const GeometryID GEOMETRY_ID_GONE = 0xFFFFFFFFu;
+#endif
+
+#ifdef __cplusplus
+static_assert(sizeof(GeometryRemap) == 8, "GeometryRemap must match Slang scalar layout");
 static_assert(sizeof(PackedVertexData) == 24, "PackedVertexData must match Slang scalar layout");
 static_assert(alignof(PackedVertexData) == 4, "PackedVertexData must be 4-byte aligned");
 static_assert(sizeof(GeometryData) == 32, "GeometryData layout mismatch");

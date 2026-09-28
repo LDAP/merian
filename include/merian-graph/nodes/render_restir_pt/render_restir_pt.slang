@@ -193,10 +193,17 @@ float restir_pt_history_cap(const uint prev_index) {
 }
 
 // The history reservoir of a slot, capped, with its suffix as it arrives now.
-RestirPTReservoir restir_pt_history(const uint prev_index, const uint index, const uint slot) {
-    RestirPTReservoir history = restir_pt_subpixel_backprojection()
-                                    ? pc.backprojected[index]
-                                    : pc.reservoirs_prev[prev_index];
+RestirPTReservoir restir_pt_history(const ParameterBlock<Scene> scene,
+                                    const uint prev_index,
+                                    const uint index,
+                                    const uint slot) {
+    RestirPTReservoir history;
+    if (restir_pt_subpixel_backprojection()) {
+        history = pc.backprojected[index];
+    } else {
+        history = pc.reservoirs_prev[prev_index];
+        restir_pt_from_prev_frame(scene, history);
+    }
     history.M = min(history.M, restir_pt_history_cap(prev_index));
     if (merian_restir_pt_dynamic_scene && history.W > 0.f) {
         const RestirPTSuffix suffix = pc.history[restir_pt_slot(index, slot)];
@@ -234,11 +241,11 @@ int2 restir_pt_backprojected_pixel(const uint2 pixel,
             motion = -motion;
         } else {
             // the pixel was hidden behind something closer: follow that instead
-            const Hit occluder = params.prev_gbuffer.get_hit(uint2(prev));
+            Hit occluder = params.prev_gbuffer.get_hit(uint2(prev));
             const float dist = params.gbuffer.get_linear_z(pixel);
             const float prev_dist = params.prev_gbuffer.get_linear_z(uint2(prev));
-            if (occluder.is_valid() && restir_pt_hit_exists(scene, occluder) &&
-                dist - prev_dist > 0.1f * dist) {
+            if (occluder.is_valid() && scene.from_prev_frame(occluder) &&
+                restir_pt_hit_exists(scene, occluder) && dist - prev_dist > 0.1f * dist) {
                 const float3 now =
                     scene.get_surface(occluder, scene.get_triangle_hit(occluder)).pos;
                 motion = float2(prev) - scene.camera.project_pinhole(now, dim);
@@ -326,8 +333,8 @@ void restir_pt_pass_splat(const uint2 pixel,
         restir_pt_pass_splat_area(pixel, scene, params);
         return;
     }
-    const Hit hit = params.prev_gbuffer.get_hit(pixel);
-    if (!hit.is_valid() || !restir_pt_hit_exists(scene, hit))
+    Hit hit = params.prev_gbuffer.get_hit(pixel);
+    if (!hit.is_valid() || !scene.from_prev_frame(hit) || !restir_pt_hit_exists(scene, hit))
         return;
     const float3 pos = scene.get_surface(hit, scene.get_triangle_hit(hit)).pos;
     const float dist = distance(pos, scene.camera.position);
@@ -371,6 +378,7 @@ void restir_pt_pass_coverage_neighbors(const uint2 thread_pixel,
 // the samples that fall outside move in by a one-pixel shift, weighed against the other overlapped
 // pixels [Zhang et al. 2024, 4.3.2].
 void restir_pt_pass_subpixel_backprojection(const uint2 pixel,
+                                            const ParameterBlock<Scene> scene,
                                             const ParameterBlock<RestirPTBinding> params) {
     const uint2 dim = params.gbuffer.get_dimensions();
     if (any(pixel >= dim))
@@ -406,6 +414,7 @@ void restir_pt_pass_subpixel_backprojection(const uint2 pixel,
                 continue;
             const uint q_index = restir_pt_index(uint2(q), dim);
             RestirPTReservoir r = pc.reservoirs_prev[q_index];
+            restir_pt_from_prev_frame(scene, r);
             const float target = yuv_luminance(r.integrand);
             if (!(r.W > 0.f) || !(target > 0.f))
                 continue;
@@ -628,6 +637,7 @@ void restir_pt_pass_shift(const uint item_index,
     if (coverage) {
         // a previous reservoir into a neighbor, within the previous frame
         r = pc.reservoirs_prev[index];
+        restir_pt_from_prev_frame(scene, r);
         const int2 offset = RESTIR_PT_COVERAGE_OFFSETS[slot];
         image_pos = restir_pt_image_pos(float2(int2(pixel) + offset), r);
         prev_frame = true;
@@ -637,6 +647,8 @@ void restir_pt_pass_shift(const uint item_index,
         r = backprojected ? pc.backprojected[index]
             : temporal    ? pc.reservoirs_prev[src]
                           : pc.reservoirs_in[src];
+        if (temporal && !backprojected)
+            restir_pt_from_prev_frame(scene, r);
         if (temporal && merian_restir_pt_dynamic_scene) {
             r = restir_pt_update_suffix(scene, r, false, rng);
             RestirPTSuffix suffix;
@@ -740,7 +752,8 @@ float restir_pt_shifted_target(const RestirPTShift s) {
 // The canonical path against the neighbors with the defensive pairwise MIS weights of
 // [Lin et al. 2022, eq. 38], weighted by confidence [Hedstrom et al. 2026, eq. 11]. The neighbors
 // are the previous frame's reservoirs where `temporal`.
-RestirPTResampler restir_pt_resample_pairwise(const uint index,
+RestirPTResampler restir_pt_resample_pairwise(const ParameterBlock<Scene> scene,
+                                              const uint index,
                                               const uint2 dim,
                                               const RestirPTReservoir canonical,
                                               const bool temporal,
@@ -760,8 +773,9 @@ RestirPTResampler restir_pt_resample_pairwise(const uint index,
         if (packed == RESTIR_PT_NO_NEIGHBOR)
             continue;
         const uint neighbor_index = restir_pt_index(uint2(restir_pt_unpack_pixel(packed)), dim);
-        const RestirPTReservoir neighbor = temporal ? restir_pt_history(neighbor_index, index, s)
-                                                    : pc.reservoirs_in[neighbor_index];
+        const RestirPTReservoir neighbor = temporal
+                                               ? restir_pt_history(scene, neighbor_index, index, s)
+                                               : pc.reservoirs_in[neighbor_index];
 
         // what the canonical path is worth in the neighbor's domain; a reciprocal neighbor
         // computed that shift for its own resampling
@@ -794,7 +808,9 @@ RestirPTResampler restir_pt_resample_pairwise(const uint index,
 // The canonical path against the one the previous frame left at the backprojected pixel, with the
 // confidence-weighted balance heuristic [Lin et al. 2022, eq. 36 and 6.2]. Splatted reservoirs
 // are any number, weighed pairwise like spatial neighbors.
-void restir_pt_pass_temporal(const uint2 pixel, const ParameterBlock<RestirPTBinding> params) {
+void restir_pt_pass_temporal(const uint2 pixel,
+                             const ParameterBlock<Scene> scene,
+                             const ParameterBlock<RestirPTBinding> params) {
     const uint2 dim = params.gbuffer.get_dimensions();
     if (any(pixel >= dim))
         return;
@@ -813,7 +829,7 @@ void restir_pt_pass_temporal(const uint2 pixel, const ParameterBlock<RestirPTBin
             if (packed == RESTIR_PT_NO_NEIGHBOR)
                 continue;
             RestirPTReservoir history = restir_pt_history(
-                restir_pt_index(uint2(restir_pt_unpack_pixel(packed)), dim), index, s);
+                scene, restir_pt_index(uint2(restir_pt_unpack_pixel(packed)), dim), index, s);
             history.film = pc.splat_samples[2 * restir_pt_slot(index, s)];
             const float film_jacobian = asfloat(pc.splat_samples[2 * restir_pt_slot(index, s) + 1]);
             const RestirPTShift shift = pc.shifts[restir_pt_shift_index(index, s, 0)];
@@ -839,13 +855,13 @@ void restir_pt_pass_temporal(const uint2 pixel, const ParameterBlock<RestirPTBin
         resampler.r.M = canonical.M + min(pc.reservoirs_prev[nearest_index].M,
                                           restir_pt_history_cap(nearest_index));
     } else if (restir_pt_splatting()) {
-        resampler = restir_pt_resample_pairwise(index, dim, canonical, true, rng);
+        resampler = restir_pt_resample_pairwise(scene, index, dim, canonical, true, rng);
     } else {
         const uint packed = pc.neighbors[restir_pt_slot(index, 0)];
         float canonical_mis = 1.f;
         if (packed != RESTIR_PT_NO_NEIGHBOR) {
             const RestirPTReservoir history = restir_pt_history(
-                restir_pt_index(uint2(restir_pt_unpack_pixel(packed)), dim), index, 0);
+                scene, restir_pt_index(uint2(restir_pt_unpack_pixel(packed)), dim), index, 0);
             const float target = yuv_luminance(canonical.integrand);
             const float canonical_there =
                 canonical.W > 0.f
@@ -877,7 +893,9 @@ void restir_pt_pass_temporal(const uint2 pixel, const ParameterBlock<RestirPTBin
 }
 
 // Resamples the neighbors the spatial neighbor pass selected.
-void restir_pt_pass_spatial(const uint2 pixel, const ParameterBlock<RestirPTBinding> params) {
+void restir_pt_pass_spatial(const uint2 pixel,
+                            const ParameterBlock<Scene> scene,
+                            const ParameterBlock<RestirPTBinding> params) {
     const uint2 dim = params.gbuffer.get_dimensions();
     if (any(pixel >= dim))
         return;
@@ -885,7 +903,7 @@ void restir_pt_pass_spatial(const uint2 pixel, const ParameterBlock<RestirPTBind
     RandomGenerator rng = restir_pt_rng(pixel, RestirPTPassSpatial);
     const RestirPTReservoir canonical = pc.reservoirs_in[index];
     const RestirPTResampler resampler =
-        restir_pt_resample_pairwise(index, dim, canonical, false, rng);
+        restir_pt_resample_pairwise(scene, index, dim, canonical, false, rng);
 
     const RestirPTReservoir out = resampler.finalize();
     pc.reservoirs_out[index] = out;
@@ -971,10 +989,10 @@ void restir_pt_pass_duplication(const uint2 pixel,
         restir_pt_pass_spatial_neighbors(thread_id.xy, scene, params);
         break;
     case RestirPTPassTemporal:
-        restir_pt_pass_temporal(thread_id.xy, params);
+        restir_pt_pass_temporal(thread_id.xy, scene, params);
         break;
     case RestirPTPassSpatial:
-        restir_pt_pass_spatial(thread_id.xy, params);
+        restir_pt_pass_spatial(thread_id.xy, scene, params);
         break;
     case RestirPTPassDuplication:
         restir_pt_pass_duplication(thread_id.xy, group_thread.xy, group.xy, group_index, params);
@@ -983,7 +1001,7 @@ void restir_pt_pass_duplication(const uint2 pixel,
         restir_pt_pass_splat(thread_id.xy, scene, params);
         break;
     case RestirPTPassSubpixelBackprojection:
-        restir_pt_pass_subpixel_backprojection(thread_id.xy, params);
+        restir_pt_pass_subpixel_backprojection(thread_id.xy, scene, params);
         break;
     case RestirPTPassCoverageNeighbors:
         restir_pt_pass_coverage_neighbors(thread_id.xy, params);

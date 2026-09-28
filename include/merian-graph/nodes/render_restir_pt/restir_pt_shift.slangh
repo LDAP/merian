@@ -186,7 +186,7 @@ RestirPTReservoir restir_pt_update_suffix(const ParameterBlock<Scene> scene,
     updated.rc_radiance = float3(0);
 
     const Hit hit = restir_pt_get_hit(r);
-    if (!restir_pt_hit_exists(scene, hit))
+    if (!hit.is_valid() || !restir_pt_hit_exists(scene, hit))
         return updated;
 
     // 1. from x_k along the direction the path took; a light sample is found where it was drawn

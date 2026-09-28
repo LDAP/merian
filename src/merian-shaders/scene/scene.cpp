@@ -170,6 +170,8 @@ ShaderObjectHandle Scene::build_shader_object() const {
     c["material_system"] = material_system;
 
     c["geometries"] = geometries_buffer ? geometries_buffer : allocator->get_dummy_buffer();
+    c["prev_geometry_remap"] =
+        prev_geometry_remap_buffer ? prev_geometry_remap_buffer : allocator->get_dummy_buffer();
 
     c["instance_transforms"] =
         instance_transforms_buffer ? instance_transforms_buffer : allocator->get_dummy_buffer();
@@ -201,6 +203,7 @@ Scene::MeshID Scene::add_mesh(MeshHandle mesh) {
         mesh_infos.resize(mesh_ids.size());
     }
     mesh_infos[id].mesh = std::move(mesh);
+    mesh_infos[id].serial = next_serial++;
 
     return id;
 }
@@ -218,6 +221,7 @@ Scene::NodeID Scene::add_node(Node node) {
         scene_graph[node.parent]->children.push_back(id);
     }
 
+    node.serial = next_serial++;
     scene_graph[id] = std::move(node);
     return id;
 }
@@ -1247,7 +1251,9 @@ void Scene::upload_transforms(const CommandBufferHandle& cmd) {
 void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
     MERIAN_PROFILE_SCOPE_GPU(cmd, "Scene::upload_geometry_data");
     geometries.clear();
+    geometry_keys.clear();
     emissive_geometries.clear();
+    std::vector<uint32_t> instance_indices;
     bool has_sky_portals = false;
 
     const float4x4 identity_transform = identity();
@@ -1270,12 +1276,15 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
                 assert(info.vertex_buffer && (!mesh.has_indices() || info.index_buffer));
 
                 const bool needs_prev = needs_prev_vertices(group, info);
+                const uint64_t geometry_key =
+                    (static_cast<uint64_t>(info.serial) << 32) | node.serial;
 
                 has_sky_portals |= (mesh.flags & MeshFlags::UseEnvMap);
                 if (!(mesh.flags & MeshFlags::UseEnvMap) &&
                     material_system->is_emissive(mesh.material_id)) {
                     emissive_geometries.push_back({static_cast<GeometryID>(geometries.size()),
-                                                   instance_index, mesh.get_primitive_count()});
+                                                   instance_index, mesh.get_primitive_count(),
+                                                   geometry_key});
                 }
 
                 GeometryData gd;
@@ -1315,6 +1324,8 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
                 }
 
                 geometries.emplace_back(gd);
+                geometry_keys.push_back(geometry_key);
+                instance_indices.push_back(instance_index);
             }
             instance_index++;
         }
@@ -1340,6 +1351,43 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
         }
         staging->cmd_to_device(cmd, geometries_buffer, geometries);
     }
+
+    upload_prev_geometry_remap(cmd, instance_indices);
+}
+
+void Scene::upload_prev_geometry_remap(const CommandBufferHandle& cmd,
+                                       const std::vector<uint32_t>& instance_indices) {
+    prev_geometry_remap.clear();
+    if (geometry_keys != prev_geometry_keys) {
+        geometry_of_key.clear();
+        geometry_of_key.reserve(geometry_keys.size());
+        for (GeometryID geometry_id = 0; geometry_id < geometry_keys.size(); geometry_id++)
+            geometry_of_key.try_emplace(geometry_keys[geometry_id], geometry_id);
+
+        prev_geometry_remap.reserve(prev_geometry_keys.size());
+        for (const uint64_t key : prev_geometry_keys) {
+            const auto it = geometry_of_key.find(key);
+            if (it == geometry_of_key.end())
+                prev_geometry_remap.push_back({GEOMETRY_ID_GONE, 0});
+            else
+                prev_geometry_remap.push_back({it->second, instance_indices[it->second]});
+        }
+        prev_geometry_keys = geometry_keys;
+    }
+
+    if (prev_geometry_remap.empty())
+        return;
+    const vk::DeviceSize remap_size = prev_geometry_remap.size() * sizeof(GeometryRemap);
+    if (!prev_geometry_remap_buffer || prev_geometry_remap_buffer->get_size() < remap_size) {
+        cmd->keep_until_pool_reset(prev_geometry_remap_buffer);
+        prev_geometry_remap_buffer = allocator->create_buffer(
+            remap_size * 3 / 2,
+            vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
+            MemoryMappingType::NONE, "Scene::prev_geometry_remap");
+        shader_object->get_cursor()["prev_geometry_remap"] = prev_geometry_remap_buffer;
+    }
+    allocator->get_staging()->cmd_to_device(cmd, prev_geometry_remap_buffer,
+                                            prev_geometry_remap.data(), 0, remap_size);
 }
 
 namespace {
@@ -1511,6 +1559,9 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                     check_node_transform && scene_graph[*info.instances.begin()]->transform_dirty;
                 if (!mesh.is_dirty())
                     continue;
+
+                if (mesh.indices_dirty || (mesh.has_variable_topology() && mesh.vertices_dirty))
+                    info.serial = next_serial++;
 
                 group.blas_dirty = true;
                 if (mesh.has_variable_topology())
@@ -2057,6 +2108,7 @@ void Scene::update(const CommandBufferHandle& cmd,
     auto c = shader_object->get_cursor();
 
     c["frame"] = frame;
+    c["prev_geometry_remap_count"] = static_cast<uint32_t>(prev_geometry_remap.size());
     c["time"] = get_time(time);
     c["time_diff"] = time_diff;
     exterior_volume->write_to(c["exterior_volume"]);

@@ -73,6 +73,18 @@ Hit restir_pt_get_hit(const RestirPTReservoir r) {
                restir_pt_unpack_unorm(r.hit_barycentrics));
 }
 
+void restir_pt_from_prev_frame(const ParameterBlock<Scene> scene, inout RestirPTReservoir r) {
+    if (scene.prev_geometry_remap_count == 0)
+        return;
+    Hit hit = restir_pt_get_hit(r);
+    if (!scene.from_prev_frame(hit)) {
+        r.W = 0.f;
+        hit = Hit();
+    }
+    r.hit_instance_id = hit.instance_id;
+    r.hit_indices = (hit.geometry_index & 0xFFFFu) | (hit.instance_index << 16);
+}
+
 RestirPTReservoir restir_pt_empty_reservoir() {
     RestirPTReservoir r;
     r.M = 0.f;
@@ -205,6 +217,10 @@ RestirPTPrimary restir_pt_primary(const ParameterBlock<Scene> scene,
         const uint2 pixel = uint2(image_pos);
         v.ray = camera.generate_ray_pinhole(pixel, dim);
         v.hit = gbuffer.get_hit(pixel);
+        if (prev_frame && !scene.from_prev_frame(v.hit)) {
+            v.valid = false;
+            return v;
+        }
     }
     v.valid = restir_pt_hit_exists(scene, v.hit);
     return v;

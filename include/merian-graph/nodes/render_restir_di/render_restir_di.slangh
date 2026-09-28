@@ -145,12 +145,14 @@ struct RestirSurface {
 RestirSurface restir_surface(const ParameterBlock<Scene> scene,
                              const GBuffer gbuffer,
                              const uint2 pixel,
-                             const uint2 dim) {
+                             const uint2 dim,
+                             const bool prev_frame = false) {
     RestirSurface s;
     s.wi = float3(0, 0, 1);
-    const Hit hit = gbuffer.get_hit(pixel);
+    Hit hit = gbuffer.get_hit(pixel);
     // the previous frame's gbuffer can reference despawned or resized geometry
-    s.valid = hit.is_valid() && scene.is_valid_geometry_id(hit.get_geometry_id()) &&
+    s.valid = hit.is_valid() && (!prev_frame || scene.from_prev_frame(hit)) &&
+              scene.is_valid_geometry_id(hit.get_geometry_id()) &&
               hit.primitive_id < scene.get_geometry_data(hit.get_geometry_id()).primitive_count;
     if (!s.valid)
         return s;

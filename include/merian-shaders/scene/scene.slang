@@ -39,6 +39,9 @@ struct Scene {
     StructuredBuffer<float4x4, ScalarDataLayout> prev_instance_transforms;
     StructuredBuffer<float4x4, ScalarDataLayout> prev_inverse_transposed_instance_transforms;
 
+    StructuredBuffer<GeometryRemap, ScalarDataLayout> prev_geometry_remap;
+    uint prev_geometry_remap_count;
+
     ParameterBlock<MaterialSystem> material_system;
     SceneEnvMap env_map;
     NEE nee;
@@ -121,6 +124,21 @@ struct Scene {
         uint stride;
         geometries.GetDimensions(count, stride);
         return geometry_id < count;
+    }
+
+    bool from_prev_frame(inout Hit hit) {
+        if (prev_geometry_remap_count == 0 || !hit.is_valid())
+            return true;
+        const GeometryID geometry_id = hit.get_geometry_id();
+        if (geometry_id >= prev_geometry_remap_count)
+            return false;
+        const GeometryRemap remap = prev_geometry_remap[geometry_id];
+        if (remap.geometry_id == GEOMETRY_ID_GONE)
+            return false;
+        hit.instance_id = remap.geometry_id;
+        hit.geometry_index = 0;
+        hit.instance_index = remap.instance_index;
+        return true;
     }
 
     // Loads the geometry data from memory.

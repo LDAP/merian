@@ -116,7 +116,7 @@ void temporal(ParameterBlock<Scene> scene, ParameterBlock<RestirBinding> params)
         }
         if (pc.temporal_clamp_m > 0)
             prev.confidence = min(prev.confidence, float(pc.temporal_clamp_m));
-        prev_surface = restir_surface(scene, params.prev_gbuffer, uint2(prev_pixel), dim);
+        prev_surface = restir_surface(scene, params.prev_gbuffer, uint2(prev_pixel), dim, true);
     }
 
     // [Lin et al. 2022, eq. 36]

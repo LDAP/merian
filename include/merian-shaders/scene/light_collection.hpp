@@ -31,6 +31,7 @@ class LightCollection {
         GeometryID geometry_id;
         uint32_t instance_index;
         uint32_t primitive_count;
+        uint64_t key;
     };
 
     LightCollection(const ShaderCompileContextHandle& compile_context,
@@ -180,6 +181,7 @@ class LightCollection {
     uint64_t env_version = std::numeric_limits<uint64_t>::max();
 
     std::vector<LightGeometry> light_geometries;
+    std::vector<uint64_t> light_geometry_keys;
     std::vector<uint32_t> geometry_light_offsets;
     // the table the grid was ranked against, and where its entries sit now
     std::vector<uint64_t> grid_table_keys;

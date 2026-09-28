@@ -42,6 +42,7 @@ void LightCollection::set_geometries(const std::vector<EmissiveGeometry>& geomet
                                      const uint32_t geometry_count) {
     std::vector<LightGeometry> new_geometries;
     new_geometries.reserve(geometries.size());
+    light_geometry_keys.clear();
     std::vector<uint32_t> new_offsets(geometry_count, LIGHT_INVALID_INDEX);
     uint32_t first_triangle = 0;
     for (const EmissiveGeometry& g : geometries) {
@@ -50,6 +51,7 @@ void LightCollection::set_geometries(const std::vector<EmissiveGeometry>& geomet
         assert(g.geometry_id < geometry_count);
         new_geometries.push_back(
             {g.geometry_id, g.instance_index, first_triangle, g.primitive_count});
+        light_geometry_keys.push_back(g.key);
         new_offsets[g.geometry_id] = first_triangle;
         first_triangle += g.primitive_count;
     }
@@ -290,10 +292,6 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
 
 // A rebuilt table can move an entry that survived; mapping it is what lets a cell's list carry.
 void LightCollection::update_light_remap(const CommandBufferHandle& cmd) {
-    const auto key = [](const LightGeometry& g) {
-        return (static_cast<uint64_t>(g.geometry_id) << 32) | g.instance_index;
-    };
-
     if (selection != LightSelection::LightSelectionGrid) {
         grid_table_keys.clear();
         light_remap.clear();
@@ -306,9 +304,9 @@ void LightCollection::update_light_remap(const CommandBufferHandle& cmd) {
     light_remap_identity = grid_table_keys.size() == light_geometries.size();
     if (!grid_table_keys.empty()) {
         light_index_of_key.clear();
-        light_index_of_key.reserve(light_geometries.size());
-        for (uint32_t i = 0; i < light_geometries.size(); i++) {
-            light_index_of_key.try_emplace(key(light_geometries[i]), i);
+        light_index_of_key.reserve(light_geometry_keys.size());
+        for (uint32_t i = 0; i < light_geometry_keys.size(); i++) {
+            light_index_of_key.try_emplace(light_geometry_keys[i], i);
         }
         for (uint32_t i = 0; i < grid_table_keys.size(); i++) {
             const auto it = light_index_of_key.find(grid_table_keys[i]);
@@ -317,10 +315,7 @@ void LightCollection::update_light_remap(const CommandBufferHandle& cmd) {
         }
     }
 
-    grid_table_keys.resize(light_geometries.size());
-    for (uint32_t i = 0; i < light_geometries.size(); i++) {
-        grid_table_keys[i] = key(light_geometries[i]);
-    }
+    grid_table_keys = light_geometry_keys;
 
     const vk::DeviceSize remap_size = std::max<size_t>(light_remap.size(), 1) * sizeof(uint32_t);
     ensure_buffer(light_remap_buffer, remap_size, "LightCollection::light_remap", cmd);

@@ -19,6 +19,7 @@
 #include "merian/vk/raytrace/as_builder.hpp"
 
 #include <optional>
+#include <unordered_map>
 #include <variant>
 #include <vector>
 
@@ -139,6 +140,8 @@ class Scene : public std::enable_shared_from_this<Scene> {
         std::optional<float4x4> prev_global_inverse_transposed;
 
         bool transform_dirty = true;
+
+        uint32_t serial = 0;
     };
 
     friend inline std::string format_as(const Node& node) {
@@ -300,6 +303,8 @@ class Scene : public std::enable_shared_from_this<Scene> {
 
         SmallSet<NodeID, 1> instances;
         uint32_t animated_instance_count = 0;
+
+        uint32_t serial = 0;
 
         bool is_dynamic() const {
             return mesh && (mesh->is_morphed() || animated_instance_count > 0);
@@ -695,6 +700,8 @@ class Scene : public std::enable_shared_from_this<Scene> {
     // this only changes if the mesh groups changed or if a transform changes (TODO: selectively
     // upload transforms)
     void upload_geometry_data(const CommandBufferHandle& cmd);
+    void upload_prev_geometry_remap(const CommandBufferHandle& cmd,
+                                    const std::vector<uint32_t>& instance_indices);
 
     // this only changes if the mesh groups changed or if a transform changes (TODO: selectively
     // upload transforms)
@@ -860,6 +867,11 @@ class Scene : public std::enable_shared_from_this<Scene> {
     vk::DeviceSize shared_ib_capacity = 0;
 
     std::vector<GeometryData> geometries;
+    std::vector<uint64_t> geometry_keys;
+    std::vector<uint64_t> prev_geometry_keys;
+    std::vector<GeometryRemap> prev_geometry_remap;
+    std::unordered_map<uint64_t, GeometryID> geometry_of_key;
+    uint32_t next_serial = 0;
     struct BLASGeometry {
         std::vector<vk::AccelerationStructureGeometryKHR> geometries;
         std::vector<vk::AccelerationStructureBuildRangeInfoKHR> ranges;
@@ -877,6 +889,7 @@ class Scene : public std::enable_shared_from_this<Scene> {
     BufferHandle inverse_transposed_instance_transforms_buffer;
     BufferHandle prev_instance_transforms_buffer;
     BufferHandle prev_inverse_transposed_instance_transforms_buffer;
+    BufferHandle prev_geometry_remap_buffer;
 
     std::vector<vk::AccelerationStructureInstanceKHR> tlas_instances;
     BufferHandle tlas_instances_buffer;
