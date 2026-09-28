@@ -1,0 +1,209 @@
+#pragma once
+
+// The spatial neighbors a pixel resamples from: reciprocal pairs [Lin et al. 2026, 5.1], a
+// low-discrepancy disk, or compatibility-guided neighbor selection [Junkins et al. 2026,
+// algorithm 1].
+
+#include "merian-graph/nodes/render_restir_pt/render_restir_pt.slangh"
+
+#include "merian-shaders/utils/math-constants.slangh"
+
+namespace merian {
+
+extern static const uint merian_restir_pt_neighbor_selection = RestirPTNeighborsReciprocal;
+extern static const int merian_restir_pt_neighbor_count = 3;
+// K: candidates CGNS scores per pixel and round
+extern static const int merian_restir_pt_cgns_candidates = 32;
+extern static const bool merian_restir_pt_cgns_early_stopping = true;
+extern static const bool merian_restir_pt_geometry_rejection = true;
+extern static const float merian_restir_pt_reject_normal = 0.5f;
+extern static const float merian_restir_pt_reject_depth = 0.1f;
+
+static const float RESTIR_PT_EPSILON = 1e-8f;
+// period of the low-discrepancy offsets, so that neighbouring pixels take different runs
+static const uint RESTIR_PT_OFFSET_COUNT = 8192;
+
+// The primary surface of a pixel, as the neighbor heuristics see it.
+struct RestirPTSurface {
+    float3 normal;
+    // distance from the camera, 0 where the primary ray left the scene
+    float dist;
+
+    bool is_surface() {
+        return dist > 0.f;
+    }
+}
+
+RestirPTSurface
+restir_pt_surface(const GBuffer gbuffer, const uint2 pixel) {
+    RestirPTSurface s;
+    s.normal = gbuffer.get_normal(pixel);
+    s.dist = gbuffer.get_hit(pixel).is_valid() ? gbuffer.get_linear_z(pixel) : 0.f;
+    return s;
+}
+
+// Symmetric, so that a reciprocal pair agrees about whether it is one.
+bool restir_pt_compatible(const RestirPTSurface a, const RestirPTSurface b) {
+    if (!a.is_surface() || !b.is_surface())
+        return false;
+    if (!merian_restir_pt_geometry_rejection)
+        return true;
+    return dot(a.normal, b.normal) >= merian_restir_pt_reject_normal &&
+           abs(a.dist - b.dist) < merian_restir_pt_reject_depth * max(a.dist, b.dist);
+}
+
+uint restir_pt_pack_pixel(const int2 pixel) {
+    return uint(pixel.x) | (uint(pixel.y) << 16);
+}
+
+int2 restir_pt_unpack_pixel(const uint packed) {
+    return int2(packed & 0xFFFFu, packed >> 16);
+}
+
+static const uint RESTIR_PT_NO_NEIGHBOR = ~0u;
+
+// Every pixel of a periodic tile holds the offset to its partner, which holds the opposite one.
+// A per-round translation, flip and transpose of the tile keeps the pairs reciprocal while it
+// moves them around [Lin et al. 2026, 5.1].
+int2 restir_pt_reciprocal_neighbor(const RestirPTUintAddress pairing,
+                                   const uint transform,
+                                   const uint2 pixel,
+                                   const uint slot) {
+    const uint period =
+        pairing[RESTIR_PT_PAIRING_EXTENT * RESTIR_PT_PAIRING_EXTENT * RESTIR_PT_MAX_NEIGHBORS +
+                slot];
+    const bool flip_x = (transform & 0x1u) != 0;
+    const bool flip_y = (transform & 0x2u) != 0;
+    const bool transpose = (transform & 0x4u) != 0;
+    uint x = (pixel.x + ((transform >> 3) & 0x3FFFu)) % period;
+    uint y = (pixel.y + (transform >> 17)) % period;
+    if (flip_x)
+        x = period - 1 - x;
+    if (flip_y)
+        y = period - 1 - y;
+    if (transpose) {
+        const uint t = x;
+        x = y;
+        y = t;
+    }
+    const uint packed =
+        pairing[RESTIR_PT_PAIRING_EXTENT * RESTIR_PT_PAIRING_EXTENT * slot + y * period + x];
+    int2 delta = int2(int(packed & 0xFFu) - 128, int((packed >> 8) & 0xFFu) - 128);
+    if (transpose)
+        delta = delta.yx;
+    if (flip_x)
+        delta.x = -delta.x;
+    if (flip_y)
+        delta.y = -delta.y;
+    return int2(pixel) + delta;
+}
+
+// Unit-disk offset i of the R2 sequence [Roberts 2018] under the concentric mapping
+// [Shirley and Chiu 1997].
+float2 restir_pt_disk_offset(const uint index) {
+    // increments are 1 / rho and 1 / rho^2 with the plastic constant rho
+    const float phi = 1.f / 1.3247179572447f;
+    const float n = float(index + 1);
+    const float a = 2.f * frac(0.5f + phi * n) - 1.f;
+    const float b = 2.f * frac(0.5f + phi * phi * n) - 1.f;
+
+    float r, angle;
+    if (abs(a) > abs(b)) {
+        r = a;
+        angle = a != 0.f ? MERIAN_M_PI_4 * (b / a) : 0.f;
+    } else {
+        r = b;
+        angle = b != 0.f ? MERIAN_M_PI_2 - MERIAN_M_PI_4 * (a / b) : 0.f;
+    }
+    return r * float2(cos(angle), sin(angle));
+}
+
+// World-space radius subtending `solid_angle` at distance d [Keller et al. 2016]; it makes the
+// position term agnostic to scene scale [Junkins et al. 2026, 4.3].
+float restir_pt_cgns_scale(const float solid_angle, const float dist) {
+    return max(RESTIR_PT_EPSILON, sqrt(solid_angle * MERIAN_M_1_PI) * dist);
+}
+
+// h(x1, y1) = h_position * h_normal with h_position = exp(-||x1 - y1|| / s) and
+// h_normal = max(n_x . n_y, 0)^beta [Junkins et al. 2026, eq. 14 and 15].
+float restir_pt_cgns_score(const RestirPTSurface query,
+                           const float3 query_pos,
+                           const RestirPTSurface candidate,
+                           const float3 candidate_pos,
+                           const float scale,
+                           const float normal_beta) {
+    // two pixels that both left the scene reuse well; a surface and the environment do not
+    if (!query.is_surface() || !candidate.is_surface())
+        return query.is_surface() == candidate.is_surface() ? 1.f : RESTIR_PT_EPSILON;
+    const float position_score = exp(-distance(query_pos, candidate_pos) / scale);
+    const float normal_score = max(0.f, dot(query.normal, candidate.normal));
+    return clamp(position_score * pow(normal_score, normal_beta), RESTIR_PT_EPSILON, 1.f);
+}
+
+// A-ES [Efraimidis 2015]: key = log(u) / w, keep the M largest. For M = 1 it is A-Chao
+// [Chao 1982] in distribution; unlike A-Chao it returns M distinct items for M > 1.
+struct RestirPTCgnsSelection {
+    int2 selected[RESTIR_PT_MAX_NEIGHBORS];
+    float keys[RESTIR_PT_MAX_NEIGHBORS];
+
+    __init() {
+        for (uint i = 0; i < RESTIR_PT_MAX_NEIGHBORS; i++) {
+            selected[i] = int2(-1);
+            keys[i] = -MERIAN_FLT_MAX;
+        }
+    }
+
+    [mutating] void add(const int2 candidate, const float score, inout RandomGenerator rng) {
+        const float key =
+            log(max(rng.next_float(), RESTIR_PT_EPSILON)) / max(score, RESTIR_PT_EPSILON);
+        uint min_index = 0;
+        for (uint i = 1; i < uint(merian_restir_pt_neighbor_count); i++) {
+            if (keys[i] < keys[min_index])
+                min_index = i;
+        }
+        if (key > keys[min_index]) {
+            selected[min_index] = candidate;
+            keys[min_index] = key;
+        }
+    }
+}
+
+// Draws K candidates from a quasi-random disk around `pixel`, scores each by how compatible its
+// primary hit is with this one, and keeps M of them in proportion to that score.
+RestirPTCgnsSelection restir_pt_cgns_select(const Camera camera,
+                                            const GBuffer gbuffer,
+                                            const uint2 pixel,
+                                            const uint2 dim,
+                                            const float radius,
+                                            const float solid_angle,
+                                            const float normal_beta,
+                                            const float early_stop_cutoff,
+                                            inout RandomGenerator rng) {
+    const RestirPTSurface query = restir_pt_surface(gbuffer, pixel);
+    const float3 query_pos = camera.position_from_linear_z(pixel, dim, query.dist);
+    const float scale = restir_pt_cgns_scale(solid_angle, query.dist);
+    const uint start = uint(rng.next_float() * RESTIR_PT_OFFSET_COUNT);
+
+    RestirPTCgnsSelection selection = RestirPTCgnsSelection();
+    int high_quality = 0;
+    for (int k = 0; k < merian_restir_pt_cgns_candidates; k++) {
+        const int2 candidate =
+            int2(round(float2(pixel) +
+                       radius * restir_pt_disk_offset((start + uint(k)) % RESTIR_PT_OFFSET_COUNT)));
+        if (any(candidate < 0) || any(candidate >= int2(dim)) || all(candidate == int2(pixel)))
+            continue;
+        const RestirPTSurface other = restir_pt_surface(gbuffer, uint2(candidate));
+        const float score = restir_pt_cgns_score(
+            query, query_pos, other,
+            camera.position_from_linear_z(uint2(candidate), dim, other.dist), scale, normal_beta);
+        selection.add(candidate, score, rng);
+
+        // stop once M candidates clear the cutoff [Junkins et al. 2026, 5]
+        if (merian_restir_pt_cgns_early_stopping && score >= early_stop_cutoff &&
+            ++high_quality >= merian_restir_pt_neighbor_count)
+            break;
+    }
+    return selection;
+}
+
+} // namespace merian

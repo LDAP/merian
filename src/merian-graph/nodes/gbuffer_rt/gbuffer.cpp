@@ -159,6 +159,7 @@ GBufferRTNode::process(const NodeIO& io, const NodeProcessInfo& info, Submission
             mask |= (1u << bit);
     }
     globals->get_cursor()["params"]["instance_mask"] = mask;
+    io[con_gbuffer]->set_instance_mask(mask);
 
     if (scene->is_ready()) {
         cmd->bind(pipe);

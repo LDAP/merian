@@ -1,0 +1,29 @@
+{
+    "cli": {
+        "max-path-length": {
+            "pointer": "/nodes/render/properties/max path length"
+        },
+        "spp": {
+            "pointer": "/nodes/render/properties/samples per pixel"
+        }
+    },
+    "nodes": {
+        "gbuffer": {
+            "$+$outputs": [
+                "gbuffer->render.prev_gbuffer"
+            ]
+        },
+        "render": {
+            "$+$outputs": [
+                "reservoirs->render.prev_reservoirs"
+            ],
+            "enabled": true,
+            "properties": {
+                "emission on primary": true,
+                "max path length": 5,
+                "samples per pixel": 1
+            },
+            "type": "Render (ReSTIR PT)"
+        }
+    }
+}

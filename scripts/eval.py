@@ -250,6 +250,7 @@ def variant_extra(variant, out_dir):
             except json.JSONDecodeError:
                 node[parts[-1]] = value
         merge = out_dir / "overrides.json"
+        out_dir.mkdir(parents=True, exist_ok=True)
         merge.write_text(json.dumps(config, indent=1))
         extra += ["--merge", str(merge)]
     return extra

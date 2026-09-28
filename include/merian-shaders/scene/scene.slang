@@ -433,6 +433,30 @@ struct Scene {
         return to_prev_world_position(tri.gd, hit.instance_index, prev_obj);
     }
 
+    // The surface where it was in the previous frame. Only positions are kept for the previous
+    // frame, so the shading attributes are the current ones.
+    Surface get_prev_surface(const Hit hit, const TriangleHit tri) {
+        float3 p0 = tri.v0.position;
+        float3 p1 = tri.v1.position;
+        float3 p2 = tri.v2.position;
+        if (tri.gd.flags & GeometryDataFlags::HasPrevVertices) {
+            const uint3 indices = get_vertex_indices(tri.gd, hit.primitive_id);
+            p0 = tri.gd.prev_vertices[indices.x].position;
+            p1 = tri.gd.prev_vertices[indices.y].position;
+            p2 = tri.gd.prev_vertices[indices.z].position;
+        }
+        p0 = to_prev_world_position(tri.gd, hit.instance_index, p0);
+        p1 = to_prev_world_position(tri.gd, hit.instance_index, p1);
+        p2 = to_prev_world_position(tri.gd, hit.instance_index, p2);
+
+        Surface s = get_surface(hit, tri);
+        const float3 bary = hit.get_barycentrics3();
+        s.pos = bary.x * p0 + bary.y * p1 + bary.z * p2;
+        const float3 face_normal = normalize(cross(p1 - p0, p2 - p0));
+        s.face_normal = (tri.gd.flags & GeometryDataFlags::FlipFacing) ? -face_normal : face_normal;
+        return s;
+    }
+
     // Pixel-space delta of the surface point between the previous and the current projection.
     float2 compute_motion_vector(const float3 prev_pos,
                                  const float3 world_pos,
@@ -455,14 +479,23 @@ struct Scene {
                                    const LODSampler2D lod = DefaultLODSampler(),
                                    const bool with_material = true) {
         const TriangleHit tri = get_triangle_hit(hit, gd);
-        const Surface surface = get_surface(hit, tri);
+        return get_shading_point(ray, hit, tri, get_surface(hit, tri), ctx, lod, with_material);
+    }
 
+    // For callers that already hold the triangle and its surface.
+    ShadingPoint get_shading_point(const RayDesc ray,
+                                   const Hit hit,
+                                   const TriangleHit tri,
+                                   const Surface surface,
+                                   const RenderContext ctx = RenderContext(),
+                                   const LODSampler2D lod = DefaultLODSampler(),
+                                   const bool with_material = true) {
         const float3 prev_pos = get_prev_world_position(hit, tri);
 
         OrthonormalFrame frame = surface.frame;
         float3 face_normal = surface.face_normal;
         bool front_facing = true;
-        if (gd.flags & GeometryDataFlags::TwoSided) {
+        if (tri.gd.flags & GeometryDataFlags::TwoSided) {
             front_facing = dot(-ray.Direction, surface.face_normal) >= 0.f;
             if (!front_facing) {
                 frame.flip_normal();

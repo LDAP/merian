@@ -168,6 +168,9 @@ class GBuffer {
     // One view per texture of the layout.
     void set_resources(const std::vector<ImageViewHandle>& textures);
 
+    // The TLAS instance mask of the primary rays, for consumers that trace them again.
+    void set_instance_mask(uint32_t mask);
+
     vk::Extent3D get_extent() const {
         return extent;
     }

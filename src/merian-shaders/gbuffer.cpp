@@ -245,6 +245,9 @@ public interface IGBuffer {{
 
     uint2 get_dimensions();
 
+    // TLAS instance mask the primary rays were traced with
+    uint get_instance_mask();
+
     Texels load(uint2 pixel);
 
 {3}    uint get_encoded_normal(uint2 pixel) {{ return load(pixel).encoded_normal; }}
@@ -529,9 +532,14 @@ public struct GBufferTexels_{1} : IGBufferTexels {{
 public struct GBuffer_{1} : IGBuffer {{
     public typealias Texels = GBufferTexels_{1};
 
-{4}
+{4}    public uint instance_mask;
+
     public uint2 get_dimensions() {{
         return texture_dimensions(tex0);
+    }}
+
+    public uint get_instance_mask() {{
+        return instance_mask;
     }}
 
     public Texels load(uint2 pixel) {{
@@ -574,6 +582,11 @@ GBuffer::GBuffer(const ShaderCompileContextHandle& compile_context,
         program->create_shader_object_for_type(context, layout->get_type_name(false), allocator);
     w_shader_object =
         program->create_shader_object_for_type(context, layout->get_type_name(true), allocator);
+    set_instance_mask(0xFFu);
+}
+
+void GBuffer::set_instance_mask(const uint32_t mask) {
+    r_shader_object->get_cursor()["instance_mask"] = mask;
 }
 
 void GBuffer::set_resources(const std::vector<ImageViewHandle>& textures) {

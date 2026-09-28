@@ -21,6 +21,9 @@
                 },
                 "restir_di": {
                     "merge": "renderers/restir_di.json"
+                },
+                "restir_pt": {
+                    "merge": "renderers/restir_pt.json"
                 }
             }
         }

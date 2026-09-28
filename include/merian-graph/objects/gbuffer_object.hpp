@@ -37,6 +37,10 @@ class GBufferObject : public GraphShaderObject {
     // The texture holding the field, laid out as its texture group asked for. Always in eGeneral.
     const ImageViewHandle& get_view(GBufferField field) const;
 
+    void set_instance_mask(uint32_t mask) {
+        gbuffer->set_instance_mask(mask);
+    }
+
   private:
     const vk::Extent3D extent;
     const GBufferLayoutHandle layout;
