@@ -25,7 +25,8 @@ DeviceSupportInfo RenderPT::query_device_support(const DeviceSupportQueryInfo& q
     composition->add_module_from_path("merian-graph/nodes/render_pt/render_pt.slang", true);
     composition->add_module_from_path("merian-graph/nodes/render_pt/render_pt_volume.slang", true);
     const auto program = SlangProgram::create(query_info.compile_context, composition);
-    return DeviceSupportInfo::check(query_info, {"rayTracingPipeline"}, {"rayQuery"}) &
+    return DeviceSupportInfo::check(query_info, {"rayTracingPipeline"},
+                                    {"rayQuery", "rayTracingInvocationReorder"}) &
            program.get()->query_device_support(query_info);
 }
 
@@ -334,40 +335,41 @@ void RenderPT::update_render_constants() {
             mask |= (1u << bit);
     }
 
-    const std::string constants =
-        fmt::format("namespace merian {{\n"
-                    "export static const bool merian_render_emission_on_primary = {};\n"
-                    "export static const int merian_render_guiding_debug_view = {};\n"
-                    "export static const bool merian_render_scatter_stats = {};\n"
-                    "export static const bool merian_render_follow_specular = {};\n"
-                    "export static const float merian_render_specular_alpha = {:f};\n"
-                    "export static const int merian_render_spp = {};\n"
-                    "export static const uint merian_render_seed = {}u;\n"
-                    "export static const int merian_render_max_path_length = {};\n"
-                    "export static const uint merian_render_instance_mask = {}u;\n"
-                    "export static const bool merian_render_enable_ser = {};\n"
-                    "export static const bool merian_render_demodulate_albedo = {};\n"
-                    "export static const int merian_render_nee_mode = {};\n"
-                    "export static const float merian_render_nee_probability = {:f};\n"
-                    "export static const int merian_render_nee_bounces = {};\n"
-                    "export static const int merian_render_scatter_mode = {};\n"
-                    "export static const int merian_render_scatter_candidates = {};\n"
-                    "export static const int merian_render_volume_spp = {};\n"
-                    "export static const float merian_render_volume_forward_project_min_z "
-                    "= {:f};\n"
-                    "export static const float merian_guiding_share = {:f};\n"
-                    "export static const bool merian_guiding_scale_with_alpha = {};\n"
-                    "export static const float merian_guiding_alpha_threshold = {:f};\n"
-                    "export static const int merian_guiding_direct_target = {};\n"
-                    "export static const float merian_guiding_distance_share = {:f};\n"
-                    "}}",
-                    emission_on_primary ? "true" : "false", guiding_debug_view,
-                    scatter_stats ? "true" : "false", follow_specular ? "true" : "false",
-                    specular_alpha, spp, seed, max_path_length, mask, enable_ser ? "true" : "false",
-                    demodulate_albedo ? "true" : "false", nee_mode, nee_probability, nee_bounces,
-                    scatter_mode, scatter_candidates, volume_spp, volume_forward_project_min_z,
-                    guiding_share, guiding_scale_with_alpha ? "true" : "false",
-                    guiding_alpha_threshold, guiding_direct_target, guiding_distance_share);
+    const std::string constants = fmt::format(
+        "namespace merian {{\n"
+        "export static const bool merian_render_emission_on_primary = {};\n"
+        "export static const int merian_render_guiding_debug_view = {};\n"
+        "export static const bool merian_render_scatter_stats = {};\n"
+        "export static const bool merian_render_follow_specular = {};\n"
+        "export static const float merian_render_specular_alpha = {:f};\n"
+        "export static const int merian_render_spp = {};\n"
+        "export static const uint merian_render_seed = {}u;\n"
+        "export static const int merian_render_max_path_length = {};\n"
+        "export static const uint merian_render_instance_mask = {}u;\n"
+        "export static const bool merian_render_enable_ser = {};\n"
+        "export static const bool merian_render_demodulate_albedo = {};\n"
+        "export static const int merian_render_nee_mode = {};\n"
+        "export static const float merian_render_nee_probability = {:f};\n"
+        "export static const int merian_render_nee_bounces = {};\n"
+        "export static const int merian_render_scatter_mode = {};\n"
+        "export static const int merian_render_scatter_candidates = {};\n"
+        "export static const bool merian_render_russian_roulette = {};\n"
+        "export static const int merian_render_volume_spp = {};\n"
+        "export static const float merian_render_volume_forward_project_min_z "
+        "= {:f};\n"
+        "export static const float merian_guiding_share = {:f};\n"
+        "export static const bool merian_guiding_scale_with_alpha = {};\n"
+        "export static const float merian_guiding_alpha_threshold = {:f};\n"
+        "export static const int merian_guiding_direct_target = {};\n"
+        "export static const float merian_guiding_distance_share = {:f};\n"
+        "}}",
+        emission_on_primary ? "true" : "false", guiding_debug_view,
+        scatter_stats ? "true" : "false", follow_specular ? "true" : "false", specular_alpha, spp,
+        seed, max_path_length, mask, enable_ser ? "true" : "false",
+        demodulate_albedo ? "true" : "false", nee_mode, nee_probability, nee_bounces, scatter_mode,
+        scatter_candidates, russian_roulette ? "true" : "false", volume_spp,
+        volume_forward_project_min_z, guiding_share, guiding_scale_with_alpha ? "true" : "false",
+        guiding_alpha_threshold, guiding_direct_target, guiding_distance_share);
     SPDLOG_INFO("render_pt constants:\n{}", constants);
     composition->add_module_from_string("render_pt_constants", constants);
 }
@@ -386,6 +388,9 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
     constants_changed |=
         config.config_int("max path length", max_path_length,
                           "Maximum number of path segments, including the primary hit.", 1, 16);
+    constants_changed |=
+        config.config_bool("russian roulette", russian_roulette,
+                           "Terminate paths in proportion to the light they can still carry.");
     constants_changed |=
         config.config_bool("emission on primary", emission_on_primary,
                            "Fold primary-hit emission into irradiance (self-contained). "

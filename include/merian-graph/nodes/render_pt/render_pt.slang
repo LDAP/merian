@@ -40,6 +40,7 @@ extern static const int merian_render_nee_bounces = 0;
 // resamples them by how much the shading function makes of each
 extern static const int merian_render_scatter_mode = SCATTER_MODE_MIS;
 extern static const int merian_render_scatter_candidates = 2;
+extern static const bool merian_render_russian_roulette = true;
 } // namespace merian
 
 // Thread reordering is a ray tracing pipeline feature, so the call may only exist in the raygen
@@ -188,6 +189,13 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
             direct = scene.sample_direct_light(
                 lights,
                 make_scatter_target(bsdf, guiding, mixture, medium, frame, wi_local, ns, ng), rng);
+        }
+
+        if (merian_render_russian_roulette) {
+            const float survive = min(1.f, yuv_luminance(throughput));
+            if (rng.next_float() >= survive)
+                break;
+            throughput /= survive;
         }
 
         // 3. one scatter direction: from a light, or out of the mixture. The light technique
