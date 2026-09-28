@@ -396,7 +396,7 @@ SVGF::NodeStatusFlags SVGF::properties(Properties& config) {
     needs_rebuild |= config.config_bool(
         "modulate albedo", taa_modulate_albedo,
         "Re-modulate the gbuffer albedo the renderer demodulated out. Disable if the renderer's "
-        "'demodulate albedo' is off.");
+        "'output/demodulate albedo' is off.");
     if (enable_mv) {
         needs_rebuild |=
             config.config_options("mv sampling", taa_mv_sampling, {"center", "magnitude dilation"},

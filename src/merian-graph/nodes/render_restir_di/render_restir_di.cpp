@@ -53,9 +53,8 @@ void RenderRestirDI::update_render_constants() {
                     "export static const float merian_restir_boiling_filter_strength = {:f};\n"
                     "}}",
                     emission_on_primary ? "true" : "false", demodulate_albedo ? "true" : "false",
-                    spp, spatial_iterations,
-                    apply_mv ? "true" : "false", visibility_shade ? "true" : "false",
-                    boiling_filter_strength));
+                    spp, spatial_iterations, apply_mv ? "true" : "false",
+                    visibility_shade ? "true" : "false", boiling_filter_strength));
 }
 
 std::vector<InputConnectorDescriptor> RenderRestirDI::describe_inputs() {
@@ -247,10 +246,6 @@ RenderRestirDI::NodeStatusFlags RenderRestirDI::properties(Properties& config) {
         config.config_bool("emission on primary", emission_on_primary,
                            "Fold the primary hit's own emission (and the env map on a miss) into "
                            "the output. Otherwise it is the GBuffer emission texture's job.");
-    needs_reconnect |= config.config_bool(
-        "demodulate albedo", demodulate_albedo,
-        "Divide the primary-hit albedo out of the output so a denoiser can re-modulate after "
-        "filtering. Use with 'emission on primary' disabled (emission is albedo-independent).");
 
     config.st_separate("Temporal reuse");
     config.config_bool("enable temporal reuse", temporal_enable);
@@ -285,13 +280,19 @@ RenderRestirDI::NodeStatusFlags RenderRestirDI::properties(Properties& config) {
     constants_changed |=
         config.config_bool("visibility", visibility_shade, "Trace a shadow ray before shading.");
 
+    if (config.st_begin_child("output", "Output")) {
+        needs_reconnect |= config.config_bool(
+            "demodulate albedo", demodulate_albedo,
+            "Divide the primary-hit albedo out of the output so a denoiser can re-modulate after "
+            "filtering. Use with 'emission on primary' disabled (emission is albedo-independent).");
+        needs_reconnect |= config.config_enum("irradiance format", irradiance_format,
+                                              Properties::OptionsStyle::COMBO);
+        config.st_end_child();
+    }
+
     if (constants_changed && composition) {
         update_render_constants();
     }
-
-    config.st_separate();
-    needs_reconnect |=
-        config.config_enum("irradiance format", irradiance_format, Properties::OptionsStyle::COMBO);
 
     if (needs_reconnect)
         return NEEDS_RECONNECT;

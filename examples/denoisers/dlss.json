@@ -38,7 +38,9 @@
         },
         "render": {
             "properties": {
-                "demodulate albedo": false
+                "output": {
+                    "demodulate albedo": false
+                }
             }
         },
         "scene": {
