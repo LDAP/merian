@@ -408,24 +408,30 @@ RenderRestirPT::process(const NodeIO& io, const NodeProcessInfo& info, Submissio
         vk::PipelineStageFlagBits::eComputeShader |
         (use_raygen ? vk::PipelineStageFlagBits::eRayTracingShaderKHR : vk::PipelineStageFlags{});
     const auto sync = [&](const vk::PipelineStageFlags dst_stages = {}) {
+        const vk::AccessFlags indirect = (dst_stages & vk::PipelineStageFlagBits::eDrawIndirect)
+                                             ? vk::AccessFlagBits::eIndirectCommandRead
+                                             : vk::AccessFlags{};
         cmd->barrier(
             stages, stages | dst_stages,
             vk::MemoryBarrier{vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite,
                               vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite |
-                                  vk::AccessFlagBits::eIndirectCommandRead});
+                                  indirect});
     };
+
+    // a pass runs more than once per frame, so its set must not change once bound
+    for (uint32_t p = 0; p < PassCount; p++) {
+        auto cursor = params[p]->get_cursor();
+        cursor["gbuffer"] = io[con_gbuffer].r();
+        cursor["prev_gbuffer"] = io[con_prev_gbuffer].r();
+        cursor["irradiance"] = io[con_irradiance].get_texture();
+        cursor["queue"] = queue;
+    }
 
     const auto run = [&](const Pass p, const BufferHandle& in, const BufferHandle& target,
                          const uint32_t flags) {
         const auto ep = entry_points[p].get();
         const auto pipe = pipelines[p].get();
         const auto obj = params[p].get();
-
-        auto cursor = obj->get_cursor();
-        cursor["gbuffer"] = io[con_gbuffer].r();
-        cursor["prev_gbuffer"] = io[con_prev_gbuffer].r();
-        cursor["irradiance"] = io[con_irradiance].get_texture();
-        cursor["queue"] = queue;
 
         pc.flags = flags;
         pc.reservoirs_in = in ? in->get_device_address() : 0;
