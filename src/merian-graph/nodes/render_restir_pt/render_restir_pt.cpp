@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cmath>
 #include <fmt/format.h>
+#include <numbers>
 #include <numeric>
 #include <random>
 
@@ -32,7 +33,7 @@ std::vector<uint32_t> generate_pairing(const float radius, const uint32_t seed) 
                                      RESTIR_PT_MAX_NEIGHBORS,
                                  pack_delta(0, 0));
     // the mean of a Rayleigh distribution is sigma sqrt(pi / 2)
-    const float sigma = std::max(radius, 1.f) / std::sqrt(0.5f * static_cast<float>(M_PI));
+    const float sigma = std::max(radius, 1.f) / std::sqrt(0.5f * std::numbers::pi_v<float>);
     constexpr int max_delta = 127;
 
     for (uint32_t slot = 0; slot < RESTIR_PT_MAX_NEIGHBORS; slot++) {

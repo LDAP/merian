@@ -7,6 +7,8 @@
 
 #include <cstdint>
 
+using uint = uint32_t;
+
 using float2 = merian::float2;
 using float3 = merian::float3;
 using float4 = merian::float4;
