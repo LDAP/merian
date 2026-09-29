@@ -362,6 +362,15 @@ ImageFormat image_format_from_extension(const std::filesystem::path& path) noexc
     return ImageFormat::AUTO;
 }
 
+bool rgba8_is_opaque(const uint8_t* data, const size_t texel_count) {
+    for (size_t i = 0; i < texel_count; i++) {
+        if (data[i * 4 + 3] != 255) {
+            return false;
+        }
+    }
+    return true;
+}
+
 BlobHandle
 image_load_u8(const std::filesystem::path& path, ImageInfo& info, const int desired_channels) {
     // BCn-compressed DDS files are not handled by stb; decode them to RGBA8 here so every consumer

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cctype>
 #include <cstring>
 #include <fstream>
@@ -122,6 +123,43 @@ void decode_alpha_block(const uint8_t* src, std::array<uint8_t, 16>& out) {
     }
 }
 
+bool mip0_is_opaque(const vk::Format format,
+                    const uint32_t width,
+                    const uint32_t height,
+                    const uint8_t* data,
+                    const size_t size) {
+    const size_t blocks = static_cast<size_t>((width + 3) / 4) * ((height + 3) / 4);
+    if (blocks * 16 > size) {
+        return false;
+    }
+
+    const bool is_bc2 = format == vk::Format::eBc2UnormBlock || format == vk::Format::eBc2SrgbBlock;
+    const bool is_bc3 = format == vk::Format::eBc3UnormBlock || format == vk::Format::eBc3SrgbBlock;
+    const bool is_bc7 = format == vk::Format::eBc7UnormBlock || format == vk::Format::eBc7SrgbBlock;
+    if (!is_bc2 && !is_bc3 && !is_bc7) {
+        return false;
+    }
+
+    for (size_t block = 0; block < blocks; block++) {
+        const uint8_t* src = data + block * 16;
+        if (is_bc2) {
+            if (!std::all_of(src, src + 8, [](const uint8_t b) { return b == 0xFF; })) {
+                return false;
+            }
+        } else if (is_bc3) {
+            std::array<uint8_t, 16> alpha{};
+            decode_alpha_block(src, alpha);
+            if (!std::all_of(alpha.begin(), alpha.end(),
+                             [](const uint8_t a) { return a == 255; })) {
+                return false;
+            }
+        } else if (src[0] == 0 || std::countr_zero(src[0]) >= 4) {
+            return false;
+        }
+    }
+    return true;
+}
+
 } // namespace
 
 bool is_dds(const std::filesystem::path& path) {
@@ -221,6 +259,8 @@ DdsImage dds_load(const std::filesystem::path& path, const bool srgb) {
     file.read(reinterpret_cast<char*>(dds.data.data()),
               static_cast<std::streamsize>(dds.data.size()));
     dds.has_alpha = format_has_alpha(dds.format);
+    dds.is_opaque = !dds.has_alpha || mip0_is_opaque(dds.format, dds.width, dds.height,
+                                                     dds.data.data(), dds.data.size());
     return dds;
 }
 

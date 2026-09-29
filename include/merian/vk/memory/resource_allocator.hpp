@@ -242,7 +242,6 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
                                                  const std::string& debug_name = {});
 
     // Load a texture from any supported image file (including BCn DDS). Optionally reports whether
-    // the source has an alpha channel. Left in ShaderReadOnlyOptimal.
     TextureHandle create_texture_from_file(
         const CommandBufferHandle& cmd,
         const std::filesystem::path& path,
@@ -264,6 +263,11 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
     create_acceleration_structure(const vk::AccelerationStructureTypeKHR type,
                                   const vk::AccelerationStructureBuildSizesInfoKHR& size_info,
                                   const std::string& debug_name = {});
+
+    [[nodiscard]]
+    MicromapHandle create_micromap(const vk::MicromapTypeEXT type,
+                                   const vk::MicromapBuildSizesInfoEXT& size_info,
+                                   const std::string& debug_name = {});
 
     //--------------------------------------------------------------------------------------------------
 

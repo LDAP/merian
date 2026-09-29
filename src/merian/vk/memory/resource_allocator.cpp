@@ -448,7 +448,7 @@ TextureHandle ResourceAllocator::create_texture_from_file(const CommandBufferHan
     if (is_dds(path)) {
         const DdsImage dds = dds_load(path, srgb);
         if (out_has_alpha != nullptr) {
-            *out_has_alpha = dds.has_alpha;
+            *out_has_alpha = !dds.is_opaque;
         }
         const SamplerHandle sampler = m_samplerPool->for_filter_and_address_mode(
             mag_filter, min_filter, address_mode, vk::SamplerMipmapMode::eLinear);
@@ -461,7 +461,9 @@ TextureHandle ResourceAllocator::create_texture_from_file(const CommandBufferHan
     ImageInfo info;
     const BlobHandle blob = image_load_u8(path, info, 4);
     if (out_has_alpha != nullptr) {
-        *out_has_alpha = info.source_channels == 4;
+        *out_has_alpha = info.source_channels == 4 &&
+                         !rgba8_is_opaque(blob->get_data<uint8_t>(),
+                                          static_cast<size_t>(info.width) * info.height);
     }
     const TextureHandle texture = create_texture_from_rgba8(
         cmd, blob->get_data<uint32_t>(), static_cast<uint32_t>(info.width),
@@ -501,6 +503,30 @@ AccelerationStructureHandle ResourceAllocator::create_acceleration_structure(
 #endif
 
     return AccelerationStructure::create(as, buffer);
+}
+
+MicromapHandle ResourceAllocator::create_micromap(const vk::MicromapTypeEXT type,
+                                                  const vk::MicromapBuildSizesInfoEXT& size_info,
+                                                  const std::string& debug_name) {
+    BufferHandle buffer = create_buffer(size_info.micromapSize,
+                                        vk::BufferUsageFlagBits::eMicromapStorageEXT |
+                                            vk::BufferUsageFlagBits::eShaderDeviceAddress,
+                                        MemoryMappingType::NONE, debug_name);
+    vk::MicromapEXT micromap;
+    vk::MicromapCreateInfoEXT create_info{{}, *buffer, {}, size_info.micromapSize, type};
+    check_result(
+        context->get_device()->get_device().createMicromapEXT(&create_info, nullptr, &micromap),
+        "could not create micromap");
+
+#ifndef NDEBUG
+    if (debug_utils) {
+        debug_utils->set_object_name(context->get_device()->get_device(), **buffer,
+                                     debug_name + " buffer");
+        debug_utils->set_object_name(context->get_device()->get_device(), micromap, debug_name);
+    }
+#endif
+
+    return Micromap::create(micromap, buffer);
 }
 
 DescriptorSetHandle

@@ -20,6 +20,7 @@ struct DdsImage {
     uint32_t mip_levels = 1;
     // True if the format carries an alpha channel.
     bool has_alpha = false;
+    bool is_opaque = true;
     std::vector<uint8_t> data;
 };
 

@@ -2,6 +2,7 @@
 
 #include "merian/utils/blob.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <string>
@@ -34,6 +35,8 @@ struct ImageInfo {
 // Throws std::runtime_error on failure.
 BlobHandle
 image_load_u8(const std::filesystem::path& path, ImageInfo& info, int desired_channels = 4);
+
+bool rgba8_is_opaque(const uint8_t* data, size_t texel_count);
 
 // Load as 32-bit float per channel. Any file format; LDR source values are mapped to [0, 1].
 // Throws std::runtime_error on failure.

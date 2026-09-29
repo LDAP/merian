@@ -1,6 +1,7 @@
 #include "merian-shaders/scene/fbx_scene.hpp"
 
 #include "merian-shaders/shading/materials/openpbr_material.hpp"
+#include "merian/io/image_io.hpp"
 #include "merian/utils/normal_encoding.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 
@@ -219,7 +220,7 @@ TextureID FBXScene::get_or_load_texture(const CommandBufferHandle& cmd,
             static_cast<uint32_t>(height), address_mode, vk::Filter::eLinear, vk::Filter::eLinear,
             !linear, tex->name.data, generate_mipmaps);
         cmd->barrier(texture->get_image()->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal));
-        slot.has_alpha = comp == 4;
+        slot.has_alpha = comp == 4 && !rgba8_is_opaque(pixels, static_cast<size_t>(width) * height);
         stbi_image_free(pixels);
     } else {
         // External file: one call dispatches to the right host-side loader by extension.

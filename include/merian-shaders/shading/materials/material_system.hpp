@@ -91,6 +91,15 @@ class MaterialSystem : public std::enable_shared_from_this<MaterialSystem> {
         return materials[id].emissive;
     }
 
+    TextureID get_alpha_texture_id(const MaterialID id) const {
+        assert(id < materials.size());
+        return materials[id].header.alpha_texture_id;
+    }
+
+    bool has_alpha_texture(const MaterialID id) const {
+        return get_alpha_texture_id(id) != TextureID(-1);
+    }
+
     // Upload material buffer to GPU and update ShaderObject state.
     void update(const CommandBufferHandle& cmd);
 

@@ -46,6 +46,14 @@ struct RayTracingProceduralHitGroup {
 
 class RayTracingPipeline : public Pipeline {
   private:
+    static vk::PipelineCreateFlags allow_opacity_micromaps(const ContextHandle& context,
+                                                           const vk::PipelineCreateFlags flags) {
+        if (context->get_device()->get_enabled_features().get_feature("micromap")) {
+            return flags | vk::PipelineCreateFlagBits::eRayTracingOpacityMicromapEXT;
+        }
+        return flags;
+    }
+
     // Use std::map with raw-pointer comparison from shared_ptr<T>::operator<
     using TriHitKey = std::pair<VulkanEntryPointHandle, VulkanEntryPointHandle>;
     using ProcHitKey =
@@ -65,10 +73,12 @@ class RayTracingPipeline : public Pipeline {
                        const void* pNext)
         : Pipeline(pipeline_layout->get_context(),
                    pipeline_layout,
-                   capture_statistics(pipeline_layout->get_context(),
-                                      raygen_groups.empty()
-                                          ? flags | vk::PipelineCreateFlagBits::eLibraryKHR
-                                          : flags)),
+                   capture_statistics(
+                       pipeline_layout->get_context(),
+                       allow_opacity_micromaps(pipeline_layout->get_context(),
+                                               raygen_groups.empty()
+                                                   ? flags | vk::PipelineCreateFlagBits::eLibraryKHR
+                                                   : flags))),
           raygen_groups(std::move(raygen_groups)), miss_groups(std::move(miss_groups)),
           triangle_hit_groups(std::move(triangle_hit_groups)),
           procedural_hit_groups(std::move(procedural_hit_groups)),

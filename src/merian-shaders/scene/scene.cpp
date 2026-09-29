@@ -53,6 +53,10 @@ Scene::Scene(const ShaderCompileContextHandle& compile_context,
                        "NullAccelerationStructure; }");
     set_env(std::make_shared<EmptyEnvMap>());
 
+    if (as_supported && OpacityMicromaps::is_supported(context)) {
+        opacity_micromaps = std::make_unique<OpacityMicromaps>(compile_context, context, allocator);
+    }
+
     // register the hint modules up front so a runtime toggle replaces them instead of adding them
     set_enable_thin_lens(false);
     set_exterior_volume(std::make_shared<VacuumVolume>());
@@ -70,8 +74,8 @@ DeviceSupportInfo Scene::query_device_support(const DeviceSupportQueryInfo& quer
     const SpirvReflect transform_prev(merian_transform_prev_vertex_slang_spv(),
                                       merian_transform_prev_vertex_slang_spv_size());
     return DeviceSupportInfo::check(query_info, {},
-                                    {"accelerationStructure", "storageBuffer16BitAccess",
-                                     "storageBuffer8BitAccess",
+                                    {"accelerationStructure", "micromap",
+                                     "storageBuffer16BitAccess", "storageBuffer8BitAccess",
                                      "uniformAndStorageBuffer8BitAccess"}) &
            transform.query_device_support(query_info) &
            transform_prev.query_device_support(query_info);
@@ -771,6 +775,16 @@ void Scene::properties_settings(Properties& props) {
         set_pretransform_animated(pretransform);
     }
     props.config_percent("BLAS Rebuild Fraction", blas_rebuild_fraction);
+
+    props.st_separate("Opacity Micromaps");
+    if (opacity_micromaps) {
+        props.config_bool("Opacity Micromaps", opacity_micromaps_enabled,
+                          "Settle alpha-tested hits during traversal instead of invoking the alpha "
+                          "test");
+        opacity_micromaps->properties(props);
+    } else {
+        props.output_text("not supported by the device");
+    }
 
     props.st_separate("Material System");
     float alpha_threshold = material_system->get_alpha_test_threshold();
@@ -1550,6 +1564,9 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                 MeshInfo& info = mesh_infos[mesh_id];
                 Mesh& mesh = *info.mesh;
 
+                if (mesh.indices_dirty || (mesh.vertices_dirty && !mesh.is_morphed()))
+                    info.uv_version++;
+
                 const bool needs_prev = needs_prev_vertices(group, info);
                 const bool has_prev = static_cast<bool>(info.prev_vertex_buffer);
                 if (needs_prev != has_prev)
@@ -1752,8 +1769,68 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
     }
 }
 
+void Scene::ensure_opacity_micromaps(const CommandBufferHandle& cmd) {
+    if (!opacity_micromaps) {
+        return;
+    }
+
+    std::vector<MeshID> changed;
+    if (opacity_micromaps_enabled) {
+        std::vector<OpacityMicromaps::MeshGeometry> alpha_tested;
+        for (MeshID mesh_id = 0; mesh_id < mesh_infos.size(); mesh_id++) {
+            const MeshInfo& info = mesh_infos[mesh_id];
+            if (!info.mesh || !info.vertex_buffer) {
+                continue;
+            }
+            const Mesh& mesh = *info.mesh;
+            if (mesh.is_opaque() || mesh.has_variable_topology() ||
+                mesh.get_primitive_count() == 0 ||
+                !material_system->has_alpha_texture(mesh.material_id)) {
+                continue;
+            }
+
+            OpacityMicromaps::MeshGeometry& geometry = alpha_tested.emplace_back();
+            geometry.mesh_id = mesh_id;
+            geometry.geometry.material_id = mesh.material_id;
+            geometry.geometry.primitive_count = mesh.get_primitive_count();
+            geometry.geometry.vertices = info.vertex_buffer.get_device_address();
+            geometry.geometry.indices =
+                info.index_buffer ? info.index_buffer.get_device_address() : vk::DeviceAddress{0};
+            geometry.geometry.flags = index_type_flag(mesh.index_type);
+            geometry.uv_version = info.uv_version;
+
+            const Mesh::MeshVertexData vertices = mesh.get_vertices();
+            const Mesh::MeshIndexData indices = mesh.get_indices();
+            const auto* host_vertices = std::get_if<Mesh::HostPacked<PackedVertexData>>(&vertices);
+            const auto* host_indices = std::get_if<Mesh::HostPacked<void>>(&indices);
+            if (host_vertices != nullptr && (host_indices != nullptr || !mesh.has_indices())) {
+                geometry.host_vertices = host_vertices->data;
+                geometry.host_indices = host_indices != nullptr ? host_indices->data : nullptr;
+                geometry.host_index_type = mesh.index_type;
+            }
+        }
+        opacity_micromaps->update(cmd, alpha_tested, material_system, changed);
+    } else {
+        opacity_micromaps->clear(cmd, changed);
+    }
+
+    for (const MeshID mesh_id : changed) {
+        if (mesh_id >= mesh_to_group.size() || mesh_to_group[mesh_id] == MESH_GROUP_ID_INVALID) {
+            continue;
+        }
+        MeshGroup& group = mesh_groups[mesh_to_group[mesh_id]];
+        if (group.blas) {
+            cmd->keep_until_pool_reset(std::move(group.blas));
+        }
+        group.cached_blas_size_info.reset();
+        group.blas_dirty = true;
+    }
+}
+
 void Scene::build_blas(const CommandBufferHandle& cmd) {
     MERIAN_PROFILE_SCOPE_GPU(cmd, "Scene::build_blas");
+
+    ensure_opacity_micromaps(cmd);
 
     blas_geometries.assign(mesh_groups.size(), {});
 
@@ -1768,6 +1845,7 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
         tlas_dirty = true;
 
         auto& blas_geometry = blas_geometries[group_id];
+        blas_geometry.micromaps.reserve(group.meshes.size());
 
         for (MeshID mesh_id : group.meshes) {
             const MeshInfo& info = mesh_infos[mesh_id];
@@ -1788,6 +1866,11 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
 
             if (mesh.flags & MeshFlags::IsOpaque) {
                 geom.flags = vk::GeometryFlagBitsKHR::eOpaque;
+            } else if (opacity_micromaps) {
+                vk::AccelerationStructureTrianglesOpacityMicromapEXT omm;
+                if (opacity_micromaps->get(mesh_id, omm)) {
+                    geom.geometry.triangles.pNext = &blas_geometry.micromaps.emplace_back(omm);
+                }
             }
 
             vk::AccelerationStructureBuildRangeInfoKHR range{};
@@ -1817,6 +1900,9 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
         const auto& size_info = *group.cached_blas_size_info;
 
         if (!group.blas || group.blas->get_size() < size_info.accelerationStructureSize) {
+            if (group.blas) {
+                cmd->keep_until_pool_reset(std::move(group.blas));
+            }
             group.blas = allocator->create_acceleration_structure(
                 vk::AccelerationStructureTypeKHR::eBottomLevel, size_info,
                 fmt::format("Scene::blas[{}]", group_id));
@@ -1859,8 +1945,10 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
             }
             const auto& size_info = *group.cached_blas_size_info;
 
-            if (i < rebuild_count) {
-                if (group.blas->get_size() < size_info.accelerationStructureSize) {
+            const bool outgrown = group.blas->get_size() < size_info.accelerationStructureSize;
+            if (i < rebuild_count || outgrown) {
+                if (outgrown) {
+                    cmd->keep_until_pool_reset(std::move(group.blas));
                     group.blas = allocator->create_acceleration_structure(
                         vk::AccelerationStructureTypeKHR::eBottomLevel, size_info,
                         fmt::format("Scene::blas[{}]", group_id));
