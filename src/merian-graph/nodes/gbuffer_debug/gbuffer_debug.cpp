@@ -51,8 +51,6 @@ const std::vector<DebugField> FIELDS = {
     {"Specular Hit Distance", {GBufferField::SpecularHitDistance}},
     {"View Depth", {GBufferField::ViewDepth}},
     {"Projected Depth", {GBufferField::ProjectedDepth}},
-    // Lights
-    {"Light Grid Coverage", {GBufferField::Hit}},
 };
 
 } // namespace
