@@ -7,26 +7,19 @@ import mc_distance;
 using merian;
 
 namespace merian {
-// distance chains resampled towards this ray
 extern static const int merian_distance_guiding_samples = 3;
-// probability the volume pass gives the fitted distance over transmittance sampling
-extern static const float merian_distance_guiding_probability = 0.9;
 } // namespace merian
 
-// Per-pixel Markov chains over the scattering distance, carried across frames by a forward
-// projection into a screen-space grid.
 namespace merian {
 
-// The chains resampled around one ray, as a mixture of normal distributions. All candidates are
-// kept: their densities form the stochastic MIS weight.
+// All candidates are kept: their densities form the stochastic MIS weight.
 struct DistanceMCDistribution : GuidingDistribution<float> {
     float scores[merian_distance_guiding_samples];
     float2 normal_dists[merian_distance_guiding_samples];
     float score_sum;
-    // the chain the update continues from, and the level it was read at
     DistanceMCState selected;
     uint selected_level;
-    // the sampled distance is drawn while the candidates are still live
+    // drawn while the candidates are live
     float sampled;
 
     float pdf(const float s) {
@@ -63,7 +56,6 @@ struct MCPGDistanceGuiding : DistanceGuidingModel {
 
     struct State {
         uint2 pixel;
-        DistanceMCState chain;
     }
 
     struct Record {
@@ -78,9 +70,7 @@ struct MCPGDistanceGuiding : DistanceGuidingModel {
     typealias UpdateRecord = Record;
 
     State begin_path() {
-        State s;
-        s.chain = distance_mc_state_new();
-        return s;
+        return {};
     }
 
     DistanceMCDistribution get_distribution(inout State state,
@@ -97,7 +87,6 @@ struct MCPGDistanceGuiding : DistanceGuidingModel {
         const float2 pixel = float2(vertex.pixel);
 
         for (int i = 0; i < merian_distance_guiding_samples; i++) {
-            // the projection pass already moved the grid to the current camera
             const uint level = distance_mc.distributed_level(rng);
             const DistanceMCState s = distance_mc.load(pixel, level, rng);
             dist.normal_dists[i] = distance_mc_state_get_normal_dist(s);
@@ -115,12 +104,11 @@ struct MCPGDistanceGuiding : DistanceGuidingModel {
             }
         }
 
-        state.chain = dist.selected;
         return dist;
     }
 
     Record record_scatter(const DistanceMCDistribution dist,
-                          const float wo,
+                          const float distance,
                           const bool guided,
                           inout RandomGenerator rng) {
         Record r;

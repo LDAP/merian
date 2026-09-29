@@ -7,7 +7,6 @@
 
 namespace merian {
 
-// One fitted lobe, as a running maximum-likelihood estimate.
 struct SSMCState {
     float3 sum_tgt;
     float sum_w;

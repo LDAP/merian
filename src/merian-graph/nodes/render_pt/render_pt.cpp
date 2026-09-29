@@ -36,7 +36,8 @@ void RenderPT::initialize(const ContextHandle& context, const ResourceAllocatorH
     this->resource_allocator = allocator;
     this->compile_context = context->get_shader_compile_context();
 
-    use_raygen = !context->get_device()->get_physical_device()->is_amd();
+    // the ray tracing pipeline caps the registers on AMD
+    raygen_preferred = !context->get_device()->get_physical_device()->is_amd();
 }
 
 std::vector<InputConnectorDescriptor> RenderPT::describe_inputs() {
@@ -70,13 +71,12 @@ std::vector<InputConnectorDescriptor> RenderPT::describe_inputs() {
 
 std::vector<OutputConnectorDescriptor> RenderPT::describe_outputs(const NodeIOLayout& io_layout) {
     extent = io_layout[con_gbuffer]->get_create_info().extent;
-    // the method's type and constants are baked in, so either changing rebuilds the program
     const auto adopt = [&](const ShaderObjectInHandle<GuidingObject>& con, GuidingModelHandle& slot,
                            uint32_t& slot_version, const GuidingModelHandle& none) {
+        const bool is_connected = io_layout.is_connected(con);
         const GuidingModelHandle connected =
-            io_layout.is_connected(con) ? io_layout[con]->get_create_info().model : none;
-        const uint32_t version =
-            io_layout.is_connected(con) ? io_layout[con]->get_create_info().version : 0;
+            is_connected ? io_layout[con]->get_create_info().model : none;
+        const uint32_t version = is_connected ? io_layout[con]->get_create_info().version : 0;
         if (!slot || slot->get_type_name() != connected->get_type_name() ||
             slot_version != version) {
             composition.reset();
@@ -117,7 +117,6 @@ RenderPT::NodeStatusFlags RenderPT::on_connected(const NodeIOLayout& io_layout,
                                                  [[maybe_unused]] const NodeConnectionInfo& info,
                                                  [[maybe_unused]] Submission& submission) {
 
-    // force the program graph to be rewired next process()
     composition = nullptr;
 
     if (path_records.update_connected(io_layout)) {
@@ -176,9 +175,9 @@ void RenderPT::ensure_pipeline(const SceneHandle& scene) {
     update_render_constants();
 
     program = SlangProgram::create(compile_context, composition);
-    entry_point = SlangProgramEntryPoint::create(program, use_raygen ? "main" : "main_compute");
+    entry_point = SlangProgramEntryPoint::create(program, use_raygen() ? "main" : "main_compute");
 
-    if (use_raygen) {
+    if (use_raygen()) {
         pipeline = Versioned<Pipeline>([this] {
             const auto ep = entry_point.get();
             return RayTracingPipelineBuilder()
@@ -264,7 +263,7 @@ RenderPT::process(const NodeIO& io, const NodeProcessInfo& info, Submission& sub
 
     {
         MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "surface");
-        if (use_raygen) {
+        if (use_raygen()) {
             cmd->trace_rays(sbt.get(), extent);
         } else {
             cmd->dispatch(extent, 8, 8);
@@ -321,7 +320,6 @@ RenderPT::process(const NodeIO& io, const NodeProcessInfo& info, Submission& sub
         dispatch_volume(project_seed, false);
         barrier_volume_mv();
 
-        // the ping-pong is only valid from the second iteration on
         if (volume_forward_project && io.is_connected(con_prev_volume_depth) &&
             info.get_iteration() != 0) {
             dispatch_volume(project, true);
@@ -374,10 +372,11 @@ void RenderPT::update_render_constants() {
         emission_on_primary ? "true" : "false", guiding_debug_view,
         scatter_stats ? "true" : "false", follow_specular ? "true" : "false", specular_alpha, spp,
         seed, max_path_length, mask, enable_ser ? "true" : "false",
-        demodulate_albedo ? "true" : "false", nee_mode, nee_probability, nee_bounces, scatter_mode,
-        scatter_candidates, russian_roulette ? "true" : "false", volume_spp,
-        volume_forward_project_min_z, guiding_share, guiding_scale_with_alpha ? "true" : "false",
-        guiding_alpha_threshold, guiding_direct_target, guiding_distance_share);
+        demodulate_albedo ? "true" : "false", static_cast<int32_t>(nee_mode), nee_probability,
+        nee_bounces, static_cast<int32_t>(scatter_mode), scatter_candidates,
+        russian_roulette ? "true" : "false", volume_spp, volume_forward_project_min_z,
+        guiding_share, guiding_scale_with_alpha ? "true" : "false", guiding_alpha_threshold,
+        guiding_direct_target, guiding_distance_share);
     SPDLOG_INFO("render_pt constants:\n{}", constants);
     composition->add_module_from_string("render_pt_constants", constants);
     path_records.add_constants(composition);
@@ -406,13 +405,17 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
                            "Otherwise it is the GBuffer emission texture's job.");
 
     if (config.st_begin_child("scatter", "Scatter")) {
-        constants_changed |= config.config_options(
-            "sampling", scatter_mode, {"mixture (MIS)", "resampled (RIS)"},
-            Properties::OptionsStyle::COMBO,
-            "How one direction comes out of the guiding lobes and the shading function. "
-            "'resampled' draws several and keeps one by how much the shading function makes of "
-            "it, at the cost of the extra evaluations; it still traces one ray.");
-        if (scatter_mode == 1) {
+        int scatter_mode_index = static_cast<int>(scatter_mode);
+        if (config.config_options(
+                "sampling", scatter_mode_index, {"mixture (MIS)", "resampled (RIS)"},
+                Properties::OptionsStyle::COMBO,
+                "How one direction comes out of the guiding lobes and the shading function. "
+                "'resampled' draws several and keeps one by how much the shading function makes "
+                "of it, at the cost of the extra evaluations; it still traces one ray.")) {
+            scatter_mode = static_cast<ScatterMode>(scatter_mode_index);
+            constants_changed = true;
+        }
+        if (scatter_mode == ScatterMode::RIS) {
             constants_changed |= config.config_int("candidates", scatter_candidates,
                                                    "Directions drawn before one is kept.", 1, 16);
         }
@@ -433,23 +436,27 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
     }
 
     if (config.st_begin_child("nee", "Next event estimation")) {
-        constants_changed |= config.config_options(
-            "mode", nee_mode, {"off", "mixture", "resampled"}, Properties::OptionsStyle::COMBO,
-            "Direct light sampling. 'mixture' replaces the scatter sample "
-            "with a light sample and costs no extra ray; 'resampled' adds a "
-            "shadow ray. How a light is chosen is the scene's to set.");
-        if (nee_mode == 1) {
+        int nee_mode_index = static_cast<int>(nee_mode);
+        if (config.config_options("mode", nee_mode_index, {"off", "mixture", "resampled"},
+                                  Properties::OptionsStyle::COMBO,
+                                  "Direct light sampling. 'mixture' replaces the scatter sample "
+                                  "with a light sample and costs no extra ray; 'resampled' adds a "
+                                  "shadow ray. How a light is chosen is the scene's to set.")) {
+            nee_mode = static_cast<NEEMode>(nee_mode_index);
+            constants_changed = true;
+        }
+        if (nee_mode == NEEMode::Mixture) {
             constants_changed |= config.config_percent(
                 "direct light share", nee_probability,
                 "Fraction of scatter samples drawn from the lights. A light sample replaces the "
                 "scatter sample, so this is taken out of the budget the indirect signal lives on. "
                 "How far it pays depends on how good the light samples are.");
         }
-        if (nee_mode != 0) {
+        if (nee_mode != NEEMode::Off) {
             constants_changed |= config.config_int(
                 "bounces", nee_bounces,
                 "Path vertices (counted from the primary hit) that sample lights; 0 = all.", 0, 16);
-            if (nee_mode == 1) {
+            if (nee_mode == NEEMode::Mixture) {
                 config.output_text(fmt::format("one draw: {:.0f} % light, {:.0f} % scatter",
                                                nee_probability * 100.f,
                                                (1.f - nee_probability) * 100.f));
@@ -461,31 +468,27 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
     }
 
     if (config.st_begin_child("guiding", "Guiding")) {
-        if (!guiding) {
-            config.output_text("connect a guiding method to the guiding slot");
-        } else {
-            constants_changed |= config.config_percent(
-                "share", guiding_share,
-                "Fraction of the scatter samples the guiding method gets, where it found "
-                "something. The rest go to the shading function.");
-            constants_changed |= config.config_bool(
-                "scale with roughness", guiding_scale_with_alpha,
-                "Scale that share with the lobe width, so a narrow lobe keeps its own sampling.");
-            constants_changed |= config.config_float(
-                "roughness threshold", guiding_alpha_threshold,
-                "Below this lobe width the guiding lobes are broader than the shading function "
-                "itself, so nothing is guided.",
-                0.01f, 0.f, 1.f);
-            constants_changed |= config.config_options(
-                "direct light target", guiding_direct_target, {"full", "MIS", "none"},
-                Properties::OptionsStyle::COMBO,
-                "What a method learns from a vertex that ended on a light: the emission whole, "
-                "only the share the scatter technique pays for, or nothing.");
-            const float effective = guiding_scale_with_alpha ? guiding_share * 0.5f : guiding_share;
-            config.output_text(
-                fmt::format("at a lobe width of 0.5: {:.0f} % guided, {:.0f} % shading function",
-                            effective * 100.f, (1.f - effective) * 100.f));
-        }
+        constants_changed |= config.config_percent(
+            "share", guiding_share,
+            "Fraction of the scatter samples the guiding method gets, where it found something. "
+            "The rest go to the shading function.");
+        constants_changed |= config.config_bool(
+            "scale with roughness", guiding_scale_with_alpha,
+            "Scale that share with the lobe width, so a narrow lobe keeps its own sampling.");
+        constants_changed |= config.config_float(
+            "roughness threshold", guiding_alpha_threshold,
+            "Below this lobe width the guiding lobes are broader than the shading function itself, "
+            "so nothing is guided.",
+            0.01f, 0.f, 1.f);
+        constants_changed |= config.config_options(
+            "direct light target", guiding_direct_target, {"full", "MIS", "none"},
+            Properties::OptionsStyle::COMBO,
+            "What a method learns from a vertex that ended on a light: the emission whole, only "
+            "the share the scatter technique pays for, or nothing.");
+        const float effective = guiding_scale_with_alpha ? guiding_share * 0.5f : guiding_share;
+        config.output_text(
+            fmt::format("at a lobe width of 0.5: {:.0f} % guided, {:.0f} % shading function",
+                        effective * 100.f, (1.f - effective) * 100.f));
         config.st_end_child();
     }
 
@@ -496,11 +499,9 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
             "with it every node that consumes its outputs.",
             0, 16);
         if (volume_spp > 0) {
-            if (distance_guiding) {
-                constants_changed |= config.config_percent(
-                    "distance guiding share", guiding_distance_share,
-                    "Fraction of the distance samples the distance guiding method gets.");
-            }
+            constants_changed |= config.config_percent(
+                "distance guiding share", guiding_distance_share,
+                "Fraction of the distance samples the distance guiding method gets.");
             needs_reconnect |= config.config_bool(
                 "forward project", volume_forward_project,
                 "Reproject the mean scattering distance into this frame's motion vectors instead "
@@ -544,10 +545,15 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
         constants_changed |=
             config.config_bool("shader execution reordering", enable_ser,
                                "Reorder threads after the primary hit to improve coherence.");
-        needs_reconnect |= config.config_bool(
-            "ray tracing pipeline", use_raygen,
-            "Trace from a raygen shader instead of a compute shader. The compute path avoids the "
-            "ray-tracing pipeline register cap.");
+        int trace_shader_index = static_cast<int>(trace_shader);
+        if (config.config_options(
+                "trace shader", trace_shader_index, {"auto", "ray generation", "compute"},
+                Properties::OptionsStyle::COMBO,
+                "Trace from a ray generation shader or a compute shader. The compute shader avoids "
+                "the ray tracing pipeline's register cap; 'auto' picks it on AMD.")) {
+            trace_shader = static_cast<TraceShader>(trace_shader_index);
+            needs_reconnect = true;
+        }
         config.st_end_child();
     }
 
@@ -564,9 +570,14 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
     return {};
 }
 
+bool RenderPT::use_raygen() const {
+    return trace_shader == TraceShader::Auto ? raygen_preferred
+                                             : trace_shader == TraceShader::RayGeneration;
+}
+
 uint32_t RenderPT::recorded_vertices_per_path() const {
     const auto length = static_cast<uint32_t>(max_path_length);
-    return (nee_mode == 2 ? 2 * length : length) + 1;
+    return (nee_mode == NEEMode::Resampled ? 2 * length : length) + 1;
 }
 
 } // namespace merian

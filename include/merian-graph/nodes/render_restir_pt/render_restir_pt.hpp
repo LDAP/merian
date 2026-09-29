@@ -42,6 +42,7 @@ class RenderRestirPT : public Node {
         Record = 10,
         PassCount = 11
     };
+    enum class TraceShader : int32_t { Auto, RayGeneration, Compute };
 
     RenderRestirPT();
 
@@ -72,6 +73,7 @@ class RenderRestirPT : public Node {
     void upload_pairing(Submission& submission);
     uint32_t recorded_paths_per_pixel() const;
     uint32_t recorded_vertices_per_path() const;
+    bool use_raygen() const;
 
     ContextHandle context;
     ResourceAllocatorHandle resource_allocator;
@@ -96,7 +98,8 @@ class RenderRestirPT : public Node {
     bool emission_on_primary = true;
     bool area = false;
     bool demodulate_albedo = false;
-    bool use_raygen = true;
+    TraceShader trace_shader = TraceShader::Auto;
+    bool raygen_preferred = true;
     std::array<bool, 8> mask_enabled{true, true, true, true, true, true, true, true};
 
     // shift

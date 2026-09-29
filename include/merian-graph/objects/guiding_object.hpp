@@ -7,8 +7,6 @@
 
 namespace merian {
 
-// A guiding method transported through the graph: the resources a path tracer binds, together
-// with the slang type it aliases into its guiding slot.
 class GuidingObject : public GraphShaderObject {
   public:
     struct CreateInfo {
@@ -34,7 +32,6 @@ class GuidingObject : public GraphShaderObject {
         return model;
     }
 
-    // Binds the method for the frame about to be rendered.
     void write() const {
         model->write_to(shader_object->get_cursor());
     }

@@ -6,20 +6,17 @@ import merian_shaders.utils.textures;
 import merian_shaders.utils.volumes;
 import merian_shaders.colors.colorspaces;
 __exported import merian_shaders.sampling.guiding;
-
-// Selects the guiding method at link time; render_pt.cpp injects the module.
 __exported import render_pt_guiding;
 
 using merian;
 
 namespace merian {
+extern static const uint merian_render_seed = 0;
 extern static const uint merian_render_instance_mask = 0xFFu;
 extern static const int merian_render_volume_spp = 1;
-// light samples resampled into one shadow ray at the scattering vertex; 0 disables volume NEE
-// share of the distance samples the distance guiding gets
 extern static const float merian_guiding_distance_share = 0.5;
+extern static const float merian_render_volume_forward_project_min_z = 50.0;
 
-// What a light candidate is worth at a scattering vertex in a medium.
 struct PhaseTarget<P : ShadingFunction, G : GuidingDistribution<float3>, V : HomogeneousVolume>
     : IDirectLightTarget {
     P phase;
@@ -50,10 +47,6 @@ make_phase_target<P : ShadingFunction, G : GuidingDistribution<float3>, V : Homo
     PhaseTarget<P, G, V> target = {phase, guiding, mixture, medium, frame, wi_local};
     return target;
 }
-
-// Below this scattering distance the surface motion vector is the better estimate, so the forward
-// projection leaves it alone.
-extern static const float merian_render_volume_forward_project_min_z = 50.0;
 } // namespace merian
 
 struct VolumeBinding {
@@ -66,9 +59,6 @@ struct VolumeBinding {
     ParameterBlock<RenderDistanceGuiding> distance_guiding;
 };
 
-// Single scattering along the primary ray: the distance comes from transmittance sampling, the
-// direction from the guiding mixed with the phase function, and the light from next event
-// estimation mixed against whatever the scattered ray finds.
 void render_pixel(const uint2 pixel,
                   const ParameterBlock<Scene> scene,
                   const ParameterBlock<VolumeBinding> params) {
@@ -80,28 +70,25 @@ void render_pixel(const uint2 pixel,
     let phase = medium.get_phase_function();
     const float mu_t = medium.sampling_mu_t();
 
-    RandomGenerator rng = PCG(pcg3d16(uint3(pixel, scene.frame)));
+    RandomGenerator rng = PCG(xxhash32(uint4(pixel, scene.frame, 0x564Fu)) ^ merian_render_seed);
 
     const RayDesc primary_ray = scene.generate_camera_ray(pixel, dim);
     const float linear_z = params.gbuffer.get_linear_z(pixel);
-    // the surface pass owns everything behind the first hit
     const float max_t = min(linear_z, medium.get_max_distance());
     const float xi_max = transmittance_xi_max(max_t, mu_t);
 
     const RenderFrameInfo frame_info = {scene.camera.position, scene.prev_camera.position,
                                         scene.time, scene.time_diff, scene.frame};
-    // a medium vertex has no surface, so the mixture is built around the view direction
     const OrthonormalFrame frame = OrthonormalFrame(-primary_ray.Direction);
     const float3 wi_local = frame.to_local(-primary_ray.Direction);
 
     float3 irradiance = float3(0);
     float second_moment = 0.f;
-    // where along the ray the scattered light came from; it drives the reprojection
     float depth_sum = 0.f;
     float depth_weight = 0.f;
 
     for (uint16_t s = uint16_t(0); s < merian_render_volume_spp; s++) {
-        // 1. a scattering distance out of the guided chains mixed with transmittance sampling
+        // 1. scattering distance
         const RayVertex ray_vertex = {primary_ray.Origin, primary_ray.Direction, max_t, pixel, s};
         var distance_state = params.distance_guiding.begin_path();
         let distances =
@@ -123,7 +110,7 @@ void render_pixel(const uint2 pixel,
         const float3 scatter_pos = primary_ray.Origin + t * primary_ray.Direction;
         const float3 throughput = medium.transmittance(t) * medium.get_mu_s() / p_distance;
 
-        // 2. the guiding lobes around this vertex, mixed with the phase function
+        // 2. guiding
         var guiding_state = params.guiding.begin_path();
         const PathVertex vertex = {scatter_pos,        scatter_pos, frame, 1.f,
                                    uint16_t(1),        s,           pixel, true,
@@ -131,13 +118,12 @@ void render_pixel(const uint2 pixel,
         let guiding = params.guiding.get_distribution(guiding_state, frame_info, vertex, rng);
         const ScatterMixture mixture = ScatterMixture(merian::guiding_share(guiding, 1.f));
 
-        // 3. resampled direct light: the scene resamples its candidates and only the survivor
-        // reaches the shadow ray below
-        let lights = scene.begin_direct_light(scatter_pos, rng);
+        // 3. resampled direct light
+        let lights = scene.nee.begin_vertex(scatter_pos, rng);
         const Optional<DirectLightSample> direct = scene.sample_direct_light(
             lights, make_phase_target(phase, guiding, mixture, medium, frame, wi_local), rng);
 
-        // 4. one scattered direction out of the mixture
+        // 4. scatter direction
         bool scattered = false;
         bool guided = false;
         float3 wo_world = float3(0, 0, 1);
@@ -166,8 +152,7 @@ void render_pixel(const uint2 pixel,
         segment.next_normal = segment.normal;
         segment.next_mv = half3(0);
         segment.incident = float3(0);
-
-        // the record is what crosses the traversal, so it is taken while the candidates are dead
+        segment.direct_scale = guiding_direct_scale(1.f);
         let guiding_record = params.guiding.record_scatter(guiding, segment, guided, rng);
 
         float3 contribution = scene.resolve_direct_light(scatter_pos, float3(0), 0.f, direct,
@@ -181,11 +166,10 @@ void render_pixel(const uint2 pixel,
             ray.TMax = SCENE_RAY_TMAX;
             const Hit hit = scene.trace_ray(ray, RAY_FLAG_NONE, merian_render_instance_mask);
 
-            // the light sampler above could have generated this vertex too
-            const LightHit lh = scene.get_light_hit(lights, ray.Origin, ray.Direction, hit);
-            const float mis_weight = segment.pdf / (lh.pdf + segment.pdf);
+            const float light_pdf =
+                scene.nee.pdf(lights, scene.get_light_index(hit), ray.Origin, ray.Direction);
+            const float mis_weight = segment.pdf / (light_pdf + segment.pdf);
 
-            // single scattering never scatters again, so the material sample would be dead
             const ShadingPoint sp = scene.get_shading_point(ray, hit, RenderContext(uint16_t(1)),
                                                             DefaultLODSampler(), false);
 
@@ -195,20 +179,20 @@ void render_pixel(const uint2 pixel,
             segment.next_normal = sp.shading_normal;
             segment.next_mv = half3((sp.pos - sp.prev_pos) / scene.time_diff);
             segment.incident = sp.emission * medium.transmittance(distance(ray.Origin, sp.pos));
+            segment.direct_scale = guiding_direct_scale(mis_weight);
             segment.weight = segment.pdf > 0.f ? f_cos / segment.pdf : float3(0);
 
             contribution += segment.weight * segment.incident * mis_weight;
         }
 
-        // what the guiding learns, and the estimate it completes the path with
         contribution +=
             segment.weight *
             params.guiding.record_segment(guiding_state, frame_info, guiding_record, segment, rng);
 
-        const float3 contrib = throughput * contribution;
-        if (!any(isnan(contrib)) && !any(isinf(contrib))) {
-            irradiance += contrib;
-            const float l = yuv_luminance(contrib);
+        contribution *= throughput;
+        if (!any(isnan(contribution)) && !any(isinf(contribution))) {
+            irradiance += contribution;
+            const float l = yuv_luminance(contribution);
             second_moment += l * l;
             depth_sum += t * l;
             depth_weight += l;
@@ -235,9 +219,8 @@ single_scattering(uint3 thread_id : SV_DispatchThreadID,
     render_pixel(thread_id.xy, scene, params);
 }
 
-    // Seeds the volume motion vectors with the surface ones. Separate from the forward projection,
-    // which scatters its writes and would otherwise race with the seeding.
-    [shader("compute")][numthreads(8, 8, 1)] void volume_project_seed(
+// Separate from the forward projection, which scatters its writes.
+[shader("compute")][numthreads(8, 8, 1)] void volume_project_seed(
         uint3 thread_id : SV_DispatchThreadID, ParameterBlock<VolumeBinding> params) {
     const uint2 pixel = thread_id.xy;
     if (any(pixel >= params.gbuffer.get_dimensions()))
@@ -246,9 +229,7 @@ single_scattering(uint3 thread_id : SV_DispatchThreadID,
     params.volume_mv[pixel] = params.gbuffer.get_motion_vectors(pixel);
 }
 
-// Surface motion vectors describe the first opaque hit, which is not where the volume signal comes
-// from. Reproject last frame's mean scattering distance instead and overwrite the vectors it lands
-// on. Concurrent writes to the same target pixel are benign: either is a valid estimate.
+// Concurrent writes to one pixel are benign: either is a valid estimate.
 [shader("compute")][numthreads(8, 8, 1)] void volume_project(uint3 thread_id : SV_DispatchThreadID,
                                                              ParameterBlock<Scene> scene,
                                                              ParameterBlock<VolumeBinding> params) {

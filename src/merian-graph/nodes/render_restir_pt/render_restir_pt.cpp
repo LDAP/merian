@@ -114,7 +114,8 @@ void RenderRestirPT::initialize(const ContextHandle& context,
     this->resource_allocator = allocator;
     this->compile_context = context->get_shader_compile_context();
 
-    use_raygen = !context->get_device()->get_physical_device()->is_amd();
+    // the ray tracing pipeline caps the registers on AMD
+    raygen_preferred = !context->get_device()->get_physical_device()->is_amd();
 }
 
 void RenderRestirPT::update_render_constants() {
@@ -171,6 +172,11 @@ void RenderRestirPT::update_render_constants() {
 
 uint32_t RenderRestirPT::recorded_paths_per_pixel() const {
     return record_mode == RestirPTRecordShaded ? 1 : static_cast<uint32_t>(std::max(spp, 1));
+}
+
+bool RenderRestirPT::use_raygen() const {
+    return trace_shader == TraceShader::Auto ? raygen_preferred
+                                             : trace_shader == TraceShader::RayGeneration;
 }
 
 uint32_t RenderRestirPT::recorded_vertices_per_path() const {
@@ -320,7 +326,7 @@ void RenderRestirPT::ensure_pipeline(const SceneHandle& scene) {
     program = SlangProgram::create(compile_context, composition);
 
     for (uint32_t p = 0; p < PassCount; p++) {
-        const bool raygen = use_raygen && p == Initial;
+        const bool raygen = use_raygen() && p == Initial;
         const char* name = raygen         ? "initial_rt"
                            : p == Initial ? "initial"
                            : p == Shift   ? "shift"
@@ -424,7 +430,7 @@ RenderRestirPT::process(const NodeIO& io, const NodeProcessInfo& info, Submissio
 
     const vk::PipelineStageFlags stages =
         vk::PipelineStageFlagBits::eComputeShader |
-        (use_raygen ? vk::PipelineStageFlagBits::eRayTracingShaderKHR : vk::PipelineStageFlags{});
+        (use_raygen() ? vk::PipelineStageFlagBits::eRayTracingShaderKHR : vk::PipelineStageFlags{});
     const auto sync = [&](const vk::PipelineStageFlags dst_stages = {}) {
         const vk::AccessFlags indirect = (dst_stages & vk::PipelineStageFlagBits::eDrawIndirect)
                                              ? vk::AccessFlagBits::eIndirectCommandRead
@@ -464,7 +470,7 @@ RenderRestirPT::process(const NodeIO& io, const NodeProcessInfo& info, Submissio
             cmd->dispatch_indirect(queue);
         } else if (p == Duplication) {
             cmd->dispatch(extent, 16, 16);
-        } else if (use_raygen && p == Initial) {
+        } else if (use_raygen() && p == Initial) {
             cmd->trace_rays(initial_sbt.get(), extent);
         } else {
             cmd->dispatch(extent, 8, 8);
@@ -741,9 +747,16 @@ RenderRestirPT::NodeStatusFlags RenderRestirPT::properties(Properties& config) {
             "(green), and whether a neighbor's path won (blue).");
         needs_reconnect |= config.config_enum("irradiance format", irradiance_format,
                                               Properties::OptionsStyle::COMBO);
-        needs_reconnect |= config.config_bool(
-            "ray tracing pipeline", use_raygen,
-            "Trace the candidates from a raygen shader instead of a compute shader.");
+        int trace_shader_index = static_cast<int>(trace_shader);
+        if (config.config_options(
+                "trace shader", trace_shader_index, {"auto", "ray generation", "compute"},
+                Properties::OptionsStyle::COMBO,
+                "Trace the candidates from a ray generation shader or a compute shader. The "
+                "compute shader avoids the ray tracing pipeline's register cap; 'auto' picks it on "
+                "AMD.")) {
+            trace_shader = static_cast<TraceShader>(trace_shader_index);
+            needs_reconnect = true;
+        }
         config.st_end_child();
     }
 

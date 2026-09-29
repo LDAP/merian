@@ -30,7 +30,6 @@ std::vector<InputConnectorDescriptor> MCPGDistanceGuidingNode::describe_inputs()
 void MCPGDistanceGuidingNode::configure(const NodeIOLayout& io_layout) {
     extent = io_layout[con_gbuffer]->get_create_info().extent;
     if (chains().on_extent(extent)) {
-        // the level count is a link-time constant of both the slot and the passes
         clear_composition = nullptr;
         project_composition = nullptr;
     }
@@ -61,7 +60,6 @@ void MCPGDistanceGuidingNode::ensure_pipelines(const SceneHandle& scene) {
         build(clear, clear_program, "main");
     }
 
-    // the projection reprojects through the scene's cameras, so it only exists with one
     if (scene && !project_composition) {
         project_composition = SlangComposition::create();
         project_composition->add_composition(scene->get_composition());
@@ -92,7 +90,6 @@ MCPGDistanceGuidingNode::NodeStatusFlags MCPGDistanceGuidingNode::process(
     const ShaderObjectAllocatorHandle& obj_allocator = info.get_shader_object_allocator();
     const uint32_t levels = chains().get_level_count();
 
-    // the tracer wrote the grid last frame; the projection moves it into this frame's
     chains().swap();
 
     // the grids are the node's own, so the graph does not order last frame's tracer writes
@@ -143,7 +140,6 @@ MCPGDistanceGuidingNode::NodeStatusFlags MCPGDistanceGuidingNode::process(
         barrier_grid();
     }
 
-    // the previous grid only holds anything from the second iteration on
     if (has_scene && info.get_iteration() != 0) {
         const auto ep = project.entry_point.get();
         const auto pipe = project.pipeline.get();

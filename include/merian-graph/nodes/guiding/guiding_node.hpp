@@ -6,8 +6,6 @@
 
 namespace merian {
 
-// A directional guiding method as a graph node: it owns the method and its properties, and hands
-// a path tracer the object that plugs into its guiding slot.
 class GuidingNode : public Node {
   public:
     ~GuidingNode() override = default;
@@ -36,7 +34,6 @@ class GuidingNode : public Node {
     }
 
     NodeStatusFlags properties(Properties& config) override {
-        // the method's type name and constants are baked into the consumer's program
         if (!model->properties(config)) {
             return {};
         }
@@ -45,10 +42,8 @@ class GuidingNode : public Node {
     }
 
   protected:
-    // Built by the concrete node's constructor: properties are loaded before initialize().
     explicit GuidingNode(const GuidingModelHandle& model) : model(model) {}
 
-    // Whatever the method takes from the graph around it, before the object is created.
     virtual void configure([[maybe_unused]] const NodeIOLayout& io_layout) {}
 
     const GuidingModelHandle model;

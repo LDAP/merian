@@ -13,19 +13,11 @@
 
 namespace merian {
 
-/**
- * @brief Host side of a directional guiding method.
- *
- * Mirrors the GuidingModel interface in merian-shaders/sampling/guiding.slang: get_type_name()
- * names the type a renderer aliases into its guiding slot, the imports and the composition make
- * that name resolve, and write_to() fills the slot in the renderer's parameter block.
- */
 class GuidingModel {
   public:
     virtual ~GuidingModel() = default;
 
-    // Device resources, once the node holding the method has them. Properties are loaded before
-    // this, so the constructor must not need a device.
+    // properties() also runs on a method that is never initialized.
     virtual void initialize(const ContextHandle& context,
                             const ResourceAllocatorHandle& allocator) = 0;
 
@@ -37,7 +29,6 @@ class GuidingModel {
 
     virtual std::string get_type_name() const = 0;
 
-    // Binds the method for the frame about to be rendered.
     virtual void write_to(ShaderCursor cursor) = 0;
 
     virtual void reset(const CommandBufferHandle& cmd) = 0;
@@ -48,7 +39,6 @@ class GuidingModel {
 
 using GuidingModelHandle = std::shared_ptr<GuidingModel>;
 
-// Host side of a method that is present but does nothing; the slot then compiles out entirely.
 class NullModel : public GuidingModel {
   public:
     explicit NullModel(std::string type_name) : type_name(std::move(type_name)) {}

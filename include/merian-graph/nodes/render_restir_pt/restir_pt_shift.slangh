@@ -109,13 +109,15 @@ RestirPTShift restir_pt_reconnect(const ParameterBlock<Scene> scene,
                      .get_shading_point(ray, hit, tri, surface, RenderContext(uint16_t(k - 1)),
                                         DefaultLODSampler(), false)
                      .emission;
-            index = restir_pt_light_index(scene, hit);
+            index = scene.get_light_index(hit);
         }
         const bool samples_lights = restir_pt_samples_lights(scene, bsdf) &&
                                     (!nee || sp.geometric_side_matches_shading(dir));
-        const float p_light = samples_lights ? restir_pt_light_pdf(scene, sp.pos, dir, dist2,
-                                                                   surface.face_normal, index)
-                                             : 0.f;
+        const float p_light =
+            samples_lights ? scene.nee.mixture_pdf(scene.nee.pdf(scene.nee.begin_vertex(sp.pos),
+                                                                 index, dir, dist2,
+                                                                 surface.face_normal))
+                           : 0.f;
         integrand *= Le * (nee ? p_light : p_prev) / (p_light + p_prev);
     } else {
         // 4b. x_k scatters: re-shade it from the new direction and leave it along rc_wo

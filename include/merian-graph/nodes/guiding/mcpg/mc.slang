@@ -45,7 +45,6 @@ struct MCState {
         return w_tgt / sum_w;
     }
 
-    // normalized direction towards the target
     float3 get_dir(const float3 from) {
         return normalize(get_target() - from);
     }
@@ -78,8 +77,7 @@ struct MCState {
         return clamp(u + (1.0 - u) * p / (n * n + p), 1e-7, 1.0);
     }
 
-    // 1 - mean resultant length of the chain's own fit. Kept as the primary quantity: it is what
-    // the concentration depends on, and the half that float resolves once the lobe is tight.
+    // 1 - mean resultant length of the chain's own fit
     float one_minus_mean_cos(const float3 pos) {
         return apply_prior(0.5 * w_chord2 / sum_w, pos);
     }
@@ -114,7 +112,6 @@ struct MCState {
         return r * (3.0 - 2.6 * r + 0.7 * r * r) / (u * (1.1 - 0.1 * u));
     }
 
-    // vmf lobe float4(direction, kappa) for a position
     VonMisesFisher3<false> get_vmf(const float3 pos) {
         const float3 dir = get_dir(pos);
         const float k = kappa(pos);
@@ -234,7 +231,6 @@ struct MCPG<let ADAPTIVE_BUFFER_SIZE : uint,
         grid.set_at_level(level, pos, access_normal, frame, s, rng);
     }
 
-    // Missing-light heuristic: invalidate the loaded cell in place.
     void kill(const HashGridPos grid_pos) {
         grid.data[grid_pos.slot].t.sum_w = 0.0;
     }

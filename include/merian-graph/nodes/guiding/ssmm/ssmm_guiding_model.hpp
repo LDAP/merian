@@ -10,8 +10,6 @@
 
 namespace merian {
 
-// Screen-space mixture models: one vMF lobe per pixel, fitted over frames and reused across the
-// neighbourhood. Describes the first scattering vertex only.
 class SSMMGuidingModel : public GuidingModel {
   public:
     void initialize(const ContextHandle& context,
@@ -25,20 +23,16 @@ class SSMMGuidingModel : public GuidingModel {
 
     std::string get_type_name() const override;
 
-    // One fit per pixel of the render target.
     void on_extent(const vk::Extent3D& extent);
 
-    // Where the gbuffer the fits are reprojected through comes from.
     void set_gbuffer_output(const std::weak_ptr<GBufferOut>& output);
 
-    // The gbuffer the fits are reprojected through, for the frame about to be rendered.
     void set_gbuffer(const ShaderObjectHandle& gbuffer);
 
     void write_to(ShaderCursor cursor) override;
 
     void reset(const CommandBufferHandle& cmd) override;
 
-    // Orders the previous frame's writes against this frame's reads.
     std::array<vk::BufferMemoryBarrier2, 2> carry_barriers() const;
 
     bool properties(Properties& props) override;
@@ -52,7 +46,6 @@ class SSMMGuidingModel : public GuidingModel {
     ShaderObjectHandle gbuffer;
 
     vk::Extent3D extent{};
-    // read and written alternately, so a frame sees the fits of the one before it
     std::array<BufferHandle, 2> states;
     uint32_t frame = 0;
 

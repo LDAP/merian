@@ -7,7 +7,6 @@
 
 namespace merian {
 
-// Screen-space mixture models: one vMF lobe per pixel, reprojected through the gbuffer.
 class SSMMGuidingNode : public GuidingNode {
   public:
     SSMMGuidingNode() : GuidingNode(std::make_shared<SSMMGuidingModel>()) {}
@@ -26,7 +25,6 @@ class SSMMGuidingNode : public GuidingNode {
     }
 
   protected:
-    // the fit is one lobe per pixel of whatever the path tracer renders into
     void configure(const NodeIOLayout& io_layout) override {
         ssmm().on_extent(io_layout[con_gbuffer]->get_create_info().extent);
         ssmm().set_gbuffer_output(std::dynamic_pointer_cast<GBufferOut>(io_layout[con_gbuffer]));

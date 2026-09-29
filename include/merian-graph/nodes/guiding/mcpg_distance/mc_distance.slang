@@ -9,10 +9,7 @@ static const float DISTANCE_ML_MIN_ALPHA = 0.01;
 
 // Cell width in pixels at level 0; every further level doubles it, which is exactly one mip.
 extern static const float distance_mc_base_width = 4.0;
-// The host exports the exact count of views it binds.
 extern static const uint distance_mc_level_count = 8;
-// Effective dimensionality the levels are spread over. Keeps the expected number of threads per
-// cell roughly constant; smaller widens the spread.
 extern static const float distance_mc_distribution_dimension = 2.0;
 
 struct DistanceMCState {
@@ -34,12 +31,9 @@ struct DistanceMCState {
     }
 };
 
-// One image per level, so a level is a plain mip lookup rather than a hash.
 struct DistanceMCGrid {
     RWTexture2D<float4> levels[distance_mc_level_count];
 
-    // Screen-space analogue of the world-space grid's distributed level: the projection already
-    // keeps a cell's screen size constant, so only the geometric spread over levels remains.
     uint distributed_level(inout RandomGenerator rng) {
         const float level =
             -log2(1.0 - rng.next_float()) / distance_mc_distribution_dimension;
@@ -57,7 +51,6 @@ struct DistanceMCGrid {
         return uint2(clamp(idx, int2(0), int2(texture_dimensions(levels[level])) - 1));
     }
 
-    // Center of the pixel footprint a vertex represents; cell() without the jitter.
     float2 vertex_pixel(const uint2 idx, const uint level) {
         const float width = float(1u << level);
         return (float2(idx) - 0.5) * (distance_mc_base_width * width);
@@ -88,13 +81,11 @@ float2 distance_mc_state_get_normal_dist(const DistanceMCState s) {
     return float2(moments.x, sigma);
 }
 
-// Shift every stored distance by delta (the ray origin moved along the view direction).
 void distance_mc_state_shift(inout DistanceMCState s, const float delta) {
     s.moments = float2(s.moments.x + delta * s.sum_w,
                        s.moments.y + delta * (2.0 * s.moments.x + delta * s.sum_w));
 }
 
-// add sample to lobe via maximum likelihood estimator and exponentially weighted average
 void distance_mc_state_add_sample(inout DistanceMCState s, const float distance, const float w) {
     s.N = min(s.N + 1, DISTANCE_ML_MAX_N);
     const float alpha = max(1.0 / float(s.N), DISTANCE_ML_MIN_ALPHA);

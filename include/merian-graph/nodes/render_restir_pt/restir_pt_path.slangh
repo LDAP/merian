@@ -332,14 +332,11 @@ bool restir_pt_is_rough<B : BSDF>(const B bsdf, const RestirPTLobe lobe, const f
     return lobe == RestirPTLobeDiffuse || sqrt(bsdf.specular_alpha) > threshold;
 }
 
-// A near-specular lobe does not sample lights.
 bool restir_pt_samples_lights<B : BSDF>(const ParameterBlock<Scene> scene, const B bsdf) {
     return scene.nee.has_lights() && bsdf.effective_alpha >= NEE_MIN_ALPHA;
 }
 
-// One light sample from the scene's techniques, as a one-sample mixture of them. Its cell is the
-// unjittered one, so the density is a function of the point alone and another domain evaluates
-// the same.
+// Drawn and evaluated at the unjittered vertex, so another domain evaluates the same density.
 struct RestirPTLightSample {
     float3 wo;
     float dist;
@@ -353,102 +350,21 @@ struct RestirPTLightSample {
     uint index;
 }
 
-uint restir_pt_light_cell(const ParameterBlock<Scene> scene, const float3 pos) {
-    return scene.nee.get_grid_cell(pos);
-}
-
-float restir_pt_light_draws(const ParameterBlock<Scene> scene) {
-    return float(max(scene.nee.candidate_count(), 1u));
-}
-
 Optional<RestirPTLightSample> restir_pt_sample_light(const ParameterBlock<Scene> scene,
                                                      const float3 pos,
                                                      inout RandomGenerator rng) {
-    const uint cell = restir_pt_light_cell(scene, pos);
-    const uint m_pool = scene.nee.pool_candidates();
-    const uint m_grid = scene.nee.cell_candidates();
-    const bool from_grid = rng.next_float() * float(m_pool + m_grid) >= float(m_pool);
-    if (let ls = scene.nee.sample_light(cell, pos, rng, scene.material_system, scene.env_map,
-                                        scene.time, from_grid)) {
+    if (let ls = scene.sample_direct_light(scene.nee.begin_vertex(pos), rng)) {
         RestirPTLightSample s;
         s.wo = ls.wo;
         s.dist = ls.dist;
-        s.pdf = scene.nee.pdf_lights(cell, ls.index, ls.pdf, m_pool, m_grid) /
-                restir_pt_light_draws(scene);
+        s.pdf = ls.pdf;
         s.Le = ls.Li;
         s.pos = ls.index == LIGHT_ENV_INDEX ? ls.pos : pos + ls.wo * ls.dist;
         s.shadow_pos = ls.pos;
         s.index = ls.index;
-        if (s.pdf > 0.f)
-            return s;
+        return s;
     }
     return none;
-}
-
-// Density with which the light techniques at `origin` produce the light `index` along dir.
-float restir_pt_light_pdf(const ParameterBlock<Scene> scene,
-                          const float3 origin,
-                          const float3 dir,
-                          const uint index) {
-    if (index == LIGHT_INVALID_INDEX)
-        return 0.f;
-    return scene.nee.pdf_lights(restir_pt_light_cell(scene, origin), index, origin, dir,
-                                scene.nee.pool_candidates(), scene.nee.cell_candidates()) /
-           restir_pt_light_draws(scene);
-}
-
-// The same for a known point and normal on the light, which may be where it was in the previous
-// frame.
-float restir_pt_light_pdf(const ParameterBlock<Scene> scene,
-                          const float3 origin,
-                          const float3 dir,
-                          const float dist2,
-                          const float3 light_normal,
-                          const uint index) {
-    if (index == LIGHT_INVALID_INDEX || index == LIGHT_ENV_INDEX)
-        return restir_pt_light_pdf(scene, origin, dir, index);
-    const EmissiveTriangle tri = scene.nee.table.triangles[index];
-    const float ndotd = dot(light_normal, dir);
-    const float cos_l = tri.is_two_sided() ? abs(ndotd) : -ndotd;
-    if (!(cos_l > 0.f))
-        return 0.f;
-    const float point_pdf = dist2 / (cos_l * 0.5f * length(tri.get_scaled_normal()));
-    return scene.nee.pdf_lights(restir_pt_light_cell(scene, origin), index, point_pdf,
-                                scene.nee.pool_candidates(), scene.nee.cell_candidates()) /
-           restir_pt_light_draws(scene);
-}
-
-// The light a hit lies on; LIGHT_ENV_INDEX where the ray reached the environment.
-uint restir_pt_light_index(const ParameterBlock<Scene> scene, const Hit hit) {
-    if (!hit.is_valid())
-        return LIGHT_ENV_INDEX;
-    const GeometryData gd = scene.get_geometry_data(hit.get_geometry_id());
-    if ((gd.flags & GeometryDataFlags::UseEnvMap) != 0)
-        return LIGHT_ENV_INDEX;
-    if (let index = scene.nee.get_triangle_index(hit.get_geometry_id(), hit.primitive_id))
-        return index;
-    return LIGHT_INVALID_INDEX;
-}
-
-// The scene hit of a point on an emissive triangle, so a light sample can serve as a vertex.
-Hit restir_pt_light_hit(const ParameterBlock<Scene> scene, const uint index, const float3 pos) {
-    const EmissiveTriangle tri = scene.nee.table.triangles[index];
-    const LightGeometry lg = scene.nee.table.geometries[find_light_geometry(
-        scene.nee.table.geometries, scene.nee.table.geometry_count, index)];
-    const float3 e1 = tri.p1 - tri.p0;
-    const float3 e2 = tri.p2 - tri.p0;
-    const float3 v = pos - tri.p0;
-    const float d00 = dot(e1, e1);
-    const float d01 = dot(e1, e2);
-    const float d11 = dot(e2, e2);
-    const float d20 = dot(v, e1);
-    const float d21 = dot(v, e2);
-    const float inv_det = 1.f / (d00 * d11 - d01 * d01);
-    float2 bary = float2(d11 * d20 - d01 * d21, d00 * d21 - d01 * d20) * inv_det;
-    // the table winds every triangle front-facing, the mesh does not
-    if ((scene.get_geometry_data(tri.geometry_id).flags & GeometryDataFlags::FlipFacing) != 0)
-        bary = bary.yx;
-    return Hit(tri.geometry_id, lg.instance_index, tri.primitive_id, 0, bary);
 }
 
 // The vertex a segment leaves from, as far as the reconnection criteria and MIS care.
@@ -616,9 +532,10 @@ float restir_pt_emitter_light_pdf(const ParameterBlock<Scene> scene,
                                   const RestirPTFrom from,
                                   const float3 dir,
                                   const Hit hit) {
-    return from.samples_lights
-               ? restir_pt_light_pdf(scene, from.pos, dir, restir_pt_light_index(scene, hit))
-               : 0.f;
+    if (!from.samples_lights)
+        return 0.f;
+    return scene.nee.mixture_pdf(scene.nee.pdf(scene.nee.begin_vertex(from.pos),
+                                               scene.get_light_index(hit), from.pos, dir));
 }
 
 // Next event estimation at a vertex: the light sample drawn from the path's own stream, with
@@ -902,8 +819,7 @@ float3 restir_pt_trace_candidates(const ParameterBlock<Scene> scene,
                         // the light vertex itself reconnects
                         float geometry = 1.f;
                         if (!env) {
-                            const float3 n =
-                                normalize(scene.nee.table.triangles[ls.index].get_scaled_normal());
+                            const float3 n = scene.nee.get_normal(ls.index);
                             geometry = abs(dot(n, ls.wo)) / (ls.dist * ls.dist);
                         }
                         candidates.write(restir_pt_candidate(
@@ -912,7 +828,7 @@ float3 restir_pt_trace_candidates(const ParameterBlock<Scene> scene,
                                 i + 1, i + 1, true, env,
                                 restir_pt_lobe_bits(RestirPTLobeDiffuse,
                                                     dot(wi, ng) * dot(ls.wo, ng) < 0.f)),
-                            env ? Hit() : restir_pt_light_hit(scene, ls.index, ls.pos), ls.wo,
+                            env ? Hit() : scene.get_emitter_hit(ls.index, ls.pos), ls.wo,
                             ls.Le, geometry, 0.f));
                     }
                 }

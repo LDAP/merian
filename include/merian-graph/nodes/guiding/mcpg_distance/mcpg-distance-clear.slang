@@ -7,7 +7,6 @@ struct DistanceClearBinding {
     DistanceMCGrid grid;
 };
 
-// The grid is transient: the projection rebuilds it every frame.
 [shader("compute")][numthreads(8, 8, 1)] void main(uint3 thread_id : SV_DispatchThreadID,
                                                    ParameterBlock<DistanceClearBinding> params) {
     for (uint level = 0; level < distance_mc_level_count; level++) {

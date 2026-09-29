@@ -9,14 +9,10 @@ using merian;
 struct DistanceProjectBinding {
     DistanceMCGrid grid;
     Sampler2D<float4> prev;
-    // the level distance_project moves; one dispatch per level
     uint level;
     uint2 dim;
 };
 
-// Carries one level of the distance chains across frames: scatters each vertex of the previous
-// grid to where its mean scattering point lands this frame, with all stored distances moved to
-// the new camera. The tracer then reads the grid at the current pixel with no motion handling.
 // Concurrent writes to the same target vertex are benign: either state is a valid estimate.
 [shader("compute")][numthreads(8, 8, 1)] void main(uint3 thread_id : SV_DispatchThreadID,
                                                    ParameterBlock<Scene> scene,
@@ -43,7 +39,6 @@ struct DistanceProjectBinding {
         return;
 
     DistanceMCState moved = s;
-    // moving toward the mean scattering point shortens every stored distance
     distance_mc_state_shift(moved, distance(pos, scene.camera.position) - mean);
     params.grid.levels[level][uint2(target)] = moved.pack();
 }

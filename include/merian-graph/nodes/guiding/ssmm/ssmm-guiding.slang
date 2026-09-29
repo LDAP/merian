@@ -8,19 +8,15 @@ import merian_shaders.colors.colorspaces;
 using merian;
 
 namespace merian {
-// neighbour fits resampled towards this vertex
 extern static const int merian_ssmm_group_size = 5;
-// standard deviation of the neighbourhood the resampling reaches into, in pixels
 extern static const float merian_ssmm_reuse_radius = 15.0;
-// samples folded into the exponentially weighted fit
 extern static const uint merian_ssmm_max_n = 1024u;
 extern static const float merian_ssmm_min_alpha = 0.01;
 extern static const float merian_ssmm_prior_n = 0.2;
 } // namespace merian
 
 // Screen-space mixture models (Dittebrandt et al. 2023), ported from VKDT with the author's
-// approval. One fitted lobe per pixel, carried over frames through the motion vectors; it
-// describes the first scattering vertex only.
+// approval.
 namespace merian {
 
 bool ssmm_valid(const SSMCState s) {
@@ -31,14 +27,12 @@ float3 ssmm_target_dir(const SSMCState s, const float3 x) {
     return normalize(s.sum_tgt / (s.sum_w > 0.0 ? s.sum_w : 1.0) - x);
 }
 
-// the vMF lobe (direction, concentration) the state stands for at x
 float4 ssmm_vmf(const SSMCState s, const float3 x) {
-    float r = s.sum_len / (s.sum_w > 0.0 ? s.sum_w : 1.0); // mean cosine in [0, 1]
+    float r = s.sum_len / (s.sum_w > 0.0 ? s.sum_w : 1.0);
     r = (s.N * s.N * r) / (s.N * s.N + merian_ssmm_prior_n);
     return float4(ssmm_target_dir(s, x), (3.0 * r - r * r * r) / (1.0 - r * r));
 }
 
-// maximum likelihood update, exponentially weighted
 void ssmm_add(inout SSMCState s, const float3 x, const float w, const float3 dir, const float3 y) {
     s.N = min(s.N + 1, merian_ssmm_max_n);
     const float alpha = max(1.0 / s.N, merian_ssmm_min_alpha);
@@ -49,8 +43,7 @@ void ssmm_add(inout SSMCState s, const float3 x, const float w, const float3 dir
     s.sum_len = length(to);
 }
 
-// How much a neighbour's fit is worth here: its own score, discounted where the surface it was
-// fitted on does not match this one. SVGF-style normal and depth weights.
+// SVGF-style normal and depth weights
 float ssmm_reuse_weight<G : IGBuffer>(const SSMCState s,
                                       const ParameterBlock<G> gbuffer,
                                       const float3 cam_pos,
@@ -64,10 +57,8 @@ float ssmm_reuse_weight<G : IGBuffer>(const SSMCState s,
     return s.f * w_n * w_d;
 }
 
-// The one fit resampled out of the neighbourhood, as a vMF lobe.
 struct SSMMDistribution : GuidingDistribution<float3> {
     float4 vmf;
-    // the fit the update continues from
     SSMCState selected;
 
     float pdf(const float3 s) {
@@ -98,7 +89,6 @@ struct SSMMGuiding<G : IGBuffer> : GuidingModel {
     RWStructuredBuffer<SSMCState, ScalarDataLayout> next;
 
     struct State {
-        // where the fit is written back; only the first vertex has one
         uint2 pixel;
         bool has_fit;
     }
@@ -125,7 +115,6 @@ struct SSMMGuiding<G : IGBuffer> : GuidingModel {
         SSMMDistribution dist;
         dist.vmf = float4(0);
         dist.selected = SSMCState(float3(0), 0.0, 0, 0.0, 0.0);
-        // a screen-space fit only describes the vertex the pixel actually sees
         if (vertex.bounce != uint16_t(1)) {
             return dist;
         }
@@ -134,9 +123,7 @@ struct SSMMGuiding<G : IGBuffer> : GuidingModel {
         const float2 mv = gbuffer.load(vertex.pixel).motion_vectors;
         const int2 reprojected = int2(float2(vertex.pixel) + mv);
 
-        // Resample the neighbourhood towards this vertex, walking outwards from the reprojected
-        // pixel. Offsets are the sum of six uniforms, so the neighbourhood is sampled densely at
-        // the centre and thinly at the edges.
+        // offsets are the sum of six uniforms: dense at the centre, thin at the edges
         SSMCState tent = SSMCState(float3(0), 0.0, 0, 0.0, 0.0);
         float sum = 0.0;
         for (int i = 0; i < merian_ssmm_group_size; i++) {
@@ -189,7 +176,6 @@ struct SSMMGuiding<G : IGBuffer> : GuidingModel {
                           const Record record,
                           const PathSegment segment,
                           inout RandomGenerator rng) {
-        // a vMF lobe cannot represent a delta direction, and only the first vertex has a fit
         if (!state.has_fit || segment.delta || segment.bounce != uint16_t(1)) {
             return float3(0);
         }

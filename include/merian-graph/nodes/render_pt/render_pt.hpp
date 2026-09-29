@@ -27,11 +27,14 @@
 
 namespace merian {
 
-// Path tracer starting from the GBuffer hit. Scatter directions come from a one-sample mixture
-// of the BSDF and a guiding method plugged into the guiding slot.
 class RenderPT : public Node {
 
   public:
+    // match SCATTER_MODE_* and NEE_MODE_* in the shaders
+    enum class ScatterMode : int32_t { MIS, RIS };
+    enum class NEEMode : int32_t { Off, Mixture, Resampled };
+    enum class TraceShader : int32_t { Auto, RayGeneration, Compute };
+
     RenderPT();
 
     ~RenderPT() override = default;
@@ -56,18 +59,16 @@ class RenderPT : public Node {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
-    vk::Format irradiance_format = vk::Format::eR32G32B32A32Sfloat;
-
     void ensure_pipeline(const SceneHandle& scene);
     void update_render_constants();
     uint32_t recorded_vertices_per_path() const;
+    bool use_raygen() const;
     void update_guiding_slot();
 
     ContextHandle context;
     ResourceAllocatorHandle resource_allocator;
     ShaderCompileContextHandle compile_context;
 
-    // Connectors
     PtrInHandle<Scene> con_scene = PtrIn<Scene>::create();
     GBufferInHandle con_gbuffer;
     ShaderObjectInHandle<GuidingObject> con_guiding = ShaderObjectIn<GuidingObject>::create();
@@ -81,42 +82,39 @@ class RenderPT : public Node {
     VkSampledImageInHandle con_prev_volume_depth = VkSampledImageIn::create();
 
     vk::Extent3D extent = vk::Extent3D{1920, 1080, 1};
+    vk::Format irradiance_format = vk::Format::eR32G32B32A32Sfloat;
     int32_t spp = 1;
-    // Decorrelates a run from another of the same configuration.
     uint32_t seed = 0;
     int32_t max_path_length = 5;
     int32_t emitted_max_path_length = max_path_length;
     bool emission_on_primary = true;
     bool enable_ser = false;
-    bool use_raygen = true;
+    TraceShader trace_shader = TraceShader::Auto;
+    bool raygen_preferred = true;
     bool russian_roulette = true;
     bool demodulate_albedo = false;
-    // NullGuidingModel while nothing is connected: the slot then compiles out entirely.
     GuidingModelHandle guiding;
     uint32_t guiding_version = 0;
     GuidingModelHandle distance_guiding;
     uint32_t distance_guiding_version = 0;
 
-    // Single scattering along the primary ray; compiled out where the scene has no medium.
     bool volume_available = false;
     int32_t volume_spp = 1;
     bool volume_forward_project = true;
     float volume_forward_project_min_z = 50.f;
     vk::Format volume_depth_format = vk::Format::eR32Sfloat;
 
-    // 0 = one draw from the mixture (MIS), 1 = resample several (RIS)
     int32_t guiding_debug_view = 0;
     bool scatter_stats = false;
     bool follow_specular = true;
     float specular_alpha = 0.f;
-    int32_t scatter_mode = 0;
+    ScatterMode scatter_mode = ScatterMode::MIS;
     int32_t scatter_candidates = 2;
 
-    int32_t nee_mode = 2;
+    NEEMode nee_mode = NEEMode::Resampled;
     float nee_probability = 0.1f;
     int32_t nee_bounces = 0;
 
-    // How the one scatter sample is split with a guiding method.
     float guiding_share = 0.5f;
     bool guiding_scale_with_alpha = true;
     float guiding_alpha_threshold = 0.05f;
@@ -133,7 +131,6 @@ class RenderPT : public Node {
     VolumePass project_seed;
     VolumePass project;
 
-    // Slang program + pipeline; rebuilt when the scene composition changes.
     SlangCompositionHandle gbuffer_composition;
     SlangCompositionHandle composition;
     Versioned<SlangProgram> program;

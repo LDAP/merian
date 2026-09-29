@@ -35,13 +35,11 @@ SlangCompositionHandle MCPGDistanceGuidingModel::get_composition() const {
         "mcpg_distance_guiding_constants",
         fmt::format("namespace merian {{\n"
                     "export static const int merian_distance_guiding_samples = {};\n"
-                    "export static const float merian_distance_guiding_probability = {};\n"
                     "}}\n"
                     "export static const float distance_mc_base_width = {};\n"
                     "export static const uint distance_mc_level_count = {}u;\n"
                     "export static const float distance_mc_distribution_dimension = {};",
-                    samples, probability, base_width, std::max(level_count, 1u),
-                    distribution_dimension));
+                    samples, base_width, std::max(level_count, 1u), distribution_dimension));
     return composition;
 }
 
@@ -67,7 +65,6 @@ void MCPGDistanceGuidingModel::reset([[maybe_unused]] const CommandBufferHandle&
 bool MCPGDistanceGuidingModel::on_extent(const vk::Extent3D& new_extent) {
     const uint32_t cells_x = uint32_t(std::ceil(new_extent.width / base_width)) + 2;
     const uint32_t cells_y = uint32_t(std::ceil(new_extent.height / base_width)) + 2;
-    // Coarser than the configured cell width buys nothing, and a level past the image is empty.
     const uint32_t levels_to_max_width =
         uint32_t(std::floor(std::log2(std::max(max_width / base_width, 1.f)))) + 1;
     const uint32_t levels_in_image =
@@ -116,11 +113,6 @@ bool MCPGDistanceGuidingModel::properties(Properties& props) {
 
     constants_changed |= props.config_int("distance MC samples", samples,
                                           "Distance chains resampled towards each ray.", 1, 16);
-    constants_changed |= props.config_float(
-        "distance guiding probability", probability,
-        "Probability of drawing the scattering distance from the chains instead of the "
-        "transmittance.",
-        0.01f, 0.f, 1.f);
     recreate |= props.config_float("distance MC grid width", base_width,
                                    "Cell width in pixels at the finest level.", 0.5f, 1.f, 64.f);
     recreate |=

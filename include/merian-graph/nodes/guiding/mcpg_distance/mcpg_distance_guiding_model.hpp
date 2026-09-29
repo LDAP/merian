@@ -9,8 +9,6 @@
 
 namespace merian {
 
-// Per-pixel Markov chains over the scattering distance, in a screen-space grid the node carries
-// across frames.
 class MCPGDistanceGuidingModel : public GuidingModel {
   public:
     static constexpr uint32_t MAX_LEVELS = 16;
@@ -32,16 +30,12 @@ class MCPGDistanceGuidingModel : public GuidingModel {
 
     bool properties(Properties& props) override;
 
-    // --- node facing ---
-
-    // Cells and levels follow the render target; returns true where the grid was rebuilt.
     bool on_extent(const vk::Extent3D& extent);
 
     uint32_t get_level_count() const {
         return level_count;
     }
 
-    // The grid the tracer reads and writes this frame, and the one the projection reads.
     const ImageHandle& get_grid() const {
         return grids[current];
     }
@@ -73,7 +67,6 @@ class MCPGDistanceGuidingModel : public GuidingModel {
     std::array<std::vector<TextureHandle>, 2> level_views;
 
     int32_t samples = 3;
-    float probability = 0.9f;
     float base_width = 4.f;
     float max_width = 128.f;
     float distribution_dimension = 2.f;

@@ -5,7 +5,6 @@
 
 namespace merian {
 
-// Markov-chain path guiding over an adaptive hash grid, learning from an irradiance cache.
 class MCPGGuidingNode : public GuidingNode {
   public:
     MCPGGuidingNode() : GuidingNode(std::make_shared<MCPGGuidingModel>()) {}

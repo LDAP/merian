@@ -567,24 +567,15 @@ struct Scene {
 
     // -----------------------------------------
 
-    // The cell is drawn once here, so that sampling and density evaluation agree on it.
-    DirectLightVertex begin_direct_light(const float3 pos, inout RandomGenerator rng) {
-        DirectLightVertex vertex;
-        vertex.pos = pos;
-        vertex.bucket = nee.get_grid_cell(pos, nee.grid.jitter * (rng.next_float3() - 0.5f));
-        return vertex;
-    }
-
-    // One direction towards a light, resampled against what the integrator says it is worth.
     Optional<DirectLightSample> sample_direct_light<T : IDirectLightTarget>(
         const DirectLightVertex vertex, const T target, inout RandomGenerator rng) {
         DirectLightReservoir reservoir = DirectLightReservoir();
         const uint pool = nee.pool_candidates();
         for (uint i = 0; i < pool + nee.cell_candidates(); i++) {
-            if (let ls = nee.sample_light(vertex.bucket, vertex.pos, rng, material_system, env_map,
+            if (let ls = nee.sample_light(vertex.cell, vertex.pos, rng, material_system, env_map,
                                           time, i >= pool)) {
                 reservoir.add_light(ls, target.unshadowed(ls, rng),
-                                    nee.pdf_lights(vertex.bucket, ls.index, ls.pdf),
+                                    nee.pdf_lights(vertex.cell, ls.index, ls.pdf),
                                     target.scatter_pdf(ls), rng);
             }
         }
@@ -599,31 +590,20 @@ struct Scene {
         return s;
     }
 
-    // A point on a light for the mixture estimator.
-    Optional<LightPoint> sample_direct_light_point(const DirectLightVertex vertex,
-                                                   inout RandomGenerator rng) {
-        return nee.sample_point(vertex.bucket, vertex.pos, rng, nee.pool_candidates(),
-                                nee.cell_candidates());
-    }
-
-    // Share of the mixture's density that the light technique accounts for.
-    float direct_light_mixture_pdf(const float hit_pdf) {
-        return hit_pdf / float(max(nee.candidate_count(), 1u));
-    }
-
-    // One unshadowed light candidate from a technique.
-    Optional<LightSample>
-    sample_light_pool(const uint bucket, const float3 pos, inout RandomGenerator rng) {
-        return nee.sample_light(bucket, pos, rng, material_system, env_map, time, false);
-    }
-
-    // A point on a light without its radiance, for the mixture estimator.
-    Optional<LightPoint> sample_light_point(const uint cell,
-                                            const float3 pos,
-                                            inout RandomGenerator rng,
-                                            const uint m_pool,
-                                            const uint m_grid) {
-        return nee.sample_point(cell, pos, rng, m_pool, m_grid);
+    // One draw; pdf is NEE::mixture_pdf of it.
+    Optional<LightSample> sample_direct_light(const DirectLightVertex vertex,
+                                              inout RandomGenerator rng) {
+        const uint m_pool = nee.pool_candidates();
+        const uint m_grid = nee.cell_candidates();
+        const bool from_grid = rng.next_float() * float(m_pool + m_grid) >= float(m_pool);
+        if (let ls = nee.sample_light(vertex.cell, vertex.pos, rng, material_system, env_map, time,
+                                      from_grid)) {
+            LightSample s = ls;
+            s.pdf = nee.mixture_pdf(nee.pdf_lights(vertex.cell, ls.index, ls.pdf, m_pool, m_grid));
+            if (s.pdf > 0.f)
+                return s;
+        }
+        return none;
     }
 
     // Ray from the receiver (offset along its face normal) towards a point on a light. Distant
@@ -670,7 +650,6 @@ struct Scene {
                 GeometryDataFlags::UseEnvMap) != 0;
     }
 
-    // Contribution of the reservoir's winner; traces the shadow ray if a light sample won.
     float3 resolve_direct_light(const float3 pos,
                                 const float3 face_normal,
                                 const float spawn_offset,
@@ -685,39 +664,34 @@ struct Scene {
         return s.value;
     }
 
-    // Which light the ray from origin along dir ended on, and the density with which
-    // the light techniques would have generated that point with. For MIS against scatter
-    // independent of the shading point, so it can run before the hit is shaded.
-    LightHit get_light_hit(const DirectLightVertex vertex,
-                           const float3 origin,
-                           const float3 dir,
-                           const Hit hit) {
-        return get_light_hit(vertex.bucket, origin, dir, hit, nee.pool_candidates(),
-                             nee.cell_candidates());
+    // LIGHT_ENV_INDEX for the environment, LIGHT_INVALID_INDEX for a non-emitter
+    uint get_light_index(const Hit hit) {
+        if (!hit.is_valid() ||
+            (get_geometry_data(hit.get_geometry_id()).flags & GeometryDataFlags::UseEnvMap) != 0)
+            return LIGHT_ENV_INDEX;
+        if (let index = nee.get_triangle_index(hit.get_geometry_id(), hit.primitive_id))
+            return index;
+        return LIGHT_INVALID_INDEX;
     }
 
-    LightHit get_light_hit(const uint cell,
-                           const float3 origin,
-                           const float3 dir,
-                           const Hit hit,
-                           const uint m_pool,
-                           const uint m_grid) {
-        LightHit lh = LightHit();
-        bool distant = !hit.is_valid();
-        if (!distant) {
-            const GeometryData gd = get_geometry_data(hit.instance_id, hit.geometry_index);
-            distant = (gd.flags & GeometryDataFlags::UseEnvMap) != 0;
-            if (!distant) {
-                if (let index = nee.get_triangle_index(hit.get_geometry_id(), hit.primitive_id)) {
-                    lh.index = index;
-                    lh.pdf = nee.pdf_lights(cell, index, origin, dir, m_pool, m_grid);
-                }
-                return lh;
-            }
-        }
-        lh.index = LIGHT_ENV_INDEX;
-        lh.pdf = nee.pdf_lights(cell, LIGHT_ENV_INDEX, origin, dir, m_pool, m_grid);
-        return lh;
+    Hit get_emitter_hit(const uint index, const float3 pos) {
+        const EmissiveTriangle tri = nee.table.triangles[index];
+        const LightGeometry lg = nee.table.geometries[find_light_geometry(
+            nee.table.geometries, nee.table.geometry_count, index)];
+        const float3 e1 = tri.p1 - tri.p0;
+        const float3 e2 = tri.p2 - tri.p0;
+        const float3 v = pos - tri.p0;
+        const float d00 = dot(e1, e1);
+        const float d01 = dot(e1, e2);
+        const float d11 = dot(e2, e2);
+        const float d20 = dot(v, e1);
+        const float d21 = dot(v, e2);
+        const float inv_det = 1.f / (d00 * d11 - d01 * d01);
+        float2 bary = float2(d11 * d20 - d01 * d21, d00 * d21 - d01 * d20) * inv_det;
+        // the table winds every triangle front-facing, the mesh does not
+        if ((get_geometry_data(tri.geometry_id).flags & GeometryDataFlags::FlipFacing) != 0)
+            bary = bary.yx;
+        return Hit(tri.geometry_id, lg.instance_index, tri.primitive_id, 0, bary);
     }
 
     // -----------------------------------------

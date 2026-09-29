@@ -12,8 +12,6 @@
 
 namespace merian {
 
-// Distance guiding for a path tracer's volume pass. Owns the screen-space chain grid and carries
-// it across frames itself: the projection is this node's work, not the renderer's.
 class MCPGDistanceGuidingNode : public GuidingNode {
   public:
     MCPGDistanceGuidingNode() : GuidingNode(std::make_shared<MCPGDistanceGuidingModel>()) {}
@@ -32,7 +30,6 @@ class MCPGDistanceGuidingNode : public GuidingNode {
   private:
     void ensure_pipelines(const SceneHandle& scene);
 
-    // Without a scene the chains cannot be moved into this frame, so they start fresh each one.
     MCPGDistanceGuidingModel& chains() const {
         return static_cast<MCPGDistanceGuidingModel&>(*model);
     }
