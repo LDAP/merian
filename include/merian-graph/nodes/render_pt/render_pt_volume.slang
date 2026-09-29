@@ -170,8 +170,8 @@ void render_pixel(const uint2 pixel,
         // the record is what crosses the traversal, so it is taken while the candidates are dead
         let guiding_record = params.guiding.record_scatter(guiding, segment, guided, rng);
 
-        float3 contribution =
-            scene.resolve_direct_light(scatter_pos, float3(0), direct, merian_render_instance_mask);
+        float3 contribution = scene.resolve_direct_light(scatter_pos, float3(0), 0.f, direct,
+                                                         merian_render_instance_mask);
 
         if (scattered && any(f_cos > 0.f)) {
             RayDesc ray;

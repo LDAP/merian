@@ -151,9 +151,8 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
             if (let lp = scene.sample_direct_light_point(lights, rng)) {
                 // aimed from where the ray will start: a direction taken from the unoffset point
                 // misses the sampled triangle near its edges
-                const float3 ng = sp.get_face_normal();
-                const float3 origin =
-                    offset_ray_origin(sp.pos, dot(lp.pos - sp.pos, ng) < 0.f ? -ng : ng);
+                const float3 origin = offset_ray_origin(sp.pos, sp.get_face_normal(),
+                                                        sp.spawn_offset, lp.pos - sp.pos);
                 light_dir = normalize(lp.pos - origin);
                 sampled_light = lp.index;
             }
@@ -266,8 +265,9 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
 
         // The shadow ray goes out once the guiding candidates are dead: only the reservoir and
         // the narrowed record cross this traversal.
-        radiance += throughput * scene.resolve_direct_light(sp.pos, sp.get_face_normal(), direct,
-                                                            merian_render_instance_mask);
+        radiance +=
+            throughput * scene.resolve_direct_light(sp.pos, sp.get_face_normal(), sp.spawn_offset,
+                                                    direct, merian_render_instance_mask);
 
         Reorder.reorder();
 

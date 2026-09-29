@@ -343,7 +343,8 @@ struct NEE {
         ls.Li = material_system.get_emission(tri.material_id, sd, DefaultLODSampler());
         // area measure to solid angle
         ls.pdf = dist2 / (cos_l * 0.5f * area2);
-        ls.pos = offset_ray_origin(light_pos, n);
+        ls.pos = offset_ray_origin(
+            light_pos, n, triangle_spawn_offset(light_pos, tri.p1 - tri.p0, tri.p2 - tri.p0), n);
         ls.index = index;
         return ls;
     }

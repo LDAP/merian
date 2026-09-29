@@ -426,6 +426,7 @@ struct Scene {
         s.pos = pos;
         s.uv = tri.get_uv(hit);
         s.face_normal = face_normal;
+        s.spawn_offset = triangle_spawn_offset(pos, edge01, edge02);
         s.frame = tangent_valid ? OrthonormalFrame(vertex_normal, tangent, handedness)
                                 : OrthonormalFrame(vertex_normal);
         return s;
@@ -472,6 +473,7 @@ struct Scene {
         s.pos = bary.x * p0 + bary.y * p1 + bary.z * p2;
         const float3 face_normal = normalize(cross(p1 - p0, p2 - p0));
         s.face_normal = (tri.gd.flags & GeometryDataFlags::FlipFacing) ? -face_normal : face_normal;
+        s.spawn_offset = triangle_spawn_offset(s.pos, p1 - p0, p2 - p0);
         return s;
     }
 
@@ -530,6 +532,7 @@ struct Scene {
         sp.enc_face_normal = encode_normal(surface.face_normal);
         sp.has_surface_material = with_material;
         sp.material_id = surface.material_id;
+        sp.spawn_offset = surface.spawn_offset;
         if (with_material) {
             sp.surface_material = material_system.get_material_sample(
                 surface.material_id, sd, sp.emission, sp.shading_frame, lod);
@@ -626,10 +629,10 @@ struct Scene {
     // samples pass through sky portals (UseEnvMap geometry) to the environment behind them.
     RayDesc make_light_ray(const float3 pos,
                            const float3 face_normal,
+                           const float spawn_offset,
                            const float3 light_pos,
                            const bool distant) {
-        const float3 origin = offset_ray_origin(
-            pos, dot(light_pos - pos, face_normal) < 0.f ? -face_normal : face_normal);
+        const float3 origin = offset_ray_origin(pos, face_normal, spawn_offset, light_pos - pos);
         // aim at the point itself: a ray along the unoffset direction that stops at the offset
         // distance clips the light triangle at grazing angles
         const float3 to_light = light_pos - origin;
@@ -647,10 +650,11 @@ struct Scene {
     // costs its own traversal stack.
     bool trace_light_visibility(const float3 pos,
                                 const float3 face_normal,
+                                const float spawn_offset,
                                 const float3 light_pos,
                                 const bool distant,
                                 const uint instances_mask = 0xff) {
-        const RayDesc ray = make_light_ray(pos, face_normal, light_pos, distant);
+        const RayDesc ray = make_light_ray(pos, face_normal, spawn_offset, light_pos, distant);
         // a sky portal in front of the environment must not end the search
         const bool closest = distant && nee.has_sky_portals;
         SceneAccelerationStructure::RayQueryImpl rq;
@@ -668,13 +672,14 @@ struct Scene {
     // Contribution of the reservoir's winner; traces the shadow ray if a light sample won.
     float3 resolve_direct_light(const float3 pos,
                                 const float3 face_normal,
+                                const float spawn_offset,
                                 const Optional<DirectLightSample> direct,
                                 const uint instances_mask = 0xff) {
         if (!direct.hasValue)
             return float3(0);
         const DirectLightSample s = direct.value;
-        if (!trace_light_visibility(pos, face_normal, s.light_pos, s.light_index == LIGHT_ENV_INDEX,
-                                    instances_mask))
+        if (!trace_light_visibility(pos, face_normal, spawn_offset, s.light_pos,
+                                    s.light_index == LIGHT_ENV_INDEX, instances_mask))
             return float3(0);
         return s.value;
     }
@@ -732,6 +737,7 @@ struct Scene {
         sp.shading_frame = OrthonormalFrame(-ray.Direction);
         sp.has_surface_material = false;
         sp.material_id = uint(-1);
+        sp.spawn_offset = 0.f;
         return sp;
     }
 

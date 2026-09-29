@@ -144,12 +144,11 @@ RestirPTShift restir_pt_reconnect(const ParameterBlock<Scene> scene,
     }
 
     // 5. visibility, towards the point offset to the side facing x'_{k-1}
-    const float3 target = distant
-                              ? sp.pos + dir * ENV_MAP_DISTANCE
-                              : offset_ray_origin(surface.pos, dot(surface.face_normal, dir) > 0.f
-                                                                   ? -surface.face_normal
-                                                                   : surface.face_normal);
-    if (!scene.trace_light_visibility(sp.pos, ng, target, distant, merian_restir_pt_instance_mask))
+    const float3 target =
+        distant ? sp.pos + dir * ENV_MAP_DISTANCE
+                : offset_ray_origin(surface.pos, surface.face_normal, surface.spawn_offset, -dir);
+    if (!scene.trace_light_visibility(sp.pos, ng, sp.spawn_offset, target, distant,
+                                      merian_restir_pt_instance_mask))
         return failed;
 
     RestirPTShift s;
@@ -194,7 +193,7 @@ RestirPTReservoir restir_pt_update_suffix(const ParameterBlock<Scene> scene,
         restir_pt_hit_surface(scene, hit, scene.get_triangle_hit(hit), prev_frame);
     const float3 ng = surface.face_normal;
     RayDesc ray;
-    ray.Origin = offset_ray_origin(surface.pos, dot(r.rc_wo, ng) < 0.f ? -ng : ng);
+    ray.Origin = offset_ray_origin(surface.pos, ng, surface.spawn_offset, r.rc_wo);
     ray.Direction = r.rc_wo;
     ray.TMin = SCENE_RAY_TMIN;
     ray.TMax = SCENE_RAY_TMAX;

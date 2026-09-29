@@ -286,6 +286,7 @@ restir_pt_splat(const ParameterBlock<Scene> scene,
     float3 dst_x = src_x;
     float3 src_n = float3(0);
     float3 dst_n = float3(0);
+    float dst_offset = 0.f;
     if (!distant) {
         const TriangleHit tri = scene.get_triangle_hit(primary.hit);
         const Surface now = scene.get_surface(primary.hit, tri);
@@ -294,6 +295,7 @@ restir_pt_splat(const ParameterBlock<Scene> scene,
         src_n = to_prev ? now.face_normal : prev.face_normal;
         dst_x = to_prev ? prev.pos : now.pos;
         dst_n = to_prev ? prev.face_normal : now.face_normal;
+        dst_offset = to_prev ? prev.spawn_offset : now.spawn_offset;
     }
     const Optional<RestirPTProjection> src =
         restir_pt_project(src_camera, src_x, src_n, distant, dim, lens);
@@ -304,10 +306,9 @@ restir_pt_splat(const ParameterBlock<Scene> scene,
 
     // the vertex must be what the other camera sees there
     const RayDesc ray = restir_pt_film_ray(dst_camera, dst.value.image_pos, dim, lens);
-    const float3 target =
-        distant ? ray.Origin + ray.Direction * ENV_MAP_DISTANCE
-                : offset_ray_origin(dst_x, dot(dst_n, ray.Direction) > 0.f ? -dst_n : dst_n);
-    if (!scene.trace_light_visibility(ray.Origin, ray.Direction, target, distant, dst_mask))
+    const float3 target = distant ? ray.Origin + ray.Direction * ENV_MAP_DISTANCE
+                                  : offset_ray_origin(dst_x, dst_n, dst_offset, -ray.Direction);
+    if (!scene.trace_light_visibility(ray.Origin, ray.Direction, 0.f, target, distant, dst_mask))
         return none;
 
     RestirPTSplat s;
@@ -656,7 +657,7 @@ restir_pt_direct<B : BSDF>(const ParameterBlock<Scene> scene,
         d.p_scatter = bsdf.pdf(wi_local, wo_local);
         d.mis = ls.pdf / (ls.pdf + d.p_scatter);
         if (any(d.f > 0.f) && scene.trace_light_visibility(
-                                  sp.pos, sp.get_face_normal(), ls.shadow_pos,
+                                  sp.pos, sp.get_face_normal(), sp.spawn_offset, ls.shadow_pos,
                                   ls.index == LIGHT_ENV_INDEX, merian_restir_pt_instance_mask))
             return d;
     }

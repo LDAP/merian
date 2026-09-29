@@ -7,19 +7,20 @@ namespace merian {
 static const float SCENE_RAY_TMIN = 0.f;
 static const float SCENE_RAY_TMAX = 1e7f;
 
-// Offsets pos along n to avoid self-intersection: a fixed number of ULPs so the offset scales
-// with the position's magnitude, a small constant offset near the origin.
-// Wächter and Binder, "A Fast and Robust Method for Avoiding Self-Intersection", RTG 2019.
-// Assumes pos was computed via barycentric interpolation, not from the ray t.
-float3 offset_ray_origin(const float3 pos, const float3 n) {
-    static const float origin = 1.f / 16.f;
-    static const float float_scale = 1.f / 65536.f;
-    static const float int_scale = 256.f;
+float triangle_spawn_offset(const float3 pos, const float3 edge01, const float3 edge02) {
+    const float3 edge12 = edge02 - edge01;
+    const float longest2 = max(max(dot(edge01, edge01), dot(edge02, edge02)), dot(edge12, edge12));
+    const float aspect = longest2 / max(length(cross(edge01, edge02)), 1e-30f);
+    const float3 a = abs(pos);
+    const float magnitude = max(max(max(a.x, a.y), a.z), sqrt(longest2));
+    return magnitude * 0x1p-23f * clamp(2.f * aspect, 8.f, 4096.f);
+}
 
-    const int3 int_offset = int3(n * int_scale);
-    const float3 int_pos = asfloat(asint(pos) + select(pos < 0.f, -int_offset, int_offset));
-
-    return select(abs(pos) < origin, pos + n * float_scale, int_pos);
+float3 offset_ray_origin(const float3 pos,
+                         const float3 face_normal,
+                         const float offset,
+                         const float3 dir) {
+    return pos + (dot(dir, face_normal) < 0.f ? -offset : offset) * face_normal;
 }
 
 struct Hit {
@@ -93,6 +94,7 @@ struct Surface {
     float2 uv;
     float3 face_normal; // in worldspace
     OrthonormalFrame frame;
+    float spawn_offset;
 
     // per-pixel screen-space derivative of linear_z along r_x, r_y
     half2
@@ -117,6 +119,7 @@ struct ShadingPoint {
     MaterialSample surface_material;
     // scene material id; uint(-1) where the ray left the scene
     uint material_id;
+    float spawn_offset;
 
     // in worldspace
     float3 get_face_normal() {
@@ -153,10 +156,8 @@ struct ShadingPoint {
         if (!geometric_side_agrees(wi, wo, transmission))
             return none;
 
-        const float3 ng = get_face_normal();
-        const float wo_ng = dot(wo, ng);
         RayDesc ray;
-        ray.Origin = offset_ray_origin(pos, wo_ng < 0.f ? -ng : ng);
+        ray.Origin = offset_ray_origin(pos, get_face_normal(), spawn_offset, wo);
         ray.Direction = wo;
         ray.TMin = SCENE_RAY_TMIN;
         ray.TMax = SCENE_RAY_TMAX;

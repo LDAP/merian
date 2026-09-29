@@ -210,7 +210,7 @@ bool restir_trace_visibility(const ParameterBlock<Scene> scene,
     const float3 dir = to_light / dist;
 
     RayDesc ray;
-    ray.Origin = offset_ray_origin(surface.sp.pos, select(dot(dir, ng) < 0, -ng, ng));
+    ray.Origin = offset_ray_origin(surface.sp.pos, ng, surface.sp.spawn_offset, dir);
     ray.Direction = dir;
     ray.TMin = SCENE_RAY_TMIN;
     ray.TMax = (y.flags & RestirSampleFlags::RestirSampleDistant) != 0 ? SCENE_RAY_TMAX
