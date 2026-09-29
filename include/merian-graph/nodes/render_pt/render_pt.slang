@@ -532,7 +532,7 @@ void render_pixel<Reorder : IThreadReorder>(const uint2 pixel,
     float3 scatter_stats = float3(0);
 
     for (int s = 0; s < merian_render_spp; s++) {
-        RandomGenerator rng = PCG(pcg4d16(uint4(pixel, scene.frame, s)) ^ merian_render_seed);
+        RandomGenerator rng = PCG(xxhash32(uint4(pixel, scene.frame, uint(s))) ^ merian_render_seed);
 
         var rec = PathRecorder::begin(
             params.path_records, pixel, uint(s), scene.frame,
@@ -564,7 +564,7 @@ void render_pixel<Reorder : IThreadReorder>(const uint2 pixel,
         // the method answers for the primary hit
         const RenderFrameInfo frame_info = {scene.camera.position, scene.prev_camera.position,
                                             scene.time, scene.time_diff, scene.frame};
-        RandomGenerator debug_rng = PCG(pcg4d16(uint4(pixel, scene.frame, 0xDEB0)));
+        RandomGenerator debug_rng = PCG(xxhash32(uint4(pixel, scene.frame, 0xDEB0)));
 
         PathVertex vertex;
         vertex.pos = primary_sp.pos;

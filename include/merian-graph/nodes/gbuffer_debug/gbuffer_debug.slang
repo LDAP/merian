@@ -311,7 +311,7 @@ static const float3 CAST_FAIL = float3(1, 1, 0);
         let bsdf = sp.surface_material.get_bsdf();
         const OrthonormalFrame frame = sp.shading_frame;
         const float3 wi_local = frame.to_local(-ray.Direction);
-        RandomGenerator rng = PCG(pcg4d16(uint4(pixel, scene.frame, 0)));
+        RandomGenerator rng = PCG(xxhash32(uint4(pixel, scene.frame, 0)));
         const uint cell = scene.get_light_bucket(sp.pos, rng);
         if (cell == LIGHT_INVALID_INDEX) {
             color = float4(0, 0, 0, 1);

@@ -251,7 +251,7 @@ static const int RESTIR_MAX_SPATIAL = 8;
 static const float RESTIR_MAX_SAMPLE_SPEED_2 = 1e8f;
 
 merian::RandomGenerator restir_rng(const uint2 pixel) {
-    return merian::XorShift32(merian::pcg4d16(uint4(pixel, pc.frame * 5 + pc.pass, pc.seed)));
+    return merian::XorShift32(max(merian::xxhash32(uint4(pixel, pc.frame * 5 + pc.pass, pc.seed)), 1u));
 }
 
 uint restir_index(const uint2 pixel, const uint2 dim) {

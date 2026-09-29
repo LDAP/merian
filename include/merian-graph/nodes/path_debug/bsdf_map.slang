@@ -40,7 +40,7 @@ void main(uint3 gid: SV_DispatchThreadID, ParameterBlock<Scene> scene) {
     const OrthonormalFrame frame = sp.shading_frame;
     let bsdf = sp.surface_material.get_bsdf();
     const float3 wi_local = path_debug_wi_local(frame.to_local(-ray.Direction));
-    RandomGenerator rng = PCG(pcg4d16(uint4(cell, 17u, 71u)));
+    RandomGenerator rng = PCG(xxhash32(uint4(cell, 17u, 71u)));
     float pdf_sum = 0.f;
     float eval_sum = 0.f;
     float pdf_min = 1e30f;

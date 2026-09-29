@@ -36,7 +36,7 @@ void main(uint3 gid: SV_DispatchThreadID, ParameterBlock<Scene> scene) {
     const float3 wi_local = path_debug_wi_local(frame.to_local(-ray.Direction));
 
     // 1. sampled half
-    RandomGenerator rng = PCG(pcg4d16(uint4(gid.xy, params.check_seq, 0xB5D5u)));
+    RandomGenerator rng = PCG(xxhash32(uint4(gid.xy, params.check_seq, 0xB5D5u)));
     uint landed = 0;
     uint valid = 0;
     uint bad = 0;

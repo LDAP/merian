@@ -51,7 +51,7 @@ uint restir_pt_shift_index(const uint index, const uint slot, const uint directi
 }
 
 RandomGenerator restir_pt_rng(const uint2 pixel, const RestirPTPass pass) {
-    return PCG(pcg4d16(uint4(pixel, pc.frame * RestirPTPassCount + pass, pc.seed + pc.round)));
+    return PCG(xxhash32(uint4(pixel, pc.frame * RestirPTPassCount + pass, pc.seed + pc.round)));
 }
 
 bool restir_pt_in_screen(const int2 pixel, const uint2 dim) {
