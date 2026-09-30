@@ -200,20 +200,22 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<WGBuffer> gbuffer) {
                 if (merian_gbuffer_specular_psr && chain.travelled > 0.f) {
                     const float virtual_z = linear_z + chain.travelled;
                     const float3 virtual_pos = ray.Origin + virtual_z * ray.Direction;
+                    const float2 virtual_mv = scene.compute_motion_vector(
+                        virtual_pos + (chain.sp.prev_pos - chain.sp.pos), virtual_pos, pixel, dim);
                     if (chain.sp.has_surface_material) {
                         let chain_bsdf = chain.sp.surface_material.get_bsdf();
                         const OrthonormalFrame chain_frame = chain.sp.shading_frame;
                         const Albedo chain_albedo =
                             chain_bsdf.get_albedo(chain_frame.to_local(-chain.ray.Direction));
                         sample = make_sample(scene.camera, virtual_pos, chain_frame.get_normal(),
-                                             virtual_z, grad_z, delta_z, mv, hit);
+                                             virtual_z, grad_z, delta_z, virtual_mv, hit);
                         sample.albedo = chain_albedo.reflection;
                         sample.diffuse_albedo = chain_albedo.diffuse;
                         sample.specular_albedo = chain_albedo.specular;
                         sample.roughness = sqrt(chain_bsdf.specular_alpha);
                     } else {
                         sample = make_sample(scene.camera, virtual_pos, chain.sp.shading_normal,
-                                             virtual_z, grad_z, delta_z, mv, hit);
+                                             virtual_z, grad_z, delta_z, virtual_mv, hit);
                         sample.albedo = chain.sp.emission;
                         sample.diffuse_albedo = float3(0.5f);
                         sample.specular_albedo = float3(0.f);
