@@ -270,7 +270,8 @@ RenderPT::process(const NodeIO& io, const NodeProcessInfo& info, Submission& sub
         }
     }
 
-    if (!volume_available) {
+    if (!volume_available || !(io.is_connected(con_volume) || io.is_connected(con_volume_depth) ||
+                               io.is_connected(con_volume_mv))) {
         return {};
     }
 
@@ -341,42 +342,41 @@ void RenderPT::update_render_constants() {
             mask |= (1u << bit);
     }
 
-    const std::string constants = fmt::format(
-        "namespace merian {{\n"
-        "export static const bool merian_render_emission_on_primary = {};\n"
-        "export static const int merian_render_guiding_debug_view = {};\n"
-        "export static const bool merian_render_scatter_stats = {};\n"
-        "export static const bool merian_render_follow_specular = {};\n"
-        "export static const float merian_render_specular_alpha = {:f};\n"
-        "export static const int merian_render_spp = {};\n"
-        "export static const uint merian_render_seed = {}u;\n"
-        "export static const int merian_render_max_path_length = {};\n"
-        "export static const uint merian_render_instance_mask = {}u;\n"
-        "export static const bool merian_render_enable_ser = {};\n"
-        "export static const bool merian_render_demodulate_albedo = {};\n"
-        "export static const int merian_render_nee_mode = {};\n"
-        "export static const float merian_render_nee_probability = {:f};\n"
-        "export static const int merian_render_nee_bounces = {};\n"
-        "export static const int merian_render_scatter_mode = {};\n"
-        "export static const int merian_render_scatter_candidates = {};\n"
-        "export static const bool merian_render_russian_roulette = {};\n"
-        "export static const int merian_render_volume_spp = {};\n"
-        "export static const float merian_render_volume_forward_project_min_z "
-        "= {:f};\n"
-        "export static const float merian_guiding_share = {:f};\n"
-        "export static const bool merian_guiding_scale_with_alpha = {};\n"
-        "export static const float merian_guiding_alpha_threshold = {:f};\n"
-        "export static const int merian_guiding_direct_target = {};\n"
-        "export static const float merian_guiding_distance_share = {:f};\n"
-        "}}",
-        emission_on_primary ? "true" : "false", guiding_debug_view,
-        scatter_stats ? "true" : "false", follow_specular ? "true" : "false", specular_alpha, spp,
-        seed, max_path_length, mask, enable_ser ? "true" : "false",
-        demodulate_albedo ? "true" : "false", static_cast<int32_t>(nee_mode), nee_probability,
-        nee_bounces, static_cast<int32_t>(scatter_mode), scatter_candidates,
-        russian_roulette ? "true" : "false", volume_spp, volume_forward_project_min_z,
-        guiding_share, guiding_scale_with_alpha ? "true" : "false", guiding_alpha_threshold,
-        guiding_direct_target, guiding_distance_share);
+    const std::string constants =
+        fmt::format("namespace merian {{\n"
+                    "export static const bool merian_render_emission_on_primary = {};\n"
+                    "export static const int merian_render_output_view = {};\n"
+                    "export static const bool merian_render_follow_specular = {};\n"
+                    "export static const float merian_render_specular_alpha = {:f};\n"
+                    "export static const int merian_render_spp = {};\n"
+                    "export static const uint merian_render_seed = {}u;\n"
+                    "export static const int merian_render_max_path_length = {};\n"
+                    "export static const uint merian_render_instance_mask = {}u;\n"
+                    "export static const bool merian_render_enable_ser = {};\n"
+                    "export static const bool merian_render_demodulate_albedo = {};\n"
+                    "export static const int merian_render_nee_mode = {};\n"
+                    "export static const float merian_render_nee_probability = {:f};\n"
+                    "export static const int merian_render_nee_bounces = {};\n"
+                    "export static const int merian_render_scatter_mode = {};\n"
+                    "export static const int merian_render_scatter_candidates = {};\n"
+                    "export static const bool merian_render_russian_roulette = {};\n"
+                    "export static const int merian_render_volume_spp = {};\n"
+                    "export static const float merian_render_volume_forward_project_min_z "
+                    "= {:f};\n"
+                    "export static const float merian_guiding_share = {:f};\n"
+                    "export static const bool merian_guiding_scale_with_alpha = {};\n"
+                    "export static const float merian_guiding_alpha_threshold = {:f};\n"
+                    "export static const int merian_guiding_direct_target = {};\n"
+                    "export static const float merian_guiding_distance_share = {:f};\n"
+                    "}}",
+                    emission_on_primary ? "true" : "false", static_cast<int32_t>(output_view),
+                    follow_specular ? "true" : "false", specular_alpha, spp, seed, max_path_length,
+                    mask, enable_ser ? "true" : "false", demodulate_albedo ? "true" : "false",
+                    static_cast<int32_t>(nee_mode), nee_probability(), nee_bounces,
+                    static_cast<int32_t>(scatter_mode), scatter_candidates,
+                    russian_roulette ? "true" : "false", volume_spp, volume_forward_project_min_z,
+                    guided_probability(), guiding_scale_with_alpha ? "true" : "false",
+                    guiding_alpha_threshold, guiding_direct_target, guiding_distance_share);
     SPDLOG_INFO("render_pt constants:\n{}", constants);
     composition->add_module_from_string("render_pt_constants", constants);
     path_records.add_constants(composition);
@@ -396,15 +396,40 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
     constants_changed |=
         config.config_int("max path length", max_path_length,
                           "Maximum number of path segments, including the primary hit.", 1, 16);
+    constants_changed |= config.config_split(
+        "shares",
+        {{"bsdf", &bsdf_share},
+         {"nee", &nee_share, nee_mode == NEEMode::Mixture},
+         {"guiding", &guiding_share, has_guiding()}},
+        "How the scatter samples are split between the shading function, the lights and the "
+        "guiding method. The guiding method passes its share on to the shading function where "
+        "it found nothing.");
     constants_changed |=
         config.config_bool("russian roulette", russian_roulette,
                            "Terminate paths in proportion to the light they can still carry.");
-    constants_changed |=
-        config.config_bool("emission on primary", emission_on_primary,
-                           "Fold primary-hit emission into irradiance (self-contained). "
-                           "Otherwise it is the GBuffer emission texture's job.");
 
-    if (config.st_begin_child("scatter", "Scatter")) {
+    if (config.st_begin_child("nee", "Next event estimation")) {
+        int nee_mode_index = static_cast<int>(nee_mode);
+        if (config.config_options("mode", nee_mode_index, {"off", "mixture", "resampled"},
+                                  Properties::OptionsStyle::COMBO,
+                                  "Direct light sampling. 'mixture' replaces the scatter sample "
+                                  "with a light sample and costs no extra ray; 'resampled' adds a "
+                                  "shadow ray. How a light is chosen is the scene's to set.")) {
+            nee_mode = static_cast<NEEMode>(nee_mode_index);
+            constants_changed = true;
+        }
+        if (nee_mode != NEEMode::Off) {
+            constants_changed |= config.config_int(
+                "bounces", nee_bounces,
+                "Path vertices (counted from the primary hit) that sample lights; 0 = all.", 0, 16);
+            if (nee_mode == NEEMode::Resampled) {
+                config.output_text("candidates into one shadow ray: the scene's to split");
+            }
+        }
+        config.st_end_child();
+    }
+
+    if (config.st_begin_child("guiding", "Guiding")) {
         int scatter_mode_index = static_cast<int>(scatter_mode);
         if (config.config_options(
                 "sampling", scatter_mode_index, {"mixture (MIS)", "resampled (RIS)"},
@@ -432,49 +457,10 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
                 "follows only the singular ones.",
                 0.01f, 0.f, 1.f);
         }
-        config.st_end_child();
-    }
-
-    if (config.st_begin_child("nee", "Next event estimation")) {
-        int nee_mode_index = static_cast<int>(nee_mode);
-        if (config.config_options("mode", nee_mode_index, {"off", "mixture", "resampled"},
-                                  Properties::OptionsStyle::COMBO,
-                                  "Direct light sampling. 'mixture' replaces the scatter sample "
-                                  "with a light sample and costs no extra ray; 'resampled' adds a "
-                                  "shadow ray. How a light is chosen is the scene's to set.")) {
-            nee_mode = static_cast<NEEMode>(nee_mode_index);
-            constants_changed = true;
-        }
-        if (nee_mode == NEEMode::Mixture) {
-            constants_changed |= config.config_percent(
-                "direct light share", nee_probability,
-                "Fraction of scatter samples drawn from the lights. A light sample replaces the "
-                "scatter sample, so this is taken out of the budget the indirect signal lives on. "
-                "How far it pays depends on how good the light samples are.");
-        }
-        if (nee_mode != NEEMode::Off) {
-            constants_changed |= config.config_int(
-                "bounces", nee_bounces,
-                "Path vertices (counted from the primary hit) that sample lights; 0 = all.", 0, 16);
-            if (nee_mode == NEEMode::Mixture) {
-                config.output_text(fmt::format("one draw: {:.0f} % light, {:.0f} % scatter",
-                                               nee_probability * 100.f,
-                                               (1.f - nee_probability) * 100.f));
-            } else {
-                config.output_text("candidates into one shadow ray: the scene's to split");
-            }
-        }
-        config.st_end_child();
-    }
-
-    if (config.st_begin_child("guiding", "Guiding")) {
-        constants_changed |= config.config_percent(
-            "share", guiding_share,
-            "Fraction of the scatter samples the guiding method gets, where it found something. "
-            "The rest go to the shading function.");
         constants_changed |= config.config_bool(
             "scale with roughness", guiding_scale_with_alpha,
-            "Scale that share with the lobe width, so a narrow lobe keeps its own sampling.");
+            "Scale the guiding share with the lobe width, so a narrow lobe keeps its own "
+            "sampling.");
         constants_changed |= config.config_float(
             "roughness threshold", guiding_alpha_threshold,
             "Below this lobe width the guiding lobes are broader than the shading function itself, "
@@ -485,7 +471,8 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
             Properties::OptionsStyle::COMBO,
             "What a method learns from a vertex that ended on a light: the emission whole, only "
             "the share the scatter technique pays for, or nothing.");
-        const float effective = guiding_scale_with_alpha ? guiding_share * 0.5f : guiding_share;
+        const float effective =
+            guiding_scale_with_alpha ? guided_probability() * 0.5f : guided_probability();
         config.output_text(
             fmt::format("at a lobe width of 0.5: {:.0f} % guided, {:.0f} % shading function",
                         effective * 100.f, (1.f - effective) * 100.f));
@@ -527,21 +514,30 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
     }
 
     if (config.st_begin_child("output", "Output")) {
+        constants_changed |=
+            config.config_bool("emission on primary", emission_on_primary,
+                               "Fold primary-hit emission into irradiance (self-contained). "
+                               "Otherwise it is the GBuffer emission texture's job.");
         needs_reconnect |= config.config_bool(
             "demodulate albedo", demodulate_albedo,
             "Divide the primary-hit albedo out of the output so a denoiser can re-modulate after "
             "filtering. Use with 'emission on primary' disabled (emission is albedo-independent).");
-        constants_changed |= config.config_int(
-            "guiding debug view", guiding_debug_view,
-            "Render the guiding method's own view of its state instead of the image. 0 is off; "
-            "what each index shows is listed by the guiding node.",
-            0, 16);
-        constants_changed |= config.config_bool(
-            "scatter statistics", scatter_stats,
-            "Replace the image with per-pixel counts of the scatter samples the guiding drew and "
-            "the ones nothing could be traced from.");
+        int output_view_index = static_cast<int>(output_view);
+        if (config.config_options(
+                "show", output_view_index, {"radiance", "guiding debug", "scatter statistics"},
+                Properties::OptionsStyle::COMBO,
+                "What the output holds. The guiding node picks its debug view; the scatter "
+                "statistics count per pixel the scatter samples the guiding drew and the ones "
+                "nothing could be traced from.")) {
+            output_view = static_cast<OutputView>(output_view_index);
+            constants_changed = true;
+        }
         needs_reconnect |= config.config_enum("irradiance format", irradiance_format,
                                               Properties::OptionsStyle::COMBO);
+        config.st_end_child();
+    }
+
+    if (config.st_begin_child("other", "Other")) {
         constants_changed |=
             config.config_bool("shader execution reordering", enable_ser,
                                "Reorder threads after the primary hit to improve coherence.");
@@ -568,6 +564,23 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
         return NEEDS_RECONNECT;
     }
     return {};
+}
+
+bool RenderPT::has_guiding() const {
+    return !std::dynamic_pointer_cast<NullGuidingModel>(guiding);
+}
+
+float RenderPT::nee_probability() const {
+    if (nee_mode != NEEMode::Mixture) {
+        return 0.f;
+    }
+    const float total = bsdf_share + nee_share + (has_guiding() ? guiding_share : 0.f);
+    return total > 0.f ? nee_share / total : 0.f;
+}
+
+float RenderPT::guided_probability() const {
+    const float total = bsdf_share + guiding_share;
+    return total > 0.f ? guiding_share / total : 0.f;
 }
 
 bool RenderPT::use_raygen() const {

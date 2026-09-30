@@ -74,6 +74,7 @@ void MCPGGuidingModel::write_to(ShaderCursor cursor) {
     irr_cache->set_grid_params(lc_params);
     mcpg->write_to(cursor["mcpg"]);
     irr_cache->write_to(cursor["irr_cache"]);
+    cursor["debug_selector"] = debug_view;
 }
 
 void MCPGGuidingModel::reset(const CommandBufferHandle& cmd) {
@@ -149,6 +150,12 @@ bool MCPGGuidingModel::properties(Properties& props) {
         lc_params.properties(props);
         props.st_end_child();
     }
+
+    props.config_options("debug view", debug_view,
+                         {"cell", "level", "chain weight", "aim", "lobe width", "samples",
+                          "target motion", "unresolved"},
+                         Properties::OptionsStyle::COMBO,
+                         "What the renderer shows as its guiding debug output.");
 
     if (recreate && mcpg) {
         recreate_grids();

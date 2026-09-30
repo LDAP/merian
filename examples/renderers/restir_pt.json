@@ -19,9 +19,11 @@
             ],
             "enabled": true,
             "properties": {
-                "emission on primary": true,
                 "max path length": 5,
-                "samples per pixel": 1
+                "samples per pixel": 1,
+                "output": {
+                    "emission on primary": true
+                }
             },
             "type": "Render (ReSTIR PT)"
         }

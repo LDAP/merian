@@ -574,15 +574,14 @@ RenderRestirPT::NodeStatusFlags RenderRestirPT::properties(Properties& config) {
         "russian roulette", russian_roulette,
         "Terminate low-throughput paths. The target function leaves the roulette out, so it only "
         "decides which candidates are drawn.");
-    constants_changed |=
-        config.config_bool("emission on primary", emission_on_primary,
-                           "Fold primary-hit emission into irradiance (self-contained). "
-                           "Otherwise it is the GBuffer emission texture's job.");
     constants_changed |= config.config_bool(
         "area reservoirs", area,
         "Integrate over the pixel's area and the lens (Zhang et al. 2024): every path carries its "
         "own point of the pixel, and a shift traces the primary ray through the same point of the "
         "destination pixel.");
+    constants_changed |= config.config_bool(
+        "decoupled shading", decoupled_shading,
+        "Shade with every resampled path by its resampling weight rather than the selected one.");
 
     if (config.st_begin_child("shift", "Shift mapping")) {
         constants_changed |= config.config_options(
@@ -729,25 +728,30 @@ RenderRestirPT::NodeStatusFlags RenderRestirPT::properties(Properties& config) {
     }
 
     if (config.st_begin_child("output", "Output")) {
+        constants_changed |=
+            config.config_bool("emission on primary", emission_on_primary,
+                               "Fold primary-hit emission into irradiance (self-contained). "
+                               "Otherwise it is the GBuffer emission texture's job.");
         constants_changed |= config.config_bool(
             "demodulate albedo", demodulate_albedo,
             "Divide the primary-hit albedo out of the output so a denoiser can re-modulate after "
             "filtering.");
-        constants_changed |= config.config_bool(
-            "decoupled shading", decoupled_shading,
-            "Shade with every resampled path by its resampling weight rather than the selected "
-            "one.");
         constants_changed |= config.config_options(
-            "debug view", debug_view,
-            {"none", "duplication", "reconnection vertex", "confidence", "reuse success"},
+            "show", debug_view,
+            {"radiance", "duplication", "reconnection vertex", "confidence", "reuse success"},
             Properties::OptionsStyle::COMBO,
-            "'duplication' shows the share of the window around a pixel that holds its path (red) "
+            "What the output holds. 'duplication' shows the share of the window around a pixel "
+            "that holds its path (red) "
             "and how long it survived (green). 'reconnection vertex' shows it over the path "
             "length (red), paths replayed whole (green) and the path length (blue). 'reuse "
             "success' shows the share of neighbors accepted (red), of their shifts that succeeded "
             "(green), and whether a neighbor's path won (blue).");
         needs_reconnect |= config.config_enum("irradiance format", irradiance_format,
                                               Properties::OptionsStyle::COMBO);
+        config.st_end_child();
+    }
+
+    if (config.st_begin_child("other", "Other")) {
         int trace_shader_index = static_cast<int>(trace_shader);
         if (config.config_options(
                 "trace shader", trace_shader_index, {"auto", "ray generation", "compute"},

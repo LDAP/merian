@@ -190,6 +190,117 @@ bool ImGuiProperties::config_percent(const std::string& id, float& value, const 
     tooltip(desc);
     return value_changed;
 }
+bool ImGuiProperties::config_split(const std::string& id,
+                                   const std::vector<SplitPart>& parts,
+                                   const std::string& desc) {
+    std::vector<const SplitPart*> shown;
+    for (const SplitPart& part : parts) {
+        if (part.shown) {
+            shown.push_back(&part);
+        }
+    }
+    if (shown.size() < 2) {
+        return false;
+    }
+    const auto count = static_cast<uint32_t>(shown.size());
+
+    bool value_changed = false;
+    float total = 0.f;
+    for (const SplitPart* part : shown) {
+        total += *part->weight;
+    }
+    if (!(total > 0.f)) {
+        for (const SplitPart* part : shown) {
+            *part->weight = 1.f;
+        }
+        total = static_cast<float>(count);
+        value_changed = true;
+    }
+
+    std::vector<float> ends(count);
+    const auto compute_ends = [&] {
+        float sum = 0.f;
+        for (uint32_t i = 0; i < count; i++) {
+            sum += *shown[i]->weight;
+            ends[i] = sum / total;
+        }
+        ends.back() = 1.f;
+    };
+    compute_ends();
+
+    ImGui::PushID(id.c_str());
+    const ImVec2 origin = ImGui::GetCursorScreenPos();
+    const ImVec2 size{ImGui::CalcItemWidth(), ImGui::GetFrameHeight()};
+    ImGui::InvisibleButton("##split", size);
+    tooltip(desc);
+
+    const float mouse = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / size.x, 0.f, 1.f);
+    ImGuiStorage* storage = ImGui::GetStateStorage();
+    const ImGuiID divider_key = ImGui::GetItemID();
+    if (ImGui::IsItemActivated()) {
+        uint32_t nearest = 0;
+        for (uint32_t i = 1; i + 1 < count; i++) {
+            const float distance = std::abs(ends[i] - mouse);
+            const float nearest_distance = std::abs(ends[nearest] - mouse);
+            if (distance < nearest_distance || (distance == nearest_distance && mouse > ends[i])) {
+                nearest = i;
+            }
+        }
+        storage->SetInt(divider_key, static_cast<int>(nearest));
+    }
+    const bool active = ImGui::IsItemActive();
+    const auto divider = static_cast<uint32_t>(storage->GetInt(divider_key, 0));
+    if (active) {
+        const float lo = divider > 0 ? ends[divider - 1] : 0.f;
+        const float hi = ends[divider + 1];
+        const float at = std::clamp(std::round(mouse * 100.f) / 100.f, lo, hi);
+        const float pair = *shown[divider]->weight + *shown[divider + 1]->weight;
+        const float left = std::min((at - lo) * total, pair);
+        if (left != *shown[divider]->weight) {
+            *shown[divider]->weight = left;
+            *shown[divider + 1]->weight = pair - left;
+            value_changed = true;
+            compute_ends();
+        }
+    }
+    if (active || ImGui::IsItemHovered()) {
+        ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+    }
+
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    const ImVec2 max{origin.x + size.x, origin.y + size.y};
+    const float rounding = ImGui::GetStyle().FrameRounding;
+    draw_list->AddRectFilled(origin, max, ImGui::GetColorU32(ImGuiCol_FrameBg), rounding);
+    float begin = 0.f;
+    for (uint32_t i = 0; i < count; i++) {
+        const ImVec2 part_min{origin.x + begin * size.x, origin.y};
+        const ImVec2 part_max{origin.x + ends[i] * size.x, max.y};
+        draw_list->AddRectFilled(
+            part_min, part_max,
+            ImColor::HSV(static_cast<float>(i) / static_cast<float>(count), 0.45f, 0.5f));
+
+        const std::string text =
+            fmt::format("{} {:.0f} %", shown[i]->label, (ends[i] - begin) * 100.f);
+        const ImVec2 text_size = ImGui::CalcTextSize(text.c_str());
+        const ImVec2 text_pos{std::max(part_min.x, (part_min.x + part_max.x - text_size.x) * 0.5f),
+                              origin.y + (size.y - text_size.y) * 0.5f};
+        draw_list->PushClipRect(part_min, part_max, true);
+        draw_list->AddText(text_pos, ImGui::GetColorU32(ImGuiCol_Text), text.c_str());
+        draw_list->PopClipRect();
+        begin = ends[i];
+    }
+    for (uint32_t i = 0; i + 1 < count; i++) {
+        const float x = origin.x + ends[i] * size.x;
+        const ImGuiCol color =
+            active && i == divider ? ImGuiCol_SliderGrabActive : ImGuiCol_SliderGrab;
+        draw_list->AddLine({x, origin.y}, {x, max.y}, ImGui::GetColorU32(color), 3.f);
+    }
+
+    ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
+    ImGui::TextUnformatted(id.c_str());
+    ImGui::PopID();
+    return value_changed;
+}
 bool ImGuiProperties::config_bool(const std::string& id, bool& value, const std::string& desc) {
     const bool old_value = value;
     ImGui::Checkbox(id.c_str(), &value);

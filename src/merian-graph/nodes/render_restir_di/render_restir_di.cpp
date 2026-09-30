@@ -249,10 +249,6 @@ RenderRestirDI::NodeStatusFlags RenderRestirDI::properties(Properties& config) {
     constants_changed |=
         config.config_int("samples per pixel", spp, "BSDF-sampled candidates per pixel.", 0, 32);
     config.config_uint("seed", seed, "Base seed for the per-pixel RNG.");
-    constants_changed |=
-        config.config_bool("emission on primary", emission_on_primary,
-                           "Fold the primary hit's own emission (and the env map on a miss) into "
-                           "the output. Otherwise it is the GBuffer emission texture's job.");
 
     config.st_separate("Temporal reuse");
     config.config_bool("enable temporal reuse", temporal_enable);
@@ -288,6 +284,11 @@ RenderRestirDI::NodeStatusFlags RenderRestirDI::properties(Properties& config) {
         config.config_bool("visibility", visibility_shade, "Trace a shadow ray before shading.");
 
     if (config.st_begin_child("output", "Output")) {
+        constants_changed |=
+            config.config_bool("emission on primary", emission_on_primary,
+                               "Fold the primary hit's own emission (and the env map on a miss) "
+                               "into the output. Otherwise it is the GBuffer emission texture's "
+                               "job.");
         needs_reconnect |= config.config_bool(
             "demodulate albedo", demodulate_albedo,
             "Divide the primary-hit albedo out of the output so a denoiser can re-modulate after "

@@ -16,6 +16,17 @@ extern static const bool merian_guiding_light_cache_tail = false;
 extern static const float merian_guiding_lc_min_pdf = 1.0;
 
 // Invalid where the direction did not come from the guiding: that starts a fresh chain.
+enum MCPGDebugView {
+    Cell,
+    Level,
+    ChainWeight,
+    Aim,
+    LobeWidth,
+    Samples,
+    TargetMotion,
+    Unresolved,
+};
+
 struct MCPGRecord {
     MCState selected;
     HashGridPos selected_pos;
@@ -75,6 +86,7 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
                           LC_SPLIT_STORAGE,
                           LC_LOCALITY_BITS>
         irr_cache;
+    MCPGDebugView debug_selector;
 
     // where the irradiance cache was probed for this vertex, one bounce earlier
     struct State {
@@ -145,52 +157,47 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
         return record;
     }
 
-    bool debug_view(const int selector,
-                    const RenderFrameInfo frame_info,
+    bool debug_view(const RenderFrameInfo frame_info,
                     const PathVertex vertex,
                     inout RandomGenerator rng,
                     out float4 color) {
         color = float4(1, 0, 1, 1);
-        if (selector <= 0) {
-            return false;
-        }
-
         const float3 cam = frame_info.cam_pos;
-        if (selector == 1) { // the cell a lookup lands in
+        if (debug_selector == MCPGDebugView::Cell) {
             const uint level = mcpg.grid.distributed_level_for_pos(vertex.pos, cam, rng);
             const int3 gidx =
                 mcpg.grid.grid_idx(vertex.pos, mcpg.grid.grid_inv_width_for_level(level), rng);
             color = float4(random_color(mcpg.grid.buffer_index(gidx, level)), 1);
             return true;
         }
-        if (selector == 2) { // its resolution level
+        if (debug_selector == MCPGDebugView::Level) {
             color = float4(
                 debug_color(mcpg.grid.distributed_level_for_pos(vertex.pos, cam, rng) / 63.0), 1);
             return true;
         }
 
         const MCState s = mcpg.load(vertex.pos, vertex.shading_frame, cam, frame_info.time, rng);
-        if (selector == 9) { // share of lookups that resolve no state at all
+        if (debug_selector == MCPGDebugView::Unresolved) {
             color = float4(s.is_valid() ? 0.0 : 1.0);
             return true;
         }
         if (!s.is_valid()) {
             return true;
         }
-        switch (selector) {
-        case 3: // chain weight
+        switch (debug_selector) {
+        case MCPGDebugView::ChainWeight:
             color = float4(debug_color(s.sum_w * 0.1), 1);
             return true;
-        case 4: // aim
+        case MCPGDebugView::Aim:
             color = float4((s.get_dir(vertex.pos) + 1) * 0.5, 1);
             return true;
-        case 5: // lobe width, 1 - mean cos
+        case MCPGDebugView::LobeWidth:
             color = float4(debug_color(s.one_minus_mean_cos(vertex.pos)), 1);
             return true;
-        case 6: // samples behind the fit
+        case MCPGDebugView::Samples:
             color = float4(debug_color(float(s.N) / float(ML_MAX_N)), 1);
             return true;
-        case 7: // motion of the target
+        case MCPGDebugView::TargetMotion:
             color = float4(abs(float3(s.mv)), 1);
             return true;
         }

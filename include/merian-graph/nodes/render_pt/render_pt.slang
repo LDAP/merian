@@ -11,8 +11,12 @@ __exported import render_pt_guiding;
 using merian;
 
 namespace merian {
+static const int OUTPUT_VIEW_RADIANCE = 0;
+static const int OUTPUT_VIEW_GUIDING_DEBUG = 1;
+static const int OUTPUT_VIEW_SCATTER_STATISTICS = 2;
+
 extern static const bool merian_render_emission_on_primary = true;
-extern static const int merian_render_guiding_debug_view = 0;
+extern static const int merian_render_output_view = OUTPUT_VIEW_RADIANCE;
 extern static const int merian_render_spp = 1;
 extern static const uint merian_render_seed = 0;
 extern static const int merian_render_max_path_length = 8;
@@ -21,7 +25,6 @@ extern static const bool merian_render_enable_ser = false;
 extern static const bool merian_render_demodulate_albedo = false;
 extern static const bool merian_render_follow_specular = true;
 extern static const float merian_render_specular_alpha = 0.f;
-extern static const bool merian_render_scatter_stats = false;
 extern static const int merian_render_nee_mode = NEE_MODE_RESAMPLED;
 extern static const float merian_render_nee_probability = 0.5;
 extern static const int merian_render_nee_bounces = 0;
@@ -292,7 +295,7 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
             next_ray = sp.make_ray(-ray.Direction, wo_world, transmission);
         }
 
-        if (merian_render_scatter_stats && guided) {
+        if (merian_render_output_view == OUTPUT_VIEW_SCATTER_STATISTICS && guided) {
             scatter_stats += float3(1.f, select(all(f_cos <= 0.f), 1.f, 0.f),
                                     select(any(f_cos > 0.f) && !next_ray.hasValue, 1.f, 0.f));
         }
@@ -503,13 +506,13 @@ void render_pixel<Reorder : IThreadReorder>(const uint2 pixel,
         second_moment /= float(merian_render_spp);
     }
 
-    if (merian_render_scatter_stats) {
+    if (merian_render_output_view == OUTPUT_VIEW_SCATTER_STATISTICS) {
         // guided, refused by the shading function, refused a ray by the geometry
         params.irradiance[pixel] = float4(scatter_stats, 1);
         return;
     }
 
-    if (merian_render_guiding_debug_view > 0) {
+    if (merian_render_output_view == OUTPUT_VIEW_GUIDING_DEBUG) {
         const RenderFrameInfo frame_info = {scene.camera.position, scene.prev_camera.position,
                                             scene.time, scene.time_diff, scene.frame};
         RandomGenerator debug_rng = PCG(xxhash32(uint4(pixel, scene.frame, 0xDEB0)));
@@ -527,8 +530,7 @@ void render_pixel<Reorder : IThreadReorder>(const uint2 pixel,
         vertex.transmissive = false;
 
         float4 view;
-        if (params.guiding.debug_view(merian_render_guiding_debug_view, frame_info, vertex,
-                                      debug_rng, view)) {
+        if (params.guiding.debug_view(frame_info, vertex, debug_rng, view)) {
             params.irradiance[pixel] = view;
             return;
         }

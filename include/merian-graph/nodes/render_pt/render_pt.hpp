@@ -30,10 +30,11 @@ namespace merian {
 class RenderPT : public Node {
 
   public:
-    // match SCATTER_MODE_* and NEE_MODE_* in the shaders
+    // match SCATTER_MODE_*, NEE_MODE_* and OUTPUT_VIEW_* in the shaders
     enum class ScatterMode : int32_t { MIS, RIS };
     enum class NEEMode : int32_t { Off, Mixture, Resampled };
     enum class TraceShader : int32_t { Auto, RayGeneration, Compute };
+    enum class OutputView : int32_t { Radiance, GuidingDebug, ScatterStatistics };
 
     RenderPT();
 
@@ -64,6 +65,9 @@ class RenderPT : public Node {
     uint32_t recorded_vertices_per_path() const;
     bool use_raygen() const;
     void update_guiding_slot();
+    bool has_guiding() const;
+    float nee_probability() const;
+    float guided_probability() const;
 
     ContextHandle context;
     ResourceAllocatorHandle resource_allocator;
@@ -104,18 +108,19 @@ class RenderPT : public Node {
     float volume_forward_project_min_z = 50.f;
     vk::Format volume_depth_format = vk::Format::eR32Sfloat;
 
-    int32_t guiding_debug_view = 0;
-    bool scatter_stats = false;
+    OutputView output_view = OutputView::Radiance;
     bool follow_specular = true;
     float specular_alpha = 0.f;
     ScatterMode scatter_mode = ScatterMode::MIS;
     int32_t scatter_candidates = 2;
 
+    float bsdf_share = 0.45f;
+    float nee_share = 0.1f;
+    float guiding_share = 0.45f;
+
     NEEMode nee_mode = NEEMode::Resampled;
-    float nee_probability = 0.1f;
     int32_t nee_bounces = 0;
 
-    float guiding_share = 0.5f;
     bool guiding_scale_with_alpha = true;
     float guiding_alpha_threshold = 0.05f;
     int32_t guiding_direct_target = 0;

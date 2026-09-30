@@ -162,8 +162,7 @@ struct SSMMGuiding<G : IGBuffer> : GuidingModel {
         return r;
     }
 
-    bool debug_view(const int selector,
-                    const RenderFrameInfo frame_info,
+    bool debug_view(const RenderFrameInfo frame_info,
                     const PathVertex vertex,
                     inout RandomGenerator rng,
                     out float4 color) {

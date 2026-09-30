@@ -61,6 +61,9 @@ class ImGuiProperties : public Properties {
                               const float max = 360) override;
     virtual bool
     config_percent(const std::string& id, float& value, const std::string& desc = "") override;
+    virtual bool config_split(const std::string& id,
+                              const std::vector<SplitPart>& parts,
+                              const std::string& desc = "") override;
 
     virtual bool
     config_color3(const std::string& id, float color[3], const std::string& desc = "") override;

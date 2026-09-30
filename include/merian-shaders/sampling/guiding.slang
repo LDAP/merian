@@ -72,7 +72,7 @@ interface GuidingDistribution<T : IFloat> : Distribution<T> {
 }
 
 interface GuidingDebugModel {
-    bool debug_view(const int selector, const RenderFrameInfo frame_info, const PathVertex vertex,
+    bool debug_view(const RenderFrameInfo frame_info, const PathVertex vertex,
                     inout RandomGenerator rng, out float4 color);
 }
 
@@ -182,8 +182,7 @@ struct NullGuidingModel : GuidingModel {
         return float3(0);
     }
 
-    bool debug_view(const int selector,
-                    const RenderFrameInfo frame_info,
+    bool debug_view(const RenderFrameInfo frame_info,
                     const PathVertex vertex,
                     inout RandomGenerator rng,
                     out float4 color) {

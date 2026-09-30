@@ -61,6 +61,8 @@ class MCPGGuidingModel : public GuidingModel {
     bool missing_light_heuristic = true;
     bool light_cache_tail = false;
     float lc_min_pdf = 1.0f;
+
+    int32_t debug_view = 0;
 };
 
 } // namespace merian

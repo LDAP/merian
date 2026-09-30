@@ -17,8 +17,10 @@
             ],
             "enabled": true,
             "properties": {
-                "emission on primary": true,
-                "samples per pixel": 4
+                "samples per pixel": 4,
+                "output": {
+                    "emission on primary": true
+                }
             },
             "type": "Render (ReSTIR DI)"
         }

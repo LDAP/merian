@@ -280,6 +280,26 @@ class Properties {
         return config_float(id, value, desc, 0.01f, 0.0f, 1.0f);
     }
 
+    struct SplitPart {
+        std::string label;
+        float* weight;
+        bool shown = true;
+    };
+
+    virtual bool config_split(const std::string& id,
+                              const std::vector<SplitPart>& parts,
+                              const std::string& desc = "") {
+        if (!st_begin_child(id, id)) {
+            return false;
+        }
+        bool value_changed = false;
+        for (const SplitPart& part : parts) {
+            value_changed |= config_float(part.label, *part.weight, desc, 0.01f, 0.0f);
+        }
+        st_end_child();
+        return value_changed;
+    }
+
     // Holds the supplied `value` if not changed by the configuration.
     // Converts to a checkbox in a GUI context.
     // Returns true if the value changed.
