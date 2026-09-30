@@ -1,5 +1,5 @@
-import "merian-shaders/colors/colorspaces.slang";
-import "merian-shaders/utils/math.slang";
+import merian_shaders.colors.colorspaces;
+import merian_shaders.utils.math;
 
 namespace merian {
 

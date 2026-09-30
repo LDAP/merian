@@ -1,6 +1,6 @@
 #include "merian-shaders/utils/math-constants.slangh"
 
-import bsdf;
+import merian_shaders.shading.bsdfs.bsdf;
 import merian_shaders.utils.sampling;
 
 namespace merian {

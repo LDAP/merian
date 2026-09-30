@@ -1,7 +1,7 @@
 #include "math-constants.slangh"
 
-import "merian-shaders/utils/random.slang";
-import "merian-shaders/utils/frame.slang";
+import merian_shaders.utils.random;
+import merian_shaders.utils.frame;
 
 namespace merian {
 

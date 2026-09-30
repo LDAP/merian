@@ -1,5 +1,5 @@
-import bsdf;
-import brdf_sheen;
+import merian_shaders.shading.bsdfs.bsdf;
+import merian_shaders.shading.bsdfs.brdf_sheen;
 
 namespace merian {
 

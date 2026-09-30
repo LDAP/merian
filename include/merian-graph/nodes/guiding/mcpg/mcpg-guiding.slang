@@ -1,9 +1,10 @@
 __exported import merian_shaders.sampling.guiding;
 __exported import merian_shaders.light_cache.hashed_irradiance_cache;
-__exported import mc;
+__exported import merian_graph.nodes.guiding.mcpg.mc;
 
 import merian_shaders.colors.colorspaces;
 import merian_shaders.colors.debug;
+import merian_shaders.utils.hash_grid;
 
 using merian;
 
@@ -244,10 +245,10 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
                          frame_info.cam_pos, frame_info.prev_cam_pos, frame_info.index, rng,
                          update_pos);
 
-        const float3 tail = merian_guiding_light_cache_tail && segment.traced &&
-                                    segment.is_last && !emissive
-                                ? target
-                                : float3(0);
+        const float3 tail =
+            merian_guiding_light_cache_tail && segment.traced && segment.is_last && !emissive
+                ? target
+                : float3(0);
 
         // the cache keeps the emitter whole, the chains learn what the direct light policy allows
         const float direct_scale = emissive ? segment.direct_scale : 1.f;

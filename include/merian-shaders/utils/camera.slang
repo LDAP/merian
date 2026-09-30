@@ -1,6 +1,6 @@
 #include "merian-shaders/utils/math-constants.slangh"
 
-import "merian-shaders/utils/math.slang";
+import merian_shaders.utils.math;
 
 namespace merian {
 

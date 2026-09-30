@@ -43,7 +43,7 @@ SlangCompositionHandle SSMMGuidingModel::get_composition() const {
 }
 
 std::vector<std::string> SSMMGuidingModel::get_slang_imports() const {
-    return {fmt::format("\"{}\"", GUIDING_MODULE), get_gbuffer_layout()->get_module_name()};
+    return {slang_import_spelling(GUIDING_MODULE), get_gbuffer_layout()->get_module_name()};
 }
 
 std::string SSMMGuidingModel::get_type_name() const {

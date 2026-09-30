@@ -44,7 +44,7 @@ SlangCompositionHandle MCPGDistanceGuidingModel::get_composition() const {
 }
 
 std::vector<std::string> MCPGDistanceGuidingModel::get_slang_imports() const {
-    return {fmt::format("\"{}\"", GUIDING_MODULE)};
+    return {slang_import_spelling(GUIDING_MODULE)};
 }
 
 std::string MCPGDistanceGuidingModel::get_type_name() const {

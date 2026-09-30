@@ -1,4 +1,4 @@
-import bsdf;
+import merian_shaders.shading.bsdfs.bsdf;
 
 namespace merian {
 

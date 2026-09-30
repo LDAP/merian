@@ -2,7 +2,7 @@ __exported import merian_shaders.sampling.guiding;
 import merian_shaders.utils.grid;
 import merian_shaders.utils.textures;
 import merian_shaders.utils.sampling;
-import mc_distance;
+import "merian-graph/nodes/guiding/mcpg_distance/mc_distance.slang";
 
 using merian;
 

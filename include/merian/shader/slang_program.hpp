@@ -36,9 +36,11 @@ class SlangProgram : public std::enable_shared_from_this<SlangProgram> {
                  const SlangCompositionHandle& composition);
 
   public:
-    ShaderModuleHandle get_shader_module(const ContextHandle& context);
+    ShaderModuleHandle get_shader_module(const ContextHandle& context, uint64_t entry_point_index);
 
     Slang::ComPtr<slang::IBlob> get_binary();
+
+    Slang::ComPtr<slang::IBlob> get_binary(uint64_t entry_point_index);
 
     // Reflects the compiled SPIR-V for the device features, capabilities and extensions it needs.
     DeviceSupportInfo query_device_support(const DeviceSupportQueryInfo& query_info);
@@ -109,8 +111,9 @@ class SlangProgram : public std::enable_shared_from_this<SlangProgram> {
     SlangSessionHandle session; // pinned: keeps reflection pointers valid
     Slang::ComPtr<slang::IComponentType> program;
 
-    mutable Slang::ComPtr<slang::IBlob> binary;
-    mutable ShaderModuleHandle shader_module{nullptr};
+    Slang::ComPtr<slang::IBlob> binary;
+    std::unordered_map<uint64_t, Slang::ComPtr<slang::IBlob>> entry_point_binaries;
+    std::unordered_map<uint64_t, ShaderModuleHandle> shader_modules;
 
     std::unordered_map<slang::TypeLayoutReflection*, std::weak_ptr<ShaderObjectLayout>>
         object_layout_cache;

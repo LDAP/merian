@@ -1,14 +1,42 @@
 #include "merian/shader/slang_composition.hpp"
 #include "merian/shader/slang_global_session.hpp"
 
+#include <algorithm>
+#include <cctype>
+
 namespace merian {
 
-SlangComposition::SlangComposition() {}
+std::string slang_import_spelling(const std::filesystem::path& import_path) {
+    const std::string quoted = fmt::format("\"{}\"", import_path.generic_string());
+    if (import_path.extension() != ".slang") {
+        return quoted;
+    }
+    const std::string stem =
+        std::filesystem::path{import_path}.replace_extension().generic_string();
+    std::string name = stem;
+    std::ranges::replace(name, '-', '_');
+    std::string dashed = name;
+    std::ranges::replace(dashed, '_', '-');
+    if (name != stem && dashed != stem) {
+        return quoted;
+    }
+    for (const std::filesystem::path& component : std::filesystem::path{name}) {
+        const std::string identifier = component.string();
+        if (identifier.empty() || std::isdigit(static_cast<unsigned char>(identifier[0])) != 0 ||
+            !std::ranges::all_of(identifier, [](const char c) {
+                return std::isalnum(static_cast<unsigned char>(c)) != 0 || c == '_';
+            })) {
+            return quoted;
+        }
+    }
+    std::ranges::replace(name, '/', '.');
+    return name;
+}
+
+SlangComposition::SlangComposition()
+    : creation_time(std::filesystem::file_time_type::clock::now()) {}
 
 void SlangComposition::add_module(const SlangModule& module) {
-    // A name is a link-time slot shared by every composition, so the binding is tracked globally.
-    bind_slang_module_source(module.name, module.source_hash());
-
     auto [it, inserted] = module_index.try_emplace(module.name, modules.size());
     if (inserted) {
         modules.emplace_back(module);
@@ -19,8 +47,6 @@ void SlangComposition::add_module(const SlangModule& module) {
 }
 
 void SlangComposition::add_module(SlangModule&& module) {
-    bind_slang_module_source(module.name, module.source_hash());
-
     auto [it, inserted] = module_index.try_emplace(module.name, modules.size());
     if (inserted) {
         modules.emplace_back(std::move(module));
@@ -80,7 +106,9 @@ void SlangComposition::add_entry_point(const std::string& defined_entry_point_na
 }
 
 void SlangComposition::add_composition(const SlangCompositionHandle& composition) {
-    compositions.emplace(composition);
+    if (std::ranges::find(compositions, composition) == compositions.end()) {
+        compositions.emplace_back(composition);
+    }
     edits++;
 }
 
@@ -115,6 +143,8 @@ bool SlangComposition::reload(const FileLoader& file_loader) {
         auto it = module_mtimes.find(*resolved);
         if (it == module_mtimes.end()) {
             module_mtimes[*resolved] = mtime;
+            // edited before the first reload
+            source_changed |= mtime > creation_time;
         } else if (it->second != mtime) {
             it->second = mtime;
             source_changed = true;

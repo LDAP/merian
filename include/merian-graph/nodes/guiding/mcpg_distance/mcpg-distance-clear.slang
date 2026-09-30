@@ -1,5 +1,5 @@
 import merian_shaders.utils.textures;
-import mc_distance;
+import "merian-graph/nodes/guiding/mcpg_distance/mc_distance.slang";
 
 using merian;
 

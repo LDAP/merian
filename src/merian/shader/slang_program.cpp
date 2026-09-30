@@ -10,17 +10,40 @@ SlangProgram::SlangProgram(const ShaderCompileContextHandle& compile_context,
                            const SlangCompositionHandle& composition)
     : compile_context(compile_context), composition(composition) {
     session = compile_context->current_session();
-    program = merian::SlangSession::link(session->compose(composition));
+    Slang::ComPtr<slang::IComponentType> composed;
+    try {
+        composed = session->compose(composition);
+    } catch (const SlangSession::stale_session& e) {
+        SPDLOG_DEBUG("retiring slang session: {}", e.what());
+        compile_context->retire_session();
+        session = compile_context->current_session();
+        try {
+            composed = session->compose(composition);
+        } catch (const SlangSession::stale_session& retry_error) {
+            throw ShaderCompiler::compilation_failed(retry_error.what());
+        }
+    }
+    program = merian::SlangSession::link(composed);
 }
 
-ShaderModuleHandle SlangProgram::get_shader_module(const ContextHandle& context) {
-    if (!shader_module) {
-        Slang::ComPtr<slang::IBlob> binary = get_binary();
-        shader_module =
+ShaderModuleHandle SlangProgram::get_shader_module(const ContextHandle& context,
+                                                   const uint64_t entry_point_index) {
+    auto [it, inserted] = shader_modules.try_emplace(entry_point_index);
+    if (inserted) {
+        const Slang::ComPtr<slang::IBlob> binary = get_binary(entry_point_index);
+        it->second =
             ShaderModule::create(context, binary->getBufferPointer(), binary->getBufferSize());
     }
+    return it->second;
+}
 
-    return shader_module;
+Slang::ComPtr<slang::IBlob> SlangProgram::get_binary(const uint64_t entry_point_index) {
+    auto [it, inserted] = entry_point_binaries.try_emplace(entry_point_index);
+    if (inserted) {
+        it->second =
+            merian::SlangSession::compile(program, static_cast<uint32_t>(entry_point_index));
+    }
+    return it->second;
 }
 
 Slang::ComPtr<slang::IBlob> SlangProgram::get_binary() {
@@ -196,10 +219,21 @@ Versioned<SlangProgram> SlangProgram::create(const ShaderCompileContextHandle& c
 }
 
 DeviceSupportInfo SlangProgram::query_device_support(const DeviceSupportQueryInfo& query_info) {
-    const Slang::ComPtr<slang::IBlob> binary = get_binary();
-    const SpirvReflect reflect(static_cast<const uint32_t*>(binary->getBufferPointer()),
-                               binary->getBufferSize());
-    return reflect.query_device_support(query_info);
+    const auto reflect = [&](const Slang::ComPtr<slang::IBlob>& binary) {
+        return SpirvReflect(static_cast<const uint32_t*>(binary->getBufferPointer()),
+                            binary->getBufferSize())
+            .query_device_support(query_info);
+    };
+    const uint64_t entry_point_count = get_program_reflection()->getEntryPointCount();
+    if (entry_point_count == 0) {
+        return reflect(get_binary());
+    }
+    DeviceSupportInfo info;
+    for (uint64_t entry_point_index = 0; entry_point_index < entry_point_count;
+         entry_point_index++) {
+        info &= reflect(get_binary(entry_point_index));
+    }
+    return info;
 }
 
 } // namespace merian

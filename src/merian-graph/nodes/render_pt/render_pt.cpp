@@ -19,7 +19,7 @@ DeviceSupportInfo RenderPT::query_device_support(const DeviceSupportQueryInfo& q
     composition->add_module_from_string(
         "render_pt_guiding",
         "module render_pt_guiding;\n"
-        "import \"merian-shaders/sampling/guiding.slang\";\n"
+        "import merian_shaders.sampling.guiding;\n"
         "public typealias RenderGuiding = merian::NullGuidingModel;\n"
         "public typealias RenderDistanceGuiding = merian::NullDistanceGuidingModel;");
     path_records.add_constants(composition);
@@ -152,14 +152,14 @@ void RenderPT::update_guiding_slot() {
             imports += fmt::format("import {};\n", import);
         }
     }
-    composition->add_module_from_string(
-        "render_pt_guiding",
-        fmt::format("module render_pt_guiding;\n"
-                    "import \"merian-shaders/sampling/guiding.slang\";\n"
-                    "{}"
-                    "public typealias RenderGuiding = {};\n"
-                    "public typealias RenderDistanceGuiding = {};",
-                    imports, guiding->get_type_name(), distance_guiding->get_type_name()));
+    composition->add_module_from_string("render_pt_guiding",
+                                        fmt::format("module render_pt_guiding;\n"
+                                                    "import merian_shaders.sampling.guiding;\n"
+                                                    "{}"
+                                                    "public typealias RenderGuiding = {};\n"
+                                                    "public typealias RenderDistanceGuiding = {};",
+                                                    imports, guiding->get_type_name(),
+                                                    distance_guiding->get_type_name()));
 }
 
 void RenderPT::ensure_pipeline(const SceneHandle& scene) {
@@ -377,7 +377,6 @@ void RenderPT::update_render_constants() {
                     russian_roulette ? "true" : "false", volume_spp, volume_forward_project_min_z,
                     guided_probability(), guiding_scale_with_alpha ? "true" : "false",
                     guiding_alpha_threshold, guiding_direct_target, guiding_distance_share);
-    SPDLOG_INFO("render_pt constants:\n{}", constants);
     composition->add_module_from_string("render_pt_constants", constants);
     path_records.add_constants(composition);
 }

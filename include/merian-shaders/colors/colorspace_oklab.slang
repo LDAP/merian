@@ -1,6 +1,6 @@
 implementing colorspaces;
 
-import "merian-shaders/utils/math.slang";
+import merian_shaders.utils.math;
 
 namespace merian {
 

@@ -117,8 +117,12 @@ class ShaderCompileContext : public std::enable_shared_from_this<ShaderCompileCo
     // -------------------------------------------------
 
     // A slang session shared by everything compiled through this context, so common modules are
-    // parsed once. A module-source change retires it (see slang_source_epoch).
+    // parsed once. Retired by a file change or by rebinding an imported module.
     SlangSessionHandle current_session();
+
+    void retire_session() {
+        hot_session.reset();
+    }
 
     // -------------------------------------------------
 

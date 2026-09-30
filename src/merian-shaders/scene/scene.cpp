@@ -101,12 +101,12 @@ Scene::query_device_support_composition(const DeviceSupportQueryInfo& query_info
     composition->add_module_from_string(
         "scene_env_map_workaround",
         "module scene_env_map_workaround;\n"
-        "import \"merian-shaders/scene/environment-map.slang\";\n"
+        "import merian_shaders.scene.environment_map;\n"
         "namespace merian { public typealias SceneEnvMap = merian::EmptyEnv; }");
     composition->add_module_from_string(
         "scene_volume_workaround",
         "module scene_volume_workaround;\n"
-        "import \"merian-shaders/shading/homogeneous-volume.slang\";\n"
+        "import merian_shaders.shading.homogeneous_volume;\n"
         "namespace merian { public typealias SceneHomogeneousVolume = merian::Vacuum; }");
     composition->add_module_from_path("merian-shaders/scene/scene.slang");
     return composition;
@@ -129,11 +129,9 @@ void Scene::set_env(EnvMapHandle env) {
     composition->add_module_from_string(
         "scene_env_map_workaround",
         fmt::format("module scene_env_map_workaround;\n"
-                    "import \"{}\";\n"
+                    "import {};\n"
                     "namespace merian {{ public typealias SceneEnvMap = {}; }}",
-                    env_map->get_slang_module().get_import_path().value_or(
-                        env_map->get_slang_module().get_name()),
-                    env_map->get_type_name()));
+                    env_map->get_slang_module().get_import_spelling(), env_map->get_type_name()));
 }
 
 void Scene::set_enable_thin_lens(const bool enable) {
@@ -156,10 +154,9 @@ void Scene::set_exterior_volume(const HomogeneousVolumeHandle& volume) {
     composition->add_module_from_string(
         "scene_volume_workaround",
         fmt::format("module scene_volume_workaround;\n"
-                    "import \"{}\";\n"
+                    "import {};\n"
                     "namespace merian {{ public typealias SceneHomogeneousVolume = {}; }}",
-                    exterior_volume->get_slang_module().get_import_path().value_or(
-                        exterior_volume->get_slang_module().get_name()),
+                    exterior_volume->get_slang_module().get_import_spelling(),
                     exterior_volume->get_type_name()));
 }
 

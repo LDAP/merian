@@ -21,6 +21,11 @@ namespace merian {
 class SlangComposition;
 using SlangCompositionHandle = std::shared_ptr<SlangComposition>;
 
+// The `import` spelling of a module file relative to a search path: `dir-a/file-b.slang` as
+// `dir_a.file_b`, quoted where the dotted name does not map back to the file. Slang names a module
+// after the import that loads it, so a module must only be imported by this spelling.
+std::string slang_import_spelling(const std::filesystem::path& import_path);
+
 // A mutable accumulator of modules, type conformances, and entrypoints, compilable to a
 // SlangProgram. version() lets a derived program detect when to recompile.
 class SlangComposition : public std::enable_shared_from_this<SlangComposition> {
@@ -43,6 +48,10 @@ class SlangComposition : public std::enable_shared_from_this<SlangComposition> {
         // this is the path for path-based import
         const std::optional<std::string>& get_import_path() {
             return import_path;
+        }
+
+        std::string get_import_spelling() const {
+            return import_path ? slang_import_spelling(*import_path) : name;
         }
 
         // the entry points to include in the composite (name -> exported name)
@@ -286,10 +295,12 @@ class SlangComposition : public std::enable_shared_from_this<SlangComposition> {
     // interface name -> type name -> dynamic dispach id
     std::map<TypeConformance, int64_t> type_conformances;
     std::set<EntryPoint> entry_points;
-    std::set<SlangCompositionHandle> compositions;
+    // insertion order keeps the composite stable across launches
+    std::vector<SlangCompositionHandle> compositions;
 
     // Last known modification times for path-based modules (for reload detection)
     std::map<std::filesystem::path, std::filesystem::file_time_type> module_mtimes;
+    const std::filesystem::file_time_type creation_time;
 
     uint64_t edits = 0;
 };

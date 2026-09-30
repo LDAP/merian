@@ -23,7 +23,7 @@ vk::ShaderStageFlagBits SlangProgramEntryPoint::get_stage() const {
 
 ShaderModuleHandle
 SlangProgramEntryPoint::vulkan_shader_module(const ContextHandle& context) const {
-    return program->get_shader_module(context);
+    return program->get_shader_module(context, entry_point_index);
 }
 
 slang::EntryPointReflection* SlangProgramEntryPoint::get_entry_point_reflection() const {

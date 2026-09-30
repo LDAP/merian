@@ -1,4 +1,4 @@
-__exported import "merian-shaders/utils/random.slang";
+__exported import merian_shaders.utils.random;
 
 namespace merian {
 

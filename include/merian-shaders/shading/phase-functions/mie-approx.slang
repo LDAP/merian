@@ -1,8 +1,8 @@
 import merian_shaders.utils.sampling;
 
-__exported import phase_function;
-import henyey_greenstein;
-import draine;
+__exported import merian_shaders.shading.phase_functions.phase_function;
+import merian_shaders.shading.phase_functions.henyey_greenstein;
+import merian_shaders.shading.phase_functions.draine;
 
 
 namespace merian {

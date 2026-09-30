@@ -1,4 +1,4 @@
-import "merian-shaders/utils/bit-twiddling.slang";
+import merian_shaders.utils.bit_twiddling;
 import merian_shaders.utils.hash;
 
 namespace merian {

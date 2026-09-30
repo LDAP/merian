@@ -11,9 +11,14 @@
 #include "slang-com-ptr.h"
 #include "slang.h"
 #include <filesystem>
+#include <functional>
 #include <optional>
 #include <ranges>
+#include <stdexcept>
 #include <string_view>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 namespace merian {
 
@@ -97,8 +102,22 @@ class SlangSession {
         slang_session_desc.searchPaths = search_paths.data();
         slang_session_desc.searchPathCount = (SlangInt)search_paths.size();
 
-        std::array<slang::CompilerOptionEntry, 4> options = {
+        if (cache_enabled()) {
+            file_system = create_file_system(module_cache_dir(*shader_compile_context),
+                                             [this] { return modules_canonically_named(); });
+            slang_session_desc.fileSystem = file_system.get();
+        }
+
+        std::array<slang::CompilerOptionEntry, 6> options = {
             {
+                {
+                    slang::CompilerOptionName::UseUpToDateBinaryModule,
+                    {slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr},
+                },
+                {
+                    slang::CompilerOptionName::VulkanUseEntryPointName,
+                    {slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr},
+                },
                 {
                     slang::CompilerOptionName::EmitSpirvDirectly,
                     {slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr},
@@ -178,67 +197,7 @@ class SlangSession {
     Slang::ComPtr<slang::IModule>
     load_module_from_source(const std::string& name,
                             const std::string& source,
-                            const std::optional<std::filesystem::path>& path) {
-        Slang::ComPtr<slang::IBlob> diagnostics_blob;
-
-        const std::string path_str = path ? path->string() : std::string{};
-        const char* path_cstr = path ? path_str.c_str() : nullptr;
-
-        const std::optional<std::filesystem::path> ir_path =
-            cache_enabled()
-                ? std::optional{cache_dir("slang-ir") /
-                                fmt::format("{:016x}.slang-mod", ir_cache_key(name, source, path))}
-                : std::nullopt;
-
-        // A module can only import what the session already holds, so every source-string module
-        // loaded so far is a possible dependency that isBinaryModuleUpToDate cannot see. Folded in
-        // after this module's own key, which already covers its own source.
-        if (!path) {
-            hash_combine(string_module_fingerprint, name, source);
-        }
-
-        // 1. try the serialized IR cache
-        if (ir_path) {
-            if (Slang::ComPtr<slang::IBlob> ir = cache_read(*ir_path)) {
-                // path-based modules are re-validated against their (transitive) source files;
-                // what has no file on disk is covered by the key.
-                if (!path || session->isBinaryModuleUpToDate(path_cstr, ir)) {
-                    Slang::ComPtr<slang::IModule> module;
-                    module = session->loadModuleFromIRBlob(name.c_str(), path_cstr, ir,
-                                                           diagnostics_blob.writeRef());
-                    if (module != nullptr) {
-                        SPDLOG_DEBUG("Slang IR cache hit: {}", name);
-                        return module;
-                    }
-                }
-            }
-        }
-
-        // 2. compile from source
-        Slang::ComPtr<slang::IModule> module;
-        module = session->loadModuleFromSourceString(name.c_str(), path_cstr, source.c_str(),
-                                                     diagnostics_blob.writeRef());
-
-        if (module == nullptr) {
-            throw ShaderCompiler::compilation_failed(diagnostics_as_string(diagnostics_blob));
-        }
-
-        if (diagnostics_blob != nullptr) {
-            SPDLOG_DEBUG("Slang compiling module {} ({}). Diagnostics: {}", name,
-                         path.has_value() ? path->string() : "no path",
-                         diagnostics_as_string(diagnostics_blob));
-        }
-
-        // 3. store the serialized IR for next launch
-        if (ir_path) {
-            Slang::ComPtr<slang::IBlob> ir;
-            if (SLANG_SUCCEEDED(module->serialize(ir.writeRef())) && ir != nullptr) {
-                cache_write(*ir_path, ir->getBufferPointer(), ir->getBufferSize());
-            }
-        }
-
-        return module;
-    }
+                            const std::optional<std::filesystem::path>& path);
 
     static Slang::ComPtr<slang::IEntryPoint> find_entry_point(Slang::ComPtr<slang::IModule>& module,
                                                               const std::string& name) {
@@ -368,108 +327,7 @@ class SlangSession {
         return composed;
     }
 
-    Slang::ComPtr<slang::IComponentType> compose(const SlangCompositionHandle& composition) {
-        std::vector<slang::IComponentType*> components;
-        components.reserve(
-            std::max(composition->modules.size() + composition->compositions.size(),
-                     1 + composition->type_conformances.size() + composition->entry_points.size()));
-
-        for (const auto& composition : composition->compositions) {
-            auto it = composition_cache.find(composition);
-            if (it == composition_cache.end()) {
-                it = composition_cache.emplace(composition, compose(composition)).first;
-            }
-            components.emplace_back(it->second);
-        }
-
-        std::set<SlangComposition::EntryPoint> additional_entry_points;
-        for (auto& module : composition->modules) {
-            // Rebinding a name retires the session (see bind_slang_module_source), so reaching this
-            // means two live compositions claim the same name for different source.
-            const uint64_t source_hash = module.source_hash();
-            const auto [source_it, source_inserted] =
-                module_source_hashes.try_emplace(module.get_name(), source_hash);
-            if (!source_inserted && source_it->second != source_hash) {
-                throw ShaderCompiler::compilation_failed(
-                    fmt::format("module {} is already compiled from different source in this "
-                                "session; give the modules distinct names",
-                                module.get_name()));
-            }
-
-            auto it = slang_module_cache.find(module.get_name());
-            if (it == slang_module_cache.end()) {
-                it = slang_module_cache
-                         .emplace(module.get_name(),
-                                  load_module_from_source(
-                                      module.get_name(),
-                                      module.get_source(
-                                          get_compile_context()->get_search_path_file_loader()),
-                                      module.get_import_path()))
-                         .first;
-            }
-
-            components.emplace_back(it->second);
-
-            if (module.get_with_entry_points()) {
-                for (uint32_t entry_point_index = 0;
-                     entry_point_index <
-                     merian::SlangSession::get_defined_entry_point_count(it->second);
-                     entry_point_index++) {
-                    Slang::ComPtr<slang::IEntryPoint> entry_point =
-                        merian::SlangSession::get_defined_entry_point(it->second,
-                                                                      entry_point_index);
-                    const char* name = entry_point->getFunctionReflection()->getName();
-                    auto rename_it = module.get_entry_point_map().find(name);
-                    if (rename_it == module.get_entry_point_map().end()) {
-                        additional_entry_points.insert(
-                            SlangComposition::EntryPoint(name, module.get_name()));
-                    } else {
-                        additional_entry_points.insert(SlangComposition::EntryPoint(
-                            name, module.get_name(), rename_it->second));
-                    }
-                }
-            }
-        }
-
-        Slang::ComPtr<slang::IComponentType> composed_modules = compose(components);
-        components.clear();
-        components.emplace_back(composed_modules);
-
-        for (auto& [type_conformance, c_id] : composition->type_conformances) {
-            auto it = type_conformance_cache.find(type_conformance);
-            if (it == type_conformance_cache.end()) {
-                int64_t id = c_id;
-                it = type_conformance_cache
-                         .emplace(type_conformance,
-                                  create_type_conformance(
-                                      composed_modules, type_conformance.get_type_name(),
-                                      type_conformance.get_interface_name(), id))
-                         .first;
-            }
-            components.emplace_back(it->second);
-        }
-
-        for (const auto& ep :
-             std::views::join(std::array{std::views::all(composition->entry_points),
-                                         std::views::all(additional_entry_points)})) {
-            auto it = entry_point_cache.find(ep);
-            if (it == entry_point_cache.end()) {
-                auto& module = slang_module_cache.at(ep.get_module());
-
-                it = entry_point_cache
-                         .emplace(ep, std::make_pair(merian::SlangSession::find_entry_point_or_fail(
-                                                         module, ep.get_defined_name()),
-                                                     nullptr))
-                         .first;
-
-                it->second.first->renameEntryPoint(ep.get_export_name().c_str(),
-                                                   it->second.second.writeRef());
-            }
-            components.push_back(it->second.second);
-        }
-
-        return compose(components);
-    }
+    Slang::ComPtr<slang::IComponentType> compose(const SlangCompositionHandle& composition);
 
     // creates a composite of the module with all its entrypoints.
     Slang::ComPtr<slang::IComponentType>
@@ -505,74 +363,12 @@ class SlangSession {
 
     static Slang::ComPtr<slang::IBlob>
     compile(const Slang::ComPtr<slang::IComponentType>& linked_programm,
-            const uint32_t entrypoint_index) {
-        const std::optional<std::filesystem::path> spv_path =
-            spirv_cache_path(linked_programm, entrypoint_index);
-        if (spv_path) {
-            if (Slang::ComPtr<slang::IBlob> cached = cache_read(*spv_path)) {
-                SPDLOG_DEBUG("Slang SPIR-V cache hit");
-                return cached;
-            }
-        }
-
-        Slang::ComPtr<slang::IBlob> compiled;
-        Slang::ComPtr<slang::IBlob> diagnostics_blob;
-
-        SlangResult result =
-            linked_programm->getEntryPointCode(entrypoint_index,
-                                               0, // targetIndex, currently only one supported
-                                               compiled.writeRef(), diagnostics_blob.writeRef());
-
-        if (SLANG_FAILED(result)) {
-            throw ShaderCompiler::compilation_failed(diagnostics_as_string(diagnostics_blob));
-        }
-
-        if (diagnostics_blob != nullptr) {
-            SPDLOG_DEBUG("Slang compiling. Diagnostics: {}",
-                         diagnostics_as_string(diagnostics_blob));
-        }
-
-        if (spv_path) {
-            cache_write(*spv_path, compiled->getBufferPointer(), compiled->getBufferSize());
-        }
-
-        return compiled;
-    }
+            const uint32_t entrypoint_index);
 
     // This compiles all entrypoints. You can skip compose and directly link the module. This will
     // compile all entrypoints in the linked composite.
     static Slang::ComPtr<slang::IBlob>
-    compile(const Slang::ComPtr<slang::IComponentType>& linked_programm) {
-        const std::optional<std::filesystem::path> spv_path = spirv_cache_path(linked_programm);
-        if (spv_path) {
-            if (Slang::ComPtr<slang::IBlob> cached = cache_read(*spv_path)) {
-                SPDLOG_DEBUG("Slang SPIR-V cache hit");
-                return cached;
-            }
-        }
-
-        Slang::ComPtr<slang::IBlob> compiled;
-        Slang::ComPtr<slang::IBlob> diagnostics_blob;
-
-        SlangResult result =
-            linked_programm->getTargetCode(0, // targetIndex, currently only one supported,
-                                           compiled.writeRef(), diagnostics_blob.writeRef());
-
-        if (SLANG_FAILED(result)) {
-            throw ShaderCompiler::compilation_failed(diagnostics_as_string(diagnostics_blob));
-        }
-
-        if (diagnostics_blob != nullptr) {
-            SPDLOG_DEBUG("Slang compiling. Diagnostics: {}",
-                         diagnostics_as_string(diagnostics_blob));
-        }
-
-        if (spv_path) {
-            cache_write(*spv_path, compiled->getBufferPointer(), compiled->getBufferSize());
-        }
-
-        return compiled;
-    }
+    compile(const Slang::ComPtr<slang::IComponentType>& linked_programm);
 
     // Shortcut for compile() then ShaderModule::create.
     //
@@ -693,6 +489,12 @@ class SlangSession {
                                             const std::string& type_name);
 
   public:
+    // Thrown when a composition needs a fresh session.
+    class stale_session : public std::runtime_error {
+      public:
+        using std::runtime_error::runtime_error;
+    };
+
     static SlangSessionHandle create(const ShaderCompileContextHandle& shader_compile_context);
 
     // Runs the on-disk cache size-cap eviction (see cache_evict).
@@ -728,15 +530,36 @@ class SlangSession {
     // default 512, 0 = unbounded).
     static void cache_evict();
 
-    uint64_t ir_cache_key(const std::string& name,
-                          const std::string& source,
-                          const std::optional<std::filesystem::path>& path) const;
-    // Slang's own backend cache key (getEntryPointHash) as a hex filename, or nullopt to skip.
+    // One directory per compile configuration.
+    static std::filesystem::path module_cache_dir(const ShaderCompileContext& context);
+    // Presents cached binary modules as `.slang-module` files beside their sources.
+    static Slang::ComPtr<ISlangFileSystemExt>
+    create_file_system(const std::filesystem::path& module_cache_dir,
+                       std::function<bool()> serve_binaries);
+    // Writes the binaries of the file modules this session compiled.
+    void store_modules();
+    std::optional<std::filesystem::path>
+    canonical_file_path(const std::filesystem::path& path) const;
+    // The name of the file's module when imported by its canonical spelling, nullopt outside the
+    // search paths.
+    std::optional<std::string> canonical_module_name(const std::filesystem::path& file) const;
+    // Slang names a module after the first import that reaches it, and mangled names contain the
+    // module name: a binary cannot load against a dependency compiled under another name.
+    bool modules_canonically_named();
+    // Slang's own backend cache key (getEntryPointHash) as a filename, or nullopt to skip.
     static std::optional<std::filesystem::path>
     spirv_cache_path(const Slang::ComPtr<slang::IComponentType>& program);
     static std::optional<std::filesystem::path>
     spirv_cache_path(const Slang::ComPtr<slang::IComponentType>& program,
                      uint32_t entry_point_index);
+
+    const Slang::ComPtr<slang::IModule>& ensure_module(SlangComposition::SlangModule& module);
+    static void check_one_source_per_name(const SlangCompositionHandle& composition,
+                                          std::unordered_map<std::string, uint64_t>& sources);
+    Slang::ComPtr<slang::IComponentType> compose_tree(const SlangCompositionHandle& composition);
+    bool is_imported(slang::IModule* module) const;
+    bool is_replaced(slang::IModule* module) const;
+    void check_no_replaced_dependency(slang::IModule* module) const;
 
   private:
     // The context owns the session it hands out, so the way back must not own it: a handle here
@@ -746,19 +569,32 @@ class SlangSession {
         return weak_compile_context.lock();
     }
 
+    static constexpr std::size_t MAX_REPLACED_MODULES = 64;
+
     const std::weak_ptr<ShaderCompileContext> weak_compile_context;
+    Slang::ComPtr<ISlangFileSystemExt> file_system;
     Slang::ComPtr<slang::ISession> session;
 
     // -> entry_point, renamed
     std::map<SlangComposition::EntryPoint,
              std::pair<Slang::ComPtr<slang::IEntryPoint>, Slang::ComPtr<slang::IComponentType>>>
         entry_point_cache;
-    std::map<std::string, Slang::ComPtr<slang::IModule>> slang_module_cache;
-    std::map<std::string, uint64_t> module_source_hashes;
-    std::size_t string_module_fingerprint = 0;
+    // identity (the path Slang reports as dependency) -> module
+    std::unordered_map<std::string, slang::IModule*> source_strings_by_identity;
+    std::unordered_set<slang::IModule*> checked_module_names;
+    bool module_names_canonical = true;
+    struct BoundModule {
+        uint64_t source_hash;
+        Slang::ComPtr<slang::IModule> module;
+    };
+    std::unordered_map<std::string, BoundModule> bound_modules;
+    std::map<std::pair<std::string, uint64_t>, Slang::ComPtr<slang::IModule>> module_versions;
     std::map<SlangComposition::TypeConformance, Slang::ComPtr<slang::IComponentType>>
         type_conformance_cache;
-    std::map<SlangCompositionHandle, Slang::ComPtr<slang::IComponentType>> composition_cache;
+    // -> composition version, composed
+    std::unordered_map<SlangCompositionHandle,
+                       std::pair<uint64_t, Slang::ComPtr<slang::IComponentType>>>
+        composition_cache;
 };
 
 } // namespace merian

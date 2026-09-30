@@ -2,7 +2,7 @@
 
 import merian_shaders.utils.sampling;
 
-__exported import phase_function;
+__exported import merian_shaders.shading.phase_functions.phase_function;
 
 namespace merian {
 

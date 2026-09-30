@@ -1,8 +1,8 @@
 #include "merian-shaders/utils/math-constants.slangh"
 
-import "distribution.slang";
-import "merian-shaders/utils/math.slang";
-import "merian-shaders/utils/frame.slang";
+import merian_shaders.distributions.distribution;
+import merian_shaders.utils.math;
+import merian_shaders.utils.frame;
 
 namespace merian {
 
