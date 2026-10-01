@@ -53,8 +53,8 @@ Scene::Scene(const ShaderCompileContextHandle& compile_context,
                        "NullAccelerationStructure; }");
     set_env(std::make_shared<EmptyEnvMap>());
 
-    if (as_supported && OpacityMicromaps::is_supported(context)) {
-        opacity_micromaps = std::make_unique<OpacityMicromaps>(compile_context, context, allocator);
+    if (as_supported) {
+        micromaps = std::make_unique<Micromaps>(compile_context, context, allocator);
     }
 
     // register the hint modules up front so a runtime toggle replaces them instead of adding them
@@ -773,14 +773,19 @@ void Scene::properties_settings(Properties& props) {
     }
     props.config_percent("BLAS Rebuild Fraction", blas_rebuild_fraction);
 
-    props.st_separate("Opacity Micromaps");
-    if (opacity_micromaps) {
+    props.st_separate("Micromaps");
+    if (micromaps && Micromaps::is_opacity_supported(context)) {
         props.config_bool("Opacity Micromaps", opacity_micromaps_enabled,
                           "Settle alpha-tested hits during traversal instead of invoking the alpha "
                           "test");
-        opacity_micromaps->properties(props);
     } else {
-        props.output_text("not supported by the device");
+        props.output_text("opacity micromaps: not supported by the device");
+    }
+    if (micromaps) {
+        props.config_bool("Emission Micromaps", emission_micromaps_enabled,
+                          "Draw light samples on an emissive triangle only where its emission "
+                          "texture emits");
+        micromaps->properties(props);
     }
 
     props.st_separate("Material System");
@@ -1293,9 +1298,17 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
                 has_sky_portals |= (mesh.flags & MeshFlags::UseEnvMap);
                 if (!(mesh.flags & MeshFlags::UseEnvMap) &&
                     material_system->is_emissive(mesh.material_id)) {
-                    emissive_geometries.push_back({static_cast<GeometryID>(geometries.size()),
-                                                   instance_index, mesh.get_primitive_count(),
-                                                   geometry_key});
+                    LightCollection::EmissiveGeometry& emissive =
+                        emissive_geometries.emplace_back(LightCollection::EmissiveGeometry{
+                            static_cast<GeometryID>(geometries.size()), instance_index,
+                            mesh.get_primitive_count(), geometry_key});
+                    if (micromaps) {
+                        if (const auto emission = micromaps->get_emission(mesh_id)) {
+                            emissive.emission_offsets = emission->offsets;
+                            emissive.emission_records = emission->records;
+                            emissive.emission_level = emission->level;
+                        }
+                    }
                 }
 
                 GeometryData gd;
@@ -1332,6 +1345,9 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
                 }
                 if (mesh.flags & MeshFlags::TwoSided) {
                     gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::TwoSided);
+                }
+                if (!mesh.is_opaque() && material_system->has_alpha_texture(mesh.material_id)) {
+                    gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::AlphaTested);
                 }
 
                 geometries.emplace_back(gd);
@@ -1766,50 +1782,59 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
     }
 }
 
-void Scene::ensure_opacity_micromaps(const CommandBufferHandle& cmd) {
-    if (!opacity_micromaps) {
+void Scene::ensure_micromaps(const CommandBufferHandle& cmd) {
+    if (!micromaps) {
         return;
     }
 
-    std::vector<MeshID> changed;
-    if (opacity_micromaps_enabled) {
-        std::vector<OpacityMicromaps::MeshGeometry> alpha_tested;
-        for (MeshID mesh_id = 0; mesh_id < mesh_infos.size(); mesh_id++) {
-            const MeshInfo& info = mesh_infos[mesh_id];
-            if (!info.mesh || !info.vertex_buffer) {
-                continue;
-            }
-            const Mesh& mesh = *info.mesh;
-            if (mesh.is_opaque() || mesh.has_variable_topology() ||
-                mesh.get_primitive_count() == 0 ||
-                !material_system->has_alpha_texture(mesh.material_id)) {
-                continue;
-            }
-
-            OpacityMicromaps::MeshGeometry& geometry = alpha_tested.emplace_back();
-            geometry.mesh_id = mesh_id;
-            geometry.geometry.material_id = mesh.material_id;
-            geometry.geometry.primitive_count = mesh.get_primitive_count();
-            geometry.geometry.vertices = info.vertex_buffer.get_device_address();
-            geometry.geometry.indices =
-                info.index_buffer ? info.index_buffer.get_device_address() : vk::DeviceAddress{0};
-            geometry.geometry.flags = index_type_flag(mesh.index_type);
-            geometry.uv_version = info.uv_version;
-
-            const Mesh::MeshVertexData vertices = mesh.get_vertices();
-            const Mesh::MeshIndexData indices = mesh.get_indices();
-            const auto* host_vertices = std::get_if<Mesh::HostPacked<PackedVertexData>>(&vertices);
-            const auto* host_indices = std::get_if<Mesh::HostPacked<void>>(&indices);
-            if (host_vertices != nullptr && (host_indices != nullptr || !mesh.has_indices())) {
-                geometry.host_vertices = host_vertices->data;
-                geometry.host_indices = host_indices != nullptr ? host_indices->data : nullptr;
-                geometry.host_index_type = mesh.index_type;
-            }
+    const bool opacity = opacity_micromaps_enabled && Micromaps::is_opacity_supported(context);
+    std::vector<Micromaps::MeshGeometry> baked;
+    for (MeshID mesh_id = 0; mesh_id < mesh_infos.size(); mesh_id++) {
+        const MeshInfo& info = mesh_infos[mesh_id];
+        if (!info.mesh || !info.vertex_buffer) {
+            continue;
         }
-        opacity_micromaps->update(cmd, alpha_tested, material_system, changed);
-    } else {
-        opacity_micromaps->clear(cmd, changed);
+        const Mesh& mesh = *info.mesh;
+        if (mesh.has_variable_topology() || mesh.get_primitive_count() == 0) {
+            continue;
+        }
+        const bool alpha_tested =
+            !mesh.is_opaque() && material_system->has_alpha_texture(mesh.material_id);
+        const bool emissive =
+            emission_micromaps_enabled && !(mesh.flags & MeshFlags::UseEnvMap) &&
+            material_system->is_emissive(mesh.material_id) &&
+            material_system->get_emission_texture_id(mesh.material_id) != TextureID(-1);
+        if (!(opacity && alpha_tested) && !emissive) {
+            continue;
+        }
+
+        Micromaps::MeshGeometry& geometry = baked.emplace_back();
+        geometry.mesh_id = mesh_id;
+        geometry.mesh_serial = info.serial;
+        geometry.alpha_tested = alpha_tested;
+        geometry.opacity = opacity && alpha_tested;
+        geometry.emission = emissive;
+        geometry.geometry.material_id = mesh.material_id;
+        geometry.geometry.primitive_count = mesh.get_primitive_count();
+        geometry.geometry.vertices = info.vertex_buffer.get_device_address();
+        geometry.geometry.indices =
+            info.index_buffer ? info.index_buffer.get_device_address() : vk::DeviceAddress{0};
+        geometry.geometry.flags = index_type_flag(mesh.index_type);
+        geometry.uv_version = info.uv_version;
+
+        const Mesh::MeshVertexData vertices = mesh.get_vertices();
+        const Mesh::MeshIndexData indices = mesh.get_indices();
+        const auto* host_vertices = std::get_if<Mesh::HostPacked<PackedVertexData>>(&vertices);
+        const auto* host_indices = std::get_if<Mesh::HostPacked<void>>(&indices);
+        if (host_vertices != nullptr && (host_indices != nullptr || !mesh.has_indices())) {
+            geometry.host_vertices = host_vertices->data;
+            geometry.host_indices = host_indices != nullptr ? host_indices->data : nullptr;
+            geometry.host_index_type = mesh.index_type;
+        }
     }
+
+    std::vector<MeshID> changed;
+    micromaps->update(cmd, baked, material_system, changed);
 
     for (const MeshID mesh_id : changed) {
         if (mesh_id >= mesh_to_group.size() || mesh_to_group[mesh_id] == MESH_GROUP_ID_INVALID) {
@@ -1827,7 +1852,7 @@ void Scene::ensure_opacity_micromaps(const CommandBufferHandle& cmd) {
 void Scene::build_blas(const CommandBufferHandle& cmd) {
     MERIAN_PROFILE_SCOPE_GPU(cmd, "Scene::build_blas");
 
-    ensure_opacity_micromaps(cmd);
+    ensure_micromaps(cmd);
 
     blas_geometries.assign(mesh_groups.size(), {});
 
@@ -1863,9 +1888,9 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
 
             if (mesh.flags & MeshFlags::IsOpaque) {
                 geom.flags = vk::GeometryFlagBitsKHR::eOpaque;
-            } else if (opacity_micromaps) {
+            } else if (micromaps) {
                 vk::AccelerationStructureTrianglesOpacityMicromapEXT omm;
-                if (opacity_micromaps->get(mesh_id, omm)) {
+                if (micromaps->get_opacity(mesh_id, omm)) {
                     geom.geometry.triangles.pNext = &blas_geometry.micromaps.emplace_back(omm);
                 }
             }
@@ -2214,10 +2239,11 @@ void Scene::update(const CommandBufferHandle& cmd,
     lights.set_env_emissive(env_map->is_emissive());
     lights.set_env_state(env_map->get_version(), env_map->is_static());
     lights.set_camera(cam->get_position());
+    lights.set_frame(frame);
     lights.set_scene_radius(aabb.is_valid() ? 0.5f * length(aabb.get_max() - aabb.get_min()) : 0.f);
     lights.prepare(cmd);
     lights.write_to(c["nee"]);
-    lights.update(cmd, composition, shader_object.get(), obj_allocator, frame);
+    lights.update(cmd, composition, shader_object.get(), obj_allocator);
 }
 
 } // namespace merian

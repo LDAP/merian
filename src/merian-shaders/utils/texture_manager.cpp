@@ -15,6 +15,7 @@ TextureManager::TextureManager(const ShaderCompileContextHandle& compile_context
                                const uint32_t initial_capacity)
     : compile_context(compile_context), context(context), allocator(allocator) {
     textures.resize(initial_capacity);
+    serials.resize(initial_capacity);
 
     // Build composition once — subsequent changes modify in-place.
     composition = SlangComposition::create();
@@ -98,6 +99,7 @@ void TextureManager::resize(const uint32_t capacity) {
     }
 
     textures.resize(capacity);
+    serials.resize(capacity);
     update_composition_constants();
 }
 
@@ -107,6 +109,10 @@ TextureID TextureManager::allocate_id() {
         resize(static_cast<uint32_t>(textures.size()) * 2);
     }
     return id;
+}
+
+void TextureManager::renew_serial(const TextureID id) {
+    serials[id] = ++last_serial;
 }
 
 TextureID TextureManager::add_texture(const TextureHandle& texture) {
@@ -119,6 +125,7 @@ void TextureManager::set_texture(const TextureID id, const TextureHandle& textur
     assert(id < textures.size());
     ids.acquire(id);
     textures[id] = texture;
+    renew_serial(id);
     // poke the live slot only when current; otherwise the next reproject covers it
     if (object_is_current()) {
         shader_object.peek()->get_cursor()["textures"][id] =
@@ -185,6 +192,7 @@ void TextureManager::set_texture_from_rgba8(const TextureID id,
                                               min_filter, srgb, generate_mipmaps);
     ids.acquire(id);
     textures[id] = texture;
+    renew_serial(id);
     // image reaches eShaderReadOnlyOptimal at the next update(); declare it now to write
     // immediately
     if (object_is_current()) {
@@ -199,6 +207,7 @@ void TextureManager::remove_texture(const TextureID id) {
     assert(was_used && "Removing already-removed texture");
 
     textures[id].reset();
+    renew_serial(id);
     if (object_is_current()) {
         shader_object.peek()->get_cursor()["textures"][id] = allocator->get_dummy_texture();
     }

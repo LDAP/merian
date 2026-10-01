@@ -88,6 +88,7 @@ std::vector<OutputConnectorDescriptor> RenderPT::describe_outputs(const NodeIOLa
     adopt(con_distance_guiding, distance_guiding, distance_guiding_version,
           std::make_shared<NullDistanceGuidingModel>());
     con_irradiance = ManagedVkImageOut::create(irradiance_format, extent);
+    con_debug = ManagedVkImageOut::create(vk::Format::eR32G32B32A32Sfloat, extent);
     con_volume = ManagedVkImageOut::create(irradiance_format, extent);
     con_volume_depth = ManagedVkImageOut::create(volume_depth_format, extent);
     con_volume_mv = ManagedVkImageOut::create(vk::Format::eR16G16Sfloat, extent);
@@ -96,6 +97,7 @@ std::vector<OutputConnectorDescriptor> RenderPT::describe_outputs(const NodeIOLa
     return {{.name = "irradiance",
              .connector = con_irradiance,
              .access = ConnectorAccess::ray_tracing_write},
+            {.name = "debug", .connector = con_debug, .access = ConnectorAccess::ray_tracing_write},
             {.name = "volume",
              .connector = con_volume,
              .access = ConnectorAccess::compute_write,
@@ -118,6 +120,7 @@ RenderPT::NodeStatusFlags RenderPT::on_connected(const NodeIOLayout& io_layout,
                                                  [[maybe_unused]] Submission& submission) {
 
     composition = nullptr;
+    debug_connected = io_layout.is_connected(con_debug);
 
     if (path_records.update_connected(io_layout)) {
         return NEEDS_RECONNECT;
@@ -252,6 +255,7 @@ RenderPT::process(const NodeIO& io, const NodeProcessInfo& info, Submission& sub
     auto cursor = params_obj->get_cursor();
     cursor["gbuffer"] = gbuf.r();
     cursor["irradiance"] = io[con_irradiance].get_texture();
+    cursor["debug"] = io[con_debug].get_texture();
     if (io.is_connected(con_guiding)) {
         cursor["guiding"] = io[con_guiding].r();
     }
@@ -345,7 +349,7 @@ void RenderPT::update_render_constants() {
     const std::string constants =
         fmt::format("namespace merian {{\n"
                     "export static const bool merian_render_emission_on_primary = {};\n"
-                    "export static const int merian_render_output_view = {};\n"
+                    "export static const int merian_render_debug_output = {};\n"
                     "export static const bool merian_render_follow_specular = {};\n"
                     "export static const float merian_render_specular_alpha = {:f};\n"
                     "export static const int merian_render_spp = {};\n"
@@ -369,7 +373,8 @@ void RenderPT::update_render_constants() {
                     "export static const int merian_guiding_direct_target = {};\n"
                     "export static const float merian_guiding_distance_share = {:f};\n"
                     "}}",
-                    emission_on_primary ? "true" : "false", static_cast<int32_t>(output_view),
+                    emission_on_primary ? "true" : "false",
+                    debug_connected ? static_cast<int32_t>(debug_output) : -1,
                     follow_specular ? "true" : "false", specular_alpha, spp, seed, max_path_length,
                     mask, enable_ser ? "true" : "false", demodulate_albedo ? "true" : "false",
                     static_cast<int32_t>(nee_mode), nee_probability(), nee_bounces,
@@ -521,14 +526,16 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
             "demodulate albedo", demodulate_albedo,
             "Divide the primary-hit albedo out of the output so a denoiser can re-modulate after "
             "filtering. Use with 'emission on primary' disabled (emission is albedo-independent).");
-        int output_view_index = static_cast<int>(output_view);
+        int debug_output_index = static_cast<int>(debug_output);
         if (config.config_options(
-                "show", output_view_index, {"radiance", "guiding debug", "scatter statistics"},
+                "debug output", debug_output_index,
+                {"scatter statistics", "guiding debug", "nee debug"},
                 Properties::OptionsStyle::COMBO,
-                "What the output holds. The guiding node picks its debug view; the scatter "
-                "statistics count per pixel the scatter samples the guiding drew and the ones "
-                "nothing could be traced from.")) {
-            output_view = static_cast<OutputView>(output_view_index);
+                "What the debug output holds, where a node consumes it. The scatter statistics "
+                "count per pixel the scatter samples the guiding drew, the ones the shading "
+                "function refused and the ones the geometry refused a ray; the guiding method and "
+                "the scene pick their own debug views.")) {
+            debug_output = static_cast<DebugOutput>(debug_output_index);
             constants_changed = true;
         }
         needs_reconnect |= config.config_enum("irradiance format", irradiance_format,

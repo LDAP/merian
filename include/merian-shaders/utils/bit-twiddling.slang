@@ -11,6 +11,20 @@ uint next_power_of_two(uint v) {
     return v;
 }
 
+// k counts from 0 at the lowest set bit and must be below countbits(bits).
+uint select_set_bit(uint bits, uint k) {
+    uint position = 0;
+    for (uint width = 16; width > 0; width >>= 1) {
+        const uint low = countbits(bits & ((1u << width) - 1u));
+        if (k >= low) {
+            k -= low;
+            bits >>= width;
+            position += width;
+        }
+    }
+    return position;
+}
+
 // Converts a random uint to a random float in [0, 1).
 float uint_to_zero_one_float_bits(uint source) {
     // 127 exponent, random mantissa => generate numbers in [1, 2), then subtract one

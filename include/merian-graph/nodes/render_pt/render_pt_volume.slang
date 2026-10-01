@@ -119,7 +119,7 @@ void render_pixel(const uint2 pixel,
         const ScatterMixture mixture = ScatterMixture(merian::guiding_share(guiding, 1.f));
 
         // 3. resampled direct light
-        let lights = scene.nee.begin_vertex(scatter_pos, rng);
+        let lights = scene.nee.begin_vertex(scatter_pos);
         const Optional<DirectLightSample> direct = scene.sample_direct_light(
             lights, make_phase_target(phase, guiding, mixture, medium, frame, wi_local), rng);
 
@@ -155,7 +155,7 @@ void render_pixel(const uint2 pixel,
         segment.direct_scale = guiding_direct_scale(1.f);
         let guiding_record = params.guiding.record_scatter(guiding, segment, guided, rng);
 
-        float3 contribution = scene.resolve_direct_light(scatter_pos, float3(0), 0.f, direct,
+        float3 contribution = scene.resolve_direct_light(lights, float3(0), 0.f, direct,
                                                          merian_render_instance_mask);
 
         if (scattered && any(f_cos > 0.f)) {
@@ -167,7 +167,8 @@ void render_pixel(const uint2 pixel,
             const Hit hit = scene.trace_ray(ray, RAY_FLAG_NONE, merian_render_instance_mask);
 
             const float light_pdf =
-                scene.nee.pdf(lights, scene.get_light_index(hit), ray.Origin, ray.Direction);
+                scene.nee.pdf(lights, scene.get_light_index(hit), ray.Origin, ray.Direction,
+                              hit.barycentrics, false);
             const float mis_weight = segment.pdf / (light_pdf + segment.pdf);
 
             const ShadingPoint sp = scene.get_shading_point(ray, hit, RenderContext(uint16_t(1)),

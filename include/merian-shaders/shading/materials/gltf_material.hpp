@@ -71,6 +71,10 @@ struct GltfMaterial : Material {
         return emissive_factor.x > 0.f || emissive_factor.y > 0.f || emissive_factor.z > 0.f;
     }
 
+    TextureID get_emission_texture_id() const override {
+        return emissive_texture;
+    }
+
     GltfMaterial() {
         header.alpha_texture_id = TextureID(-1);
     }

@@ -30,11 +30,11 @@ namespace merian {
 class RenderPT : public Node {
 
   public:
-    // match SCATTER_MODE_*, NEE_MODE_* and OUTPUT_VIEW_* in the shaders
+    // match SCATTER_MODE_*, NEE_MODE_* and DEBUG_OUTPUT_* in the shaders
     enum class ScatterMode : int32_t { MIS, RIS };
     enum class NEEMode : int32_t { Off, Mixture, Resampled };
     enum class TraceShader : int32_t { Auto, RayGeneration, Compute };
-    enum class OutputView : int32_t { Radiance, GuidingDebug, ScatterStatistics };
+    enum class DebugOutput : int32_t { ScatterStatistics, Guiding, NEE };
 
     RenderPT();
 
@@ -79,6 +79,7 @@ class RenderPT : public Node {
     ShaderObjectInHandle<GuidingObject> con_distance_guiding =
         ShaderObjectIn<GuidingObject>::create();
     ManagedVkImageOutHandle con_irradiance;
+    ManagedVkImageOutHandle con_debug;
     PathRecordSink path_records;
     ManagedVkImageOutHandle con_volume;
     ManagedVkImageOutHandle con_volume_depth;
@@ -108,7 +109,8 @@ class RenderPT : public Node {
     float volume_forward_project_min_z = 50.f;
     vk::Format volume_depth_format = vk::Format::eR32Sfloat;
 
-    OutputView output_view = OutputView::Radiance;
+    DebugOutput debug_output = DebugOutput::ScatterStatistics;
+    bool debug_connected = false;
     bool follow_specular = true;
     float specular_alpha = 0.f;
     ScatterMode scatter_mode = ScatterMode::MIS;

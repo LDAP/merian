@@ -158,51 +158,42 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
         return record;
     }
 
-    bool debug_view(const RenderFrameInfo frame_info,
-                    const PathVertex vertex,
-                    inout RandomGenerator rng,
-                    out float4 color) {
-        color = float4(1, 0, 1, 1);
+    float4 debug_view(const RenderFrameInfo frame_info,
+                      const PathVertex vertex,
+                      inout RandomGenerator rng) {
         const float3 cam = frame_info.cam_pos;
         if (debug_selector == MCPGDebugView::Cell) {
             const uint level = mcpg.grid.distributed_level_for_pos(vertex.pos, cam, rng);
             const int3 gidx =
                 mcpg.grid.grid_idx(vertex.pos, mcpg.grid.grid_inv_width_for_level(level), rng);
-            color = float4(random_color(mcpg.grid.buffer_index(gidx, level)), 1);
-            return true;
+            return float4(random_color(mcpg.grid.buffer_index(gidx, level)), 1);
         }
         if (debug_selector == MCPGDebugView::Level) {
-            color = float4(
+            return float4(
                 debug_color(mcpg.grid.distributed_level_for_pos(vertex.pos, cam, rng) / 63.0), 1);
-            return true;
         }
 
         const MCState s = mcpg.load(vertex.pos, vertex.shading_frame, cam, frame_info.time, rng);
         if (debug_selector == MCPGDebugView::Unresolved) {
-            color = float4(s.is_valid() ? 0.0 : 1.0);
-            return true;
+            return float4(s.is_valid() ? 0.0 : 1.0);
         }
         if (!s.is_valid()) {
-            return true;
+            return float4(1, 0, 1, 1);
         }
         switch (debug_selector) {
         case MCPGDebugView::ChainWeight:
-            color = float4(debug_color(s.sum_w * 0.1), 1);
-            return true;
+            return float4(debug_color(s.sum_w * 0.1), 1);
         case MCPGDebugView::Aim:
-            color = float4((s.get_dir(vertex.pos) + 1) * 0.5, 1);
-            return true;
+            return float4((s.get_dir(vertex.pos) + 1) * 0.5, 1);
         case MCPGDebugView::LobeWidth:
-            color = float4(debug_color(s.one_minus_mean_cos(vertex.pos)), 1);
-            return true;
+            return float4(debug_color(s.one_minus_mean_cos(vertex.pos)), 1);
         case MCPGDebugView::Samples:
-            color = float4(debug_color(float(s.N) / float(ML_MAX_N)), 1);
-            return true;
+            return float4(debug_color(float(s.N) / float(ML_MAX_N)), 1);
         case MCPGDebugView::TargetMotion:
-            color = float4(abs(float3(s.mv)), 1);
-            return true;
+            return float4(abs(float3(s.mv)), 1);
+        default:
+            return float4(0);
         }
-        return false;
     }
 
     float3 record_segment(inout State state,

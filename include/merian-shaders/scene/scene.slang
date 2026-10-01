@@ -6,10 +6,13 @@ __exported import merian_shaders.scene.scene_data;
 __exported import merian_shaders.scene.hit;
 __exported import merian_shaders.scene.nee;
 
+import merian_shaders.colors.colorspaces;
+import merian_shaders.colors.debug;
 import merian_shaders.utils.encoding;
 import merian_shaders.utils.hash;
 import merian_shaders.utils.pseudorandom;
 import merian_shaders.utils.random;
+import merian_shaders.utils.sampling;
 
 // Workaround for https://github.com/shader-slang/slang/pull/10769; scene.cpp injects replacements.
 __exported import scene_as_workaround;
@@ -554,12 +557,15 @@ struct Scene {
     Optional<DirectLightSample> sample_direct_light<T : IDirectLightTarget>(
         const DirectLightVertex vertex, const T target, inout RandomGenerator rng) {
         DirectLightReservoir reservoir = DirectLightReservoir();
-        const uint pool = nee.pool_candidates();
-        for (uint i = 0; i < pool + nee.cell_candidates(); i++) {
-            if (let ls = nee.sample_light(vertex.cell, vertex.pos, rng, material_system, env_map,
-                                          time, i >= pool)) {
-                reservoir.add_light(ls, target.unshadowed(ls, rng),
-                                    nee.pdf_lights(vertex.cell, ls.index, ls.pdf),
+        const uint m_scene = nee.scene_draws();
+        const uint m_cell = nee.cell_draws();
+        const LightCellWeights weights = nee.grid.weigh_cell(vertex, m_cell, rng);
+        for (uint i = 0; i < m_scene + m_cell; i++) {
+            if (let ls = nee.sample_light(vertex, weights, rng, material_system, env_map, time,
+                                          i >= m_scene, i - m_scene)) {
+                const float light_pdf = nee.pdf_lights(vertex, ls.index, ls.wo, ls.pdf, m_scene,
+                                                       m_cell, weights, ls.grid_entry);
+                reservoir.add_light(ls, target.unshadowed(ls, rng), light_pdf,
                                     target.scatter_pdf(ls), rng);
             }
         }
@@ -577,13 +583,15 @@ struct Scene {
     // One draw; pdf is NEE::mixture_pdf of it.
     Optional<LightSample> sample_direct_light(const DirectLightVertex vertex,
                                               inout RandomGenerator rng) {
-        const uint m_pool = nee.pool_candidates();
-        const uint m_grid = nee.cell_candidates();
-        const bool from_grid = rng.next_float() * float(m_pool + m_grid) >= float(m_pool);
-        if (let ls = nee.sample_light(vertex.cell, vertex.pos, rng, material_system, env_map, time,
-                                      from_grid)) {
+        const uint m_scene = nee.scene_draws();
+        const uint m_cell = nee.cell_draws();
+        const bool from_cell = rng.next_float() * float(m_scene + m_cell) >= float(m_scene);
+        const LightCellWeights weights = nee.grid.weigh_cell(vertex, 1, rng);
+        if (let ls = nee.sample_light(vertex, weights, rng, material_system, env_map, time,
+                                      from_cell, 0)) {
             LightSample s = ls;
-            s.pdf = nee.mixture_pdf(nee.pdf_lights(vertex.cell, ls.index, ls.pdf, m_pool, m_grid));
+            s.pdf = nee.mixture_pdf(nee.pdf_lights(vertex, ls.index, ls.wo, ls.pdf, m_scene, m_cell,
+                                                   weights, ls.grid_entry));
             if (s.pdf > 0.f)
                 return s;
         }
@@ -634,7 +642,7 @@ struct Scene {
                 GeometryDataFlags::UseEnvMap) != 0;
     }
 
-    float3 resolve_direct_light(const float3 pos,
+    float3 resolve_direct_light(const DirectLightVertex vertex,
                                 const float3 face_normal,
                                 const float spawn_offset,
                                 const Optional<DirectLightSample> direct,
@@ -642,10 +650,124 @@ struct Scene {
         if (!direct.hasValue)
             return float3(0);
         const DirectLightSample s = direct.value;
-        if (!trace_light_visibility(pos, face_normal, spawn_offset, s.light_pos,
-                                    s.light_index == LIGHT_ENV_INDEX, instances_mask))
+        const bool visible =
+            trace_light_visibility(vertex.pos, face_normal, spawn_offset, s.light_pos,
+                                   s.light_index == LIGHT_ENV_INDEX, instances_mask);
+        nee.record_visibility(vertex, s.light_index, normalize(s.light_pos - vertex.pos), visible);
+        return visible ? s.value : float3(0);
+    }
+
+    static float3
+    get_receiver_normal(const float3 incident, const float3 face_normal, const bool transmissive) {
+        if (transmissive)
             return float3(0);
-        return s.value;
+        return dot(face_normal, incident) < 0.f ? face_normal : -face_normal;
+    }
+
+    float4 debug_direct_light(const RayDesc ray,
+                              const ShadingPoint sp,
+                              const uint instance_mask,
+                              inout RandomGenerator rng) {
+        if (!sp.has_surface_material || !nee.has_lights())
+            return float4(0);
+        const float3 ng = sp.get_face_normal();
+        const float3 normal = get_receiver_normal(
+            ray.Direction, ng,
+            bsdf_is_transmissive(sp.surface_material.get_bsdf().get_lobe_types()));
+        let vertex = nee.begin_vertex(sp.pos, normal);
+
+        switch (nee.debug_view) {
+        case LightDebugView::LightDebugCell:
+            return vertex.has_cell() ? float4(random_color(vertex.cell), 1) : float4(0, 0, 0, 1);
+        case LightDebugView::LightDebugSlots: {
+            if (!vertex.has_cell())
+                return float4(0, 0, 0, 1);
+            const LightCellWeights weights = nee.grid.weigh_cell(vertex);
+            float learned = 0.f;
+            float actual = 0.f;
+            const uint base = light_bucket_base(vertex.cell);
+            for (uint slot = 0; slot < LIGHT_GRID_SLOTS; slot++) {
+                const uint held = nee.grid.slots[base + slot];
+                const bool distant = is_env_region(held);
+                if (held >= nee.table.triangle_count && !distant)
+                    continue;
+                const float p = nee.grid.slot_share(vertex, base + slot, weights);
+                learned += p * nee.grid.visibility[base + slot];
+                float3 centre;
+                if (distant) {
+                    float sin_radius;
+                    const uint region = held - LIGHT_ENV_REGION_BASE;
+                    nee.env.importance.region_cone(region, centre, sin_radius);
+                    centre = sp.pos + centre * ENV_MAP_DISTANCE;
+                } else {
+                    centre = nee.grid.sources[held].centroid;
+                }
+                RayDesc probe = make_light_ray(sp.pos, ng, sp.spawn_offset, centre, distant);
+                probe.TMax = SCENE_RAY_TMAX;
+                const uint hit = get_light_index(trace_ray(probe, RAY_FLAG_NONE, instance_mask));
+                if (distant ? hit == LIGHT_ENV_INDEX : nee.reaches_source(held, hit))
+                    actual += p;
+            }
+            return float4(float(weights.occupied) / float(LIGHT_GRID_SLOTS), learned, actual, 1);
+        }
+        case LightDebugView::LightDebugCoverage: {
+            const OrthonormalFrame frame = OrthonormalFrame(any(normal != 0.f) ? normal : ng);
+            float3 found = float3(0);
+            for (uint i = 0; i < LIGHT_DEBUG_COVERAGE_RAYS; i++) {
+                RayDesc probe;
+                probe.Direction = frame.to_world(merian::sample_cos(rng));
+                probe.Origin = offset_ray_origin(sp.pos, ng, sp.spawn_offset, probe.Direction);
+                probe.TMin = SCENE_RAY_TMIN;
+                probe.TMax = SCENE_RAY_TMAX;
+                const Hit hit = trace_ray(probe, RAY_FLAG_NONE, instance_mask);
+                const float emitted = yuv_luminance(
+                    get_shading_point(probe, hit, RenderContext(), DefaultLODSampler(), false)
+                        .emission);
+                if (!(emitted > 0.f))
+                    continue;
+                const uint index = get_light_index(hit);
+                if (index == LIGHT_INVALID_INDEX)
+                    found.b += emitted;
+                else if (nee.pdf(vertex, index, probe.Origin, probe.Direction) > 0.f)
+                    found.r += emitted;
+                else if (index == LIGHT_ENV_INDEX ||
+                         (nee.table.triangles[index].flux > 0.f &&
+                          nee.pdf_triangle(index, probe.Origin, probe.Direction) > 0.f))
+                    found.g += emitted;
+                else
+                    found.b += emitted;
+            }
+            const float total = found.r + found.g + found.b;
+            return total > 0.f ? float4(found / total, 1) : float4(0, 0, 0, 1);
+        }
+        default: {
+            float3 outcome = float3(0);
+            for (uint i = 0; i < LIGHT_DEBUG_DRAWS; i++) {
+                let lp = nee.sample_point(vertex, rng);
+                if (!lp.hasValue)
+                    continue;
+                const bool distant = lp.value.index == LIGHT_ENV_INDEX;
+                RayDesc probe = make_light_ray(sp.pos, ng, sp.spawn_offset, lp.value.pos, distant);
+                if (any(normal != 0.f) && dot(probe.Direction, normal) <= 0.f)
+                    continue;
+                const float light_dist = probe.TMax;
+                probe.TMax = SCENE_RAY_TMAX;
+                const uint hit = get_light_index(trace_ray(probe, RAY_FLAG_NONE, instance_mask));
+                const bool reached =
+                    distant ? hit == LIGHT_ENV_INDEX : nee.reaches_source(lp.value.index, hit);
+                if (reached) {
+                    outcome.g += 1.f;
+                } else {
+                    probe.TMax = 0.999f * light_dist;
+                    if (distant || trace_ray(probe, RAY_FLAG_NONE, instance_mask).is_valid())
+                        outcome.r += 1.f;
+                    else
+                        outcome.b += 1.f;
+                }
+            }
+            return float4(outcome / float(LIGHT_DEBUG_DRAWS), 1);
+        }
+        }
     }
 
     // LIGHT_ENV_INDEX for the environment, LIGHT_INVALID_INDEX for a non-emitter
@@ -662,16 +784,7 @@ struct Scene {
         const EmissiveTriangle tri = nee.table.triangles[index];
         const LightGeometry lg = nee.table.geometries[find_light_geometry(
             nee.table.geometries, nee.table.geometry_count, index)];
-        const float3 e1 = tri.p1 - tri.p0;
-        const float3 e2 = tri.p2 - tri.p0;
-        const float3 v = pos - tri.p0;
-        const float d00 = dot(e1, e1);
-        const float d01 = dot(e1, e2);
-        const float d11 = dot(e2, e2);
-        const float d20 = dot(v, e1);
-        const float d21 = dot(v, e2);
-        const float inv_det = 1.f / (d00 * d11 - d01 * d01);
-        float2 bary = float2(d11 * d20 - d01 * d21, d00 * d21 - d01 * d20) * inv_det;
+        float2 bary = tri.get_barycentrics(pos);
         // the table winds every triangle front-facing, the mesh does not
         if ((get_geometry_data(tri.geometry_id).flags & GeometryDataFlags::FlipFacing) != 0)
             bary = bary.yx;

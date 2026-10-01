@@ -2,7 +2,7 @@
 
 #include "merian-shaders/scene/env_map.hpp"
 #include "merian-shaders/scene/light_collection.hpp"
-#include "merian-shaders/scene/opacity_micromaps.hpp"
+#include "merian-shaders/scene/micromaps.hpp"
 #include "merian-shaders/scene/scene-data.slangh"
 #include "merian-shaders/shading/homogeneous_volume.hpp"
 #include "merian-shaders/shading/materials/material_system.hpp"
@@ -714,7 +714,7 @@ class Scene : public std::enable_shared_from_this<Scene> {
 
     void build_blas(const CommandBufferHandle& cmd);
 
-    void ensure_opacity_micromaps(const CommandBufferHandle& cmd);
+    void ensure_micromaps(const CommandBufferHandle& cmd);
     void build_tlas(const CommandBufferHandle& cmd);
 
     // Grows one shared buffer: re-suballocates every live region into a new backing buffer and
@@ -798,8 +798,9 @@ class Scene : public std::enable_shared_from_this<Scene> {
     float blas_rebuild_fraction = 0.33f;
     uint32_t current_frame = 0;
 
-    std::unique_ptr<OpacityMicromaps> opacity_micromaps;
+    std::unique_ptr<Micromaps> micromaps;
     bool opacity_micromaps_enabled = true;
+    bool emission_micromaps_enabled = true;
 
     UpdateChanges last_update_changes;
 

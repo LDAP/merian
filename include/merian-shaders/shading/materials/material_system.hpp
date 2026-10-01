@@ -6,6 +6,7 @@
 #include "merian/shader/slang_composition.hpp"
 #include "merian/shader/slang_program.hpp"
 
+#include <span>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -27,6 +28,11 @@ struct Material {
     // True if get_emission can be non-zero; enrolls the material's geometry as a light source.
     virtual bool is_emissive() const {
         return false;
+    }
+    // The only texture through which get_emission varies over the surface, or -1. Must be -1
+    // where the emission changes with time or the back face emits where the front face does not.
+    virtual TextureID get_emission_texture_id() const {
+        return TextureID(-1);
     }
     // True if get_interior_volume can be anything but vacuum; renderers that track the medium a
     // path travels in compile that tracking out where no material needs it.
@@ -100,6 +106,13 @@ class MaterialSystem : public std::enable_shared_from_this<MaterialSystem> {
         return get_alpha_texture_id(id) != TextureID(-1);
     }
 
+    TextureID get_emission_texture_id(const MaterialID id) const {
+        assert(id < materials.size());
+        return materials[id].emission_texture_id;
+    }
+
+    std::span<const uint8_t> get_material_data(const MaterialID id) const;
+
     // Upload material buffer to GPU and update ShaderObject state.
     void update(const CommandBufferHandle& cmd);
 
@@ -159,6 +172,7 @@ class MaterialSystem : public std::enable_shared_from_this<MaterialSystem> {
         MaterialHeader header;
         std::vector<uint8_t> payload;
         bool emissive = false;
+        TextureID emission_texture_id = TextureID(-1);
     };
     std::vector<StoredMaterial> materials;
 

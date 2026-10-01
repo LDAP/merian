@@ -15,7 +15,7 @@ Resource::~Resource() {}
 // --------------------------------------------------------------------------
 
 Sampler::Sampler(const ContextHandle& context, const vk::SamplerCreateInfo& create_info)
-    : context(context) {
+    : context(context), create_info(vk::SamplerCreateInfo(create_info).setPNext(nullptr)) {
     sampler = context->get_device()->get_device().createSampler(create_info);
     SPDLOG_DEBUG("created sampler ({})", fmt::ptr(VkSampler(sampler)));
 }

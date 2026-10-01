@@ -6,9 +6,18 @@
 #else
 __exported import merian_shaders.scene.light_select;
 import merian_shaders.scene.scene_data;
+import merian_shaders.utils.bit_twiddling;
 #endif
 
+#include "merian-shaders/scene/micromap.slangh"
+
 namespace merian {
+
+#ifdef __cplusplus
+using EmissionAddress = uint64_t;
+#else
+typealias EmissionAddress = uint*;
+#endif
 
 #ifdef __cplusplus
 static constexpr uint32_t LIGHT_INVALID_INDEX = 0xFFFFFFFFu;
@@ -18,11 +27,19 @@ static constexpr uint32_t LIGHT_ENV_INDEX = 0xFFFFFFFEu;
 static const uint LIGHT_INVALID_INDEX = 0xFFFFFFFFu;
 // the environment map, which has no triangle index
 static const uint LIGHT_ENV_INDEX = 0xFFFFFFFEu;
+static const uint LIGHT_ENV_REGION_BASE = 0xFFFF0000u;
+
+bool is_env_region(const uint source) {
+    return source >= LIGHT_ENV_REGION_BASE && source < LIGHT_ENV_INDEX;
+}
 #endif
 
 enum EmissiveTriangleFlags : uint16_t {
     // visible from both sides; the flux sums both faces
     EmissiveTwoSided = 0x1,
+    EmissiveAlphaTested = 0x2,
+    // at infinity: centroid holds the direction, radius the sine of the angle it covers
+    EmissiveDistant = 0x4,
 };
 
 // One emissive triangle in world space. p0, p1, p2 are wound so that cross(p1 - p0, p2 - p0)
@@ -55,8 +72,80 @@ struct EmissiveTriangle {
         return cross(p1 - p0, p2 - p0);
     }
 
+    float2 get_barycentrics(const float3 pos) {
+        const float3 e1 = p1 - p0;
+        const float3 e2 = p2 - p0;
+        const float3 v = pos - p0;
+        const float d00 = dot(e1, e1);
+        const float d01 = dot(e1, e2);
+        const float d11 = dot(e2, e2);
+        const float d20 = dot(v, e1);
+        const float d21 = dot(v, e2);
+        return float2(d11 * d20 - d01 * d21, d00 * d21 - d01 * d20) / (d00 * d11 - d01 * d01);
+    }
+
     bool is_two_sided() {
         return (flags & EmissiveTriangleFlags::EmissiveTwoSided) != 0;
+    }
+
+    bool is_alpha_tested() {
+        return (flags & EmissiveTriangleFlags::EmissiveAlphaTested) != 0;
+    }
+#endif
+};
+
+struct EmissiveRegion {
+    EmissionAddress record;
+    uint16_t level;
+    // vertices 1 and 2 swapped against the mesh
+    uint16_t swapped;
+    uint32_t count;
+
+#ifndef __cplusplus
+    static EmissiveRegion whole() {
+        EmissiveRegion region;
+        region.record = nullptr;
+        region.level = uint16_t(0);
+        region.swapped = uint16_t(0);
+        region.count = 1;
+        return region;
+    }
+
+    float get_fraction() {
+        return float(count) / float(1u << (2 * uint(level)));
+    }
+
+    float3 to_triangle(const float3 bary, const float u) {
+        if (record == nullptr)
+            return bary;
+        uint k = min(uint(u * float(count)), count - 1);
+        uint index = 0;
+        for (uint word = 0; word < emission_bit_words(level); word++) {
+            const uint bits = record[EMISSION_RECORD_BITS + word];
+            const uint set = countbits(bits);
+            if (k < set) {
+                index = 32 * word + select_set_bit(bits, k);
+                break;
+            }
+            k -= set;
+        }
+        const MicroTriangle micro = emission_grid_to_bary(index, level);
+        const float2 uv = micro.p0 * bary.x + micro.p1 * bary.y + micro.p2 * bary.z;
+        const float3 mesh = float3(1.f - uv.x - uv.y, uv);
+        return swapped != 0 ? mesh.xzy : mesh;
+    }
+
+    bool emits(const float2 mesh_bary) {
+        const uint index = emission_grid_index_of(mesh_bary, level);
+        return (record[EMISSION_RECORD_BITS + index / 32] & (1u << (index % 32))) != 0;
+    }
+
+    bool contains_mesh(const float2 mesh_bary) {
+        return record == nullptr || emits(mesh_bary);
+    }
+
+    bool contains(const float3 bary) {
+        return contains_mesh(swapped != 0 ? bary.zy : bary.yz);
     }
 #endif
 };
@@ -81,9 +170,77 @@ struct EmissiveLightProxy {
 #endif
 };
 
+// Stored at the index of its first triangle.
+struct LightSource {
+    float3 centroid;
+    float flux;
+    float3 normal;
+    float radius;
+    uint16_t flags;
+    uint16_t triangle_count;
+
 #ifndef __cplusplus
-// Where a search for target lands in [lo, hi] of an inclusive prefix sum.
-uint search_flux(const StructuredBuffer<float> cdf, const float target, uint lo, uint hi) {
+    bool is_valid() {
+        return flux > 0.f;
+    }
+
+    bool is_two_sided() {
+        return (flags & uint16_t(EmissiveTriangleFlags::EmissiveTwoSided)) != 0;
+    }
+
+    bool is_distant() {
+        return (flags & uint16_t(EmissiveTriangleFlags::EmissiveDistant)) != 0;
+    }
+
+    // A zero normal receives from every side; cones widened as in Conty Estevez and Kulla 2018.
+    float geometry_term(const float3 pos,
+                        const float3 receiver_normal,
+                        const float receiver_radius) {
+        if (is_distant()) {
+            const float cos_u = sqrt(max(1.f - radius * radius, 0.f));
+            return any(receiver_normal != 0.f)
+                       ? widened_cos(dot(receiver_normal, centroid), cos_u, radius)
+                       : 1.f;
+        }
+        const float3 to_pos = pos - centroid;
+        const float dist2 = dot(to_pos, to_pos);
+        const float dist = sqrt(dist2);
+        const float sin_u = dist > 0.f ? min((radius + receiver_radius) / dist, 1.f) : 1.f;
+        const float cos_u = sqrt(max(1.f - sin_u * sin_u, 0.f));
+        const float3 dir = dist > 0.f ? to_pos / dist : float3(0);
+
+        float emitter = 1.f;
+        if (any(normal != 0.f)) {
+            const float cos_theta = is_two_sided() ? abs(dot(normal, dir)) : dot(normal, dir);
+            emitter = widened_cos(cos_theta, cos_u, sin_u);
+        }
+        float receiver = 1.f;
+        if (any(receiver_normal != 0.f)) {
+            receiver = widened_cos(-dot(receiver_normal, dir), cos_u, sin_u);
+        }
+        return emitter * receiver / max(dist2, radius * radius);
+    }
+
+    static float widened_cos(const float cos_theta, const float cos_u, const float sin_u) {
+        if (cos_theta >= cos_u)
+            return 1.f;
+        const float sin_theta = sqrt(max(1.f - cos_theta * cos_theta, 0.f));
+        return max(cos_theta * cos_u + sin_theta * sin_u, 0.f);
+    }
+#endif
+};
+
+struct LightRemap {
+    uint32_t old_first;
+    uint32_t old_count;
+    uint32_t new_first;
+    uint32_t new_count;
+};
+
+#ifndef __cplusplus
+uint search_flux(const StructuredBuffer<float> cdf, float target, uint lo, uint hi) {
+    if (hi != ~0u && cdf[hi] > 0.f)
+        target = min(target, asfloat(asuint(cdf[hi]) - 1u));
     while (lo < hi && hi != ~0u) {
         const uint mid = (lo + hi) >> 1;
         if (cdf[mid] > target)
@@ -101,6 +258,11 @@ struct LightGeometry {
     uint32_t instance_index;
     uint32_t first_triangle;
     uint32_t primitive_count;
+    // per triangle, in words; null until baked
+    EmissionAddress emission_offsets;
+    EmissionAddress emission_records;
+    uint32_t emission_level;
+    uint32_t _pad;
 
 #ifdef __cplusplus
     bool operator==(const LightGeometry&) const = default;
@@ -130,8 +292,11 @@ uint find_light_geometry(const StructuredBuffer<LightGeometry, ScalarDataLayout>
 #ifdef __cplusplus
 static_assert(sizeof(EmissiveTriangle) == 64,
               "EmissiveTriangle must match the Slang scalar layout");
-static_assert(sizeof(LightGeometry) == 16, "LightGeometry layout mismatch");
+static_assert(sizeof(LightGeometry) == 40, "LightGeometry layout mismatch");
 static_assert(sizeof(EmissiveLightProxy) == 32, "EmissiveLightProxy layout mismatch");
+static_assert(sizeof(LightSource) == 36, "LightSource layout mismatch");
+static_assert(sizeof(EmissiveRegion) == 16, "EmissiveRegion layout mismatch");
+static_assert(sizeof(LightRemap) == 16, "LightRemap layout mismatch");
 #endif
 
 } // namespace merian

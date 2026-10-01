@@ -38,6 +38,9 @@ enum GeometryDataFlags : uint16_t {
 
     // Disables backface culling and enables special handling for backfaces.
     TwoSided = 0x400,
+
+    // Hits pass through texels that fail the material's alpha test.
+    AlphaTested = 0x800,
 };
 
 // See scene.hpp for details.

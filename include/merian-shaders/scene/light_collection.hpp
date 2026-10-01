@@ -32,6 +32,9 @@ class LightCollection {
         uint32_t instance_index;
         uint32_t primitive_count;
         uint64_t key;
+        vk::DeviceAddress emission_offsets = 0;
+        vk::DeviceAddress emission_records = 0;
+        uint32_t emission_level = 0;
     };
 
     LightCollection(const ShaderCompileContextHandle& compile_context,
@@ -52,8 +55,7 @@ class LightCollection {
     void update(const CommandBufferHandle& cmd,
                 const SlangCompositionHandle& scene_composition,
                 const ShaderObjectHandle& scene_object,
-                const ShaderObjectAllocatorHandle& obj_allocator,
-                uint32_t frame);
+                const ShaderObjectAllocatorHandle& obj_allocator);
 
     // Binds the buffers to a merian::NEE cursor.
     void write_to(ShaderCursor cursor) const;
@@ -109,6 +111,10 @@ class LightCollection {
         camera_position = position;
     }
 
+    void set_frame(const uint32_t frame_index) {
+        frame = frame_index;
+    }
+
     // Whether UseEnvMap geometry exists (rays to the environment must not stop at it).
     void set_has_sky_portals(const bool value) {
         has_sky_portals = value;
@@ -133,6 +139,7 @@ class LightCollection {
                        vk::DeviceSize size,
                        const std::string& name,
                        const CommandBufferHandle& cmd);
+    static void retire_buffer(BufferHandle& buffer, const CommandBufferHandle& cmd);
 
     void update_light_remap(const CommandBufferHandle& cmd);
 
@@ -147,24 +154,28 @@ class LightCollection {
     int32_t env_selection = EnvSelection::EnvSelectionPool;
     int32_t env_pool_size = 8192;
     int32_t pool_size = 4096;
-    int32_t pool_candidates = 3;
+    int32_t scene_draws = 3;
     int32_t grid_dimension = 16;
     int32_t grid_cascades = 6;
-    // Candidates a cell races each frame. The list carries across frames, so a few are enough
-    // and more only churn it.
-    int32_t grid_candidates = 16;
-    int32_t cell_candidates = 2;
+    int32_t grid_new_lights = 16;
+    int32_t cell_draws = 2;
     float grid_cell_size = 0.f; // 0: derived from the distance to the lights
     float grid_coverage = 1.f;
     float grid_jitter = 1.f;
+    float grid_source_extent = 8.f;
     bool debug_jitter = true;
+    int32_t debug_view = LightDebugView::LightDebugDrawOutcome;
     bool constants_dirty = true;
     float grid_share = 1.f;
+    float grid_even_share = 0.1f;
+    int32_t slot_weighing = LightSlotWeighing::LightSlotWeighingCell;
+    bool grid_env_regions = true;
     bool grid_a_res = true;
     int32_t grid_max_age = 8;
     // set for a frame the carried-over grid cannot describe
     bool grid_reset = true;
     float3 camera_position{0.f};
+    uint32_t frame = 0;
     bool env_share_from_power = true;
     float env_share = 0.5f;
     // Neither technique may lose its density where both can contribute.
@@ -183,11 +194,10 @@ class LightCollection {
     std::vector<LightGeometry> light_geometries;
     std::vector<uint64_t> light_geometry_keys;
     std::vector<uint32_t> geometry_light_offsets;
-    // the table the grid was ranked against, and where its entries sit now
     std::vector<uint64_t> grid_table_keys;
-    std::vector<uint32_t> light_remap;
+    std::vector<LightGeometry> grid_table_geometries;
+    std::vector<LightRemap> light_remap;
     std::unordered_map<uint64_t, uint32_t> light_index_of_key;
-    bool light_remap_identity = true;
     uint32_t triangle_count = 0;
     bool tables_dirty = false;
 
@@ -199,13 +209,21 @@ class LightCollection {
     BufferHandle env_split_buffer;
     BufferHandle pool_buffer;
     BufferHandle grid_buffer[2];
-    BufferHandle grid_weight_buffer[2];
-    BufferHandle geometry_proxies_buffer;
-    BufferHandle pool_geometry_buffer;
+    BufferHandle grid_key_buffer[2];
+    BufferHandle grid_visibility_buffer[2];
+    BufferHandle grid_slot_sources_buffer;
+    BufferHandle grid_probability_buffer;
+    BufferHandle grid_feedback_buffer[2];
+    BufferHandle grid_discovered_buffer[2];
+    BufferHandle sources_buffer;
+    BufferHandle source_of_buffer;
+    BufferHandle source_cdf_buffer;
+    BufferHandle pool_source_buffer;
     BufferHandle grid_info_buffer[2];
     uint32_t grid_slot = 0;
     BufferHandle triangles_buffer;
     BufferHandle proxies_buffer;
+    BufferHandle regions_buffer;
     BufferHandle cdf_buffer;
     BufferHandle cdf_block_sums_buffer;
     BufferHandle light_geometries_buffer;
@@ -224,17 +242,17 @@ class LightCollection {
     Versioned<SlangProgramEntryPoint> pool_entry_point;
     Versioned<SlangProgramEntryPoint> grid_entry_point;
     Versioned<SlangProgramEntryPoint> env_split_entry_point;
-    Versioned<SlangProgramEntryPoint> geometry_proxy_entry_point;
+    Versioned<SlangProgramEntryPoint> sources_entry_point;
     Versioned<Pipeline> setup_pipeline;
     Versioned<Pipeline> pool_pipeline;
     Versioned<Pipeline> grid_pipeline;
     Versioned<Pipeline> env_split_pipeline;
-    Versioned<Pipeline> geometry_proxy_pipeline;
+    Versioned<Pipeline> sources_pipeline;
     Versioned<ShaderObject> setup_params;
     Versioned<ShaderObject> pool_params;
     Versioned<ShaderObject> grid_params;
     Versioned<ShaderObject> env_split_params;
-    Versioned<ShaderObject> geometry_proxy_params;
+    Versioned<ShaderObject> sources_params;
 
     SlangCompositionHandle env_composition;
     Versioned<SlangProgram> env_program;

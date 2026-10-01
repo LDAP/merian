@@ -85,6 +85,12 @@ class TextureManager : public std::enable_shared_from_this<TextureManager> {
         return textures[id];
     }
 
+    // Renewed whenever a texture is set or removed at id.
+    uint64_t get_texture_serial(TextureID id) const {
+        assert(id < serials.size());
+        return serials[id];
+    }
+
     uint32_t get_texture_count() const {
         return ids.count();
     }
@@ -121,6 +127,7 @@ class TextureManager : public std::enable_shared_from_this<TextureManager> {
 
     // Pulls the next slot from free_list or grows the table.
     TextureID allocate_id();
+    void renew_serial(TextureID id);
     // Builds image + view + sampler and queues the staging copy. Returns the
     // texture; the upload becomes visible to shaders after the next update().
     TextureHandle stage_rgba8(const uint32_t* data,
@@ -136,6 +143,8 @@ class TextureManager : public std::enable_shared_from_this<TextureManager> {
     ContextHandle context;
     ResourceAllocatorHandle allocator;
     std::vector<TextureHandle> textures;
+    std::vector<uint64_t> serials;
+    uint64_t last_serial = 0;
     FreeList<TextureID> ids;
     SlangCompositionHandle composition;
     Versioned<SlangProgram> layout_program;

@@ -186,8 +186,12 @@ bool ImGuiProperties::config_angle(const std::string& id,
     return value_changed;
 }
 bool ImGuiProperties::config_percent(const std::string& id, float& value, const std::string& desc) {
-    const bool value_changed = ImGui::SliderFloat(id.c_str(), &value, 0, 1, "%.06f");
+    float percent = value * 100.f;
+    const bool value_changed = ImGui::SliderFloat(id.c_str(), &percent, 0, 100, "%.1f %%");
     tooltip(desc);
+    if (value_changed) {
+        value = percent / 100.f;
+    }
     return value_changed;
 }
 bool ImGuiProperties::config_split(const std::string& id,

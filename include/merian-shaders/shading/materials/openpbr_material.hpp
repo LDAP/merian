@@ -75,6 +75,10 @@ struct OpenPBRMaterial : Material {
         return emission.x > 0.f || emission.y > 0.f || emission.z > 0.f;
     }
 
+    TextureID get_emission_texture_id() const override {
+        return emission_texture;
+    }
+
     OpenPBRMaterial() {
         header.alpha_texture_id = TextureID(-1);
     }

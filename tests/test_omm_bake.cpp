@@ -1,5 +1,4 @@
-
-#include "merian-shaders/scene/omm-bake.slangh"
+#include "merian-shaders/scene/micromap-bake.slangh"
 
 #include <gtest/gtest.h>
 
@@ -14,8 +13,13 @@ using namespace merian;
 
 namespace {
 
-std::vector<std::pair<int, int>> covered_texels(const OmmMicroTriangle& t) {
-    const OmmTexelFootprint footprint = omm_texel_footprint(t.p0, t.p1, t.p2);
+bool bilinear_reads(const TexelFootprint footprint, const int x, const int y) {
+    return micromap_footprint_reaches(footprint, x, y,
+                                      static_cast<float>(1 + MERIAN_MICROMAP_TEXEL_SLACK));
+}
+
+std::vector<std::pair<int, int>> covered_texels(const MicroTriangle& t) {
+    const TexelFootprint footprint = micromap_texel_footprint(t.p0, t.p1, t.p2);
     if (!footprint.bounded) {
         return {};
     }
@@ -24,7 +28,7 @@ std::vector<std::pair<int, int>> covered_texels(const OmmMicroTriangle& t) {
     for (int y = footprint.first.y; y <= footprint.last.y; y++) {
         bool was_inside = false;
         for (int x = footprint.first.x; x <= footprint.last.x; x++) {
-            if (!omm_footprint_reads(footprint, x, y)) {
+            if (!bilinear_reads(footprint, x, y)) {
                 if (was_inside) {
                     break;
                 }
@@ -37,18 +41,18 @@ std::vector<std::pair<int, int>> covered_texels(const OmmMicroTriangle& t) {
     return out;
 }
 
-bool point_in_triangle(const OmmMicroTriangle& t, const float2 p) {
-    const float d0 = omm_edge_area(t.p0, t.p1, p);
-    const float d1 = omm_edge_area(t.p1, t.p2, p);
-    const float d2 = omm_edge_area(t.p2, t.p0, p);
+bool point_in_triangle(const MicroTriangle& t, const float2 p) {
+    const float d0 = micromap_edge_area(t.p0, t.p1, p);
+    const float d1 = micromap_edge_area(t.p1, t.p2, p);
+    const float d2 = micromap_edge_area(t.p2, t.p0, p);
     return (d0 >= 0 && d1 >= 0 && d2 >= 0) || (d0 <= 0 && d1 <= 0 && d2 <= 0);
 }
 
-float triangle_area(const OmmMicroTriangle& t) {
-    return std::abs(omm_edge_area(t.p0, t.p1, t.p2)) * 0.5f;
+float triangle_area(const MicroTriangle& t) {
+    return std::abs(micromap_edge_area(t.p0, t.p1, t.p2)) * 0.5f;
 }
 
-OmmMicroTriangle map(const OmmMicroTriangle& bary, const OmmMicroTriangle& t) {
+MicroTriangle map(const MicroTriangle& bary, const MicroTriangle& t) {
     const auto at = [&](const float2 b) {
         return t.p0 + (t.p1 - t.p0) * b.x + (t.p2 - t.p0) * b.y;
     };
@@ -60,7 +64,7 @@ bool contains(const std::vector<std::pair<int, int>>& texels, const int x, const
 }
 
 std::vector<std::pair<int, int>> texels_read_near(const float2 p) {
-    const float slack = 0.99f * static_cast<float>(MERIAN_OMM_TEXEL_SLACK);
+    const float slack = 0.99f * static_cast<float>(MERIAN_MICROMAP_TEXEL_SLACK);
     std::vector<std::pair<int, int>> out;
     for (const float dx : {-slack, 0.f, slack}) {
         for (const float dy : {-slack, 0.f, slack}) {
@@ -74,14 +78,14 @@ std::vector<std::pair<int, int>> texels_read_near(const float2 p) {
 
 } // namespace
 
-TEST(OmmBake, MicroTrianglesTileTheTriangle) {
+TEST(MicromapBake, MicroTrianglesTileTheTriangle) {
     for (uint32_t level = 0; level <= 5; level++) {
         const uint32_t count = 1u << (2 * level);
         const float expected = 0.5f / static_cast<float>(count);
 
         double total = 0.0;
         for (uint32_t i = 0; i < count; i++) {
-            const OmmMicroTriangle t = omm_index_to_bary(i, level);
+            const MicroTriangle t = micromap_index_to_bary(i, level);
             EXPECT_NEAR(triangle_area(t), expected, expected * 1e-3f)
                 << "level " << level << " index " << i;
             total += triangle_area(t);
@@ -90,16 +94,16 @@ TEST(OmmBake, MicroTrianglesTileTheTriangle) {
     }
 }
 
-TEST(OmmBake, MicroTrianglesCoverTheTriangle) {
+TEST(MicromapBake, MicroTrianglesCoverTheTriangle) {
     std::mt19937 rng(7);
     std::uniform_real_distribution<float> uniform(0.f, 1.f);
 
     for (uint32_t level = 1; level <= 4; level++) {
         const uint32_t count = 1u << (2 * level);
-        std::vector<OmmMicroTriangle> micro;
+        std::vector<MicroTriangle> micro;
         micro.reserve(count);
         for (uint32_t i = 0; i < count; i++) {
-            micro.push_back(omm_index_to_bary(i, level));
+            micro.push_back(micromap_index_to_bary(i, level));
         }
 
         for (int sample = 0; sample < 2000; sample++) {
@@ -112,18 +116,18 @@ TEST(OmmBake, MicroTrianglesCoverTheTriangle) {
             const float2 p{u, v};
             EXPECT_TRUE(
                 std::any_of(micro.begin(), micro.end(),
-                            [&](const OmmMicroTriangle& t) { return point_in_triangle(t, p); }))
+                            [&](const MicroTriangle& t) { return point_in_triangle(t, p); }))
                 << "level " << level << " uncovered at " << u << "," << v;
         }
     }
 }
 
-TEST(OmmBake, RasterCoversEveryReadableTexel) {
+TEST(MicromapBake, RasterCoversEveryReadableTexel) {
     std::mt19937 rng(11);
     std::uniform_real_distribution<float> coord(2.f, 30.f);
 
     for (int trial = 0; trial < 200; trial++) {
-        const OmmMicroTriangle t{
+        const MicroTriangle t{
             {coord(rng), coord(rng)}, {coord(rng), coord(rng)}, {coord(rng), coord(rng)}};
         if (triangle_area(t) < 1e-3f) {
             continue;
@@ -145,7 +149,40 @@ TEST(OmmBake, RasterCoversEveryReadableTexel) {
     }
 }
 
-TEST(OmmBake, CommittedStateHoldsEverywhere) {
+TEST(MicromapBake, ExactReachCoversLookupsInside) {
+    std::mt19937 rng(17);
+    std::uniform_real_distribution<float> coord(2.f, 30.f);
+
+    for (int trial = 0; trial < 200; trial++) {
+        const MicroTriangle t{
+            {coord(rng), coord(rng)}, {coord(rng), coord(rng)}, {coord(rng), coord(rng)}};
+        if (triangle_area(t) < 1e-3f) {
+            continue;
+        }
+        const TexelFootprint footprint = micromap_texel_footprint(t.p0, t.p1, t.p2);
+        ASSERT_TRUE(footprint.bounded);
+
+        for (int i = 1; i < 60; i++) {
+            for (int j = 1; j + i < 60; j++) {
+                const float2 b{static_cast<float>(i) / 60.f, static_cast<float>(j) / 60.f};
+                const float2 p = t.p0 + (t.p1 - t.p0) * b.x + (t.p2 - t.p0) * b.y;
+                const int nearest_x = static_cast<int>(std::floor(p.x + 0.5f));
+                const int nearest_y = static_cast<int>(std::floor(p.y + 0.5f));
+                EXPECT_TRUE(micromap_footprint_reaches(footprint, nearest_x, nearest_y, 0.5f))
+                    << "nearest texel " << nearest_x << "," << nearest_y << " not reached";
+
+                const int x = static_cast<int>(std::floor(p.x));
+                const int y = static_cast<int>(std::floor(p.y));
+                for (const auto [dx, dy] : {std::pair{0, 0}, {1, 0}, {0, 1}, {1, 1}}) {
+                    EXPECT_TRUE(micromap_footprint_reaches(footprint, x + dx, y + dy, 1.f))
+                        << "bilinear texel " << x + dx << "," << y + dy << " not reached";
+                }
+            }
+        }
+    }
+}
+
+TEST(MicromapBake, CommittedStateHoldsEverywhere) {
     constexpr float size = 64.f;
     const auto texel_passes = [&](const int x, const int y) {
         const float dx = static_cast<float>(std::clamp(x, 0, 63)) - 31.5f;
@@ -153,15 +190,14 @@ TEST(OmmBake, CommittedStateHoldsEverywhere) {
         return std::sqrt(dx * dx + dy * dy) < 18.f;
     };
 
-    const OmmMicroTriangle uv{{0.05f, 0.05f}, {0.95f, 0.1f}, {0.1f, 0.95f}};
-    const OmmMicroTriangle texel_space{uv.p0 * size - 0.5f, uv.p1 * size - 0.5f,
-                                       uv.p2 * size - 0.5f};
+    const MicroTriangle uv{{0.05f, 0.05f}, {0.95f, 0.1f}, {0.1f, 0.95f}};
+    const MicroTriangle texel_space{uv.p0 * size - 0.5f, uv.p1 * size - 0.5f, uv.p2 * size - 0.5f};
     const uint32_t level = 4;
     const uint32_t count = 1u << (2 * level);
 
     int committed = 0;
     for (uint32_t i = 0; i < count; i++) {
-        const OmmMicroTriangle t = map(omm_index_to_bary(i, level), texel_space);
+        const MicroTriangle t = map(micromap_index_to_bary(i, level), texel_space);
         const auto visited = covered_texels(t);
 
         bool any_pass = false;
@@ -189,12 +225,12 @@ TEST(OmmBake, CommittedStateHoldsEverywhere) {
     EXPECT_GT(committed, static_cast<int>(count) / 2);
 }
 
-TEST(OmmBake, TriangleTexelsCoverItsMicroTriangles) {
+TEST(MicromapBake, TriangleTexelsCoverItsMicroTriangles) {
     std::mt19937 rng(23);
     std::uniform_real_distribution<float> coord(4.f, 40.f);
 
     for (int trial = 0; trial < 100; trial++) {
-        const OmmMicroTriangle t{
+        const MicroTriangle t{
             {coord(rng), coord(rng)}, {coord(rng), coord(rng)}, {coord(rng), coord(rng)}};
         if (triangle_area(t) < 1.f) {
             continue;
@@ -205,7 +241,7 @@ TEST(OmmBake, TriangleTexelsCoverItsMicroTriangles) {
         for (uint32_t level = 1; level <= 3; level++) {
             const uint32_t count = 1u << (2 * level);
             for (uint32_t i = 0; i < count; i++) {
-                for (const auto [x, y] : covered_texels(map(omm_index_to_bary(i, level), t))) {
+                for (const auto [x, y] : covered_texels(map(micromap_index_to_bary(i, level), t))) {
                     EXPECT_TRUE(contains(whole, x, y))
                         << "micro-triangle " << i << " at level " << level
                         << " reads a texel its triangle does not";
@@ -215,17 +251,17 @@ TEST(OmmBake, TriangleTexelsCoverItsMicroTriangles) {
     }
 }
 
-TEST(OmmBake, WorkStaysBounded) {
-    const OmmMicroTriangle huge{{-1e6f, -1e6f}, {1e6f, -1e6f}, {-1e6f, 1e6f}};
-    EXPECT_FALSE(omm_texel_footprint(huge.p0, huge.p1, huge.p2).bounded);
+TEST(MicromapBake, WorkStaysBounded) {
+    const MicroTriangle huge{{-1e6f, -1e6f}, {1e6f, -1e6f}, {-1e6f, 1e6f}};
+    EXPECT_FALSE(micromap_texel_footprint(huge.p0, huge.p1, huge.p2).bounded);
 
     const float nan = std::numeric_limits<float>::quiet_NaN();
     const float inf = std::numeric_limits<float>::infinity();
-    EXPECT_FALSE(omm_texel_footprint({nan, 0.f}, {1.f, 0.f}, {0.f, 1.f}).bounded);
-    EXPECT_FALSE(omm_texel_footprint({inf, inf}, {inf, inf}, {inf, inf}).bounded);
-    EXPECT_FALSE(omm_texel_footprint({3e9f, 3e9f}, {3e9f, 3e9f}, {3e9f, 3e9f}).bounded);
+    EXPECT_FALSE(micromap_texel_footprint({nan, 0.f}, {1.f, 0.f}, {0.f, 1.f}).bounded);
+    EXPECT_FALSE(micromap_texel_footprint({inf, inf}, {inf, inf}, {inf, inf}).bounded);
+    EXPECT_FALSE(micromap_texel_footprint({3e9f, 3e9f}, {3e9f, 3e9f}, {3e9f, 3e9f}).bounded);
 
-    const OmmMicroTriangle degenerate{{0.f, 0.f}, {0.f, 0.f}, {0.f, 0.f}};
+    const MicroTriangle degenerate{{0.f, 0.f}, {0.f, 0.f}, {0.f, 0.f}};
     EXPECT_LE(covered_texels(degenerate).size(), 4u);
 
     std::mt19937 rng(3);
@@ -234,10 +270,65 @@ TEST(OmmBake, WorkStaysBounded) {
         const float2 p0{coord(rng), coord(rng)};
         const float2 p1{coord(rng), coord(rng)};
         const float2 p2{coord(rng), coord(rng)};
-        const OmmTexelFootprint footprint = omm_texel_footprint(p0, p1, p2);
+        const TexelFootprint footprint = micromap_texel_footprint(p0, p1, p2);
         if (footprint.bounded) {
-            EXPECT_LE(footprint.last.x - footprint.first.x + 1, MERIAN_OMM_MAX_SPAN);
-            EXPECT_LE(footprint.last.y - footprint.first.y + 1, MERIAN_OMM_MAX_SPAN);
+            EXPECT_LE(footprint.last.x - footprint.first.x + 1, MERIAN_MICROMAP_MAX_SPAN);
+            EXPECT_LE(footprint.last.y - footprint.first.y + 1, MERIAN_MICROMAP_MAX_SPAN);
         }
     }
+}
+
+TEST(EmissionMicromap, GridIndexRoundTrips) {
+    std::mt19937 rng(11);
+    std::uniform_real_distribution<float> uniform(0.f, 1.f);
+    for (uint32_t level = 0; level <= 4; level++) {
+        const uint32_t count = 1u << (2 * level);
+        for (uint32_t index = 0; index < count; index++) {
+            const MicroTriangle t = emission_grid_to_bary(index, level);
+            for (int sample = 0; sample < 32; sample++) {
+                float a = uniform(rng);
+                float b = uniform(rng);
+                if (a + b > 1.f) {
+                    a = 1.f - a;
+                    b = 1.f - b;
+                }
+                const float2 p = t.p0 * (1.f - a - b) + t.p1 * a + t.p2 * b;
+                EXPECT_EQ(emission_grid_index_of(p, level), index)
+                    << "level " << level << " index " << index;
+            }
+        }
+    }
+}
+
+TEST(EmissionMicromap, CurveAndGridNameTheSameMicroTriangles) {
+    for (uint32_t level = 0; level <= 4; level++) {
+        const uint32_t count = 1u << (2 * level);
+        std::vector<bool> seen(count, false);
+        for (uint32_t index = 0; index < count; index++) {
+            const MicroTriangle t = micromap_index_to_bary(index, level);
+            const float2 centroid = (t.p0 + t.p1 + t.p2) / 3.f;
+            const uint32_t grid = emission_grid_index_of(centroid, level);
+            ASSERT_LT(grid, count);
+            EXPECT_FALSE(seen[grid]) << "level " << level << " index " << index;
+            seen[grid] = true;
+
+            EXPECT_EQ(emission_grid_index_of_micro_triangle(t, level), grid)
+                << "level " << level << " index " << index;
+        }
+    }
+}
+
+TEST(EmissionMicromap, ScanMipKeepsMicroTrianglesAtTwoTexels) {
+    for (uint32_t level = 0; level <= EMISSION_MAX_LEVEL; level++) {
+        for (float extent = 0.5f; extent < 1e5f; extent *= 1.37f) {
+            const uint32_t mip = emission_scan_mip(extent, level, 30);
+            const float micro_extent = extent / std::exp2(static_cast<float>(level + mip));
+            EXPECT_TRUE(mip == 0 || micro_extent >= 2.f)
+                << "level " << level << " extent " << extent;
+            EXPECT_LT(micro_extent, 4.f) << "level " << level << " extent " << extent;
+            EXPECT_LE(emission_scan_mip(extent, level, 2), 2u);
+        }
+    }
+    EXPECT_EQ(emission_scan_mip(std::numeric_limits<float>::quiet_NaN(), 0, 8), 0u);
+    EXPECT_EQ(emission_scan_mip(std::numeric_limits<float>::infinity(), 0, 8), 8u);
 }

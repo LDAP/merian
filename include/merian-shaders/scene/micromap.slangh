@@ -1,0 +1,101 @@
+#pragma once
+
+#ifdef __cplusplus
+#include "merian/utils/vector_matrix.hpp"
+#include <cmath>
+#include <cstdint>
+#define MERIAN_MICROMAP_FUNC inline
+#else
+#define MERIAN_MICROMAP_FUNC
+#endif
+
+namespace merian {
+
+struct MicroTriangle {
+    float2 p0;
+    float2 p1;
+    float2 p2;
+};
+
+// Emitting count, then one bit per micro-triangle in grid row order, not curve order.
+#ifdef __cplusplus
+static constexpr uint32_t EMISSION_RECORD_COUNT = 0;
+static constexpr uint32_t EMISSION_RECORD_BITS = 1;
+static constexpr uint32_t EMISSION_MAX_LEVEL = 4;
+static constexpr uint32_t EMISSION_MAX_BIT_WORDS = (1u << (2 * EMISSION_MAX_LEVEL)) / 32;
+static_assert(EMISSION_MAX_LEVEL >= 3, "EMISSION_MAX_BIT_WORDS assumes more than one word");
+#else
+static const uint EMISSION_RECORD_COUNT = 0;
+static const uint EMISSION_RECORD_BITS = 1;
+static const uint EMISSION_MAX_LEVEL = 4;
+static const uint EMISSION_MAX_BIT_WORDS = (1u << (2 * EMISSION_MAX_LEVEL)) / 32;
+#endif
+
+MERIAN_MICROMAP_FUNC uint32_t emission_bit_words(const uint32_t level) {
+    const uint32_t micro_triangles = 1u << (2 * level);
+    return micro_triangles > 32 ? micro_triangles / 32 : 1;
+}
+
+MERIAN_MICROMAP_FUNC uint32_t emission_record_words(const uint32_t level) {
+    return EMISSION_RECORD_BITS + emission_bit_words(level);
+}
+
+// Row v holds the upright micro-triangles with a corner at (u, v) and the inverted between.
+MERIAN_MICROMAP_FUNC uint32_t emission_grid_index(const uint32_t u,
+                                                  const uint32_t v,
+                                                  const bool inverted,
+                                                  const uint32_t level) {
+    const uint32_t n = 1u << level;
+    return 2 * n * v - v * v + 2 * u + (inverted ? 1u : 0u);
+}
+
+MERIAN_MICROMAP_FUNC uint32_t emission_grid_index_of(const float2 bary, const uint32_t level) {
+    const uint32_t n = 1u << level;
+    const float scaled_u = bary.x * float(n);
+    const float scaled_v = bary.y * float(n);
+    const uint32_t v = uint32_t(
+        scaled_v <= 0.f ? 0.f : (scaled_v >= float(n - 1) ? float(n - 1) : floor(scaled_v)));
+    const uint32_t row_end = n - 1 - v;
+    const uint32_t u = uint32_t(
+        scaled_u <= 0.f ? 0.f : (scaled_u >= float(row_end) ? float(row_end) : floor(scaled_u)));
+    const bool inverted = u < row_end && scaled_u - float(u) + scaled_v - float(v) > 1.f;
+    return emission_grid_index(u, v, inverted, level);
+}
+
+MERIAN_MICROMAP_FUNC uint32_t emission_grid_index_of_micro_triangle(const MicroTriangle t,
+                                                                    const uint32_t level) {
+    const bool inverted = t.p1.x < t.p0.x;
+    const float cells = float(1u << level);
+    const float2 corner = (inverted ? t.p0 - 1.f / cells : t.p0) * cells;
+    return emission_grid_index(uint32_t(floor(corner.x + 0.5f)), uint32_t(floor(corner.y + 0.5f)),
+                               inverted, level);
+}
+
+MERIAN_MICROMAP_FUNC MicroTriangle emission_grid_to_bary(const uint32_t index,
+                                                         const uint32_t level) {
+    const uint32_t n = 1u << level;
+    const uint32_t remaining = n * n - index;
+    uint32_t rows_left = uint32_t(ceil(sqrt(float(remaining))));
+    while (rows_left * rows_left < remaining)
+        rows_left++;
+    while (rows_left > 1 && (rows_left - 1) * (rows_left - 1) >= remaining)
+        rows_left--;
+    const uint32_t v = n - rows_left;
+    const uint32_t within = index - (n * n - rows_left * rows_left);
+    const uint32_t u = within >> 1;
+
+    const float scale = 1.f / float(n);
+    MicroTriangle t;
+    if ((within & 1) == 0) {
+        t.p0 = float2(float(u), float(v)) * scale;
+        t.p1 = float2(float(u + 1), float(v)) * scale;
+        t.p2 = float2(float(u), float(v + 1)) * scale;
+    } else {
+        t.p0 = float2(float(u + 1), float(v + 1)) * scale;
+        t.p1 = float2(float(u), float(v + 1)) * scale;
+        t.p2 = float2(float(u + 1), float(v)) * scale;
+    }
+    return t;
+}
+
+} // namespace merian

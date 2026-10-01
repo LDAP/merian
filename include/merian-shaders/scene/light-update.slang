@@ -11,6 +11,7 @@ using merian;
 struct LightUpdateBinding {
     RWStructuredBuffer<EmissiveTriangle, ScalarDataLayout> triangles;
     RWStructuredBuffer<EmissiveLightProxy, ScalarDataLayout> proxies;
+    RWStructuredBuffer<EmissiveRegion, ScalarDataLayout> regions;
     StructuredBuffer<LightGeometry, ScalarDataLayout> light_geometries;
     uint light_geometry_count;
     uint triangle_count;
@@ -55,7 +56,10 @@ struct LightUpdateBinding {
     tri.primitive_id = primitive_id;
     tri.material_id = gd.material_id;
     const bool two_sided = (gd.flags & GeometryDataFlags::TwoSided) != 0;
-    tri.flags = two_sided ? EmissiveTriangleFlags::EmissiveTwoSided : EmissiveTriangleFlags(0);
+    const bool alpha_tested = (gd.flags & GeometryDataFlags::AlphaTested) != 0;
+    tri.flags = EmissiveTriangleFlags(
+        (two_sided ? uint16_t(EmissiveTriangleFlags::EmissiveTwoSided) : uint16_t(0)) |
+        (alpha_tested ? uint16_t(EmissiveTriangleFlags::EmissiveAlphaTested) : uint16_t(0)));
 
     // flux = pi * area * mean radiance (diffuse emitter) per visible face, estimated at
     // stratified points. Cutout texels are no surface (the tracer passes through them) and
@@ -63,19 +67,32 @@ struct LightUpdateBinding {
     const float3 scaled_n = tri.get_scaled_normal();
     const float area2 = length(scaled_n);
     float flux = 0.f;
-    if (area2 > 0.f) {
+    EmissiveRegion region = EmissiveRegion::whole();
+    region.swapped = uint16_t((gd.flags & GeometryDataFlags::FlipFacing) != 0 ? 1 : 0);
+    if (lg.emission_records != nullptr) {
+        const EmissionAddress record = lg.emission_records + lg.emission_offsets[primitive_id];
+        const uint count = record[EMISSION_RECORD_COUNT];
+        if (count < 1u << (2 * lg.emission_level)) {
+            region.record = record;
+            region.level = uint16_t(lg.emission_level);
+            region.count = count;
+        }
+    }
+    if (area2 > 0.f && region.get_fraction() > 0.f) {
         const float3 n = scaled_n / area2;
         RandomGenerator rng = PCG(xxhash32(uint2(lg.geometry_id, primitive_id)));
-        const float2 shift = rng.next_float2();
+        const float3 shift = rng.next_float3();
         float luminance_sum = 0.f;
         for (uint s = 0; s < params.flux_samples; s++) {
             // R2 sequence, randomly shifted per triangle, warped to uniform barycentrics
-            const float2 u = frac(r2_sequence(s) + shift);
+            const float2 u = frac(r2_sequence(s) + shift.xy);
             const float su = sqrt(u.x);
-            const float3 bary = float3(1.f - su, su * (1.f - u.y), su * u.y);
+            const float3 bary = region.to_triangle(
+                float3(1.f - su, su * (1.f - u.y), su * u.y),
+                frac((float(s) + shift.z) / float(params.flux_samples)));
             const float3 pos = tri.get_position(bary);
             const float2 uv = tri.get_uv(bary);
-            if (scene.material_system.alpha_test(gd.material_id, uv))
+            if (alpha_tested && scene.material_system.alpha_test(gd.material_id, uv))
                 continue;
             luminance_sum += yuv_luminance(scene.material_system.get_emission(
                 gd.material_id,
@@ -89,11 +106,13 @@ struct LightUpdateBinding {
                     DefaultLODSampler()));
             }
         }
-        flux = MERIAN_PI * 0.5f * area2 * luminance_sum / float(params.flux_samples);
+        flux = MERIAN_PI * 0.5f * area2 * region.get_fraction() * luminance_sum /
+               float(params.flux_samples);
     }
     tri.flux = isfinite(flux) ? flux : 0.f;
 
     params.triangles[i] = tri;
+    params.regions[i] = region;
 
     EmissiveLightProxy proxy;
     proxy.centroid = (tri.p0 + tri.p1 + tri.p2) * (1.f / 3.f);

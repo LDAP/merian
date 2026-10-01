@@ -47,10 +47,16 @@ class Sampler : public std::enable_shared_from_this<Sampler>, public Resource {
         return sampler;
     }
 
+    // Without its pNext chain.
+    const vk::SamplerCreateInfo& get_create_info() const {
+        return create_info;
+    }
+
     vk::DescriptorImageInfo get_descriptor_info() const;
 
   private:
     const ContextHandle context;
+    const vk::SamplerCreateInfo create_info;
     vk::Sampler sampler;
 };
 using SamplerHandle = std::shared_ptr<Sampler>;

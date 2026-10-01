@@ -1,0 +1,181 @@
+#pragma once
+
+#include "merian-shaders/scene/micromap.slangh"
+
+#ifdef __cplusplus
+#include "merian-shaders/scene/scene-data.slangh"
+#endif
+
+namespace merian {
+
+#define MERIAN_OMM_FORMAT_4_STATE 2
+
+#define MERIAN_OMM_TARGET_EDGE_TEXELS 4.0
+
+#define MERIAN_MICROMAP_MAX_SPAN 180
+
+#define MERIAN_MICROMAP_TEXEL_SLACK 0.125
+
+#ifdef __cplusplus
+using MicromapDataAddress = vk::DeviceAddress;
+#else
+typealias MicromapDataAddress = uint*;
+#endif
+
+enum MicromapBakeFlags : uint32_t {
+    AlphaNearestFilter = 0x1,
+    EmissionNearestFilter = 0x2,
+};
+
+struct MicromapBakeJob {
+    GeometryData geometry;
+    MicromapDataAddress opacity;
+    MicromapDataAddress emission;
+    uint32_t subdivision_level;
+    uint32_t alpha_width;
+    uint32_t alpha_height;
+    uint32_t emission_width;
+    uint32_t emission_height;
+    uint32_t emission_max_mip;
+    MicromapBakeFlags flags;
+    uint32_t _pad;
+};
+
+struct MicromapBakeBlock {
+    uint32_t job_index;
+    uint32_t primitive_id;
+    uint32_t opacity_word_offset;
+    uint32_t emission_word_offset;
+};
+
+#ifdef __cplusplus
+static_assert(sizeof(MicromapBakeBlock) == 16, "MicromapBakeBlock layout mismatch");
+static_assert(sizeof(MicromapBakeJob) == sizeof(GeometryData) + 48,
+              "MicromapBakeJob layout mismatch");
+#endif
+
+MERIAN_MICROMAP_FUNC uint32_t micromap_extract_even_bits(uint32_t x) {
+    x &= 0x55555555;
+    x = (x | (x >> 1)) & 0x33333333;
+    x = (x | (x >> 2)) & 0x0f0f0f0f;
+    x = (x | (x >> 4)) & 0x00ff00ff;
+    x = (x | (x >> 8)) & 0x0000ffff;
+    return x;
+}
+
+MERIAN_MICROMAP_FUNC uint32_t micromap_prefix_eor(uint32_t x) {
+    x ^= x >> 1;
+    x ^= x >> 2;
+    x ^= x >> 4;
+    x ^= x >> 8;
+    return x;
+}
+
+// Space-filling curve of the Vulkan specification, "Ray Opacity Micromap".
+MERIAN_MICROMAP_FUNC MicroTriangle micromap_index_to_bary(const uint32_t index,
+                                                          const uint32_t level) {
+    MicroTriangle t;
+    if (level == 0) {
+        t.p0 = float2(0, 0);
+        t.p1 = float2(1, 0);
+        t.p2 = float2(0, 1);
+        return t;
+    }
+
+    const uint32_t b0 = micromap_extract_even_bits(index);
+    const uint32_t b1 = micromap_extract_even_bits(index >> 1);
+    const uint32_t fx = micromap_prefix_eor(b0);
+    const uint32_t fy = micromap_prefix_eor(b0 & ~b1);
+    const uint32_t tt = fy ^ b1;
+
+    const uint32_t mask = (1u << level) - 1;
+    uint32_t iu = ((fx & ~tt) | (b0 & ~tt) | (~b0 & ~fx & tt)) & mask;
+    uint32_t iv = (fy ^ b0) & mask;
+    const uint32_t iw = ((~fx & ~tt) | (b0 & ~tt) | (~b0 & fx & tt)) & mask;
+
+    const bool upright = ((iu ^ iv ^ iw) & 1) != 0;
+    if (!upright) {
+        iu += 1;
+        iv += 1;
+    }
+
+    const float scale = 1.f / float(1u << level);
+    const float step = upright ? scale : -scale;
+    const float u = float(iu) * scale;
+    const float v = float(iv) * scale;
+    t.p0 = float2(u, v);
+    t.p1 = float2(u + step, v);
+    t.p2 = float2(u, v + step);
+    return t;
+}
+
+MERIAN_MICROMAP_FUNC uint32_t emission_scan_mip(const float extent,
+                                                const uint32_t level,
+                                                const uint32_t max_mip) {
+    const float micro_extent = extent / float(1u << level);
+    if (!(micro_extent >= 4.f))
+        return 0;
+    const float mip = floor(log2(micro_extent * 0.5f));
+    return mip < float(max_mip) ? uint32_t(mip) : max_mip;
+}
+
+MERIAN_MICROMAP_FUNC float micromap_edge_area(const float2 a, const float2 b, const float2 c) {
+    return (c.x - a.x) * (b.y - a.y) - (c.y - a.y) * (b.x - a.x);
+}
+
+// Akenine-Moeller and Aila 2005, "Conservative and Tiled Rasterization Using a Modified
+// Triangle Setup".
+MERIAN_MICROMAP_FUNC bool
+micromap_box_inside_edge(const float2 a, const float2 b, const float2 corner, const float2 extent) {
+    const float2 normal = float2(b.y - a.y, a.x - b.x);
+    const float offset = -dot(normal, a);
+    const float2 bias = float2(normal.x > 0.f ? 0.f : normal.x, normal.y > 0.f ? 0.f : normal.y);
+    return dot(normal, corner) + offset + dot(bias, extent) < 0.f;
+}
+
+struct TexelFootprint {
+    bool bounded;
+    int2 first;
+    int2 last;
+    float2 a;
+    float2 b;
+    float2 c;
+};
+
+MERIAN_MICROMAP_FUNC TexelFootprint micromap_texel_footprint(const float2 p0,
+                                                             const float2 p1,
+                                                             const float2 p2) {
+    TexelFootprint footprint;
+    const float2 aabb_min = min(p0, min(p1, p2)) - float(MERIAN_MICROMAP_TEXEL_SLACK);
+    const float2 aabb_max = max(p0, max(p1, p2)) + float(MERIAN_MICROMAP_TEXEL_SLACK);
+    footprint.bounded = aabb_max.x - aabb_min.x < float(MERIAN_MICROMAP_MAX_SPAN - 2) &&
+                        aabb_max.y - aabb_min.y < float(MERIAN_MICROMAP_MAX_SPAN - 2) &&
+                        aabb_min.x > -1e9f && aabb_min.y > -1e9f && aabb_max.x < 1e9f &&
+                        aabb_max.y < 1e9f;
+    if (!footprint.bounded) {
+        return footprint;
+    }
+
+    footprint.first = int2(floor(aabb_min));
+    footprint.last = int2(floor(aabb_max)) + 1;
+
+    const bool flip = micromap_edge_area(p0, p1, p2) > 0.f;
+    footprint.a = p0;
+    footprint.b = flip ? p2 : p1;
+    footprint.c = flip ? p1 : p2;
+    return footprint;
+}
+
+// reach must not exceed 1 + MERIAN_MICROMAP_TEXEL_SLACK.
+MERIAN_MICROMAP_FUNC bool micromap_footprint_reaches(const TexelFootprint footprint,
+                                                     const int x,
+                                                     const int y,
+                                                     const float reach) {
+    const float2 corner = float2(float(x), float(y)) - reach;
+    const float2 extent = float2(2.f * reach);
+    return micromap_box_inside_edge(footprint.a, footprint.b, corner, extent) &&
+           micromap_box_inside_edge(footprint.b, footprint.c, corner, extent) &&
+           micromap_box_inside_edge(footprint.c, footprint.a, corner, extent);
+}
+
+} // namespace merian

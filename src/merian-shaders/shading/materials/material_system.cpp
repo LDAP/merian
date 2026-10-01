@@ -121,6 +121,12 @@ MaterialModelID MaterialSystem::register_material_type(const std::string& slang_
     return dispatch_id;
 }
 
+std::span<const uint8_t> MaterialSystem::get_material_data(const MaterialID id) const {
+    assert(id < materials.size());
+    return {host_buffer.data() + static_cast<size_t>(id) * get_entry_size(),
+            sizeof(MaterialHeader) + materials[id].payload.size()};
+}
+
 uint32_t MaterialSystem::get_entry_size() const {
     return sizeof(MaterialHeader) + payload_size_in_uints(max_payload_size) * sizeof(uint32_t);
 }
@@ -143,6 +149,7 @@ MaterialID MaterialSystem::add_material(const MaterialModelID type_id, const Mat
     stored.header = material.header;
     stored.header.material_model_type_id = type_id;
     stored.emissive = material.is_emissive();
+    stored.emission_texture_id = material.get_emission_texture_id();
 
     if (material.has_interior_volume() && !any_interior_volume) {
         any_interior_volume = true;
@@ -199,6 +206,7 @@ void MaterialSystem::update_material(const MaterialID id, const Material& materi
     stored.header = material.header;
     stored.header.material_model_type_id = type_id;
     stored.emissive = material.is_emissive();
+    stored.emission_texture_id = material.get_emission_texture_id();
 
     stored.payload.resize(payload_bytes);
     material.write_payload(stored.payload.data());

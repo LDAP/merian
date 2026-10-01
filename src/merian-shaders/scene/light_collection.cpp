@@ -49,8 +49,9 @@ void LightCollection::set_geometries(const std::vector<EmissiveGeometry>& geomet
         if (g.primitive_count == 0)
             continue;
         assert(g.geometry_id < geometry_count);
-        new_geometries.push_back(
-            {g.geometry_id, g.instance_index, first_triangle, g.primitive_count});
+        new_geometries.push_back({g.geometry_id, g.instance_index, first_triangle,
+                                  g.primitive_count, g.emission_offsets, g.emission_records,
+                                  g.emission_level, 0});
         light_geometry_keys.push_back(g.key);
         new_offsets[g.geometry_id] = first_triangle;
         first_triangle += g.primitive_count;
@@ -78,6 +79,12 @@ void LightCollection::ensure_buffer(BufferHandle& buffer,
                                       vk::BufferUsageFlagBits::eStorageBuffer |
                                           vk::BufferUsageFlagBits::eTransferDst,
                                       MemoryMappingType::NONE, name);
+}
+
+void LightCollection::retire_buffer(BufferHandle& buffer, const CommandBufferHandle& cmd) {
+    if (buffer)
+        cmd->keep_until_pool_reset(std::move(buffer));
+    buffer.reset();
 }
 
 void LightCollection::ensure_pipelines(const SlangCompositionHandle& scene_composition) {
@@ -122,8 +129,7 @@ void LightCollection::ensure_pipelines(const SlangCompositionHandle& scene_compo
         make("pool", pool_entry_point, pool_pipeline, pool_params);
         make("grid", grid_entry_point, grid_pipeline, grid_params);
         make("env_split", env_split_entry_point, env_split_pipeline, env_split_params);
-        make("geometry_proxy", geometry_proxy_entry_point, geometry_proxy_pipeline,
-             geometry_proxy_params);
+        make("sources", sources_entry_point, sources_pipeline, sources_params);
     }
 
     if (!env_composition) {
@@ -223,39 +229,77 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
     }
 
     if (triangle_count > 0) {
-        ensure_buffer(pool_geometry_buffer,
+        ensure_buffer(pool_source_buffer,
                       std::min(static_cast<uint32_t>(pool_size), LIGHT_GRID_POOL) *
                           sizeof(uint32_t),
-                      "LightCollection::pool_geometry", cmd);
-        ensure_buffer(geometry_proxies_buffer,
-                      std::max<uint32_t>(static_cast<uint32_t>(light_geometries.size()), 1u) *
-                          sizeof(EmissiveLightProxy),
-                      "LightCollection::geometry_proxies", cmd);
+                      "LightCollection::pool_source", cmd);
+        ensure_buffer(sources_buffer, triangle_count * sizeof(LightSource),
+                      "LightCollection::sources", cmd);
+        ensure_buffer(source_of_buffer, triangle_count * sizeof(uint32_t),
+                      "LightCollection::source_of", cmd);
+        ensure_buffer(source_cdf_buffer, triangle_count * sizeof(float),
+                      "LightCollection::source_cdf", cmd);
         ensure_buffer(pool_buffer, static_cast<uint32_t>(pool_size) * sizeof(uint32_t),
                       "LightCollection::pool", cmd);
-        const vk::DeviceSize grid_size = grid_cell_count() * LIGHT_GRID_SLOTS * sizeof(uint32_t);
+        bool info_grew = false;
         for (uint32_t i = 0; i < 2; i++) {
-            const bool grew = !grid_buffer[i] || grid_buffer[i]->get_size() < grid_size;
-            ensure_buffer(grid_buffer[i], grid_size, "LightCollection::grid", cmd);
-            ensure_buffer(grid_weight_buffer[i], grid_size, "LightCollection::grid_weight", cmd);
-            ensure_buffer(grid_info_buffer[i],
-                          static_cast<uint32_t>(grid_cascades) * sizeof(LightGridInfo),
-                          "LightCollection::grid_info", cmd);
-            if (grew) {
-                // the sampler reads the slot filled a frame earlier, so a fresh allocation is
-                // read once before anything writes it
-                cmd->fill(grid_buffer[i], LIGHT_INVALID_INDEX);
+            const vk::DeviceSize info_size =
+                static_cast<uint32_t>(grid_cascades) * sizeof(LightGridInfo);
+            if (!grid_info_buffer[i] || grid_info_buffer[i]->get_size() < info_size) {
+                ensure_buffer(grid_info_buffer[i], info_size, "LightCollection::grid_info", cmd);
+                // read as the previous cascades before the first setup
                 cmd->fill(grid_info_buffer[i]);
-                grid_reset = true;
+                info_grew = true;
             }
         }
-        if (grid_reset) {
+        if (info_grew) {
             cmd->barrier(vk::MemoryBarrier2{
                 vk::PipelineStageFlagBits2::eTransfer,
                 vk::AccessFlagBits2::eTransferWrite,
                 vk::PipelineStageFlagBits2::eComputeShader,
-                vk::AccessFlagBits2::eShaderRead,
+                vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
             });
+        }
+
+        if (selection == LightSelection::LightSelectionGrid) {
+            grid_slot ^= 1u;
+            const vk::DeviceSize slot_count =
+                static_cast<vk::DeviceSize>(grid_cell_count()) * LIGHT_GRID_SLOTS;
+            for (uint32_t i = 0; i < 2; i++) {
+                const bool grew =
+                    !grid_buffer[i] || grid_buffer[i]->get_size() < slot_count * sizeof(uint32_t);
+                ensure_buffer(grid_buffer[i], slot_count * sizeof(uint32_t),
+                              "LightCollection::grid", cmd);
+                ensure_buffer(grid_key_buffer[i], slot_count * sizeof(float),
+                              "LightCollection::grid_key", cmd);
+                ensure_buffer(grid_visibility_buffer[i], slot_count * sizeof(float),
+                              "LightCollection::grid_visibility", cmd);
+                ensure_buffer(grid_feedback_buffer[i], 2 * slot_count * sizeof(uint32_t),
+                              "LightCollection::grid_feedback", cmd);
+                ensure_buffer(grid_discovered_buffer[i],
+                              grid_cell_count() * LIGHT_GRID_DISCOVERED * sizeof(uint32_t),
+                              "LightCollection::grid_discovered", cmd);
+                grid_reset |= grew;
+            }
+            if (slot_weighing == LightSlotWeighing::LightSlotWeighingShadingPoint) {
+                ensure_buffer(grid_slot_sources_buffer, slot_count * sizeof(LightSource),
+                              "LightCollection::grid_slot_sources", cmd);
+                retire_buffer(grid_probability_buffer, cmd);
+            } else {
+                ensure_buffer(grid_probability_buffer, slot_count * sizeof(float),
+                              "LightCollection::grid_probability", cmd);
+                retire_buffer(grid_slot_sources_buffer, cmd);
+            }
+        } else {
+            for (uint32_t i = 0; i < 2; i++) {
+                retire_buffer(grid_buffer[i], cmd);
+                retire_buffer(grid_key_buffer[i], cmd);
+                retire_buffer(grid_visibility_buffer[i], cmd);
+                retire_buffer(grid_feedback_buffer[i], cmd);
+                retire_buffer(grid_discovered_buffer[i], cmd);
+            }
+            retire_buffer(grid_slot_sources_buffer, cmd);
+            retire_buffer(grid_probability_buffer, cmd);
         }
     }
 
@@ -273,6 +317,8 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
                       "LightCollection::triangles", cmd);
         ensure_buffer(proxies_buffer, triangle_count * sizeof(EmissiveLightProxy),
                       "LightCollection::proxies", cmd);
+        ensure_buffer(regions_buffer, triangle_count * sizeof(EmissiveRegion),
+                      "LightCollection::regions", cmd);
         ensure_buffer(cdf_buffer, triangle_count * sizeof(float), "LightCollection::cdf", cmd);
         ensure_buffer(cdf_block_sums_buffer, cdf_block_count() * sizeof(float),
                       "LightCollection::cdf_block_sums", cmd);
@@ -290,40 +336,37 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
     }
 }
 
-// A rebuilt table can move an entry that survived; mapping it is what lets a cell's list carry.
 void LightCollection::update_light_remap(const CommandBufferHandle& cmd) {
-    if (selection != LightSelection::LightSelectionGrid) {
-        grid_table_keys.clear();
-        light_remap.clear();
-        light_remap_identity = true;
-        ensure_buffer(light_remap_buffer, sizeof(uint32_t), "LightCollection::light_remap", cmd);
-        return;
-    }
-
-    light_remap.assign(grid_table_keys.size(), LIGHT_INVALID_INDEX);
-    light_remap_identity = grid_table_keys.size() == light_geometries.size();
-    if (!grid_table_keys.empty()) {
+    light_remap.clear();
+    if (selection == LightSelection::LightSelectionGrid &&
+        grid_table_geometries != light_geometries) {
         light_index_of_key.clear();
         light_index_of_key.reserve(light_geometry_keys.size());
         for (uint32_t i = 0; i < light_geometry_keys.size(); i++) {
             light_index_of_key.try_emplace(light_geometry_keys[i], i);
         }
-        for (uint32_t i = 0; i < grid_table_keys.size(); i++) {
-            const auto it = light_index_of_key.find(grid_table_keys[i]);
-            light_remap[i] = it == light_index_of_key.end() ? LIGHT_INVALID_INDEX : it->second;
-            light_remap_identity &= light_remap[i] == i;
+        light_remap.reserve(grid_table_geometries.size());
+        for (uint32_t i = 0; i < grid_table_geometries.size(); i++) {
+            const LightGeometry& old_geometry = grid_table_geometries[i];
+            LightRemap& remap = light_remap.emplace_back(LightRemap{
+                old_geometry.first_triangle, old_geometry.primitive_count, LIGHT_INVALID_INDEX, 0});
+            if (const auto it = light_index_of_key.find(grid_table_keys[i]);
+                it != light_index_of_key.end()) {
+                remap.new_first = light_geometries[it->second].first_triangle;
+                remap.new_count = light_geometries[it->second].primitive_count;
+            }
         }
     }
-
     grid_table_keys = light_geometry_keys;
+    grid_table_geometries = light_geometries;
 
-    const vk::DeviceSize remap_size = std::max<size_t>(light_remap.size(), 1) * sizeof(uint32_t);
+    const vk::DeviceSize remap_size = std::max<size_t>(light_remap.size(), 1) * sizeof(LightRemap);
     ensure_buffer(light_remap_buffer, remap_size, "LightCollection::light_remap", cmd);
-    if (light_remap_identity) {
+    if (light_remap.empty()) {
         return;
     }
     allocator->get_staging()->cmd_to_device(cmd, light_remap_buffer, light_remap.data(), 0,
-                                            light_remap.size() * sizeof(uint32_t));
+                                            light_remap.size() * sizeof(LightRemap));
     cmd->barrier(vk::MemoryBarrier2{
         vk::PipelineStageFlagBits2::eTransfer,
         vk::AccessFlagBits2::eTransferWrite,
@@ -340,18 +383,19 @@ void LightCollection::update_constants(const SlangCompositionHandle& scene_compo
     scene_composition->add_module_from_string(
         "scene_light_constants",
         fmt::format("namespace merian {{\n"
-                    "export static const int merian_nee_pool_candidates = {};\n"
-                    "export static const int merian_nee_cell_candidates = {};\n"
+                    "export static const int merian_nee_scene_draws = {};\n"
+                    "export static const int merian_nee_cell_draws = {};\n"
+                    "export static const int merian_nee_slot_weighing = {};\n"
+                    "export static const bool merian_nee_env_regions = {};\n"
                     "}}",
-                    pool_candidates, cell_candidates));
+                    scene_draws, cell_draws, slot_weighing, grid_env_regions));
     constants_dirty = false;
 }
 
 void LightCollection::update(const CommandBufferHandle& cmd,
                              const SlangCompositionHandle& scene_composition,
                              const ShaderObjectHandle& scene_object,
-                             const ShaderObjectAllocatorHandle& obj_allocator_in,
-                             const uint32_t frame) {
+                             const ShaderObjectAllocatorHandle& obj_allocator_in) {
     if (!enabled || (triangle_count == 0 && !env_emissive))
         return;
 
@@ -443,6 +487,7 @@ void LightCollection::update(const CommandBufferHandle& cmd,
         auto c = params->get_cursor();
         c["triangles"] = triangles_buffer;
         c["proxies"] = proxies_buffer;
+        c["regions"] = regions_buffer;
         c["light_geometries"] = light_geometries_buffer;
         c["light_geometry_count"] = static_cast<uint32_t>(light_geometries.size());
         c["triangle_count"] = triangle_count;
@@ -461,6 +506,33 @@ void LightCollection::update(const CommandBufferHandle& cmd,
         vk::AccessFlagBits2::eShaderRead,
     });
 
+    const auto split_env = [&] {
+        if (!env_emissive || !env_split_buffer) {
+            return;
+        }
+        MERIAN_PROFILE_SCOPE_GPU(cmd, "env split");
+        const auto ep = env_split_entry_point.get();
+        const auto pipe = env_split_pipeline.get();
+        const auto params = env_split_params.get();
+        auto c = params->get_cursor();
+        c["cdf"] = cdf_buffer ? cdf_buffer : allocator->get_dummy_buffer();
+        c["env_split"] = env_split_buffer;
+        c["triangle_count"] = cdf_buffer ? triangle_count : 0u;
+        c["scene_radius"] = scene_radius;
+        c["manual_probability"] = env_share;
+        c["from_power"] = static_cast<uint32_t>(env_share_from_power ? 1 : 0);
+        c["min_probability"] = env_share_min;
+        c["max_probability"] = env_share_max;
+        auto env = c["env_importance"];
+        env["levels"] = env_importance_buffer;
+        env["size"] = env_importance_size();
+        env["level_count"] = level_count_for(env_importance_size());
+
+        cmd->bind(pipe);
+        ep->bind("params", params, cmd, pipe, obj_allocator);
+        cmd->dispatch(1, 1, 1);
+    };
+
     if (triangle_count > 0) {
         MERIAN_PROFILE_SCOPE_GPU(cmd, "light selection");
         const auto barrier = [&] {
@@ -471,6 +543,9 @@ void LightCollection::update(const CommandBufferHandle& cmd,
                 vk::AccessFlagBits2::eShaderRead,
             });
         };
+        const auto or_dummy = [&](const BufferHandle& buffer) -> const BufferHandle& {
+            return buffer ? buffer : allocator->get_dummy_buffer();
+        };
         const auto write_preprocess = [&](const ShaderObjectHandle& params) {
             auto c = params->get_cursor();
             c["triangles"] = triangles_buffer;
@@ -480,30 +555,51 @@ void LightCollection::update(const CommandBufferHandle& cmd,
             c["light_geometries"] = light_geometries_buffer;
             c["light_geometry_count"] = static_cast<uint32_t>(light_geometries.size());
             c["light_remap"] = light_remap_buffer;
-            c["light_remap_count"] =
-                light_remap_identity ? 0u : static_cast<uint32_t>(light_remap.size());
-            c["geometry_proxies_out"] = geometry_proxies_buffer;
-            c["pool_geometry_out"] = pool_geometry_buffer;
-            c["pool_geometry"] = pool_geometry_buffer;
-            c["geometry_proxies"] = geometry_proxies_buffer;
-            c["grid"] = grid_buffer[grid_slot];
-            c["grid_weight"] = grid_weight_buffer[grid_slot];
-            c["grid_weight_prev"] = grid_weight_buffer[grid_slot ^ 1];
-            c["grid_prev"] = grid_buffer[grid_slot ^ 1];
+            c["light_remap_count"] = static_cast<uint32_t>(light_remap.size());
+            c["sources_out"] = sources_buffer;
+            c["sources"] = sources_buffer;
+            c["source_of_out"] = source_of_buffer;
+            c["source_of"] = source_of_buffer;
+            c["source_cdf_out"] = source_cdf_buffer;
+            c["pool_source_out"] = pool_source_buffer;
+            c["pool_source"] = pool_source_buffer;
+            c["grid"] = or_dummy(grid_buffer[grid_slot]);
+            c["grid_key"] = or_dummy(grid_key_buffer[grid_slot]);
+            c["grid_key_prev"] = or_dummy(grid_key_buffer[grid_slot ^ 1]);
+            c["grid_visibility"] = or_dummy(grid_visibility_buffer[grid_slot]);
+            c["grid_slot_sources"] = or_dummy(grid_slot_sources_buffer);
+            c["grid_probability"] = or_dummy(grid_probability_buffer);
+            c["grid_even_share"] = grid_even_share;
+            c["slot_weighing"] = static_cast<uint32_t>(slot_weighing);
+            const bool env_regions =
+                grid_env_regions && env_emissive && env_importance_buffer && env_split_buffer;
+            c["env_regions"] = env_regions;
+            c["env_split"] = env_regions ? env_split_buffer : allocator->get_dummy_buffer();
+            auto env = c["env_importance"];
+            env["levels"] = env_regions ? env_importance_buffer : allocator->get_dummy_buffer();
+            env["size"] = env_regions ? env_importance_size() : 0u;
+            env["level_count"] = env_regions ? level_count_for(env_importance_size()) : 0u;
+            c["grid_visibility_prev"] = or_dummy(grid_visibility_buffer[grid_slot ^ 1]);
+            c["grid_feedback"] = or_dummy(grid_feedback_buffer[grid_slot]);
+            c["grid_feedback_prev"] = or_dummy(grid_feedback_buffer[grid_slot ^ 1]);
+            c["grid_discovered"] = or_dummy(grid_discovered_buffer[grid_slot]);
+            c["grid_discovered_prev"] = or_dummy(grid_discovered_buffer[grid_slot ^ 1]);
+            c["grid_prev"] = or_dummy(grid_buffer[grid_slot ^ 1]);
             c["grid_info"] = grid_info_buffer[grid_slot];
             c["grid_info_prev"] = grid_info_buffer[grid_slot ^ 1];
             c["grid_coverage"] = grid_coverage;
             c["camera_position"] = camera_position;
             c["triangle_count"] = triangle_count;
             c["pool_size"] = static_cast<uint32_t>(pool_size);
-            c["grid_candidates"] = static_cast<uint32_t>(grid_candidates);
+            c["grid_new_lights"] = static_cast<uint32_t>(grid_new_lights);
             c["grid_dimension"] = static_cast<uint32_t>(grid_dimension);
             c["grid_cascades"] = static_cast<uint32_t>(grid_cascades);
             c["grid_cell_size"] = grid_cell_size;
             c["grid_jitter"] = grid_jitter;
+            c["grid_source_extent"] = grid_source_extent;
             c["grid_max_age"] = static_cast<uint32_t>(grid_max_age);
-            c["grid_a_res"] = static_cast<uint32_t>(grid_a_res ? 1 : 0);
-            c["grid_reset"] = static_cast<uint32_t>(grid_reset ? 1 : 0);
+            c["grid_a_res"] = grid_a_res;
+            c["grid_reset"] = grid_reset;
             c["frame"] = frame;
             return params;
         };
@@ -538,16 +634,20 @@ void LightCollection::update(const CommandBufferHandle& cmd,
                 pass(cdf_offset_entry_point, cdf_offset_pipeline, cdf_offset_params, blocks);
             }
         }
+        barrier();
+        split_env();
         if (selection != LightSelection::LightSelectionPower) {
             barrier();
             {
-                MERIAN_PROFILE_SCOPE_GPU(cmd, "geometry proxies");
-                const auto ep = geometry_proxy_entry_point.get();
-                const auto pipe = geometry_proxy_pipeline.get();
+                MERIAN_PROFILE_SCOPE_GPU(cmd, "sources");
+                const auto ep = sources_entry_point.get();
+                const auto pipe = sources_pipeline.get();
                 cmd->bind(pipe);
-                ep->bind("params", write_preprocess(geometry_proxy_params.get()), cmd, pipe,
+                ep->bind("params", write_preprocess(sources_params.get()), cmd, pipe,
                          obj_allocator);
-                cmd->dispatch(static_cast<uint32_t>(light_geometries.size()), 1, 1);
+                const uint32_t chunks =
+                    (triangle_count + LIGHT_SOURCE_CHUNK - 1) / LIGHT_SOURCE_CHUNK;
+                cmd->dispatch(chunks, 1, 1);
             }
             barrier();
             {
@@ -569,7 +669,13 @@ void LightCollection::update(const CommandBufferHandle& cmd,
                 ep->bind("params", write_preprocess(setup_params.get()), cmd, pipe, obj_allocator);
                 cmd->dispatch(1, 1, 1);
             }
-            barrier();
+            // the renderer's feedback, from any stage
+            cmd->barrier(vk::MemoryBarrier2{
+                vk::PipelineStageFlagBits2::eAllCommands,
+                vk::AccessFlagBits2::eShaderWrite,
+                vk::PipelineStageFlagBits2::eComputeShader,
+                vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
+            });
             {
                 MERIAN_PROFILE_SCOPE_GPU(cmd, "grid fill");
                 const auto ep = grid_entry_point.get();
@@ -577,43 +683,23 @@ void LightCollection::update(const CommandBufferHandle& cmd,
                 cmd->bind(pipe);
                 ep->bind("params", write_preprocess(grid_params.get()), cmd, pipe, obj_allocator);
                 // one group per cell
-                cmd->dispatch(grid_cell_count(), 1, 1);
+                const uint32_t cells = grid_cell_count();
+                cmd->dispatch(std::min(cells, LIGHT_GRID_DISPATCH_ROW),
+                              (cells + LIGHT_GRID_DISPATCH_ROW - 1) / LIGHT_GRID_DISPATCH_ROW, 1);
             }
             grid_reset = false;
-            grid_slot ^= 1u;
         }
     }
 
-    // after the prefix scan: its total is the triangles' side of the split
-    if (env_emissive && env_split_buffer) {
-        MERIAN_PROFILE_SCOPE_GPU(cmd, "env split");
-        const auto ep = env_split_entry_point.get();
-        const auto pipe = env_split_pipeline.get();
-        const auto params = env_split_params.get();
-        auto c = params->get_cursor();
-        c["cdf"] = cdf_buffer ? cdf_buffer : allocator->get_dummy_buffer();
-        c["env_split"] = env_split_buffer;
-        c["triangle_count"] = cdf_buffer ? triangle_count : 0u;
-        c["scene_radius"] = scene_radius;
-        c["manual_probability"] = env_share;
-        c["from_power"] = static_cast<uint32_t>(env_share_from_power ? 1 : 0);
-        c["min_probability"] = env_share_min;
-        c["max_probability"] = env_share_max;
-        auto env = c["env_importance"];
-        env["levels"] = env_importance_buffer;
-        env["size"] = env_importance_size();
-        env["level_count"] = level_count_for(env_importance_size());
-
-        cmd->bind(pipe);
-        ep->bind("params", params, cmd, pipe, obj_allocator);
-        cmd->dispatch(1, 1, 1);
+    if (triangle_count == 0) {
+        split_env();
     }
 
     cmd->barrier(vk::MemoryBarrier2{
         vk::PipelineStageFlagBits2::eComputeShader,
         vk::AccessFlagBits2::eShaderWrite,
         vk::PipelineStageFlagBits2::eAllCommands,
-        vk::AccessFlagBits2::eShaderRead,
+        vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
     });
 }
 
@@ -622,6 +708,7 @@ void LightCollection::write_to(ShaderCursor cursor) const {
     const BufferHandle& dummy = allocator->get_dummy_buffer();
     auto table = cursor["table"];
     table["triangles"] = active ? triangles_buffer : dummy;
+    table["regions"] = active ? regions_buffer : dummy;
     table["cdf"] = active ? cdf_buffer : dummy;
     table["geometries"] = active ? light_geometries_buffer : dummy;
     table["geometry_offsets"] = active ? geometry_light_offsets_buffer : dummy;
@@ -636,15 +723,30 @@ void LightCollection::write_to(ShaderCursor cursor) const {
                        ? static_cast<uint32_t>(pool_size)
                        : 0u;
 
+    const bool grid_active =
+        active && selection == LightSelection::LightSelectionGrid && grid_buffer[grid_slot];
     auto grid = cursor["grid"];
-    grid["slots"] = active ? grid_buffer[grid_slot] : dummy;
-    grid["cascades"] = active && grid_info_buffer[grid_slot] ? grid_info_buffer[grid_slot] : dummy;
+    grid["slots"] = grid_active ? grid_buffer[grid_slot] : dummy;
+    grid["sources"] = active && sources_buffer ? sources_buffer : dummy;
+    grid["source_of"] = active && source_of_buffer ? source_of_buffer : dummy;
+    grid["source_cdf"] = active && source_cdf_buffer ? source_cdf_buffer : dummy;
+    grid["cascades"] = grid_active ? grid_info_buffer[grid_slot] : dummy;
+    grid["in_use"] = grid_active;
     grid["jitter"] = debug_jitter ? grid_jitter : 0.f;
+    grid["frame"] = frame;
     grid["share"] = grid_share;
+    grid["even_share"] = grid_even_share;
+    grid["visibility"] = grid_active ? grid_visibility_buffer[grid_slot] : dummy;
+    grid["slot_sources"] =
+        grid_active && grid_slot_sources_buffer ? grid_slot_sources_buffer : dummy;
+    grid["probability"] = grid_active && grid_probability_buffer ? grid_probability_buffer : dummy;
+    grid["feedback"] = grid_active ? grid_feedback_buffer[grid_slot] : dummy;
+    grid["discovered"] = grid_active ? grid_discovered_buffer[grid_slot] : dummy;
 
     cursor["selection"] =
         active ? static_cast<uint32_t>(selection) : static_cast<uint32_t>(LightSelectionPower);
     cursor["has_sky_portals"] = has_sky_portals;
+    cursor["debug_view"] = static_cast<uint32_t>(debug_view);
 
     const bool env_active = enabled && env_emissive && env_importance_buffer && env_split_buffer;
     auto env = cursor["env"];
@@ -662,114 +764,173 @@ void LightCollection::write_to(ShaderCursor cursor) const {
 
 void LightCollection::properties(Properties& props) {
     props.config_bool("enable", enabled,
-                      "Maintain the emissive triangle list for next event estimation.");
-    props.config_int("flux samples", flux_samples,
-                     "Emission evaluations per triangle for the flux estimate.", 1, 256);
+                      "Keep the emissive triangles as lights a renderer can sample directly (next "
+                      "event estimation).");
+
+    constants_dirty |= props.config_int(
+        "scene draws", scene_draws,
+        "Lights a shading point draws from the whole scene, in proportion to their power.", 0, 32);
+    if (grid_enabled) {
+        constants_dirty |= props.config_int(
+            "cell draws", cell_draws,
+            "Lights a shading point draws from the list of the cell it lies in, by what each "
+            "delivers to it.",
+            0, static_cast<int32_t>(LIGHT_GRID_MAX_DRAWS));
+    }
+    props.output_text(
+        "A resampling renderer weighs all draws and traces one shadow ray; a mixture takes one.");
+
+    if (props.st_begin_child("cells", "Cell lists")) {
+        props.config_bool("enable", grid_enabled,
+                          "Keep a list of the lights that reach every cell of a camera-anchored "
+                          "grid, so a shading point draws from the few lights that matter where "
+                          "it is.");
+        if (grid_enabled) {
+            props.st_separate("Drawing");
+            props.config_percent("list share", grid_share,
+                                 "Share of the cell draws taken from the cell's list. The rest "
+                                 "are drawn from the whole scene, so that a light the cell does "
+                                 "not list still has a chance.");
+            constants_dirty |= props.config_options(
+                "weigh at", slot_weighing, {"cell", "shading point"},
+                Properties::OptionsStyle::COMBO,
+                "Where the listed lights are weighed by what each delivers.\n"
+                "cell: once per frame, at the cell. A draw and its density are a few loads, "
+                "which suits renderers that often hit lights with other techniques, such as "
+                "guiding.\n"
+                "shading point: towards the shading point and its normal, so a draw favours the "
+                "closest light. Every draw and density weighs all listed lights.");
+            if (props.config_bool("sky regions", grid_env_regions,
+                                  "List regions of the environment that rays from a cell reached, "
+                                  "so the sky the cell sees through an opening is drawn like a "
+                                  "light.")) {
+                constants_dirty = true;
+                grid_reset = true;
+            }
+            props.config_percent("even share", grid_even_share,
+                                 "Share of the list draws that pick the listed lights alike "
+                                 "instead of by what each delivers.");
+
+            props.st_separate("List upkeep");
+            props.config_int("new lights per frame", grid_new_lights,
+                             "Lights drawn from the whole scene that every cell weighs against "
+                             "its list each frame. Lights the renderer's rays hit from the cell "
+                             "and lights its neighbours list are weighed too, and what a cell "
+                             "learned carries across frames.",
+                             1, static_cast<int32_t>(LIGHT_GRID_MAX_NEW_LIGHTS));
+            props.config_int("forget after", grid_max_age,
+                             "Frames after which a listed light that stopped earning its place "
+                             "loses it to a new one.",
+                             1, 256);
+            props.config_bool("random ranking", grid_a_res,
+                              "Rank lights by a random key weighted by their worth rather than by "
+                              "their worth alone, so a cell that sees more lights than it lists "
+                              "does not keep only the strongest.");
+            props.config_float("source extent", grid_source_extent,
+                               "Largest extent of one listed light, in cells of the finest "
+                               "cascade. An emissive mesh that spreads further, such as a "
+                               "particle system, is listed as several lights.",
+                               0.1f, 0.f);
+
+            props.st_separate("Layout");
+            props.config_int("cells per side", grid_dimension, "Cells per side of every cascade.",
+                             4, 64);
+            props.config_int("cascades", grid_cascades,
+                             "Nested grids around the camera, each with twice the cell size of "
+                             "the one inside it.",
+                             1, 16);
+            props.config_float("cell size", grid_cell_size,
+                               "World units per cell of the innermost cascade; 0 derives it from "
+                               "the distance to the lights.",
+                               0.1f, 0.f);
+            if (grid_cell_size <= 0.f) {
+                props.config_float("reach", grid_coverage,
+                                   "Distance the outermost cascade reaches, relative to the "
+                                   "farthest light, when the cell size is derived.",
+                                   0.05f, 0.01f, 16.f);
+            }
+            props.config_float("lookup jitter", grid_jitter,
+                               "Cells a shading point's lookup is shifted by at random, so the "
+                               "cell borders do not show.",
+                               0.05f, 0.f, 2.f);
+        }
+        props.st_end_child();
+    }
+
+    if (props.st_begin_child("scene", "Whole-scene draws")) {
+        props.config_bool("presampled", pool_presampled,
+                          "Draw a pool of lights once per frame, so a draw is one load. Off "
+                          "searches all lights per draw.");
+        if (pool_presampled) {
+            props.config_int("pool size", pool_size, "Lights in the per-frame pool.", 64, 65536);
+        }
+        props.st_end_child();
+    }
 
     if (props.st_begin_child("environment", "Environment")) {
         props.config_bool("share from power", env_share_from_power,
-                          "Derive the environment's share of the light samples from the power each "
-                          "side emits. The environment's power is the flux an infinite light of "
-                          "its mean radiance puts through the scene's bounding sphere, so it is "
-                          "blind to occlusion: the limits below keep an enclosed scene from "
-                          "spending everything on a sky it barely sees.");
+                          "Derive how often a whole-scene draw takes the environment from the "
+                          "power it emits against the triangles. That power is blind to "
+                          "occlusion, so the limits keep an enclosed scene from spending its "
+                          "draws on a sky it barely sees.");
         if (env_share_from_power) {
             props.config_percent("share min", env_share_min);
             props.config_percent("share max", env_share_max);
         } else {
             props.config_percent("share", env_share,
-                                 "How often the environment is sampled instead of an emissive "
-                                 "triangle, where both exist.");
+                                 "How often a whole-scene draw takes the environment instead of "
+                                 "a triangle, where both exist.");
         }
         props.config_options("sampling", env_selection, {"warp", "pool"},
                              Properties::OptionsStyle::COMBO,
-                             "A pyramid descent per sample, or one load from a per-frame pool of "
-                             "texels it drew.");
+                             "Descend the importance map per draw, or load from a pool of "
+                             "directions drawn once per frame.");
         if (env_selection == EnvSelection::EnvSelectionPool) {
-            props.config_int("pool size", env_pool_size, "Texels pre-drawn per frame.", 64, 262144);
+            props.config_int("pool size", env_pool_size, "Directions in the per-frame pool.", 64,
+                             262144);
         }
         int32_t env_size_option = env_importance_log2 - 6;
         if (props.config_options("importance map", env_size_option, {"64", "128", "256", "512"},
                                  Properties::OptionsStyle::COMBO,
-                                 "Side length of the importance map, rebuilt every frame.")) {
+                                 "Side length of the importance map over the environment.")) {
             env_importance_log2 = env_size_option + 6;
             env_importance_resized = true;
         }
         props.st_end_child();
     }
 
-    if (props.st_begin_child("pool", "Pool")) {
-        props.config_bool("presampled", pool_presampled,
-                          "Draw the lights of a frame into a pool, so a sample is one load. Off "
-                          "searches the whole scene per sample.");
-        constants_dirty |= props.config_int(
-            "candidates", pool_candidates,
-            "Draws a vertex takes from the pool. Resampled into the one shadow ray by unshadowed "
-            "contribution (RIS); the mixture draws one of them.",
-            0, 32);
-        if (pool_presampled) {
-            props.config_int("size", pool_size, "Lights drawn per frame.", 64, 65536);
-        }
-        props.st_end_child();
-    }
-
-    if (props.st_begin_child("cell_grid", "Cell grid")) {
-        props.config_bool("enable", grid_enabled,
-                          "Keep a per-cell list of the light sources that reach it, so a shading "
-                          "point draws from the few lights that matter where it stands.");
-        if (grid_enabled) {
-            constants_dirty |= props.config_int(
-                "candidates", cell_candidates,
-                "Draws a vertex takes from the cell's list, alongside the ones the pool offers.", 0,
-                32);
-            props.config_percent("share", grid_share,
-                                 "How often a draw takes the cell's list. The rest falls back to "
-                                 "the pool, so a light the cell does not hold keeps a density.");
-            props.config_int("ranked per frame", grid_candidates,
-                             "Pool draws a cell ranks each frame. The list carries across frames, "
-                             "so a few are enough.",
-                             1, 256);
-            props.config_int("dimension", grid_dimension,
-                             "Cells per side of every cascade. Also sets how much of the view a "
-                             "cell covers, since a cascade is placed by the distance it has to "
-                             "reach.",
-                             4, 128);
-            props.config_int("cascades", grid_cascades,
-                             "Camera-anchored cascades. Each one doubles the cell size of the one "
-                             "before, so the resolution follows the distance to the camera.",
-                             1, 16);
-            props.config_float("cell size", grid_cell_size,
-                               "World units per cell of the finest cascade; 0 derives it from the "
-                               "distance to the lights.",
-                               0.1f, 0.f);
-            props.config_float("coverage", grid_coverage,
-                               "Fraction of the distance to the farthest light that the coarsest "
-                               "cascade spans, when the cell size is derived.",
-                               0.05f, 0.01f, 16.f);
-            props.config_float("jitter", grid_jitter,
-                               "Cells the lookup is offset by, so the cell boundaries do not show.",
-                               0.05f, 0.f, 2.f);
-            props.config_bool("without replacement", grid_a_res,
-                              "Draw the slots in proportion to what a source is worth here rather "
-                              "than keeping the largest. Off suits a cell that sees fewer sources "
-                              "than it has slots.");
-            props.config_int("max age", grid_max_age,
-                             "Frames over which a light that stopped earning its slot is overtaken "
-                             "by a fresh candidate.",
-                             1, 256);
-        }
-        props.st_end_child();
-    }
+    props.config_int("flux samples", flux_samples,
+                     "Emission evaluations per triangle and frame that estimate its power. Where "
+                     "the mesh has an emission micromap they land where it emits.",
+                     1, 256);
 
     if (props.st_begin_child("debug", "Debug")) {
-        props.config_bool("enable jitter", debug_jitter,
-                          "Off shows the cell structure the lookup actually sees.");
+        props.config_options(
+            "view", debug_view, {"draw outcome", "cell", "slots", "coverage"},
+            Properties::OptionsStyle::COMBO,
+            fmt::format(
+                "What a renderer's NEE debug output shows at the primary hit.\n"
+                "draw outcome: of {} light draws, the share blocked before the light (red), "
+                "reaching it (green), passing through where it is cut out (blue); dark where "
+                "draws produce no ray.\n"
+                "cell: the cell of the lookup.\n"
+                "slots: occupied slots (red), the visibility the cell learned for what it picks "
+                "(green), their actual visibility (blue).\n"
+                "coverage: of the direct light {} cosine-distributed rays find, the share the "
+                "draws can reach here (red), the share of lights not offered here (green), the "
+                "share no draw can ever reach (blue).",
+                LIGHT_DEBUG_DRAWS, LIGHT_DEBUG_COVERAGE_RAYS));
+        props.config_bool("jitter the lookup", debug_jitter,
+                          "Off shows the cells the lookup sees without its random shift.");
         props.st_end_child();
     }
 
+    const int32_t previous_selection = selection;
     selection = grid_enabled ? LightSelection::LightSelectionGrid
                              : (pool_presampled ? LightSelection::LightSelectionPool
                                                 : LightSelection::LightSelectionPower);
+    grid_reset |= selection == LightSelection::LightSelectionGrid &&
+                  previous_selection != LightSelection::LightSelectionGrid;
 
     props.output_text(fmt::format("emissive geometries: {}\nemissive triangles: {}",
                                   light_geometries.size(), triangle_count));
