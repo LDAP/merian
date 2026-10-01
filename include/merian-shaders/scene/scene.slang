@@ -619,6 +619,18 @@ struct Scene {
         return ray;
     }
 
+    uint light_ray_flags(const bool distant) {
+        // a sky portal in front of the environment must not end the search
+        return distant && nee.has_sky_portals ? RAY_FLAG_NONE
+                                              : RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH;
+    }
+
+    bool reaches_light(const Hit hit, const bool distant) {
+        if (let gd = get_geometry_data(hit))
+            return distant && nee.has_sky_portals && (gd.flags & GeometryDataFlags::UseEnvMap) != 0;
+        return true;
+    }
+
     // Shadow ray towards a point on a light. One ray query for every case: each query object
     // costs its own traversal stack.
     bool trace_light_visibility(const float3 pos,
@@ -628,18 +640,28 @@ struct Scene {
                                 const bool distant,
                                 const uint instances_mask = 0xff) {
         const RayDesc ray = make_light_ray(pos, face_normal, spawn_offset, light_pos, distant);
-        // a sky portal in front of the environment must not end the search
-        const bool closest = distant && nee.has_sky_portals;
-        SceneAccelerationStructure::RayQueryImpl rq;
-        as.trace_ray(rq, ray, closest ? RAY_FLAG_NONE : RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH,
-                     instances_mask);
-        _proceed_ray(rq);
-        if (rq.CommittedStatus() == COMMITTED_NOTHING)
-            return true;
-        if (!closest)
-            return false;
-        return (get_geometry_data(rq.CommittedInstanceID(), rq.CommittedGeometryIndex()).flags &
-                GeometryDataFlags::UseEnvMap) != 0;
+        return reaches_light(trace_ray(ray, light_ray_flags(distant), instances_mask), distant);
+    }
+
+    RayDesc make_light_ray(const float3 pos,
+                           const float3 face_normal,
+                           const float spawn_offset,
+                           const DirectLightSample direct) {
+        return make_light_ray(pos, face_normal, spawn_offset, direct.light_pos,
+                              direct.light_index == LIGHT_ENV_INDEX);
+    }
+
+    uint light_ray_flags(const DirectLightSample direct) {
+        return light_ray_flags(direct.light_index == LIGHT_ENV_INDEX);
+    }
+
+    float3 resolve_direct_light(const DirectLightVertex vertex,
+                                const DirectLightSample direct,
+                                const Hit hit) {
+        const bool visible = reaches_light(hit, direct.light_index == LIGHT_ENV_INDEX);
+        nee.record_visibility(vertex, direct.light_index, normalize(direct.light_pos - vertex.pos),
+                              visible);
+        return visible ? direct.value : float3(0);
     }
 
     float3 resolve_direct_light(const DirectLightVertex vertex,
@@ -650,11 +672,10 @@ struct Scene {
         if (!direct.hasValue)
             return float3(0);
         const DirectLightSample s = direct.value;
-        const bool visible =
-            trace_light_visibility(vertex.pos, face_normal, spawn_offset, s.light_pos,
-                                   s.light_index == LIGHT_ENV_INDEX, instances_mask);
-        nee.record_visibility(vertex, s.light_index, normalize(s.light_pos - vertex.pos), visible);
-        return visible ? s.value : float3(0);
+        return resolve_direct_light(
+            vertex, s,
+            trace_ray(make_light_ray(vertex.pos, face_normal, spawn_offset, s), light_ray_flags(s),
+                      instances_mask));
     }
 
     static float3
@@ -692,7 +713,7 @@ struct Scene {
                 if (held >= nee.table.triangle_count && !distant)
                     continue;
                 const float p = nee.grid.slot_share(vertex, base + slot, weights);
-                learned += p * nee.grid.visibility[base + slot];
+                learned += p * nee.grid.visibility[base + slot].x;
                 float3 centre;
                 if (distant) {
                     float sin_radius;

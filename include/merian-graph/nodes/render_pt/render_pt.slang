@@ -266,11 +266,6 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
         // taken after the mixture densities die, so only the record crosses the traversals below
         let guiding_record = params.guiding.record_scatter(guiding, segment, guided, rng);
 
-        const float3 direct_light =
-            throughput * scene.resolve_direct_light(lights, ng, spawn_offset, direct,
-                                                    merian_render_instance_mask);
-        radiance += direct_light;
-
         Reorder.reorder();
 
         const bool transmission = wi_local.z * wo_local.z < 0.f;
@@ -288,10 +283,11 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
             rec.vertex(params.path_records, vertex.pos, wo_world, record_pdf,
                        segment.pdf > 0.f ? record_f_cos / segment.pdf : float3(0),
                        uint(bounce) - 1u, record_lobe, record_method, record_material);
-            record_connection(rec, params, vertex.pos,
-                              merian_render_nee_mode == NEE_MODE_RESAMPLED && nee_surface, direct,
-                              throughput, direct_light,
-                              uint(bounce) - 1u, record_material);
+            if (!direct.hasValue) {
+                record_connection(rec, params, vertex.pos,
+                                  merian_render_nee_mode == NEE_MODE_RESAMPLED && nee_surface, none,
+                                  throughput, float3(0), uint(bounce) - 1u, record_material);
+            }
         }
 
         Optional<RayDesc> next_ray = none;
@@ -304,123 +300,138 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
                                     select(any(f_cos > 0.f) && !next_ray.hasValue, 1.f, 0.f));
         }
 
-        if (let next = next_ray) {
+        const bool continues = next_ray.hasValue;
+        if (continues) {
             if (merian_material_system_any_interior_volume && transmission) {
                 medium.cross_boundary(sp.surface_material.get_interior_volume(),
                                       dot(-ray.Direction, ng) >= 0.f);
             }
-            ray = next;
+            ray = next_ray.value;
+        }
 
-            float mis_weight = 1.f;
-            float3 chain_bsdf = float3(1);
-            float3 chain_transmittance = float3(1);
-            float apparent_distance = 0.f;
-            float apparent_depth_scale = 1.f;
-            float mirror_focal_length = 0.f;
-            bool through_specular = false;
+        float mis_weight = 1.f;
+        float3 chain_bsdf = float3(1);
+        float3 chain_transmittance = float3(1);
+        float apparent_distance = 0.f;
+        float apparent_depth_scale = 1.f;
+        float mirror_focal_length = 0.f;
+        bool through_specular = false;
 
-            for (;;) {
-                const Hit hit = scene.trace_ray(ray, RAY_FLAG_NONE, merian_render_instance_mask);
-
-                // before the hit is shaded; no light sampler reaches past a singular surface
-                if (!through_specular && nee_surface && !delta) {
-                    const uint light_index = scene.get_light_index(hit);
-                    scene.nee.record_discovery(lights, light_index, ray.Direction, rng);
-                    const float light_hit_pdf =
-                        scene.nee.pdf(lights, light_index, ray.Origin, ray.Direction,
-                                      hit.barycentrics, light_index == sampled_light);
-                    if (merian_render_nee_mode == NEE_MODE_RESAMPLED) {
-                        mis_weight = segment.pdf / (light_hit_pdf + segment.pdf);
-                    } else {
-                        const float light_pdf = p_light * scene.nee.mixture_pdf(light_hit_pdf);
-                        segment.pdf += light_pdf;
-                        if (record_waits) {
-                            rec.vertex(
-                                params.path_records, vertex.pos, wo_world, record_pdf + light_pdf,
-                                segment.pdf > 0.f ? record_f_cos / segment.pdf : float3(0),
-                                uint(bounce) - 1u, record_lobe, record_method, record_material);
-                            record_waits = false;
-                        }
-                        scene.nee.record_visibility(
-                            lights, sampled_light, light_dir,
-                            scene.nee.reaches_source(sampled_light, light_index));
-                        // occluded
-                        if (sampled_light != LIGHT_INVALID_INDEX && sampled_light != light_index) {
-                            segment.pdf = 0.f;
-                        }
-                    }
-                }
-
-                sp = scene.get_shading_point(ray, hit, RenderContext(bounce), DefaultLODSampler(),
-                                             !segment.is_last);
-
-                const float distance_travelled = distance(ray.Origin, sp.pos);
-                chain_transmittance *= medium.transmittance(distance_travelled);
-                // A curved mirror puts the image at its focal length R/2. One focusing in front
-                // of itself has no virtual image and keeps the distance.
-                float segment_length = distance_travelled;
-                if (mirror_focal_length != 0.f) {
-                    const float denominator = segment_length + mirror_focal_length;
-                    if (denominator > 1e-4f) {
-                        segment_length *= mirror_focal_length / denominator;
-                    }
-                    mirror_focal_length = 0.f;
-                }
-                apparent_distance += apparent_depth_scale * segment_length;
-
-                if (!merian_render_follow_specular || !sp.has_surface_material ||
-                    any(sp.emission > 0.f) ||
-                    bounce + uint16_t(2) >= merian_render_max_path_length) {
-                    break;
-                }
-                let follow_bsdf = sp.surface_material.get_bsdf();
-                if (!bsdf_is_delta_only(follow_bsdf.get_lobe_types()) &&
-                    follow_bsdf.effective_alpha >= merian_render_specular_alpha) {
-                    break;
-                }
-
-                const OrthonormalFrame chain_frame = sp.shading_frame;
-                const float3 chain_wi = chain_frame.to_local(-ray.Direction);
-                const Optional<ShadingFunctionSample> chain_sample =
-                    follow_bsdf.sample_eval(chain_wi, rng);
-                if (!chain_sample.hasValue) {
-                    break;
-                }
-                const float3 chain_wo_local = chain_sample.value.wo;
-                const float3 chain_wo = chain_frame.to_world(chain_wo_local);
-                const bool chain_transmission = chain_wi.z * chain_wo_local.z < 0.f;
-                const Optional<RayDesc> chain_ray =
-                    sp.make_ray(-ray.Direction, chain_wo, chain_transmission);
-                if (!chain_ray.hasValue) {
-                    break;
-                }
-
-                rec.vertex(params.path_records, sp.pos, chain_wo, chain_sample.value.pdf,
-                           throughput * chain_bsdf * chain_sample.value.weight, uint(bounce),
-                           path_record_pack_lobe(chain_sample.value.lobe) |
-                               (chain_transmission ? PATH_RECORD_LOBE_TRANSMISSION : 0u),
-                           PATH_RECORD_METHOD_BSDF, path_record_pack_material(sp.material_id));
-
-                chain_bsdf *= chain_sample.value.weight;
-                if (!chain_transmission) {
-                    const float radius =
-                        scene.get_curvature_radius(hit, scene.get_triangle_hit(hit));
-                    mirror_focal_length = 0.5f * (chain_wi.z < 0.f ? -radius : radius);
-                } else {
-                    // apparent depth of a refraction (Ruppert et al. 2020); eta is incident over
-                    // transmitted
-                    let interior = sp.surface_material.get_interior_volume();
-                    apparent_depth_scale *= interior.eta * abs(chain_wi.z / chain_wo_local.z);
-                    if (merian_material_system_any_interior_volume) {
-                        medium.cross_boundary(interior,
-                                              dot(-ray.Direction, sp.get_face_normal()) >= 0.f);
-                    }
-                }
-                ray = chain_ray.value;
-                through_specular = true;
-                bounce++;
+        // the light ray shares the continuation's traversal call site
+        bool light_pass = direct.hasValue;
+        while (light_pass || continues) {
+            const Hit hit = scene.trace_ray(
+                light_pass ? scene.make_light_ray(vertex.pos, ng, spawn_offset, direct.value) : ray,
+                light_pass ? scene.light_ray_flags(direct.value) : RAY_FLAG_NONE,
+                merian_render_instance_mask);
+            if (light_pass) {
+                light_pass = false;
+                const float3 direct_light =
+                    throughput * scene.resolve_direct_light(lights, direct.value, hit);
+                radiance += direct_light;
+                record_connection(rec, params, vertex.pos, true, direct, throughput, direct_light,
+                                  uint(bounce) - 1u, record_material);
+                continue;
             }
 
+            // before the hit is shaded; no light sampler reaches past a singular surface
+            if (!through_specular && nee_surface && !delta) {
+                const uint light_index = scene.get_light_index(hit);
+                scene.nee.record_discovery(lights, light_index, ray.Direction, rng);
+                const float light_hit_pdf =
+                    scene.nee.pdf(lights, light_index, ray.Origin, ray.Direction, hit.barycentrics,
+                                  light_index == sampled_light);
+                if (merian_render_nee_mode == NEE_MODE_RESAMPLED) {
+                    mis_weight = segment.pdf / (light_hit_pdf + segment.pdf);
+                } else {
+                    const float light_pdf = p_light * scene.nee.mixture_pdf(light_hit_pdf);
+                    segment.pdf += light_pdf;
+                    if (record_waits) {
+                        rec.vertex(params.path_records, vertex.pos, wo_world,
+                                   record_pdf + light_pdf,
+                                   segment.pdf > 0.f ? record_f_cos / segment.pdf : float3(0),
+                                   uint(bounce) - 1u, record_lobe, record_method, record_material);
+                        record_waits = false;
+                    }
+                    scene.nee.record_visibility(
+                        lights, sampled_light, light_dir,
+                        scene.nee.reaches_source(sampled_light, light_index));
+                    // occluded
+                    if (sampled_light != LIGHT_INVALID_INDEX && sampled_light != light_index) {
+                        segment.pdf = 0.f;
+                    }
+                }
+            }
+
+            sp = scene.get_shading_point(ray, hit, RenderContext(bounce), DefaultLODSampler(),
+                                         !segment.is_last);
+
+            const float distance_travelled = distance(ray.Origin, sp.pos);
+            chain_transmittance *= medium.transmittance(distance_travelled);
+            // A curved mirror puts the image at its focal length R/2. One focusing in front
+            // of itself has no virtual image and keeps the distance.
+            float segment_length = distance_travelled;
+            if (mirror_focal_length != 0.f) {
+                const float denominator = segment_length + mirror_focal_length;
+                if (denominator > 1e-4f) {
+                    segment_length *= mirror_focal_length / denominator;
+                }
+                mirror_focal_length = 0.f;
+            }
+            apparent_distance += apparent_depth_scale * segment_length;
+
+            if (!merian_render_follow_specular || !sp.has_surface_material ||
+                any(sp.emission > 0.f) || bounce + uint16_t(2) >= merian_render_max_path_length) {
+                break;
+            }
+            let follow_bsdf = sp.surface_material.get_bsdf();
+            if (!bsdf_is_delta_only(follow_bsdf.get_lobe_types()) &&
+                follow_bsdf.effective_alpha >= merian_render_specular_alpha) {
+                break;
+            }
+
+            const OrthonormalFrame chain_frame = sp.shading_frame;
+            const float3 chain_wi = chain_frame.to_local(-ray.Direction);
+            const Optional<ShadingFunctionSample> chain_sample =
+                follow_bsdf.sample_eval(chain_wi, rng);
+            if (!chain_sample.hasValue) {
+                break;
+            }
+            const float3 chain_wo_local = chain_sample.value.wo;
+            const float3 chain_wo = chain_frame.to_world(chain_wo_local);
+            const bool chain_transmission = chain_wi.z * chain_wo_local.z < 0.f;
+            const Optional<RayDesc> chain_ray =
+                sp.make_ray(-ray.Direction, chain_wo, chain_transmission);
+            if (!chain_ray.hasValue) {
+                break;
+            }
+
+            rec.vertex(params.path_records, sp.pos, chain_wo, chain_sample.value.pdf,
+                       throughput * chain_bsdf * chain_sample.value.weight, uint(bounce),
+                       path_record_pack_lobe(chain_sample.value.lobe) |
+                           (chain_transmission ? PATH_RECORD_LOBE_TRANSMISSION : 0u),
+                       PATH_RECORD_METHOD_BSDF, path_record_pack_material(sp.material_id));
+
+            chain_bsdf *= chain_sample.value.weight;
+            if (!chain_transmission) {
+                const float radius = scene.get_curvature_radius(hit, scene.get_triangle_hit(hit));
+                mirror_focal_length = 0.5f * (chain_wi.z < 0.f ? -radius : radius);
+            } else {
+                // apparent depth of a refraction (Ruppert et al. 2020); eta is incident over
+                // transmitted
+                let interior = sp.surface_material.get_interior_volume();
+                apparent_depth_scale *= interior.eta * abs(chain_wi.z / chain_wo_local.z);
+                if (merian_material_system_any_interior_volume) {
+                    medium.cross_boundary(interior,
+                                          dot(-ray.Direction, sp.get_face_normal()) >= 0.f);
+                }
+            }
+            ray = chain_ray.value;
+            through_specular = true;
+            bounce++;
+        }
+
+        if (continues) {
             segment.traced = true;
             segment.next_pos = sp.pos;
             segment.aim_pos =

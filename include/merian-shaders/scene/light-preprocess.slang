@@ -29,17 +29,16 @@ struct LightPreprocessBinding {
     StructuredBuffer<uint> pool_source;
     uint light_geometry_count;
     RWStructuredBuffer<uint> grid;
-    RWStructuredBuffer<float> grid_key;
-    RWStructuredBuffer<float> grid_visibility;
+    // per slot: (visibility, samples)
+    RWStructuredBuffer<float2> grid_visibility;
     RWStructuredBuffer<LightSource, ScalarDataLayout> grid_slot_sources;
     RWStructuredBuffer<float> grid_probability;
-    StructuredBuffer<float> grid_visibility_prev;
+    StructuredBuffer<float2> grid_visibility_prev;
     RWStructuredBuffer<uint> grid_feedback;
     StructuredBuffer<uint> grid_feedback_prev;
     RWStructuredBuffer<uint> grid_discovered;
     StructuredBuffer<uint> grid_discovered_prev;
     StructuredBuffer<uint> grid_prev;
-    StructuredBuffer<float> grid_key_prev;
     RWStructuredBuffer<LightGridInfo, ScalarDataLayout> grid_info;
     StructuredBuffer<LightGridInfo, ScalarDataLayout> grid_info_prev;
 
@@ -55,9 +54,6 @@ struct LightPreprocessBinding {
     float grid_jitter;
     // in cells of the finest cascade
     float grid_source_extent;
-    // frames over which a key that stopped earning its slot is overtaken
-    uint grid_max_age;
-    bool grid_a_res;
     float grid_even_share;
     LightSlotWeighing slot_weighing;
     bool env_regions;
@@ -312,6 +308,13 @@ grid_setup(uint local_id : SV_GroupIndex, ParameterBlock<LightPreprocessBinding>
             reach > 0.f ? max(2.f * reach / (float(dim) * exp2(float(cascades - 1u))), 1e-4f) : 1.f;
         // snapped so the cells keep their world positions as the bounds shift
         cell = exp2(ceil(log2(cell)));
+        const LightGridInfo prev = params.grid_info_prev[0];
+        if (!params.grid_reset && prev.dimension == dim && prev.cascade_count == cascades &&
+            prev.inv_cell_size > 0.f) {
+            const float prev_cell = 1.f / prev.inv_cell_size;
+            if (cell < prev_cell && cell >= 0.5f * prev_cell)
+                cell = prev_cell;
+        }
     }
 
     for (uint cascade = local_id; cascade < cascades; cascade += LIGHT_GRID_SETUP_GROUP) {
@@ -419,10 +422,10 @@ static const uint LIGHT_GRID_CANDIDATE_ENTRIES =
     LIGHT_GRID_MAX_NEW_LIGHTS + LIGHT_GRID_NEIGHBOURS + LIGHT_GRID_DISCOVERED;
 groupshared uint s_candidate[LIGHT_GRID_CANDIDATE_ENTRIES];
 groupshared float s_candidate_key[LIGHT_GRID_CANDIDATE_ENTRIES];
-groupshared float s_candidate_visibility[LIGHT_GRID_CANDIDATE_ENTRIES];
+groupshared float2 s_candidate_visibility[LIGHT_GRID_CANDIDATE_ENTRIES];
 groupshared uint s_slot_index[LIGHT_GRID_SLOTS];
 groupshared float s_slot_key[LIGHT_GRID_SLOTS];
-groupshared float s_slot_visibility[LIGHT_GRID_SLOTS];
+groupshared float2 s_slot_visibility[LIGHT_GRID_SLOTS];
 
 bool reproject_cell(const StructuredBuffer<LightGridInfo, ScalarDataLayout> grid_info_prev,
                     const LightGridInfo info,
@@ -449,12 +452,18 @@ bool reproject_cell(const StructuredBuffer<LightGridInfo, ScalarDataLayout> grid
     return true;
 }
 
+float rank_key(const uint light, const float weight, const float visibility) {
+    if (light == LIGHT_INVALID_INDEX || !(weight > 0.f))
+        return 1e30f;
+    return 1.f / (weight * max(visibility, LIGHT_GRID_MIN_VISIBILITY));
+}
+
 /* Each cell keeps the lights that reach it, ranked by what they deliver there.
  *
  * A candidate's key is the reciprocal of its importance for the cell and the cell keeps the
- * LIGHT_GRID_SLOTS smallest. Keys carry across frames, so the list ranks every candidate the cell
- * has ever seen rather than this frame's; they also age, so it follows the scene when the lights
- * or the camera move. One slot per source keeps the list on distinct lights.
+ * LIGHT_GRID_SLOTS smallest. The listed lights are weighed again every frame, so the list follows
+ * moving lights and occluders, and a candidate takes a slot only by a margin. One slot per source
+ * keeps the list on distinct lights.
  */
 [shader("compute")][numthreads(LIGHT_GRID_BUILD_GROUP, 1, 1)] void
 grid(uint3 group_id : SV_GroupID,
@@ -474,8 +483,7 @@ grid(uint3 group_id : SV_GroupID,
     const float radius = cg.radius;
     const uint new_lights = clamp(params.grid_new_lights, 1u, LIGHT_GRID_MAX_NEW_LIGHTS);
     const uint grid_pool = max(min(params.pool_size, LIGHT_GRID_POOL), 1u);
-    // a key lengthens by this much a frame, so a stale one is overtaken after grid_max_age
-    const float ageing = 1.f + 1.f / float(max(params.grid_max_age, 1u));
+    const float2 prior = float2(LIGHT_GRID_PRIOR_VISIBILITY, LIGHT_GRID_PRIOR_SAMPLES);
 
     uint prev_cascade;
     uint3 prev_coord;
@@ -492,24 +500,21 @@ grid(uint3 group_id : SV_GroupID,
     // 1. carried slots and new lights
     if (local_id < LIGHT_GRID_SLOTS) {
         uint held = LIGHT_INVALID_INDEX;
-        float key = 1e30f;
-        float visibility = LIGHT_GRID_PRIOR_VISIBILITY;
+        float2 visibility = prior;
         if (carry) {
             const uint entry = prev_cell * LIGHT_GRID_SLOTS + local_id;
             held = remap_carried(params, params.grid_prev[entry]);
             if (held != LIGHT_INVALID_INDEX) {
-                const float prev_visibility = params.grid_visibility_prev[entry];
+                const float2 prev = params.grid_visibility_prev[entry];
                 const float tries = float(params.grid_feedback_prev[2 * entry]);
                 const float hits = float(params.grid_feedback_prev[2 * entry + 1]);
-                visibility = (hits + LIGHT_GRID_PRIOR_SAMPLES * prev_visibility) /
-                             (tries + LIGHT_GRID_PRIOR_SAMPLES);
-                key = params.grid_key_prev[entry] * ageing *
-                      max(prev_visibility, LIGHT_GRID_MIN_VISIBILITY) /
-                      max(visibility, LIGHT_GRID_MIN_VISIBILITY);
+                visibility = float2((hits + prev.y * prev.x) / max(tries + prev.y, 1.f),
+                                    min(prev.y + tries, LIGHT_GRID_VISIBILITY_MEMORY));
             }
         }
         s_slot_index[local_id] = held;
-        s_slot_key[local_id] = key;
+        s_slot_key[local_id] =
+            rank_key(held, candidate_weight(params, held, center, radius), visibility.x);
         s_slot_visibility[local_id] = visibility;
     }
 
@@ -520,7 +525,7 @@ grid(uint3 group_id : SV_GroupID,
         const uint source = pooled < params.triangle_count ? pooled : LIGHT_INVALID_INDEX;
         s_candidate[c] = source;
         s_candidate_key[c] = candidate_weight(params, source, center, radius);
-        s_candidate_visibility[c] = LIGHT_GRID_PRIOR_VISIBILITY;
+        s_candidate_visibility[c] = prior;
     }
 
     // neighbours' slots
@@ -528,7 +533,7 @@ grid(uint3 group_id : SV_GroupID,
         const uint n_id = LIGHT_GRID_BUILD_GROUP - 1u - local_id;
         uint index = LIGHT_INVALID_INDEX;
         float weight = 0.f;
-        float visibility = LIGHT_GRID_PRIOR_VISIBILITY;
+        float2 visibility = prior;
         if (carry) {
             RandomGenerator rng = PCG(xxhash32(uint2(seed ^ 0x9e3779b9u, n_id)));
             const uint axis = min(uint(rng.next_float() * 3.f), 2u);
@@ -542,8 +547,6 @@ grid(uint3 group_id : SV_GroupID,
                 const uint neighbour_entry = neighbour * LIGHT_GRID_SLOTS + slot;
                 index = remap_carried(params, params.grid_prev[neighbour_entry]);
                 if (index != LIGHT_INVALID_INDEX) {
-                    visibility = params.grid_visibility_prev[neighbour_entry];
-                    // judged for this cell, not the one it came from
                     weight = candidate_weight(params, index, center, radius);
                 }
             }
@@ -563,7 +566,10 @@ grid(uint3 group_id : SV_GroupID,
         }
         s_candidate[discovered + local_id] = index;
         s_candidate_key[discovered + local_id] = weight;
-        s_candidate_visibility[discovered + local_id] = 1.f;
+        s_candidate_visibility[discovered + local_id] =
+            float2((1.f + LIGHT_GRID_PRIOR_SAMPLES * LIGHT_GRID_PRIOR_VISIBILITY) /
+                       (1.f + LIGHT_GRID_PRIOR_SAMPLES),
+                   1.f + LIGHT_GRID_PRIOR_SAMPLES);
         params.grid_discovered[cell * LIGHT_GRID_DISCOVERED + local_id] = LIGHT_INVALID_INDEX;
     }
     GroupMemoryBarrierWithGroupSync();
@@ -571,27 +577,11 @@ grid(uint3 group_id : SV_GroupID,
     // 2. keys
     for (uint c = local_id; c < ranked; c += LIGHT_GRID_BUILD_GROUP) {
         const uint index = s_candidate[c];
-        const float weight = s_candidate_key[c];
-        uint held = LIGHT_GRID_SLOTS;
-        for (uint slot = 0; slot < LIGHT_GRID_SLOTS; slot++) {
-            if (s_slot_index[slot] == index) {
-                held = slot;
-                break;
-            }
-        }
-        const float visibility =
-            held < LIGHT_GRID_SLOTS ? s_slot_visibility[held] : s_candidate_visibility[c];
-        float key = 1e30f;
-        if (index != LIGHT_INVALID_INDEX && weight > 0.f) {
-            // without replacement, so a cell that sees more sources than it has slots does not
-            // collapse onto the largest (A-Res, Efraimidis and Spirakis 2006)
-            RandomGenerator key_rng = PCG(xxhash32(uint3(seed, c, 0x85ebca6bu)));
-            key = (params.grid_a_res ? -log(max(key_rng.next_float(), 1e-7f)) / weight
-                                     : 1.f / weight) /
-                  max(visibility, LIGHT_GRID_MIN_VISIBILITY);
-        }
-        s_candidate_key[c] = key;
-        s_candidate_visibility[c] = visibility;
+        bool held = false;
+        for (uint slot = 0; slot < LIGHT_GRID_SLOTS; slot++)
+            held |= s_slot_index[slot] == index;
+        s_candidate_key[c] =
+            held ? 1e30f : rank_key(index, s_candidate_key[c], s_candidate_visibility[c].x);
     }
 
     bool carried_twice = false;
@@ -604,7 +594,7 @@ grid(uint3 group_id : SV_GroupID,
     if (carried_twice) {
         s_slot_index[local_id] = LIGHT_INVALID_INDEX;
         s_slot_key[local_id] = 1e30f;
-        s_slot_visibility[local_id] = LIGHT_GRID_PRIOR_VISIBILITY;
+        s_slot_visibility[local_id] = prior;
     }
     GroupMemoryBarrierWithGroupSync();
 
@@ -613,29 +603,19 @@ grid(uint3 group_id : SV_GroupID,
         const bool has_slot = local_id < LIGHT_GRID_SLOTS;
         uint slot_index = has_slot ? s_slot_index[local_id] : LIGHT_INVALID_INDEX;
         float slot_key = has_slot ? s_slot_key[local_id] : -1.f;
-        float slot_visibility = has_slot ? s_slot_visibility[local_id] : 0.f;
+        float2 slot_visibility = has_slot ? s_slot_visibility[local_id] : prior;
         float worst_key = WaveActiveMax(slot_key);
         for (uint c = 0; c < ranked; c++) {
-            float key = s_candidate_key[c];
-            if (key >= worst_key)
-                continue;
+            const float key = s_candidate_key[c];
             const uint index = s_candidate[c];
-            float visibility = s_candidate_visibility[c];
-            const uint held = WaveActiveBallot(slot_index == index).x;
-            uint target;
-            if (held != 0) {
-                target = firstbitlow(held);
-                const float held_visibility = WaveReadLaneAt(slot_visibility, target);
-                key *= max(visibility, LIGHT_GRID_MIN_VISIBILITY) /
-                       max(held_visibility, LIGHT_GRID_MIN_VISIBILITY);
-                visibility = held_visibility;
-            } else {
-                target = firstbitlow(WaveActiveBallot(slot_key == worst_key).x);
-            }
-            if (WaveGetLaneIndex() == target && key < slot_key) {
+            if (!(key < (worst_key < 1e30f ? LIGHT_GRID_REPLACE_MARGIN * worst_key : worst_key)) ||
+                WaveActiveAnyTrue(slot_index == index))
+                continue;
+            const uint target = firstbitlow(WaveActiveBallot(slot_key == worst_key).x);
+            if (WaveGetLaneIndex() == target) {
                 slot_index = index;
                 slot_key = key;
-                slot_visibility = visibility;
+                slot_visibility = s_candidate_visibility[c];
             }
             worst_key = WaveActiveMax(slot_key);
         }
@@ -652,14 +632,14 @@ grid(uint3 group_id : SV_GroupID,
 
     const uint entry = cell * LIGHT_GRID_SLOTS + local_id;
     const uint held = s_slot_index[local_id];
+    const float2 visibility = s_slot_visibility[local_id];
     params.grid[entry] = held;
-    params.grid_key[entry] = s_slot_key[local_id];
-    params.grid_visibility[entry] = s_slot_visibility[local_id];
+    params.grid_visibility[entry] = visibility;
     const bool listed = held != LIGHT_INVALID_INDEX;
     LightSource slot_source = {};
     if (listed) {
         slot_source = listed_light(params, held);
-        slot_source.flux *= max(s_slot_visibility[local_id], LIGHT_GRID_MIN_DRAW_VISIBILITY);
+        slot_source.flux *= max(visibility.x, LIGHT_GRID_MIN_DRAW_VISIBILITY);
     }
     if (params.slot_weighing == LightSlotWeighing::LightSlotWeighingShadingPoint) {
         params.grid_slot_sources[entry] = slot_source;

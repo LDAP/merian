@@ -58,8 +58,10 @@ static_assert(LIGHT_GRID_MAX_DRAWS * LIGHT_GRID_SLOT_BITS <= 32);
 #else
 static const float LIGHT_GRID_MIN_VISIBILITY = 0.05f;
 static const float LIGHT_GRID_MIN_DRAW_VISIBILITY = 0.0001f;
-static const float LIGHT_GRID_PRIOR_VISIBILITY = 0.1f;
+static const float LIGHT_GRID_PRIOR_VISIBILITY = 0.05f;
 static const float LIGHT_GRID_PRIOR_SAMPLES = 8.f;
+static const float LIGHT_GRID_VISIBILITY_MEMORY = 64.f;
+static const float LIGHT_GRID_REPLACE_MARGIN = 0.8f;
 #endif
 
 #ifndef __cplusplus

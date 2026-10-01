@@ -89,7 +89,7 @@ struct LightGrid {
     uint frame;
     float share;
     float even_share;
-    StructuredBuffer<float> visibility;
+    StructuredBuffer<float2> visibility;
     StructuredBuffer<LightSource, ScalarDataLayout> slot_sources;
     StructuredBuffer<float> probability;
     RWStructuredBuffer<uint> feedback;

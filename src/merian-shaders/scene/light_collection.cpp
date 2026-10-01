@@ -270,9 +270,7 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
                     !grid_buffer[i] || grid_buffer[i]->get_size() < slot_count * sizeof(uint32_t);
                 ensure_buffer(grid_buffer[i], slot_count * sizeof(uint32_t),
                               "LightCollection::grid", cmd);
-                ensure_buffer(grid_key_buffer[i], slot_count * sizeof(float),
-                              "LightCollection::grid_key", cmd);
-                ensure_buffer(grid_visibility_buffer[i], slot_count * sizeof(float),
+                ensure_buffer(grid_visibility_buffer[i], slot_count * sizeof(float2),
                               "LightCollection::grid_visibility", cmd);
                 ensure_buffer(grid_feedback_buffer[i], 2 * slot_count * sizeof(uint32_t),
                               "LightCollection::grid_feedback", cmd);
@@ -293,7 +291,6 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
         } else {
             for (uint32_t i = 0; i < 2; i++) {
                 retire_buffer(grid_buffer[i], cmd);
-                retire_buffer(grid_key_buffer[i], cmd);
                 retire_buffer(grid_visibility_buffer[i], cmd);
                 retire_buffer(grid_feedback_buffer[i], cmd);
                 retire_buffer(grid_discovered_buffer[i], cmd);
@@ -564,8 +561,6 @@ void LightCollection::update(const CommandBufferHandle& cmd,
             c["pool_source_out"] = pool_source_buffer;
             c["pool_source"] = pool_source_buffer;
             c["grid"] = or_dummy(grid_buffer[grid_slot]);
-            c["grid_key"] = or_dummy(grid_key_buffer[grid_slot]);
-            c["grid_key_prev"] = or_dummy(grid_key_buffer[grid_slot ^ 1]);
             c["grid_visibility"] = or_dummy(grid_visibility_buffer[grid_slot]);
             c["grid_slot_sources"] = or_dummy(grid_slot_sources_buffer);
             c["grid_probability"] = or_dummy(grid_probability_buffer);
@@ -597,8 +592,6 @@ void LightCollection::update(const CommandBufferHandle& cmd,
             c["grid_cell_size"] = grid_cell_size;
             c["grid_jitter"] = grid_jitter;
             c["grid_source_extent"] = grid_source_extent;
-            c["grid_max_age"] = static_cast<uint32_t>(grid_max_age);
-            c["grid_a_res"] = grid_a_res;
             c["grid_reset"] = grid_reset;
             c["frame"] = frame;
             return params;
@@ -818,14 +811,6 @@ void LightCollection::properties(Properties& props) {
                              "and lights its neighbours list are weighed too, and what a cell "
                              "learned carries across frames.",
                              1, static_cast<int32_t>(LIGHT_GRID_MAX_NEW_LIGHTS));
-            props.config_int("forget after", grid_max_age,
-                             "Frames after which a listed light that stopped earning its place "
-                             "loses it to a new one.",
-                             1, 256);
-            props.config_bool("random ranking", grid_a_res,
-                              "Rank lights by a random key weighted by their worth rather than by "
-                              "their worth alone, so a cell that sees more lights than it lists "
-                              "does not keep only the strongest.");
             props.config_float("source extent", grid_source_extent,
                                "Largest extent of one listed light, in cells of the finest "
                                "cascade. An emissive mesh that spreads further, such as a "

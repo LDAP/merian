@@ -170,8 +170,6 @@ class LightCollection {
     float grid_even_share = 0.1f;
     int32_t slot_weighing = LightSlotWeighing::LightSlotWeighingCell;
     bool grid_env_regions = true;
-    bool grid_a_res = true;
-    int32_t grid_max_age = 8;
     // set for a frame the carried-over grid cannot describe
     bool grid_reset = true;
     float3 camera_position{0.f};
@@ -209,7 +207,6 @@ class LightCollection {
     BufferHandle env_split_buffer;
     BufferHandle pool_buffer;
     BufferHandle grid_buffer[2];
-    BufferHandle grid_key_buffer[2];
     BufferHandle grid_visibility_buffer[2];
     BufferHandle grid_slot_sources_buffer;
     BufferHandle grid_probability_buffer;

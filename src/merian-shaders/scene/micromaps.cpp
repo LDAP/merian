@@ -703,12 +703,17 @@ bool Micromaps::get_opacity(const uint32_t mesh_id,
     return true;
 }
 
-std::optional<Micromaps::EmissionMicromap> Micromaps::get_emission(const uint32_t mesh_id) const {
+std::optional<Micromaps::EmissionMicromap> Micromaps::get_emission(
+    const uint32_t mesh_id, const uint32_t mesh_serial, const uint32_t primitive_count) const {
     const auto it = entries.find(mesh_id);
-    if (it == entries.end() || !it->second.ready || !it->second.emission_offsets) {
+    if (it == entries.end()) {
         return std::nullopt;
     }
     const Entry& entry = it->second;
+    if (!entry.ready || !entry.emission_offsets || entry.mesh_serial != mesh_serial ||
+        entry.primitive_count != primitive_count) {
+        return std::nullopt;
+    }
     return EmissionMicromap{entry.emission_offsets->get_device_address(),
                             emission_pool.buffer->get_device_address(), entry.subdivision_level};
 }

@@ -64,7 +64,9 @@ class Micromaps {
     bool get_opacity(const uint32_t mesh_id,
                      vk::AccelerationStructureTrianglesOpacityMicromapEXT& omm) const;
 
-    std::optional<EmissionMicromap> get_emission(const uint32_t mesh_id) const;
+    std::optional<EmissionMicromap> get_emission(const uint32_t mesh_id,
+                                                 const uint32_t mesh_serial,
+                                                 const uint32_t primitive_count) const;
 
     void properties(Properties& props);
 

@@ -100,8 +100,9 @@ struct Surface {
     half2
     compute_grad_z(const RayDesc ray, const float3 r_x, const float3 r_y, const float linear_z) {
         const float n_dot_oo = dot(face_normal, pos - ray.Origin);
-        return half2(half(n_dot_oo / dot(face_normal, r_x) - linear_z),
-                     half(n_dot_oo / dot(face_normal, r_y) - linear_z));
+        const float2 grad_z =
+            n_dot_oo / float2(dot(face_normal, r_x), dot(face_normal, r_y)) - linear_z;
+        return half2(clamp(grad_z, -65504.f, 65504.f));
     }
 }
 

@@ -1303,7 +1303,8 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
                             static_cast<GeometryID>(geometries.size()), instance_index,
                             mesh.get_primitive_count(), geometry_key});
                     if (micromaps) {
-                        if (const auto emission = micromaps->get_emission(mesh_id)) {
+                        if (const auto emission = micromaps->get_emission(
+                                mesh_id, info.serial, mesh.get_primitive_count())) {
                             emissive.emission_offsets = emission->offsets;
                             emissive.emission_records = emission->records;
                             emissive.emission_level = emission->level;
@@ -1788,6 +1789,10 @@ void Scene::ensure_micromaps(const CommandBufferHandle& cmd) {
     }
 
     const bool opacity = opacity_micromaps_enabled && Micromaps::is_opacity_supported(context);
+    const TextureManager& textures = *material_system->get_texture_manager();
+    const auto is_loaded = [&](const TextureID texture_id) {
+        return texture_id < textures.get_capacity() && textures.get_texture(texture_id);
+    };
     std::vector<Micromaps::MeshGeometry> baked;
     for (MeshID mesh_id = 0; mesh_id < mesh_infos.size(); mesh_id++) {
         const MeshInfo& info = mesh_infos[mesh_id];
@@ -1799,11 +1804,10 @@ void Scene::ensure_micromaps(const CommandBufferHandle& cmd) {
             continue;
         }
         const bool alpha_tested =
-            !mesh.is_opaque() && material_system->has_alpha_texture(mesh.material_id);
-        const bool emissive =
-            emission_micromaps_enabled && !(mesh.flags & MeshFlags::UseEnvMap) &&
-            material_system->is_emissive(mesh.material_id) &&
-            material_system->get_emission_texture_id(mesh.material_id) != TextureID(-1);
+            !mesh.is_opaque() && is_loaded(material_system->get_alpha_texture_id(mesh.material_id));
+        const bool emissive = emission_micromaps_enabled && !(mesh.flags & MeshFlags::UseEnvMap) &&
+                              material_system->is_emissive(mesh.material_id) &&
+                              is_loaded(material_system->get_emission_texture_id(mesh.material_id));
         if (!(opacity && alpha_tested) && !emissive) {
             continue;
         }
