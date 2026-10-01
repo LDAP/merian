@@ -7,7 +7,7 @@ __exported import merian_shaders.distributions.von_mises_fisher;
 
 using merian;
 
-static const uint16_t ML_MAX_N = 1024;
+static const uint8_t ML_MAX_N = 255;
 static const float ML_MIN_ALPHA = 0.01;
 
 extern static const float dir_guide_prior = 0.2;
@@ -28,7 +28,25 @@ struct MCState {
     float w_chord2;
 
     half3 mv;
-    uint16_t N;
+    uint16_t n_chain;
+
+    property uint8_t N {
+        get {
+            return uint8_t(n_chain & uint16_t(0xFF));
+        }
+        set {
+            n_chain = (n_chain & uint16_t(0xFF00)) | uint16_t(newValue);
+        }
+    }
+
+    property uint8_t chain {
+        get {
+            return uint8_t(n_chain >> 8u);
+        }
+        set {
+            n_chain = (n_chain & uint16_t(0xFF)) | (uint16_t(newValue) << 8u);
+        }
+    }
 
     float T;
 
@@ -38,7 +56,7 @@ struct MCState {
         w_chord2 = 0.0;
         mv = half3(0);
         T = 0.0;
-        N = uint16_t(0);
+        n_chain = uint16_t(0);
     }
 
     float3 get_target() {
@@ -128,15 +146,19 @@ struct MCState {
         w_chord2 *= factor;
     }
 
-        [mutating] void add_sample(const float3 pos,
-                                   const float w,
-                                   const float3 target,
-                                   const half3 target_mv,
-                                   const float time) {
-        N = min(uint16_t(N + uint16_t(1)), ML_MAX_N);
+    [mutating]
+    void add_sample(const float3 pos,
+                    const float w,
+                    const float3 target,
+                    const half3 target_mv,
+                    const float time,
+                    const uint8_t target_chain) {
+        const bool restart = chain != target_chain;
+        N = restart ? uint8_t(1) : uint8_t(min(uint(N) + 1u, uint(ML_MAX_N)));
+        chain = target_chain;
         const float alpha = max(1.0 / float(N), ML_MIN_ALPHA);
 
-        const bool had_aim = sum_w > 0.0;
+        const bool had_aim = !restart && sum_w > 0.0;
         const float3 dir_before = had_aim ? get_dir(pos) : float3(0);
 
         sum_w = lerp(sum_w, w, alpha);

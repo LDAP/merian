@@ -346,42 +346,42 @@ void RenderPT::update_render_constants() {
             mask |= (1u << bit);
     }
 
-    const std::string constants =
-        fmt::format("namespace merian {{\n"
-                    "export static const bool merian_render_emission_on_primary = {};\n"
-                    "export static const int merian_render_debug_output = {};\n"
-                    "export static const bool merian_render_follow_specular = {};\n"
-                    "export static const float merian_render_specular_alpha = {:f};\n"
-                    "export static const int merian_render_spp = {};\n"
-                    "export static const uint merian_render_seed = {}u;\n"
-                    "export static const int merian_render_max_path_length = {};\n"
-                    "export static const uint merian_render_instance_mask = {}u;\n"
-                    "export static const bool merian_render_enable_ser = {};\n"
-                    "export static const bool merian_render_demodulate_albedo = {};\n"
-                    "export static const int merian_render_nee_mode = {};\n"
-                    "export static const float merian_render_nee_probability = {:f};\n"
-                    "export static const int merian_render_nee_bounces = {};\n"
-                    "export static const int merian_render_scatter_mode = {};\n"
-                    "export static const int merian_render_scatter_candidates = {};\n"
-                    "export static const bool merian_render_russian_roulette = {};\n"
-                    "export static const int merian_render_volume_spp = {};\n"
-                    "export static const float merian_render_volume_forward_project_min_z "
-                    "= {:f};\n"
-                    "export static const float merian_guiding_share = {:f};\n"
-                    "export static const bool merian_guiding_scale_with_alpha = {};\n"
-                    "export static const float merian_guiding_alpha_threshold = {:f};\n"
-                    "export static const int merian_guiding_direct_target = {};\n"
-                    "export static const float merian_guiding_distance_share = {:f};\n"
-                    "}}",
-                    emission_on_primary ? "true" : "false",
-                    debug_connected ? static_cast<int32_t>(debug_output) : -1,
-                    follow_specular ? "true" : "false", specular_alpha, spp, seed, max_path_length,
-                    mask, enable_ser ? "true" : "false", demodulate_albedo ? "true" : "false",
-                    static_cast<int32_t>(nee_mode), nee_probability(), nee_bounces,
-                    static_cast<int32_t>(scatter_mode), scatter_candidates,
-                    russian_roulette ? "true" : "false", volume_spp, volume_forward_project_min_z,
-                    guided_probability(), guiding_scale_with_alpha ? "true" : "false",
-                    guiding_alpha_threshold, guiding_direct_target, guiding_distance_share);
+    const std::string constants = fmt::format(
+        "namespace merian {{\n"
+        "export static const bool merian_render_emission_on_primary = {};\n"
+        "export static const int merian_render_debug_output = {};\n"
+        "export static const bool merian_render_follow_specular = {};\n"
+        "export static const float merian_render_follow_max_roughness = {:f};\n"
+        "export static const int merian_render_spp = {};\n"
+        "export static const uint merian_render_seed = {}u;\n"
+        "export static const int merian_render_max_path_length = {};\n"
+        "export static const uint merian_render_instance_mask = {}u;\n"
+        "export static const bool merian_render_enable_ser = {};\n"
+        "export static const bool merian_render_demodulate_albedo = {};\n"
+        "export static const int merian_render_nee_mode = {};\n"
+        "export static const float merian_render_nee_probability = {:f};\n"
+        "export static const int merian_render_nee_bounces = {};\n"
+        "export static const int merian_render_scatter_mode = {};\n"
+        "export static const int merian_render_scatter_candidates = {};\n"
+        "export static const bool merian_render_russian_roulette = {};\n"
+        "export static const int merian_render_volume_spp = {};\n"
+        "export static const float merian_render_volume_forward_project_min_z "
+        "= {:f};\n"
+        "export static const float merian_guiding_share = {:f};\n"
+        "export static const bool merian_guiding_scale_with_alpha = {};\n"
+        "export static const float merian_guiding_alpha_threshold = {:f};\n"
+        "export static const int merian_guiding_direct_target = {};\n"
+        "export static const float merian_guiding_distance_share = {:f};\n"
+        "}}",
+        emission_on_primary ? "true" : "false",
+        debug_connected ? static_cast<int32_t>(debug_output) : -1,
+        follow_specular ? "true" : "false", follow_max_roughness, spp, seed, max_path_length, mask,
+        enable_ser ? "true" : "false", demodulate_albedo ? "true" : "false",
+        static_cast<int32_t>(nee_mode), nee_probability(), nee_bounces,
+        static_cast<int32_t>(scatter_mode), scatter_candidates, russian_roulette ? "true" : "false",
+        volume_spp, volume_forward_project_min_z, guided_probability(),
+        guiding_scale_with_alpha ? "true" : "false", guiding_alpha_threshold, guiding_direct_target,
+        guiding_distance_share);
     composition->add_module_from_string("render_pt_constants", constants);
     path_records.add_constants(composition);
 }
@@ -450,16 +450,14 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
         }
         constants_changed |= config.config_bool(
             "follow specular", follow_specular,
-            "Follow a surface that scatters singularly instead of making it a path vertex: it "
-            "cannot be guided and no light sampler can reach it, so it costs a guiding query and "
-            "a write for nothing, and leaves the vertex before it aiming at the surface rather "
-            "than at the light behind it.");
+            "Follow a smooth surface instead of making it a path vertex: no guiding lobe and no "
+            "light sampler resolves it, so it costs a guiding query and a write for nothing, and "
+            "leaves the vertex before it aiming at the surface rather than at the light behind "
+            "it.");
         if (follow_specular) {
-            constants_changed |= config.config_float(
-                "follow below alpha", specular_alpha,
-                "Also follow surfaces narrower than this, which do not scatter singularly. 0 "
-                "follows only the singular ones.",
-                0.01f, 0.f, 1.f);
+            constants_changed |=
+                config.config_float("follow below roughness", follow_max_roughness,
+                                    "Surfaces smoother than this are followed.", 0.01f, 0.f, 1.f);
         }
         constants_changed |= config.config_bool(
             "scale with roughness", guiding_scale_with_alpha,

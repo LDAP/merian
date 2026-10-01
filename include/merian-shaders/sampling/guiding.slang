@@ -18,6 +18,17 @@ struct RenderFrameInfo {
     uint index;
 }
 
+// One bit per followed surface below a leading 1, set where it transmitted. Rough once a surface
+// did not scatter singularly or more than seven were followed.
+static const uint8_t SPECULAR_CHAIN_EMPTY = 1;
+static const uint8_t SPECULAR_CHAIN_ROUGH = 0;
+
+uint8_t specular_chain_append(const uint8_t chain, const bool singular, const bool transmission) {
+    return chain == SPECULAR_CHAIN_ROUGH || chain >= uint8_t(0x80) || !singular
+               ? SPECULAR_CHAIN_ROUGH
+               : uint8_t((uint(chain) << 1u) | (transmission ? 1u : 0u));
+}
+
 // Plain data: a material here would drag the material existential into every guiding method.
 struct PathVertex {
     float3 pos;
@@ -44,10 +55,13 @@ struct PathSegment {
     float3 pos;
     float3 normal;
     uint16_t bounce;
+    // the surfaces followed to reach next_pos
+    uint8_t chain;
 
     float3 wo;
     // over every technique that could have generated wo
     float pdf;
+    // throughput from pos to next_pos, the surfaces followed on the way included
     float3 weight;
     bool delta;
     bool is_last;
@@ -59,6 +73,7 @@ struct PathSegment {
     float3 aim_pos;
     float3 next_normal;
     half3 next_mv;
+    // emitted at next_pos back along the path
     float3 incident;
     // the share of an emitter's incident radiance a guiding method learns
     float direct_scale;
@@ -88,8 +103,8 @@ interface GuidingModel : GuidingDebugModel {
     DistributionImpl get_distribution(inout PathState state, const RenderFrameInfo frame_info,
                                       const PathVertex vertex, inout RandomGenerator rng);
 
-    // Before the continuation ray: the segment carries only pos, normal, bounce, wo, pdf, delta
-    // and is_last. A zero pdf means the vertex generated no direction.
+    // Before the continuation ray: the segment carries only pos, normal, bounce, wo, pdf and
+    // delta. A zero pdf means the vertex generated no direction.
     UpdateRecord record_scatter(const DistributionImpl dist, const PathSegment segment,
                                 const bool guided, inout RandomGenerator rng);
 

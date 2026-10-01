@@ -248,13 +248,15 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
         }
         const float guide_f = mc_f * direct_scale;
 
+        const bool same_path = record.selected.chain == segment.chain;
         if (rng.next_float() * record.score_sum < guide_f * merian_guiding_mc_samples) {
             MCState chain = record.selected;
             chain.add_sample(segment.pos, guide_f, segment.aim_pos, segment.next_mv,
-                             frame_info.time);
+                             frame_info.time, segment.chain);
             mcpg.store(chain, segment.pos, segment.normal, frame_info.cam_pos, frame_info.index,
                        rng);
         } else if (merian_guiding_missing_light_heuristic && record.selected_pos.is_valid() &&
+                   same_path && segment.chain != SPECULAR_CHAIN_ROUGH &&
                    record.selected.light_missing_heuristic(guide_f, segment.wo, segment.pos,
                                                            segment.next_pos)) {
             mcpg.kill(record.selected_pos);

@@ -1,6 +1,9 @@
+#include "merian-shaders/utils/math-constants.slangh"
+
 import merian_shaders.debug.path_record;
 import merian_shaders.gbuffer;
 import merian_shaders.scene.scene;
+import merian_shaders.scene.virtual_image;
 import merian_shaders.utils.random;
 import merian_shaders.utils.hash;
 import merian_shaders.utils.textures;
@@ -25,7 +28,7 @@ extern static const uint merian_render_instance_mask = 0xFFu;
 extern static const bool merian_render_enable_ser = false;
 extern static const bool merian_render_demodulate_albedo = false;
 extern static const bool merian_render_follow_specular = true;
-extern static const float merian_render_specular_alpha = 0.f;
+extern static const float merian_render_follow_max_roughness = 0.25f;
 extern static const int merian_render_nee_mode = NEE_MODE_RESAMPLED;
 extern static const float merian_render_nee_probability = 0.5;
 extern static const int merian_render_nee_bounces = 0;
@@ -255,6 +258,7 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
         segment.weight = float3(0);
         segment.delta = delta;
         segment.traced = false;
+        segment.chain = SPECULAR_CHAIN_EMPTY;
         segment.is_last = bounce + uint16_t(1) >= merian_render_max_path_length;
         segment.next_pos = vertex.pos;
         segment.aim_pos = vertex.pos;
@@ -310,11 +314,8 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
         }
 
         float mis_weight = 1.f;
-        float3 chain_bsdf = float3(1);
-        float3 chain_transmittance = float3(1);
-        float apparent_distance = 0.f;
-        float apparent_depth_scale = 1.f;
-        float mirror_focal_length = 0.f;
+        float3 chain_weight = float3(1);
+        VirtualImage image = VirtualImage();
         bool through_specular = false;
 
         // the light ray shares the continuation's traversal call site
@@ -364,29 +365,18 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
             }
 
             sp = scene.get_shading_point(ray, hit, RenderContext(bounce), DefaultLODSampler(),
-                                         !segment.is_last);
+                                         bounce + uint16_t(1) < merian_render_max_path_length);
 
             const float distance_travelled = distance(ray.Origin, sp.pos);
-            chain_transmittance *= medium.transmittance(distance_travelled);
-            // A curved mirror puts the image at its focal length R/2. One focusing in front
-            // of itself has no virtual image and keeps the distance.
-            float segment_length = distance_travelled;
-            if (mirror_focal_length != 0.f) {
-                const float denominator = segment_length + mirror_focal_length;
-                if (denominator > 1e-4f) {
-                    segment_length *= mirror_focal_length / denominator;
-                }
-                mirror_focal_length = 0.f;
-            }
-            apparent_distance += apparent_depth_scale * segment_length;
+            chain_weight *= medium.transmittance(distance_travelled);
+            image.propagate(distance_travelled);
 
             if (!merian_render_follow_specular || !sp.has_surface_material ||
-                any(sp.emission > 0.f) || bounce + uint16_t(2) >= merian_render_max_path_length) {
+                any(sp.emission > 0.f)) {
                 break;
             }
             let follow_bsdf = sp.surface_material.get_bsdf();
-            if (!bsdf_is_delta_only(follow_bsdf.get_lobe_types()) &&
-                follow_bsdf.effective_alpha >= merian_render_specular_alpha) {
+            if (sqrt(follow_bsdf.effective_alpha) >= merian_render_follow_max_roughness) {
                 break;
             }
 
@@ -407,20 +397,25 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
             }
 
             rec.vertex(params.path_records, sp.pos, chain_wo, chain_sample.value.pdf,
-                       throughput * chain_bsdf * chain_sample.value.weight, uint(bounce),
+                       throughput * (segment.pdf > 0.f ? f_cos / segment.pdf : float3(0)) *
+                           chain_weight * chain_sample.value.weight,
+                       uint(bounce),
                        path_record_pack_lobe(chain_sample.value.lobe) |
                            (chain_transmission ? PATH_RECORD_LOBE_TRANSMISSION : 0u),
                        PATH_RECORD_METHOD_BSDF, path_record_pack_material(sp.material_id));
 
-            chain_bsdf *= chain_sample.value.weight;
+            chain_weight *= chain_sample.value.weight;
+            segment.chain = specular_chain_append(
+                segment.chain, bsdf_lobe_is_delta(chain_sample.value.lobe), chain_transmission);
+
+            const float2 curvature =
+                scene.get_curvatures(hit, scene.get_triangle_hit(hit), -ray.Direction);
             if (!chain_transmission) {
-                const float radius = scene.get_curvature_radius(hit, scene.get_triangle_hit(hit));
-                mirror_focal_length = 0.5f * (chain_wi.z < 0.f ? -radius : radius);
+                image.reflect(-ray.Direction, chain_wo, curvature);
             } else {
-                // apparent depth of a refraction (Ruppert et al. 2020); eta is incident over
-                // transmitted
                 let interior = sp.surface_material.get_interior_volume();
-                apparent_depth_scale *= interior.eta * abs(chain_wi.z / chain_wo_local.z);
+                image.refract(-ray.Direction, chain_wo, abs(chain_wi.z), abs(chain_wo_local.z),
+                              interior.eta, curvature);
                 if (merian_material_system_any_interior_volume) {
                     medium.cross_boundary(interior,
                                           dot(-ray.Direction, sp.get_face_normal()) >= 0.f);
@@ -433,21 +428,24 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
 
         if (continues) {
             segment.traced = true;
+            segment.is_last = bounce + uint16_t(1) >= merian_render_max_path_length;
             segment.next_pos = sp.pos;
-            segment.aim_pos =
-                through_specular ? segment.pos + wo_world * apparent_distance : sp.pos;
+            segment.aim_pos = through_specular ? segment.pos + wo_world * image.distance() : sp.pos;
             segment.next_normal = sp.shading_normal;
-            segment.next_mv = half3((sp.pos - sp.prev_pos) / scene.time_diff);
-            segment.incident = chain_bsdf * chain_transmittance * sp.emission;
+            const float3 next_motion = sp.pos - sp.prev_pos;
+            segment.next_mv = half3(clamp(
+                (through_specular ? image.displacement(next_motion, ray.Direction) : next_motion) /
+                    scene.time_diff,
+                -MERIAN_HALF_MAX, MERIAN_HALF_MAX));
+            segment.incident = sp.emission;
             const float direct_mis = through_specular ? 1.f : mis_weight;
             segment.direct_scale = guiding_direct_scale(direct_mis);
-            segment.weight = segment.pdf > 0.f ? f_cos / segment.pdf : float3(0);
+            segment.weight = segment.pdf > 0.f ? f_cos / segment.pdf * chain_weight : float3(0);
 
             throughput *= segment.weight;
             const float3 emitted = throughput * segment.incident * direct_mis;
             radiance += emitted;
             rec.emission(emitted);
-            throughput *= chain_bsdf;
         }
 
         if (merian_path_record && record_waits) {

@@ -112,7 +112,7 @@ class RenderPT : public Node {
     DebugOutput debug_output = DebugOutput::ScatterStatistics;
     bool debug_connected = false;
     bool follow_specular = true;
-    float specular_alpha = 0.f;
+    float follow_max_roughness = 0.25f;
     ScatterMode scatter_mode = ScatterMode::MIS;
     int32_t scatter_candidates = 2;
 

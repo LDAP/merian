@@ -147,6 +147,7 @@ void render_pixel(const uint2 pixel,
         segment.delta = false;
         segment.is_last = true;
         segment.traced = false;
+        segment.chain = SPECULAR_CHAIN_EMPTY;
         segment.next_pos = scatter_pos;
         segment.aim_pos = scatter_pos;
         segment.next_normal = segment.normal;
@@ -179,9 +180,10 @@ void render_pixel(const uint2 pixel,
             segment.aim_pos = sp.pos;
             segment.next_normal = sp.shading_normal;
             segment.next_mv = half3((sp.pos - sp.prev_pos) / scene.time_diff);
-            segment.incident = sp.emission * medium.transmittance(distance(ray.Origin, sp.pos));
+            segment.incident = sp.emission;
             segment.direct_scale = guiding_direct_scale(mis_weight);
-            segment.weight = segment.pdf > 0.f ? f_cos / segment.pdf : float3(0);
+            const float3 transmittance = medium.transmittance(distance(ray.Origin, sp.pos));
+            segment.weight = segment.pdf > 0.f ? f_cos / segment.pdf * transmittance : float3(0);
 
             contribution += segment.weight * segment.incident * mis_weight;
         }

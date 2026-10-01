@@ -330,30 +330,41 @@ struct Scene {
         return tri;
     }
 
-    /* Radius of curvature of the smooth surface at a hit, signed against its own normals.
-     *
-     * On a sphere p = c + R n, so an edge and the turn of the vertex normals across it are
-     * proportional and R falls out of their ratio; both edges are used at once, in the
-     * least-squares sense. Positive where the surface curves away from the side its normals point
-     * to, zero where it is flat or flat-shaded.
-     */
-    float get_curvature_radius(const Hit hit, const TriangleHit tri) {
+    // Normal curvatures across and along the plane of incidence of wi, positive where the surface
+    // bulges towards wi.
+    float2 get_curvatures(const Hit hit, const TriangleHit tri, const float3 wi) {
         if (tri.gd.flags & GeometryDataFlags::FlatShading) {
-            return 0.f;
+            return float2(0.f);
         }
-        const float3 n0 = decode_normal(tri.v0.encoded_normal);
-        const float3 dn01 = decode_normal(tri.v1.encoded_normal) - n0;
-        const float3 dn02 = decode_normal(tri.v2.encoded_normal) - n0;
-        const float turn = dot(dn01, dn01) + dot(dn02, dn02);
-        if (turn < 1e-10f) {
-            return 0.f;
+        const uint instance = hit.instance_index;
+        const float3 n0 = to_world_normal(tri.gd, instance, decode_normal(tri.v0.encoded_normal));
+        const float3 dn1 =
+            to_world_normal(tri.gd, instance, decode_normal(tri.v1.encoded_normal)) - n0;
+        const float3 dn2 =
+            to_world_normal(tri.gd, instance, decode_normal(tri.v2.encoded_normal)) - n0;
+        const float3 e1 = to_world_vector(tri.gd, instance, tri.get_triangle_edge01());
+        const float3 e2 = to_world_vector(tri.gd, instance, tri.get_triangle_edge02());
+        const float3 w = normalize(cross(e1, e2));
+        const float3 u = normalize(e1);
+        const float3 v = cross(w, u);
+
+        // S E = D for the edges E and normal turns D in the face's plane
+        const float det = dot(e1, u) * dot(e2, v) - dot(e2, u) * dot(e1, v);
+        if (!(abs(det) > 0.f)) {
+            return float2(0.f);
         }
-        const float3 e01 = tri.get_triangle_edge01();
-        const float3 e02 = tri.get_triangle_edge02();
-        // the edges are object space, so a scaled instance needs its edge scale putting back
-        const float scale =
-            length(to_world_vector(tri.gd, hit.instance_index, e01)) / max(length(e01), 1e-20f);
-        return scale * (dot(e01, dn01) + dot(e02, dn02)) / turn;
+        const float2x2 e_inv = float2x2(dot(e2, v), -dot(e2, u), -dot(e1, v), dot(e1, u)) / det;
+        const float2x2 d = float2x2(dot(dn1, u), dot(dn2, u), dot(dn1, v), dot(dn2, v));
+        const float2x2 shape = mul(d, e_inv);
+        const float2x2 symmetric = 0.5f * (shape + transpose(shape));
+
+        const float3 in_plane = wi - dot(wi, w) * w;
+        const float3 t = dot(in_plane, in_plane) > 1e-12f ? normalize(in_plane) : u;
+        const float3 b = cross(w, t);
+        const float2 t2 = float2(dot(t, u), dot(t, v));
+        const float2 b2 = float2(dot(b, u), dot(b, v));
+        const float side = dot(wi, 3.f * n0 + dn1 + dn2) >= 0.f ? 1.f : -1.f;
+        return side * float2(dot(b2, mul(symmetric, b2)), dot(t2, mul(symmetric, t2)));
     }
 
     Surface get_surface(const Hit hit, const TriangleHit tri) {

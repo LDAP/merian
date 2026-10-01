@@ -1,4 +1,5 @@
 import merian_shaders.scene.scene;
+import merian_shaders.scene.virtual_image;
 import merian_shaders.gbuffer;
 import merian_shaders.utils.textures;
 import merian_shaders.utils.ray_differential;
@@ -53,57 +54,74 @@ struct SpecularChain {
     ShadingPoint sp;
     RayDesc ray;
     float travelled;
+    VirtualImage image;
 }
 
 SpecularChain trace_specular_chain(const ParameterBlock<Scene> scene,
                                    const uint instance_mask,
                                    RayDesc ray,
+                                   Hit hit,
                                    ShadingPoint sp,
                                    inout RandomGenerator rng) {
+    VirtualImage image = VirtualImage();
+    image.propagate(distance(ray.Origin, sp.pos));
     float travelled = 0.f;
     for (int bounce = 0; bounce < merian_gbuffer_specular_max_bounces; bounce++) {
         if (!sp.has_surface_material) {
-            return {sp, ray, bounce == 0 ? 0.f : MAX_LINEAR_Z};
+            return {sp, ray, bounce == 0 ? 0.f : MAX_LINEAR_Z, image};
         }
         let bsdf = sp.surface_material.get_bsdf();
         if (sqrt(bsdf.specular_alpha) >= merian_gbuffer_specular_max_roughness) {
-            return {sp, ray, travelled};
+            return {sp, ray, travelled, image};
         }
 
         const OrthonormalFrame frame = sp.shading_frame;
         const float3 wi_local = frame.to_local(-ray.Direction);
         const Optional<float3> wo_local = bsdf.sample(wi_local, rng);
         if (!wo_local.hasValue) {
-            return {sp, ray, travelled};
+            return {sp, ray, travelled, image};
         }
-        const Optional<RayDesc> next = sp.make_ray(-ray.Direction, frame.to_world(wo_local.value),
-                                                   wi_local.z * wo_local.value.z < 0.f);
+        const float3 wo = frame.to_world(wo_local.value);
+        const bool transmission = wi_local.z * wo_local.value.z < 0.f;
+        const Optional<RayDesc> next = sp.make_ray(-ray.Direction, wo, transmission);
         if (!next.hasValue) {
-            return {sp, ray, travelled};
+            return {sp, ray, travelled, image};
+        }
+
+        const float2 curvature =
+            scene.get_curvatures(hit, scene.get_triangle_hit(hit), -ray.Direction);
+        if (transmission) {
+            image.refract(-ray.Direction, wo, abs(wi_local.z), abs(wo_local.value.z),
+                          sp.surface_material.get_interior_volume().eta, curvature);
+        } else {
+            image.reflect(-ray.Direction, wo, curvature);
         }
 
         const float3 from = sp.pos;
         ray = next.value;
-        sp = scene.get_shading_point(ray, scene.trace_ray(ray, RAY_FLAG_NONE, instance_mask),
-                                     RenderContext(uint16_t(bounce + 1)), DefaultLODSampler(), true);
+        hit = scene.trace_ray(ray, RAY_FLAG_NONE, instance_mask);
+        sp = scene.get_shading_point(ray, hit, RenderContext(uint16_t(bounce + 1)),
+                                     DefaultLODSampler(), true);
         travelled += distance(from, sp.pos);
+        image.propagate(distance(from, sp.pos));
     }
-    return {sp, ray, min(travelled, MAX_LINEAR_Z)};
+    return {sp, ray, min(travelled, MAX_LINEAR_Z), image};
 }
 
 SpecularChain specular_chain(const ParameterBlock<Scene> scene,
                              const uint instance_mask,
                              const RayDesc ray,
+                             const Hit hit,
                              const ShadingPoint sp,
                              const uint2 pixel) {
     if (merian_gbuffer_specular_lobe == 0) {
         RandomGenerator rng = XorShift32(pcg3d16(uint3(pixel, scene.frame)));
-        return trace_specular_chain(scene, instance_mask, ray, sp, rng);
+        return trace_specular_chain(scene, instance_mask, ray, hit, sp, rng);
     }
     RandomGenerator rng = ConstantRandom(merian_gbuffer_specular_lobe == 1   ? 0.f
                                          : merian_gbuffer_specular_lobe == 2 ? 1.f
                                                                              : 0.5f);
-    return trace_specular_chain(scene, instance_mask, ray, sp, rng);
+    return trace_specular_chain(scene, instance_mask, ray, hit, sp, rng);
 }
 
 GBufferSample make_sample(const Camera camera,
@@ -192,16 +210,18 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<WGBuffer> gbuffer) {
             sample.roughness = sqrt(bsdf.specular_alpha);
             if (merian_gbuffer_write_specular_hit_distance || merian_gbuffer_specular_psr) {
                 const SpecularChain chain = specular_chain(
-                    scene, params.instance_mask, ray,
+                    scene, params.instance_mask, ray, hit,
                     scene.get_shading_point(ray, hit, RenderContext(), GradLODSampler(ddx, ddy)),
                     pixel);
                 sample.specular_hit_distance = chain.travelled;
 
                 if (merian_gbuffer_specular_psr && chain.travelled > 0.f) {
-                    const float virtual_z = linear_z + chain.travelled;
+                    const float virtual_z = chain.image.distance();
                     const float3 virtual_pos = ray.Origin + virtual_z * ray.Direction;
                     const float2 virtual_mv = scene.compute_motion_vector(
-                        virtual_pos + (chain.sp.prev_pos - chain.sp.pos), virtual_pos, pixel, dim);
+                        virtual_pos + chain.image.displacement(chain.sp.prev_pos - chain.sp.pos,
+                                                               chain.ray.Direction),
+                        virtual_pos, pixel, dim);
                     if (chain.sp.has_surface_material) {
                         let chain_bsdf = chain.sp.surface_material.get_bsdf();
                         const OrthonormalFrame chain_frame = chain.sp.shading_frame;

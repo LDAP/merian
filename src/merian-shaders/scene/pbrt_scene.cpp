@@ -530,7 +530,8 @@ MaterialID PBRTScene::material_for_shape(const CommandBufferHandle& cmd,
 
 namespace {
 
-bool fill_trianglemesh(const ParamDict& p, Scene::SimpleMesh& sm) {
+// Without normals pbrt shades a mesh with its geometric normal.
+bool fill_trianglemesh(const ParamDict& p, Scene::SimpleMesh& sm, bool& flat_shading) {
     const std::vector<float3> positions = p.get_vec3_list("P");
     if (positions.empty()) {
         return false;
@@ -556,7 +557,8 @@ bool fill_trianglemesh(const ParamDict& p, Scene::SimpleMesh& sm) {
     }
 
     std::vector<float3> normals = p.get_vec3_list("N");
-    if (normals.size() != positions.size()) {
+    flat_shading = normals.size() != positions.size();
+    if (flat_shading) {
         normals = compute_vertex_normals(positions, triangles);
     } else {
         for (float3& n : normals) {
@@ -574,7 +576,7 @@ bool fill_trianglemesh(const ParamDict& p, Scene::SimpleMesh& sm) {
     return true;
 }
 
-bool fill_plymesh(const std::filesystem::path& path, Scene::SimpleMesh& sm) {
+bool fill_plymesh(const std::filesystem::path& path, Scene::SimpleMesh& sm, bool& flat_shading) {
     // miniply reads from a file path; decompress .ply.gz to runtime scratch.
     std::filesystem::path actual = path;
     std::optional<std::filesystem::path> temp;
@@ -660,7 +662,8 @@ bool fill_plymesh(const std::filesystem::path& path, Scene::SimpleMesh& sm) {
                                        static_cast<uint32_t>(tri[i + 2]));
             }
             std::vector<float3> normals;
-            if (nrm.size() == pos.size()) {
+            flat_shading = nrm.size() != pos.size();
+            if (!flat_shading) {
                 normals.resize(vertex_count);
                 for (uint32_t i = 0; i < vertex_count; i++) {
                     const float3 n(nrm[i * 3], nrm[i * 3 + 1], nrm[i * 3 + 2]);
@@ -779,20 +782,23 @@ std::optional<Scene::MeshID> PBRTScene::build_shape_mesh(const CommandBufferHand
     }
 
     auto sm = std::make_unique<SimpleMesh>();
+    bool flat_shading = false;
     if (shape.type == "trianglemesh" || shape.type == "loopsubdiv") {
-        if (!fill_trianglemesh(shape.params, *sm)) {
+        if (!fill_trianglemesh(shape.params, *sm, flat_shading)) {
             SPDLOG_WARN("PBRTScene: invalid trianglemesh (shape {})", shape_index);
             return std::nullopt;
         }
         if (shape.type == "loopsubdiv") {
             warn_once("loopsubdiv", "loading subdivision control meshes unsubdivided");
+            // the limit surface is smooth
+            flat_shading = false;
         }
     } else if (shape.type == "plymesh") {
         const std::string filename = shape.params.get_string("filename", "");
         const std::filesystem::path path = std::filesystem::path(filename).is_absolute()
                                                ? std::filesystem::path(filename)
                                                : base_dir / filename;
-        if (filename.empty() || !fill_plymesh(path, *sm)) {
+        if (filename.empty() || !fill_plymesh(path, *sm, flat_shading)) {
             SPDLOG_WARN("PBRTScene: failed to load plymesh '{}'", filename);
             return std::nullopt;
         }
@@ -826,6 +832,9 @@ std::optional<Scene::MeshID> PBRTScene::build_shape_mesh(const CommandBufferHand
     }
     if (shape.params.find("S") != nullptr) {
         flags = flags | MeshFlags::HasTangents;
+    }
+    if (flat_shading) {
+        flags = flags | MeshFlags::FlatShading;
     }
     sm->flags = flags;
 
