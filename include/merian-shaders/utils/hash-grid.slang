@@ -489,6 +489,14 @@ struct HashGrid<typename T,
                                 prev_cam_pos, frame, update, rng);
     }
 
+    HashGridPos cell_at_level(const uint level,
+                              const float3 pos,
+                              const float3 normal,
+                              inout RandomGenerator rng) {
+        const int3 gidx = grid_idx(pos, grid_inv_width_for_level(level), rng);
+        return get_hash_grid_pos(gidx, level, normal);
+    }
+
     // Replaces the slot value instead of accumulating, so no prev-level lookup is needed.
     void _set_at_level<let has_normal : bool>(const uint level,
                                               const float3 pos,
@@ -500,7 +508,10 @@ struct HashGrid<typename T,
 
         const uint level_normal =
             has_normal ? level_normal_word(level, normal) : level_normal_word(level);
-        const HashGridPos cell = get_hash_grid_pos(gidx, level_normal);
+        set_cell(get_hash_grid_pos(gidx, level_normal), frame, t);
+    }
+
+    void set_cell(const HashGridPos cell, const uint frame, const T t) {
         const uint base = cell.slot;
         const uint hash = cell.key;
 

@@ -45,6 +45,7 @@ SlangCompositionHandle MCPGGuidingModel::get_composition() const {
                     "export static const int merian_guiding_mc_samples = {};\n"
                     "export static const float merian_guiding_weight_exponent = {};\n"
                     "export static const bool merian_guiding_missing_light_heuristic = {};\n"
+                    "export static const int merian_guiding_replacement = {};\n"
                     "export static const bool merian_guiding_light_cache_tail = {};\n"
                     "export static const float merian_guiding_lc_min_pdf = {};\n"
                     "}}\n"
@@ -52,8 +53,8 @@ SlangCompositionHandle MCPGGuidingModel::get_composition() const {
                     "export static const float mc_conf_z = {};\n"
                     "export static const bool mc_welford_chord = {};",
                     mc_samples, weight_exponent, missing_light_heuristic ? "true" : "false",
-                    light_cache_tail ? "true" : "false", lc_min_pdf, dir_guide_prior, mc_conf_z,
-                    mc_welford_chord ? "true" : "false"));
+                    replacement, light_cache_tail ? "true" : "false", lc_min_pdf, dir_guide_prior,
+                    mc_conf_z, mc_welford_chord ? "true" : "false"));
     return composition;
 }
 
@@ -106,6 +107,13 @@ bool MCPGGuidingModel::properties(Properties& props) {
         constants_changed |= props.config_bool(
             "missing light heuristic", missing_light_heuristic,
             "Flood the Markov chains with invalidated states when no light is detected.");
+        constants_changed |= props.config_options(
+            "replacement", replacement,
+            {"always (Alber et al. 2025)", "mutated state / replaced state"},
+            Properties::OptionsStyle::COMBO,
+            "A mutated state overwrites the state in the slot it is stored to either always or "
+            "with probability its weight over that state's weight, so a dim state cannot displace "
+            "a brighter one.");
         recreate |= props.config_uint("adaptive grid buf size", mc_buffer_size,
                                       "Buffer size backing the hash grid.");
         constants_changed |=

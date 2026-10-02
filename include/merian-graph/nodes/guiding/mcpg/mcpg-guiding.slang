@@ -13,8 +13,14 @@ namespace merian {
 extern static const int merian_guiding_mc_samples = 5;
 extern static const float merian_guiding_weight_exponent = 1.0;
 extern static const bool merian_guiding_missing_light_heuristic = true;
+extern static const int merian_guiding_replacement = 1;
 extern static const bool merian_guiding_light_cache_tail = false;
 extern static const float merian_guiding_lc_min_pdf = 1.0;
+
+enum MCPGReplacement {
+    Always,
+    MutatedOverReplaced,
+}
 
 // Invalid where the direction did not come from the guiding: that starts a fresh chain.
 enum MCPGDebugView {
@@ -253,8 +259,12 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
             MCState chain = record.selected;
             chain.add_sample(segment.pos, guide_f, segment.aim_pos, segment.next_mv,
                              frame_info.time, segment.chain);
-            mcpg.store(chain, segment.pos, segment.normal, frame_info.cam_pos, frame_info.index,
-                       rng);
+            const HashGridPos destination =
+                mcpg.destination(segment.pos, segment.normal, frame_info.cam_pos, rng);
+            if (merian_guiding_replacement == MCPGReplacement::Always ||
+                rng.next_float() * mcpg.weight_at(destination) < chain.sum_w) {
+                mcpg.store(chain, destination, frame_info.index);
+            }
         } else if (merian_guiding_missing_light_heuristic && record.selected_pos.is_valid() &&
                    same_path && segment.chain != SPECULAR_CHAIN_ROUGH &&
                    record.selected.light_missing_heuristic(guide_f, segment.wo, segment.pos,

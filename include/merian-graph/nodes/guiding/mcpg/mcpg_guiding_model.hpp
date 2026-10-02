@@ -59,6 +59,7 @@ class MCPGGuidingModel : public GuidingModel {
     bool mc_welford_chord = true;
     float weight_exponent = 1.0f;
     bool missing_light_heuristic = true;
+    int replacement = 1;
     bool light_cache_tail = false;
     float lc_min_pdf = 1.0f;
 

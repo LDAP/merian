@@ -235,13 +235,21 @@ struct MCPG<let ADAPTIVE_BUFFER_SIZE : uint,
         return at_time(grid_pos, time);
     }
 
-    void store(const MCState s,
-               const float3 pos,
-               const float3 access_normal,
-               const float3 cam_pos,
-               const uint frame,
-               inout RandomGenerator rng) {
-        grid.distributed_set(pos, access_normal, cam_pos, frame, s, rng);
+    HashGridPos destination(const float3 pos,
+                            const float3 access_normal,
+                            const float3 cam_pos,
+                            inout RandomGenerator rng) {
+        return grid.cell_at_level(grid.distributed_level_for_pos(pos, cam_pos, rng), pos,
+                                  access_normal, rng);
+    }
+
+    float weight_at(const HashGridPos cell) {
+        const HashGridPos found = grid.find(cell);
+        return found.is_valid() ? grid.data[found.slot].t.sum_w : 0.0;
+    }
+
+    void store(const MCState s, const HashGridPos cell, const uint frame) {
+        grid.set_cell(cell, frame, s);
     }
 
     void store_at_level(const MCState s,
