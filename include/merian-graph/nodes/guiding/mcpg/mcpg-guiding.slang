@@ -24,13 +24,16 @@ enum MCPGReplacement {
 
 // Invalid where the direction did not come from the guiding: that starts a fresh chain.
 enum MCPGDebugView {
-    Cell,
-    Level,
-    ChainWeight,
-    Aim,
-    LobeWidth,
-    Samples,
-    TargetMotion,
+    LightCache,
+    Grid,
+    Lod,
+    Weight,
+    MeanDirection,
+    Cos,
+    N,
+    MV,
+    LCNormalBinActual,
+    LCNormalBinSelected,
     Unresolved,
 };
 
@@ -168,35 +171,54 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
                       const PathVertex vertex,
                       inout RandomGenerator rng) {
         const float3 cam = frame_info.cam_pos;
-        if (debug_selector == MCPGDebugView::Cell) {
+        switch (debug_selector) {
+        case MCPGDebugView::LightCache: {
+            if (let l = irr_cache.grid.get(vertex.pos, vertex.normal, cam, rng)) {
+                return float4(float3(l.irr), 1);
+            }
+            return float4(1, 0, 1, 1);
+        }
+        case MCPGDebugView::Grid: {
             const uint level = mcpg.grid.distributed_level_for_pos(vertex.pos, cam, rng);
             const int3 gidx =
                 mcpg.grid.grid_idx(vertex.pos, mcpg.grid.grid_inv_width_for_level(level), rng);
             return float4(random_color(mcpg.grid.buffer_index(gidx, level)), 1);
         }
-        if (debug_selector == MCPGDebugView::Level) {
-            return float4(
-                debug_color(mcpg.grid.distributed_level_for_pos(vertex.pos, cam, rng) / 63.0), 1);
+        case MCPGDebugView::Lod:
+            return float4(float3(mcpg.grid.distributed_level_for_pos(vertex.pos, cam, rng) / 63.0),
+                          1);
+        case MCPGDebugView::LCNormalBinActual: {
+            const uint level = irr_cache.grid.target_level_for_pos(vertex.pos, cam, rng);
+            return float4(random_color(irr_cache.grid.normal_bin(vertex.normal, level)), 1);
+        }
+        case MCPGDebugView::LCNormalBinSelected: {
+            const uint bin = irr_cache.grid.debug_selected_bin(vertex.pos, vertex.normal, cam, rng);
+            return bin == MERIAN_HASH_GRID_INVALID_SLOT ? float4(0, 0, 0, 1)
+                                                        : float4(random_color(bin), 1);
+        }
+        default:
+            break;
         }
 
         const MCState s = mcpg.load(vertex.pos, vertex.shading_frame, cam, frame_info.time, rng);
         if (debug_selector == MCPGDebugView::Unresolved) {
             return float4(s.is_valid() ? 0.0 : 1.0);
         }
+        if (debug_selector == MCPGDebugView::MV) {
+            return float4(float3(s.mv), 1);
+        }
         if (!s.is_valid()) {
             return float4(1, 0, 1, 1);
         }
         switch (debug_selector) {
-        case MCPGDebugView::ChainWeight:
+        case MCPGDebugView::Weight:
             return float4(debug_color(s.sum_w * 0.1), 1);
-        case MCPGDebugView::Aim:
+        case MCPGDebugView::MeanDirection:
             return float4((s.get_dir(vertex.pos) + 1) * 0.5, 1);
-        case MCPGDebugView::LobeWidth:
-            return float4(debug_color(s.one_minus_mean_cos(vertex.pos)), 1);
-        case MCPGDebugView::Samples:
-            return float4(debug_color(float(s.N) / float(ML_MAX_N)), 1);
-        case MCPGDebugView::TargetMotion:
-            return float4(abs(float3(s.mv)), 1);
+        case MCPGDebugView::Cos:
+            return float4(debug_color(1.0 - s.one_minus_mean_cos(vertex.pos)), 1);
+        case MCPGDebugView::N:
+            return float4(float3(float(s.N) / float(ML_MAX_N)), 1);
         default:
             return float4(0);
         }

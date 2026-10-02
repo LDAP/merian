@@ -159,11 +159,12 @@ bool MCPGGuidingModel::properties(Properties& props) {
         props.st_end_child();
     }
 
-    props.config_options("debug view", debug_view,
-                         {"cell", "level", "chain weight", "aim", "lobe width", "samples",
-                          "target motion", "unresolved"},
-                         Properties::OptionsStyle::COMBO,
-                         "What the renderer shows as its guiding debug output.");
+    props.st_separate("Debug");
+    props.config_options(
+        "debug output", debug_view,
+        {"light cache", "mc grid", "mc lod", "mc weight", "mc mean direction", "mc cos", "mc N",
+         "mc mv", "lc normal bin (actual)", "lc normal bin (selected)", "unresolved"},
+        Properties::OptionsStyle::COMBO, "What the renderer shows as its guiding debug output.");
 
     if (recreate && mcpg) {
         recreate_grids();
