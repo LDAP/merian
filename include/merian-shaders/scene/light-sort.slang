@@ -3,25 +3,27 @@ import merian_shaders.utils.morton;
 
 using merian;
 
-// Least significant digit radix sort of the light tree keys: count, scan and a stable scatter per
-// digit.
+// Least significant digit radix sort of the light tree keys, one pass per digit over tiles that
+// find their offsets by decoupled look-back (Merrill and Garland 2016; Adinets and Merrill 2022).
 
 static const uint SORT_RADIX = 1u << LIGHT_SORT_RADIX_BITS;
 static const uint SORT_ITEMS = LIGHT_SORT_TILE / LIGHT_SORT_GROUP;
-static const uint SORT_SCAN_GROUP = 1024;
 static const uint SORT_MAX_WAVES = LIGHT_SORT_GROUP / 16;
+static const uint SORT_FLAG_AGGREGATE = 1u << 30;
+static const uint SORT_FLAG_PREFIX = 2u << 30;
+static const uint SORT_COUNT_MASK = SORT_FLAG_AGGREGATE - 1u;
 
 struct LightSortBinding {
     StructuredBuffer<EmissiveLightProxy, ScalarDataLayout> proxies;
     StructuredBuffer<LightTreeInfo, ScalarDataLayout> tree_info;
-    // the first pass writes them
+    // the histogram pass writes them
     RWStructuredBuffer<uint> keys_in;
     StructuredBuffer<uint> values_in;
     RWStructuredBuffer<uint> keys_out;
     RWStructuredBuffer<uint> values_out;
-    // digit-major
-    RWStructuredBuffer<uint> histogram;
     RWStructuredBuffer<uint> rank;
+    // zeroed: every pass's digit counts, every pass's tiles started, then the tiles' digit status
+    RWStructuredBuffer<uint> state;
     uint count;
     uint tile_count;
     uint pass;
@@ -39,67 +41,54 @@ uint digit_of(const uint key, const uint pass) {
     return (key >> (pass * LIGHT_SORT_RADIX_BITS)) & (SORT_RADIX - 1u);
 }
 
-groupshared uint s_histogram[SORT_RADIX];
+uint histogram_at(const uint pass, const uint digit) {
+    return pass * SORT_RADIX + digit;
+}
 
+uint tiles_started_at(const uint pass) {
+    return LIGHT_SORT_PASSES * SORT_RADIX + pass;
+}
+
+uint status_at(const LightSortBinding params, const uint tile, const uint digit) {
+    return LIGHT_SORT_PASSES * (SORT_RADIX + 1u) +
+           (params.pass * params.tile_count + tile) * SORT_RADIX + digit;
+}
+
+groupshared uint s_histogram[LIGHT_SORT_PASSES * SORT_RADIX];
+
+// The digit counts of every pass at once: they do not depend on the order.
 [shader("compute")][numthreads(LIGHT_SORT_GROUP, 1, 1)] void
-sort_count(uint3 group_id : SV_GroupID,
-           uint thread_id : SV_GroupIndex,
-           ParameterBlock<LightSortBinding> params) {
-    for (uint d = thread_id; d < SORT_RADIX; d += LIGHT_SORT_GROUP)
+sort_histogram(uint3 group_id : SV_GroupID,
+               uint thread_id : SV_GroupIndex,
+               ParameterBlock<LightSortBinding> params) {
+    for (uint d = thread_id; d < LIGHT_SORT_PASSES * SORT_RADIX; d += LIGHT_SORT_GROUP)
         s_histogram[d] = 0;
     GroupMemoryBarrierWithGroupSync();
 
+    const LightTreeInfo info = params.tree_info[0];
     const uint base = group_id.x * LIGHT_SORT_TILE;
     for (uint item = 0; item < SORT_ITEMS; item++) {
         const uint i = base + item * LIGHT_SORT_GROUP + thread_id;
         if (i >= params.count)
             break;
-        const uint key = params.pass == 0
-                             ? light_tree_key(params.proxies[i].centroid, params.tree_info[0])
-                             : params.keys_in[i];
-        if (params.pass == 0)
-            params.keys_in[i] = key;
-        InterlockedAdd(s_histogram[digit_of(key, params.pass)], 1u);
+        const uint key = light_tree_key(params.proxies[i].centroid, info);
+        params.keys_in[i] = key;
+        for (uint pass = 0; pass < LIGHT_SORT_PASSES; pass++)
+            InterlockedAdd(s_histogram[histogram_at(pass, digit_of(key, pass))], 1u);
     }
     GroupMemoryBarrierWithGroupSync();
 
-    for (uint d = thread_id; d < SORT_RADIX; d += LIGHT_SORT_GROUP)
-        params.histogram[d * params.tile_count + group_id.x] = s_histogram[d];
-}
-
-groupshared uint s_scan_waves[SORT_SCAN_GROUP];
-
-[shader("compute")][numthreads(SORT_SCAN_GROUP, 1, 1)] void
-sort_scan(uint thread_id : SV_GroupIndex, ParameterBlock<LightSortBinding> params) {
-    const uint lane_count = WaveGetLaneCount();
-    const uint wave = thread_id / lane_count;
-    const uint entries = SORT_RADIX * params.tile_count;
-    uint carry = 0;
-    for (uint base = 0; base < entries; base += SORT_SCAN_GROUP) {
-        const uint i = base + thread_id;
-        const uint value = i < entries ? params.histogram[i] : 0u;
-        const uint wave_prefix = WavePrefixSum(value);
-        const uint wave_total = WaveActiveSum(value);
-        if (WaveIsFirstLane())
-            s_scan_waves[wave] = wave_total;
-        GroupMemoryBarrierWithGroupSync();
-
-        uint offset = 0;
-        uint total = 0;
-        for (uint w = 0; w < SORT_SCAN_GROUP / lane_count; w++) {
-            if (w == wave)
-                offset = total;
-            total += s_scan_waves[w];
-        }
-        if (i < entries)
-            params.histogram[i] = carry + offset + wave_prefix;
-        carry += total;
-        GroupMemoryBarrierWithGroupSync();
+    for (uint d = thread_id; d < LIGHT_SORT_PASSES * SORT_RADIX; d += LIGHT_SORT_GROUP) {
+        if (s_histogram[d] > 0)
+            InterlockedAdd(params.state[d], s_histogram[d]);
     }
 }
 
+groupshared uint s_tile;
 groupshared uint s_digit_offset[SORT_RADIX];
-groupshared uint s_wave_digits[SORT_MAX_WAVES * SORT_RADIX];
+// per item, wave and digit: the keys of the digit, then the tile's keys of the digit before them
+groupshared uint s_round_digits[SORT_ITEMS * SORT_MAX_WAVES * SORT_RADIX];
+groupshared uint s_wave_sums[SORT_MAX_WAVES];
 
 uint count_below(const uint4 mask, const uint lane) {
     uint below = 0;
@@ -113,30 +102,65 @@ uint count_below(const uint4 mask, const uint lane) {
     return below;
 }
 
+void publish(const LightSortBinding params, const uint tile, const uint digit, const uint status) {
+    uint previous;
+    InterlockedExchange(params.state[status_at(params, tile, digit)], status, previous);
+}
+
+// The digit's keys in the tiles before this one, from the counts the tiles publish.
+uint look_back(const LightSortBinding params, const uint tile, const uint digit, const uint local) {
+    if (tile == 0) {
+        publish(params, tile, digit, SORT_FLAG_PREFIX | local);
+        return 0;
+    }
+    publish(params, tile, digit, SORT_FLAG_AGGREGATE | local);
+    uint before = 0;
+    uint t = tile;
+    while (t > 0) {
+        uint status;
+        InterlockedOr(params.state[status_at(params, t - 1u, digit)], 0u, status);
+        if ((status & ~SORT_COUNT_MASK) == 0)
+            continue;
+        before += status & SORT_COUNT_MASK;
+        if ((status & SORT_FLAG_PREFIX) != 0)
+            break;
+        t--;
+    }
+    publish(params, tile, digit, SORT_FLAG_PREFIX | (before + local));
+    return before;
+}
+
+// One thread per digit.
 [shader("compute")][numthreads(LIGHT_SORT_GROUP, 1, 1)] void
-sort_scatter(uint3 group_id : SV_GroupID,
-             uint thread_id : SV_GroupIndex,
-             ParameterBlock<LightSortBinding> params) {
+sort_scatter(uint thread_id : SV_GroupIndex, ParameterBlock<LightSortBinding> params) {
     const uint lane_count = WaveGetLaneCount();
     const uint wave_count = LIGHT_SORT_GROUP / lane_count;
     const uint wave = thread_id / lane_count;
     const uint lane = WaveGetLaneIndex();
     const bool last_pass = params.pass + 1 == LIGHT_SORT_PASSES;
 
-    for (uint d = thread_id; d < SORT_RADIX; d += LIGHT_SORT_GROUP) {
-        s_digit_offset[d] = params.histogram[d * params.tile_count + group_id.x];
-        for (uint w = 0; w < wave_count; w++)
-            s_wave_digits[w * SORT_RADIX + d] = 0;
+    // tiles in launch order, so every tile one waits for has started
+    if (thread_id == 0) {
+        uint started;
+        InterlockedAdd(params.state[tiles_started_at(params.pass)], 1u, started);
+        s_tile = started;
     }
+    for (uint k = thread_id; k < SORT_ITEMS * wave_count * SORT_RADIX; k += LIGHT_SORT_GROUP)
+        s_round_digits[k] = 0;
     GroupMemoryBarrierWithGroupSync();
 
-    const uint base = group_id.x * LIGHT_SORT_TILE;
+    // rank every key among the keys of its digit in its wave and item
+    const uint tile = s_tile;
+    const uint base = tile * LIGHT_SORT_TILE;
+    uint keys[SORT_ITEMS];
+    uint values[SORT_ITEMS];
+    uint below[SORT_ITEMS];
     for (uint item = 0; item < SORT_ITEMS; item++) {
         const uint i = base + item * LIGHT_SORT_GROUP + thread_id;
         const bool valid = i < params.count;
-        const uint key = valid ? params.keys_in[i] : 0u;
-        const uint value = !valid ? 0u : params.pass == 0 ? i : params.values_in[i];
-        const uint digit = digit_of(key, params.pass);
+        keys[item] = valid ? params.keys_in[i] : 0u;
+        values[item] = !valid ? 0u : params.pass == 0 ? i : params.values_in[i];
+        const uint digit = digit_of(keys[item], params.pass);
 
         uint4 peers = WaveActiveBallot(valid);
         for (uint b = 0; b < LIGHT_SORT_RADIX_BITS; b++) {
@@ -144,32 +168,47 @@ sort_scatter(uint3 group_id : SV_GroupID,
             const uint4 ballot = WaveActiveBallot(set);
             peers &= set ? ballot : ~ballot;
         }
-        const uint below = count_below(peers, lane);
+        below[item] = count_below(peers, lane);
         const uint same =
             countbits(peers.x) + countbits(peers.y) + countbits(peers.z) + countbits(peers.w);
-        if (valid && below + 1 == same)
-            s_wave_digits[wave * SORT_RADIX + digit] = same;
-        GroupMemoryBarrierWithGroupSync();
+        if (valid && below[item] + 1 == same)
+            s_round_digits[(item * wave_count + wave) * SORT_RADIX + digit] = same;
+    }
+    GroupMemoryBarrierWithGroupSync();
 
-        if (valid) {
-            uint at = s_digit_offset[digit] + below;
-            for (uint w = 0; w < wave; w++)
-                at += s_wave_digits[w * SORT_RADIX + digit];
-            params.keys_out[at] = key;
-            params.values_out[at] = value;
-            if (last_pass)
-                params.rank[value] = at;
+    // the digit's keys in item and wave order, in earlier tiles and of smaller digits
+    uint local = 0;
+    for (uint item = 0; item < SORT_ITEMS; item++) {
+        for (uint w = 0; w < wave_count; w++) {
+            const uint at = (item * wave_count + w) * SORT_RADIX + thread_id;
+            const uint round = s_round_digits[at];
+            s_round_digits[at] = local;
+            local += round;
         }
-        GroupMemoryBarrierWithGroupSync();
+    }
+    const uint digit_count = params.state[histogram_at(params.pass, thread_id)];
+    const uint wave_prefix = WavePrefixSum(digit_count);
+    if (lane == lane_count - 1u)
+        s_wave_sums[wave] = wave_prefix + digit_count;
+    const uint before = look_back(params, tile, thread_id, local);
+    GroupMemoryBarrierWithGroupSync();
+    uint smaller = wave_prefix;
+    for (uint w = 0; w < wave; w++)
+        smaller += s_wave_sums[w];
+    s_digit_offset[thread_id] = smaller + before;
+    GroupMemoryBarrierWithGroupSync();
 
-        for (uint d = thread_id; d < SORT_RADIX; d += LIGHT_SORT_GROUP) {
-            uint round = 0;
-            for (uint w = 0; w < wave_count; w++) {
-                round += s_wave_digits[w * SORT_RADIX + d];
-                s_wave_digits[w * SORT_RADIX + d] = 0;
-            }
-            s_digit_offset[d] += round;
-        }
-        GroupMemoryBarrierWithGroupSync();
+    for (uint item = 0; item < SORT_ITEMS; item++) {
+        const uint i = base + item * LIGHT_SORT_GROUP + thread_id;
+        if (i >= params.count)
+            continue;
+        const uint digit = digit_of(keys[item], params.pass);
+        const uint at = s_digit_offset[digit] +
+                        s_round_digits[(item * wave_count + wave) * SORT_RADIX + digit] +
+                        below[item];
+        params.keys_out[at] = keys[item];
+        params.values_out[at] = values[item];
+        if (last_pass)
+            params.rank[values[item]] = at;
     }
 }

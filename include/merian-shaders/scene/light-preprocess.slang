@@ -21,21 +21,29 @@ struct LightPreprocessBinding {
     StructuredBuffer<float2> env_cdf;
     // 0 where the cells do not list the environment
     uint env_size;
+    // per node of the environment's texels, heap-indexed: the cone around them as (center, cosine
+    // of the radius)
+    RWStructuredBuffer<float4> env_cones;
     RWStructuredBuffer<LightTreeInfo, ScalarDataLayout> tree_info;
     StructuredBuffer<LightTreeInfo, ScalarDataLayout> tree_info_prev;
     RWStructuredBuffer<uint> pool;
     RWStructuredBuffer<uint> grid_keys;
     StructuredBuffer<uint> grid_keys_prev;
-    RWStructuredBuffer<float4> grid_contribution;
-    StructuredBuffer<float4> grid_contribution_prev;
+    RWStructuredBuffer<float3, ScalarDataLayout> grid_contribution;
+    StructuredBuffer<float3, ScalarDataLayout> grid_contribution_prev;
     RWStructuredBuffer<float> grid_estimate;
     RWStructuredBuffer<uint> grid_feedback;
     StructuredBuffer<uint> grid_feedback_prev;
+    // per cell: whether its feedback holds anything
+    RWStructuredBuffer<uint> grid_touched;
+    StructuredBuffer<uint> grid_touched_prev;
     RWStructuredBuffer<uint> grid_starts;
     RWStructuredBuffer<float> grid_probability;
     RWStructuredBuffer<LightBound, ScalarDataLayout> grid_slot_bounds;
     RWStructuredBuffer<LightGridInfo, ScalarDataLayout> grid_info;
     StructuredBuffer<LightGridInfo, ScalarDataLayout> grid_info_prev;
+    // zeroed, see LIGHT_GRID_SETUP_STATE
+    RWStructuredBuffer<uint> setup_state;
 
     // fraction of the light bounds the grid spans around the camera
     float grid_coverage;
@@ -48,6 +56,7 @@ struct LightPreprocessBinding {
     float grid_jitter;
     float grid_even_share;
     uint grid_refinements;
+    uint setup_groups;
     LightSlotWeighing slot_weighing;
     // drop everything carried over, for a frame the previous grid cannot describe
     bool grid_reset;
@@ -92,10 +101,32 @@ struct EnvSplitBinding {
     params.env_split[0] = clamp(p, 0.f, 1.f);
 }
 
-static const uint LIGHT_GRID_SETUP_GROUP = 256;
+static const uint SETUP_DONE = LIGHT_GRID_SETUP_STATE - 1;
 groupshared float3 s_setup_min[LIGHT_GRID_SETUP_GROUP];
 groupshared float3 s_setup_max[LIGHT_GRID_SETUP_GROUP];
 groupshared float s_setup_distance[LIGHT_GRID_SETUP_GROUP];
+groupshared bool s_setup_last;
+
+// Floats as unsigned integers of the same order; zero is below every float.
+uint ordered(const float f) {
+    const uint u = asuint(f);
+    return (u & 0x80000000u) != 0 ? ~u : u | 0x80000000u;
+}
+
+float from_ordered(const uint u) {
+    return asfloat((u & 0x80000000u) != 0 ? u & 0x7FFFFFFFu : ~u);
+}
+
+void merge_maximum(const LightPreprocessBinding params, const uint at, const float value) {
+    uint previous;
+    InterlockedMax(params.setup_state[at], ordered(value), previous);
+}
+
+float read_maximum(const LightPreprocessBinding params, const uint at) {
+    uint value;
+    InterlockedOr(params.setup_state[at], 0u, value);
+    return from_ordered(value);
+}
 
 bool same_lattice(const LightTreeInfo a, const LightTreeInfo b) {
     return all(asuint(a.origin) == asuint(b.origin)) &&
@@ -107,12 +138,19 @@ bool same_lattice(const LightTreeInfo a, const LightTreeInfo b) {
 // distance from the camera to the farthest light, with the spread of the lights as a floor for a
 // camera standing among them. Every finer cascade halves the cell size, so a cell covers a roughly
 // constant angle from the camera at any scale.
+// The groups merge their bounds, and the last one to finish places everything.
 [shader("compute")][numthreads(LIGHT_GRID_SETUP_GROUP, 1, 1)] void
-grid_setup(uint local_id : SV_GroupIndex, ParameterBlock<LightPreprocessBinding> params) {
+grid_setup(uint3 group_id : SV_GroupID,
+           uint local_id : SV_GroupIndex,
+           ParameterBlock<LightPreprocessBinding> params) {
     float3 bmin = float3(1e30f);
     float3 bmax = float3(-1e30f);
     float max_distance = 0.f;
-    for (uint i = local_id; i < params.triangle_count; i += LIGHT_GRID_SETUP_GROUP) {
+    const uint base = group_id.x * LIGHT_GRID_SETUP_GROUP * LIGHT_GRID_SETUP_ITEMS;
+    for (uint item = 0; item < LIGHT_GRID_SETUP_ITEMS; item++) {
+        const uint i = base + item * LIGHT_GRID_SETUP_GROUP + local_id;
+        if (i >= params.triangle_count)
+            break;
         const EmissiveLightProxy light = params.proxies[i];
         if (!light.is_valid())
             continue;
@@ -134,12 +172,32 @@ grid_setup(uint local_id : SV_GroupIndex, ParameterBlock<LightPreprocessBinding>
     }
     GroupMemoryBarrierWithGroupSync();
 
-    const uint wave_count = LIGHT_GRID_SETUP_GROUP / WaveGetLaneCount();
-    for (uint w = 0; w < wave_count; w++) {
-        bmin = min(bmin, s_setup_min[w]);
-        bmax = max(bmax, s_setup_max[w]);
-        max_distance = max(max_distance, s_setup_distance[w]);
+    if (local_id == 0) {
+        const uint wave_count = LIGHT_GRID_SETUP_GROUP / WaveGetLaneCount();
+        for (uint w = 0; w < wave_count; w++) {
+            bmin = min(bmin, s_setup_min[w]);
+            bmax = max(bmax, s_setup_max[w]);
+            max_distance = max(max_distance, s_setup_distance[w]);
+        }
+        for (uint axis = 0; axis < 3; axis++) {
+            merge_maximum(params, axis, bmax[axis]);
+            merge_maximum(params, 3 + axis, -bmin[axis]);
+        }
+        merge_maximum(params, 6, max_distance);
+        AllMemoryBarrier();
+        uint done;
+        InterlockedAdd(params.setup_state[SETUP_DONE], 1u, done);
+        s_setup_last = done + 1u == params.setup_groups;
     }
+    GroupMemoryBarrierWithGroupSync();
+    if (!s_setup_last)
+        return;
+    AllMemoryBarrier();
+    for (uint axis = 0; axis < 3; axis++) {
+        bmax[axis] = read_maximum(params, axis);
+        bmin[axis] = -read_maximum(params, 3 + axis);
+    }
+    max_distance = read_maximum(params, 6);
 
     if (local_id == 0) {
         LightTreeInfo info = params.tree_info_prev[0];
@@ -234,7 +292,8 @@ CellGeometry cell_geometry(const RWStructuredBuffer<LightGridInfo, ScalarDataLay
         return;
     }
     RandomGenerator rng = PCG(xxhash32(uint2(i, params.frame)));
-    params.pool[i] = params.tree_order[search_range(params.tree_cdf, 0, count, rng.next_float())];
+    params.pool[i] =
+        params.tree_order[search_range_wide(params.tree_cdf, 0, count, rng.next_float2())];
 }
 
 bool reproject_cell(const StructuredBuffer<LightGridInfo, ScalarDataLayout> grid_info_prev,
@@ -334,6 +393,35 @@ struct TreeNode {
     }
 };
 
+uint env_cone_index(const uint side, const uint first_texel, const uint free_bits) {
+    const uint level_bits = 2u * firstbithigh(side) - free_bits;
+    return (1u << level_bits) + (first_texel >> free_bits);
+}
+
+[shader("compute")][numthreads(64, 1, 1)] void
+env_cones(uint3 thread_id : SV_DispatchThreadID, ParameterBlock<LightPreprocessBinding> params) {
+    const uint index = thread_id.x + 1u;
+    if (index >= 2u * env_texels(params))
+        return;
+    const uint level_bits = firstbithigh(index);
+    const uint free_bits = 2u * firstbithigh(params.env_size) - level_bits;
+    const uint first_texel = (index - (1u << level_bits)) << free_bits;
+
+    const uint2 axis_free = uint2((free_bits + 1u) / 2u, free_bits / 2u);
+    const uint2 lo = (morton_decode2d(first_texel) >> axis_free) << axis_free;
+    const float2 size = float2(uint2(1u) << axis_free);
+    const float inv_side = 1.f / float(params.env_size);
+    const float3 center = equal_area_square_to_sphere((float2(lo) + 0.5f * size) * inv_side);
+    float cos_radius = 1.f;
+    for (uint corner = 0; corner < 9; corner++) {
+        const float2 offset = float2(float(corner % 3), float(corner / 3)) * 0.5f;
+        const float3 edge =
+            equal_area_square_to_sphere(min((float2(lo) + offset * size) * inv_side, float2(1.f)));
+        cos_radius = min(cos_radius, dot(center, edge));
+    }
+    params.env_cones[index] = float4(center, cos_radius);
+}
+
 uint shared_prefix_free_bits(const uint first, const uint last) {
     return first != last ? firstbithigh(first ^ last) + 1u : 0u;
 }
@@ -374,19 +462,10 @@ TreeNode tree_node(const LightPreprocessBinding params, const uint first, const 
     if (node.splittable)
         node.split_key =
             LIGHT_TREE_ENV_KEY + ((last_texel >> (free_bits - 1u)) << (free_bits - 1u));
-    const uint2 axis_free = uint2((free_bits + 1u) / 2u, free_bits / 2u);
-    const uint2 lo = (morton_decode2d(first_texel) >> axis_free) << axis_free;
-    const float2 size = float2(uint2(1u) << axis_free);
-    const float inv_side = 1.f / float(params.env_size);
+    const float4 cone = params.env_cones[env_cone_index(params.env_size, first_texel, free_bits)];
     node.distant = true;
-    node.center = equal_area_square_to_sphere((float2(lo) + 0.5f * size) * inv_side);
-    float cos_radius = 1.f;
-    for (uint corner = 0; corner < 9; corner++) {
-        const float2 offset = float2(float(corner % 3), float(corner / 3)) * 0.5f;
-        const float3 edge =
-            equal_area_square_to_sphere(min((float2(lo) + offset * size) * inv_side, float2(1.f)));
-        cos_radius = min(cos_radius, dot(node.center, edge));
-    }
+    node.center = cone.xyz;
+    const float cos_radius = cone.w;
     node.radius = cos_radius > 0.f ? sqrt(max(1.f - cos_radius * cos_radius, 0.f)) : 1.f;
     node.spread = min(2.f * (1.f - cos_radius), 1.f);
     return node;
@@ -408,16 +487,16 @@ node_geometry(const TreeNode node, const float3 pos, const float reach, const fl
 
 // Mean, mean square and sample count of delivered over nominal radiance, times the node's
 // estimated over the sample's inverse squared distance.
-typealias Contribution = float4;
+typealias Contribution = float3;
 
 Contribution prior_contribution(const float3 geometry, const bool distant) {
     const float spread = geometry.x > 0.f ? 0.5f * (geometry.y - geometry.z) / geometry.x : 0.f;
     const float mean = distant ? LIGHT_GRID_PRIOR_ENV_CONTRIBUTION : LIGHT_GRID_PRIOR_CONTRIBUTION;
-    return Contribution(mean, mean * mean * (1.f + spread * spread), LIGHT_GRID_PRIOR_SAMPLES, 0.f);
+    return Contribution(mean, mean * mean * (1.f + spread * spread), LIGHT_GRID_PRIOR_SAMPLES);
 }
 
 Contribution rescale_contribution(const Contribution c, const float ratio) {
-    return Contribution(c.x * ratio, c.y * ratio * ratio, c.z, 0.f);
+    return Contribution(c.x * ratio, c.y * ratio * ratio, c.z);
 }
 
 Contribution halve_contribution(const Contribution parent,
@@ -429,7 +508,7 @@ Contribution halve_contribution(const Contribution parent,
         return prior;
     const float mean = parent.x * parent_geometry.x / geometry.x;
     return Contribution(mean, mean * mean * prior.y / (prior.x * prior.x),
-                        min(parent.z, 4.f * LIGHT_GRID_PRIOR_SAMPLES), 0.f);
+                        min(parent.z, 4.f * LIGHT_GRID_PRIOR_SAMPLES));
 }
 
 struct CutSlot {
@@ -444,14 +523,10 @@ float nearest_distance(const LightPreprocessBinding params, const CellGeometry c
     return max(0.5f / params.tree_info[0].inv_cell_size, 0.25f * cg.radius);
 }
 
-CutSlot cut_slot(const LightPreprocessBinding params,
-                 const CellGeometry cg,
-                 const uint first,
-                 const uint end,
-                 const Contribution contribution) {
+CutSlot cut_slot(const TreeNode node, const float3 geometry, const Contribution contribution) {
     CutSlot s;
-    s.node = tree_node(params, first, end);
-    s.geometry = node_geometry(s.node, cg.center, cg.radius, nearest_distance(params, cg));
+    s.node = node;
+    s.geometry = geometry;
     s.reach = s.node.flux * s.geometry.x;
     s.importance = s.reach * max(contribution.x, 0.f);
     s.excess = s.reach * max(contribution.y - contribution.x * contribution.x, 0.f) /
@@ -459,18 +534,32 @@ CutSlot cut_slot(const LightPreprocessBinding params,
     return s;
 }
 
+// One past the last light of the slot's node.
+uint cut_end(const uint first, const uint slot, const uint lights) {
+    const uint next_first = WaveShuffle(first, min(slot + 1u, LIGHT_GRID_SLOTS - 1u));
+    return slot < LIGHT_GRID_SLOTS - 1u ? next_first : lights;
+}
+
+CutSlot cut_slot(const LightPreprocessBinding params,
+                 const CellGeometry cg,
+                 const uint first,
+                 const uint end,
+                 const Contribution contribution) {
+    const TreeNode node = tree_node(params, first, end);
+    return cut_slot(node, node_geometry(node, cg.center, cg.radius, nearest_distance(params, cg)),
+                    contribution);
+}
+
 void store_cut(const LightPreprocessBinding params,
-               const CellGeometry cg,
                const uint cell,
                const uint slot,
                const uint key,
                const uint first,
-               const Contribution contribution) {
+               const Contribution contribution,
+               const CutSlot s,
+               const bool touched) {
     const uint lights = light_count(params);
     const bool listed = key != LIGHT_TREE_NO_KEY;
-    const uint next_first = WaveShuffle(first, min(slot + 1u, LIGHT_GRID_SLOTS - 1u));
-    const uint end = slot < LIGHT_GRID_SLOTS - 1u ? next_first : lights;
-    const CutSlot s = cut_slot(params, cg, first, listed ? end : first, contribution);
     const bool emits = listed && s.node.flux > 0.f;
     const float total = WaveActiveSum(emits ? s.importance : 0.f);
     const float even = total > 0.f ? params.grid_even_share : 1.f;
@@ -484,8 +573,12 @@ void store_cut(const LightPreprocessBinding params,
     params.grid_contribution[entry] = contribution;
     params.grid_starts[entry] = listed ? first : lights;
     params.grid_estimate[entry] = emits && !s.node.distant ? 1.f / s.geometry.x : 1.f;
-    for (uint i = 0; i < LIGHT_GRID_FEEDBACK_STRIDE; i++)
-        params.grid_feedback[LIGHT_GRID_FEEDBACK_STRIDE * entry + i] = 0;
+    if (touched) {
+        for (uint i = 0; i < LIGHT_GRID_FEEDBACK_STRIDE; i++)
+            params.grid_feedback[LIGHT_GRID_FEEDBACK_STRIDE * entry + i] = 0;
+        if (slot == 0)
+            params.grid_touched[cell] = 0;
+    }
     if (params.slot_weighing == LightSlotWeighing::LightSlotWeighingShadingPoint) {
         LightBound bound;
         bound.centroid = s.node.center;
@@ -513,14 +606,15 @@ grid(uint3 group_id : SV_GroupID,
      ParameterBlock<LightPreprocessBinding> params) {
     const uint dim = params.grid_info[0].dimension;
     const uint cells_per_cascade = dim * dim * dim;
-    const uint cell = group_id.x + group_id.y * LIGHT_GRID_DISPATCH_ROW;
+    const uint cell = group_id.x + group_id.y * LIGHT_DISPATCH_ROW;
     if (cell >= cells_per_cascade * params.grid_info[0].cascade_count)
         return;
 
     const CellGeometry cg = cell_geometry(params.grid_info, cell, params.grid_jitter);
     const uint lights = light_count(params);
     if (WaveGetLaneCount() < LIGHT_GRID_SLOTS) {
-        store_cut(params, cg, cell, slot, LIGHT_TREE_NO_KEY, lights, Contribution(0.f));
+        store_cut(params, cell, slot, LIGHT_TREE_NO_KEY, lights, Contribution(0.f),
+                  cut_slot(TreeNode::empty(), float3(0.f), Contribution(0.f)), true);
         return;
     }
     const LightGridInfo info = params.grid_info[cg.cascade];
@@ -546,7 +640,7 @@ grid(uint3 group_id : SV_GroupID,
         const uint prev_entry = prev_cell * LIGHT_GRID_SLOTS + slot;
         key = params.grid_keys_prev[prev_entry];
         contribution = params.grid_contribution_prev[prev_entry];
-        if (carried) {
+        if (carried && params.grid_touched_prev[prev_cell] != 0) {
             const uint feedback_at = LIGHT_GRID_FEEDBACK_STRIDE * prev_entry;
             const uint3 feedback = uint3(params.grid_feedback_prev[feedback_at],
                                          params.grid_feedback_prev[feedback_at + 1],
@@ -588,14 +682,11 @@ grid(uint3 group_id : SV_GroupID,
     }
 
     uint first = node_start(params, key);
-    float flux;
+    const float nearest = nearest_distance(params, cg);
+    const uint end = cut_end(first, slot, lights);
+    const TreeNode node = tree_node(params, first, key != LIGHT_TREE_NO_KEY ? end : first);
+    const float3 geometry = node_geometry(node, cg.center, cg.radius, nearest);
     {
-        const uint next_first = WaveShuffle(first, next_slot);
-        const uint end = slot < last_slot ? next_first : lights;
-        const TreeNode node = tree_node(params, first, key != LIGHT_TREE_NO_KEY ? end : first);
-        const float nearest = nearest_distance(params, cg);
-        const float3 geometry = node_geometry(node, cg.center, cg.radius, nearest);
-        flux = node.flux;
         if (fresh) {
             contribution = prior_contribution(geometry, node.distant);
         } else if (inherited && geometry.x > 0.f) {
@@ -609,6 +700,8 @@ grid(uint3 group_id : SV_GroupID,
             contribution.z = min(contribution.z, LIGHT_GRID_PRIOR_SAMPLES);
         }
     }
+    CutSlot s = cut_slot(node, geometry, contribution);
+    bool evaluated = true;
 
     // merge non-emitting and dead nodes into their predecessor
     {
@@ -617,7 +710,8 @@ grid(uint3 group_id : SV_GroupID,
                           contribution.z >= LIGHT_GRID_DEAD_SAMPLES;
         const bool previous_dead = WaveShuffle(dead, slot > 0 ? slot - 1u : 0u);
         const uint previous_key = WaveShuffle(key, slot > 0 ? slot - 1u : 0u);
-        const bool absorbed = slot > 0 && listed && (!(flux > 0.f) || (dead && previous_dead)) &&
+        const bool absorbed = slot > 0 && listed &&
+                              (!(node.flux > 0.f) || (dead && previous_dead)) &&
                               (key >= LIGHT_TREE_ENV_KEY) == (previous_key >= LIGHT_TREE_ENV_KEY);
         const bool keep = listed && !absorbed;
         if (WaveActiveAnyTrue(absorbed)) {
@@ -632,6 +726,7 @@ grid(uint3 group_id : SV_GroupID,
             key = slot < kept ? s_compact_key[slot] : LIGHT_TREE_NO_KEY;
             first = slot < kept ? s_compact_first[slot] : lights;
             contribution = slot < kept ? s_compact_contribution[slot] : Contribution(0.f);
+            evaluated = false;
         }
     }
 
@@ -642,9 +737,10 @@ grid(uint3 group_id : SV_GroupID,
                                                           : 0u;
     for (uint step = 0; step < steps; step++) {
         const bool listed = key != LIGHT_TREE_NO_KEY;
-        const uint next_first = WaveShuffle(first, next_slot);
-        const uint end = slot < last_slot ? next_first : lights;
-        const CutSlot s = cut_slot(params, cg, first, listed ? end : first, contribution);
+        const uint end = cut_end(first, slot, lights);
+        if (!evaluated)
+            s = cut_slot(params, cg, first, listed ? end : first, contribution);
+        evaluated = true;
 
         const float candidate = s.node.splittable ? s.excess : 0.f;
         const float best = WaveActiveMax(candidate);
@@ -658,14 +754,16 @@ grid(uint3 group_id : SV_GroupID,
         const float next_flux = WaveShuffle(s.node.flux, next_slot);
         const float next_estimate = WaveShuffle(s.geometry.x, next_slot);
         const Contribution next_contribution = WaveShuffle(contribution, next_slot);
-        const bool pair = slot < last_slot && listed && next_key != LIGHT_TREE_NO_KEY &&
+        const bool full = !WaveActiveAnyTrue(!listed);
+        const bool pair = full && slot < last_slot &&
                           (key >= LIGHT_TREE_ENV_KEY) == (next_key >= LIGHT_TREE_ENV_KEY);
         float merge_loss = 0.f;
         Contribution merged_contribution = contribution;
         if (pair) {
             const TreeNode merged_node = tree_node(params, first, next_end);
-            const float merged_estimate =
-                node_geometry(merged_node, cg.center, cg.radius, nearest_distance(params, cg)).x;
+            const float3 merged_geometry =
+                node_geometry(merged_node, cg.center, cg.radius, nearest);
+            const float merged_estimate = merged_geometry.x;
             const float merged_flux = s.node.flux + next_flux;
             const float w = merged_flux > 0.f ? s.node.flux / merged_flux : 0.5f;
             const Contribution a =
@@ -676,8 +774,8 @@ grid(uint3 group_id : SV_GroupID,
                 merged_estimate > 0.f
                     ? rescale_contribution(next_contribution, next_estimate / merged_estimate)
                     : next_contribution;
-            merged_contribution = Contribution(w * a.xy + (1.f - w) * b.xy, min(a.z, b.z), 0.f);
-            const CutSlot merged = cut_slot(params, cg, first, next_end, merged_contribution);
+            merged_contribution = Contribution(w * a.xy + (1.f - w) * b.xy, min(a.z, b.z));
+            const CutSlot merged = cut_slot(merged_node, merged_geometry, merged_contribution);
             merge_loss = max(merged.excess - s.excess - next_excess, 0.f);
         }
 
@@ -702,7 +800,7 @@ grid(uint3 group_id : SV_GroupID,
         high_contribution = WaveReadLaneAt(high_contribution, split_slot);
 
         uint merge_slot = LIGHT_GRID_SLOTS;
-        if (!WaveActiveAnyTrue(!listed)) {
+        if (full) {
             const bool mergeable = pair && slot != split_slot && slot + 1u != split_slot;
             const float cheapest = WaveActiveMin(mergeable ? merge_loss : MERIAN_FLT_MAX);
             if (!WaveActiveAnyTrue(mergeable) || !(gain > LIGHT_GRID_REFINE_MARGIN * cheapest))
@@ -737,7 +835,12 @@ grid(uint3 group_id : SV_GroupID,
             first = split_first;
             contribution = high_contribution;
         }
+        evaluated = false;
     }
 
-    store_cut(params, cg, cell, slot, key, first, contribution);
+    if (!evaluated) {
+        const uint end = cut_end(first, slot, lights);
+        s = cut_slot(params, cg, first, key != LIGHT_TREE_NO_KEY ? end : first, contribution);
+    }
+    store_cut(params, cell, slot, key, first, contribution, s, params.grid_touched[cell] != 0);
 }

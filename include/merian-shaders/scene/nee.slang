@@ -77,7 +77,6 @@ struct LightTree {
     StructuredBuffer<float2> cdf;
     StructuredBuffer<uint> order;
     StructuredBuffer<uint> rank;
-    StructuredBuffer<float2> env_cdf;
     // 0 where the cells do not list the environment
     uint env_texels;
 }
@@ -96,11 +95,13 @@ struct LightGrid {
     uint frame;
     float share;
     float even_share;
-    StructuredBuffer<float4> contribution;
+    StructuredBuffer<float3, ScalarDataLayout> contribution;
     StructuredBuffer<float> estimate;
     StructuredBuffer<LightBound, ScalarDataLayout> slot_bounds;
     StructuredBuffer<float> probability;
     RWStructuredBuffer<uint> feedback;
+    // per cell: whether any of its slots got feedback
+    RWStructuredBuffer<uint> touched;
     uint light_count;
 
     uint lookup(const float3 pos) {
@@ -298,6 +299,7 @@ struct LightGrid {
     // fixed point, rounded stochastically
     void count_sample(const uint entry, const float contribution, const float2 u) {
         const uint at = LIGHT_GRID_FEEDBACK_STRIDE * entry;
+        touched[entry / LIGHT_GRID_SLOTS] = 1u;
         uint counted;
         InterlockedAdd(feedback[at], 1u, counted);
         if (contribution > 0.f && counted < LIGHT_GRID_FEEDBACK_SAMPLES) {
@@ -311,7 +313,7 @@ struct LightGrid {
 
 struct EnvLight {
     EnvImportance importance;
-    // texels drawn from importance this frame; empty to descend the pyramid per sample
+    // texels drawn from importance this frame; empty to search per sample
     StructuredBuffer<uint> pool;
     uint pool_size;
     StructuredBuffer<float> split;
@@ -523,7 +525,7 @@ struct NEE {
 
     uint draw_scene(inout RandomGenerator rng) {
         if (selection == LightSelection::LightSelectionPower || pool.size == 0)
-            return tree.order[search_range(tree.cdf, 0, table.triangle_count, rng.next_float())];
+            return tree.order[search_range(tree.cdf, 0, table.triangle_count, rng.next_float2())];
         return pool.entries[min(uint(rng.next_float() * pool.size), pool.size - 1)];
     }
 
@@ -619,10 +621,11 @@ struct NEE {
         if (range.x >= count) {
             if (!lists_env())
                 return LIGHT_INVALID_INDEX;
-            texel = search_range(tree.env_cdf, range.x - count, range.y - count, rng.next_float());
+            texel = search_range(env.importance.cdf, range.x - count, range.y - count,
+                                 rng.next_float2());
             return LIGHT_ENV_INDEX;
         }
-        return tree.order[search_range(tree.cdf, range.x, range.y, rng.next_float())];
+        return tree.order[search_range(tree.cdf, range.x, range.y, rng.next_float2())];
     }
 
     float pdf_cell(const DirectLightVertex vertex,
@@ -652,7 +655,7 @@ struct NEE {
         if (range.x < count)
             return 0.f;
         return grid.share * grid.slot_share(vertex, entry, weights) *
-               range_share(tree.env_cdf, range.x - count, range.y - count, texel) *
+               range_share(env.importance.cdf, range.x - count, range.y - count, texel) *
                float(tree.env_texels) / MERIAN_FOUR_PI;
     }
 

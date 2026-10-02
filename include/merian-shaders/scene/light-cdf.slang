@@ -3,21 +3,20 @@ import merian_shaders.scene.light_data;
 using merian;
 
 static const uint CDF_GROUP_SIZE = 1024;
+static const uint CDF_PUBLISHED = 1;
 
 struct LightCdfBinding {
     StructuredBuffer<EmissiveLightProxy, ScalarDataLayout> proxies;
     StructuredBuffer<uint> order;
-    StructuredBuffer<float> values;
-    bool gather;
     RWStructuredBuffer<float2> cdf;
-    // one entry per block, scanned in place into the offsets the blocks are shifted by
-    RWStructuredBuffer<float2> block_sums;
+    // zeroed: the blocks started, then per block a flag and its total
+    RWStructuredBuffer<uint> state;
     uint count;
-    uint block_count;
 };
 
 // One entry per wave; a wave size of one would mean one per thread.
 groupshared float2 s_wave_total[CDF_GROUP_SIZE];
+groupshared uint s_block;
 
 float2 wave_scan(float2 value) {
     const uint lane = WaveGetLaneIndex();
@@ -51,52 +50,73 @@ float2 group_scan(const float2 value, const uint thread_id, out float2 total) {
     return ff_add(offset, wave_prefix);
 }
 
-// Inclusive prefix sum, as three passes.
+// Blocks in launch order, so every block one waits for has started.
+uint start_block(const RWStructuredBuffer<uint> state, const uint thread_id) {
+    if (thread_id == 0) {
+        uint started;
+        InterlockedAdd(state[0], 1u, started);
+        s_block = started;
+    }
+    GroupMemoryBarrierWithGroupSync();
+    return s_block;
+}
+
+uint block_status_at(const uint block) {
+    return 1u + 3u * block;
+}
+
+void publish_total(const RWStructuredBuffer<uint> state, const uint block, const float2 total) {
+    const uint at = block_status_at(block);
+    uint previous;
+    InterlockedExchange(state[at + 1u], asuint(total.x), previous);
+    InterlockedExchange(state[at + 2u], asuint(total.y), previous);
+    AllMemoryBarrier();
+    InterlockedExchange(state[at], CDF_PUBLISHED, previous);
+}
+
+float2 published_total(const RWStructuredBuffer<uint> state, const uint block) {
+    const uint at = block_status_at(block);
+    uint status = 0;
+    while (status == 0)
+        InterlockedOr(state[at], 0u, status);
+    AllMemoryBarrier();
+    uint hi;
+    uint lo;
+    InterlockedOr(state[at + 1u], 0u, hi);
+    InterlockedOr(state[at + 2u], 0u, lo);
+    return float2(asfloat(hi), asfloat(lo));
+}
+
+// The sum of the blocks before this one, from the totals they publish (decoupled look-back,
+// Merrill and Garland 2016), added in a fixed order so that every run sums alike.
+float2 block_prefix(const RWStructuredBuffer<uint> state,
+                    const uint block,
+                    const float2 total,
+                    const uint thread_id) {
+    if (thread_id == 0)
+        publish_total(state, block, total);
+    float2 before = float2(0);
+    for (uint first = 0; first < block; first += CDF_GROUP_SIZE) {
+        const uint earlier = first + thread_id;
+        const float2 value = earlier < block ? published_total(state, earlier) : float2(0);
+        GroupMemoryBarrierWithGroupSync();
+        float2 chunk;
+        group_scan(value, thread_id, chunk);
+        before = ff_add(before, chunk);
+    }
+    return before;
+}
+
+// Inclusive prefix sum of the flux in tree order, in one pass.
 [shader("compute")][numthreads(CDF_GROUP_SIZE, 1, 1)] void
-scan_blocks(uint3 group_id: SV_GroupID,
-            uint thread_id: SV_GroupIndex,
-            ParameterBlock<LightCdfBinding> params) {
-    const uint i = group_id.x * CDF_GROUP_SIZE + thread_id;
-    float value = 0.f;
-    if (i < params.count)
-        value = params.gather ? params.proxies[params.order[i]].flux : params.values[i];
+scan(uint thread_id : SV_GroupIndex, ParameterBlock<LightCdfBinding> params) {
+    const uint block = start_block(params.state, thread_id);
+    const uint i = block * CDF_GROUP_SIZE + thread_id;
+    const float flux = i < params.count ? params.proxies[params.order[i]].flux : 0.f;
 
     float2 total;
-    const float2 prefix = group_scan(float2(max(value, 0.f), 0.f), thread_id, total);
-
+    const float2 prefix = group_scan(float2(max(flux, 0.f), 0.f), thread_id, total);
+    const float2 before = block_prefix(params.state, block, total, thread_id);
     if (i < params.count)
-        params.cdf[i] = prefix;
-    if (thread_id == 0)
-        params.block_sums[group_id.x] = total;
-}
-
-// The block totals are few, so one group walking them in chunks costs nothing.
-[shader("compute")][numthreads(CDF_GROUP_SIZE, 1, 1)] void
-scan_block_sums(uint thread_id: SV_GroupIndex, ParameterBlock<LightCdfBinding> params) {
-    float2 carry = float2(0);
-    for (uint base = 0; base < params.block_count; base += CDF_GROUP_SIZE) {
-        const uint i = base + thread_id;
-        const float2 value = i < params.block_count ? params.block_sums[i] : float2(0);
-
-        float2 total;
-        const float2 prefix = group_scan(value, thread_id, total);
-
-        if (i < params.block_count)
-            params.block_sums[i] = ff_add(carry, prefix);
-        carry = ff_add(carry, total);
-        GroupMemoryBarrierWithGroupSync();
-    }
-}
-
-// Shifts every block past the first by the totals of the blocks before it.
-[shader("compute")][numthreads(CDF_GROUP_SIZE, 1, 1)] void
-add_block_offset(uint3 group_id: SV_GroupID,
-                 uint thread_id: SV_GroupIndex,
-                 ParameterBlock<LightCdfBinding> params) {
-    if (group_id.x == 0)
-        return;
-    const uint i = group_id.x * CDF_GROUP_SIZE + thread_id;
-    if (i >= params.count)
-        return;
-    params.cdf[i] = ff_add(params.block_sums[group_id.x - 1], params.cdf[i]);
+        params.cdf[i] = ff_add(before, prefix);
 }

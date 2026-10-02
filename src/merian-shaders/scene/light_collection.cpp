@@ -4,34 +4,10 @@
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/utils/profiler.hpp"
 
+#include <array>
 #include <spdlog/spdlog.h>
 
 namespace merian {
-
-namespace {
-constexpr uint32_t UPDATE_GROUP_SIZE = 64;
-constexpr uint32_t ENV_GROUP_SIZE = 8;
-
-// levels from size x size down to 1 x 1; the warp starts at the 2 x 2 level
-uint32_t level_count_for(const uint32_t size) {
-    uint32_t levels = 1;
-    while ((size >> (levels - 1)) > 1) {
-        levels++;
-    }
-    return levels;
-}
-} // namespace
-
-// quads (float4), one per 2 x 2 block of every level down to 2 x 2
-uint32_t LightCollection::env_importance_quad_count() const {
-    const uint32_t size = env_importance_size();
-    uint32_t quads = 0;
-    for (uint32_t level = 0; level + 1 < level_count_for(size); level++) {
-        const uint32_t s = size >> level;
-        quads += (s * s) / 4;
-    }
-    return quads;
-}
 
 LightCollection::LightCollection(const ShaderCompileContextHandle& compile_context,
                                  const ContextHandle& context,
@@ -127,6 +103,7 @@ void LightCollection::ensure_pipelines(const SlangCompositionHandle& scene_compo
         make("pool", pool_entry_point, pool_pipeline, pool_params);
         make("grid", grid_entry_point, grid_pipeline, grid_params);
         make("env_split", env_split_entry_point, env_split_pipeline, env_split_params);
+        make("env_cones", env_cones_entry_point, env_cones_pipeline, env_cones_params);
     }
 
     if (!sort_composition) {
@@ -142,14 +119,12 @@ void LightCollection::ensure_pipelines(const SlangCompositionHandle& scene_compo
             });
             pipe.depends_on(ep);
         };
-        make("sort_count", sort_count_entry_point, sort_count_pipeline);
-        make("sort_scan", sort_scan_entry_point, sort_scan_pipeline);
+        make("sort_histogram", sort_histogram_entry_point, sort_histogram_pipeline);
         make("sort_scatter", sort_scatter_entry_point, sort_scatter_pipeline);
         sort_params.clear();
-        for (uint32_t i = 0; i < 3 * LIGHT_SORT_PASSES; i++) {
-            Versioned<SlangProgramEntryPoint>& ep = i % 3 == 0   ? sort_count_entry_point
-                                                    : i % 3 == 1 ? sort_scan_entry_point
-                                                                 : sort_scatter_entry_point;
+        for (uint32_t i = 0; i <= LIGHT_SORT_PASSES; i++) {
+            Versioned<SlangProgramEntryPoint>& ep =
+                i == 0 ? sort_histogram_entry_point : sort_scatter_entry_point;
             Versioned<ShaderObject> params([this, &ep] {
                 return ep->create_shader_object_for_parameter(context, "params", allocator);
             });
@@ -176,63 +151,33 @@ void LightCollection::ensure_pipelines(const SlangCompositionHandle& scene_compo
         });
         env_pool_params.depends_on(env_pool_entry_point);
         env_build_entry_point = SlangProgramEntryPoint::create(env_program, "build");
-        env_reduce_entry_point = SlangProgramEntryPoint::create(env_program, "reduce");
         env_build_pipeline = Versioned<Pipeline>([this] {
             const auto ep = env_build_entry_point.get();
             return ComputePipeline::create(ep->get_pipeline_layout(context), ep->specialize());
         });
         env_build_pipeline.depends_on(env_build_entry_point);
-        env_reduce_pipeline = Versioned<Pipeline>([this] {
-            const auto ep = env_reduce_entry_point.get();
-            return ComputePipeline::create(ep->get_pipeline_layout(context), ep->specialize());
-        });
-        env_reduce_pipeline.depends_on(env_reduce_entry_point);
         env_build_params = Versioned<ShaderObject>([this] {
             return env_build_entry_point->create_shader_object_for_parameter(context, "params",
                                                                              allocator);
         });
         env_build_params.depends_on(env_build_entry_point);
-        // one object per level: they are bound in the same command buffer
-        env_reduce_params.clear();
-        for (uint32_t level = 1; level < level_count_for(16384); level++) {
-            Versioned<ShaderObject> params([this] {
-                return env_reduce_entry_point->create_shader_object_for_parameter(context, "params",
-                                                                                  allocator);
-            });
-            params.depends_on(env_reduce_entry_point);
-            env_reduce_params.emplace_back(std::move(params));
-        }
     }
 
     if (!cdf_composition) {
         cdf_composition = SlangComposition::create();
         cdf_composition->add_module_from_path("merian-shaders/scene/light-cdf.slang", true);
         cdf_program = SlangProgram::create(compile_context, cdf_composition);
-        const auto make_cdf_pass = [this](const char* name,
-                                          Versioned<SlangProgramEntryPoint>& entry_point,
-                                          Versioned<Pipeline>& pipeline,
-                                          Versioned<ShaderObject>& tree_params,
-                                          Versioned<ShaderObject>& env_params) {
-            entry_point = SlangProgramEntryPoint::create(cdf_program, name);
-            pipeline = Versioned<Pipeline>([&entry_point, this] {
-                const auto ep = entry_point.get();
-                return ComputePipeline::create(ep->get_pipeline_layout(context), ep->specialize());
-            });
-            pipeline.depends_on(entry_point);
-            for (Versioned<ShaderObject>* params : {&tree_params, &env_params}) {
-                *params = Versioned<ShaderObject>([&entry_point, this] {
-                    return entry_point->create_shader_object_for_parameter(context, "params",
-                                                                           allocator);
-                });
-                params->depends_on(entry_point);
-            }
-        };
-        make_cdf_pass("scan_blocks", cdf_blocks_entry_point, cdf_blocks_pipeline,
-                      tree_cdf_params[0], env_cdf_params[0]);
-        make_cdf_pass("scan_block_sums", cdf_sums_entry_point, cdf_sums_pipeline,
-                      tree_cdf_params[1], env_cdf_params[1]);
-        make_cdf_pass("add_block_offset", cdf_offset_entry_point, cdf_offset_pipeline,
-                      tree_cdf_params[2], env_cdf_params[2]);
+        cdf_entry_point = SlangProgramEntryPoint::create(cdf_program, "scan");
+        cdf_pipeline = Versioned<Pipeline>([this] {
+            const auto ep = cdf_entry_point.get();
+            return ComputePipeline::create(ep->get_pipeline_layout(context), ep->specialize());
+        });
+        cdf_pipeline.depends_on(cdf_entry_point);
+        cdf_params = Versioned<ShaderObject>([this] {
+            return cdf_entry_point->create_shader_object_for_parameter(context, "params",
+                                                                       allocator);
+        });
+        cdf_params.depends_on(cdf_entry_point);
     }
 }
 
@@ -241,27 +186,28 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
         return;
 
     if (env_emissive) {
-        if (env_importance_resized && env_importance_buffer) {
-            cmd->keep_until_pool_reset(std::move(env_importance_buffer));
-            env_importance_built = false;
+        if (env_importance_resized && env_cdf_buffer) {
+            cmd->keep_until_pool_reset(std::move(env_cdf_buffer));
         }
         env_importance_resized = false;
-        const bool had_buffer = static_cast<bool>(env_importance_buffer);
-        ensure_buffer(env_importance_buffer, env_importance_quad_count() * 4 * sizeof(float),
-                      "LightCollection::env_importance", cmd);
-        if (!had_buffer || env_importance_buffer != env_importance_built_buffer) {
+        const uint32_t texels = env_importance_size() * env_importance_size();
+        ensure_buffer(env_cdf_buffer, texels * sizeof(float2), "LightCollection::env_cdf", cmd);
+        if (env_cdf_buffer != env_importance_built_buffer) {
             env_importance_built = false;
-            env_importance_built_buffer = env_importance_buffer;
+            env_importance_built_buffer = env_cdf_buffer;
         }
+        ensure_buffer(env_cdf_state_buffer, cdf_state_size(texels),
+                      "LightCollection::env_cdf_state", cmd);
         ensure_buffer(env_pool_buffer, static_cast<uint32_t>(env_pool_size) * sizeof(uint32_t),
                       "LightCollection::env_pool", cmd);
         ensure_buffer(env_split_buffer, sizeof(float), "LightCollection::env_split", cmd);
-        const uint32_t texels = env_importance_size() * env_importance_size();
-        if (!env_cdf_buffer || env_cdf_buffer->get_size() < texels * sizeof(float2))
-            env_importance_built = false;
-        ensure_buffer(env_cdf_buffer, texels * sizeof(float2), "LightCollection::env_cdf", cmd);
-        ensure_buffer(env_cdf_block_sums_buffer, cdf_block_count(texels) * sizeof(float2),
-                      "LightCollection::env_cdf_block_sums", cmd);
+        if (grid_lists_env) {
+            const BufferHandle previous = env_cones_buffer;
+            ensure_buffer(env_cones_buffer, 2 * texels * sizeof(float4),
+                          "LightCollection::env_cones", cmd);
+            if (env_cones_buffer != previous)
+                env_cones_size = 0;
+        }
     }
 
     grid_slot ^= 1u;
@@ -278,12 +224,11 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
                       "LightCollection::tree_rank", cmd);
         ensure_buffer(tree_cdf_buffer, triangle_count * sizeof(float2), "LightCollection::tree_cdf",
                       cmd);
-        ensure_buffer(tree_cdf_block_sums_buffer, cdf_block_count(triangle_count) * sizeof(float2),
-                      "LightCollection::tree_cdf_block_sums", cmd);
-        ensure_buffer(sort_histogram_buffer,
-                      static_cast<vk::DeviceSize>(sort_tile_count()) *
-                          (1u << LIGHT_SORT_RADIX_BITS) * sizeof(uint32_t),
-                      "LightCollection::sort_histogram", cmd);
+        ensure_buffer(tree_cdf_state_buffer, cdf_state_size(triangle_count),
+                      "LightCollection::tree_cdf_state", cmd);
+        ensure_buffer(setup_state_buffer, LIGHT_GRID_SETUP_STATE * sizeof(uint32_t),
+                      "LightCollection::setup_state", cmd);
+        ensure_buffer(sort_state_buffer, sort_state_size(), "LightCollection::sort_state", cmd);
 
         bool info_grew = false;
         for (uint32_t i = 0; i < 2; i++) {
@@ -315,16 +260,24 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
             const vk::DeviceSize slot_count =
                 static_cast<vk::DeviceSize>(grid_cell_count()) * LIGHT_GRID_SLOTS;
             for (uint32_t i = 0; i < 2; i++) {
-                const bool grew = !grid_keys_buffer[i] ||
-                                  grid_keys_buffer[i]->get_size() < slot_count * sizeof(uint32_t);
+                const std::array<BufferHandle, 4> previous = {
+                    grid_keys_buffer[i], grid_contribution_buffer[i], grid_feedback_buffer[i],
+                    grid_touched_buffer[i]};
                 ensure_buffer(grid_keys_buffer[i], slot_count * sizeof(uint32_t),
                               "LightCollection::grid_keys", cmd);
-                ensure_buffer(grid_contribution_buffer[i], slot_count * sizeof(float4),
+                ensure_buffer(grid_contribution_buffer[i], slot_count * sizeof(float3),
                               "LightCollection::grid_contribution", cmd);
                 ensure_buffer(grid_feedback_buffer[i],
                               LIGHT_GRID_FEEDBACK_STRIDE * slot_count * sizeof(uint32_t),
                               "LightCollection::grid_feedback", cmd);
-                grid_reset |= grew;
+                ensure_buffer(grid_touched_buffer[i], grid_cell_count() * sizeof(uint32_t),
+                              "LightCollection::grid_touched", cmd);
+                const bool reallocated =
+                    previous !=
+                    std::array<BufferHandle, 4>{grid_keys_buffer[i], grid_contribution_buffer[i],
+                                                grid_feedback_buffer[i], grid_touched_buffer[i]};
+                grid_reset |= reallocated;
+                grid_feedback_fresh |= reallocated;
             }
             ensure_buffer(grid_starts_buffer, slot_count * sizeof(uint32_t),
                           "LightCollection::grid_starts", cmd);
@@ -344,6 +297,7 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
                 retire_buffer(grid_keys_buffer[i], cmd);
                 retire_buffer(grid_contribution_buffer[i], cmd);
                 retire_buffer(grid_feedback_buffer[i], cmd);
+                retire_buffer(grid_touched_buffer[i], cmd);
             }
             retire_buffer(grid_starts_buffer, cmd);
             retire_buffer(grid_estimate_buffer, cmd);
@@ -416,113 +370,30 @@ void LightCollection::update(const CommandBufferHandle& cmd,
     cmd->barrier(vk::MemoryBarrier2{
         vk::PipelineStageFlagBits2::eAllCommands,
         vk::AccessFlagBits2::eShaderWrite,
+        vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer,
+        vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite |
+            vk::AccessFlagBits2::eTransferWrite,
+    });
+    if (triangle_count > 0) {
+        cmd->fill(setup_state_buffer);
+        cmd->fill(sort_state_buffer, 0, sort_state_size());
+        cmd->fill(tree_cdf_state_buffer, 0, cdf_state_size(triangle_count));
+    }
+    if (env_emissive && !env_importance_built)
+        cmd->fill(env_cdf_state_buffer, 0,
+                  cdf_state_size(env_importance_size() * env_importance_size()));
+    if (grid_feedback_fresh) {
+        for (uint32_t i = 0; i < 2; i++) {
+            cmd->fill(grid_feedback_buffer[i]);
+            cmd->fill(grid_touched_buffer[i]);
+        }
+        grid_feedback_fresh = false;
+    }
+    cmd->barrier(vk::MemoryBarrier2{
+        vk::PipelineStageFlagBits2::eTransfer,
+        vk::AccessFlagBits2::eTransferWrite,
         vk::PipelineStageFlagBits2::eComputeShader,
         vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
-    });
-
-    if (env_emissive) {
-        MERIAN_PROFILE_SCOPE_GPU(cmd, "env importance");
-        const uint32_t size = env_importance_size();
-        // the coarsest level is 2 x 2: its single quad holds the mean
-        const uint32_t levels = level_count_for(size) - 1;
-        if (!env_importance_built) {
-            const auto ep = env_build_entry_point.get();
-            const auto pipe = env_build_pipeline.get();
-            const auto params = env_build_params.get();
-            auto c = params->get_cursor();
-            c["levels"] = env_importance_buffer;
-            c["size"] = size;
-            c["level"] = 0u;
-            c["level_size"] = size;
-
-            cmd->bind(pipe);
-            ep->bind("scene", scene_object, cmd, pipe, obj_allocator);
-            ep->bind("params", params, cmd, pipe, obj_allocator);
-            cmd->dispatch((size + ENV_GROUP_SIZE - 1) / ENV_GROUP_SIZE,
-                          (size + ENV_GROUP_SIZE - 1) / ENV_GROUP_SIZE, 1);
-        }
-
-        if (!env_importance_built) {
-            const auto ep = env_reduce_entry_point.get();
-            const auto pipe = env_reduce_pipeline.get();
-            cmd->bind(pipe);
-            for (uint32_t level = 1; level < levels; level++) {
-                cmd->barrier(vk::MemoryBarrier2{
-                    vk::PipelineStageFlagBits2::eComputeShader,
-                    vk::AccessFlagBits2::eShaderWrite,
-                    vk::PipelineStageFlagBits2::eComputeShader,
-                    vk::AccessFlagBits2::eShaderRead,
-                });
-                const uint32_t level_size = size >> level;
-                const auto params = env_reduce_params[level - 1].get();
-                auto c = params->get_cursor();
-                c["levels"] = env_importance_buffer;
-                c["size"] = size;
-                c["level"] = level;
-                c["level_size"] = level_size;
-                ep->bind("params", params, cmd, pipe, obj_allocator);
-                cmd->dispatch((level_size + ENV_GROUP_SIZE - 1) / ENV_GROUP_SIZE,
-                              (level_size + ENV_GROUP_SIZE - 1) / ENV_GROUP_SIZE, 1);
-            }
-            cmd->barrier(vk::MemoryBarrier2{
-                vk::PipelineStageFlagBits2::eComputeShader,
-                vk::AccessFlagBits2::eShaderWrite,
-                vk::PipelineStageFlagBits2::eComputeShader,
-                vk::AccessFlagBits2::eShaderRead,
-            });
-            record_scan(cmd, obj_allocator, env_cdf_params, env_importance_buffer, env_cdf_buffer,
-                        env_cdf_block_sums_buffer, size * size);
-            env_importance_built = true;
-        }
-
-        if (env_selection == EnvSelection::EnvSelectionPool && env_pool_buffer) {
-            cmd->barrier(vk::MemoryBarrier2{
-                vk::PipelineStageFlagBits2::eComputeShader,
-                vk::AccessFlagBits2::eShaderWrite,
-                vk::PipelineStageFlagBits2::eComputeShader,
-                vk::AccessFlagBits2::eShaderRead,
-            });
-            const auto pool_ep = env_pool_entry_point.get();
-            const auto pool_pipe = env_pool_pipeline.get();
-            const auto params = env_pool_params.get();
-            auto c = params->get_cursor();
-            c["levels"] = env_importance_buffer;
-            c["pool"] = env_pool_buffer;
-            c["size"] = size;
-            c["level_count"] = level_count_for(size);
-            c["pool_size"] = static_cast<uint32_t>(env_pool_size);
-            c["frame"] = frame;
-
-            cmd->bind(pool_pipe);
-            pool_ep->bind("params", params, cmd, pool_pipe, obj_allocator);
-            cmd->dispatch((static_cast<uint32_t>(env_pool_size) + 63) / 64, 1, 1);
-        }
-    }
-
-    if (triangle_count > 0) {
-        const auto ep = update_entry_point.get();
-        const auto pipe = update_pipeline.get();
-        const auto params = update_params.get();
-        auto c = params->get_cursor();
-        c["triangles"] = triangles_buffer;
-        c["proxies"] = proxies_buffer;
-        c["regions"] = regions_buffer;
-        c["light_geometries"] = light_geometries_buffer;
-        c["light_geometry_count"] = static_cast<uint32_t>(light_geometries.size());
-        c["triangle_count"] = triangle_count;
-        c["flux_samples"] = static_cast<uint32_t>(flux_samples);
-
-        cmd->bind(pipe);
-        ep->bind("scene", scene_object, cmd, pipe, obj_allocator);
-        ep->bind("params", params, cmd, pipe, obj_allocator);
-        cmd->dispatch((triangle_count + UPDATE_GROUP_SIZE - 1) / UPDATE_GROUP_SIZE, 1, 1);
-    }
-
-    cmd->barrier(vk::MemoryBarrier2{
-        vk::PipelineStageFlagBits2::eComputeShader,
-        vk::AccessFlagBits2::eShaderWrite,
-        vk::PipelineStageFlagBits2::eComputeShader,
-        vk::AccessFlagBits2::eShaderRead,
     });
 
     const auto barrier = [&] {
@@ -533,146 +404,194 @@ void LightCollection::update(const CommandBufferHandle& cmd,
             vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
         });
     };
+    const auto run = [&](Versioned<SlangProgramEntryPoint>& entry_point,
+                         Versioned<Pipeline>& pipeline, const ShaderObjectHandle& params,
+                         const uint32_t groups_x, const uint32_t groups_y = 1,
+                         const ShaderObjectHandle& scene = {}) {
+        const auto ep = entry_point.get();
+        const auto pipe = pipeline.get();
+        cmd->bind(pipe);
+        if (scene)
+            ep->bind("scene", scene, cmd, pipe, obj_allocator);
+        ep->bind("params", params, cmd, pipe, obj_allocator);
+        cmd->dispatch(groups_x, groups_y, 1);
+    };
     const BufferHandle& dummy = allocator->get_dummy_buffer();
     const auto or_dummy = [&](const BufferHandle& buffer) -> const BufferHandle& {
         return buffer ? buffer : dummy;
     };
-
-    const auto split_env = [&] {
-        if (!env_emissive || !env_split_buffer) {
-            return;
-        }
-        MERIAN_PROFILE_SCOPE_GPU(cmd, "env split");
-        const auto ep = env_split_entry_point.get();
-        const auto pipe = env_split_pipeline.get();
-        const auto params = env_split_params.get();
+    const uint32_t env_size = env_importance_size();
+    const bool env_listed = triangle_count > 0 && lists_env();
+    const auto write_preprocess = [&](const ShaderObjectHandle& params) {
         auto c = params->get_cursor();
-        c["cdf"] = or_dummy(tree_cdf_buffer);
-        c["env_split"] = env_split_buffer;
-        c["triangle_count"] = tree_cdf_buffer ? triangle_count : 0u;
-        c["scene_radius"] = scene_radius;
-        c["manual_probability"] = env_share;
-        c["from_power"] = static_cast<uint32_t>(env_share_from_power ? 1 : 0);
-        c["min_probability"] = env_share_min;
-        c["max_probability"] = env_share_max;
-        auto env = c["env_importance"];
-        env["levels"] = env_importance_buffer;
-        env["size"] = env_importance_size();
-        env["level_count"] = level_count_for(env_importance_size());
-
-        cmd->bind(pipe);
-        ep->bind("params", params, cmd, pipe, obj_allocator);
-        cmd->dispatch(1, 1, 1);
+        c["proxies"] = proxies_buffer;
+        c["tree_keys"] = tree_keys_buffer[0];
+        c["tree_order"] = tree_values_buffer[0];
+        c["tree_cdf"] = tree_cdf_buffer;
+        c["env_cdf"] = env_listed ? env_cdf_buffer : dummy;
+        c["env_size"] = env_listed ? env_size : 0u;
+        c["env_cones"] = env_listed ? env_cones_buffer : dummy;
+        c["tree_info"] = tree_info_buffer[grid_slot];
+        c["tree_info_prev"] = tree_info_buffer[grid_slot ^ 1];
+        c["pool"] = pool_buffer;
+        c["grid_keys"] = or_dummy(grid_keys_buffer[grid_slot]);
+        c["grid_keys_prev"] = or_dummy(grid_keys_buffer[grid_slot ^ 1]);
+        c["grid_contribution"] = or_dummy(grid_contribution_buffer[grid_slot]);
+        c["grid_contribution_prev"] = or_dummy(grid_contribution_buffer[grid_slot ^ 1]);
+        c["grid_feedback"] = or_dummy(grid_feedback_buffer[grid_slot]);
+        c["grid_feedback_prev"] = or_dummy(grid_feedback_buffer[grid_slot ^ 1]);
+        c["grid_touched"] = or_dummy(grid_touched_buffer[grid_slot]);
+        c["grid_touched_prev"] = or_dummy(grid_touched_buffer[grid_slot ^ 1]);
+        c["grid_starts"] = or_dummy(grid_starts_buffer);
+        c["grid_estimate"] = or_dummy(grid_estimate_buffer);
+        c["grid_probability"] = or_dummy(grid_probability_buffer);
+        c["grid_slot_bounds"] = or_dummy(grid_slot_bounds_buffer);
+        c["grid_info"] = grid_info_buffer[grid_slot];
+        c["grid_info_prev"] = grid_info_buffer[grid_slot ^ 1];
+        c["grid_coverage"] = grid_coverage;
+        c["camera_position"] = camera_position;
+        c["triangle_count"] = triangle_count;
+        c["pool_size"] = static_cast<uint32_t>(pool_size);
+        c["grid_dimension"] = static_cast<uint32_t>(grid_dimension);
+        c["grid_cascades"] = static_cast<uint32_t>(grid_cascades);
+        c["grid_cell_size"] = grid_cell_size;
+        c["grid_jitter"] = grid_jitter;
+        c["grid_even_share"] = grid_even_share;
+        c["grid_refinements"] = static_cast<uint32_t>(grid_refinements);
+        c["setup_state"] = setup_state_buffer;
+        c["setup_groups"] = setup_group_count();
+        c["slot_weighing"] = static_cast<uint32_t>(slot_weighing);
+        c["grid_reset"] = grid_reset;
+        c["frame"] = frame;
+        return params;
     };
 
+    {
+        MERIAN_PROFILE_SCOPE_GPU(cmd, "flux and environment");
+        if (env_emissive && !env_importance_built) {
+            const auto params = env_build_params.get();
+            auto c = params->get_cursor();
+            c["cdf"] = env_cdf_buffer;
+            c["state"] = env_cdf_state_buffer;
+            c["size"] = env_size;
+            run(env_build_entry_point, env_build_pipeline, params,
+                cdf_block_count(env_size * env_size), 1, scene_object);
+            env_importance_built = true;
+        }
+        if (triangle_count > 0) {
+            const auto params = update_params.get();
+            auto c = params->get_cursor();
+            c["triangles"] = triangles_buffer;
+            c["proxies"] = proxies_buffer;
+            c["regions"] = regions_buffer;
+            c["light_geometries"] = light_geometries_buffer;
+            c["light_geometry_count"] = static_cast<uint32_t>(light_geometries.size());
+            c["triangle_count"] = triangle_count;
+            c["flux_samples"] = static_cast<uint32_t>(flux_samples);
+            const uint32_t groups =
+                (triangle_count * LIGHT_UPDATE_LANES + LIGHT_UPDATE_GROUP - 1) / LIGHT_UPDATE_GROUP;
+            run(update_entry_point, update_pipeline, params, std::min(groups, LIGHT_DISPATCH_ROW),
+                (groups + LIGHT_DISPATCH_ROW - 1) / LIGHT_DISPATCH_ROW, scene_object);
+        }
+        barrier();
+    }
+
+    {
+        MERIAN_PROFILE_SCOPE_GPU(cmd, "setup");
+        if (env_emissive && env_selection == EnvSelection::EnvSelectionPool && env_pool_buffer) {
+            const auto params = env_pool_params.get();
+            auto c = params->get_cursor();
+            c["importance"]["cdf"] = env_cdf_buffer;
+            c["importance"]["size"] = env_size;
+            c["pool"] = env_pool_buffer;
+            c["pool_size"] = static_cast<uint32_t>(env_pool_size);
+            c["frame"] = frame;
+            run(env_pool_entry_point, env_pool_pipeline, params,
+                (static_cast<uint32_t>(env_pool_size) + 63) / 64);
+        }
+        if (triangle_count > 0) {
+            run(setup_entry_point, setup_pipeline, write_preprocess(setup_params.get()),
+                setup_group_count());
+        }
+        if (env_listed && env_cones_size != env_size) {
+            run(env_cones_entry_point, env_cones_pipeline, write_preprocess(env_cones_params.get()),
+                (2 * env_size * env_size + 63) / 64);
+            env_cones_size = env_size;
+        }
+        barrier();
+    }
+
     if (triangle_count > 0) {
-        MERIAN_PROFILE_SCOPE_GPU(cmd, "light selection");
-        const bool env_listed = lists_env();
-        const auto write_preprocess = [&](const ShaderObjectHandle& params) {
+        MERIAN_PROFILE_SCOPE_GPU(cmd, "sort");
+        const uint32_t tiles = sort_tile_count();
+        for (uint32_t pass = 0; pass <= LIGHT_SORT_PASSES; pass++) {
+            const uint32_t in = pass > 0 ? (pass - 1) % 2 : 0;
+            const auto params = sort_params[pass].get();
             auto c = params->get_cursor();
             c["proxies"] = proxies_buffer;
-            c["tree_keys"] = tree_keys_buffer[0];
-            c["tree_order"] = tree_values_buffer[0];
-            c["tree_cdf"] = tree_cdf_buffer;
-            c["env_cdf"] = env_listed ? env_cdf_buffer : dummy;
-            c["env_size"] = env_listed ? env_importance_size() : 0u;
             c["tree_info"] = tree_info_buffer[grid_slot];
-            c["tree_info_prev"] = tree_info_buffer[grid_slot ^ 1];
-            c["pool"] = pool_buffer;
-            c["grid_keys"] = or_dummy(grid_keys_buffer[grid_slot]);
-            c["grid_keys_prev"] = or_dummy(grid_keys_buffer[grid_slot ^ 1]);
-            c["grid_contribution"] = or_dummy(grid_contribution_buffer[grid_slot]);
-            c["grid_contribution_prev"] = or_dummy(grid_contribution_buffer[grid_slot ^ 1]);
-            c["grid_feedback"] = or_dummy(grid_feedback_buffer[grid_slot]);
-            c["grid_feedback_prev"] = or_dummy(grid_feedback_buffer[grid_slot ^ 1]);
-            c["grid_starts"] = or_dummy(grid_starts_buffer);
-            c["grid_estimate"] = or_dummy(grid_estimate_buffer);
-            c["grid_probability"] = or_dummy(grid_probability_buffer);
-            c["grid_slot_bounds"] = or_dummy(grid_slot_bounds_buffer);
-            c["grid_info"] = grid_info_buffer[grid_slot];
-            c["grid_info_prev"] = grid_info_buffer[grid_slot ^ 1];
-            c["grid_coverage"] = grid_coverage;
-            c["camera_position"] = camera_position;
-            c["triangle_count"] = triangle_count;
-            c["pool_size"] = static_cast<uint32_t>(pool_size);
-            c["grid_dimension"] = static_cast<uint32_t>(grid_dimension);
-            c["grid_cascades"] = static_cast<uint32_t>(grid_cascades);
-            c["grid_cell_size"] = grid_cell_size;
-            c["grid_jitter"] = grid_jitter;
-            c["grid_even_share"] = grid_even_share;
-            c["grid_refinements"] = static_cast<uint32_t>(grid_refinements);
-            c["slot_weighing"] = static_cast<uint32_t>(slot_weighing);
-            c["grid_reset"] = grid_reset;
-            c["frame"] = frame;
-            return params;
-        };
-        const auto run = [&](Versioned<SlangProgramEntryPoint>& entry_point,
-                             Versioned<Pipeline>& pipeline, const ShaderObjectHandle& params,
-                             const uint32_t groups_x, const uint32_t groups_y = 1) {
-            const auto ep = entry_point.get();
-            const auto pipe = pipeline.get();
-            cmd->bind(pipe);
-            ep->bind("params", params, cmd, pipe, obj_allocator);
-            cmd->dispatch(groups_x, groups_y, 1);
-        };
+            c["keys_in"] = tree_keys_buffer[in];
+            c["values_in"] = tree_values_buffer[in];
+            c["keys_out"] = tree_keys_buffer[in ^ 1];
+            c["values_out"] = tree_values_buffer[in ^ 1];
+            c["rank"] = tree_rank_buffer;
+            c["state"] = sort_state_buffer;
+            c["count"] = triangle_count;
+            c["tile_count"] = tiles;
+            c["pass"] = pass > 0 ? pass - 1 : 0u;
+            if (pass == 0)
+                run(sort_histogram_entry_point, sort_histogram_pipeline, params, tiles);
+            else
+                run(sort_scatter_entry_point, sort_scatter_pipeline, params, tiles);
+            barrier();
+        }
+    }
 
-        run(setup_entry_point, setup_pipeline, write_preprocess(setup_params.get()), 1);
+    if (triangle_count > 0) {
+        MERIAN_PROFILE_SCOPE_GPU(cmd, "cdf");
+        const auto params = cdf_params.get();
+        auto c = params->get_cursor();
+        c["proxies"] = proxies_buffer;
+        c["order"] = tree_values_buffer[0];
+        c["cdf"] = tree_cdf_buffer;
+        c["state"] = tree_cdf_state_buffer;
+        c["count"] = triangle_count;
+        run(cdf_entry_point, cdf_pipeline, params, cdf_block_count(triangle_count));
         barrier();
-        {
-            MERIAN_PROFILE_SCOPE_GPU(cmd, "sort");
-            const uint32_t tiles = sort_tile_count();
-            for (uint32_t pass = 0; pass < LIGHT_SORT_PASSES; pass++) {
-                const uint32_t in = pass % 2;
-                for (uint32_t step = 0; step < 3; step++) {
-                    const auto params = sort_params[3 * pass + step].get();
-                    auto c = params->get_cursor();
-                    c["proxies"] = proxies_buffer;
-                    c["tree_info"] = tree_info_buffer[grid_slot];
-                    c["keys_in"] = tree_keys_buffer[in];
-                    c["values_in"] = tree_values_buffer[in];
-                    c["keys_out"] = tree_keys_buffer[in ^ 1];
-                    c["values_out"] = tree_values_buffer[in ^ 1];
-                    c["histogram"] = sort_histogram_buffer;
-                    c["rank"] = tree_rank_buffer;
-                    c["count"] = triangle_count;
-                    c["tile_count"] = tiles;
-                    c["pass"] = pass;
-                    if (step == 0)
-                        run(sort_count_entry_point, sort_count_pipeline, params, tiles);
-                    else if (step == 1)
-                        run(sort_scan_entry_point, sort_scan_pipeline, params, 1);
-                    else
-                        run(sort_scatter_entry_point, sort_scatter_pipeline, params, tiles);
-                    barrier();
-                }
-            }
+    }
+
+    {
+        MERIAN_PROFILE_SCOPE_GPU(cmd, "grid");
+        if (env_emissive && env_split_buffer) {
+            const auto params = env_split_params.get();
+            auto c = params->get_cursor();
+            c["cdf"] = or_dummy(tree_cdf_buffer);
+            c["env_split"] = env_split_buffer;
+            c["triangle_count"] = tree_cdf_buffer ? triangle_count : 0u;
+            c["scene_radius"] = scene_radius;
+            c["manual_probability"] = env_share;
+            c["from_power"] = static_cast<uint32_t>(env_share_from_power ? 1 : 0);
+            c["min_probability"] = env_share_min;
+            c["max_probability"] = env_share_max;
+            auto env = c["env_importance"];
+            env["cdf"] = or_dummy(env_cdf_buffer);
+            env["size"] = env_cdf_buffer ? env_size : 0u;
+            run(env_split_entry_point, env_split_pipeline, params, 1);
         }
-        {
-            MERIAN_PROFILE_SCOPE_GPU(cmd, "cdf");
-            record_scan(cmd, obj_allocator, tree_cdf_params, nullptr, tree_cdf_buffer,
-                        tree_cdf_block_sums_buffer, triangle_count);
-        }
-        barrier();
-        split_env();
-        if (selection != LightSelection::LightSelectionPower) {
-            MERIAN_PROFILE_SCOPE_GPU(cmd, "pool");
+        if (triangle_count > 0 && selection != LightSelection::LightSelectionPower) {
             run(pool_entry_point, pool_pipeline, write_preprocess(pool_params.get()),
                 (static_cast<uint32_t>(pool_size) + 63) / 64);
         }
-        if (selection == LightSelection::LightSelectionGrid) {
-            MERIAN_PROFILE_SCOPE_GPU(cmd, "grid fill");
+        if (triangle_count > 0 && selection == LightSelection::LightSelectionGrid) {
             // one group per cell
             const uint32_t cells = grid_cell_count();
             run(grid_entry_point, grid_pipeline, write_preprocess(grid_params.get()),
-                std::min(cells, LIGHT_GRID_DISPATCH_ROW),
-                (cells + LIGHT_GRID_DISPATCH_ROW - 1) / LIGHT_GRID_DISPATCH_ROW);
+                std::min(cells, LIGHT_DISPATCH_ROW),
+                (cells + LIGHT_DISPATCH_ROW - 1) / LIGHT_DISPATCH_ROW);
         }
+    }
+    if (triangle_count > 0)
         grid_reset = false;
-    }
-
-    if (triangle_count == 0) {
-        split_env();
-    }
 
     cmd->barrier(vk::MemoryBarrier2{
         vk::PipelineStageFlagBits2::eComputeShader,
@@ -680,52 +599,6 @@ void LightCollection::update(const CommandBufferHandle& cmd,
         vk::PipelineStageFlagBits2::eAllCommands,
         vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
     });
-}
-
-void LightCollection::record_scan(const CommandBufferHandle& cmd,
-                                  const ShaderObjectAllocatorHandle& obj_allocator,
-                                  std::array<Versioned<ShaderObject>, 3>& params,
-                                  const BufferHandle& values,
-                                  const BufferHandle& cdf,
-                                  const BufferHandle& block_sums,
-                                  const uint32_t count) {
-    const BufferHandle& dummy = allocator->get_dummy_buffer();
-    const bool gather = !values;
-    const uint32_t blocks = cdf_block_count(count);
-    const auto pass = [&](Versioned<SlangProgramEntryPoint>& entry_point,
-                          Versioned<Pipeline>& pipeline, Versioned<ShaderObject>& object,
-                          const uint32_t groups) {
-        const auto o = object.get();
-        auto c = o->get_cursor();
-        c["proxies"] = gather ? proxies_buffer : dummy;
-        c["order"] = gather ? tree_values_buffer[0] : dummy;
-        c["values"] = gather ? dummy : values;
-        c["gather"] = gather;
-        c["cdf"] = cdf;
-        c["block_sums"] = block_sums;
-        c["count"] = count;
-        c["block_count"] = blocks;
-        const auto ep = entry_point.get();
-        const auto pipe = pipeline.get();
-        cmd->bind(pipe);
-        ep->bind("params", o, cmd, pipe, obj_allocator);
-        cmd->dispatch(groups, 1, 1);
-    };
-    const auto barrier = [&] {
-        cmd->barrier(vk::MemoryBarrier2{
-            vk::PipelineStageFlagBits2::eComputeShader,
-            vk::AccessFlagBits2::eShaderWrite,
-            vk::PipelineStageFlagBits2::eComputeShader,
-            vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
-        });
-    };
-    pass(cdf_blocks_entry_point, cdf_blocks_pipeline, params[0], blocks);
-    if (blocks > 1) {
-        barrier();
-        pass(cdf_sums_entry_point, cdf_sums_pipeline, params[1], 1);
-        barrier();
-        pass(cdf_offset_entry_point, cdf_offset_pipeline, params[2], blocks);
-    }
 }
 
 void LightCollection::write_to(ShaderCursor cursor) const {
@@ -747,7 +620,6 @@ void LightCollection::write_to(ShaderCursor cursor) const {
     tree["cdf"] = active ? tree_cdf_buffer : dummy;
     tree["order"] = active ? tree_values_buffer[0] : dummy;
     tree["rank"] = active ? tree_rank_buffer : dummy;
-    tree["env_cdf"] = env_listed ? env_cdf_buffer : dummy;
     tree["env_texels"] = env_texels;
 
     auto pool = cursor["pool"];
@@ -771,6 +643,7 @@ void LightCollection::write_to(ShaderCursor cursor) const {
     grid["slot_bounds"] = grid_active && grid_slot_bounds_buffer ? grid_slot_bounds_buffer : dummy;
     grid["probability"] = grid_active && grid_probability_buffer ? grid_probability_buffer : dummy;
     grid["feedback"] = grid_active ? grid_feedback_buffer[grid_slot] : dummy;
+    grid["touched"] = grid_active ? grid_touched_buffer[grid_slot] : dummy;
     grid["light_count"] = triangle_count + env_texels;
 
     cursor["selection"] =
@@ -778,7 +651,7 @@ void LightCollection::write_to(ShaderCursor cursor) const {
     cursor["has_sky_portals"] = has_sky_portals;
     cursor["debug_view"] = static_cast<uint32_t>(debug_view);
 
-    const bool env_active = enabled && env_emissive && env_importance_buffer && env_split_buffer;
+    const bool env_active = enabled && env_emissive && env_cdf_buffer && env_split_buffer;
     auto env = cursor["env"];
     env["split"] = env_active ? env_split_buffer : dummy;
     env["pool"] = env_active && env_pool_buffer ? env_pool_buffer : dummy;
@@ -787,9 +660,8 @@ void LightCollection::write_to(ShaderCursor cursor) const {
             ? static_cast<uint32_t>(env_pool_size)
             : 0u;
     auto importance = env["importance"];
-    importance["levels"] = env_active ? env_importance_buffer : dummy;
+    importance["cdf"] = env_active ? env_cdf_buffer : dummy;
     importance["size"] = env_active ? env_importance_size() : 0u;
-    importance["level_count"] = env_active ? level_count_for(env_importance_size()) : 0u;
 }
 
 void LightCollection::properties(Properties& props) {
@@ -895,9 +767,9 @@ void LightCollection::properties(Properties& props) {
                                  "How often a whole-scene draw takes the environment instead of "
                                  "a triangle, where both exist.");
         }
-        props.config_options("sampling", env_selection, {"warp", "pool"},
+        props.config_options("sampling", env_selection, {"search", "pool"},
                              Properties::OptionsStyle::COMBO,
-                             "Descend the importance map per draw, or load from a pool of "
+                             "Search the importance map per draw, or load from a pool of "
                              "directions drawn once per frame.");
         if (env_selection == EnvSelection::EnvSelectionPool) {
             props.config_int("pool size", env_pool_size, "Directions in the per-frame pool.", 64,

@@ -118,6 +118,12 @@ class CommandBuffer : public std::enable_shared_from_this<CommandBuffer> {
 
     void fill(const BufferHandle& buffer, const uint32_t data = 0);
 
+    // size: a multiple of 4
+    void fill(const BufferHandle& buffer,
+              const vk::DeviceSize offset,
+              const vk::DeviceSize size,
+              const uint32_t data = 0);
+
     template <typename DataType>
     void update(const BufferHandle& dst_buffer,
                 const vk::DeviceSize dst_offset,

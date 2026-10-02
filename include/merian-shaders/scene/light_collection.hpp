@@ -14,7 +14,6 @@
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 
-#include <array>
 #include <limits>
 #include <vector>
 
@@ -124,18 +123,29 @@ class LightCollection {
     uint32_t env_importance_size() const {
         return 1u << static_cast<uint32_t>(env_importance_log2);
     }
-    uint32_t env_importance_quad_count() const;
     bool lists_env() const {
-        return grid_lists_env && env_emissive && env_importance_buffer && env_split_buffer &&
-               env_cdf_buffer;
+        return grid_lists_env && env_emissive && env_split_buffer && env_cdf_buffer;
     }
-    // threads per block of the flux scan; matches CDF_GROUP_SIZE
+    // threads per block of the scans; matches CDF_GROUP_SIZE
     static constexpr uint32_t CDF_GROUP_SIZE = 1024;
     static uint32_t cdf_block_count(const uint32_t count) {
         return (count + CDF_GROUP_SIZE - 1) / CDF_GROUP_SIZE;
     }
+    // the blocks started, then per block a flag and its total
+    static vk::DeviceSize cdf_state_size(const uint32_t count) {
+        return (1 + 3 * static_cast<vk::DeviceSize>(cdf_block_count(count))) * sizeof(uint32_t);
+    }
+    uint32_t setup_group_count() const {
+        const uint32_t per_group = LIGHT_GRID_SETUP_GROUP * LIGHT_GRID_SETUP_ITEMS;
+        return (triangle_count + per_group - 1) / per_group;
+    }
     uint32_t sort_tile_count() const {
         return (triangle_count + LIGHT_SORT_TILE - 1) / LIGHT_SORT_TILE;
+    }
+    // per pass the digit counts, the tiles started and every tile's digit status
+    vk::DeviceSize sort_state_size() const {
+        return static_cast<vk::DeviceSize>(LIGHT_SORT_PASSES) *
+               ((1u << LIGHT_SORT_RADIX_BITS) * (sort_tile_count() + 1) + 1) * sizeof(uint32_t);
     }
     uint32_t grid_cell_count() const {
         const uint32_t d = static_cast<uint32_t>(grid_dimension);
@@ -146,15 +156,6 @@ class LightCollection {
                        const std::string& name,
                        const CommandBufferHandle& cmd);
     static void retire_buffer(BufferHandle& buffer, const CommandBufferHandle& cmd);
-
-    // values: nullptr scans the triangles' flux in tree order
-    void record_scan(const CommandBufferHandle& cmd,
-                     const ShaderObjectAllocatorHandle& obj_allocator,
-                     std::array<Versioned<ShaderObject>, 3>& params,
-                     const BufferHandle& values,
-                     const BufferHandle& cdf,
-                     const BufferHandle& block_sums,
-                     uint32_t count);
 
     ShaderCompileContextHandle compile_context;
     ContextHandle context;
@@ -208,24 +209,30 @@ class LightCollection {
 
     ShaderObjectAllocatorHandle fallback_obj_allocator;
 
-    BufferHandle env_importance_buffer;
     BufferHandle env_importance_built_buffer;
     BufferHandle env_pool_buffer;
     BufferHandle env_split_buffer;
     BufferHandle env_cdf_buffer;
-    BufferHandle env_cdf_block_sums_buffer;
+    BufferHandle env_cdf_state_buffer;
     BufferHandle pool_buffer;
+    BufferHandle env_cones_buffer;
+    // side length of the environment the cones were computed for
+    uint32_t env_cones_size = 0;
     // sorted into slot 0
     BufferHandle tree_keys_buffer[2];
     BufferHandle tree_values_buffer[2];
     BufferHandle tree_rank_buffer;
     BufferHandle tree_cdf_buffer;
-    BufferHandle tree_cdf_block_sums_buffer;
+    BufferHandle tree_cdf_state_buffer;
     BufferHandle tree_info_buffer[2];
-    BufferHandle sort_histogram_buffer;
+    BufferHandle setup_state_buffer;
+    BufferHandle sort_state_buffer;
     BufferHandle grid_keys_buffer[2];
     BufferHandle grid_contribution_buffer[2];
     BufferHandle grid_feedback_buffer[2];
+    BufferHandle grid_touched_buffer[2];
+    // zeroed in the next update
+    bool grid_feedback_fresh = false;
     BufferHandle grid_starts_buffer;
     BufferHandle grid_estimate_buffer;
     BufferHandle grid_slot_bounds_buffer;
@@ -256,17 +263,19 @@ class LightCollection {
     Versioned<Pipeline> env_split_pipeline;
     Versioned<ShaderObject> setup_params;
     Versioned<ShaderObject> pool_params;
+    Versioned<SlangProgramEntryPoint> env_cones_entry_point;
+    Versioned<Pipeline> env_cones_pipeline;
+    Versioned<ShaderObject> env_cones_params;
     Versioned<ShaderObject> grid_params;
     Versioned<ShaderObject> env_split_params;
 
     SlangCompositionHandle sort_composition;
     Versioned<SlangProgram> sort_program;
-    Versioned<SlangProgramEntryPoint> sort_count_entry_point;
-    Versioned<SlangProgramEntryPoint> sort_scan_entry_point;
+    Versioned<SlangProgramEntryPoint> sort_histogram_entry_point;
     Versioned<SlangProgramEntryPoint> sort_scatter_entry_point;
-    Versioned<Pipeline> sort_count_pipeline;
-    Versioned<Pipeline> sort_scan_pipeline;
+    Versioned<Pipeline> sort_histogram_pipeline;
     Versioned<Pipeline> sort_scatter_pipeline;
+    // the histogram, then one per pass
     std::vector<Versioned<ShaderObject>> sort_params;
 
     SlangCompositionHandle env_composition;
@@ -275,22 +284,14 @@ class LightCollection {
     Versioned<Pipeline> env_pool_pipeline;
     Versioned<ShaderObject> env_pool_params;
     Versioned<SlangProgramEntryPoint> env_build_entry_point;
-    Versioned<SlangProgramEntryPoint> env_reduce_entry_point;
     Versioned<Pipeline> env_build_pipeline;
-    Versioned<Pipeline> env_reduce_pipeline;
     Versioned<ShaderObject> env_build_params;
-    std::vector<Versioned<ShaderObject>> env_reduce_params;
 
     SlangCompositionHandle cdf_composition;
     Versioned<SlangProgram> cdf_program;
-    Versioned<SlangProgramEntryPoint> cdf_blocks_entry_point;
-    Versioned<SlangProgramEntryPoint> cdf_sums_entry_point;
-    Versioned<SlangProgramEntryPoint> cdf_offset_entry_point;
-    Versioned<Pipeline> cdf_blocks_pipeline;
-    Versioned<Pipeline> cdf_sums_pipeline;
-    Versioned<Pipeline> cdf_offset_pipeline;
-    std::array<Versioned<ShaderObject>, 3> tree_cdf_params;
-    std::array<Versioned<ShaderObject>, 3> env_cdf_params;
+    Versioned<SlangProgramEntryPoint> cdf_entry_point;
+    Versioned<Pipeline> cdf_pipeline;
+    Versioned<ShaderObject> cdf_params;
 };
 
 } // namespace merian

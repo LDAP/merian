@@ -34,9 +34,9 @@ enum LightDebugView : uint32_t {
 
 // How a direction towards the environment is chosen.
 enum EnvSelection : uint32_t {
-    // Hierarchical warp over the importance pyramid, per sample.
-    EnvSelectionWarp = 0,
-    // Per-frame pool of texels drawn by that warp; the sample is one load plus a jitter.
+    // A binary search over the importance prefix sum, per sample.
+    EnvSelectionSearch = 0,
+    // Per-frame pool of texels drawn by that search; the sample is one load plus a jitter.
     EnvSelectionPool = 1,
 };
 
@@ -45,7 +45,13 @@ static const uint32_t LIGHT_GRID_MAX_DRAWS = 6;
 static const uint32_t LIGHT_GRID_SLOT_BITS = 5;
 // samples, contribution sum, squared contribution sum
 static const uint32_t LIGHT_GRID_FEEDBACK_STRIDE = 3;
-static const uint32_t LIGHT_GRID_DISPATCH_ROW = 32768;
+static const uint32_t LIGHT_DISPATCH_ROW = 32768;
+static const uint32_t LIGHT_GRID_SETUP_GROUP = 256;
+static const uint32_t LIGHT_GRID_SETUP_ITEMS = 4;
+// the bounds as seven ordered maxima, then the groups done
+static const uint32_t LIGHT_GRID_SETUP_STATE = 8;
+static const uint32_t LIGHT_UPDATE_GROUP = 32;
+static const uint32_t LIGHT_UPDATE_LANES = 16;
 static const uint32_t LIGHT_DEBUG_DRAWS = 16;
 static const uint32_t LIGHT_DEBUG_COVERAGE_RAYS = 32;
 
@@ -56,13 +62,15 @@ static const uint32_t LIGHT_TREE_NO_KEY = 0xFFFFFFFFu;
 static const uint32_t LIGHT_SORT_RADIX_BITS = 8;
 static const uint32_t LIGHT_SORT_PASSES = 4;
 static const uint32_t LIGHT_SORT_GROUP = 256;
-static const uint32_t LIGHT_SORT_TILE = 1024;
+static const uint32_t LIGHT_SORT_TILE = 512;
 
 #ifdef __cplusplus
 static_assert((1u << LIGHT_GRID_SLOT_BITS) == LIGHT_GRID_SLOTS);
 static_assert(LIGHT_GRID_MAX_DRAWS * LIGHT_GRID_SLOT_BITS <= 32);
 static_assert(LIGHT_SORT_RADIX_BITS * LIGHT_SORT_PASSES >= 3 * LIGHT_TREE_SIDE_BITS);
 static_assert(LIGHT_SORT_PASSES % 2 == 0, "the sort must end in the buffers it started from");
+static_assert(LIGHT_SORT_GROUP == 1u << LIGHT_SORT_RADIX_BITS,
+              "the sort scatters a digit per thread");
 #else
 static const float LIGHT_GRID_MIN_CONTRIBUTION = 0.0001f;
 static const float LIGHT_GRID_PRIOR_CONTRIBUTION = 0.5f;

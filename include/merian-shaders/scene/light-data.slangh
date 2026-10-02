@@ -221,17 +221,71 @@ float range_share(const StructuredBuffer<float2> cdf,
     return total > 0.f ? max(value, 0.f) / total : 0.f;
 }
 
+// Double-float product, with a fused multiply-add for the error of the leading one (Dekker 1971).
+float2 ff_mul(const float2 a, const float2 b) {
+    precise const float p = a.x * b.x;
+    precise const float e = fma(a.x, b.x, -p) + (a.x * b.y + a.y * b.x);
+    precise const float h = p + e;
+    return float2(h, e - (h - p));
+}
+
+bool ff_greater(const float2 a, const float2 b) {
+    return a.x > b.x || (a.x == b.x && a.y > b.y);
+}
+
+// Where the entries of [first, end) are drawn by their share of the range's sum: u is uniform to 48
+// bits as two uniform numbers, so even entries far below the range's sum keep their share.
+float2 range_threshold(const StructuredBuffer<float2> cdf,
+                       const uint first,
+                       const uint end,
+                       const float2 u) {
+    const float2 base = first > 0 ? cdf[first - 1] : float2(0);
+    const float2 total = ff_add(cdf[end - 1], -base);
+    return ff_add(base, ff_mul(total, float2(u.x, u.y * (1.f / 16777216.f))));
+}
+
 uint search_range(const StructuredBuffer<float2> cdf,
                   const uint first,
                   const uint end,
-                  const float u) {
-    const float2 base = first > 0 ? cdf[first - 1] : float2(0);
-    const float target = u * ff_diff(cdf[end - 1], base);
+                  const float2 u) {
+    const float2 threshold = range_threshold(cdf, first, end, u);
     uint lo = first;
     uint hi = end - 1;
     while (lo < hi) {
         const uint mid = (lo + hi) >> 1;
-        if (ff_diff(cdf[mid], base) > target)
+        if (ff_greater(cdf[mid], threshold))
+            hi = mid;
+        else
+            lo = mid + 1;
+    }
+    return lo;
+}
+
+// The entry search_range finds, with eight-way steps.
+uint search_range_wide(const StructuredBuffer<float2> cdf,
+                       const uint first,
+                       const uint end,
+                       const float2 u) {
+    const float2 threshold = range_threshold(cdf, first, end, u);
+    uint lo = first;
+    uint hi = end - 1;
+    while (lo + 8u <= hi) {
+        const uint step = (hi - lo) / 8u;
+        uint next_lo = lo;
+        uint next_hi = hi;
+        for (uint k = 1; k < 8; k++) {
+            const uint pivot = lo + k * step;
+            if (ff_greater(cdf[pivot], threshold))
+                next_hi = min(next_hi, pivot);
+            else
+                next_lo = max(next_lo, pivot + 1u);
+        }
+        lo = min(next_lo, next_hi);
+        hi = next_hi;
+    }
+    while (lo < hi) {
+        const uint mid = (lo + hi) >> 1;
+        if (ff_greater(cdf[mid], threshold))
             hi = mid;
         else
             lo = mid + 1;

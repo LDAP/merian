@@ -20,10 +20,15 @@ struct LightUpdateBinding {
 };
 
 // Rebuilds every emissive triangle record (world-space positions, uvs, flux) from the scene.
-[shader("compute")][numthreads(64, 1, 1)] void main(uint3 thread_id : SV_DispatchThreadID,
-                                                    ParameterBlock<Scene> scene,
-                                                    ParameterBlock<LightUpdateBinding> params) {
-    const uint i = thread_id.x;
+[shader("compute")][numthreads(LIGHT_UPDATE_GROUP, 1, 1)] void
+main(uint3 group_id : SV_GroupID,
+     uint thread_id : SV_GroupIndex,
+     ParameterBlock<Scene> scene,
+     ParameterBlock<LightUpdateBinding> params) {
+    const uint lane = thread_id % LIGHT_UPDATE_LANES;
+    const uint i =
+        (group_id.x + group_id.y * LIGHT_DISPATCH_ROW) * (LIGHT_UPDATE_GROUP / LIGHT_UPDATE_LANES) +
+        thread_id / LIGHT_UPDATE_LANES;
     if (i >= params.triangle_count)
         return;
 
@@ -66,7 +71,7 @@ struct LightUpdateBinding {
     // contribute nothing.
     const float3 scaled_n = tri.get_scaled_normal();
     const float area2 = length(scaled_n);
-    float flux = 0.f;
+    float luminance_sum = 0.f;
     EmissiveRegion region = EmissiveRegion::whole();
     region.swapped = uint16_t((gd.flags & GeometryDataFlags::FlipFacing) != 0 ? 1 : 0);
     if (lg.emission_records != nullptr) {
@@ -82,8 +87,7 @@ struct LightUpdateBinding {
         const float3 n = scaled_n / area2;
         RandomGenerator rng = PCG(xxhash32(uint2(lg.geometry_id, primitive_id)));
         const float3 shift = rng.next_float3();
-        float luminance_sum = 0.f;
-        for (uint s = 0; s < params.flux_samples; s++) {
+        for (uint s = lane; s < params.flux_samples; s += LIGHT_UPDATE_LANES) {
             // R2 sequence, randomly shifted per triangle, warped to uniform barycentrics
             const float2 u = frac(r2_sequence(s) + shift.xy);
             const float su = sqrt(u.x);
@@ -106,9 +110,17 @@ struct LightUpdateBinding {
                     DefaultLODSampler()));
             }
         }
-        flux = MERIAN_PI * 0.5f * area2 * region.get_fraction() * luminance_sum /
-               float(params.flux_samples);
     }
+
+    float total = luminance_sum;
+    for (uint offset = LIGHT_UPDATE_LANES / 2; offset > 0; offset >>= 1)
+        total += WaveShuffle(total, WaveGetLaneIndex() ^ offset);
+    if (lane != 0)
+        return;
+    const float flux =
+        area2 > 0.f && params.flux_samples > 0
+            ? MERIAN_PI * 0.5f * area2 * region.get_fraction() * total / float(params.flux_samples)
+            : 0.f;
     tri.flux = isfinite(flux) ? flux : 0.f;
 
     params.triangles[i] = tri;

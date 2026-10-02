@@ -1,6 +1,7 @@
 #include "merian-shaders/utils/math-constants.slangh"
 
 import merian_shaders.scene.scene;
+import merian_shaders.scene.light_cdf;
 import merian_shaders.utils.envmap;
 import merian_shaders.scene.env_importance;
 import merian_shaders.utils.morton;
@@ -12,90 +13,66 @@ import merian_shaders.colors.colorspaces;
 using merian;
 
 struct EnvImportanceBinding {
-    RWStructuredBuffer<float4> levels;
+    RWStructuredBuffer<float2> cdf;
+    // zeroed, see LightCdfBinding
+    RWStructuredBuffer<uint> state;
     uint size;
-    uint level;
-    // texels per side of the level being written
-    uint level_size;
 };
 
 struct EnvPoolBinding {
-    StructuredBuffer<float4> levels;
+    EnvImportance importance;
     RWStructuredBuffer<uint> pool;
-    uint size;
-    uint level_count;
     uint pool_size;
     uint frame;
 };
 
-// First quad of a level; every level holds its texels in Morton order, four per entry.
-uint level_offset(const uint size, const uint level) {
-    const uint quads = (size * size) / 4u;
-    return (4u * (quads - (quads >> (2u * level)))) / 3u;
-}
+// The mean environment luminance over a stratified 2x2 within every texel, scanned in Morton order.
+[shader("compute")][numthreads(CDF_GROUP_SIZE, 1, 1)] void
+build(uint thread_id : SV_GroupIndex,
+      ParameterBlock<Scene> scene,
+      ParameterBlock<EnvImportanceBinding> params) {
+    const uint block = start_block(params.state, thread_id);
+    const uint i = block * CDF_GROUP_SIZE + thread_id;
+    const uint texels = params.size * params.size;
 
-uint quad_index(const uint2 texel) {
-    return morton_encode2d(texel >> 1);
-}
-
-uint quad_child(const uint2 texel) {
-    return (texel.x & 1u) | ((texel.y & 1u) << 1u);
-}
-
-// Level 0: mean environment luminance over a stratified 2x2 within the texel.
-[shader("compute")][numthreads(8, 8, 1)] void build(uint3 thread_id : SV_DispatchThreadID,
-                                                    ParameterBlock<Scene> scene,
-                                                    ParameterBlock<EnvImportanceBinding> params) {
-    if (any(thread_id.xy >= params.size))
-        return;
-
-    const float inv_size = 1.f / float(params.size);
-    float sum = 0.f;
-    for (uint s = 0; s < 4; s++) {
-        const float2 offset = float2(0.25f + 0.5f * float(s & 1), 0.25f + 0.5f * float(s >> 1));
-        const float3 dir = equal_area_square_to_sphere((float2(thread_id.xy) + offset) * inv_size);
-        // the environment is looked up along -wi, and emitters may only light later bounces
-        const ShadingData sd = make_env_shading_data(dir, float3(0), scene.time);
-        sum += yuv_luminance(
-            scene.env_map.eval(sd, scene.material_system.texture_manager, DefaultLODSampler()));
+    float value = 0.f;
+    if (i < texels) {
+        const uint2 texel = morton_decode2d(i);
+        const float inv_size = 1.f / float(params.size);
+        float sum = 0.f;
+        for (uint s = 0; s < 4; s++) {
+            const float2 offset =
+                float2(0.25f + 0.5f * float(s & 1), 0.25f + 0.5f * float(s >> 1));
+            const float3 dir = equal_area_square_to_sphere((float2(texel) + offset) * inv_size);
+            // the environment is looked up along -wi, and emitters may only light later bounces
+            const ShadingData sd = make_env_shading_data(dir, float3(0), scene.time);
+            sum += yuv_luminance(
+                scene.env_map.eval(sd, scene.material_system.texture_manager, DefaultLODSampler()));
+        }
+        value = 0.25f * sum;
+        value = isfinite(value) ? max(value, 0.f) : 0.f;
     }
 
-    const float value = 0.25f * sum;
-    params.levels[quad_index(thread_id.xy)][quad_child(thread_id.xy)] =
-        isfinite(value) ? max(value, 0.f) : 0.f;
+    float2 total;
+    const float2 prefix = group_scan(float2(value, 0.f), thread_id, total);
+    const float2 before = block_prefix(params.state, block, total, thread_id);
+    if (i < texels)
+        params.cdf[i] = ff_add(before, prefix);
 }
 
-    // Coarser levels: the mean of the four finer texels.
-    [shader("compute")][numthreads(8, 8, 1)] void reduce(
-        uint3 thread_id : SV_DispatchThreadID, ParameterBlock<EnvImportanceBinding> params) {
-    if (any(thread_id.xy >= params.level_size))
-        return;
-
-    // the four children are one quad at the finer level
-    const float4 children =
-        params.levels[level_offset(params.size, params.level - 1) + morton_encode2d(thread_id.xy)];
-    const float mean = 0.25f * (children.x + children.y + children.z + children.w);
-
-    params.levels[level_offset(params.size, params.level) + quad_index(thread_id.xy)]
-                 [quad_child(thread_id.xy)] = mean;
-}
-
-// Draws the pool the samplers load from: one descent per entry, once per frame instead of once
-// per sample.
+// Draws the pool the samplers load from, once per frame.
 [shader("compute")][numthreads(64, 1, 1)] void env_pool(uint3 thread_id : SV_DispatchThreadID,
                                                         ParameterBlock<EnvPoolBinding> params) {
     const uint i = thread_id.x;
     if (i >= params.pool_size)
         return;
 
-    EnvImportance importance;
-    importance.levels = params.levels;
-    importance.size = params.size;
-    importance.level_count = params.level_count;
-
+    if (!params.importance.is_valid()) {
+        params.pool[i] = 0xFFFFFFFFu;
+        return;
+    }
     RandomGenerator rng = PCG(xxhash32(uint2(i, params.frame)));
-    uint2 texel;
-    float2 u;
-    params.pool[i] =
-        importance.sample_texel(rng, texel, u) ? (texel.x | (texel.y << 16u)) : 0xFFFFFFFFu;
+    const uint2 texel = morton_decode2d(search_range_wide(
+        params.importance.cdf, 0, params.importance.texel_count(), rng.next_float2()));
+    params.pool[i] = texel.x | (texel.y << 16u);
 }

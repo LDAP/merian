@@ -83,6 +83,14 @@ void CommandBuffer::fill(const BufferHandle& buffer, const uint32_t data) {
     keep_until_pool_reset(buffer);
 }
 
+void CommandBuffer::fill(const BufferHandle& buffer,
+                         const vk::DeviceSize offset,
+                         const vk::DeviceSize size,
+                         const uint32_t data) {
+    cmd.fillBuffer(*buffer, offset, size, data);
+    keep_until_pool_reset(buffer);
+}
+
 void CommandBuffer::copy(const ImageHandle& src_image,
                          const vk::ImageLayout src_layout,
                          const ImageHandle& dst_image,
