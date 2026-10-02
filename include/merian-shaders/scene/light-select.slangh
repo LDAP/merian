@@ -15,8 +15,8 @@ enum LightSelection : uint32_t {
     LightSelectionPower = 0,
     // The same distribution, drawn once per frame into a pool: a sample is one load.
     LightSelectionPool = 1,
-    // Per-frame world-space grid: each cell holds the light sources that reach it, so the choice
-    // follows the shading point.
+    // Per-frame world-space grid: each cell holds a cut through the light tree, weighed by what its
+    // nodes delivered there, so the choice follows the shading point.
     LightSelectionGrid = 2,
 };
 
@@ -40,28 +40,47 @@ enum EnvSelection : uint32_t {
     EnvSelectionPool = 1,
 };
 
-// Light sources a cell holds, one slot each.
-static const uint32_t LIGHT_GRID_SLOTS = 16;
-static const uint32_t LIGHT_GRID_MAX_NEW_LIGHTS = 256;
-static const uint32_t LIGHT_GRID_POOL = 1024;
-static const uint32_t LIGHT_SOURCE_CHUNK = 64;
-static const uint32_t LIGHT_GRID_DISCOVERED = 4;
-static const uint32_t LIGHT_GRID_MAX_DRAWS = 8;
-static const uint32_t LIGHT_GRID_SLOT_BITS = 4;
+static const uint32_t LIGHT_GRID_SLOTS = 32;
+static const uint32_t LIGHT_GRID_MAX_DRAWS = 6;
+static const uint32_t LIGHT_GRID_SLOT_BITS = 5;
+// samples, contribution sum, squared contribution sum
+static const uint32_t LIGHT_GRID_FEEDBACK_STRIDE = 3;
 static const uint32_t LIGHT_GRID_DISPATCH_ROW = 32768;
 static const uint32_t LIGHT_DEBUG_DRAWS = 16;
 static const uint32_t LIGHT_DEBUG_COVERAGE_RAYS = 32;
 
+// tree keys: Morton codes of the triangle centroids, then of the environment's texels
+static const uint32_t LIGHT_TREE_SIDE_BITS = 10;
+static const uint32_t LIGHT_TREE_ENV_KEY = 1u << 30;
+static const uint32_t LIGHT_TREE_NO_KEY = 0xFFFFFFFFu;
+static const uint32_t LIGHT_SORT_RADIX_BITS = 8;
+static const uint32_t LIGHT_SORT_PASSES = 4;
+static const uint32_t LIGHT_SORT_GROUP = 256;
+static const uint32_t LIGHT_SORT_TILE = 1024;
+
 #ifdef __cplusplus
 static_assert((1u << LIGHT_GRID_SLOT_BITS) == LIGHT_GRID_SLOTS);
 static_assert(LIGHT_GRID_MAX_DRAWS * LIGHT_GRID_SLOT_BITS <= 32);
+static_assert(LIGHT_SORT_RADIX_BITS * LIGHT_SORT_PASSES >= 3 * LIGHT_TREE_SIDE_BITS);
+static_assert(LIGHT_SORT_PASSES % 2 == 0, "the sort must end in the buffers it started from");
 #else
-static const float LIGHT_GRID_MIN_VISIBILITY = 0.05f;
-static const float LIGHT_GRID_MIN_DRAW_VISIBILITY = 0.0001f;
-static const float LIGHT_GRID_PRIOR_VISIBILITY = 0.05f;
-static const float LIGHT_GRID_PRIOR_SAMPLES = 8.f;
-static const float LIGHT_GRID_VISIBILITY_MEMORY = 64.f;
-static const float LIGHT_GRID_REPLACE_MARGIN = 0.8f;
+static const float LIGHT_GRID_MIN_CONTRIBUTION = 0.0001f;
+static const float LIGHT_GRID_PRIOR_CONTRIBUTION = 0.5f;
+static const float LIGHT_GRID_PRIOR_ENV_CONTRIBUTION = 0.005f;
+static const float LIGHT_GRID_PRIOR_SAMPLES = 2.f;
+static const float LIGHT_GRID_CONTRIBUTION_MEMORY = 64.f;
+static const float LIGHT_GRID_REFINE_MARGIN = 2.f;
+static const float LIGHT_GRID_DEAD_SAMPLES = 16.f;
+static const uint LIGHT_GRID_FRESH_SPLITS = 8;
+static const float LIGHT_GRID_MAX_CONTRIBUTION = 64.f;
+static const float LIGHT_GRID_CONTRIBUTION_SCALE = 256.f;
+static const float LIGHT_GRID_CONTRIBUTION_SQUARE_SCALE = 4.f;
+// samples per slot and frame whose fixed-point sums cannot wrap
+static const uint LIGHT_GRID_FEEDBACK_SAMPLES =
+    0xFFFFFFFFu / (uint(LIGHT_GRID_MAX_CONTRIBUTION *
+                        max(LIGHT_GRID_CONTRIBUTION_SCALE,
+                            LIGHT_GRID_MAX_CONTRIBUTION* LIGHT_GRID_CONTRIBUTION_SQUARE_SCALE)) +
+                   1u);
 #endif
 
 #ifndef __cplusplus
@@ -80,8 +99,14 @@ struct LightGridInfo {
     uint32_t cascade_count;
 };
 
+struct LightTreeInfo {
+    float3 origin;
+    float inv_cell_size;
+};
+
 #ifdef __cplusplus
 static_assert(sizeof(LightGridInfo) == 24, "LightGridInfo layout mismatch");
+static_assert(sizeof(LightTreeInfo) == 16, "LightTreeInfo layout mismatch");
 #endif
 
 } // namespace merian

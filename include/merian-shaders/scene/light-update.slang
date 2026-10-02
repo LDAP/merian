@@ -117,7 +117,5 @@ struct LightUpdateBinding {
     EmissiveLightProxy proxy;
     proxy.centroid = (tri.p0 + tri.p1 + tri.p2) * (1.f / 3.f);
     proxy.flux = tri.flux;
-    proxy.scaled_normal = scaled_n;
-    proxy.flags = uint(tri.flags);
     params.proxies[i] = proxy;
 }

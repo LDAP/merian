@@ -8,9 +8,6 @@ import merian_shaders.utils.random;
 
 namespace merian {
 
-static const uint ENV_REGIONS_PER_SIDE = 16;
-static const uint ENV_REGIONS = ENV_REGIONS_PER_SIDE * ENV_REGIONS_PER_SIDE;
-
 // A mip pyramid over the environment luminance in the equal-area octahedral square, sampled by
 // hierarchical warping (Falcor's EnvMapSampler; McCool and Harwood 1997). Level 0 is the finest;
 // every texel covers the same solid angle, so the density needs no jacobian.
@@ -45,46 +42,6 @@ struct EnvImportance {
         return size > 0 && get_average() > 0.f;
     }
 
-    float node_value(const uint level, const uint2 node) {
-        const uint quad = level_offset(level) + morton_encode2d(node >> 1);
-        return levels[quad][(node.x & 1u) | ((node.y & 1u) << 1u)];
-    }
-
-    uint region_level() {
-        return level_count - 1u - firstbithigh(ENV_REGIONS_PER_SIDE);
-    }
-
-    uint2 region_node(const uint region) {
-        return uint2(region % ENV_REGIONS_PER_SIDE, region / ENV_REGIONS_PER_SIDE);
-    }
-
-    uint region_of(const float3 dir) {
-        const uint2 node = min(uint2(equal_area_sphere_to_square(dir) * ENV_REGIONS_PER_SIDE),
-                               uint2(ENV_REGIONS_PER_SIDE - 1));
-        return node.x + ENV_REGIONS_PER_SIDE * node.y;
-    }
-
-    float region_value(const uint region) {
-        return node_value(region_level(), region_node(region));
-    }
-
-    float region_probability(const uint region) {
-        return region_value(region) / (get_average() * float(ENV_REGIONS));
-    }
-
-    void region_cone(const uint region, out float3 dir, out float sin_radius) {
-        const float2 node = float2(region_node(region));
-        dir = equal_area_square_to_sphere((node + 0.5f) / float(ENV_REGIONS_PER_SIDE));
-        float cos_radius = 1.f;
-        for (uint corner = 0; corner < 9; corner++) {
-            const float2 offset = float2(float(corner % 3), float(corner / 3)) * 0.5f;
-            const float3 edge = equal_area_square_to_sphere(
-                min((node + offset) / float(ENV_REGIONS_PER_SIDE), float2(1.f)));
-            cos_radius = min(cos_radius, dot(dir, edge));
-        }
-        sin_radius = sqrt(max(1.f - cos_radius * cos_radius, 0.f));
-    }
-
     bool descend(const uint from_level, const uint to_level, inout uint2 node, inout float2 u) {
         for (int level = int(from_level) - 1; level >= int(to_level); level--) {
             // x = (0,0), y = (1,0), z = (0,1), w = (1,1) in Morton order
@@ -114,14 +71,6 @@ struct EnvImportance {
         texel = uint2(0);
         u = rng.next_float2();
         return is_valid() && descend(level_count - 1u, 0, texel, u);
-    }
-
-    Optional<EnvSample> sample_in_region(const uint region, inout RandomGenerator rng) {
-        uint2 texel = region_node(region);
-        float2 u = rng.next_float2();
-        if (!is_valid() || !descend(region_level(), 0, texel, u))
-            return none;
-        return texel_sample(texel, u);
     }
 
     // A direction uniformly inside the texel, with the density the descent gave it.
@@ -162,6 +111,14 @@ struct EnvImportance {
         const uint quad = morton_encode2d(texel >> 1);
         const uint child = (texel.x & 1u) | ((texel.y & 1u) << 1u);
         return levels[quad][child];
+    }
+
+    uint2 texel_of(const float3 dir) {
+        return min(uint2(equal_area_sphere_to_square(dir) * float(size)), uint2(size - 1));
+    }
+
+    float value(const float3 dir) {
+        return texel_value(texel_of(dir));
     }
 
     // Solid angle density of sample_direction() generating dir.

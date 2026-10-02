@@ -1301,7 +1301,7 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
                     LightCollection::EmissiveGeometry& emissive =
                         emissive_geometries.emplace_back(LightCollection::EmissiveGeometry{
                             static_cast<GeometryID>(geometries.size()), instance_index,
-                            mesh.get_primitive_count(), geometry_key});
+                            mesh.get_primitive_count()});
                     if (micromaps) {
                         if (const auto emission = micromaps->get_emission(
                                 mesh_id, info.serial, mesh.get_primitive_count())) {

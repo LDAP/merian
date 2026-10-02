@@ -14,8 +14,8 @@
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 
+#include <array>
 #include <limits>
-#include <unordered_map>
 #include <vector>
 
 namespace merian {
@@ -31,7 +31,6 @@ class LightCollection {
         GeometryID geometry_id;
         uint32_t instance_index;
         uint32_t primitive_count;
-        uint64_t key;
         vk::DeviceAddress emission_offsets = 0;
         vk::DeviceAddress emission_records = 0;
         uint32_t emission_level = 0;
@@ -126,10 +125,17 @@ class LightCollection {
         return 1u << static_cast<uint32_t>(env_importance_log2);
     }
     uint32_t env_importance_quad_count() const;
+    bool lists_env() const {
+        return grid_lists_env && env_emissive && env_importance_buffer && env_split_buffer &&
+               env_cdf_buffer;
+    }
     // threads per block of the flux scan; matches CDF_GROUP_SIZE
     static constexpr uint32_t CDF_GROUP_SIZE = 1024;
-    uint32_t cdf_block_count() const {
-        return (triangle_count + CDF_GROUP_SIZE - 1) / CDF_GROUP_SIZE;
+    static uint32_t cdf_block_count(const uint32_t count) {
+        return (count + CDF_GROUP_SIZE - 1) / CDF_GROUP_SIZE;
+    }
+    uint32_t sort_tile_count() const {
+        return (triangle_count + LIGHT_SORT_TILE - 1) / LIGHT_SORT_TILE;
     }
     uint32_t grid_cell_count() const {
         const uint32_t d = static_cast<uint32_t>(grid_dimension);
@@ -141,7 +147,14 @@ class LightCollection {
                        const CommandBufferHandle& cmd);
     static void retire_buffer(BufferHandle& buffer, const CommandBufferHandle& cmd);
 
-    void update_light_remap(const CommandBufferHandle& cmd);
+    // values: nullptr scans the triangles' flux in tree order
+    void record_scan(const CommandBufferHandle& cmd,
+                     const ShaderObjectAllocatorHandle& obj_allocator,
+                     std::array<Versioned<ShaderObject>, 3>& params,
+                     const BufferHandle& values,
+                     const BufferHandle& cdf,
+                     const BufferHandle& block_sums,
+                     uint32_t count);
 
     ShaderCompileContextHandle compile_context;
     ContextHandle context;
@@ -157,19 +170,18 @@ class LightCollection {
     int32_t scene_draws = 3;
     int32_t grid_dimension = 16;
     int32_t grid_cascades = 6;
-    int32_t grid_new_lights = 16;
+    int32_t grid_refinements = 2;
     int32_t cell_draws = 2;
     float grid_cell_size = 0.f; // 0: derived from the distance to the lights
     float grid_coverage = 1.f;
     float grid_jitter = 1.f;
-    float grid_source_extent = 8.f;
     bool debug_jitter = true;
     int32_t debug_view = LightDebugView::LightDebugDrawOutcome;
     bool constants_dirty = true;
     float grid_share = 1.f;
-    float grid_even_share = 0.1f;
+    float grid_even_share = 0.3f;
     int32_t slot_weighing = LightSlotWeighing::LightSlotWeighingCell;
-    bool grid_env_regions = true;
+    bool grid_lists_env = true;
     // set for a frame the carried-over grid cannot describe
     bool grid_reset = true;
     float3 camera_position{0.f};
@@ -190,12 +202,7 @@ class LightCollection {
     uint64_t env_version = std::numeric_limits<uint64_t>::max();
 
     std::vector<LightGeometry> light_geometries;
-    std::vector<uint64_t> light_geometry_keys;
     std::vector<uint32_t> geometry_light_offsets;
-    std::vector<uint64_t> grid_table_keys;
-    std::vector<LightGeometry> grid_table_geometries;
-    std::vector<LightRemap> light_remap;
-    std::unordered_map<uint64_t, uint32_t> light_index_of_key;
     uint32_t triangle_count = 0;
     bool tables_dirty = false;
 
@@ -205,27 +212,31 @@ class LightCollection {
     BufferHandle env_importance_built_buffer;
     BufferHandle env_pool_buffer;
     BufferHandle env_split_buffer;
+    BufferHandle env_cdf_buffer;
+    BufferHandle env_cdf_block_sums_buffer;
     BufferHandle pool_buffer;
-    BufferHandle grid_buffer[2];
-    BufferHandle grid_visibility_buffer[2];
-    BufferHandle grid_slot_sources_buffer;
-    BufferHandle grid_probability_buffer;
+    // sorted into slot 0
+    BufferHandle tree_keys_buffer[2];
+    BufferHandle tree_values_buffer[2];
+    BufferHandle tree_rank_buffer;
+    BufferHandle tree_cdf_buffer;
+    BufferHandle tree_cdf_block_sums_buffer;
+    BufferHandle tree_info_buffer[2];
+    BufferHandle sort_histogram_buffer;
+    BufferHandle grid_keys_buffer[2];
+    BufferHandle grid_contribution_buffer[2];
     BufferHandle grid_feedback_buffer[2];
-    BufferHandle grid_discovered_buffer[2];
-    BufferHandle sources_buffer;
-    BufferHandle source_of_buffer;
-    BufferHandle source_cdf_buffer;
-    BufferHandle pool_source_buffer;
+    BufferHandle grid_starts_buffer;
+    BufferHandle grid_estimate_buffer;
+    BufferHandle grid_slot_bounds_buffer;
+    BufferHandle grid_probability_buffer;
     BufferHandle grid_info_buffer[2];
     uint32_t grid_slot = 0;
     BufferHandle triangles_buffer;
     BufferHandle proxies_buffer;
     BufferHandle regions_buffer;
-    BufferHandle cdf_buffer;
-    BufferHandle cdf_block_sums_buffer;
     BufferHandle light_geometries_buffer;
     BufferHandle geometry_light_offsets_buffer;
-    BufferHandle light_remap_buffer;
 
     SlangCompositionHandle update_composition;
     Versioned<SlangProgram> update_program;
@@ -239,17 +250,24 @@ class LightCollection {
     Versioned<SlangProgramEntryPoint> pool_entry_point;
     Versioned<SlangProgramEntryPoint> grid_entry_point;
     Versioned<SlangProgramEntryPoint> env_split_entry_point;
-    Versioned<SlangProgramEntryPoint> sources_entry_point;
     Versioned<Pipeline> setup_pipeline;
     Versioned<Pipeline> pool_pipeline;
     Versioned<Pipeline> grid_pipeline;
     Versioned<Pipeline> env_split_pipeline;
-    Versioned<Pipeline> sources_pipeline;
     Versioned<ShaderObject> setup_params;
     Versioned<ShaderObject> pool_params;
     Versioned<ShaderObject> grid_params;
     Versioned<ShaderObject> env_split_params;
-    Versioned<ShaderObject> sources_params;
+
+    SlangCompositionHandle sort_composition;
+    Versioned<SlangProgram> sort_program;
+    Versioned<SlangProgramEntryPoint> sort_count_entry_point;
+    Versioned<SlangProgramEntryPoint> sort_scan_entry_point;
+    Versioned<SlangProgramEntryPoint> sort_scatter_entry_point;
+    Versioned<Pipeline> sort_count_pipeline;
+    Versioned<Pipeline> sort_scan_pipeline;
+    Versioned<Pipeline> sort_scatter_pipeline;
+    std::vector<Versioned<ShaderObject>> sort_params;
 
     SlangCompositionHandle env_composition;
     Versioned<SlangProgram> env_program;
@@ -271,9 +289,8 @@ class LightCollection {
     Versioned<Pipeline> cdf_blocks_pipeline;
     Versioned<Pipeline> cdf_sums_pipeline;
     Versioned<Pipeline> cdf_offset_pipeline;
-    Versioned<ShaderObject> cdf_blocks_params;
-    Versioned<ShaderObject> cdf_sums_params;
-    Versioned<ShaderObject> cdf_offset_params;
+    std::array<Versioned<ShaderObject>, 3> tree_cdf_params;
+    std::array<Versioned<ShaderObject>, 3> env_cdf_params;
 };
 
 } // namespace merian

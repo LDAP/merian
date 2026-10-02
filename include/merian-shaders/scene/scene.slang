@@ -587,6 +587,7 @@ struct Scene {
         s.value = reservoir.resolve();
         s.light_pos = reservoir.light_pos;
         s.light_index = reservoir.light_index;
+        s.radiance = reservoir.light_radiance;
         s.realized_pdf = reservoir.realized_pdf();
         return s;
     }
@@ -670,8 +671,9 @@ struct Scene {
                                 const DirectLightSample direct,
                                 const Hit hit) {
         const bool visible = reaches_light(hit, direct.light_index == LIGHT_ENV_INDEX);
-        nee.record_visibility(vertex, direct.light_index, normalize(direct.light_pos - vertex.pos),
-                              visible);
+        nee.record_contribution(
+            vertex, direct.light_index, normalize(direct.light_pos - vertex.pos),
+            visible ? direct.radiance : 0.f, distance(direct.light_pos, vertex.pos));
         return visible ? direct.value : float3(0);
     }
 
@@ -715,32 +717,31 @@ struct Scene {
             if (!vertex.has_cell())
                 return float4(0, 0, 0, 1);
             const LightCellWeights weights = nee.grid.weigh_cell(vertex);
+            float listed = 0.f;
             float learned = 0.f;
             float actual = 0.f;
             const uint base = light_bucket_base(vertex.cell);
             for (uint slot = 0; slot < LIGHT_GRID_SLOTS; slot++) {
-                const uint held = nee.grid.slots[base + slot];
-                const bool distant = is_env_region(held);
-                if (held >= nee.table.triangle_count && !distant)
+                const uint2 range = nee.grid.slot_range(base + slot);
+                if (range.x >= range.y)
                     continue;
+                listed += 1.f;
                 const float p = nee.grid.slot_share(vertex, base + slot, weights);
-                learned += p * nee.grid.visibility[base + slot].x;
-                float3 centre;
-                if (distant) {
-                    float sin_radius;
-                    const uint region = held - LIGHT_ENV_REGION_BASE;
-                    nee.env.importance.region_cone(region, centre, sin_radius);
-                    centre = sp.pos + centre * ENV_MAP_DISTANCE;
-                } else {
-                    centre = nee.grid.sources[held].centroid;
-                }
-                RayDesc probe = make_light_ray(sp.pos, ng, sp.spawn_offset, centre, distant);
+                learned += p * nee.grid.contribution[base + slot].x;
+                uint texel;
+                const uint drawn = nee.draw_in_slot(base + slot, rng, texel);
+                let lp = nee.light_point(vertex, drawn, texel, base + slot, rng);
+                if (!lp.hasValue)
+                    continue;
+                const bool distant = drawn == LIGHT_ENV_INDEX;
+                RayDesc probe = make_light_ray(sp.pos, ng, sp.spawn_offset, lp.value.pos, distant);
                 probe.TMax = SCENE_RAY_TMAX;
                 const uint hit = get_light_index(trace_ray(probe, RAY_FLAG_NONE, instance_mask));
-                if (distant ? hit == LIGHT_ENV_INDEX : nee.reaches_source(held, hit))
+                const uint position = nee.tree_position(hit, probe.Direction);
+                if (position >= range.x && position < range.y)
                     actual += p;
             }
-            return float4(float(weights.occupied) / float(LIGHT_GRID_SLOTS), learned, actual, 1);
+            return float4(listed / float(LIGHT_GRID_SLOTS), learned, actual, 1);
         }
         case LightDebugView::LightDebugCoverage: {
             const OrthonormalFrame frame = OrthonormalFrame(any(normal != 0.f) ? normal : ng);
@@ -785,8 +786,8 @@ struct Scene {
                 const float light_dist = probe.TMax;
                 probe.TMax = SCENE_RAY_TMAX;
                 const uint hit = get_light_index(trace_ray(probe, RAY_FLAG_NONE, instance_mask));
-                const bool reached =
-                    distant ? hit == LIGHT_ENV_INDEX : nee.reaches_source(lp.value.index, hit);
+                const bool reached = distant ? hit == LIGHT_ENV_INDEX
+                                             : nee.reaches(lp.value.index, lp.value.entry, hit);
                 if (reached) {
                     outcome.g += 1.f;
                 } else {

@@ -31,6 +31,24 @@ uint morton_encode3d(in uint3 p) {
     return p.x | (p.y << 1) | (p.z << 2);
 }
 
+uint2 morton_decode2d(const uint code) {
+    uint2 p = uint2(code, code >> 1) & 0x55555555;
+    p = (p ^ (p >> 1)) & 0x33333333;
+    p = (p ^ (p >> 2)) & 0x0f0f0f0f;
+    p = (p ^ (p >> 4)) & 0x00ff00ff;
+    p = (p ^ (p >> 8)) & 0x0000ffff;
+    return p;
+}
+
+uint3 morton_decode3d(const uint code) {
+    uint3 p = uint3(code, code >> 1, code >> 2) & 0x09249249;
+    p = (p ^ (p >> 2)) & 0x030c30c3;
+    p = (p ^ (p >> 4)) & 0x0300f00f;
+    p = (p ^ (p >> 8)) & 0x030000ff;
+    p = (p ^ (p >> 16)) & 0x000003ff;
+    return p;
+}
+
 uint morton_encode2d(const uint2 p, in uint width, in uint height) {
     width = next_power_of_two(width);
     height = next_power_of_two(height);

@@ -159,9 +159,10 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
         const bool light_technique = merian_render_nee_mode == NEE_MODE_MIXTURE && nee_here &&
                                      rng.next_float() < merian_render_nee_probability;
         uint sampled_light = LIGHT_INVALID_INDEX;
+        uint sampled_entry = LIGHT_INVALID_INDEX;
         float3 light_dir = float3(0, 0, 1);
         if (light_technique) {
-            if (let lp = scene.nee.sample_point(lights, rng)) {
+            if (let lp = scene.nee.sample_point(lights, rng, sampled_entry)) {
                 // aimed from the offset origin: from sp.pos it misses the triangle near its edges
                 const float3 origin = offset_ray_origin(sp.pos, ng, spawn_offset, lp.pos - sp.pos);
                 light_dir = normalize(lp.pos - origin);
@@ -231,6 +232,7 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
             }
         } else {
             sampled_light = LIGHT_INVALID_INDEX;
+            sampled_entry = LIGHT_INVALID_INDEX;
             const Optional<ScatterSample> scatter =
                 merian_render_scatter_mode == SCATTER_MODE_RIS
                     ? mixture.sample_ris(bsdf, guiding, frame, merian_render_scatter_candidates,
@@ -298,6 +300,13 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
         if (scattered && any(f_cos > 0.f)) {
             next_ray = sp.make_ray(-ray.Direction, wo_world, transmission);
         }
+        if (light_scatter && !next_ray.hasValue) {
+            if (scattered)
+                scene.nee.record_contribution(lights, sampled_light, light_dir, 0.f, 1.f,
+                                              sampled_entry);
+            else
+                scene.nee.record_failed_draw(sampled_entry);
+        }
 
         if (merian_render_debug_output == DEBUG_OUTPUT_SCATTER_STATISTICS && guided) {
             scatter_stats += float3(1.f, select(all(f_cos <= 0.f), 1.f, 0.f),
@@ -320,6 +329,7 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
 
         // the light ray shares the continuation's traversal call site
         bool light_pass = direct.hasValue;
+        bool light_reached = false;
         while (light_pass || continues) {
             const Hit hit = scene.trace_ray(
                 light_pass ? scene.make_light_ray(vertex.pos, ng, spawn_offset, direct.value) : ray,
@@ -338,10 +348,10 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
             // before the hit is shaded; no light sampler reaches past a singular surface
             if (!through_specular && nee_surface && !delta) {
                 const uint light_index = scene.get_light_index(hit);
-                scene.nee.record_discovery(lights, light_index, ray.Direction, rng);
+                const bool drawn = light_index == sampled_light;
                 const float light_hit_pdf =
                     scene.nee.pdf(lights, light_index, ray.Origin, ray.Direction, hit.barycentrics,
-                                  light_index == sampled_light);
+                                  drawn, drawn ? sampled_entry : LIGHT_INVALID_INDEX);
                 if (merian_render_nee_mode == NEE_MODE_RESAMPLED) {
                     mis_weight = segment.pdf / (light_hit_pdf + segment.pdf);
                 } else {
@@ -354,9 +364,7 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
                                    uint(bounce) - 1u, record_lobe, record_method, record_material);
                         record_waits = false;
                     }
-                    scene.nee.record_visibility(
-                        lights, sampled_light, light_dir,
-                        scene.nee.reaches_source(sampled_light, light_index));
+                    light_reached = scene.nee.reaches(sampled_light, sampled_entry, light_index);
                     // occluded
                     if (sampled_light != LIGHT_INVALID_INDEX && sampled_light != light_index) {
                         segment.pdf = 0.f;
@@ -368,6 +376,11 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
                                          bounce + uint16_t(1) < merian_render_max_path_length);
 
             const float distance_travelled = distance(ray.Origin, sp.pos);
+            if (sampled_light != LIGHT_INVALID_INDEX && !through_specular) {
+                scene.nee.record_contribution(lights, sampled_light, wo_world,
+                                              light_reached ? yuv_luminance(sp.emission) : 0.f,
+                                              distance_travelled, sampled_entry);
+            }
             chain_weight *= medium.transmittance(distance_travelled);
             image.propagate(distance_travelled);
 
