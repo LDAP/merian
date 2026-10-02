@@ -7,8 +7,9 @@ __exported import merian_shaders.colors.colorspaces;
 
 namespace merian {
 
-static const int SCATTER_MODE_MIS = 0;
-static const int SCATTER_MODE_RIS = 1;
+static const int SCATTER_MODE_OFF = 0;
+static const int SCATTER_MODE_MIS = 1;
+static const int SCATTER_MODE_RIS = 2;
 
 struct RenderFrameInfo {
     float3 cam_pos;

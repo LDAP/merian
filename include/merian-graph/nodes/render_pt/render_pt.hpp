@@ -31,7 +31,7 @@ class RenderPT : public Node {
 
   public:
     // match SCATTER_MODE_*, NEE_MODE_* and DEBUG_OUTPUT_* in the shaders
-    enum class ScatterMode : int32_t { MIS, RIS };
+    enum class ScatterMode : int32_t { Off, MIS, RIS };
     enum class NEEMode : int32_t { Off, Mixture, Resampled };
     enum class TraceShader : int32_t { Auto, RayGeneration, Compute };
     enum class DebugOutput : int32_t { ScatterStatistics, Guiding, NEE };

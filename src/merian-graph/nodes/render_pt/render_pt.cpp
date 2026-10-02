@@ -436,11 +436,12 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
     if (config.st_begin_child("guiding", "Guiding")) {
         int scatter_mode_index = static_cast<int>(scatter_mode);
         if (config.config_options(
-                "sampling", scatter_mode_index, {"mixture (MIS)", "resampled (RIS)"},
+                "sampling", scatter_mode_index, {"off", "mixture (MIS)", "resampled (RIS)"},
                 Properties::OptionsStyle::COMBO,
                 "How one direction comes out of the guiding lobes and the shading function. "
-                "'resampled' draws several and keeps one by how much the shading function makes "
-                "of it, at the cost of the extra evaluations; it still traces one ray.")) {
+                "'off' draws from the shading function alone; 'resampled' draws several and keeps "
+                "one by how much the shading function makes of it, at the cost of the extra "
+                "evaluations; it still traces one ray.")) {
             scatter_mode = static_cast<ScatterMode>(scatter_mode_index);
             constants_changed = true;
         }
@@ -571,7 +572,8 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
 }
 
 bool RenderPT::has_guiding() const {
-    return !std::dynamic_pointer_cast<NullGuidingModel>(guiding);
+    return !std::dynamic_pointer_cast<NullGuidingModel>(guiding) &&
+           scatter_mode != ScatterMode::Off;
 }
 
 float RenderPT::nee_probability() const {
@@ -583,6 +585,8 @@ float RenderPT::nee_probability() const {
 }
 
 float RenderPT::guided_probability() const {
+    if (scatter_mode == ScatterMode::Off)
+        return 0.f;
     const float total = bsdf_share + guiding_share;
     return total > 0.f ? guiding_share / total : 0.f;
 }
