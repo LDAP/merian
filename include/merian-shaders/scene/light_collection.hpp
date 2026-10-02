@@ -14,7 +14,9 @@
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 
+#include <cmath>
 #include <limits>
+#include <numbers>
 #include <vector>
 
 namespace merian {
@@ -138,6 +140,14 @@ class LightCollection {
     uint32_t setup_group_count() const {
         const uint32_t per_group = LIGHT_GRID_SETUP_GROUP * LIGHT_GRID_SETUP_ITEMS;
         return (triangle_count + per_group - 1) / per_group;
+    }
+    uint32_t update_lanes() const {
+        const float ideal = 900.f / std::sqrt(static_cast<float>(std::max(triangle_count, 1u)));
+        uint32_t lanes = 1;
+        while (lanes < LIGHT_UPDATE_GROUP &&
+               static_cast<float>(lanes) * std::numbers::sqrt2_v<float> < ideal)
+            lanes *= 2;
+        return lanes;
     }
     uint32_t sort_tile_count() const {
         return (triangle_count + LIGHT_SORT_TILE - 1) / LIGHT_SORT_TILE;

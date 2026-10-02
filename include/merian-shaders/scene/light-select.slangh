@@ -51,7 +51,6 @@ static const uint32_t LIGHT_GRID_SETUP_ITEMS = 4;
 // the bounds as seven ordered maxima, then the groups done
 static const uint32_t LIGHT_GRID_SETUP_STATE = 8;
 static const uint32_t LIGHT_UPDATE_GROUP = 32;
-static const uint32_t LIGHT_UPDATE_LANES = 16;
 static const uint32_t LIGHT_DEBUG_DRAWS = 16;
 static const uint32_t LIGHT_DEBUG_COVERAGE_RAYS = 32;
 

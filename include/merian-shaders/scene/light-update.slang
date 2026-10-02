@@ -17,6 +17,7 @@ struct LightUpdateBinding {
     uint triangle_count;
     // emission evaluations per triangle for the flux estimate
     uint flux_samples;
+    uint lanes;
 };
 
 // Rebuilds every emissive triangle record (world-space positions, uvs, flux) from the scene.
@@ -25,15 +26,19 @@ main(uint3 group_id : SV_GroupID,
      uint thread_id : SV_GroupIndex,
      ParameterBlock<Scene> scene,
      ParameterBlock<LightUpdateBinding> params) {
-    const uint lane = thread_id % LIGHT_UPDATE_LANES;
-    const uint i =
-        (group_id.x + group_id.y * LIGHT_DISPATCH_ROW) * (LIGHT_UPDATE_GROUP / LIGHT_UPDATE_LANES) +
-        thread_id / LIGHT_UPDATE_LANES;
+    const uint lanes = params.lanes;
+    const uint lane = thread_id & (lanes - 1u);
+    const uint i = (group_id.x + group_id.y * LIGHT_DISPATCH_ROW) * (LIGHT_UPDATE_GROUP / lanes) +
+                   thread_id / lanes;
+
+    uint geometry = merian::find_light_geometry(params.light_geometries,
+                                                params.light_geometry_count, WaveReadLaneFirst(i));
     if (i >= params.triangle_count)
         return;
-
-    const LightGeometry lg = params.light_geometries[merian::find_light_geometry(
-        params.light_geometries, params.light_geometry_count, i)];
+    while (geometry + 1u < params.light_geometry_count &&
+           params.light_geometries[geometry + 1u].first_triangle <= i)
+        geometry++;
+    const LightGeometry lg = params.light_geometries[geometry];
     const uint primitive_id = i - lg.first_triangle;
     const GeometryData gd = scene.get_geometry_data(lg.geometry_id);
 
@@ -85,9 +90,12 @@ main(uint3 group_id : SV_GroupID,
     }
     if (area2 > 0.f && region.get_fraction() > 0.f) {
         const float3 n = scaled_n / area2;
+        const OrthonormalFrame front = OrthonormalFrame(n);
+        const OrthonormalFrame back = OrthonormalFrame(-n);
+        let material = scene.material_system.get_material(gd.material_id);
         RandomGenerator rng = PCG(xxhash32(uint2(lg.geometry_id, primitive_id)));
         const float3 shift = rng.next_float3();
-        for (uint s = lane; s < params.flux_samples; s += LIGHT_UPDATE_LANES) {
+        for (uint s = lane; s < params.flux_samples; s += lanes) {
             // R2 sequence, randomly shifted per triangle, warped to uniform barycentrics
             const float2 u = frac(r2_sequence(s) + shift.xy);
             const float su = sqrt(u.x);
@@ -98,22 +106,19 @@ main(uint3 group_id : SV_GroupID,
             const float2 uv = tri.get_uv(bary);
             if (alpha_tested && scene.material_system.alpha_test(gd.material_id, uv))
                 continue;
-            luminance_sum += yuv_luminance(scene.material_system.get_emission(
-                gd.material_id,
-                ShadingData(n, pos, uv, scene.time, OrthonormalFrame(n), n, uint16_t(1), true),
-                DefaultLODSampler()));
+            luminance_sum += yuv_luminance(material.get_emission(
+                ShadingData(n, pos, uv, scene.time, front, n, uint16_t(1), true),
+                scene.material_system.texture_manager, DefaultLODSampler()));
             if (two_sided) {
-                luminance_sum += yuv_luminance(scene.material_system.get_emission(
-                    gd.material_id,
-                    ShadingData(-n, pos, uv, scene.time, OrthonormalFrame(-n), -n, uint16_t(1),
-                                false),
-                    DefaultLODSampler()));
+                luminance_sum += yuv_luminance(material.get_emission(
+                    ShadingData(-n, pos, uv, scene.time, back, -n, uint16_t(1), false),
+                    scene.material_system.texture_manager, DefaultLODSampler()));
             }
         }
     }
 
     float total = luminance_sum;
-    for (uint offset = LIGHT_UPDATE_LANES / 2; offset > 0; offset >>= 1)
+    for (uint offset = lanes / 2; offset > 0; offset >>= 1)
         total += WaveShuffle(total, WaveGetLaneIndex() ^ offset);
     if (lane != 0)
         return;

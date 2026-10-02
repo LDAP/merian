@@ -488,8 +488,10 @@ void LightCollection::update(const CommandBufferHandle& cmd,
             c["light_geometry_count"] = static_cast<uint32_t>(light_geometries.size());
             c["triangle_count"] = triangle_count;
             c["flux_samples"] = static_cast<uint32_t>(flux_samples);
+            const uint32_t lanes = update_lanes();
+            c["lanes"] = lanes;
             const uint32_t groups =
-                (triangle_count * LIGHT_UPDATE_LANES + LIGHT_UPDATE_GROUP - 1) / LIGHT_UPDATE_GROUP;
+                (triangle_count * lanes + LIGHT_UPDATE_GROUP - 1) / LIGHT_UPDATE_GROUP;
             run(update_entry_point, update_pipeline, params, std::min(groups, LIGHT_DISPATCH_ROW),
                 (groups + LIGHT_DISPATCH_ROW - 1) / LIGHT_DISPATCH_ROW, scene_object);
         }
@@ -712,6 +714,9 @@ void LightCollection::properties(Properties& props) {
                                  "instead of by what each delivers.");
 
             props.st_separate("Cut upkeep");
+            if (props.config_bool("clear learned state",
+                                  "Drop every cell's cut and what it learned about its lights."))
+                grid_reset = true;
             props.config_int("refinements per frame", grid_refinements,
                              "Groups a cell may split per frame, merging others to make room "
                              "once its slots are full. What a cell learned carries across "
