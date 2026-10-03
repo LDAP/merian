@@ -7,6 +7,7 @@
 #include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <type_traits>
 
 namespace merian {
@@ -392,6 +393,13 @@ void RenderPT::update_render_constants() {
     }
 
     const DebugOutput emitted_debug_output = debug_connected ? debug_output : DebugOutput::None;
+    const auto bounce_limit = [&](const int32_t bounces) {
+        return bounces < max_path_length - 1 ? static_cast<uint32_t>(bounces) : 255u;
+    };
+    const uint32_t diffuse_limit = bounce_limit(max_diffuse_bounces);
+    const uint32_t glossy_limit = bounce_limit(max_glossy_bounces);
+    const uint32_t transmission_limit = bounce_limit(max_transmission_bounces);
+    const bool limit_bounces = std::min({diffuse_limit, glossy_limit, transmission_limit}) < 255u;
     const std::string constants = fmt::format(
         "import \"merian-graph/nodes/render_pt/render_pt_common.slang\";\n"
         "namespace merian {{\n"
@@ -402,6 +410,10 @@ void RenderPT::update_render_constants() {
         "export static const int merian_render_spp = {};\n"
         "export static const uint merian_render_seed = {}u;\n"
         "export static const int merian_render_max_path_length = {};\n"
+        "export static const bool merian_render_limit_bounces = {};\n"
+        "export static const uint merian_render_max_diffuse_bounces = {}u;\n"
+        "export static const uint merian_render_max_glossy_bounces = {}u;\n"
+        "export static const uint merian_render_max_transmission_bounces = {}u;\n"
         "export static const uint merian_render_instance_mask = {}u;\n"
         "export static const bool merian_render_enable_ser = {};\n"
         "export static const bool merian_render_demodulate_albedo = {};\n"
@@ -426,14 +438,14 @@ void RenderPT::update_render_constants() {
         "export static const float merian_render_volume_forward_project_min_z = {:f};\n"
         "}}",
         emission_on_primary, static_cast<int32_t>(emitted_debug_output), follow_specular,
-        follow_max_alpha, spp, seed, max_path_length, mask, enable_ser, demodulate_albedo,
-        russian_roulette, static_cast<int32_t>(scatter_mode), scatter_candidates,
-        guiding_scale_with_alpha, guiding_alpha_threshold,
-        static_cast<int32_t>(guiding_direct_target), static_cast<int32_t>(surface.nee_mode),
-        surface.nee_probability(has_guiding()), surface_nee_bounces,
-        surface.guided_probability(has_guiding()), surface.cache_tail && has_irradiance_cache(),
-        volume_spp, static_cast<int32_t>(volume.nee_mode),
-        volume.nee_probability(has_volume_guiding()),
+        follow_max_alpha, spp, seed, max_path_length, limit_bounces, diffuse_limit, glossy_limit,
+        transmission_limit, mask, enable_ser, demodulate_albedo, russian_roulette,
+        static_cast<int32_t>(scatter_mode), scatter_candidates, guiding_scale_with_alpha,
+        guiding_alpha_threshold, static_cast<int32_t>(guiding_direct_target),
+        static_cast<int32_t>(surface.nee_mode), surface.nee_probability(has_guiding()),
+        surface_nee_bounces, surface.guided_probability(has_guiding()),
+        surface.cache_tail && has_irradiance_cache(), volume_spp,
+        static_cast<int32_t>(volume.nee_mode), volume.nee_probability(has_volume_guiding()),
         volume.guided_probability(has_volume_guiding()),
         volume.cache_tail && has_irradiance_cache(), distance_guided_probability(),
         volume_forward_project_min_z);
@@ -506,6 +518,20 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
         constants_changed |=
             config.config_int("max path length", max_path_length,
                               "Maximum number of path segments, including the primary hit.", 1, 16);
+        constants_changed |= config.config_int(
+            "max diffuse bounces", max_diffuse_bounces,
+            "Diffuse reflections along a path. The ray of the last one only gathers emission.", 0,
+            16);
+        constants_changed |= config.config_int(
+            "max glossy bounces", max_glossy_bounces,
+            "Glossy and mirror reflections along a path. The ray of the last one only gathers "
+            "emission.",
+            0, 16);
+        constants_changed |= config.config_int(
+            "max transmission bounces", max_transmission_bounces,
+            "Transmissions along a path, rough or smooth. The ray of the last one only gathers "
+            "emission.",
+            0, 16);
         constants_changed |=
             config.config_bool("russian roulette", russian_roulette,
                                "Terminate paths in proportion to the light they can still carry.");

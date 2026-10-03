@@ -110,6 +110,9 @@ class RenderPT : public Node {
     int32_t spp = 1;
     uint32_t seed = 0;
     int32_t max_path_length = 5;
+    int32_t max_diffuse_bounces = 16;
+    int32_t max_glossy_bounces = 16;
+    int32_t max_transmission_bounces = 16;
     int32_t emitted_max_path_length = max_path_length;
     bool emission_on_primary = true;
     bool enable_ser = false;

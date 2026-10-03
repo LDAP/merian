@@ -18,6 +18,10 @@ extern static const bool merian_render_emission_on_primary = true;
 extern static const int merian_render_spp = 1;
 extern static const uint merian_render_seed = 0;
 extern static const int merian_render_max_path_length = 8;
+extern static const bool merian_render_limit_bounces = false;
+extern static const uint merian_render_max_diffuse_bounces = 255u;
+extern static const uint merian_render_max_glossy_bounces = 255u;
+extern static const uint merian_render_max_transmission_bounces = 255u;
 extern static const uint merian_render_instance_mask = 0xFFu;
 extern static const bool merian_render_enable_ser = false;
 extern static const bool merian_render_demodulate_albedo = false;
@@ -98,6 +102,44 @@ make_scatter_target<B : ShadingFunction, G : GuidingDistribution<float3>, V : Ho
     return target;
 }
 
+enum BounceKind {
+    Diffuse,
+    Glossy,
+    Transmission,
+}
+
+BounceKind
+bounce_kind(const BSDFLobe lobe, const bool transmission, const bool diffuse_reflection) {
+    if (lobe == BSDFLobe::None) {
+        return transmission         ? BounceKind::Transmission
+               : diffuse_reflection ? BounceKind::Diffuse
+                                    : BounceKind::Glossy;
+    }
+    if ((uint(lobe) & uint(BSDFLobe::Transmission)) != 0u) {
+        return BounceKind::Transmission;
+    }
+    return lobe == BSDFLobe::DiffuseReflection ? BounceKind::Diffuse : BounceKind::Glossy;
+}
+
+struct BounceCounts {
+    uint packed;
+
+    [mutating] void add(const BounceKind kind) {
+        const uint shift = 8u * uint(kind);
+        packed += 1u << shift;
+        const uint limit = kind == BounceKind::Diffuse ? merian_render_max_diffuse_bounces
+                           : kind == BounceKind::Glossy ? merian_render_max_glossy_bounces
+                                                        : merian_render_max_transmission_bounces;
+        if (((packed >> shift) & 0xFFu) >= limit) {
+            packed |= 0x80000000u;
+        }
+    }
+
+    bool used_up() {
+        return merian_render_limit_bounces && (packed & 0x80000000u) != 0u;
+    }
+}
+
 bool survives_roulette(inout float3 throughput, inout RandomGenerator rng) {
     const float survive = min(1.f, yuv_luminance(throughput));
     if (rng.next_float() >= survive) {
@@ -147,6 +189,7 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
     const bool nee = merian_render_surface_nee_mode != NEEMode::Off && scene.nee.has_lights();
     // a mixture's light draw is the continuation
     const bool roulette_first = merian_render_surface_nee_mode == NEEMode::Mixture;
+    BounceCounts bounces = {0u};
 
     for (uint16_t bounce = 1; bounce < merian_render_max_path_length; bounce++) {
         if (!sp.has_surface_material || all(throughput < SCENE_THROUGHPUT_THRESHOLD)) {
@@ -197,6 +240,8 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
                                    false,
                                    dot(ng, ns) < 0.f ? -ng : ng,
                                    bsdf_is_transmissive(bsdf.get_lobe_types())};
+        const bool diffuse_reflection =
+            (bsdf.get_lobe_types() & uint(BSDFLobe::DiffuseReflection)) != 0u;
 
         // 1. guiding
         let guiding = params.guiding.get_distribution(guiding_state, frame_info, vertex, rng);
@@ -273,6 +318,12 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
         Reorder.reorder();
 
         const bool transmission = wi_local.z * wo_local.z < 0.f;
+        if (merian_render_limit_bounces && scattered) {
+            bounces.add(bounce_kind(scatter_lobe, transmission, diffuse_reflection));
+            segment.is_last =
+                !merian_render_surface_cache_tail &&
+                (bounce + uint16_t(1) >= merian_render_max_path_length || bounces.used_up());
+        }
 
         const float record_pdf = techniques.scatter_density(realized_pdf);
         const float3 record_f_cos = throughput * f_cos;
@@ -376,8 +427,9 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
                 }
             }
 
-            sp = scene.get_shading_point(ray, hit, RenderContext(bounce), DefaultLODSampler(),
-                                         bounce + uint16_t(1) < merian_render_max_path_length);
+            sp = scene.get_shading_point(
+                ray, hit, RenderContext(bounce), DefaultLODSampler(),
+                bounce + uint16_t(1) < merian_render_max_path_length && !bounces.used_up());
 
             const float distance_travelled = distance(ray.Origin, sp.pos);
             if (sampled_light != LIGHT_INVALID_INDEX && !through_specular) {
@@ -441,10 +493,14 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
             ray = chain_ray.value;
             through_specular = true;
             bounce++;
+            if (merian_render_limit_bounces) {
+                bounces.add(bounce_kind(chain_sample.value.lobe, chain_transmission, false));
+            }
         }
 
         if (continues) {
-            const bool last_vertex = bounce + uint16_t(1) >= merian_render_max_path_length;
+            const bool last_vertex =
+                bounce + uint16_t(1) >= merian_render_max_path_length || bounces.used_up();
             segment.traced = true;
             segment.is_last = !merian_render_surface_cache_tail && last_vertex;
             segment.next_pos = sp.pos;
