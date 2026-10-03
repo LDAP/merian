@@ -56,6 +56,7 @@ void MCPGDistanceGuidingModel::write_to(ShaderCursor cursor) {
     for (uint32_t level = 0; level < level_count; level++) {
         levels[level] = level_views[current][level];
     }
+    cursor["debug_selector"] = debug_view;
 }
 
 void MCPGDistanceGuidingModel::reset([[maybe_unused]] const CommandBufferHandle& cmd) {
@@ -119,9 +120,16 @@ bool MCPGDistanceGuidingModel::properties(Properties& props) {
         props.config_float("distance MC max width", max_width,
                            "Cell width in pixels the coarsest level stops at.", 1.f, 1.f, 1024.f);
     constants_changed |= props.config_float(
-        "distance MC states per vertex", distribution_dimension,
+        "distance MC distribution dimension", distribution_dimension,
         "Effective dimensionality the levels are spread over; smaller widens the spread.", 0.1f,
         0.1f, 8.f);
+
+    props.st_separate("Debug");
+    props.config_options("debug output", debug_view,
+                         {"mean distance", "deviation", "weight", "samples"},
+                         Properties::OptionsStyle::COMBO,
+                         "What the renderer's distance guiding debug output shows of the chain "
+                         "the camera ray resamples: magenta where there is none.");
 
     if (recreate && !extent.width) {
         return constants_changed;

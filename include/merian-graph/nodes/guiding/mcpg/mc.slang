@@ -140,12 +140,6 @@ struct MCState {
         return VonMisesFisher3<false>(k, dir);
     }
 
-    [mutating] void reweight(const float factor) {
-        sum_w *= factor;
-        w_tgt *= factor;
-        w_chord2 *= factor;
-    }
-
     [mutating]
     void add_sample(const float3 pos,
                     const float w,
@@ -250,15 +244,6 @@ struct MCPG<let ADAPTIVE_BUFFER_SIZE : uint,
 
     void store(const MCState s, const HashGridPos cell, const uint frame) {
         grid.set_cell(cell, frame, s);
-    }
-
-    void store_at_level(const MCState s,
-                        const float3 pos,
-                        const float3 access_normal,
-                        const uint level,
-                        const uint frame,
-                        inout RandomGenerator rng) {
-        grid.set_at_level(level, pos, access_normal, frame, s, rng);
     }
 
     void kill(const HashGridPos grid_pos) {

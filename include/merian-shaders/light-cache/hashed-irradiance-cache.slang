@@ -1,3 +1,4 @@
+__exported import merian_shaders.light_cache.irradiance_cache;
 import merian_shaders.colors.colorspaces;
 import merian_shaders.utils.hash_grid;
 import merian_shaders.utils.random;
@@ -47,7 +48,7 @@ struct HashedIrradianceCache<let BUFFER_SIZE : uint,
                              let PROBE_COUNT : uint = 4,
                              let STOCHASTIC_INTERPOLATION : bool = false,
                              let SPLIT_STORAGE : bool = true,
-                             let LOCALITY_BITS : uint = 0> {
+                             let LOCALITY_BITS : uint = 0> : IrradianceCache {
     HashGrid<HashedIrradianceCacheData,
              BUFFER_SIZE,
              PROBE_COUNT,
@@ -65,6 +66,15 @@ struct HashedIrradianceCache<let BUFFER_SIZE : uint,
             return hashed_irradiance_cache_sanitize(r.irr);
         }
         return half3(0);
+    }
+
+    half3 get(const float3 pos,
+              const float3 normal,
+              const float3 cam_pos,
+              const float3 prev_cam_pos,
+              inout RandomGenerator rng) {
+        HashGridPos grid_pos;
+        return get(pos, normal, cam_pos, prev_cam_pos, rng, grid_pos);
     }
 
     // grid_pos is invalid unless the queried level matched.

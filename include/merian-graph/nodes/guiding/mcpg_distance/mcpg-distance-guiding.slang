@@ -1,4 +1,5 @@
 __exported import merian_shaders.sampling.guiding;
+import merian_shaders.colors.debug;
 import merian_shaders.utils.grid;
 import merian_shaders.utils.textures;
 import merian_shaders.utils.sampling;
@@ -11,6 +12,13 @@ extern static const int merian_distance_guiding_samples = 3;
 } // namespace merian
 
 namespace merian {
+
+enum MCPGDistanceDebugView {
+    MeanDistance,
+    Deviation,
+    Weight,
+    N,
+};
 
 // All candidates are kept: their densities form the stochastic MIS weight.
 struct DistanceMCDistribution : GuidingDistribution<float> {
@@ -53,6 +61,7 @@ struct DistanceMCDistribution : GuidingDistribution<float> {
 
 struct MCPGDistanceGuiding : DistanceGuidingModel {
     DistanceMCGrid distance_mc;
+    MCPGDistanceDebugView debug_selector;
 
     struct State {
         uint2 pixel;
@@ -62,7 +71,6 @@ struct MCPGDistanceGuiding : DistanceGuidingModel {
         DistanceMCState selected;
         uint level;
         float score_sum;
-        bool guided;
     }
 
     typealias PathState = State;
@@ -115,8 +123,30 @@ struct MCPGDistanceGuiding : DistanceGuidingModel {
         r.selected = dist.selected;
         r.level = dist.selected_level;
         r.score_sum = dist.score_sum;
-        r.guided = guided;
         return r;
+    }
+
+    float4 debug_view(const RenderFrameInfo frame_info,
+                      const RayVertex vertex,
+                      inout RandomGenerator rng) {
+        var state = begin_path();
+        const DistanceMCDistribution dist = get_distribution(state, frame_info, vertex, rng);
+        if (!dist.is_valid()) {
+            return float4(1, 0, 1, 1);
+        }
+        const float2 normal_dist = distance_mc_state_get_normal_dist(dist.selected);
+        switch (debug_selector) {
+        case MCPGDistanceDebugView::MeanDistance:
+            return float4(float3(normal_dist.x / vertex.max_distance), 1);
+        case MCPGDistanceDebugView::Deviation:
+            return float4(float3(normal_dist.y / vertex.max_distance), 1);
+        case MCPGDistanceDebugView::Weight:
+            return float4(debug_color(dist.selected.sum_w * 0.1), 1);
+        case MCPGDistanceDebugView::N:
+            return float4(float3(float(dist.selected.N) / float(DISTANCE_ML_MAX_N)), 1);
+        default:
+            return float4(0);
+        }
     }
 
     void record_segment(inout State state,

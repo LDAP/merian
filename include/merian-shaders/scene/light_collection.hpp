@@ -172,7 +172,6 @@ class LightCollection {
     ResourceAllocatorHandle allocator;
 
     bool enabled = true;
-    int32_t selection = LightSelection::LightSelectionGrid;
     bool pool_presampled = true;
     bool grid_enabled = true;
     int32_t env_selection = EnvSelection::EnvSelectionPool;

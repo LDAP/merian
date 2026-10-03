@@ -17,8 +17,10 @@
                 "volume_depth->render.prev_volume_depth"
             ],
             "properties": {
-                "volume forward project": true,
-                "volume samples per pixel": 2
+                "volume": {
+                    "forward project": true,
+                    "samples per pixel": 2
+                }
             }
         }
     }

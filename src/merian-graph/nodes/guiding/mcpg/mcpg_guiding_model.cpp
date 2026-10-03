@@ -31,7 +31,7 @@ void MCPGGuidingModel::recreate_grids() {
     mcpg = std::make_shared<MCPG>(compile_context, allocator, mc_buffer_size, mc_split_storage);
     irr_cache = std::make_shared<HashedIrradianceCache>(compile_context, allocator, lc_buffer_size,
                                                         lc_probe_count, lc_stochastic_interpolation,
-                                                        lc_split_storage);
+                                                        lc_split_storage, lc_locality_bits);
 }
 
 SlangCompositionHandle MCPGGuidingModel::get_composition() const {
@@ -41,20 +41,21 @@ SlangCompositionHandle MCPGGuidingModel::get_composition() const {
     composition->add_module_from_path(GUIDING_MODULE);
     composition->add_module_from_string(
         "mcpg_guiding_constants",
-        fmt::format("namespace merian {{\n"
+        fmt::format("import {};\n"
+                    "namespace merian {{\n"
                     "export static const int merian_guiding_mc_samples = {};\n"
                     "export static const float merian_guiding_weight_exponent = {};\n"
                     "export static const bool merian_guiding_missing_light_heuristic = {};\n"
-                    "export static const int merian_guiding_replacement = {};\n"
-                    "export static const bool merian_guiding_light_cache_tail = {};\n"
+                    "export static const MCPGReplacement merian_guiding_replacement = "
+                    "MCPGReplacement({});\n"
                     "export static const float merian_guiding_lc_min_pdf = {};\n"
                     "}}\n"
                     "export static const float dir_guide_prior = {};\n"
                     "export static const float mc_conf_z = {};\n"
                     "export static const bool mc_welford_chord = {};",
-                    mc_samples, weight_exponent, missing_light_heuristic ? "true" : "false",
-                    replacement, light_cache_tail ? "true" : "false", lc_min_pdf, dir_guide_prior,
-                    mc_conf_z, mc_welford_chord ? "true" : "false"));
+                    slang_import_spelling(GUIDING_MODULE), mc_samples, weight_exponent,
+                    missing_light_heuristic ? "true" : "false", replacement, lc_min_pdf,
+                    dir_guide_prior, mc_conf_z, mc_welford_chord ? "true" : "false"));
     return composition;
 }
 
@@ -89,8 +90,10 @@ bool MCPGGuidingModel::properties(Properties& props) {
 
     if (props.st_begin_child("mc", "Markov Chain Path Guiding",
                              Properties::ChildFlagBits::DEFAULT_OPEN)) {
-        constants_changed |= props.config_percent("ML prior", dir_guide_prior);
-        constants_changed |= props.config_int("MC samples", mc_samples, "", 0, 30);
+        constants_changed |= props.config_float(
+            "ML prior", dir_guide_prior,
+            "Prior on a chain's lobe width, in squared distance to its target.", 0.01f, 0.f);
+        constants_changed |= props.config_int("MC samples", mc_samples, "", 1, 30);
         constants_changed |= props.config_float(
             "width confidence z", mc_conf_z,
             "Sample the lobe width's upper confidence limit at this standard normal quantile "
@@ -106,7 +109,7 @@ bool MCPGGuidingModel::properties(Properties& props) {
             "Exponent on a chain's weight where it selects among candidates.", 0.1f, 0.25f, 4.f);
         constants_changed |= props.config_bool(
             "missing light heuristic", missing_light_heuristic,
-            "Flood the Markov chains with invalidated states when no light is detected.");
+            "Invalidate the selected chain's cell where the light it aims at went missing.");
         constants_changed |= props.config_options(
             "replacement", replacement,
             {"always (Alber et al. 2025)", "mutated state / replaced state"},
@@ -132,8 +135,6 @@ bool MCPGGuidingModel::properties(Properties& props) {
     }
 
     if (props.st_begin_child("lc", "Light cache", Properties::ChildFlagBits::DEFAULT_OPEN)) {
-        constants_changed |= props.config_bool("surf: use LC", light_cache_tail,
-                                               "Use the light cache for the path tail.");
         recreate |=
             props.config_uint("LC buffer size", lc_buffer_size,
                               "Number of cache slots backing the hash grid.", 1u, 100000000u);
@@ -145,11 +146,15 @@ bool MCPGGuidingModel::properties(Properties& props) {
         recreate |= props.config_bool("LC split keys/payload", lc_split_storage,
                                       "Store hash+stamp separately from the payload "
                                       "(probe-friendly) instead of one combined record per slot.");
-        constants_changed |= props.config_uint(
-            "LC locality bits", lc_locality_bits,
-            "Give each 2^n-wide cell tile a contiguous Morton-ordered slot range so nearby "
-            "cells share cache lines (0 = scatter every cell).",
-            0u, 5u);
+        if (props.config_uint("LC locality bits", lc_locality_bits,
+                              "Give each 2^n-wide cell tile a contiguous Morton-ordered slot "
+                              "range so nearby cells share cache lines (0 = scatter every cell).",
+                              0u, 5u)) {
+            if (irr_cache) {
+                irr_cache->set_locality_bits(lc_locality_bits);
+            }
+            constants_changed = true;
+        }
         constants_changed |= props.config_float(
             "LC min pdf", lc_min_pdf,
             "Increase to reduce fireflies in the irradiance cache and bias the guiding towards "

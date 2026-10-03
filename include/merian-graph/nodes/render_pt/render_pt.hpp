@@ -30,11 +30,12 @@ namespace merian {
 class RenderPT : public Node {
 
   public:
-    // match SCATTER_MODE_*, NEE_MODE_* and DEBUG_OUTPUT_* in the shaders
+    // match the enums in render_pt_common.slang
     enum class ScatterMode : int32_t { Off, MIS, RIS };
     enum class NEEMode : int32_t { Off, Mixture, Resampled };
+    enum class DirectTarget : int32_t { Full, MIS, None };
+    enum class DebugOutput : int32_t { ScatterStatistics, Guiding, NEE, DistanceGuiding, None };
     enum class TraceShader : int32_t { Auto, RayGeneration, Compute };
-    enum class DebugOutput : int32_t { ScatterStatistics, Guiding, NEE };
 
     RenderPT();
 
@@ -60,14 +61,30 @@ class RenderPT : public Node {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
+    struct Sampling {
+        NEEMode nee_mode = NEEMode::Resampled;
+        float shading_share = 0.45f;
+        float nee_share = 0.1f;
+        float guiding_share = 0.45f;
+        bool cache_tail = false;
+
+        float nee_probability(bool guided) const;
+        float guided_probability(bool guided) const;
+        bool properties(Properties& config,
+                        const std::string& shading_label,
+                        bool guided,
+                        bool has_cache);
+    };
+
     void ensure_pipeline(const SceneHandle& scene);
     void update_render_constants();
     uint32_t recorded_vertices_per_path() const;
     bool use_raygen() const;
     void update_guiding_slot();
     bool has_guiding() const;
-    float nee_probability() const;
-    float guided_probability() const;
+    bool has_volume_guiding() const;
+    float distance_guided_probability() const;
+    bool has_irradiance_cache() const;
 
     ContextHandle context;
     ResourceAllocatorHandle resource_allocator;
@@ -76,8 +93,10 @@ class RenderPT : public Node {
     PtrInHandle<Scene> con_scene = PtrIn<Scene>::create();
     GBufferInHandle con_gbuffer;
     ShaderObjectInHandle<GuidingObject> con_guiding = ShaderObjectIn<GuidingObject>::create();
-    ShaderObjectInHandle<GuidingObject> con_distance_guiding =
-        ShaderObjectIn<GuidingObject>::create();
+    ShaderObjectInHandle<DistanceGuidingObject> con_distance_guiding =
+        ShaderObjectIn<DistanceGuidingObject>::create();
+    ShaderObjectInHandle<IrradianceCacheObject> con_irradiance_cache =
+        ShaderObjectIn<IrradianceCacheObject>::create();
     ManagedVkImageOutHandle con_irradiance;
     ManagedVkImageOutHandle con_debug;
     PathRecordSink path_records;
@@ -100,8 +119,10 @@ class RenderPT : public Node {
     bool demodulate_albedo = false;
     GuidingModelHandle guiding;
     uint32_t guiding_version = 0;
-    GuidingModelHandle distance_guiding;
+    DistanceGuidingModelHandle distance_guiding;
     uint32_t distance_guiding_version = 0;
+    IrradianceCacheHandle irradiance_cache;
+    uint32_t irradiance_cache_version = 0;
 
     bool volume_available = false;
     int32_t volume_spp = 1;
@@ -112,21 +133,19 @@ class RenderPT : public Node {
     DebugOutput debug_output = DebugOutput::ScatterStatistics;
     bool debug_connected = false;
     bool follow_specular = true;
-    float follow_max_roughness = 0.25f;
+    float follow_max_alpha = 0.0625f;
     ScatterMode scatter_mode = ScatterMode::MIS;
     int32_t scatter_candidates = 2;
 
-    float bsdf_share = 0.45f;
-    float nee_share = 0.1f;
-    float guiding_share = 0.45f;
-
-    NEEMode nee_mode = NEEMode::Resampled;
-    int32_t nee_bounces = 0;
+    Sampling surface;
+    int32_t surface_nee_bounces = 0;
+    Sampling volume;
+    float distance_transmittance_share = 0.1f;
+    float distance_guiding_share = 0.9f;
 
     bool guiding_scale_with_alpha = true;
     float guiding_alpha_threshold = 0.05f;
-    int32_t guiding_direct_target = 0;
-    float guiding_distance_share = 0.9f;
+    DirectTarget guiding_direct_target = DirectTarget::Full;
     std::array<bool, 8> mask_enabled{true, true, true, true, true, true, true, true};
 
     struct VolumePass {

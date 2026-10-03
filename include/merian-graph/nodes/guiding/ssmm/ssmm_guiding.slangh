@@ -2,7 +2,6 @@
 
 #ifdef __cplusplus
 #include "merian-shaders/types.slang.h"
-#include <vulkan/vulkan.hpp>
 #endif
 
 namespace merian {
@@ -14,12 +13,6 @@ struct SSMCState {
     float sum_len;
     float f;
 };
-
-#ifdef __cplusplus
-using SSMCStateAddress = vk::DeviceAddress;
-#else
-typealias SSMCStateAddress = SSMCState*;
-#endif
 
 } // namespace merian
 

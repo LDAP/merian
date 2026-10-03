@@ -4,12 +4,9 @@ __exported import merian_shaders.shading.shading_function;
 __exported import merian_shaders.utils.frame;
 __exported import merian_shaders.utils.random;
 __exported import merian_shaders.colors.colorspaces;
+import merian_shaders.sampling.resampling;
 
 namespace merian {
-
-static const int SCATTER_MODE_OFF = 0;
-static const int SCATTER_MODE_MIS = 1;
-static const int SCATTER_MODE_RIS = 2;
 
 struct RenderFrameInfo {
     float3 cam_pos;
@@ -35,7 +32,6 @@ struct PathVertex {
     float3 pos;
     float3 prev_pos;
     OrthonormalFrame shading_frame;
-    float alpha;
     uint16_t bounce; // 1 is the first scattering vertex
     uint16_t sample_index;
     uint2 pixel;
@@ -65,6 +61,7 @@ struct PathSegment {
     // throughput from pos to next_pos, the surfaces followed on the way included
     float3 weight;
     bool delta;
+    // the integrator gathers nothing beyond next_pos
     bool is_last;
 
     // Set only where a continuation ray was traced. A ray that left the scene is traced.
@@ -109,10 +106,9 @@ interface GuidingModel : GuidingDebugModel {
     UpdateRecord record_scatter(const DistributionImpl dist, const PathSegment segment,
                                 const bool guided, inout RandomGenerator rng);
 
-    // Returns radiance the integrator adds to complete the path at the next vertex.
-    float3 record_segment(inout PathState state, const RenderFrameInfo frame_info,
-                          const UpdateRecord record, const PathSegment segment,
-                          inout RandomGenerator rng);
+    void record_segment(inout PathState state, const RenderFrameInfo frame_info,
+                        const UpdateRecord record, const PathSegment segment,
+                        inout RandomGenerator rng);
 }
 
 struct RayVertex {
@@ -145,6 +141,10 @@ interface DistanceGuidingModel {
     void record_segment(inout PathState state, const RenderFrameInfo frame_info,
                         const UpdateRecord record, const RaySegment segment,
                         inout RandomGenerator rng);
+
+    float4 debug_view(const RenderFrameInfo frame_info,
+                      const RayVertex vertex,
+                      inout RandomGenerator rng);
 }
 
 struct NullGuidingDistribution : GuidingDistribution<float3> {
@@ -191,13 +191,11 @@ struct NullGuidingModel : GuidingModel {
         return {};
     }
 
-    float3 record_segment(inout State state,
-                          const RenderFrameInfo frame_info,
-                          const State record,
-                          const PathSegment segment,
-                          inout RandomGenerator rng) {
-        return float3(0);
-    }
+    void record_segment(inout State state,
+                        const RenderFrameInfo frame_info,
+                        const State record,
+                        const PathSegment segment,
+                        inout RandomGenerator rng) {}
 
     float4 debug_view(const RenderFrameInfo frame_info,
                       const PathVertex vertex,
@@ -255,6 +253,12 @@ struct NullDistanceGuidingModel : DistanceGuidingModel {
                         const State record,
                         const RaySegment segment,
                         inout RandomGenerator rng) {}
+
+    float4 debug_view(const RenderFrameInfo frame_info,
+                      const RayVertex vertex,
+                      inout RandomGenerator rng) {
+        return float4(0);
+    }
 }
 
 struct ScatterSample {
@@ -268,35 +272,6 @@ struct ScatterSample {
     bool delta;
     bool guided;
     BSDFLobe lobe;
-}
-
-static const int GUIDING_DIRECT_FULL = 0;
-static const int GUIDING_DIRECT_MIS = 1;
-static const int GUIDING_DIRECT_NONE = 2;
-
-extern static const float merian_guiding_share = 0.5;
-extern static const bool merian_guiding_scale_with_alpha = true;
-extern static const float merian_guiding_alpha_threshold = 0.05;
-extern static const int merian_guiding_direct_target = GUIDING_DIRECT_FULL;
-
-float guiding_share<G : GuidingDistribution<float3>>(const G guiding, const float alpha) {
-    if (!guiding.is_valid() || alpha < merian_guiding_alpha_threshold) {
-        return 0.f;
-    }
-    const float share =
-        merian_guiding_scale_with_alpha ? merian_guiding_share * alpha : merian_guiding_share;
-    return clamp(share * guiding.get_confidence(), 0.f, 1.f);
-}
-
-float guiding_direct_scale(const float mis_weight) {
-    switch (merian_guiding_direct_target) {
-    case GUIDING_DIRECT_MIS:
-        return mis_weight;
-    case GUIDING_DIRECT_NONE:
-        return 0.f;
-    default:
-        return 1.f;
-    }
 }
 
 // The shading function and the guiding distribution are passed per call so that neither stays
@@ -367,30 +342,26 @@ struct ScatterMixture {
             return sample(bsdf, guiding, frame, wi_local, rng);
         }
 
+        // a delta candidate weighs its contribution over the probability of drawing it
         ScatterSample selected;
         float target = 0.f;
-        float weight_sum = 0.f;
+        StreamingResampler resampler = StreamingResampler();
 
         for (int i = 0; i < candidates; i++) {
             if (let c = sample(bsdf, guiding, frame, wi_local, rng)) {
-                if (c.delta) {
-                    return c;
-                }
                 const float t = yuv_luminance(c.f_cos);
-                const float w = c.pdf > 0.f ? t / c.pdf : 0.f;
-                weight_sum += w;
-                if (w > 0.f && rng.next_float() * weight_sum < w) {
+                if (resampler.update(c.pdf > 0.f ? t / c.pdf : 0.f, rng)) {
                     selected = c;
                     target = t;
                 }
             }
         }
 
-        if (!(weight_sum > 0.f)) {
+        if (!(resampler.weight_sum > 0.f)) {
             return none;
         }
-        selected.f_cos *= selected.pdf * weight_sum / (target * candidates);
-        selected.realized_pdf = target * candidates / weight_sum;
+        selected.f_cos *= selected.pdf * resampler.weight_sum / (target * candidates);
+        selected.realized_pdf = target * candidates / resampler.weight_sum;
         return selected;
     }
 }

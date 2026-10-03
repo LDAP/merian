@@ -8,6 +8,7 @@
                 "on": {
                     "merge": [
                         "renderers/volume.json",
+                        "renderers/volume_scene.json",
                         "denoisers/volume_svgf.json"
                     ],
                     "set": {

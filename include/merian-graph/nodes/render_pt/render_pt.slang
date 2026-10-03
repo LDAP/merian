@@ -8,19 +8,13 @@ import merian_shaders.utils.random;
 import merian_shaders.utils.hash;
 import merian_shaders.utils.textures;
 import merian_shaders.colors.colorspaces;
-__exported import merian_shaders.sampling.guiding;
+__exported import "merian-graph/nodes/render_pt/render_pt_common.slang";
 __exported import render_pt_guiding;
 
 using merian;
 
 namespace merian {
-static const int DEBUG_OUTPUT_NONE = -1;
-static const int DEBUG_OUTPUT_SCATTER_STATISTICS = 0;
-static const int DEBUG_OUTPUT_GUIDING = 1;
-static const int DEBUG_OUTPUT_NEE = 2;
-
 extern static const bool merian_render_emission_on_primary = true;
-extern static const int merian_render_debug_output = DEBUG_OUTPUT_NONE;
 extern static const int merian_render_spp = 1;
 extern static const uint merian_render_seed = 0;
 extern static const int merian_render_max_path_length = 8;
@@ -28,12 +22,12 @@ extern static const uint merian_render_instance_mask = 0xFFu;
 extern static const bool merian_render_enable_ser = false;
 extern static const bool merian_render_demodulate_albedo = false;
 extern static const bool merian_render_follow_specular = true;
-extern static const float merian_render_follow_max_roughness = 0.25f;
-extern static const int merian_render_nee_mode = NEE_MODE_RESAMPLED;
-extern static const float merian_render_nee_probability = 0.5;
-extern static const int merian_render_nee_bounces = 0;
-extern static const int merian_render_scatter_mode = SCATTER_MODE_MIS;
-extern static const int merian_render_scatter_candidates = 2;
+extern static const float merian_render_follow_max_alpha = 0.0625f;
+extern static const NEEMode merian_render_surface_nee_mode = NEEMode::Resampled;
+extern static const float merian_render_surface_nee_probability = 0.f;
+extern static const int merian_render_surface_nee_bounces = 0;
+extern static const float merian_render_surface_guiding_share = 0.5;
+extern static const bool merian_render_surface_cache_tail = false;
 extern static const bool merian_render_russian_roulette = true;
 } // namespace merian
 
@@ -60,6 +54,7 @@ struct RenderBinding {
     RWTexture2D<float4> irradiance;
     RWTexture2D<float4> debug;
     ParameterBlock<RenderGuiding> guiding;
+    ParameterBlock<RenderIrradianceCache> irradiance_cache;
     RWStructuredBuffer<uint, ScalarDataLayout> path_records;
 }
 
@@ -103,6 +98,15 @@ make_scatter_target<B : ShadingFunction, G : GuidingDistribution<float3>, V : Ho
     return target;
 }
 
+bool survives_roulette(inout float3 throughput, inout RandomGenerator rng) {
+    const float survive = min(1.f, yuv_luminance(throughput));
+    if (rng.next_float() >= survive) {
+        return false;
+    }
+    throughput /= survive;
+    return true;
+}
+
 void record_connection(inout PathRecorder rec,
                        const ParameterBlock<RenderBinding> params,
                        const float3 from,
@@ -140,28 +144,39 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
                                         scene.time, scene.time_diff, scene.frame};
     var guiding_state = params.guiding.begin_path();
 
-    const bool nee = merian_render_nee_mode != NEE_MODE_OFF && scene.nee.has_lights();
+    const bool nee = merian_render_surface_nee_mode != NEEMode::Off && scene.nee.has_lights();
+    // a mixture's light draw is the continuation
+    const bool roulette_first = merian_render_surface_nee_mode == NEEMode::Mixture;
 
     for (uint16_t bounce = 1; bounce < merian_render_max_path_length; bounce++) {
         if (!sp.has_surface_material || all(throughput < SCENE_THROUGHPUT_THRESHOLD)) {
             break;
         }
 
-        const bool nee_here =
-            nee && (merian_render_nee_bounces <= 0 || bounce <= merian_render_nee_bounces);
         const float3 ng = sp.get_face_normal();
         const float spawn_offset = sp.spawn_offset;
         let bsdf = sp.surface_material.get_bsdf();
+        const bool nee_surface = nee &&
+                                 (merian_render_surface_nee_bounces <= 0 ||
+                                  bounce <= merian_render_surface_nee_bounces) &&
+                                 bsdf.effective_alpha >= NEE_MIN_ALPHA;
         let lights = scene.nee.begin_vertex(
             sp.pos, Scene::get_receiver_normal(ray.Direction, ng,
                                                bsdf_is_transmissive(bsdf.get_lobe_types())));
+        if (merian_render_russian_roulette && roulette_first &&
+            !survives_roulette(throughput, rng)) {
+            break;
+        }
+        const LightOrScatter techniques =
+            LightOrScatter(merian_render_surface_nee_mode == NEEMode::Mixture && nee_surface
+                               ? merian_render_surface_nee_probability
+                               : 0.f);
         // drawn before the guiding candidates exist, so the triangle record is not live with them
-        const bool light_technique = merian_render_nee_mode == NEE_MODE_MIXTURE && nee_here &&
-                                     rng.next_float() < merian_render_nee_probability;
+        const bool light_scatter = techniques.draws_light(rng);
         uint sampled_light = LIGHT_INVALID_INDEX;
         uint sampled_entry = LIGHT_INVALID_INDEX;
         float3 light_dir = float3(0, 0, 1);
-        if (light_technique) {
+        if (light_scatter) {
             if (let lp = scene.nee.sample_point(lights, rng, sampled_entry)) {
                 // aimed from the offset origin: from sp.pos it misses the triangle near its edges
                 const float3 origin = offset_ray_origin(sp.pos, ng, spawn_offset, lp.pos - sp.pos);
@@ -176,7 +191,6 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
         const PathVertex vertex = {sp.pos,
                                    sp.prev_pos,
                                    frame,
-                                   bsdf.effective_alpha,
                                    bounce,
                                    sample_index,
                                    pixel,
@@ -186,33 +200,25 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
 
         // 1. guiding
         let guiding = params.guiding.get_distribution(guiding_state, frame_info, vertex, rng);
-        const ScatterMixture mixture =
-            ScatterMixture(merian::guiding_share(guiding, bsdf.effective_alpha));
-
-        const bool nee_surface = nee_here && bsdf.effective_alpha >= NEE_MIN_ALPHA;
+        const ScatterMixture mixture = ScatterMixture(
+            guided_share(guiding, merian_render_surface_guiding_share, bsdf.effective_alpha));
 
         // 2. resampled direct light
         Optional<DirectLightSample> direct = none;
-        if (merian_render_nee_mode == NEE_MODE_RESAMPLED && nee_surface) {
+        if (merian_render_surface_nee_mode == NEEMode::Resampled && nee_surface) {
             direct = scene.sample_direct_light(
                 lights,
                 make_scatter_target(bsdf, guiding, mixture, medium, frame, wi_local, ns, ng),
                 rng);
         }
 
-        if (merian_render_russian_roulette) {
-            const float survive = min(1.f, yuv_luminance(throughput));
-            if (rng.next_float() >= survive)
-                break;
-            throughput /= survive;
+        if (merian_render_russian_roulette && !roulette_first &&
+            !survives_roulette(throughput, rng)) {
+            break;
         }
 
         // 3. scatter direction, from a light or from the mixture. The light technique's density
         // joins the mixture once the hit says which light the ray reached.
-        const float p_light = merian_render_nee_mode == NEE_MODE_MIXTURE && nee_surface
-                                  ? merian_render_nee_probability
-                                  : 0.f;
-        const bool light_scatter = light_technique && p_light > 0.f;
         bool scattered = false;
         bool guided = false;
         BSDFLobe scatter_lobe = BSDFLobe::None;
@@ -230,24 +236,15 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
                 scatter_pdf = mixture.pdf(bsdf, guiding, wi_local, wo_l, wo_world);
                 realized_pdf = scatter_pdf;
             }
-        } else {
-            sampled_light = LIGHT_INVALID_INDEX;
-            sampled_entry = LIGHT_INVALID_INDEX;
-            const Optional<ScatterSample> scatter =
-                merian_render_scatter_mode == SCATTER_MODE_RIS
-                    ? mixture.sample_ris(bsdf, guiding, frame, merian_render_scatter_candidates,
-                                         wi_local, rng)
-                    : mixture.sample(bsdf, guiding, frame, wi_local, rng);
-            if (let s = scatter) {
-                wo_world = s.wo;
-                f_cos = s.f_cos;
-                scatter_pdf = s.pdf;
-                realized_pdf = s.realized_pdf;
-                delta = s.delta;
-                guided = s.guided;
-                scatter_lobe = s.lobe;
-                scattered = true;
-            }
+        } else if (let s = sample_scatter(mixture, bsdf, guiding, frame, wi_local, rng)) {
+            wo_world = s.wo;
+            f_cos = s.f_cos;
+            scatter_pdf = s.pdf;
+            realized_pdf = s.realized_pdf;
+            delta = s.delta;
+            guided = s.guided;
+            scatter_lobe = s.lobe;
+            scattered = true;
         }
         const float3 wo_local = frame.to_local(wo_world);
 
@@ -256,12 +253,13 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
         segment.normal = frame.get_normal();
         segment.bounce = bounce;
         segment.wo = wo_world;
-        segment.pdf = delta ? scatter_pdf : (1.f - p_light) * scatter_pdf;
+        segment.pdf = techniques.scatter_density(scatter_pdf);
         segment.weight = float3(0);
         segment.delta = delta;
         segment.traced = false;
         segment.chain = SPECULAR_CHAIN_EMPTY;
-        segment.is_last = bounce + uint16_t(1) >= merian_render_max_path_length;
+        segment.is_last = !merian_render_surface_cache_tail &&
+                          bounce + uint16_t(1) >= merian_render_max_path_length;
         segment.next_pos = vertex.pos;
         segment.aim_pos = vertex.pos;
         segment.next_normal = segment.normal;
@@ -276,7 +274,7 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
 
         const bool transmission = wi_local.z * wo_local.z < 0.f;
 
-        const float record_pdf = delta ? realized_pdf : (1.f - p_light) * realized_pdf;
+        const float record_pdf = techniques.scatter_density(realized_pdf);
         const float3 record_f_cos = throughput * f_cos;
         const uint record_lobe = path_record_pack_lobe(scatter_lobe) |
                                  (transmission ? PATH_RECORD_LOBE_TRANSMISSION : 0u);
@@ -284,15 +282,16 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
                                    : guided      ? PATH_RECORD_METHOD_GUIDING
                                                  : PATH_RECORD_METHOD_BSDF;
         const uint record_material = path_record_pack_material(sp.material_id);
-        bool record_waits = p_light > 0.f && scattered && !delta;
+        bool record_waits = techniques.p_light > 0.f && scattered && !delta;
         if (!record_waits) {
             rec.vertex(params.path_records, vertex.pos, wo_world, record_pdf,
                        segment.pdf > 0.f ? record_f_cos / segment.pdf : float3(0),
                        uint(bounce) - 1u, record_lobe, record_method, record_material);
             if (!direct.hasValue) {
                 record_connection(rec, params, vertex.pos,
-                                  merian_render_nee_mode == NEE_MODE_RESAMPLED && nee_surface, none,
-                                  throughput, float3(0), uint(bounce) - 1u, record_material);
+                                  merian_render_surface_nee_mode == NEEMode::Resampled &&
+                                      nee_surface,
+                                  none, throughput, float3(0), uint(bounce) - 1u, record_material);
             }
         }
 
@@ -308,7 +307,7 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
                 scene.nee.record_failed_draw(sampled_entry);
         }
 
-        if (merian_render_debug_output == DEBUG_OUTPUT_SCATTER_STATISTICS && guided) {
+        if (merian_render_debug_output == DebugOutput::ScatterStatistics && guided) {
             scatter_stats += float3(1.f, select(all(f_cos <= 0.f), 1.f, 0.f),
                                     select(any(f_cos > 0.f) && !next_ray.hasValue, 1.f, 0.f));
         }
@@ -323,6 +322,7 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
         }
 
         float mis_weight = 1.f;
+        float scatter_share = 1.f;
         float3 chain_weight = float3(1);
         VirtualImage image = VirtualImage();
         bool through_specular = false;
@@ -352,10 +352,14 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
                 const float light_hit_pdf =
                     scene.nee.pdf(lights, light_index, ray.Origin, ray.Direction, hit.barycentrics,
                                   drawn, drawn ? sampled_entry : LIGHT_INVALID_INDEX);
-                if (merian_render_nee_mode == NEE_MODE_RESAMPLED) {
-                    mis_weight = segment.pdf / (light_hit_pdf + segment.pdf);
+                if (merian_render_surface_nee_mode == NEEMode::Resampled) {
+                    mis_weight = balance_heuristic(segment.pdf, light_hit_pdf);
+                    scatter_share = mis_weight;
                 } else {
-                    const float light_pdf = p_light * scene.nee.mixture_pdf(light_hit_pdf);
+                    const float light_pdf =
+                        techniques.light_density(scene.nee.mixture_pdf(light_hit_pdf));
+                    scatter_share =
+                        segment.pdf > 0.f ? balance_heuristic(segment.pdf, light_pdf) : 0.f;
                     segment.pdf += light_pdf;
                     if (record_waits) {
                         rec.vertex(params.path_records, vertex.pos, wo_world,
@@ -389,7 +393,7 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
                 break;
             }
             let follow_bsdf = sp.surface_material.get_bsdf();
-            if (sqrt(follow_bsdf.effective_alpha) >= merian_render_follow_max_roughness) {
+            if (follow_bsdf.effective_alpha >= merian_render_follow_max_alpha) {
                 break;
             }
 
@@ -440,8 +444,9 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
         }
 
         if (continues) {
+            const bool last_vertex = bounce + uint16_t(1) >= merian_render_max_path_length;
             segment.traced = true;
-            segment.is_last = bounce + uint16_t(1) >= merian_render_max_path_length;
+            segment.is_last = !merian_render_surface_cache_tail && last_vertex;
             segment.next_pos = sp.pos;
             segment.aim_pos = through_specular ? segment.pos + wo_world * image.distance() : sp.pos;
             segment.next_normal = sp.shading_normal;
@@ -452,11 +457,16 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
                 -MERIAN_HALF_MAX, MERIAN_HALF_MAX));
             segment.incident = sp.emission;
             const float direct_mis = through_specular ? 1.f : mis_weight;
-            segment.direct_scale = guiding_direct_scale(direct_mis);
+            segment.direct_scale = guiding_direct_scale(through_specular ? 1.f : scatter_share);
             segment.weight = segment.pdf > 0.f ? f_cos / segment.pdf * chain_weight : float3(0);
 
             throughput *= segment.weight;
-            const float3 emitted = throughput * segment.incident * direct_mis;
+            float3 emitted = throughput * segment.incident * direct_mis;
+            if (merian_render_surface_cache_tail && last_vertex && !any(sp.emission > 0.f)) {
+                emitted += throughput * float3(params.irradiance_cache.get(
+                                            sp.pos, sp.shading_normal, frame_info.cam_pos,
+                                            frame_info.prev_cam_pos, rng));
+            }
             radiance += emitted;
             rec.emission(emitted);
         }
@@ -472,7 +482,7 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
             const float light_hit_pdf =
                 scene.nee.pdf(lights, probe_light, probe.Origin, wo_world, hit.barycentrics,
                               probe_light == sampled_light);
-            const float light_pdf = p_light * scene.nee.mixture_pdf(light_hit_pdf);
+            const float light_pdf = techniques.light_density(scene.nee.mixture_pdf(light_hit_pdf));
             const float mixed_pdf = segment.pdf + light_pdf;
             rec.vertex(params.path_records, vertex.pos, wo_world, record_pdf + light_pdf,
                        mixed_pdf > 0.f ? record_f_cos / mixed_pdf : float3(0), uint(bounce) - 1u,
@@ -480,11 +490,7 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
         }
 
         // 4. guiding update
-        const float3 tail =
-            throughput *
-            params.guiding.record_segment(guiding_state, frame_info, guiding_record, segment, rng);
-        radiance += tail;
-        rec.emission(tail);
+        params.guiding.record_segment(guiding_state, frame_info, guiding_record, segment, rng);
 
         if (!next_ray.hasValue || !any(segment.weight > 0.f)) {
             break;
@@ -522,7 +528,7 @@ void render_pixel<Reorder : IThreadReorder>(const uint2 pixel,
         var rec = PathRecorder::begin(
             params.path_records, pixel, uint(s), scene.frame,
             uint(merian_render_max_path_length) *
-                    (merian_render_nee_mode == NEE_MODE_RESAMPLED ? 2u : 1u) +
+                    (merian_render_surface_nee_mode == NEEMode::Resampled ? 2u : 1u) +
                 1u);
         const float3 contrib = trace_path<Reorder>(scene, params, pixel, primary_ray, primary_sp,
                                                    uint16_t(s), rng, scatter_stats, rec) /
@@ -541,15 +547,15 @@ void render_pixel<Reorder : IThreadReorder>(const uint2 pixel,
 
     params.irradiance[pixel] = float4(irradiance, second_moment);
 
-    if (merian_render_debug_output == DEBUG_OUTPUT_NONE) {
+    if (merian_render_debug_output == DebugOutput::None) {
         return;
     }
     float4 debug = float4(0);
     RandomGenerator debug_rng = PCG(xxhash32(uint4(pixel, scene.frame, 0xDEB0)));
-    if (merian_render_debug_output == DEBUG_OUTPUT_SCATTER_STATISTICS) {
+    if (merian_render_debug_output == DebugOutput::ScatterStatistics) {
         // guided, refused by the shading function, refused a ray by the geometry
         debug = float4(scatter_stats, 1);
-    } else if (merian_render_debug_output == DEBUG_OUTPUT_GUIDING &&
+    } else if (merian_render_debug_output == DebugOutput::Guiding &&
                primary_sp.has_surface_material) {
         const RenderFrameInfo frame_info = {scene.camera.position, scene.prev_camera.position,
                                             scene.time, scene.time_diff, scene.frame};
@@ -559,7 +565,6 @@ void render_pixel<Reorder : IThreadReorder>(const uint2 pixel,
         vertex.pos = primary_sp.pos;
         vertex.prev_pos = primary_sp.prev_pos;
         vertex.shading_frame = primary_sp.shading_frame;
-        vertex.alpha = bsdf.effective_alpha;
         vertex.bounce = uint16_t(1);
         vertex.sample_index = uint16_t(0);
         vertex.pixel = pixel;
@@ -567,7 +572,7 @@ void render_pixel<Reorder : IThreadReorder>(const uint2 pixel,
         vertex.geo_normal = dot(ng, primary_sp.shading_frame.get_normal()) < 0.f ? -ng : ng;
         vertex.transmissive = bsdf_is_transmissive(bsdf.get_lobe_types());
         debug = params.guiding.debug_view(frame_info, vertex, debug_rng);
-    } else if (merian_render_debug_output == DEBUG_OUTPUT_NEE) {
+    } else if (merian_render_debug_output == DebugOutput::NEE) {
         debug = scene.debug_direct_light(primary_ray, primary_sp, merian_render_instance_mask,
                                          debug_rng);
     }

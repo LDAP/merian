@@ -1,10 +1,10 @@
 {
     "cli": {
         "max-path-length": {
-            "pointer": "/nodes/render/properties/max path length"
+            "pointer": "/nodes/render/properties/surface/max path length"
         },
         "spp": {
-            "pointer": "/nodes/render/properties/samples per pixel"
+            "pointer": "/nodes/render/properties/surface/samples per pixel"
         }
     },
     "nodes": {
@@ -21,11 +21,13 @@
                     "6": true,
                     "7": true
                 },
-                "max path length": 5,
                 "output": {
                     "emission on primary": true
                 },
-                "samples per pixel": 2
+                "surface": {
+                    "max path length": 5,
+                    "samples per pixel": 2
+                }
             },
             "type": "Render (Path-traced)"
         }

@@ -7,19 +7,6 @@
 
 namespace merian {
 
-// How a light is chosen for a shading point. All three build their tables in a per-frame
-// preprocess; the per-sample work is what differs.
-enum LightSelection : uint32_t {
-    // Proportional to emitted power. One binary search over the whole scene, blind to where the
-    // shading point is.
-    LightSelectionPower = 0,
-    // The same distribution, drawn once per frame into a pool: a sample is one load.
-    LightSelectionPool = 1,
-    // Per-frame world-space grid: each cell holds a cut through the light tree, weighed by what its
-    // nodes delivered there, so the choice follows the shading point.
-    LightSelectionGrid = 2,
-};
-
 enum LightSlotWeighing : uint32_t {
     LightSlotWeighingCell = 0,
     LightSlotWeighingShadingPoint = 1,

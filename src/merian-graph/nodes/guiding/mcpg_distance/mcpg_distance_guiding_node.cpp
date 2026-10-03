@@ -19,19 +19,20 @@ void MCPGDistanceGuidingNode::initialize(const ContextHandle& context,
                                          const ResourceAllocatorHandle& allocator) {
     this->context = context;
     this->resource_allocator = allocator;
-    GuidingNode::initialize(context, allocator);
+    DistanceGuidingNode::initialize(context, allocator);
 }
 
 std::vector<InputConnectorDescriptor> MCPGDistanceGuidingNode::describe_inputs() {
-    return {{.name = "scene", .connector = con_scene, .optional = true},
+    return {{.name = "scene", .connector = con_scene},
             {.name = "gbuffer", .connector = con_gbuffer, .access = ConnectorAccess::compute_read}};
 }
 
 void MCPGDistanceGuidingNode::configure(const NodeIOLayout& io_layout) {
-    extent = io_layout[con_gbuffer]->get_create_info().extent;
-    if (chains().on_extent(extent)) {
+    if (chains().on_extent(io_layout[con_gbuffer]->get_create_info().extent) ||
+        pipelines_version != version) {
         clear_composition = nullptr;
         project_composition = nullptr;
+        pipelines_version = version;
     }
 }
 
@@ -60,7 +61,7 @@ void MCPGDistanceGuidingNode::ensure_pipelines(const SceneHandle& scene) {
         build(clear, clear_program, "main");
     }
 
-    if (scene && !project_composition) {
+    if (!project_composition) {
         project_composition = SlangComposition::create();
         project_composition->add_composition(scene->get_composition());
         project_composition->add_composition(model->get_composition());
@@ -80,11 +81,11 @@ void MCPGDistanceGuidingNode::ensure_pipelines(const SceneHandle& scene) {
 
 MCPGDistanceGuidingNode::NodeStatusFlags MCPGDistanceGuidingNode::process(
     const NodeIO& io, const NodeProcessInfo& info, Submission& submission) {
-    const bool has_scene = io.is_connected(con_scene);
-    if (has_scene && (!io[con_scene] || !io[con_scene]->is_ready())) {
+    const SceneHandle& scene = io[con_scene];
+    if (!scene || !scene->is_ready()) {
         return {};
     }
-    ensure_pipelines(has_scene ? SceneHandle(io[con_scene]) : SceneHandle{});
+    ensure_pipelines(scene);
 
     const CommandBufferHandle& cmd = submission.get_cmd();
     const ShaderObjectAllocatorHandle& obj_allocator = info.get_shader_object_allocator();
@@ -118,6 +119,7 @@ MCPGDistanceGuidingNode::NodeStatusFlags MCPGDistanceGuidingNode::process(
         auto cursor = write_grid(obj)->get_cursor();
         cursor["prev"].write(chains().get_prev_texture(), vk::ImageLayout::eGeneral);
         cursor["level"] = level;
+        const vk::Extent3D& extent = chains().get_extent();
         cursor["dim"] = uint2{extent.width, extent.height};
         return obj;
     };
@@ -140,11 +142,11 @@ MCPGDistanceGuidingNode::NodeStatusFlags MCPGDistanceGuidingNode::process(
         barrier_grid();
     }
 
-    if (has_scene && info.get_iteration() != 0) {
+    if (info.get_iteration() != 0) {
         const auto ep = project.entry_point.get();
         const auto pipe = project.pipeline.get();
         cmd->bind(pipe);
-        ep->bind("scene", io[con_scene]->get_shader_object(), cmd, pipe, obj_allocator);
+        ep->bind("scene", scene->get_shader_object(), cmd, pipe, obj_allocator);
         for (uint32_t level = 0; level < levels; level++) {
             ep->bind("params", write_project(project_params[level].get(), level), cmd, pipe,
                      obj_allocator);

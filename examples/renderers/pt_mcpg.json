@@ -12,8 +12,7 @@
                     "LC stochastic interpolation": false,
                     "grid distribution dimension": 2.0,
                     "grid level bias": 0.0,
-                    "grid tan(alpha/2)": 0.012000000052154064,
-                    "surf: use LC": false
+                    "grid tan(alpha/2)": 0.012000000052154064
                 },
                 "mc": {
                     "MC samples": 5,

@@ -12,9 +12,9 @@
 
 namespace merian {
 
-class MCPGDistanceGuidingNode : public GuidingNode {
+class MCPGDistanceGuidingNode : public DistanceGuidingNode {
   public:
-    MCPGDistanceGuidingNode() : GuidingNode(std::make_shared<MCPGDistanceGuidingModel>()) {}
+    MCPGDistanceGuidingNode() : DistanceGuidingNode(std::make_shared<MCPGDistanceGuidingModel>()) {}
 
     void initialize(const ContextHandle& context,
                     const ResourceAllocatorHandle& allocator) override;
@@ -40,8 +40,7 @@ class MCPGDistanceGuidingNode : public GuidingNode {
     PtrInHandle<Scene> con_scene = PtrIn<Scene>::create();
     GBufferInHandle con_gbuffer = GBufferIn::create({});
 
-    vk::Extent3D extent{};
-
+    uint32_t pipelines_version = 0;
     SlangCompositionHandle clear_composition;
     SlangCompositionHandle project_composition;
     Versioned<SlangProgram> clear_program;

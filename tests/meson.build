@@ -83,6 +83,13 @@ test_graph_load_store = executable(
 )
 test('graph_load_store', test_graph_load_store, timeout: 120)
 
+test_node_properties = executable(
+    'test-node-properties',
+    'test_node_properties.cpp',
+    dependencies: [merian_dep, gtest_main_dep],
+)
+test('node_properties', test_node_properties, timeout: 120)
+
 test_path_expression = executable(
     'test-path-expression',
     'test_path_expression.cpp',

@@ -14,10 +14,6 @@ import merian_shaders.colors.colorspaces;
 
 namespace merian {
 
-static const int NEE_MODE_OFF = 0;
-static const int NEE_MODE_MIXTURE = 1;
-static const int NEE_MODE_RESAMPLED = 2;
-
 static const float NEE_MIN_ALPHA = 0.05f;
 
 extern static const bool merian_scene_has_env_light = false;
@@ -326,7 +322,6 @@ struct NEE {
     LightPool pool;
     LightGrid grid;
     EnvLight env;
-    uint selection;
     // UseEnvMap geometry exists: rays towards the environment must find the closest hit
     bool has_sky_portals;
     LightDebugView debug_view;
@@ -524,7 +519,7 @@ struct NEE {
     }
 
     uint draw_scene(inout RandomGenerator rng) {
-        if (selection == LightSelection::LightSelectionPower || pool.size == 0)
+        if (pool.size == 0)
             return tree.order[search_range(tree.cdf, 0, table.triangle_count, rng.next_float2())];
         return pool.entries[min(uint(rng.next_float() * pool.size), pool.size - 1)];
     }

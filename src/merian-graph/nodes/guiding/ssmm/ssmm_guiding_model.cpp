@@ -121,15 +121,17 @@ bool SSMMGuidingModel::properties(Properties& props) {
                                           "Neighbour fits resampled towards each vertex.", 1, 16);
     constants_changed |= props.config_float(
         "reuse radius", reuse_radius,
-        "Standard deviation of the neighbourhood the resampling reaches into, in pixels.", 1.f,
-        64.f);
-    constants_changed |=
-        props.config_uint("max N", max_n, "Samples folded into the exponentially weighted fit.");
+        "Standard deviation of the neighbourhood the resampling reaches into, in pixels.", 0.1f,
+        1.f, 64.f);
+    constants_changed |= props.config_uint(
+        "max N", max_n, "Samples folded into the exponentially weighted fit.", 1u);
     constants_changed |= props.config_float("min alpha", min_alpha,
                                             "Floor on the exponential weight, so the fit keeps "
                                             "adapting once max N is reached.",
-                                            0.f, 1.f);
-    constants_changed |= props.config_percent("ML prior", prior_n);
+                                            0.001f, 0.f, 1.f);
+    constants_changed |= props.config_float(
+        "ML prior", prior_n, "Pseudo-count that pulls a fit with few samples towards a wide lobe.",
+        0.01f, 0.f);
 
     return constants_changed;
 }

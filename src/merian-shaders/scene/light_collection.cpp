@@ -256,7 +256,7 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
             });
         }
 
-        if (selection == LightSelection::LightSelectionGrid) {
+        if (grid_enabled) {
             const vk::DeviceSize slot_count =
                 static_cast<vk::DeviceSize>(grid_cell_count()) * LIGHT_GRID_SLOTS;
             for (uint32_t i = 0; i < 2; i++) {
@@ -580,11 +580,11 @@ void LightCollection::update(const CommandBufferHandle& cmd,
             env["size"] = env_cdf_buffer ? env_size : 0u;
             run(env_split_entry_point, env_split_pipeline, params, 1);
         }
-        if (triangle_count > 0 && selection != LightSelection::LightSelectionPower) {
+        if (triangle_count > 0 && pool_presampled) {
             run(pool_entry_point, pool_pipeline, write_preprocess(pool_params.get()),
                 (static_cast<uint32_t>(pool_size) + 63) / 64);
         }
-        if (triangle_count > 0 && selection == LightSelection::LightSelectionGrid) {
+        if (triangle_count > 0 && grid_enabled) {
             // one group per cell
             const uint32_t cells = grid_cell_count();
             run(grid_entry_point, grid_pipeline, write_preprocess(grid_params.get()),
@@ -626,12 +626,9 @@ void LightCollection::write_to(ShaderCursor cursor) const {
 
     auto pool = cursor["pool"];
     pool["entries"] = active ? pool_buffer : dummy;
-    pool["size"] = active && selection != LightSelection::LightSelectionPower
-                       ? static_cast<uint32_t>(pool_size)
-                       : 0u;
+    pool["size"] = active && pool_presampled ? static_cast<uint32_t>(pool_size) : 0u;
 
-    const bool grid_active =
-        active && selection == LightSelection::LightSelectionGrid && grid_keys_buffer[grid_slot];
+    const bool grid_active = active && grid_enabled && grid_keys_buffer[grid_slot];
     auto grid = cursor["grid"];
     grid["starts"] = grid_active ? grid_starts_buffer : dummy;
     grid["cascades"] = grid_active ? grid_info_buffer[grid_slot] : dummy;
@@ -648,8 +645,6 @@ void LightCollection::write_to(ShaderCursor cursor) const {
     grid["touched"] = grid_active ? grid_touched_buffer[grid_slot] : dummy;
     grid["light_count"] = triangle_count + env_texels;
 
-    cursor["selection"] =
-        active ? static_cast<uint32_t>(selection) : static_cast<uint32_t>(LightSelectionPower);
     cursor["has_sky_portals"] = has_sky_portals;
     cursor["debug_view"] = static_cast<uint32_t>(debug_view);
 
@@ -685,10 +680,13 @@ void LightCollection::properties(Properties& props) {
         "A resampling renderer weighs all draws and traces one shadow ray; a mixture takes one.");
 
     if (props.st_begin_child("cells", "Cell cuts")) {
-        props.config_bool("enable", grid_enabled,
-                          "Keep a cut through a light tree for every cell of a camera-anchored "
-                          "grid: all lights, grouped finely where they matter to the cell and "
-                          "coarsely elsewhere, weighed by what each group delivers there.");
+        if (props.config_bool("enable", grid_enabled,
+                              "Keep a cut through a light tree for every cell of a camera-anchored "
+                              "grid: all lights, grouped finely where they matter to the cell and "
+                              "coarsely elsewhere, weighed by what each group delivers there.") &&
+            grid_enabled) {
+            grid_reset = true;
+        }
         if (grid_enabled) {
             props.st_separate("Drawing");
             props.config_percent("cut share", grid_share,
@@ -817,13 +815,6 @@ void LightCollection::properties(Properties& props) {
                           "Off shows the cells the lookup sees without its random shift.");
         props.st_end_child();
     }
-
-    const int32_t previous_selection = selection;
-    selection = grid_enabled ? LightSelection::LightSelectionGrid
-                             : (pool_presampled ? LightSelection::LightSelectionPool
-                                                : LightSelection::LightSelectionPower);
-    grid_reset |= selection == LightSelection::LightSelectionGrid &&
-                  previous_selection != LightSelection::LightSelectionGrid;
 
     props.output_text(fmt::format("emissive geometries: {}\nemissive triangles: {}",
                                   light_geometries.size(), triangle_count));

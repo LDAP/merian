@@ -1,0 +1,9 @@
+{
+    "nodes": {
+        "scene": {
+            "$+$outputs": [
+                "scene->distance_guiding.scene"
+            ]
+        }
+    }
+}

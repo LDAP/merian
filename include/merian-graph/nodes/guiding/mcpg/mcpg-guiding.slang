@@ -13,8 +13,6 @@ namespace merian {
 extern static const int merian_guiding_mc_samples = 5;
 extern static const float merian_guiding_weight_exponent = 1.0;
 extern static const bool merian_guiding_missing_light_heuristic = true;
-extern static const int merian_guiding_replacement = 1;
-extern static const bool merian_guiding_light_cache_tail = false;
 extern static const float merian_guiding_lc_min_pdf = 1.0;
 
 enum MCPGReplacement {
@@ -22,7 +20,9 @@ enum MCPGReplacement {
     MutatedOverReplaced,
 }
 
-// Invalid where the direction did not come from the guiding: that starts a fresh chain.
+extern static const MCPGReplacement merian_guiding_replacement =
+    MCPGReplacement::MutatedOverReplaced;
+
 enum MCPGDebugView {
     LightCache,
     Grid,
@@ -37,6 +37,7 @@ enum MCPGDebugView {
     Unresolved,
 };
 
+// Invalid where the direction did not come from the guiding: that starts a fresh chain.
 struct MCPGRecord {
     MCState selected;
     HashGridPos selected_pos;
@@ -224,21 +225,20 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
         }
     }
 
-    float3 record_segment(inout State state,
-                          const RenderFrameInfo frame_info,
-                          const MCPGRecord record,
-                          const PathSegment segment,
-                          inout RandomGenerator rng) {
+    void record_segment(inout State state,
+                        const RenderFrameInfo frame_info,
+                        const MCPGRecord record,
+                        const PathSegment segment,
+                        inout RandomGenerator rng) {
         const HashGridPos update_pos = state.lc_grid_pos;
         state.lc_grid_pos = HashGridPos();
 
         if (segment.delta) {
-            return float3(0);
+            return;
         }
 
         const bool emissive = any(segment.incident > 0.0);
-        const bool gathers_emission_only =
-            !merian_guiding_light_cache_tail && segment.is_last && segment.bounce == uint16_t(1);
+        const bool gathers_emission_only = segment.is_last && segment.bounce == uint16_t(1);
 
         // The emission where the continuation found one, the cached irradiance where it keeps
         // scattering. The lookup also resolves the cell the next vertex updates into.
@@ -255,7 +255,7 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
         const float3 contribution = target * segment.weight;
         const float mc_f = yuv_luminance(contribution);
         if (isinf(mc_f) || isnan(mc_f)) {
-            return float3(0);
+            return;
         }
 
         // the density floor bounds what a single near-specular sample can teach
@@ -264,15 +264,10 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
                          frame_info.cam_pos, frame_info.prev_cam_pos, frame_info.index, rng,
                          update_pos);
 
-        const float3 tail =
-            merian_guiding_light_cache_tail && segment.traced && segment.is_last && !emissive
-                ? target
-                : float3(0);
-
         // the cache keeps the emitter whole, the chains learn what the direct light policy allows
         const float direct_scale = emissive ? segment.direct_scale : 1.f;
         if (!(direct_scale > 0.f)) {
-            return tail;
+            return;
         }
         const float guide_f = mc_f * direct_scale;
 
@@ -293,8 +288,6 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
                                                            segment.next_pos)) {
             mcpg.kill(record.selected_pos);
         }
-
-        return tail;
     }
 }
 

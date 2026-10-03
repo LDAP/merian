@@ -594,19 +594,19 @@ RenderRestirPT::NodeStatusFlags RenderRestirPT::properties(Properties& config) {
                 "min footprint", min_footprint,
                 "Footprint a segment needs to be reconnected, in percent of the pixel footprint "
                 "(Lin et al. 2026, eq. 5). Shorter segments are replayed.",
-                0.f);
+                0.1f, 0.f);
             constants_changed |= config.config_float(
                 "footprint jitter", footprint_jitter,
                 "Relative jitter of the minimum footprint per path, which hides the boundary "
                 "between replay and reconnection.",
-                0.f, 1.f);
+                0.01f, 0.f, 1.f);
             constants_changed |= config.config_float(
                 "min roughness", min_roughness,
                 "Linear roughness the lobe before a vertex needs for the vertex to be reconnected.",
-                0.f, 1.f);
-            constants_changed |=
-                config.config_float("roughness jitter", roughness_jitter,
-                                    "Relative jitter of the minimum roughness per path.", 0.f, 1.f);
+                0.01f, 0.f, 1.f);
+            constants_changed |= config.config_float(
+                "roughness jitter", roughness_jitter,
+                "Relative jitter of the minimum roughness per path.", 0.01f, 0.f, 1.f);
         }
         config.st_end_child();
     }
@@ -679,7 +679,7 @@ RenderRestirPT::NodeStatusFlags RenderRestirPT::properties(Properties& config) {
         if (config.config_float("radius", spatial_radius,
                                 "Pixel radius of the disk the neighbors are drawn from; the mean "
                                 "distance of a pair with reciprocal selection.",
-                                1.f, 100.f)) {
+                                0.1f, 1.f, 100.f)) {
             pairing_dirty = true;
         }
         constants_changed |= config.config_bool(

@@ -28,6 +28,14 @@ class MCPGGuidingModel : public GuidingModel {
 
     void reset(const CommandBufferHandle& cmd) override;
 
+    bool supports_volume() const override {
+        return true;
+    }
+
+    IrradianceCacheHandle get_irradiance_cache() const override {
+        return irr_cache;
+    }
+
     bool properties(Properties& props) override;
 
   private:
@@ -60,7 +68,6 @@ class MCPGGuidingModel : public GuidingModel {
     float weight_exponent = 1.0f;
     bool missing_light_heuristic = true;
     int replacement = 1;
-    bool light_cache_tail = false;
     float lc_min_pdf = 1.0f;
 
     int32_t debug_view = 0;

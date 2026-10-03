@@ -2,6 +2,7 @@
 
 __exported import merian_shaders.sampling.guiding;
 import merian_shaders.gbuffer;
+import merian_shaders.sampling.resampling;
 import merian_shaders.distributions.von_mises_fisher;
 import merian_shaders.colors.colorspaces;
 
@@ -125,7 +126,7 @@ struct SSMMGuiding<G : IGBuffer> : GuidingModel {
 
         // offsets are the sum of six uniforms: dense at the centre, thin at the edges
         SSMCState tent = SSMCState(float3(0), 0.0, 0, 0.0, 0.0);
-        float sum = 0.0;
+        StreamingResampler resampler = StreamingResampler();
         for (int i = 0; i < merian_ssmm_group_size; i++) {
             const float4 r0 = rng.next_float4();
             const float4 r1 = rng.next_float4();
@@ -136,10 +137,9 @@ struct SSMMGuiding<G : IGBuffer> : GuidingModel {
             const SSMCState other = prev[ssmm_index(tc, resolution)];
             const float w = ssmm_reuse_weight(other, gbuffer, frame_info.cam_pos, resolution,
                                               vertex.pos, vertex.normal, tc);
-            if (sum <= 0.0 || rng.next_float() < w / (w + sum)) {
+            if (resampler.update(w, rng)) {
                 tent = other;
             }
-            sum += w;
         }
 
         if (ssmm_valid(tent)) {
@@ -168,18 +168,18 @@ struct SSMMGuiding<G : IGBuffer> : GuidingModel {
         return float4(0);
     }
 
-    float3 record_segment(inout State state,
-                          const RenderFrameInfo frame_info,
-                          const Record record,
-                          const PathSegment segment,
-                          inout RandomGenerator rng) {
+    void record_segment(inout State state,
+                        const RenderFrameInfo frame_info,
+                        const Record record,
+                        const PathSegment segment,
+                        inout RandomGenerator rng) {
         if (!state.has_fit || segment.delta || segment.bounce != uint16_t(1)) {
-            return float3(0);
+            return;
         }
 
-        const float f = yuv_luminance(segment.incident * segment.weight);
+        const float f = yuv_luminance(segment.incident * segment.weight) * segment.direct_scale;
         if (isinf(f) || isnan(f)) {
-            return float3(0);
+            return;
         }
 
         // a direction the fit did not propose explores: it starts a fit rather than continuing one
@@ -188,7 +188,6 @@ struct SSMMGuiding<G : IGBuffer> : GuidingModel {
         ssmm_add(fit, segment.pos, f, segment.wo, segment.aim_pos);
 
         next[ssmm_index(int2(state.pixel), gbuffer.get_dimensions())] = fit;
-        return float3(0);
     }
 }
 

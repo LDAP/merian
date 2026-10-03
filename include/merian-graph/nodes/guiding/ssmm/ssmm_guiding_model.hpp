@@ -33,6 +33,10 @@ class SSMMGuidingModel : public GuidingModel {
 
     void reset(const CommandBufferHandle& cmd) override;
 
+    bool supports_volume() const override {
+        return false;
+    }
+
     std::array<vk::BufferMemoryBarrier2, 2> carry_barriers() const;
 
     bool properties(Properties& props) override;

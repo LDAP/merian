@@ -9,7 +9,7 @@
 
 namespace merian {
 
-class MCPGDistanceGuidingModel : public GuidingModel {
+class MCPGDistanceGuidingModel : public DistanceGuidingModel {
   public:
     static constexpr uint32_t MAX_LEVELS = 16;
 
@@ -31,6 +31,10 @@ class MCPGDistanceGuidingModel : public GuidingModel {
     bool properties(Properties& props) override;
 
     bool on_extent(const vk::Extent3D& extent);
+
+    const vk::Extent3D& get_extent() const {
+        return extent;
+    }
 
     uint32_t get_level_count() const {
         return level_count;
@@ -70,6 +74,7 @@ class MCPGDistanceGuidingModel : public GuidingModel {
     float base_width = 4.f;
     float max_width = 128.f;
     float distribution_dimension = 2.f;
+    int32_t debug_view = 0;
 };
 
 } // namespace merian

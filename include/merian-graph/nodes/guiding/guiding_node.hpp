@@ -6,9 +6,9 @@
 
 namespace merian {
 
-class GuidingNode : public Node {
+template <typename Model> class GuidingNodeBase : public Node {
   public:
-    ~GuidingNode() override = default;
+    ~GuidingNodeBase() override = default;
 
     void initialize(const ContextHandle& context,
                     const ResourceAllocatorHandle& allocator) override {
@@ -18,7 +18,8 @@ class GuidingNode : public Node {
     std::vector<OutputConnectorDescriptor>
     describe_outputs(const NodeIOLayout& io_layout) override {
         configure(io_layout);
-        con_guiding = ShaderObjectOut<GuidingObject>::create({model, version}, true);
+        con_guiding =
+            ShaderObjectOut<SlotObject<Model>>::create({.model = model, .version = version}, true);
         needs_reset = true;
         return {{.name = "guiding", .connector = con_guiding}};
     }
@@ -42,14 +43,47 @@ class GuidingNode : public Node {
     }
 
   protected:
-    explicit GuidingNode(const GuidingModelHandle& model) : model(model) {}
+    explicit GuidingNodeBase(const std::shared_ptr<Model>& model) : model(model) {}
 
     virtual void configure([[maybe_unused]] const NodeIOLayout& io_layout) {}
 
-    const GuidingModelHandle model;
-    ShaderObjectOutHandle<GuidingObject> con_guiding;
+    const std::shared_ptr<Model> model;
+    ShaderObjectOutHandle<SlotObject<Model>> con_guiding;
     bool needs_reset = true;
     uint32_t version = 0;
 };
+
+class GuidingNode : public GuidingNodeBase<GuidingModel> {
+  public:
+    std::vector<OutputConnectorDescriptor>
+    describe_outputs(const NodeIOLayout& io_layout) override {
+        std::vector<OutputConnectorDescriptor> outputs =
+            GuidingNodeBase::describe_outputs(io_layout);
+        const IrradianceCacheHandle cache = model->get_irradiance_cache();
+        con_irradiance_cache = ShaderObjectOut<IrradianceCacheObject>::create(
+            {.model = cache ? cache : std::make_shared<NullIrradianceCache>(), .version = version},
+            true);
+        outputs.push_back(
+            {.name = "irradiance_cache", .connector = con_irradiance_cache, .disabled = !cache});
+        return outputs;
+    }
+
+    NodeStatusFlags
+    process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) override {
+        const NodeStatusFlags flags = GuidingNodeBase::process(io, info, submission);
+        if (io.is_connected(con_irradiance_cache)) {
+            io[con_irradiance_cache]->write();
+        }
+        return flags;
+    }
+
+  protected:
+    explicit GuidingNode(const GuidingModelHandle& model) : GuidingNodeBase(model) {}
+
+  private:
+    ShaderObjectOutHandle<IrradianceCacheObject> con_irradiance_cache;
+};
+
+using DistanceGuidingNode = GuidingNodeBase<DistanceGuidingModel>;
 
 } // namespace merian

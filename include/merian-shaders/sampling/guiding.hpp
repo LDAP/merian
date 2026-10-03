@@ -1,5 +1,7 @@
 #pragma once
 
+#include "merian-shaders/light-cache/irradiance_cache.hpp"
+
 #include "merian/shader/shader_cursor.hpp"
 #include "merian/shader/slang_composition.hpp"
 #include "merian/utils/properties.hpp"
@@ -13,9 +15,9 @@
 
 namespace merian {
 
-class GuidingModel {
+class GuidingMethod {
   public:
-    virtual ~GuidingModel() = default;
+    virtual ~GuidingMethod() = default;
 
     // properties() also runs on a method that is never initialized.
     virtual void initialize(const ContextHandle& context,
@@ -37,9 +39,21 @@ class GuidingModel {
     virtual bool properties(Properties& props) = 0;
 };
 
-using GuidingModelHandle = std::shared_ptr<GuidingModel>;
+class GuidingModel : public GuidingMethod {
+  public:
+    virtual bool supports_volume() const = 0;
 
-class NullModel : public GuidingModel {
+    virtual IrradianceCacheHandle get_irradiance_cache() const {
+        return nullptr;
+    }
+};
+
+class DistanceGuidingModel : public GuidingMethod {};
+
+using GuidingModelHandle = std::shared_ptr<GuidingModel>;
+using DistanceGuidingModelHandle = std::shared_ptr<DistanceGuidingModel>;
+
+template <typename Model> class NullModel : public Model {
   public:
     explicit NullModel(std::string type_name) : type_name(std::move(type_name)) {}
 
@@ -70,12 +84,16 @@ class NullModel : public GuidingModel {
     const std::string type_name;
 };
 
-class NullGuidingModel : public NullModel {
+class NullGuidingModel : public NullModel<GuidingModel> {
   public:
     NullGuidingModel() : NullModel("merian::NullGuidingModel") {}
+
+    bool supports_volume() const override {
+        return true;
+    }
 };
 
-class NullDistanceGuidingModel : public NullModel {
+class NullDistanceGuidingModel : public NullModel<DistanceGuidingModel> {
   public:
     NullDistanceGuidingModel() : NullModel("merian::NullDistanceGuidingModel") {}
 };
