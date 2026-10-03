@@ -3,6 +3,7 @@ import merian_shaders.scene.virtual_image;
 import merian_shaders.gbuffer;
 import merian_shaders.utils.textures;
 import merian_shaders.utils.ray_differential;
+import merian_shaders.colors.colorspaces;
 import merian_shaders.colors.debug;
 import merian_shaders.utils.hash;
 import merian_shaders.utils.random;
@@ -55,6 +56,8 @@ struct SpecularChain {
     RayDesc ray;
     float travelled;
     VirtualImage image;
+    Albedo passed;
+    float3 carried;
 }
 
 SpecularChain trace_specular_chain(const ParameterBlock<Scene> scene,
@@ -66,32 +69,42 @@ SpecularChain trace_specular_chain(const ParameterBlock<Scene> scene,
     VirtualImage image = VirtualImage();
     image.propagate(distance(ray.Origin, sp.pos));
     float travelled = 0.f;
+    Albedo passed = Albedo(float3(0.f), float3(0.f));
+    float3 carried = float3(1.f);
     for (int bounce = 0; bounce < merian_gbuffer_specular_max_bounces; bounce++) {
         if (!sp.has_surface_material) {
-            return {sp, ray, bounce == 0 ? 0.f : MAX_LINEAR_Z, image};
+            return {sp, ray, bounce == 0 ? 0.f : MAX_LINEAR_Z, image, passed, carried};
         }
         let bsdf = sp.surface_material.get_bsdf();
         if (sqrt(bsdf.specular_alpha) >= merian_gbuffer_specular_max_roughness) {
-            return {sp, ray, travelled, image};
+            return {sp, ray, travelled, image, passed, carried};
         }
 
         const OrthonormalFrame frame = sp.shading_frame;
         const float3 wi_local = frame.to_local(-ray.Direction);
-        const Optional<float3> wo_local = bsdf.sample(wi_local, rng);
-        if (!wo_local.hasValue) {
-            return {sp, ray, travelled, image};
+        const Optional<ShadingFunctionSample> s = bsdf.sample_eval(wi_local, rng);
+        if (!s.hasValue) {
+            return {sp, ray, travelled, image, passed, carried};
         }
-        const float3 wo = frame.to_world(wo_local.value);
-        const bool transmission = wi_local.z * wo_local.value.z < 0.f;
+        const float3 wo_local = s.value.wo;
+        const float3 wo = frame.to_world(wo_local);
+        const bool transmission = wi_local.z * wo_local.z < 0.f;
         const Optional<RayDesc> next = sp.make_ray(-ray.Direction, wo, transmission);
         if (!next.hasValue) {
-            return {sp, ray, travelled, image};
+            return {sp, ray, travelled, image, passed, carried};
+        }
+        if (bsdf_lobe_is_delta(s.value.lobe)) {
+            const float3 followed = s.value.pdf * s.value.weight;
+            const Albedo own = bsdf.get_albedo(wi_local);
+            passed.diffuse += carried * own.diffuse;
+            passed.specular += carried * max(own.specular - followed, float3(0.f));
+            carried *= followed;
         }
 
         const float2 curvature =
             scene.get_curvatures(hit, scene.get_triangle_hit(hit), -ray.Direction);
         if (transmission) {
-            image.refract(-ray.Direction, wo, abs(wi_local.z), abs(wo_local.value.z),
+            image.refract(-ray.Direction, wo, abs(wi_local.z), abs(wo_local.z),
                           sp.surface_material.get_interior_volume().eta, curvature);
         } else {
             image.reflect(-ray.Direction, wo, curvature);
@@ -105,7 +118,7 @@ SpecularChain trace_specular_chain(const ParameterBlock<Scene> scene,
         travelled += distance(from, sp.pos);
         image.propagate(distance(from, sp.pos));
     }
-    return {sp, ray, min(travelled, MAX_LINEAR_Z), image};
+    return {sp, ray, min(travelled, MAX_LINEAR_Z), image, passed, carried};
 }
 
 SpecularChain specular_chain(const ParameterBlock<Scene> scene,
@@ -241,6 +254,13 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<WGBuffer> gbuffer) {
                         sample.specular_albedo = float3(0.f);
                         sample.roughness = 0.f;
                     }
+                    sample.diffuse_albedo =
+                        chain.passed.diffuse + chain.carried * sample.diffuse_albedo;
+                    sample.specular_albedo =
+                        chain.passed.specular + chain.carried * sample.specular_albedo;
+                    sample.albedo = chain.passed.reflection + chain.carried * sample.albedo;
+                    sample.roughness = lerp(sqrt(bsdf.specular_alpha), sample.roughness,
+                                            yuv_luminance(chain.carried));
                     // the distance starts at the surface the guides describe
                     sample.specular_hit_distance = 0.f;
                 }
