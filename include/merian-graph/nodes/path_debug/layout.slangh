@@ -23,15 +23,15 @@ static const float PATH_DEBUG_ENV_DISTANCE = 1e6f;
 
 static const uint32_t PATH_DEBUG_MAX_SEGMENTS = 64;
 
-// resampled: a record stream with one path per slot, then the slot keys (0 = empty)
-static const uint32_t PATH_DEBUG_RESAMPLED_SLOTS = 16;
-static const uint32_t PATH_DEBUG_RESAMPLED_VERTICES =
-    PATH_RECORD_HEADER_UINTS + PATH_DEBUG_RESAMPLED_SLOTS * PATH_RECORD_UINTS;
-static const uint32_t PATH_DEBUG_RESAMPLED_KEYS =
-    PATH_DEBUG_RESAMPLED_VERTICES +
-    PATH_DEBUG_RESAMPLED_SLOTS * PATH_DEBUG_MAX_SEGMENTS * PATH_RECORD_VERTEX_UINTS;
-static const uint32_t PATH_DEBUG_RESAMPLED_UINTS =
-    PATH_DEBUG_RESAMPLED_KEYS + PATH_DEBUG_RESAMPLED_SLOTS;
+// kept: a record stream with one path per slot, then the slot keys (0 = empty)
+static const uint32_t PATH_DEBUG_KEPT_SLOTS = 64;
+static const uint32_t PATH_DEBUG_KEPT_VERTICES =
+    PATH_RECORD_HEADER_UINTS + PATH_DEBUG_KEPT_SLOTS * PATH_RECORD_UINTS;
+static const uint32_t PATH_DEBUG_KEPT_KEYS =
+    PATH_DEBUG_KEPT_VERTICES +
+    PATH_DEBUG_KEPT_SLOTS * PATH_DEBUG_MAX_SEGMENTS * PATH_RECORD_VERTEX_UINTS;
+static const uint32_t PATH_DEBUG_KEPT_HEAD = PATH_DEBUG_KEPT_KEYS + PATH_DEBUG_KEPT_SLOTS;
+static const uint32_t PATH_DEBUG_KEPT_UINTS = PATH_DEBUG_KEPT_HEAD + 1;
 
 // --- state: scratch, cleared every frame ---
 static const uint32_t PATH_DEBUG_STATE_DRAW_COUNT = 0;
@@ -50,9 +50,10 @@ static const uint32_t PATH_DEBUG_STATE_HIST = PATH_DEBUG_STATE_PICK + PATH_DEBUG
 // per resampled slot: the frame's largest key, then whether a winner claimed the slot
 static const uint32_t PATH_DEBUG_STATE_RESAMPLE_KEY = PATH_DEBUG_STATE_HIST + PATH_DEBUG_HIST_BINS;
 static const uint32_t PATH_DEBUG_STATE_RESAMPLE_CLAIM =
-    PATH_DEBUG_STATE_RESAMPLE_KEY + PATH_DEBUG_RESAMPLED_SLOTS;
-static const uint32_t PATH_DEBUG_STATE_DRAW_LIST =
-    PATH_DEBUG_STATE_RESAMPLE_CLAIM + PATH_DEBUG_RESAMPLED_SLOTS;
+    PATH_DEBUG_STATE_RESAMPLE_KEY + PATH_DEBUG_KEPT_SLOTS;
+static const uint32_t PATH_DEBUG_STATE_RECENT_COUNT =
+    PATH_DEBUG_STATE_RESAMPLE_CLAIM + PATH_DEBUG_KEPT_SLOTS;
+static const uint32_t PATH_DEBUG_STATE_DRAW_LIST = PATH_DEBUG_STATE_RECENT_COUNT + 1;
 
 static const uint32_t PATH_DEBUG_MAX_DRAW = 4096;
 
@@ -113,6 +114,7 @@ static const uint32_t PATH_DEBUG_RANK_ANY = 0;
 static const uint32_t PATH_DEBUG_RANK_BRIGHTEST = 1;
 static const uint32_t PATH_DEBUG_RANK_FIREFLIES = 2;
 static const uint32_t PATH_DEBUG_RANK_RESAMPLED = 3;
+static const uint32_t PATH_DEBUG_RANK_RECENT = 4;
 
 static const uint32_t PATH_DEBUG_NO_PIXEL = 0xFFFFFFFFu;
 
@@ -318,7 +320,7 @@ struct PathDebugParams {
     uint32_t overlay_color;
     float overlay_color_scale;
     uint32_t overlay_isolate;
-    uint32_t overlay_resample;
+    uint32_t overlay_keep_update;
 
     uint32_t backdrop;
     float backdrop_split;
@@ -405,7 +407,7 @@ RWStructuredBuffer<float, ScalarDataLayout> moments_f;
 RWStructuredBuffer<uint, ScalarDataLayout> filtered;
 RWStructuredBuffer<float, ScalarDataLayout> filtered_f;
 RWStructuredBuffer<uint, ScalarDataLayout> matches;
-RWStructuredBuffer<uint, ScalarDataLayout> resampled;
+RWStructuredBuffer<uint, ScalarDataLayout> kept;
 uniform merian::Camera camera;
 uniform PathDebugParams params;
 

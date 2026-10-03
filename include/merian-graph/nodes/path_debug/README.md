@@ -25,7 +25,7 @@ ctrl+scroll to widen the region; the same values are editable as numbers under `
 | Axis | Answers | Controls |
 | --- | --- | --- |
 | **selection** | which paths am I looking at | the pick and what it restricts, two path expressions, scatter/method/material constraints |
-| **overlay** | which of them are drawn as lines | `paths from`, `keep` (spread over the image / brightest / brightest fraction / resampled by contribution), `max paths`, `depth test`, `thickness`, colour, isolate |
+| **overlay** | which of them are drawn as lines | `paths from`, `keep` (spread over the image / brightest / brightest fraction / resampled by contribution / most recent), `max paths`, `depth test`, `thickness`, colour, isolate |
 | **backdrop** | what the lines are drawn on | the render (default), the filtered paths re-rendered, a reference image, difference, splits |
 | **analysis** | what the panels measure | directional maps, heat grid, per-pixel statistics — each with its own `paths from` |
 
@@ -61,6 +61,8 @@ contribution stopped being finite at.
 | --- | --- |
 | Debug a reference path tracer | connect the debugger, leave everything default: a representative sample of the frame's paths draws over the render |
 | Top-k contributing paths | overlay `keep: brightest`, `max paths: k` |
+| The last N paths of a pixel | click it, overlay `keep: most recent`, `max paths: N`; the slots keep the latest matching paths over frames and clear on a new pick |
+| The last N paths of a kind | as above, plus `expression A`: `.N` direct NEE, `.*T.+N` NEE after a refraction, `.*S.+N` after a specular event |
 | Representative paths | overlay `keep: resampled by contribution`, `max paths: 1`; each slot holds one path drawn proportionally to its contribution from every path since the last change |
 | Fireflies | overlay `keep: brightest fraction`, `brightest fraction: 1e-4`; the inspector lists them and dissects one vertex by vertex |
 | NaN or infinite paths | `--debug nonfinite`, or selection `contribution: NaN or infinite only`; the heatmap shows where they come from and the inspector marks the vertex that broke |

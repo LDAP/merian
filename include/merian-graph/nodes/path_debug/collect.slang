@@ -27,6 +27,10 @@ void main(uint3 gid: SV_DispatchThreadID) {
         path_debug_resample_commit(i, p);
         return;
     }
+    if (params.overlay_rank == PATH_DEBUG_RANK_RECENT) {
+        path_debug_recent_commit(p);
+        return;
+    }
     const uint bin = path_debug_lum_bin(p.luminance);
     if (bin < state[PATH_DEBUG_STATE_BAND_LO]) {
         return;

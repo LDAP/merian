@@ -40,7 +40,7 @@ void write_top_list(PathRecordStream records,
     float top_lum[PATH_DEBUG_TOP_COUNT] = {};
     uint filled = 0;
     for (uint d = 0; d < candidates; d++) {
-        if (slots && resampled[PATH_DEBUG_RESAMPLED_KEYS + d] == 0) {
+        if (slots && kept[PATH_DEBUG_KEPT_KEYS + d] == 0) {
             continue;
         }
         const uint candidate = slots ? d : state[PATH_DEBUG_STATE_DRAW_LIST + d];
@@ -128,18 +128,21 @@ void main() {
     }
 
     out_state[PATH_DEBUG_OUT_ISOLATE] = 0;
-    const bool slots = params.overlay_rank == PATH_DEBUG_RANK_RESAMPLED;
-    if (slots) {
+    if (params.overlay_rank == PATH_DEBUG_RANK_RECENT && params.overlay_keep_update != 0) {
+        kept[PATH_DEBUG_KEPT_HEAD] =
+            (kept[PATH_DEBUG_KEPT_HEAD] + path_debug_recent_advance()) % params.overlay_max_paths;
+    }
+    if (path_debug_overlay_kept()) {
         uint filled = 0;
         for (uint slot = 0; slot < params.overlay_max_paths; slot++) {
-            filled += resampled[PATH_DEBUG_RESAMPLED_KEYS + slot] != 0 ? 1 : 0;
+            filled += kept[PATH_DEBUG_KEPT_KEYS + slot] != 0 ? 1 : 0;
         }
         out_state[PATH_DEBUG_OUT_DRAW_COUNT] = filled;
         if (params.overlay_isolate < params.overlay_max_paths &&
-            resampled[PATH_DEBUG_RESAMPLED_KEYS + params.overlay_isolate] != 0) {
-            write_isolated(resampled, PATH_DEBUG_RESAMPLED_VERTICES);
+            kept[PATH_DEBUG_KEPT_KEYS + params.overlay_isolate] != 0) {
+            write_isolated(kept, PATH_DEBUG_KEPT_VERTICES);
         }
-        write_top_list(resampled, PATH_DEBUG_RESAMPLED_VERTICES, true, params.overlay_max_paths);
+        write_top_list(kept, PATH_DEBUG_KEPT_VERTICES, true, params.overlay_max_paths);
     } else {
         if (params.overlay_isolate < path_record_path_count(in_records)) {
             write_isolated(in_records, path_record_vertex_region_offset(in_records));

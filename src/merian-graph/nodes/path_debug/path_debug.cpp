@@ -144,10 +144,10 @@ void PathDebugNode::initialize(const ContextHandle& context,
                                             vk::BufferUsageFlagBits::eStorageBuffer |
                                                 vk::BufferUsageFlagBits::eTransferDst,
                                             MemoryMappingType::NONE, "path_debug state");
-    resampled_buffer = allocator->create_buffer(vk::DeviceSize{PATH_DEBUG_RESAMPLED_UINTS} * 4,
-                                                vk::BufferUsageFlagBits::eStorageBuffer |
-                                                    vk::BufferUsageFlagBits::eTransferDst,
-                                                MemoryMappingType::NONE, "path_debug resampled");
+    kept_buffer = allocator->create_buffer(vk::DeviceSize{PATH_DEBUG_KEPT_UINTS} * 4,
+                                           vk::BufferUsageFlagBits::eStorageBuffer |
+                                               vk::BufferUsageFlagBits::eTransferDst,
+                                           MemoryMappingType::NONE, "path_debug kept");
     out_state_buffer = allocator->create_buffer(vk::DeviceSize{OUT_UINTS} * 4,
                                                 vk::BufferUsageFlagBits::eStorageBuffer |
                                                     vk::BufferUsageFlagBits::eTransferSrc,
@@ -368,7 +368,7 @@ PathDebugNode::on_connected(const NodeIOLayout& io_layout,
                                       [this](const GraphEvent::Info&, const GraphEvent::Data&) {
                                           pixel_stats_dirty = true;
                                           maps_dirty = true;
-                                          resampled_dirty = true;
+                                          kept_dirty = true;
                                           return false;
                                       });
     io_layout.register_event_listener("//geometry_changed,//transform_changed",
@@ -558,7 +558,7 @@ void PathDebugNode::record_clears(const NodeIO& io,
                   compute_to_transfer(matches_buffer), compute_to_transfer(filtered_buffer),
                   compute_to_transfer(stats_buffer), compute_to_transfer(maps_buffer),
                   compute_to_transfer(grid_buffer), compute_to_transfer(moments_buffer),
-                  compute_to_transfer(resampled_buffer)});
+                  compute_to_transfer(kept_buffer)});
     if (info.get_iteration() == 0) {
         cmd->fill(records);
     }
@@ -589,10 +589,10 @@ void PathDebugNode::record_clears(const NodeIO& io,
         rel_error_history.clear();
         variance_history.clear();
     }
-    if (resampled_dirty || info.get_iteration() == 0) {
-        cmd->fill(resampled_buffer);
-        resampled_dirty = false;
-        resampled_frames = 0;
+    if (kept_dirty || info.get_iteration() == 0) {
+        cmd->fill(kept_buffer);
+        kept_dirty = false;
+        kept_frames = 0;
         const std::scoped_lock lock(stats_mutex);
         resampled_from = 0;
     }
@@ -602,7 +602,7 @@ void PathDebugNode::record_clears(const NodeIO& io,
     cmd->barrier({transfer_to_compute(state_buffer), transfer_to_compute(stats_buffer),
                   transfer_to_compute(maps_buffer), transfer_to_compute(grid_buffer),
                   transfer_to_compute(moments_buffer), transfer_to_compute(filtered_buffer),
-                  transfer_to_compute(matches_buffer), transfer_to_compute(resampled_buffer)});
+                  transfer_to_compute(matches_buffer), transfer_to_compute(kept_buffer)});
 }
 
 PathDebugNode::FrameActivity PathDebugNode::update_params(const NodeIO& io,
@@ -689,13 +689,13 @@ void PathDebugNode::update_capture_params() {
 }
 
 void PathDebugNode::update_overlay_params(const ReadbackFeedback& fed, const bool frozen) {
-    const bool resampling = overlay_rank == static_cast<int32_t>(PATH_DEBUG_RANK_RESAMPLED);
+    const bool kept = overlay_kept();
     params.overlay_source = static_cast<uint32_t>(overlay_source);
     params.overlay_rank = static_cast<uint32_t>(overlay_rank);
     params.overlay_max_paths = std::min(static_cast<uint32_t>(std::max(overlay_max_paths, 1)),
-                                        resampling ? PATH_DEBUG_RESAMPLED_SLOTS : MAX_DRAW);
-    params.overlay_resample = resampling && (!frozen || resampled_frames == 0) ? 1 : 0;
-    resampled_frames += params.overlay_resample;
+                                        kept ? PATH_DEBUG_KEPT_SLOTS : MAX_DRAW);
+    params.overlay_keep_update = kept && (!frozen || kept_frames == 0) ? 1 : 0;
+    kept_frames += params.overlay_keep_update;
     params.overlay_brightest_fraction = std::clamp(overlay_brightest_fraction, 1e-7f, 1.f);
     params.overlay_sample_max = std::numeric_limits<uint32_t>::max();
     if (overlay_rank == static_cast<int32_t>(PATH_DEBUG_RANK_ANY) &&
@@ -810,7 +810,7 @@ void PathDebugNode::bind_node_buffers(ShaderCursor cursor, const NodeIO& io) con
         {"filtered", filtered_buffer},
         {"filtered_f", filtered_buffer},
         {"matches", matches_buffer},
-        {"resampled", resampled_buffer},
+        {"kept", kept_buffer},
         {"in_records", io[con_records]},
     }};
     for (const auto& [name, buffer] : buffers) {
@@ -941,7 +941,7 @@ void PathDebugNode::record_analysis(const NodeIO& io,
     cmd->barrier({compute_to_compute(stats_buffer), compute_to_compute(maps_buffer),
                   compute_to_compute(grid_buffer), compute_to_compute(state_buffer),
                   compute_to_compute(moments_buffer), compute_to_compute(filtered_buffer),
-                  compute_to_compute(resampled_buffer)});
+                  compute_to_compute(kept_buffer)});
 }
 
 void PathDebugNode::record_compose(const NodeIO& io,
@@ -971,7 +971,7 @@ void PathDebugNode::record_overlay_lines(const NodeIO& io,
         {state_buffer->buffer_barrier2(
              vk::PipelineStageFlagBits2::eComputeShader, vk::PipelineStageFlagBits2::eVertexShader,
              vk::AccessFlagBits2::eShaderWrite, vk::AccessFlagBits2::eShaderRead),
-         resampled_buffer->buffer_barrier2(
+         kept_buffer->buffer_barrier2(
              vk::PipelineStageFlagBits2::eComputeShader, vk::PipelineStageFlagBits2::eVertexShader,
              vk::AccessFlagBits2::eShaderWrite, vk::AccessFlagBits2::eShaderRead),
          records->buffer_barrier2(vk::PipelineStageFlagBits2::eComputeShader |
@@ -1096,7 +1096,9 @@ void PathDebugNode::record_readback(const NodeIO& io,
     cmd->barrier(readback->buffer_barrier2(
         vk::PipelineStageFlagBits2::eTransfer, vk::PipelineStageFlagBits2::eHost,
         vk::AccessFlagBits2::eTransferWrite, vk::AccessFlagBits2::eHostRead));
-    submission.sync_to_cpu([this, readback, resampled = params.overlay_resample != 0]() {
+    submission.sync_to_cpu([this, readback,
+                            resampled = params.overlay_rank == PATH_DEBUG_RANK_RESAMPLED &&
+                                        params.overlay_keep_update != 0]() {
         const Readback data = *readback->get_memory()->map_as<Readback>();
         readback->get_memory()->unmap();
         const std::scoped_lock lock(stats_mutex);
@@ -1176,7 +1178,7 @@ void PathDebugNode::invalidate_selection() {
     maps_dirty = true;
     pixel_stats_dirty = true;
     heat_dirty = true;
-    resampled_dirty = true;
+    kept_dirty = true;
 }
 
 void PathDebugNode::clear_selection() {
@@ -1192,6 +1194,11 @@ void PathDebugNode::set_expression(const bool slot_b, const std::string& text) {
     (slot_b ? expr_b : expr_a) = text;
     (slot_b ? compiled_b : compiled_a) = compile_path_expression(text);
     invalidate_selection();
+}
+
+bool PathDebugNode::overlay_kept() const {
+    return overlay_rank == static_cast<int32_t>(PATH_DEBUG_RANK_RESAMPLED) ||
+           overlay_rank == static_cast<int32_t>(PATH_DEBUG_RANK_RECENT);
 }
 
 bool PathDebugNode::shared_support(const bool needs_camera_wi) const {

@@ -75,8 +75,9 @@ class PathDebugNode : public Node {
     static constexpr std::array<const char*, 3> FINITE_NAMES = {"any", "finite only",
                                                                 "NaN or infinite only"};
     static constexpr std::array<const char*, 2> METHOD_MODE_NAMES = {"any vertex", "every vertex"};
-    static constexpr std::array<const char*, 4> RANK_NAMES = {
-        "spread over the image", "brightest", "brightest fraction", "resampled by contribution"};
+    static constexpr std::array<const char*, 5> RANK_NAMES = {
+        "spread over the image", "brightest", "brightest fraction", "resampled by contribution",
+        "most recent"};
     static constexpr std::array<const char*, 3> DEPTH_NAMES = {
         "off (x-ray)", "hide behind geometry", "dash behind geometry"};
     static constexpr std::array<const char*, 4> COLOR_NAMES = {"luminance", "bounces", "random",
@@ -233,6 +234,7 @@ class PathDebugNode : public Node {
     void clear_selection();
     void set_expression(bool slot_b, const std::string& text);
     bool shared_support(bool needs_camera_wi) const;
+    bool overlay_kept() const;
 
     uint32_t shown_panel_mask() const;
     int32_t panel_top(uint32_t slot) const;
@@ -324,7 +326,7 @@ class PathDebugNode : public Node {
     BufferHandle moments_buffer;
     BufferHandle filtered_buffer;
     BufferHandle matches_buffer;
-    BufferHandle resampled_buffer;
+    BufferHandle kept_buffer;
     TextureHandle reference_texture;
     std::vector<BufferHandle> readback_buffers;
 
@@ -426,8 +428,8 @@ class PathDebugNode : public Node {
     int32_t pixel_stats_view = static_cast<int32_t>(PATH_DEBUG_PIXEL_STAT_OFF);
     bool pixel_stats_dirty = true;
     uint32_t pixel_stats_frames = 0;
-    bool resampled_dirty = true;
-    uint32_t resampled_frames = 0;
+    bool kept_dirty = true;
+    uint32_t kept_frames = 0;
     uint64_t resampled_from = 0;
     std::deque<float> mean_history;
     std::deque<float> rel_error_history;

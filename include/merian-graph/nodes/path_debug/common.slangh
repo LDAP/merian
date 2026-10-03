@@ -404,7 +404,8 @@ bool path_debug_resample_weight_valid(const float luminance) {
 }
 
 void path_debug_resample_offer(const uint path_index, const float luminance) {
-    if (params.overlay_resample == 0 || !path_debug_resample_weight_valid(luminance)) {
+    if (params.overlay_rank != PATH_DEBUG_RANK_RESAMPLED || params.overlay_keep_update == 0 ||
+        !path_debug_resample_weight_valid(luminance)) {
         return;
     }
     for (uint slot = 0; slot < params.overlay_max_paths; slot++) {
@@ -413,16 +414,36 @@ void path_debug_resample_offer(const uint path_index, const float luminance) {
     }
 }
 
-void path_debug_resample_commit(const uint path_index, const PathRecordPath p) {
-    if (params.overlay_resample == 0 || !path_debug_resample_weight_valid(p.luminance)) {
-        return;
-    }
+bool path_debug_overlay_kept() {
+    return params.overlay_rank == PATH_DEBUG_RANK_RESAMPLED ||
+           params.overlay_rank == PATH_DEBUG_RANK_RECENT;
+}
+
+void path_debug_keep_path(const uint slot, const PathRecordPath p, const uint key) {
     const uint vertex_region = path_record_vertex_region_offset(in_records);
     const uint vertices = min(p.vertex_count, PATH_DEBUG_MAX_SEGMENTS);
+    const uint dst = PATH_RECORD_HEADER_UINTS + slot * PATH_RECORD_UINTS;
+    kept[dst + PATH_RECORD_PATH_PIXEL] = path_record_pack_pixel(p.pixel);
+    kept[dst + PATH_RECORD_PATH_VERTEX_OFFSET] = slot * PATH_DEBUG_MAX_SEGMENTS;
+    kept[dst + PATH_RECORD_PATH_COUNT_SAMPLE] = vertices | (p.sample_idx << 16);
+    kept[dst + PATH_RECORD_PATH_LUMINANCE] = asuint(p.luminance);
+    const uint src_vertices = vertex_region + p.vertex_offset * PATH_RECORD_VERTEX_UINTS;
+    const uint dst_vertices =
+        PATH_DEBUG_KEPT_VERTICES + slot * PATH_DEBUG_MAX_SEGMENTS * PATH_RECORD_VERTEX_UINTS;
+    for (uint w = 0; w < vertices * PATH_RECORD_VERTEX_UINTS; w++) {
+        kept[dst_vertices + w] = in_records[src_vertices + w];
+    }
+    kept[PATH_DEBUG_KEPT_KEYS + slot] = key;
+}
+
+void path_debug_resample_commit(const uint path_index, const PathRecordPath p) {
+    if (params.overlay_keep_update == 0 || !path_debug_resample_weight_valid(p.luminance)) {
+        return;
+    }
     for (uint slot = 0; slot < params.overlay_max_paths; slot++) {
         const uint key = asuint(path_debug_resample_key(path_index, slot, p.luminance));
         if (key != state[PATH_DEBUG_STATE_RESAMPLE_KEY + slot] ||
-            key <= resampled[PATH_DEBUG_RESAMPLED_KEYS + slot]) {
+            key <= kept[PATH_DEBUG_KEPT_KEYS + slot]) {
             continue;
         }
         uint claimed;
@@ -430,19 +451,25 @@ void path_debug_resample_commit(const uint path_index, const PathRecordPath p) {
         if (claimed != 0) {
             continue;
         }
-        const uint dst = PATH_RECORD_HEADER_UINTS + slot * PATH_RECORD_UINTS;
-        resampled[dst + PATH_RECORD_PATH_PIXEL] = path_record_pack_pixel(p.pixel);
-        resampled[dst + PATH_RECORD_PATH_VERTEX_OFFSET] = slot * PATH_DEBUG_MAX_SEGMENTS;
-        resampled[dst + PATH_RECORD_PATH_COUNT_SAMPLE] = vertices | (p.sample_idx << 16);
-        resampled[dst + PATH_RECORD_PATH_LUMINANCE] = asuint(p.luminance);
-        const uint src_vertices = vertex_region + p.vertex_offset * PATH_RECORD_VERTEX_UINTS;
-        const uint dst_vertices = PATH_DEBUG_RESAMPLED_VERTICES +
-                                  slot * PATH_DEBUG_MAX_SEGMENTS * PATH_RECORD_VERTEX_UINTS;
-        for (uint w = 0; w < vertices * PATH_RECORD_VERTEX_UINTS; w++) {
-            resampled[dst_vertices + w] = in_records[src_vertices + w];
-        }
-        resampled[PATH_DEBUG_RESAMPLED_KEYS + slot] = key;
+        path_debug_keep_path(slot, p, key);
     }
+}
+
+void path_debug_recent_commit(const PathRecordPath p) {
+    if (params.overlay_keep_update == 0) {
+        return;
+    }
+    const uint matched = state[PATH_DEBUG_STATE_MATCHED];
+    uint order;
+    InterlockedAdd(state[PATH_DEBUG_STATE_RECENT_COUNT], 1, order);
+    if (order >= matched || order + params.overlay_max_paths < matched) {
+        return;
+    }
+    path_debug_keep_path((kept[PATH_DEBUG_KEPT_HEAD] + order) % params.overlay_max_paths, p, 1);
+}
+
+uint path_debug_recent_advance() {
+    return min(state[PATH_DEBUG_STATE_RECENT_COUNT], state[PATH_DEBUG_STATE_MATCHED]);
 }
 
 uint path_debug_log_bin(const float value,

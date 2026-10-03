@@ -76,7 +76,8 @@ void PathDebugNode::properties_selection(Properties& config) {
             "expression A", text_a, false,
             "Per scatter event: S G D U specular, glossy, diffuse, unclassified; R T reflected, "
             "transmitted; . any; <RD> both; [SG] either; repeats * + ? {n} {n,m}. Matches the "
-            "whole path.")) {
+            "whole path; a trailing N instead ends at a vertex that connected to a light by NEE "
+            "(.N direct, .*S.+N after a specular event).")) {
         set_expression(false, text_a);
     }
     if (!compiled_a.valid) {
@@ -117,19 +118,18 @@ void PathDebugNode::properties_overlay(Properties& config) {
     if (!config.st_begin_child("overlay", "overlay", Properties::ChildFlagBits::DEFAULT_OPEN)) {
         return;
     }
-    resampled_dirty |= config.config_options("paths from", overlay_source, options(SOURCE_NAMES),
-                                             Properties::OptionsStyle::COMBO);
+    kept_dirty |= config.config_options("paths from", overlay_source, options(SOURCE_NAMES),
+                                        Properties::OptionsStyle::COMBO);
     if (config.config_options(
             "keep", overlay_rank, options(RANK_NAMES), Properties::OptionsStyle::COMBO,
             "Resampled: paths drawn proportional to their contribution from every "
-            "path since the last change.")) {
-        resampled_dirty = true;
+            "path since the last change. Most recent: the last matching paths over frames.")) {
+        kept_dirty = true;
         isolate_path = -1;
     }
-    const bool resampling = overlay_rank == static_cast<int32_t>(PATH_DEBUG_RANK_RESAMPLED);
-    resampled_dirty |=
+    kept_dirty |=
         config.config_int("max paths", overlay_max_paths, "", 1,
-                          static_cast<int32_t>(resampling ? PATH_DEBUG_RESAMPLED_SLOTS : MAX_DRAW));
+                          static_cast<int32_t>(overlay_kept() ? PATH_DEBUG_KEPT_SLOTS : MAX_DRAW));
     if (overlay_rank == static_cast<int32_t>(PATH_DEBUG_RANK_FIREFLIES)) {
         config.config_float("brightest fraction", overlay_brightest_fraction, "", 1e-5f);
     }

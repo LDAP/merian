@@ -379,6 +379,9 @@ std::string PathDebugNode::overlay_summary() const {
         return fmt::format("{} resampled from {}", latest_readback.frame.draw_count,
                            si_count(resampled_from));
     }
+    if (overlay_rank == static_cast<int32_t>(PATH_DEBUG_RANK_RECENT)) {
+        return fmt::format("{} most recent", latest_readback.frame.draw_count);
+    }
     const uint32_t matched = latest_readback.frame.matched;
     if (matched == 0) {
         return "none";
