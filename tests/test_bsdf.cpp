@@ -70,6 +70,16 @@ export merian::LambertDiffuseBRDF make_test_bsdf(BSDFParams p) {
 }
 )";
 
+const char* const CONFIG_DIFFUSE_TRANSMISSION = R"(
+import merian_shaders.shading.bsdfs.bsdf_diffuse_transmission;
+import bsdf.bsdf_test_common;
+namespace merian_test {
+export merian::DiffuseTransmissionBSDF make_test_bsdf(BSDFParams p) {
+    return merian::DiffuseTransmissionBSDF(p.albedo, float3(0.1f, 0.3f, 0.5f));
+}
+}
+)";
+
 const char* const CONFIG_GGX = R"(
 import merian_shaders.shading.bsdfs.brdf_ggx;
 import bsdf.bsdf_test_common;
@@ -412,6 +422,18 @@ TEST_F(BSDFTest, LambertGrazing) {
     expect_energy_conserving(r);
     expect_pdf_normalized(r);
     EXPECT_NEAR(r.furnace.x, p.albedo.x, MC_SIGMA * r.furnace_stderr.x);
+}
+
+TEST_F(BSDFTest, DiffuseTransmission) {
+    BSDFParams p;
+    p.albedo = {0.6f, 0.5f, 0.2f};
+    for (const float3& wi : {WI_NORMAL, WI_GRAZING, float3(-WI_GRAZING.x, 0.0f, -WI_GRAZING.z)}) {
+        const auto r = run(CONFIG_DIFFUSE_TRANSMISSION, wi, p);
+        expect_sample_eval_consistent(r);
+        expect_reciprocal(r);
+        expect_energy_conserving(r);
+        expect_albedo_matches_furnace(r);
+    }
 }
 
 // Sheen. Reciprocity is left out: the Estevez & Kulla shadowing term raises the outgoing
