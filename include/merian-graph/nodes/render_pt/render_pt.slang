@@ -30,6 +30,9 @@ extern static const float merian_render_follow_max_alpha = 0.0625f;
 extern static const NEEMode merian_render_surface_nee_mode = NEEMode::Resampled;
 extern static const float merian_render_surface_nee_probability = 0.f;
 extern static const int merian_render_surface_nee_bounces = 0;
+extern static const float merian_render_surface_nee_alpha_threshold = 0.05f;
+extern static const GuidingMode merian_render_surface_guiding_mode = GuidingMode::MIS;
+extern static const int merian_render_surface_guiding_candidates = 2;
 extern static const float merian_render_surface_guiding_share = 0.5;
 extern static const bool merian_render_surface_cache_tail = false;
 extern static const bool merian_render_russian_roulette = true;
@@ -202,7 +205,7 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
         const bool nee_surface = nee &&
                                  (merian_render_surface_nee_bounces <= 0 ||
                                   bounce <= merian_render_surface_nee_bounces) &&
-                                 bsdf.effective_alpha >= NEE_MIN_ALPHA;
+                                 bsdf.effective_alpha >= merian_render_surface_nee_alpha_threshold;
         let lights = scene.nee.begin_vertex(
             sp.pos, Scene::get_receiver_normal(ray.Direction, ng,
                                                bsdf_is_transmissive(bsdf.get_lobe_types())));
@@ -281,7 +284,9 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
                 scatter_pdf = mixture.pdf(bsdf, guiding, wi_local, wo_l, wo_world);
                 realized_pdf = scatter_pdf;
             }
-        } else if (let s = sample_scatter(mixture, bsdf, guiding, frame, wi_local, rng)) {
+        } else if (let s = sample_scatter(mixture, bsdf, guiding, frame, wi_local,
+                                          merian_render_surface_guiding_mode,
+                                          merian_render_surface_guiding_candidates, rng)) {
             wo_world = s.wo;
             f_cos = s.f_cos;
             scatter_pdf = s.pdf;

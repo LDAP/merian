@@ -31,8 +31,8 @@ class RenderPT : public Node {
 
   public:
     // match the enums in render_pt_common.slang
-    enum class ScatterMode : int32_t { Off, MIS, RIS };
     enum class NEEMode : int32_t { Off, Mixture, Resampled };
+    enum class GuidingMode : int32_t { Off, MIS, RIS };
     enum class DirectTarget : int32_t { Full, MIS, None };
     enum class DebugOutput : int32_t { ScatterStatistics, Guiding, NEE, DistanceGuiding, None };
     enum class TraceShader : int32_t { Auto, RayGeneration, Compute };
@@ -63,6 +63,8 @@ class RenderPT : public Node {
   private:
     struct Sampling {
         NEEMode nee_mode = NEEMode::Resampled;
+        GuidingMode guiding_mode = GuidingMode::MIS;
+        int32_t guiding_candidates = 2;
         float shading_share = 0.45f;
         float nee_share = 0.1f;
         float guiding_share = 0.45f;
@@ -72,7 +74,7 @@ class RenderPT : public Node {
         float guided_probability(bool guided) const;
         bool properties(Properties& config,
                         const std::string& shading_label,
-                        bool guided,
+                        bool has_guiding_model,
                         bool has_cache);
     };
 
@@ -81,6 +83,7 @@ class RenderPT : public Node {
     uint32_t recorded_vertices_per_path() const;
     bool use_raygen() const;
     void update_guiding_slot();
+    bool has_guiding_model() const;
     bool has_guiding() const;
     bool has_volume_guiding() const;
     float distance_guided_probability() const;
@@ -137,11 +140,10 @@ class RenderPT : public Node {
     bool debug_connected = false;
     bool follow_specular = true;
     float follow_max_alpha = 0.0625f;
-    ScatterMode scatter_mode = ScatterMode::MIS;
-    int32_t scatter_candidates = 2;
 
     Sampling surface;
     int32_t surface_nee_bounces = 0;
+    float surface_nee_alpha_threshold = 0.05f;
     Sampling volume;
     float distance_transmittance_share = 0.1f;
     float distance_guiding_share = 0.9f;

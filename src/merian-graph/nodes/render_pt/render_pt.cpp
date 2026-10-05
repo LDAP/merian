@@ -418,8 +418,6 @@ void RenderPT::update_render_constants() {
         "export static const bool merian_render_enable_ser = {};\n"
         "export static const bool merian_render_demodulate_albedo = {};\n"
         "export static const bool merian_render_russian_roulette = {};\n"
-        "export static const ScatterMode merian_render_scatter_mode = ScatterMode({});\n"
-        "export static const int merian_render_scatter_candidates = {};\n"
         "export static const bool merian_render_guiding_scale_with_alpha = {};\n"
         "export static const float merian_render_guiding_alpha_threshold = {:f};\n"
         "export static const GuidingDirectTarget merian_render_guiding_direct_target = "
@@ -427,11 +425,16 @@ void RenderPT::update_render_constants() {
         "export static const NEEMode merian_render_surface_nee_mode = NEEMode({});\n"
         "export static const float merian_render_surface_nee_probability = {:f};\n"
         "export static const int merian_render_surface_nee_bounces = {};\n"
+        "export static const float merian_render_surface_nee_alpha_threshold = {:f};\n"
+        "export static const GuidingMode merian_render_surface_guiding_mode = GuidingMode({});\n"
+        "export static const int merian_render_surface_guiding_candidates = {};\n"
         "export static const float merian_render_surface_guiding_share = {:f};\n"
         "export static const bool merian_render_surface_cache_tail = {};\n"
         "export static const int merian_render_volume_spp = {};\n"
         "export static const NEEMode merian_render_volume_nee_mode = NEEMode({});\n"
         "export static const float merian_render_volume_nee_probability = {:f};\n"
+        "export static const GuidingMode merian_render_volume_guiding_mode = GuidingMode({});\n"
+        "export static const int merian_render_volume_guiding_candidates = {};\n"
         "export static const float merian_render_volume_guiding_share = {:f};\n"
         "export static const bool merian_render_volume_cache_tail = {};\n"
         "export static const float merian_render_distance_guiding_share = {:f};\n"
@@ -440,13 +443,14 @@ void RenderPT::update_render_constants() {
         emission_on_primary, static_cast<int32_t>(emitted_debug_output), follow_specular,
         follow_max_alpha, spp, seed, max_path_length, limit_bounces, diffuse_limit, glossy_limit,
         transmission_limit, mask, enable_ser, demodulate_albedo, russian_roulette,
-        static_cast<int32_t>(scatter_mode), scatter_candidates, guiding_scale_with_alpha,
-        guiding_alpha_threshold, static_cast<int32_t>(guiding_direct_target),
-        static_cast<int32_t>(surface.nee_mode), surface.nee_probability(has_guiding()),
-        surface_nee_bounces, surface.guided_probability(has_guiding()),
-        surface.cache_tail && has_irradiance_cache(), volume_spp,
-        static_cast<int32_t>(volume.nee_mode), volume.nee_probability(has_volume_guiding()),
-        volume.guided_probability(has_volume_guiding()),
+        guiding_scale_with_alpha, guiding_alpha_threshold,
+        static_cast<int32_t>(guiding_direct_target), static_cast<int32_t>(surface.nee_mode),
+        surface.nee_probability(has_guiding()), surface_nee_bounces, surface_nee_alpha_threshold,
+        static_cast<int32_t>(surface.guiding_mode), surface.guiding_candidates,
+        surface.guided_probability(has_guiding()), surface.cache_tail && has_irradiance_cache(),
+        volume_spp, static_cast<int32_t>(volume.nee_mode),
+        volume.nee_probability(has_volume_guiding()), static_cast<int32_t>(volume.guiding_mode),
+        volume.guiding_candidates, volume.guided_probability(has_volume_guiding()),
         volume.cache_tail && has_irradiance_cache(), distance_guided_probability(),
         volume_forward_project_min_z);
     composition->add_module_from_string("render_pt_constants", constants);
@@ -471,11 +475,12 @@ float RenderPT::Sampling::guided_probability(const bool guided) const {
 
 bool RenderPT::Sampling::properties(Properties& config,
                                     const std::string& shading_label,
-                                    const bool guided,
+                                    const bool has_guiding_model,
                                     const bool has_cache) {
     bool changed = false;
     int nee_mode_index = static_cast<int>(nee_mode);
-    if (config.config_options("nee", nee_mode_index, {"off", "mixture (MIS)", "resampled (RIS)"},
+    if (config.config_options("nee sampling", nee_mode_index,
+                              {"off", "mixture (MIS)", "resampled (RIS)"},
                               Properties::OptionsStyle::COMBO,
                               "Direct light sampling. 'mixture' replaces the scatter sample with a "
                               "light sample and costs no extra ray; 'resampled' adds a shadow "
@@ -483,6 +488,24 @@ bool RenderPT::Sampling::properties(Properties& config,
         nee_mode = static_cast<NEEMode>(nee_mode_index);
         changed = true;
     }
+    if (has_guiding_model) {
+        int guiding_mode_index = static_cast<int>(guiding_mode);
+        if (config.config_options(
+                "guiding sampling", guiding_mode_index, {"off", "mixture (MIS)", "resampled (RIS)"},
+                Properties::OptionsStyle::COMBO,
+                "How one direction comes out of the guiding lobes and the shading function. "
+                "'off' draws from the shading function alone; 'resampled' draws several and keeps "
+                "one by how much the shading function makes of it, at the cost of the extra "
+                "evaluations; it still traces one ray.")) {
+            guiding_mode = static_cast<GuidingMode>(guiding_mode_index);
+            changed = true;
+        }
+        if (guiding_mode == GuidingMode::RIS) {
+            changed |= config.config_int("guiding candidates", guiding_candidates,
+                                         "Directions drawn before one is kept.", 1, 16);
+        }
+    }
+    const bool guided = has_guiding_model && guiding_mode != GuidingMode::Off;
     changed |= config.config_split(
         "shares",
         {{shading_label, &shading_share},
@@ -503,6 +526,9 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
     bool needs_reconnect = false;
     bool constants_changed = false;
     // a configuration loads before the inputs connect, so only the UI hides what they decide
+    const bool shows_guiding_model = has_guiding_model() || !config.is_ui();
+    const bool shows_volume_guiding_model =
+        (has_guiding_model() && guiding->supports_volume()) || !config.is_ui();
     const bool shows_guiding = has_guiding() || !config.is_ui();
     const bool shows_cache = has_irradiance_cache() || !config.is_ui();
 
@@ -535,14 +561,7 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
         constants_changed |=
             config.config_bool("russian roulette", russian_roulette,
                                "Terminate paths in proportion to the light they can still carry.");
-        constants_changed |= surface.properties(config, "bsdf", has_guiding(), shows_cache);
-        if (surface.nee_mode != NEEMode::Off) {
-            constants_changed |= config.config_int(
-                "nee bounces", surface_nee_bounces,
-                "Path depth, counted from the primary hit and including the followed specular "
-                "surfaces, up to which vertices sample lights; 0 = all.",
-                0, 16);
-        }
+        constants_changed |= surface.properties(config, "bsdf", shows_guiding_model, shows_cache);
         config.st_end_child();
     }
 
@@ -554,7 +573,7 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
             0, 16);
         if (volume_spp > 0) {
             constants_changed |=
-                volume.properties(config, "phase", has_volume_guiding(), shows_cache);
+                volume.properties(config, "phase", shows_volume_guiding_model, shows_cache);
             if (!std::dynamic_pointer_cast<NullDistanceGuidingModel>(distance_guiding) ||
                 !config.is_ui()) {
                 constants_changed |= config.config_split(
@@ -579,22 +598,20 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
         config.st_end_child();
     }
 
+    if (config.st_begin_child("nee", "NEE")) {
+        constants_changed |= config.config_int(
+            "bounces", surface_nee_bounces,
+            "Path depth, counted from the primary hit and including the followed specular "
+            "surfaces, up to which surface vertices sample lights; 0 = all.",
+            0, 16);
+        constants_changed |= config.config_float(
+            "alpha threshold", surface_nee_alpha_threshold,
+            "Below this GGX alpha (roughness squared) a surface samples no lights.", 0.001f, 0.f,
+            1.f);
+        config.st_end_child();
+    }
+
     if (config.st_begin_child("guiding", "Guiding")) {
-        int scatter_mode_index = static_cast<int>(scatter_mode);
-        if (config.config_options(
-                "sampling", scatter_mode_index, {"off", "mixture (MIS)", "resampled (RIS)"},
-                Properties::OptionsStyle::COMBO,
-                "How one direction comes out of the guiding lobes and the shading function. "
-                "'off' draws from the shading function alone; 'resampled' draws several and keeps "
-                "one by how much the shading function makes of it, at the cost of the extra "
-                "evaluations; it still traces one ray.")) {
-            scatter_mode = static_cast<ScatterMode>(scatter_mode_index);
-            constants_changed = true;
-        }
-        if (scatter_mode == ScatterMode::RIS) {
-            constants_changed |= config.config_int("candidates", scatter_candidates,
-                                                   "Directions drawn before one is kept.", 1, 16);
-        }
         constants_changed |= config.config_bool(
             "follow specular", follow_specular,
             "Follow a smooth surface instead of making it a path vertex: no guiding lobe and no "
@@ -707,13 +724,17 @@ float RenderPT::distance_guided_probability() const {
     return total > 0.f ? distance_guiding_share / total : 0.f;
 }
 
+bool RenderPT::has_guiding_model() const {
+    return !std::dynamic_pointer_cast<NullGuidingModel>(guiding);
+}
+
 bool RenderPT::has_guiding() const {
-    return !std::dynamic_pointer_cast<NullGuidingModel>(guiding) &&
-           scatter_mode != ScatterMode::Off;
+    return has_guiding_model() && surface.guiding_mode != GuidingMode::Off;
 }
 
 bool RenderPT::has_volume_guiding() const {
-    return has_guiding() && guiding->supports_volume();
+    return has_guiding_model() && guiding->supports_volume() &&
+           volume.guiding_mode != GuidingMode::Off;
 }
 
 bool RenderPT::has_irradiance_cache() const {

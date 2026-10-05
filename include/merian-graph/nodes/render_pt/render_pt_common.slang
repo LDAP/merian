@@ -8,7 +8,7 @@ enum NEEMode {
     Resampled,
 }
 
-enum ScatterMode {
+enum GuidingMode {
     Off,
     MIS,
     RIS,
@@ -29,8 +29,6 @@ enum DebugOutput {
 }
 
 extern static const DebugOutput merian_render_debug_output = DebugOutput::None;
-extern static const ScatterMode merian_render_scatter_mode = ScatterMode::MIS;
-extern static const int merian_render_scatter_candidates = 2;
 extern static const bool merian_render_guiding_scale_with_alpha = true;
 extern static const float merian_render_guiding_alpha_threshold = 0.05;
 extern static const GuidingDirectTarget merian_render_guiding_direct_target =
@@ -63,10 +61,11 @@ sample_scatter<B : ShadingFunction, G : GuidingDistribution<float3>>(const Scatt
                                                                      const G guiding,
                                                                      const OrthonormalFrame frame,
                                                                      const float3 wi_local,
+                                                                     const GuidingMode mode,
+                                                                     const int candidates,
                                                                      inout RandomGenerator rng) {
-    return merian_render_scatter_mode == ScatterMode::RIS
-               ? mixture.sample_ris(bsdf, guiding, frame, merian_render_scatter_candidates,
-                                    wi_local, rng)
+    return mode == GuidingMode::RIS
+               ? mixture.sample_ris(bsdf, guiding, frame, candidates, wi_local, rng)
                : mixture.sample(bsdf, guiding, frame, wi_local, rng);
 }
 

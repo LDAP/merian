@@ -16,6 +16,8 @@ extern static const uint merian_render_instance_mask = 0xFFu;
 extern static const int merian_render_volume_spp = 1;
 extern static const NEEMode merian_render_volume_nee_mode = NEEMode::Resampled;
 extern static const float merian_render_volume_nee_probability = 0.f;
+extern static const GuidingMode merian_render_volume_guiding_mode = GuidingMode::MIS;
+extern static const int merian_render_volume_guiding_candidates = 2;
 extern static const float merian_render_volume_guiding_share = 0.5;
 extern static const bool merian_render_volume_cache_tail = false;
 extern static const float merian_render_distance_guiding_share = 0.5;
@@ -160,7 +162,9 @@ void render_pixel(const uint2 pixel,
                 scatter_pdf = mixture.pdf(phase, guiding, wi_local, wo_local, wo_world);
                 scattered = true;
             }
-        } else if (let sc = sample_scatter(mixture, phase, guiding, frame, wi_local, rng)) {
+        } else if (let sc = sample_scatter(mixture, phase, guiding, frame, wi_local,
+                                           merian_render_volume_guiding_mode,
+                                           merian_render_volume_guiding_candidates, rng)) {
             wo_world = sc.wo;
             f_cos = sc.f_cos;
             scatter_pdf = sc.pdf;
