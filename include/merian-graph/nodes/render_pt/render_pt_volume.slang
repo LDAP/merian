@@ -137,7 +137,7 @@ void render_pixel(const uint2 pixel,
             ScatterMixture(guided_share(guiding, merian_render_volume_guiding_share, 1.f));
 
         // 3. resampled direct light
-        let lights = scene.nee.begin_vertex(scatter_pos);
+        let lights = scene.nee.begin_vertex(scatter_pos, rng);
         Optional<DirectLightSample> direct = none;
         if (merian_render_volume_nee_mode == NEEMode::Resampled && nee) {
             direct = scene.sample_direct_light(
@@ -191,7 +191,7 @@ void render_pixel(const uint2 pixel,
         segment.direct_scale = guiding_direct_scale(1.f);
         let guiding_record = params.guiding.record_scatter(guiding, segment, guided, rng);
 
-        float3 contribution = scene.resolve_direct_light(lights, float3(0), 0.f, direct,
+        float3 contribution = scene.resolve_direct_light(lights, float3(0), 0.f, direct, rng,
                                                          merian_render_instance_mask);
 
         if (scattered && any(f_cos > 0.f)) {
@@ -233,7 +233,7 @@ void render_pixel(const uint2 pixel,
             if (sampled_light != LIGHT_INVALID_INDEX) {
                 scene.nee.record_contribution(lights, sampled_light, wo_world,
                                               light_reached ? yuv_luminance(sp.emission) : 0.f,
-                                              distance_travelled, sampled_entry);
+                                              distance_travelled, rng, sampled_entry);
             }
 
             segment.traced = true;
@@ -254,7 +254,7 @@ void render_pixel(const uint2 pixel,
             }
         } else if (light_scatter) {
             if (scattered)
-                scene.nee.record_contribution(lights, sampled_light, wo_world, 0.f, 1.f,
+                scene.nee.record_contribution(lights, sampled_light, wo_world, 0.f, 1.f, rng,
                                               sampled_entry);
             else
                 scene.nee.record_failed_draw(sampled_entry);

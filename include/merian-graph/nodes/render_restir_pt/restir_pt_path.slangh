@@ -336,7 +336,7 @@ bool restir_pt_samples_lights<B : BSDF>(const ParameterBlock<Scene> scene, const
     return scene.nee.has_lights() && bsdf.effective_alpha >= NEE_MIN_ALPHA;
 }
 
-// Drawn and evaluated at the unjittered vertex, so another domain evaluates the same density.
+// Drawn and evaluated from the path's light stream, so another domain evaluates the same density.
 struct RestirPTLightSample {
     float3 wo;
     float dist;
@@ -353,7 +353,8 @@ struct RestirPTLightSample {
 Optional<RestirPTLightSample> restir_pt_sample_light(const ParameterBlock<Scene> scene,
                                                      const float3 pos,
                                                      inout RandomGenerator rng) {
-    if (let ls = scene.sample_direct_light(scene.nee.begin_vertex(pos), rng)) {
+    const DirectLightVertex vertex = scene.nee.begin_vertex(pos, rng);
+    if (let ls = scene.sample_direct_light(vertex, rng)) {
         RestirPTLightSample s;
         s.wo = ls.wo;
         s.dist = ls.dist;
@@ -370,6 +371,7 @@ Optional<RestirPTLightSample> restir_pt_sample_light(const ParameterBlock<Scene>
 // The vertex a segment leaves from, as far as the reconnection criteria and MIS care.
 struct RestirPTFrom {
     float3 pos;
+    uint vertex;
     // |cos| between its face normal and the direction drawn there
     float cos;
     // solid angle density of that direction, RESTIR_PT_DELTA_PDF for a delta lobe
@@ -514,10 +516,12 @@ Optional<RestirPTScatter> restir_pt_scatter<B : BSDF>(const B bsdf,
 RestirPTFrom restir_pt_from<B : BSDF>(const ParameterBlock<Scene> scene,
                                       const B bsdf,
                                       const ShadingPoint sp,
+                                      const uint vertex,
                                       const RestirPTScatter scatter,
                                       const float min_roughness) {
     RestirPTFrom from;
     from.pos = sp.pos;
+    from.vertex = vertex;
     from.cos = abs(dot(sp.get_face_normal(), scatter.wo));
     from.pdf = scatter.footprint_pdf();
     from.lobes = restir_pt_lobe_bits(scatter.lobe, scatter.transmission);
@@ -529,12 +533,14 @@ RestirPTFrom restir_pt_from<B : BSDF>(const ParameterBlock<Scene> scene,
 // Density of the light techniques for the light a scatter from `from` reached, for the MIS
 // weight of that emitter; 0 where no light was sampled there.
 float restir_pt_emitter_light_pdf(const ParameterBlock<Scene> scene,
+                                  const RestirPTRandom random,
                                   const RestirPTFrom from,
                                   const float3 dir,
                                   const Hit hit) {
     if (!from.samples_lights)
         return 0.f;
-    return scene.nee.mixture_pdf(scene.nee.pdf(scene.nee.begin_vertex(from.pos),
+    RandomGenerator light_rng = random.light(from.vertex);
+    return scene.nee.mixture_pdf(scene.nee.pdf(scene.nee.begin_vertex(from.pos, light_rng),
                                                scene.get_light_index(hit), from.pos, dir));
 }
 
@@ -751,7 +757,7 @@ float3 restir_pt_trace_candidates(const ParameterBlock<Scene> scene,
             if (merian_restir_pt_emission_on_primary)
                 rec.emission(sp.emission);
         } else if (any(sp.emission > 0.f)) {
-            const float light_pdf = restir_pt_emitter_light_pdf(scene, from, -wi, hit);
+            const float light_pdf = restir_pt_emitter_light_pdf(scene, random, from, -wi, hit);
             const float mis = from.pdf / (from.pdf + light_pdf);
             const float3 contribution = throughput * sp.emission * mis;
             rec.emission(contribution);
@@ -879,7 +885,7 @@ float3 restir_pt_trace_candidates(const ParameterBlock<Scene> scene,
         }
 
         throughput *= scatter.f / scatter.pdf;
-        from = restir_pt_from(scene, bsdf, sp, scatter, thresholds.roughness);
+        from = restir_pt_from(scene, bsdf, sp, i, scatter, thresholds.roughness);
         rec.vertex(records, sp.pos, scatter.wo, scatter.pdf, throughput, i - 1,
                    restir_pt_record_lobe(scatter.lobe, scatter.transmission),
                    PATH_RECORD_METHOD_BSDF, material);

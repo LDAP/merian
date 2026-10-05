@@ -634,7 +634,6 @@ void LightCollection::write_to(ShaderCursor cursor) const {
     grid["cascades"] = grid_active ? grid_info_buffer[grid_slot] : dummy;
     grid["in_use"] = grid_active;
     grid["jitter"] = debug_jitter ? grid_jitter : 0.f;
-    grid["frame"] = frame;
     grid["share"] = grid_share;
     grid["even_share"] = grid_even_share;
     grid["contribution"] = grid_active ? grid_contribution_buffer[grid_slot] : dummy;

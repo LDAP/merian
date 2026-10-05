@@ -207,8 +207,10 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
                                   bounce <= merian_render_surface_nee_bounces) &&
                                  bsdf.effective_alpha >= merian_render_surface_nee_alpha_threshold;
         let lights = scene.nee.begin_vertex(
-            sp.pos, Scene::get_receiver_normal(ray.Direction, ng,
-                                               bsdf_is_transmissive(bsdf.get_lobe_types())));
+            sp.pos,
+            Scene::get_receiver_normal(ray.Direction, ng,
+                                       bsdf_is_transmissive(bsdf.get_lobe_types())),
+            rng);
         if (merian_render_russian_roulette && roulette_first &&
             !survives_roulette(throughput, rng)) {
             break;
@@ -357,7 +359,7 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
         }
         if (light_scatter && !next_ray.hasValue) {
             if (scattered)
-                scene.nee.record_contribution(lights, sampled_light, light_dir, 0.f, 1.f,
+                scene.nee.record_contribution(lights, sampled_light, light_dir, 0.f, 1.f, rng,
                                               sampled_entry);
             else
                 scene.nee.record_failed_draw(sampled_entry);
@@ -394,7 +396,7 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
             if (light_pass) {
                 light_pass = false;
                 const float3 direct_light =
-                    throughput * scene.resolve_direct_light(lights, direct.value, hit);
+                    throughput * scene.resolve_direct_light(lights, direct.value, hit, rng);
                 radiance += direct_light;
                 record_connection(rec, params, vertex.pos, true, direct, throughput, direct_light,
                                   uint(bounce) - 1u, record_material);
@@ -440,7 +442,7 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
             if (sampled_light != LIGHT_INVALID_INDEX && !through_specular) {
                 scene.nee.record_contribution(lights, sampled_light, wo_world,
                                               light_reached ? yuv_luminance(sp.emission) : 0.f,
-                                              distance_travelled, sampled_entry);
+                                              distance_travelled, rng, sampled_entry);
             }
             chain_weight *= medium.transmittance(distance_travelled);
             image.propagate(distance_travelled);

@@ -6,7 +6,6 @@ __exported import merian_shaders.scene.env_importance;
 import merian_shaders.scene.hit;
 import merian_shaders.shading.materials.material_system;
 import merian_shaders.utils.bit_twiddling;
-import merian_shaders.utils.hash;
 import merian_shaders.utils.morton;
 import merian_shaders.utils.random;
 import merian_shaders.utils.sampling;
@@ -88,7 +87,6 @@ struct LightGrid {
     bool in_use;
     // in cells
     float jitter;
-    uint frame;
     float share;
     float even_share;
     StructuredBuffer<float3, ScalarDataLayout> contribution;
@@ -100,10 +98,7 @@ struct LightGrid {
     RWStructuredBuffer<uint> touched;
     uint light_count;
 
-    uint lookup(const float3 pos) {
-        const uint4 h = pcg4d(uint4(asuint(pos), frame));
-        const float3 u = float3(uint_to_zero_one_float_rust(h.x), uint_to_zero_one_float_rust(h.y),
-                                uint_to_zero_one_float_rust(h.z));
+    uint lookup(const float3 pos, const float3 u) {
         const float3 offset = jitter * (u - 0.5f);
 
         if (!in_use)
@@ -330,17 +325,19 @@ struct NEE {
         return get_env_share() > 0.f || has_emissive_triangles();
     }
 
-    // Deterministic per point and frame, so a vertex begun again finds the same densities.
-    DirectLightVertex begin_vertex(const float3 pos, const float3 normal) {
+    // Deterministic per point and random numbers, so a vertex begun again finds the same densities.
+    DirectLightVertex begin_vertex(const float3 pos,
+                                   const float3 normal,
+                                   inout RandomGenerator rng) {
         DirectLightVertex vertex;
         vertex.pos = pos;
         vertex.normal = normal;
-        vertex.cell = grid.lookup(pos);
+        vertex.cell = grid.lookup(pos, rng.next_float3());
         return vertex;
     }
 
-    DirectLightVertex begin_vertex(const float3 pos) {
-        return begin_vertex(pos, float3(0));
+    DirectLightVertex begin_vertex(const float3 pos, inout RandomGenerator rng) {
+        return begin_vertex(pos, float3(0), rng);
     }
 
     // Of the light `index` where the ray from origin along dir meets it, summed over every
@@ -577,6 +574,7 @@ struct NEE {
                              const float3 dir,
                              const float radiance,
                              const float dist,
+                             inout RandomGenerator rng,
                              uint entry = LIGHT_INVALID_INDEX) {
         if (!vertex.has_cell() || index == LIGHT_INVALID_INDEX)
             return;
@@ -588,10 +586,7 @@ struct NEE {
         float contribution = delivery(index, dir, radiance);
         if (contribution > 0.f && index != LIGHT_ENV_INDEX)
             contribution *= grid.estimate[entry] / max(dist * dist, 1e-8f);
-        const uint3 h = pcg3d(uint3(asuint(vertex.pos.xy), grid.frame ^ position));
-        grid.count_sample(
-            entry, contribution,
-            float2(uint_to_zero_one_float_rust(h.x), uint_to_zero_one_float_rust(h.y)));
+        grid.count_sample(entry, contribution, rng.next_float2());
     }
 
     uint draw_cell(const DirectLightVertex vertex,

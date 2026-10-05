@@ -669,11 +669,12 @@ struct Scene {
 
     float3 resolve_direct_light(const DirectLightVertex vertex,
                                 const DirectLightSample direct,
-                                const Hit hit) {
+                                const Hit hit,
+                                inout RandomGenerator rng) {
         const bool visible = reaches_light(hit, direct.light_index == LIGHT_ENV_INDEX);
         nee.record_contribution(
             vertex, direct.light_index, normalize(direct.light_pos - vertex.pos),
-            visible ? direct.radiance : 0.f, distance(direct.light_pos, vertex.pos));
+            visible ? direct.radiance : 0.f, distance(direct.light_pos, vertex.pos), rng);
         return visible ? direct.value : float3(0);
     }
 
@@ -681,6 +682,7 @@ struct Scene {
                                 const float3 face_normal,
                                 const float spawn_offset,
                                 const Optional<DirectLightSample> direct,
+                                inout RandomGenerator rng,
                                 const uint instances_mask = 0xff) {
         if (!direct.hasValue)
             return float3(0);
@@ -688,7 +690,8 @@ struct Scene {
         return resolve_direct_light(
             vertex, s,
             trace_ray(make_light_ray(vertex.pos, face_normal, spawn_offset, s), light_ray_flags(s),
-                      instances_mask));
+                      instances_mask),
+            rng);
     }
 
     static float3
@@ -708,7 +711,7 @@ struct Scene {
         const float3 normal = get_receiver_normal(
             ray.Direction, ng,
             bsdf_is_transmissive(sp.surface_material.get_bsdf().get_lobe_types()));
-        let vertex = nee.begin_vertex(sp.pos, normal);
+        let vertex = nee.begin_vertex(sp.pos, normal, rng);
 
         switch (nee.debug_view) {
         case LightDebugView::LightDebugCell:

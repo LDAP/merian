@@ -113,11 +113,12 @@ RestirPTShift restir_pt_reconnect(const ParameterBlock<Scene> scene,
         }
         const bool samples_lights = restir_pt_samples_lights(scene, bsdf) &&
                                     (!nee || sp.geometric_side_matches_shading(dir));
+        RandomGenerator light_rng = RestirPTRandom(r.seed).light(k - 1);
         const float p_light =
-            samples_lights ? scene.nee.mixture_pdf(scene.nee.pdf(scene.nee.begin_vertex(sp.pos),
-                                                                 index, dir, dist2,
-                                                                 surface.face_normal))
-                           : 0.f;
+            samples_lights
+                ? scene.nee.mixture_pdf(scene.nee.pdf(scene.nee.begin_vertex(sp.pos, light_rng),
+                                                      index, dir, dist2, surface.face_normal))
+                : 0.f;
         integrand *= Le * (nee ? p_light : p_prev) / (p_light + p_prev);
     } else {
         // 4b. x_k scatters: re-shade it from the new direction and leave it along rc_wo
@@ -199,27 +200,28 @@ RestirPTReservoir restir_pt_update_suffix(const ParameterBlock<Scene> scene,
     ray.Direction = r.rc_wo;
     ray.TMin = SCENE_RAY_TMIN;
     ray.TMax = SCENE_RAY_TMAX;
+    const RestirPTRandom random = {r.seed};
     RestirPTFrom from;
     from.pos = surface.pos;
+    from.vertex = k;
     // only the MIS weight of the light right after x_k reads these
     from.pdf = 1.f;
     from.samples_lights = nee || r.light_pdf > 0.f;
     Hit next = scene.trace_ray(ray, RAY_FLAG_NONE, merian_restir_pt_instance_mask);
     ShadingPoint sp = restir_pt_shading_point(scene, ray, next, k, k + 1 < n, prev_frame);
     if (k + 1 == n) {
-        updated.light_pdf = restir_pt_emitter_light_pdf(scene, from, r.rc_wo, next);
+        updated.light_pdf = restir_pt_emitter_light_pdf(scene, random, from, r.rc_wo, next);
         updated.rc_radiance = sp.emission;
         return updated;
     }
 
     // 2. the vertices after it, replayed up to the light the scatter technique reached
-    const RestirPTRandom random = {r.seed};
     const float roughness = RestirPTThresholds(r.seed).roughness;
     float3 throughput = float3(1);
     float3 wi = -r.rc_wo;
     for (uint i = k + 1;; i++) {
         if (i == n) {
-            const float light_pdf = restir_pt_emitter_light_pdf(scene, from, -wi, next);
+            const float light_pdf = restir_pt_emitter_light_pdf(scene, random, from, -wi, next);
             updated.rc_radiance = throughput * sp.emission * (from.pdf / (from.pdf + light_pdf));
             return updated;
         }
@@ -231,7 +233,7 @@ RestirPTReservoir restir_pt_update_suffix(const ParameterBlock<Scene> scene,
             return updated;
         const RestirPTScatter scatter = sampled.value;
         throughput *= scatter.f / scatter.pdf;
-        from = restir_pt_from(scene, bsdf, sp, scatter, roughness);
+        from = restir_pt_from(scene, bsdf, sp, i, scatter, roughness);
         next = scene.trace_ray(scatter.ray, RAY_FLAG_NONE, merian_restir_pt_instance_mask);
         sp = restir_pt_shading_point(scene, scatter.ray, next, i, i + 1 < n, prev_frame);
         wi = -scatter.ray.Direction;
@@ -294,7 +296,7 @@ RestirPTShift restir_pt_shift(const ParameterBlock<Scene> scene,
             return failed;
 
         throughput *= scatter.f / scatter.pdf;
-        from = restir_pt_from(scene, bsdf, sp, scatter, thresholds.roughness);
+        from = restir_pt_from(scene, bsdf, sp, i, scatter, thresholds.roughness);
 
         hit = scene.trace_ray(scatter.ray, RAY_FLAG_NONE, merian_restir_pt_instance_mask);
         sp = restir_pt_shading_point(scene, scatter.ray, hit, i, i + 1 < end || k != 0, prev_frame);
@@ -316,7 +318,7 @@ RestirPTShift restir_pt_shift(const ParameterBlock<Scene> scene,
     // not reconnect either
     if (!any(sp.emission > 0.f) || (hybrid && segment.reconnects_emitter(limit)))
         return failed;
-    const float light_pdf = restir_pt_emitter_light_pdf(scene, from, -wi, hit);
+    const float light_pdf = restir_pt_emitter_light_pdf(scene, random, from, -wi, hit);
     RestirPTShift s;
     s.integrand = throughput * sp.emission * (from.pdf / (from.pdf + light_pdf));
     s.jacobian = 1.f;
