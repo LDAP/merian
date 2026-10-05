@@ -1,22 +1,17 @@
 #include "merian-shaders/utils/math-constants.slangh"
 
-import merian_shaders.scene.env_importance;
 import merian_shaders.scene.light_data;
 import merian_shaders.utils.envmap;
-import merian_shaders.utils.hash;
 import merian_shaders.utils.morton;
-import merian_shaders.utils.random;
 
 using merian;
 
-// Per-frame preprocess for next event estimation: the share the environment takes of the light
-// samples, a pool drawn from the flux distribution, and a world-space grid of per-cell cuts through
-// the light tree.
+// Per-frame preprocess for next event estimation: per-cell cuts through the light tree, for the
+// cells of a world-space grid or for one cell over everything.
 
 struct LightPreprocessBinding {
     StructuredBuffer<EmissiveLightProxy, ScalarDataLayout> proxies;
     StructuredBuffer<uint> tree_keys;
-    StructuredBuffer<uint> tree_order;
     StructuredBuffer<float2> tree_cdf;
     StructuredBuffer<float2> env_cdf;
     // 0 where the cells do not list the environment
@@ -26,7 +21,6 @@ struct LightPreprocessBinding {
     RWStructuredBuffer<float4> env_cones;
     RWStructuredBuffer<LightTreeInfo, ScalarDataLayout> tree_info;
     StructuredBuffer<LightTreeInfo, ScalarDataLayout> tree_info_prev;
-    RWStructuredBuffer<uint> pool;
     RWStructuredBuffer<uint> grid_keys;
     StructuredBuffer<uint> grid_keys_prev;
     RWStructuredBuffer<float3, ScalarDataLayout> grid_contribution;
@@ -49,57 +43,21 @@ struct LightPreprocessBinding {
     float grid_coverage;
     float3 camera_position;
     uint triangle_count;
-    uint pool_size;
     uint grid_dimension;
     uint grid_cascades;
     float grid_cell_size;
     float grid_jitter;
     float grid_even_share;
     uint grid_refinements;
+    uint cell_count;
+    bool single_cut;
+    float triangle_prior;
+    float env_prior;
     uint setup_groups;
     LightSlotWeighing slot_weighing;
     // drop everything carried over, for a frame the previous grid cannot describe
     bool grid_reset;
-    uint frame;
 };
-
-struct EnvSplitBinding {
-    // inclusive prefix sum of the triangle flux
-    StructuredBuffer<float2> cdf;
-    EnvImportance env_importance;
-    RWStructuredBuffer<float> env_split;
-    uint triangle_count;
-    // 0 keeps the manual share
-    float scene_radius;
-    float manual_probability;
-    uint from_power;
-    float min_probability;
-    float max_probability;
-};
-
-/* The share of the light samples the environment takes, from the power each side emits.
- *
- * The environment's power is the flux an infinite light of that mean radiance puts through the
- * scene's bounding sphere, 4 pi^2 r^2 L (pbrt-v4, ImageInfiniteLight::Phi). It is blind to
- * occlusion, which the limits bound.
- */
-[shader("compute")][numthreads(1, 1, 1)] void env_split(ParameterBlock<EnvSplitBinding> params) {
-    const float2 total =
-        params.triangle_count > 0 ? params.cdf[params.triangle_count - 1] : float2(0);
-    const float triangles = max(total.x + total.y, 0.f);
-    const float radiance = params.env_importance.get_average();
-    const float env = 4.f * MERIAN_PI * MERIAN_PI * params.scene_radius * params.scene_radius *
-                      max(radiance, 0.f);
-
-    float p = params.manual_probability;
-    if (params.from_power != 0u && params.scene_radius > 0.f && env + triangles > 0.f) {
-        p = env / (env + triangles);
-        if (env > 0.f && triangles > 0.f) {
-            p = clamp(p, params.min_probability, params.max_probability);
-        }
-    }
-    params.env_split[0] = clamp(p, 0.f, 1.f);
-}
 
 static const uint SETUP_DONE = LIGHT_GRID_SETUP_STATE - 1;
 groupshared float3 s_setup_min[LIGHT_GRID_SETUP_GROUP];
@@ -278,31 +236,23 @@ CellGeometry cell_geometry(const RWStructuredBuffer<LightGridInfo, ScalarDataLay
     return cg;
 }
 
-// Independent draws from the flux distribution, so a sample is one load and its density is still
-// flux[i] / total.
-[shader("compute")][numthreads(64, 1, 1)] void pool(uint3 thread_id : SV_DispatchThreadID,
-                                                    ParameterBlock<LightPreprocessBinding> params) {
-    const uint i = thread_id.x;
-    if (i >= params.pool_size)
-        return;
-    const uint count = params.triangle_count;
-    const float2 total = count > 0 ? params.tree_cdf[count - 1] : float2(0);
-    if (!(total.x + total.y > 0.f)) {
-        params.pool[i] = LIGHT_INVALID_INDEX;
-        return;
-    }
-    RandomGenerator rng = PCG(xxhash32(uint2(i, params.frame)));
-    params.pool[i] =
-        params.tree_order[search_range_wide(params.tree_cdf, 0, count, rng.next_float2())];
+CellGeometry
+global_cell_geometry(const RWStructuredBuffer<LightGridInfo, ScalarDataLayout> grid_info) {
+    CellGeometry cg;
+    cg.cascade = grid_info[0].cascade_count - 1u;
+    cg.coord = uint3(0);
+    const LightGridInfo outermost = grid_info[cg.cascade];
+    const float extent = float(outermost.dimension) / outermost.inv_cell_size;
+    cg.center = outermost.origin + 0.5f * extent;
+    cg.radius = 0.5f * sqrt(3.f) * extent;
+    return cg;
 }
 
 bool reproject_cell(const StructuredBuffer<LightGridInfo, ScalarDataLayout> grid_info_prev,
                     const LightGridInfo info,
                     const uint3 coord,
-                    out uint prev_cascade,
-                    out uint3 prev_coord) {
-    prev_cascade = 0;
-    prev_coord = coord;
+                    out uint prev_cell) {
+    prev_cell = 0;
     const LightGridInfo finest = grid_info_prev[0];
     if (finest.dimension != info.dimension || !(finest.inv_cell_size > 0.f))
         return false;
@@ -316,8 +266,7 @@ bool reproject_cell(const StructuredBuffer<LightGridInfo, ScalarDataLayout> grid
     const int3 c = int3(coord) + delta;
     if (any(c < 0) || any(c >= int(info.dimension)))
         return false;
-    prev_cascade = uint(cascade);
-    prev_coord = uint3(c);
+    prev_cell = light_cell_index(uint(cascade), uint3(c), info.dimension);
     return true;
 }
 
@@ -336,10 +285,9 @@ bool coarser_cell(const StructuredBuffer<LightGridInfo, ScalarDataLayout> grid_i
     if (abs(2.f * prev.inv_cell_size - info.inv_cell_size) > 1e-6f * info.inv_cell_size)
         return false;
     const int3 c = int3(floor((pos - prev.origin) * prev.inv_cell_size));
-    const uint dim = info.dimension;
-    if (any(c < 0) || any(c >= int(dim)))
+    if (any(c < 0) || any(c >= int(info.dimension)))
         return false;
-    prev_cell = uint(cascade) * dim * dim * dim + uint(c.x) + dim * (uint(c.y) + dim * uint(c.z));
+    prev_cell = light_cell_index(uint(cascade), uint3(c), info.dimension);
     return true;
 }
 
@@ -489,10 +437,17 @@ node_geometry(const TreeNode node, const float3 pos, const float reach, const fl
 // estimated over the sample's inverse squared distance.
 typealias Contribution = float3;
 
-Contribution prior_contribution(const float3 geometry, const bool distant) {
+float prior_mean(const LightPreprocessBinding params, const bool distant) {
+    return distant ? params.env_prior : params.triangle_prior;
+}
+
+float spread_moment(const float3 geometry) {
     const float spread = geometry.x > 0.f ? 0.5f * (geometry.y - geometry.z) / geometry.x : 0.f;
-    const float mean = distant ? LIGHT_GRID_PRIOR_ENV_CONTRIBUTION : LIGHT_GRID_PRIOR_CONTRIBUTION;
-    return Contribution(mean, mean * mean * (1.f + spread * spread), LIGHT_GRID_PRIOR_SAMPLES);
+    return 1.f + spread * spread;
+}
+
+Contribution prior_contribution(const float3 geometry, const float mean) {
+    return Contribution(mean, mean * mean * spread_moment(geometry), LIGHT_GRID_PRIOR_SAMPLES);
 }
 
 Contribution rescale_contribution(const Contribution c, const float ratio) {
@@ -502,12 +457,11 @@ Contribution rescale_contribution(const Contribution c, const float ratio) {
 Contribution halve_contribution(const Contribution parent,
                                 const float3 parent_geometry,
                                 const float3 geometry,
-                                const bool distant) {
-    const Contribution prior = prior_contribution(geometry, distant);
+                                const float prior) {
     if (parent.z <= LIGHT_GRID_PRIOR_SAMPLES || !(geometry.x > 0.f))
-        return prior;
+        return prior_contribution(geometry, prior);
     const float mean = parent.x * parent_geometry.x / geometry.x;
-    return Contribution(mean, mean * mean * prior.y / (prior.x * prior.x),
+    return Contribution(mean, mean * mean * spread_moment(geometry),
                         min(parent.z, 4.f * LIGHT_GRID_PRIOR_SAMPLES));
 }
 
@@ -534,9 +488,152 @@ CutSlot cut_slot(const TreeNode node, const float3 geometry, const Contribution 
     return s;
 }
 
+// The slots of a cell, one thread each; every slot enters every call.
+interface ISlotGroup {
+    float sum(const float value);
+    float maximum(const float value);
+    float minimum(const float value);
+    uint count(const bool value);
+    bool any_true(const bool value);
+    bool all_true(const bool value);
+    float prefix_sum(const float value);
+    uint prefix_count(const bool value);
+    uint first(const bool value);
+    uint read(const uint value, const uint slot);
+    float read(const float value, const uint slot);
+    float3 read(const float3 value, const uint slot);
+    bool read(const bool value, const uint slot);
+    uint broadcast(const uint value, const uint slot);
+    float3 broadcast(const float3 value, const uint slot);
+}
+
+struct WaveSlots : ISlotGroup {
+    float sum(const float value) {
+        return WaveActiveSum(value);
+    }
+    float maximum(const float value) {
+        return WaveActiveMax(value);
+    }
+    float minimum(const float value) {
+        return WaveActiveMin(value);
+    }
+    uint count(const bool value) {
+        return WaveActiveCountBits(value);
+    }
+    bool any_true(const bool value) {
+        return WaveActiveAnyTrue(value);
+    }
+    bool all_true(const bool value) {
+        return WaveActiveAllTrue(value);
+    }
+    float prefix_sum(const float value) {
+        return WavePrefixSum(value);
+    }
+    uint prefix_count(const bool value) {
+        return WavePrefixCountBits(value);
+    }
+    uint first(const bool value) {
+        return firstbitlow(WaveActiveBallot(value).x);
+    }
+    uint read(const uint value, const uint slot) {
+        return WaveShuffle(value, slot);
+    }
+    float read(const float value, const uint slot) {
+        return WaveShuffle(value, slot);
+    }
+    float3 read(const float3 value, const uint slot) {
+        return WaveShuffle(value, slot);
+    }
+    bool read(const bool value, const uint slot) {
+        return WaveShuffle(value, slot);
+    }
+    uint broadcast(const uint value, const uint slot) {
+        return WaveReadLaneAt(value, slot);
+    }
+    float3 broadcast(const float3 value, const uint slot) {
+        return WaveReadLaneAt(value, slot);
+    }
+}
+
+groupshared float3 s_slot_values[LIGHT_GRID_SLOTS];
+
+struct SharedSlots : ISlotGroup {
+    uint slot;
+
+    __init(const uint slot) {
+        this.slot = slot;
+    }
+
+    float3 read(const float3 value, const uint from) {
+        s_slot_values[slot] = value;
+        GroupMemoryBarrierWithGroupSync();
+        const float3 result = s_slot_values[from];
+        GroupMemoryBarrierWithGroupSync();
+        return result;
+    }
+    float read(const float value, const uint from) {
+        return read(float3(value, 0.f, 0.f), from).x;
+    }
+    uint read(const uint value, const uint from) {
+        return asuint(read(asfloat(value), from));
+    }
+    bool read(const bool value, const uint from) {
+        return read(value ? 1u : 0u, from) != 0u;
+    }
+    uint broadcast(const uint value, const uint from) {
+        return read(value, from);
+    }
+    float3 broadcast(const float3 value, const uint from) {
+        return read(value, from);
+    }
+
+    float4 reduce(const float value) {
+        s_slot_values[slot].x = value;
+        GroupMemoryBarrierWithGroupSync();
+        float4 result = float4(0.f, 0.f, -MERIAN_FLT_MAX, MERIAN_FLT_MAX);
+        for (uint i = 0; i < LIGHT_GRID_SLOTS; i++) {
+            const float v = s_slot_values[i].x;
+            result.x += v;
+            result.y += i < slot ? v : 0.f;
+            result.z = max(result.z, v);
+            result.w = min(result.w, v);
+        }
+        GroupMemoryBarrierWithGroupSync();
+        return result;
+    }
+    float sum(const float value) {
+        return reduce(value).x;
+    }
+    float maximum(const float value) {
+        return reduce(value).z;
+    }
+    float minimum(const float value) {
+        return reduce(value).w;
+    }
+    float prefix_sum(const float value) {
+        return reduce(value).y;
+    }
+    uint count(const bool value) {
+        return uint(reduce(value ? 1.f : 0.f).x);
+    }
+    uint prefix_count(const bool value) {
+        return uint(reduce(value ? 1.f : 0.f).y);
+    }
+    bool any_true(const bool value) {
+        return reduce(value ? 1.f : 0.f).z > 0.f;
+    }
+    bool all_true(const bool value) {
+        return reduce(value ? 1.f : 0.f).w > 0.f;
+    }
+    uint first(const bool value) {
+        const float4 r = reduce(value ? float(LIGHT_GRID_SLOTS - slot) : 0.f);
+        return LIGHT_GRID_SLOTS - uint(r.z);
+    }
+}
+
 // One past the last light of the slot's node.
-uint cut_end(const uint first, const uint slot, const uint lights) {
-    const uint next_first = WaveShuffle(first, min(slot + 1u, LIGHT_GRID_SLOTS - 1u));
+uint cut_end<S : ISlotGroup>(const S slots, const uint first, const uint slot, const uint lights) {
+    const uint next_first = slots.read(first, min(slot + 1u, LIGHT_GRID_SLOTS - 1u));
     return slot < LIGHT_GRID_SLOTS - 1u ? next_first : lights;
 }
 
@@ -550,20 +647,21 @@ CutSlot cut_slot(const LightPreprocessBinding params,
                     contribution);
 }
 
-void store_cut(const LightPreprocessBinding params,
-               const uint cell,
-               const uint slot,
-               const uint key,
-               const uint first,
-               const Contribution contribution,
-               const CutSlot s,
-               const bool touched) {
+void store_cut<S : ISlotGroup>(const S slots,
+                               const LightPreprocessBinding params,
+                               const uint cell,
+                               const uint slot,
+                               const uint key,
+                               const uint first,
+                               const Contribution contribution,
+                               const CutSlot s,
+                               const bool touched) {
     const uint lights = light_count(params);
     const bool listed = key != LIGHT_TREE_NO_KEY;
     const bool emits = listed && s.node.flux > 0.f;
-    const float total = WaveActiveSum(emits ? s.importance : 0.f);
+    const float total = slots.sum(emits ? s.importance : 0.f);
     const float even = total > 0.f ? params.grid_even_share : 1.f;
-    const uint emitting = WaveActiveCountBits(emits);
+    const uint emitting = slots.count(emits);
     const float p =
         emits ? (1.f - even) * (total > 0.f ? s.importance / total : 0.f) + even / float(emitting)
               : 0.f;
@@ -587,7 +685,7 @@ void store_cut(const LightPreprocessBinding params,
         bound.flags = s.node.distant ? uint(EmissiveTriangleFlags::EmissiveDistant) : 0u;
         params.grid_slot_bounds[entry] = bound;
     } else {
-        params.grid_probability[entry] = WavePrefixSum(p) + p;
+        params.grid_probability[entry] = slots.prefix_sum(p) + p;
     }
 }
 
@@ -600,23 +698,18 @@ groupshared Contribution s_compact_contribution[LIGHT_GRID_SLOTS];
  * splits the node whose lights' contributions vary most and, once full, merges the pair that varies
  * least. Nodes are named by their first Morton code. (Walter et al. 2005; Vevoda et al. 2018.)
  */
-[shader("compute")][numthreads(LIGHT_GRID_SLOTS, 1, 1)] void
-grid(uint3 group_id : SV_GroupID,
-     uint slot : SV_GroupIndex,
-     ParameterBlock<LightPreprocessBinding> params) {
+void grid_cell<S : ISlotGroup>(const S slots,
+                               const LightPreprocessBinding params,
+                               const uint cell,
+                               const uint slot) {
     const uint dim = params.grid_info[0].dimension;
     const uint cells_per_cascade = dim * dim * dim;
-    const uint cell = group_id.x + group_id.y * LIGHT_DISPATCH_ROW;
-    if (cell >= cells_per_cascade * params.grid_info[0].cascade_count)
-        return;
-
-    const CellGeometry cg = cell_geometry(params.grid_info, cell, params.grid_jitter);
+    const bool global = params.single_cut;
+    // slot 0 clears it once stored
+    const bool touched = slots.broadcast(slot == 0 ? params.grid_touched[cell] : 0u, 0) != 0;
+    const CellGeometry cg = global ? global_cell_geometry(params.grid_info)
+                                   : cell_geometry(params.grid_info, cell, params.grid_jitter);
     const uint lights = light_count(params);
-    if (WaveGetLaneCount() < LIGHT_GRID_SLOTS) {
-        store_cut(params, cell, slot, LIGHT_TREE_NO_KEY, lights, Contribution(0.f),
-                  cut_slot(TreeNode::empty(), float3(0.f), Contribution(0.f)), true);
-        return;
-    }
     const LightGridInfo info = params.grid_info[cg.cascade];
     const uint last_slot = LIGHT_GRID_SLOTS - 1u;
     const uint next_slot = min(slot + 1u, last_slot);
@@ -624,14 +717,11 @@ grid(uint3 group_id : SV_GroupID,
     // carry the cut, or take the coarser cell's
     const bool lattice_kept =
         !params.grid_reset && same_lattice(params.tree_info[0], params.tree_info_prev[0]);
-    uint prev_cascade = 0;
-    uint3 prev_coord = uint3(0);
-    const bool carried = lattice_kept && reproject_cell(params.grid_info_prev, info, cg.coord,
-                                                        prev_cascade, prev_coord);
-    uint prev_cell =
-        prev_cascade * cells_per_cascade + prev_coord.x + dim * (prev_coord.y + dim * prev_coord.z);
-    const bool inherited =
-        !carried && lattice_kept && coarser_cell(params.grid_info_prev, info, cg.center, prev_cell);
+    uint prev_cell = cell;
+    const bool carried = lattice_kept && (global || reproject_cell(params.grid_info_prev, info,
+                                                                   cg.coord, prev_cell));
+    const bool inherited = !carried && lattice_kept && !global &&
+                           coarser_cell(params.grid_info_prev, info, cg.center, prev_cell);
 
     uint key = LIGHT_TREE_NO_KEY;
     Contribution contribution = Contribution(0.f);
@@ -660,10 +750,10 @@ grid(uint3 group_id : SV_GroupID,
     // a carried cut must still partition all lights
     bool fresh = !(carried || inherited);
     {
-        const uint next_key = WaveShuffle(key, next_slot);
+        const uint next_key = slots.read(key, next_slot);
         const bool listed = key != LIGHT_TREE_NO_KEY;
         const bool env = listed && key >= LIGHT_TREE_ENV_KEY;
-        const uint prev_key = WaveShuffle(key, slot > 0 ? slot - 1u : 0u);
+        const uint prev_key = slots.read(key, slot > 0 ? slot - 1u : 0u);
         bool valid = slot != 0 || key == 0;
         if (slot < last_slot)
             valid &= listed ? next_key == LIGHT_TREE_NO_KEY || next_key > key
@@ -673,7 +763,7 @@ grid(uint3 group_id : SV_GroupID,
             if (slot == 0 || prev_key < LIGHT_TREE_ENV_KEY)
                 valid &= key == LIGHT_TREE_ENV_KEY;
         }
-        if (!WaveActiveAllTrue(valid) || WaveActiveAnyTrue(env) != (env_texels(params) > 0)) {
+        if (!slots.all_true(valid) || slots.any_true(env) != (env_texels(params) > 0)) {
             key = slot == 0                              ? 0u
                   : slot == 1 && env_texels(params) > 0u ? LIGHT_TREE_ENV_KEY
                                                          : LIGHT_TREE_NO_KEY;
@@ -683,12 +773,12 @@ grid(uint3 group_id : SV_GroupID,
 
     uint first = node_start(params, key);
     const float nearest = nearest_distance(params, cg);
-    const uint end = cut_end(first, slot, lights);
+    const uint end = cut_end(slots, first, slot, lights);
     const TreeNode node = tree_node(params, first, key != LIGHT_TREE_NO_KEY ? end : first);
     const float3 geometry = node_geometry(node, cg.center, cg.radius, nearest);
     {
         if (fresh) {
-            contribution = prior_contribution(geometry, node.distant);
+            contribution = prior_contribution(geometry, prior_mean(params, node.distant));
         } else if (inherited && geometry.x > 0.f) {
             const LightGridInfo coarser = params.grid_info_prev[prev_cell / cells_per_cascade];
             const float3 coarser_center =
@@ -708,21 +798,21 @@ grid(uint3 group_id : SV_GroupID,
         const bool listed = key != LIGHT_TREE_NO_KEY;
         const bool dead = listed && !(contribution.x > 0.f) && !(contribution.y > 0.f) &&
                           contribution.z >= LIGHT_GRID_DEAD_SAMPLES;
-        const bool previous_dead = WaveShuffle(dead, slot > 0 ? slot - 1u : 0u);
-        const uint previous_key = WaveShuffle(key, slot > 0 ? slot - 1u : 0u);
+        const bool previous_dead = slots.read(dead, slot > 0 ? slot - 1u : 0u);
+        const uint previous_key = slots.read(key, slot > 0 ? slot - 1u : 0u);
         const bool absorbed = slot > 0 && listed &&
                               (!(node.flux > 0.f) || (dead && previous_dead)) &&
                               (key >= LIGHT_TREE_ENV_KEY) == (previous_key >= LIGHT_TREE_ENV_KEY);
         const bool keep = listed && !absorbed;
-        if (WaveActiveAnyTrue(absorbed)) {
-            const uint at = WavePrefixCountBits(keep);
+        if (slots.any_true(absorbed)) {
+            const uint at = slots.prefix_count(keep);
             if (keep) {
                 s_compact_key[at] = key;
                 s_compact_first[at] = first;
                 s_compact_contribution[at] = contribution;
             }
             GroupMemoryBarrierWithGroupSync();
-            const uint kept = WaveActiveCountBits(keep);
+            const uint kept = slots.count(keep);
             key = slot < kept ? s_compact_key[slot] : LIGHT_TREE_NO_KEY;
             first = slot < kept ? s_compact_first[slot] : lights;
             contribution = slot < kept ? s_compact_contribution[slot] : Contribution(0.f);
@@ -731,30 +821,30 @@ grid(uint3 group_id : SV_GroupID,
     }
 
     // refine
-    const uint steps = fresh                              ? LIGHT_GRID_FRESH_SPLITS
-                       : !carried                         ? LIGHT_GRID_SLOTS
-                       : WaveActiveAnyTrue(samples > 0.f) ? params.grid_refinements
-                                                          : 0u;
+    const uint steps = fresh                           ? LIGHT_GRID_FRESH_SPLITS
+                       : !carried                      ? LIGHT_GRID_SLOTS
+                       : slots.any_true(samples > 0.f) ? params.grid_refinements
+                                                       : 0u;
     for (uint step = 0; step < steps; step++) {
         const bool listed = key != LIGHT_TREE_NO_KEY;
-        const uint end = cut_end(first, slot, lights);
+        const uint end = cut_end(slots, first, slot, lights);
         if (!evaluated)
             s = cut_slot(params, cg, first, listed ? end : first, contribution);
         evaluated = true;
 
         const float candidate = s.node.splittable ? s.excess : 0.f;
-        const float best = WaveActiveMax(candidate);
+        const float best = slots.maximum(candidate);
         if (!(best > 0.f))
             break;
-        const uint split_slot = firstbitlow(WaveActiveBallot(candidate == best).x);
+        const uint split_slot = slots.first(candidate == best);
 
-        const uint next_key = WaveShuffle(key, next_slot);
-        const uint next_end = WaveShuffle(end, next_slot);
-        const float next_excess = WaveShuffle(s.excess, next_slot);
-        const float next_flux = WaveShuffle(s.node.flux, next_slot);
-        const float next_estimate = WaveShuffle(s.geometry.x, next_slot);
-        const Contribution next_contribution = WaveShuffle(contribution, next_slot);
-        const bool full = !WaveActiveAnyTrue(!listed);
+        const uint next_key = slots.read(key, next_slot);
+        const uint next_end = slots.read(end, next_slot);
+        const float next_excess = slots.read(s.excess, next_slot);
+        const float next_flux = slots.read(s.node.flux, next_slot);
+        const float next_estimate = slots.read(s.geometry.x, next_slot);
+        const Contribution next_contribution = slots.read(contribution, next_slot);
+        const bool full = !slots.any_true(!listed);
         const bool pair = full && slot < last_slot &&
                           (key >= LIGHT_TREE_ENV_KEY) == (next_key >= LIGHT_TREE_ENV_KEY);
         float merge_loss = 0.f;
@@ -788,33 +878,32 @@ grid(uint3 group_id : SV_GroupID,
                               : lower_bound(params, s.node.split_key, first, end);
             const CutSlot low = cut_slot(params, cg, first, split_first, contribution);
             const CutSlot high = cut_slot(params, cg, split_first, end, contribution);
-            low_contribution =
-                halve_contribution(contribution, s.geometry, low.geometry, s.node.distant);
-            high_contribution =
-                halve_contribution(contribution, s.geometry, high.geometry, s.node.distant);
+            const float prior = prior_mean(params, s.node.distant);
+            low_contribution = halve_contribution(contribution, s.geometry, low.geometry, prior);
+            high_contribution = halve_contribution(contribution, s.geometry, high.geometry, prior);
         }
         const float gain = 0.5f * best;
-        split_first = WaveReadLaneAt(split_first, split_slot);
-        const uint split_key = WaveReadLaneAt(s.node.split_key, split_slot);
-        low_contribution = WaveReadLaneAt(low_contribution, split_slot);
-        high_contribution = WaveReadLaneAt(high_contribution, split_slot);
+        split_first = slots.broadcast(split_first, split_slot);
+        const uint split_key = slots.broadcast(s.node.split_key, split_slot);
+        low_contribution = slots.broadcast(low_contribution, split_slot);
+        high_contribution = slots.broadcast(high_contribution, split_slot);
 
         uint merge_slot = LIGHT_GRID_SLOTS;
         if (full) {
             const bool mergeable = pair && slot != split_slot && slot + 1u != split_slot;
-            const float cheapest = WaveActiveMin(mergeable ? merge_loss : MERIAN_FLT_MAX);
-            if (!WaveActiveAnyTrue(mergeable) || !(gain > LIGHT_GRID_REFINE_MARGIN * cheapest))
+            const float cheapest = slots.minimum(mergeable ? merge_loss : MERIAN_FLT_MAX);
+            if (!slots.any_true(mergeable) || !(gain > LIGHT_GRID_REFINE_MARGIN * cheapest))
                 break;
-            merge_slot = firstbitlow(WaveActiveBallot(mergeable && merge_loss == cheapest).x);
+            merge_slot = slots.first(mergeable && merge_loss == cheapest);
         }
 
         uint target = split_slot;
         if (merge_slot < LIGHT_GRID_SLOTS) {
-            const Contribution merged = WaveReadLaneAt(merged_contribution, merge_slot);
+            const Contribution merged = slots.broadcast(merged_contribution, merge_slot);
             const uint from = slot > merge_slot ? next_slot : slot;
-            key = WaveShuffle(key, from);
-            first = WaveShuffle(first, from);
-            contribution = WaveShuffle(contribution, from);
+            key = slots.read(key, from);
+            first = slots.read(first, from);
+            contribution = slots.read(contribution, from);
             if (slot == last_slot) {
                 key = LIGHT_TREE_NO_KEY;
                 first = lights;
@@ -825,9 +914,9 @@ grid(uint3 group_id : SV_GroupID,
         }
 
         const uint from = slot > target + 1u ? slot - 1u : slot;
-        key = WaveShuffle(key, from);
-        first = WaveShuffle(first, from);
-        contribution = WaveShuffle(contribution, from);
+        key = slots.read(key, from);
+        first = slots.read(first, from);
+        contribution = slots.read(contribution, from);
         if (slot == target)
             contribution = low_contribution;
         if (slot == target + 1u) {
@@ -839,8 +928,21 @@ grid(uint3 group_id : SV_GroupID,
     }
 
     if (!evaluated) {
-        const uint end = cut_end(first, slot, lights);
+        const uint end = cut_end(slots, first, slot, lights);
         s = cut_slot(params, cg, first, key != LIGHT_TREE_NO_KEY ? end : first, contribution);
     }
-    store_cut(params, cell, slot, key, first, contribution, s, params.grid_touched[cell] != 0);
+    store_cut(slots, params, cell, slot, key, first, contribution, s, touched);
+}
+
+[shader("compute")][numthreads(LIGHT_GRID_SLOTS, 1, 1)] void
+grid(uint3 group_id : SV_GroupID,
+     uint slot : SV_GroupIndex,
+     ParameterBlock<LightPreprocessBinding> params) {
+    const uint cell = group_id.x + group_id.y * LIGHT_DISPATCH_ROW;
+    if (cell >= params.cell_count)
+        return;
+    if (WaveGetLaneCount() >= LIGHT_GRID_SLOTS)
+        grid_cell(WaveSlots(), params, cell, slot);
+    else
+        grid_cell(SharedSlots(slot), params, cell, slot);
 }

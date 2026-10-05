@@ -568,17 +568,22 @@ struct Scene {
     Optional<DirectLightSample> sample_direct_light<T : IDirectLightTarget>(
         const DirectLightVertex vertex, const T target, inout RandomGenerator rng) {
         DirectLightReservoir reservoir = DirectLightReservoir();
-        const uint m_scene = nee.scene_draws();
-        const uint m_cell = nee.cell_draws();
-        const LightCellWeights weights = nee.grid.weigh_cell(vertex, m_cell, rng);
-        for (uint i = 0; i < m_scene + m_cell; i++) {
-            if (let ls = nee.sample_light(vertex, weights, rng, material_system, env_map, time,
-                                          i >= m_scene, i - m_scene)) {
-                const float light_pdf = nee.pdf_lights(vertex, ls.index, ls.wo, ls.pdf, m_scene,
-                                                       m_cell, weights, ls.grid_entry);
-                reservoir.add_light(ls, target.unshadowed(ls, rng), light_pdf,
-                                    target.scatter_pdf(ls), rng);
+        const uint draws = nee.draw_count();
+        const LightCellWeights weights = nee.grid.weigh_cell(vertex, draws, rng);
+        for (uint i = 0; i < draws; i++) {
+            uint entry;
+            bool delivers = false;
+            if (let ls = nee.sample_light(vertex, weights, rng, material_system, env_map, time, i,
+                                          entry)) {
+                const float light_pdf =
+                    nee.pdf_lights(vertex, ls.index, ls.wo, ls.pdf, weights, entry);
+                const float3 unshadowed = target.unshadowed(ls, rng);
+                delivers = yuv_luminance(unshadowed) > 0.f;
+                reservoir.add_light(ls, unshadowed, light_pdf, target.scatter_pdf(ls), rng);
             }
+            // only the winner is traced; a draw the receiver cannot see delivers nothing
+            if (!delivers)
+                nee.record_failed_draw(entry);
         }
         if (!reservoir.needs_shadow_ray()) {
             return none;
@@ -595,15 +600,13 @@ struct Scene {
     // One draw; pdf is NEE::mixture_pdf of it.
     Optional<LightSample> sample_direct_light(const DirectLightVertex vertex,
                                               inout RandomGenerator rng) {
-        const uint m_scene = nee.scene_draws();
-        const uint m_cell = nee.cell_draws();
-        const bool from_cell = rng.next_float() * float(m_scene + m_cell) >= float(m_scene);
         const LightCellWeights weights = nee.grid.weigh_cell(vertex, 1, rng);
-        if (let ls = nee.sample_light(vertex, weights, rng, material_system, env_map, time,
-                                      from_cell, 0)) {
+        uint entry;
+        if (let ls =
+                nee.sample_light(vertex, weights, rng, material_system, env_map, time, 0, entry)) {
             LightSample s = ls;
-            s.pdf = nee.mixture_pdf(nee.pdf_lights(vertex, ls.index, ls.wo, ls.pdf, m_scene, m_cell,
-                                                   weights, ls.grid_entry));
+            s.pdf =
+                nee.mixture_pdf(nee.pdf_lights(vertex, ls.index, ls.wo, ls.pdf, weights, entry));
             if (s.pdf > 0.f)
                 return s;
         }

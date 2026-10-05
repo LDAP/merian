@@ -7,6 +7,11 @@
 
 namespace merian {
 
+enum LightSource : uint32_t {
+    LightSourceScene = 0,
+    LightSourceGrid = 1,
+};
+
 enum LightSlotWeighing : uint32_t {
     LightSlotWeighingCell = 0,
     LightSlotWeighingShadingPoint = 1,
@@ -59,8 +64,6 @@ static_assert(LIGHT_SORT_GROUP == 1u << LIGHT_SORT_RADIX_BITS,
               "the sort scatters a digit per thread");
 #else
 static const float LIGHT_GRID_MIN_CONTRIBUTION = 0.0001f;
-static const float LIGHT_GRID_PRIOR_CONTRIBUTION = 0.5f;
-static const float LIGHT_GRID_PRIOR_ENV_CONTRIBUTION = 0.005f;
 static const float LIGHT_GRID_PRIOR_SAMPLES = 2.f;
 static const float LIGHT_GRID_CONTRIBUTION_MEMORY = 64.f;
 static const float LIGHT_GRID_REFINE_MARGIN = 2.f;
@@ -81,11 +84,15 @@ static const uint LIGHT_GRID_FEEDBACK_SAMPLES =
 uint light_bucket_base(const uint bucket) {
     return bucket * LIGHT_GRID_SLOTS;
 }
+
+uint light_cell_index(const uint cascade, const uint3 coord, const uint dimension) {
+    return coord.x + dimension * (coord.y + dimension * (coord.z + dimension * cascade));
+}
 #endif
 
 // One cascade of the light grid. Every cascade holds dimension^3 cells and is snapped to the
 // camera, and the cell size doubles from one cascade to the next, so the resolution follows the
-// distance to the camera. Points beyond the last cascade fall back to the pool.
+// distance to the camera. Points beyond the last cascade take its nearest cell.
 struct LightGridInfo {
     float3 origin;
     float inv_cell_size;

@@ -2244,7 +2244,6 @@ void Scene::update(const CommandBufferHandle& cmd,
     lights.set_env_state(env_map->get_version(), env_map->is_static());
     lights.set_camera(cam->get_position());
     lights.set_frame(frame);
-    lights.set_scene_radius(aabb.is_valid() ? 0.5f * length(aabb.get_max() - aabb.get_min()) : 0.f);
     lights.prepare(cmd);
     lights.write_to(c["nee"]);
     lights.update(cmd, composition, shader_object.get(), obj_allocator);

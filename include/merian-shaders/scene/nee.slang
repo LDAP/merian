@@ -16,10 +16,9 @@ namespace merian {
 static const float NEE_MIN_ALPHA = 0.05f;
 
 extern static const bool merian_scene_has_env_light = false;
-extern static const int merian_nee_scene_draws = 1;
-extern static const int merian_nee_cell_draws = 0;
+extern static const int merian_nee_draws = 1;
+extern static const int merian_nee_source = 0;
 extern static const int merian_nee_slot_weighing = 0;
-extern static const bool merian_nee_lists_env = false;
 
 struct LightSample {
     float3 wo;  // from the receiver towards the light
@@ -29,14 +28,13 @@ struct LightSample {
     // offset to the emitting side; for the environment at ENV_MAP_DISTANCE along wo
     float3 pos;
     uint index;
-    uint grid_entry;
 }
 
 struct LightPoint {
     // not offset, so that a ray aimed at it reaches the light at grazing angles
     float3 pos;
     uint index;
-    // LIGHT_INVALID_INDEX for a whole-scene draw
+    // LIGHT_INVALID_INDEX without cuts
     uint entry;
 }
 
@@ -76,18 +74,12 @@ struct LightTree {
     uint env_texels;
 }
 
-struct LightPool {
-    StructuredBuffer<uint> entries;
-    uint size;
-}
-
 struct LightGrid {
     StructuredBuffer<uint> starts;
     StructuredBuffer<LightGridInfo, ScalarDataLayout> cascades;
     bool in_use;
     // in cells
     float jitter;
-    float share;
     float even_share;
     StructuredBuffer<float3, ScalarDataLayout> contribution;
     StructuredBuffer<float> estimate;
@@ -98,11 +90,16 @@ struct LightGrid {
     RWStructuredBuffer<uint> touched;
     uint light_count;
 
-    uint lookup(const float3 pos, const float3 u) {
-        const float3 offset = jitter * (u - 0.5f);
+    int3 cell_coord(const uint cascade, const float3 pos, const float3 offset) {
+        const LightGridInfo info = cascades[cascade];
+        return int3(floor((pos - info.origin) * info.inv_cell_size + offset));
+    }
 
+    uint lookup(const float3 pos, inout RandomGenerator rng) {
         if (!in_use)
             return LIGHT_INVALID_INDEX;
+        if (merian_nee_source == int(LightSource::LightSourceScene))
+            return 0u;
         const LightGridInfo base = cascades[0];
 
         // the cascade is picked from the unjittered position, so the jitter cannot walk the
@@ -112,20 +109,17 @@ struct LightGrid {
         const float distance = max(to_center.x, max(to_center.y, to_center.z));
         // snapping moves a cascade by up to one cell, so only dimension / 2 - 1 cells are certain
         const float reach = max(0.5f * float(base.dimension) - 1.f, 1.f) * cell;
-        uint cascade = uint(max(ceil(log2(max(distance / reach, 1e-6f))), 0.f));
+        const uint outermost = base.cascade_count - 1u;
+        uint cascade = min(uint(max(ceil(log2(max(distance / reach, 1e-6f))), 0.f)), outermost);
+        const float3 offset = jitter * (rng.next_float3() - 0.5f);
 
-        const uint cells_per_cascade = base.dimension * base.dimension * base.dimension;
         // the cascade the distance implies always contains pos unless the snapping pushed it out,
         // which the next one up covers
-        for (uint step = 0; step < 2 && cascade < base.cascade_count; step++, cascade++) {
-            const LightGridInfo info = cascades[cascade];
-            const float3 local = (pos - info.origin) * info.inv_cell_size + offset;
-            const int3 coord = int3(floor(local));
-            if (all(coord >= 0) && all(coord < int(info.dimension)))
-                return cascade * cells_per_cascade + uint(coord.x) +
-                       info.dimension * (uint(coord.y) + info.dimension * uint(coord.z));
-        }
-        return LIGHT_INVALID_INDEX;
+        int3 coord = cell_coord(cascade, pos, offset);
+        if ((any(coord < 0) || any(coord >= int(base.dimension))) && cascade < outermost)
+            coord = cell_coord(++cascade, pos, offset);
+        return light_cell_index(cascade, uint3(clamp(coord, 0, int(base.dimension) - 1)),
+                                base.dimension);
     }
 
     bool weighs_at_cell() {
@@ -267,11 +261,9 @@ struct LightGrid {
         return uint2(starts[entry], last ? light_count : next);
     }
 
-    uint draw_slot(const DirectLightVertex vertex,
-                   const LightCellWeights weights,
-                   const uint draw,
-                   inout RandomGenerator rng) {
-        if (!vertex.has_cell() || weights.occupied == 0 || !(rng.next_float() < share))
+    uint
+    draw_slot(const DirectLightVertex vertex, const LightCellWeights weights, const uint draw) {
+        if (weights.occupied == 0)
             return LIGHT_INVALID_INDEX;
         return light_bucket_base(vertex.cell) +
                ((weights.draws >> (draw * LIGHT_GRID_SLOT_BITS)) & (LIGHT_GRID_SLOTS - 1u));
@@ -280,11 +272,10 @@ struct LightGrid {
     bool draws_from(const DirectLightVertex vertex, const Optional<LightCellWeights> weights) {
         if (!vertex.has_cell())
             return false;
-        if (weights.hasValue)
-            return weights.value.occupied > 0;
-        return weighs_at_cell()
-                   ? probability[light_bucket_base(vertex.cell) + LIGHT_GRID_SLOTS - 1u] > 0.f
-                   : weigh_cell(vertex).occupied > 0;
+        // an empty cut weighs every slot 0
+        if (weighs_at_cell())
+            return true;
+        return (weights.hasValue ? weights.value : weigh_cell(vertex)).occupied > 0;
     }
 
     // fixed point, rounded stochastically
@@ -307,14 +298,12 @@ struct EnvLight {
     // texels drawn from importance this frame; empty to search per sample
     StructuredBuffer<uint> pool;
     uint pool_size;
-    StructuredBuffer<float> split;
 }
 
 // All densities are per solid angle at the receiver.
 struct NEE {
     LightTable table;
     LightTree tree;
-    LightPool pool;
     LightGrid grid;
     EnvLight env;
     // UseEnvMap geometry exists: rays towards the environment must find the closest hit
@@ -322,7 +311,7 @@ struct NEE {
     LightDebugView debug_view;
 
     bool has_lights() {
-        return get_env_share() > 0.f || has_emissive_triangles();
+        return has_cuts() ? has_emissive_triangles() || lists_env() : has_env();
     }
 
     // Deterministic per point and random numbers, so a vertex begun again finds the same densities.
@@ -332,7 +321,7 @@ struct NEE {
         DirectLightVertex vertex;
         vertex.pos = pos;
         vertex.normal = normal;
-        vertex.cell = grid.lookup(pos, rng.next_float3());
+        vertex.cell = grid.lookup(pos, rng);
         return vertex;
     }
 
@@ -348,7 +337,10 @@ struct NEE {
               const float3 dir) {
         if (index == LIGHT_INVALID_INDEX)
             return 0.f;
-        return pdf_lights(vertex, index, origin, dir, scene_draws(), cell_draws());
+        if (index == LIGHT_ENV_INDEX)
+            return pdf_env(vertex, dir);
+        const float point_pdf = pdf_triangle(index, origin, dir);
+        return point_pdf > 0.f ? pdf_lights(vertex, index, dir, point_pdf) : 0.f;
     }
 
     // The same at a traced hit; drawn skips the region test for a point the light technique drew.
@@ -361,20 +353,15 @@ struct NEE {
               const uint entry = LIGHT_INVALID_INDEX) {
         if (index == LIGHT_INVALID_INDEX)
             return 0.f;
-        float point_pdf;
-        if (index == LIGHT_ENV_INDEX) {
-            point_pdf = pdf_env_point(dir);
-        } else {
-            if (!drawn && !table.regions[index].contains_mesh(hit_barycentrics))
-                return 0.f;
-            float dist, cos_l;
-            point_pdf = intersect_triangle(index, origin, dir, dist, cos_l)
-                            ? pdf_triangle_area(index, dist * dist, cos_l)
-                            : 0.f;
-        }
-        return point_pdf > 0.f ? pdf_lights(vertex, index, dir, point_pdf, scene_draws(),
-                                            cell_draws(), none, entry)
-                               : 0.f;
+        if (index == LIGHT_ENV_INDEX)
+            return pdf_env(vertex, dir);
+        if (!drawn && !table.regions[index].contains_mesh(hit_barycentrics))
+            return 0.f;
+        float dist, cos_l;
+        const float point_pdf = intersect_triangle(index, origin, dir, dist, cos_l)
+                                    ? pdf_triangle_area(index, dist * dist, cos_l)
+                                    : 0.f;
+        return point_pdf > 0.f ? pdf_lights(vertex, index, dir, point_pdf, none, entry) : 0.f;
     }
 
     // The same for a known point on the light, which need not be where the light is now.
@@ -385,15 +372,15 @@ struct NEE {
               const float3 light_normal) {
         if (index == LIGHT_INVALID_INDEX)
             return 0.f;
-        const float point_pdf = index == LIGHT_ENV_INDEX
-                                    ? pdf_env_point(dir)
-                                    : pdf_triangle(index, vertex.pos, dir, dist2, light_normal);
+        if (index == LIGHT_ENV_INDEX)
+            return pdf_env(vertex, dir);
+        const float point_pdf = pdf_triangle(index, vertex.pos, dir, dist2, light_normal);
         return point_pdf > 0.f ? pdf_lights(vertex, index, dir, point_pdf) : 0.f;
     }
 
     // Of a single draw instead of every candidate.
     float mixture_pdf(const float pdf) {
-        return pdf / float(max(draw_count(), 1u));
+        return pdf / float(draw_count());
     }
 
     float3 get_normal(const uint index) {
@@ -410,31 +397,10 @@ struct NEE {
     Optional<LightPoint>
     sample_point(const DirectLightVertex vertex, inout RandomGenerator rng, out uint entry) {
         entry = LIGHT_INVALID_INDEX;
-        const uint m_scene = scene_draws();
-        const uint draws = m_scene + cell_draws();
-        if (draws == 0)
-            return none;
-
-        LightPoint lp;
-        const bool from_cell = rng.next_float() * float(draws) >= float(m_scene);
-        if (!from_cell) {
-            if (rng.next_float() < get_env_share()) {
-                if (let es = sample_env(rng)) {
-                    lp.pos = vertex.pos + es.dir * ENV_MAP_DISTANCE;
-                    lp.index = LIGHT_ENV_INDEX;
-                    lp.entry = LIGHT_INVALID_INDEX;
-                    return lp;
-                }
-                return none;
-            }
-            if (!has_emissive_triangles())
-                return none;
-        }
-
         uint texel = 0;
         const uint index =
-            from_cell ? draw_cell(vertex, grid.weigh_cell(vertex, 1, rng), 0, rng, entry, texel)
-                      : draw_scene(rng);
+            has_cuts() ? draw_cell(vertex, grid.weigh_cell(vertex, 1, rng), 0, rng, entry, texel)
+                       : LIGHT_ENV_INDEX;
         return light_point(vertex, index, texel, entry, rng);
     }
 
@@ -446,7 +412,7 @@ struct NEE {
         LightPoint lp;
         lp.entry = entry;
         if (index == LIGHT_ENV_INDEX) {
-            if (let es = env.importance.texel_sample(morton_decode2d(texel), rng.next_float2())) {
+            if (let es = draw_env(texel, rng)) {
                 lp.pos = vertex.pos + es.dir * ENV_MAP_DISTANCE;
                 lp.index = LIGHT_ENV_INDEX;
                 return lp;
@@ -469,7 +435,11 @@ struct NEE {
         return lp;
     }
 
-    Optional<EnvSample> sample_env(inout RandomGenerator rng) {
+    Optional<EnvSample> draw_env(const uint texel, inout RandomGenerator rng) {
+        if (has_cuts())
+            return env.importance.texel_sample(morton_decode2d(texel), rng.next_float2());
+        if (!has_env())
+            return none;
         if (env.pool_size > 0)
             return env.importance.pool_sample(env.pool, env.pool_size, rng);
         return env.importance.sample_direction(rng);
@@ -486,24 +456,16 @@ struct NEE {
         return get_total_flux() > 0.f;
     }
 
-    float get_env_share() {
-        if (!merian_scene_has_env_light || !env.importance.is_valid())
-            return 0.f;
-        const float p_env = env.split[0];
-        return has_emissive_triangles() ? p_env : select(p_env > 0.f, 1.f, 0.f);
+    bool has_env() {
+        return merian_scene_has_env_light && env.importance.is_valid();
     }
 
-    uint scene_draws() {
-        const uint cell = cell_draws();
-        return uint(max(merian_nee_scene_draws, cell > 0 ? 0 : 1));
-    }
-
-    uint cell_draws() {
-        return grid.in_use ? uint(clamp(merian_nee_cell_draws, 0, int(LIGHT_GRID_MAX_DRAWS))) : 0u;
+    bool has_cuts() {
+        return grid.in_use;
     }
 
     uint draw_count() {
-        return scene_draws() + cell_draws();
+        return uint(merian_nee_draws);
     }
 
     Optional<uint> get_triangle_index(const GeometryID geometry_id, const uint primitive_id) {
@@ -515,19 +477,8 @@ struct NEE {
         return offset + primitive_id;
     }
 
-    uint draw_scene(inout RandomGenerator rng) {
-        if (pool.size == 0)
-            return tree.order[search_range(tree.cdf, 0, table.triangle_count, rng.next_float2())];
-        return pool.entries[min(uint(rng.next_float() * pool.size), pool.size - 1)];
-    }
-
-    float pdf_scene(const uint index) {
-        return range_share(tree.cdf, 0, table.triangle_count, tree.rank[index]);
-    }
-
     bool lists_env() {
-        return merian_nee_lists_env && merian_scene_has_env_light && tree.env_texels > 0 &&
-               env.importance.is_valid();
+        return has_env() && tree.env_texels > 0;
     }
 
     uint tree_position(const uint index, const float3 dir) {
@@ -596,10 +547,8 @@ struct NEE {
                    out uint entry,
                    out uint texel) {
         texel = 0;
-        entry = grid.draw_slot(vertex, weights, draw, rng);
-        if (entry == LIGHT_INVALID_INDEX)
-            return has_emissive_triangles() ? draw_scene(rng) : LIGHT_INVALID_INDEX;
-        return draw_in_slot(entry, rng, texel);
+        entry = grid.draw_slot(vertex, weights, draw);
+        return entry != LIGHT_INVALID_INDEX ? draw_in_slot(entry, rng, texel) : LIGHT_INVALID_INDEX;
     }
 
     uint draw_in_slot(const uint entry, inout RandomGenerator rng, out uint texel) {
@@ -623,14 +572,13 @@ struct NEE {
                    const uint index,
                    uint entry) {
         if (!grid.draws_from(vertex, weights))
-            return pdf_scene(index);
+            return 0.f;
         const uint position = tree.rank[index];
         if (entry == LIGHT_INVALID_INDEX)
             entry = grid.slot_of(vertex.cell, position);
         const uint2 range = grid.slot_range(entry);
-        const float from_scene = grid.share < 1.f ? (1.f - grid.share) * pdf_scene(index) : 0.f;
-        return from_scene + grid.share * grid.slot_share(vertex, entry, weights) *
-                                range_share(tree.cdf, range.x, range.y, position);
+        return grid.slot_share(vertex, entry, weights) *
+               range_share(tree.cdf, range.x, range.y, position);
     }
 
     float pdf_cell_env(const DirectLightVertex vertex,
@@ -644,7 +592,7 @@ struct NEE {
         const uint2 range = grid.slot_range(entry);
         if (range.x < count)
             return 0.f;
-        return grid.share * grid.slot_share(vertex, entry, weights) *
+        return grid.slot_share(vertex, entry, weights) *
                range_share(env.importance.cdf, range.x - count, range.y - count, texel) *
                float(tree.env_texels) / MERIAN_FOUR_PI;
     }
@@ -699,7 +647,6 @@ struct NEE {
         ls.pos = offset_ray_origin(
             light_pos, n, triangle_spawn_offset(light_pos, tri.p1 - tri.p0, tri.p2 - tri.p0), n);
         ls.index = index;
-        ls.grid_entry = LIGHT_INVALID_INDEX;
         return ls;
     }
 
@@ -753,61 +700,46 @@ struct NEE {
         return pdf_triangle_area(index, dist2, cos_l);
     }
 
-    // Without the environment's share.
     float pdf_env_point(const float3 dir) {
         return merian_scene_has_env_light ? env.importance.pdf(dir) : 0.f;
     }
 
-    // Every technique counted as often as it draws: the denominator of the generalized balance
-    // heuristic (Veach 1997; Bitterli et al. 2020).
+    // Summed over the draws: the denominator of the generalized balance heuristic (Veach 1997;
+    // Bitterli et al. 2020).
     float pdf_lights(const DirectLightVertex vertex,
                      const uint index,
                      const float3 dir,
                      const float point_pdf,
-                     const uint m_scene,
-                     const uint m_cell,
                      const Optional<LightCellWeights> weights = none,
                      const uint entry = LIGHT_INVALID_INDEX) {
-        Optional<LightCellWeights> cell_weights = weights;
-        if (m_cell > 0 && !cell_weights.hasValue && !grid.weighs_at_cell())
-            cell_weights = grid.weigh_cell(vertex);
-        const float p_e = get_env_share();
-        if (index == LIGHT_ENV_INDEX) {
-            const float from_cell =
-                m_cell > 0 ? float(m_cell) * pdf_cell_env(vertex, cell_weights, dir) : 0.f;
-            return float(m_scene) * p_e * point_pdf + from_cell;
-        }
-        const float from_scene =
-            m_scene > 0 ? float(m_scene) * (1.f - p_e) * pdf_scene(index) : 0.f;
-        const float from_cell =
-            m_cell > 0 ? float(m_cell) * pdf_cell(vertex, cell_weights, index, entry) : 0.f;
-        return (from_scene + from_cell) * point_pdf;
+        if (index == LIGHT_ENV_INDEX)
+            return pdf_env(vertex, dir, weights);
+        if (!has_cuts())
+            return 0.f;
+        return float(draw_count()) * pdf_cell(vertex, cell_weights(vertex, weights), index, entry) *
+               point_pdf;
     }
 
-    float pdf_lights(const DirectLightVertex vertex,
-                     const uint index,
-                     const float3 dir,
-                     const float point_pdf) {
-        return pdf_lights(vertex, index, dir, point_pdf, scene_draws(), cell_draws());
+    float pdf_env(const DirectLightVertex vertex,
+                  const float3 dir,
+                  const Optional<LightCellWeights> weights = none) {
+        return float(draw_count()) * (has_cuts()
+                                          ? pdf_cell_env(vertex, cell_weights(vertex, weights), dir)
+                                          : pdf_env_point(dir));
     }
 
-    float pdf_lights(const DirectLightVertex vertex,
-                     const uint index,
-                     const float3 origin,
-                     const float3 dir,
-                     const uint m_scene,
-                     const uint m_cell) {
-        const float point_pdf =
-            index == LIGHT_ENV_INDEX ? pdf_env_point(dir) : pdf_triangle(index, origin, dir);
-        return point_pdf > 0.f ? pdf_lights(vertex, index, dir, point_pdf, m_scene, m_cell) : 0.f;
+    Optional<LightCellWeights> cell_weights(const DirectLightVertex vertex,
+                                            const Optional<LightCellWeights> weights) {
+        if (weights.hasValue || grid.weighs_at_cell())
+            return weights;
+        return grid.weigh_cell(vertex);
     }
 
     LightSample env_light_sample<Env : IEnvMap>(const EnvSample es,
                                                 const float3 pos,
                                                 const MaterialSystem material_system,
                                                 const Env env_map,
-                                                const float time,
-                                                const uint entry) {
+                                                const float time) {
         LightSample ls;
         ls.wo = es.dir;
         ls.dist = SCENE_RAY_TMAX;
@@ -816,45 +748,30 @@ struct NEE {
         ls.pdf = es.pdf;
         ls.pos = pos + es.dir * ENV_MAP_DISTANCE;
         ls.index = LIGHT_ENV_INDEX;
-        ls.grid_entry = entry;
         return ls;
     }
 
+    // entry: the cell slot drawn from, also where the draw yields no sample.
     Optional<LightSample> sample_light<Env : IEnvMap>(const DirectLightVertex vertex,
                                                       const LightCellWeights weights,
                                                       inout RandomGenerator rng,
                                                       const MaterialSystem material_system,
                                                       const Env env_map,
                                                       const float time,
-                                                      const bool from_cell,
-                                                      const uint cell_draw) {
-        if (!from_cell) {
-            if (rng.next_float() < get_env_share()) {
-                if (let es = sample_env(rng))
-                    return env_light_sample(es, vertex.pos, material_system, env_map, time,
-                                            LIGHT_INVALID_INDEX);
-                return none;
-            }
-            if (!has_emissive_triangles())
-                return none;
-        }
-        uint entry = LIGHT_INVALID_INDEX;
+                                                      const uint draw,
+                                                      out uint entry) {
+        entry = LIGHT_INVALID_INDEX;
         uint texel = 0;
         const uint index =
-            from_cell ? draw_cell(vertex, weights, cell_draw, rng, entry, texel) : draw_scene(rng);
+            has_cuts() ? draw_cell(vertex, weights, draw, rng, entry, texel) : LIGHT_ENV_INDEX;
         if (index == LIGHT_ENV_INDEX) {
-            if (let es = env.importance.texel_sample(morton_decode2d(texel), rng.next_float2()))
-                return env_light_sample(es, vertex.pos, material_system, env_map, time, entry);
+            if (let es = draw_env(texel, rng))
+                return env_light_sample(es, vertex.pos, material_system, env_map, time);
             return none;
         }
         if (index == LIGHT_INVALID_INDEX)
             return none;
-        if (let ls = sample_triangle(index, vertex.pos, rng, material_system, time)) {
-            LightSample s = ls;
-            s.grid_entry = entry;
-            return s;
-        }
-        return none;
+        return sample_triangle(index, vertex.pos, rng, material_system, time);
     }
 }
 

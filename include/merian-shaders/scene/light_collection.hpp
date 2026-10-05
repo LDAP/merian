@@ -14,6 +14,7 @@
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <numbers>
@@ -23,9 +24,9 @@ namespace merian {
 
 class Properties;
 
-// The emissive triangles of a Scene and the flux-proportional sampling data behind merian::NEE
-// (nee.slang). Records are rebuilt on the GPU every update from the scene's geometry and
-// materials, so animation, morphing and material edits need no bookkeeping.
+// The emissive triangles of a Scene and the cuts through them merian::NEE (nee.slang) draws from.
+// Records are rebuilt on the GPU every update from the scene's geometry and materials, so
+// animation, morphing and material edits need no bookkeeping.
 class LightCollection {
   public:
     struct EmissiveGeometry {
@@ -78,20 +79,6 @@ class LightCollection {
         enabled = value;
     }
 
-    // The manual environment share, used where it is not derived from the emitted power.
-    float get_env_share() const {
-        return env_share;
-    }
-
-    void set_env_share(const float p) {
-        env_share = p;
-    }
-
-    // Bounding sphere the environment's power is measured through; 0 keeps the manual share.
-    void set_scene_radius(const float radius) {
-        scene_radius = radius;
-    }
-
     // Whether the scene's environment map emits; false routes all samples to the triangles.
     // The importance map is a function of the environment alone, so a static one is built once
     // and kept until it changes. The per-frame texel pool is drawn from it either way.
@@ -125,8 +112,14 @@ class LightCollection {
     uint32_t env_importance_size() const {
         return 1u << static_cast<uint32_t>(env_importance_log2);
     }
+    bool uses_grid() const {
+        return source == LightSource::LightSourceGrid;
+    }
+    bool uses_env_pool() const {
+        return env_selection == EnvSelection::EnvSelectionPool && triangle_count == 0;
+    }
     bool lists_env() const {
-        return grid_lists_env && env_emissive && env_split_buffer && env_cdf_buffer;
+        return triangle_count > 0 && env_emissive && env_cdf_buffer;
     }
     // threads per block of the scans; matches CDF_GROUP_SIZE
     static constexpr uint32_t CDF_GROUP_SIZE = 1024;
@@ -143,8 +136,9 @@ class LightCollection {
     }
     uint32_t update_lanes() const {
         const float ideal = 900.f / std::sqrt(static_cast<float>(std::max(triangle_count, 1u)));
+        const uint32_t max_lanes = std::min(LIGHT_UPDATE_GROUP, min_subgroup_size);
         uint32_t lanes = 1;
-        while (lanes < LIGHT_UPDATE_GROUP &&
+        while (lanes < max_lanes &&
                static_cast<float>(lanes) * std::numbers::sqrt2_v<float> < ideal)
             lanes *= 2;
         return lanes;
@@ -157,9 +151,9 @@ class LightCollection {
         return static_cast<vk::DeviceSize>(LIGHT_SORT_PASSES) *
                ((1u << LIGHT_SORT_RADIX_BITS) * (sort_tile_count() + 1) + 1) * sizeof(uint32_t);
     }
-    uint32_t grid_cell_count() const {
+    uint32_t cell_count() const {
         const uint32_t d = static_cast<uint32_t>(grid_dimension);
-        return static_cast<uint32_t>(grid_cascades) * d * d * d;
+        return uses_grid() ? static_cast<uint32_t>(grid_cascades) * d * d * d : 1u;
     }
     void ensure_buffer(BufferHandle& buffer,
                        vk::DeviceSize size,
@@ -171,37 +165,30 @@ class LightCollection {
     ContextHandle context;
     ResourceAllocatorHandle allocator;
 
+    uint32_t min_subgroup_size;
     bool enabled = true;
-    bool pool_presampled = true;
-    bool grid_enabled = true;
     int32_t env_selection = EnvSelection::EnvSelectionPool;
     int32_t env_pool_size = 8192;
-    int32_t pool_size = 4096;
-    int32_t scene_draws = 3;
+    int32_t source = LightSource::LightSourceGrid;
+    int32_t draws = 4;
     int32_t grid_dimension = 16;
     int32_t grid_cascades = 6;
     int32_t grid_refinements = 2;
-    int32_t cell_draws = 2;
     float grid_cell_size = 0.f; // 0: derived from the distance to the lights
     float grid_coverage = 1.f;
     float grid_jitter = 1.f;
     bool debug_jitter = true;
     int32_t debug_view = LightDebugView::LightDebugDrawOutcome;
     bool constants_dirty = true;
-    float grid_share = 1.f;
     float grid_even_share = 0.3f;
+    float triangle_prior = 0.5f;
+    float env_prior = 0.005f;
     int32_t slot_weighing = LightSlotWeighing::LightSlotWeighingCell;
-    bool grid_lists_env = true;
     // set for a frame the carried-over grid cannot describe
     bool grid_reset = true;
     float3 camera_position{0.f};
     uint32_t frame = 0;
-    bool env_share_from_power = true;
-    float env_share = 0.5f;
-    // Neither technique may lose its density where both can contribute.
-    float env_share_min = 0.05f;
-    float env_share_max = 0.95f;
-    float scene_radius = 0.f;
+    uint32_t allocated_cells = 0;
     bool env_emissive = false;
     bool has_sky_portals = false;
     int32_t flux_samples = 32;
@@ -220,10 +207,8 @@ class LightCollection {
 
     BufferHandle env_importance_built_buffer;
     BufferHandle env_pool_buffer;
-    BufferHandle env_split_buffer;
     BufferHandle env_cdf_buffer;
     BufferHandle env_cdf_state_buffer;
-    BufferHandle pool_buffer;
     BufferHandle env_cones_buffer;
     // side length of the environment the cones were computed for
     uint32_t env_cones_size = 0;
@@ -263,20 +248,14 @@ class LightCollection {
     SlangCompositionHandle preprocess_composition;
     Versioned<SlangProgram> preprocess_program;
     Versioned<SlangProgramEntryPoint> setup_entry_point;
-    Versioned<SlangProgramEntryPoint> pool_entry_point;
     Versioned<SlangProgramEntryPoint> grid_entry_point;
-    Versioned<SlangProgramEntryPoint> env_split_entry_point;
     Versioned<Pipeline> setup_pipeline;
-    Versioned<Pipeline> pool_pipeline;
     Versioned<Pipeline> grid_pipeline;
-    Versioned<Pipeline> env_split_pipeline;
     Versioned<ShaderObject> setup_params;
-    Versioned<ShaderObject> pool_params;
     Versioned<SlangProgramEntryPoint> env_cones_entry_point;
     Versioned<Pipeline> env_cones_pipeline;
     Versioned<ShaderObject> env_cones_params;
     Versioned<ShaderObject> grid_params;
-    Versioned<ShaderObject> env_split_params;
 
     SlangCompositionHandle sort_composition;
     Versioned<SlangProgram> sort_program;
