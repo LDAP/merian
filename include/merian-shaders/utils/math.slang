@@ -14,6 +14,31 @@ T pow2<T : IFloat>(const T x) {
     return x * x;
 }
 
+// never reassociated or contracted, Slang drops `precise` for SPIR-V
+T exact_add<T : IFloat>(const T a, const T b) {
+    return spirv_asm {
+        %sum : $$T = OpFAdd $a $b;
+        OpDecorate %sum NoContraction;
+        result : $$T = OpCopyObject %sum;
+    };
+}
+
+T exact_sub<T : IFloat>(const T a, const T b) {
+    return spirv_asm {
+        %difference : $$T = OpFSub $a $b;
+        OpDecorate %difference NoContraction;
+        result : $$T = OpCopyObject %difference;
+    };
+}
+
+// a + b == sum + error exactly (Knuth, TAOCP Vol. 2, TwoSum)
+T two_sum<T : IFloat>(const T a, const T b, out T error) {
+    const T sum = exact_add(a, b);
+    const T b_virtual = exact_sub(sum, a);
+    error = exact_add(exact_sub(a, exact_sub(sum, b_virtual)), exact_sub(b, b_virtual));
+    return sum;
+}
+
 float max3(const float3 v) {
     return max(v.x, max(v.y, v.z));
 }

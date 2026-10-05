@@ -30,10 +30,12 @@ const int GBUFFER_CHECK_MODE = GBUFFER_CHECK_ALWAYS;
 [vk::constant_id(9)]
 const bool MV_OVERRIDE = false;
 
+import accumulate_constants;
 import merian_shaders.gbuffer;
 import merian_shaders.utils.encoding;
 import merian_shaders.utils.textures;
 import merian_shaders.utils.interpolation;
+import merian_shaders.utils.math;
 import merian_shaders.utils.random;
 import merian_shaders.utils.hash;
 import merian_shaders.utils.reprojection;
@@ -45,23 +47,71 @@ using merian;
 // inf-vs-inf passes the relative depth test, which would validate geometry against far field.
 static const float MAX_HISTORY_Z = 65504.0;
 
+static const int HISTORY_CHANNELS = accumulate_high_precision ? 4 : 2;
+typealias HistoryTexel = vector<uint, HISTORY_CHANNELS>;
+
 struct History {
     float3 normal;
     float linear_z;
-    float length;
+    uint length;
+    int4 out_low;
 };
 
-// history texel: .x = raw gbuffer enc_normal bits, .y = f16 linear_z | f16 length << 16
-uint2 encode_history(uint enc_normal, float linear_z, float length) {
-    return uint2(enc_normal, f32tof16(linear_z) | (f32tof16(length) << 16));
+static const float OUT_LOW_SCALE = 1.0 / 2048.0;
+static const uint MAX_HISTORY_LENGTH = accumulate_high_precision ? 0xfffff : 0xffff;
+
+float4 ulp(const float4 x) {
+    return asfloat(max(asuint(x) & 0x7f800000u, 0x12800000u)) * exp2(-23.0);
 }
 
-History decode_history(uint2 packed) {
+// stochastic rounding (Connolly et al. 2021, "Stochastic Rounding and Its Probabilistic Backward
+// Error Analysis")
+int4 encode_out_low(const float4 hi, const float4 lo, const float4 u) {
+    return clamp(int4(floor(lo / (ulp(hi) * OUT_LOW_SCALE) + u)), -1024, 1023);
+}
+
+float4 decode_out_low(const float4 hi, const int4 out_low) {
+    return float4(out_low) * (ulp(hi) * OUT_LOW_SCALE);
+}
+
+// .x = raw gbuffer enc_normal bits, .y = f16 linear_z | u16 length << 16 (saturates),
+// high precision: .z = s11 low.x | s11 low.y << 11 | length bits 0-9 << 22,
+//                 .w = s11 low.z | s11 low.w << 11 | length bits 10-19 << 22
+HistoryTexel encode_history(uint enc_normal, float linear_z, uint length, int4 out_low) {
+    const uint4 low = uint4(out_low) & 0x7ffu;
+    const uint4 packed = uint4(enc_normal, f32tof16(linear_z) | (min(length, 0xffffu) << 16),
+                               low.x | low.y << 11 | (length & 0x3ffu) << 22,
+                               low.z | low.w << 11 | (length >> 10) << 22);
+    HistoryTexel texel;
+    for (int i = 0; i < HISTORY_CHANNELS; i++)
+        texel[i] = packed[i];
+    return texel;
+}
+
+History decode_history(const HistoryTexel texel) {
+    uint4 packed = 0;
+    for (int i = 0; i < HISTORY_CHANNELS; i++)
+        packed[i] = texel[i];
+
     History history;
     history.normal = merian::decode_normal(packed.x);
     history.linear_z = f16tof32(packed.y & 0xffff);
-    history.length = f16tof32(packed.y >> 16);
+    history.length =
+        accumulate_high_precision ? packed.z >> 22 | (packed.w >> 22) << 10 : packed.y >> 16;
+    history.out_low =
+        int4(uint4(packed.z << 21, packed.z << 10, packed.w << 21, packed.w << 10)) >> 21;
     return history;
+}
+
+float4 lerp_precise(const float4 hi,
+                    const float4 lo,
+                    const float4 src,
+                    const float alpha,
+                    out float4 new_lo) {
+    const float4 increment = alpha * ((src - hi) - lo);
+    float4 error;
+    const float4 sum = two_sum(hi, increment, error);
+    return two_sum(sum, exact_add(error, lo), new_lo);
 }
 
 // graph io
@@ -69,9 +119,9 @@ Sampler2D<float4> in_src;
 ParameterBlock<GBuffer> in_gbuffer;
 Sampler2D<float2> in_mv; // only read when MV_OVERRIDE
 Sampler2D<float4> in_prev_out;
-Sampler2D<uint2> in_prev_history;
+Sampler2D<HistoryTexel> in_prev_history;
 RWTexture2D<float4> out_out;
-RWTexture2D<uint2> out_history;
+RWTexture2D<HistoryTexel> out_history;
 
 // percentile pass result, bound by the node
 Sampler2D<float4> quartiles;
@@ -141,7 +191,7 @@ void main(uint3 ipos: SV_DispatchThreadID) {
     // CLEAR SHORTCUT
     if (pc.clear == 1 || pc.accum_alpha == 0) {
         out_out.Store(ipos.xy, src);
-        out_history.Store(ipos.xy, encode_history(enc_normal, linear_z, 1.0));
+        out_history.Store(ipos.xy, encode_history(enc_normal, linear_z, 1, 0));
         return;
     }
 
@@ -178,8 +228,9 @@ void main(uint3 ipos: SV_DispatchThreadID) {
     }
 
     // GET PREVIOUS PIXEL
-    float prev_history = 0.0;
+    uint prev_length = 0;
     float4 prev_out = float4(0);
+    float4 prev_out_low = float4(0);
 
     const bool skip_gbuffer_check = GBUFFER_CHECK_MODE == GBUFFER_CHECK_NEVER ||
                                     (GBUFFER_CHECK_MODE == GBUFFER_CHECK_IF_MOVING && is_static);
@@ -191,14 +242,17 @@ void main(uint3 ipos: SV_DispatchThreadID) {
                 reprojection_valid(gbuf.normal, history.normal, pc.normal_reject_cos, linear_z,
                                    gbuf.delta_z, history.linear_z, pc.z_reject_percent);
         if (found) {
-            prev_history = history.length;
+            prev_length = history.length;
             prev_out = in_prev_out[prev_ipos];
+            if (accumulate_high_precision)
+                prev_out_low = decode_out_low(prev_out, history.out_low);
         }
     }
 
     if (EXTENDED_SEARCH && !skip_gbuffer_check) {
         if (!found) {
             float sum_w = 0.0;
+            float length_sum = 0.0;
 
             [[unroll]]
             for (int i = 0; i <= 9; i++) {
@@ -216,7 +270,7 @@ void main(uint3 ipos: SV_DispatchThreadID) {
                     history.linear_z, pc.z_reject_percent * 2.);
 
                 if (w > 0.0001) {
-                    prev_history += w * history.length;
+                    length_sum += w * history.length;
                     prev_out += w * in_prev_out[tc];
                     sum_w += w;
                 }
@@ -225,7 +279,7 @@ void main(uint3 ipos: SV_DispatchThreadID) {
             if (sum_w > 0.001) {
                 found = true;
                 prev_out /= sum_w;
-                prev_history /= sum_w;
+                prev_length = uint(round(length_sum / sum_w));
             }
         }
     }
@@ -246,15 +300,25 @@ void main(uint3 ipos: SV_DispatchThreadID) {
             max_history = min(1.0 / (1.0 - adaptive_alpha), max_history);
         }
 
-        const float new_history = min(prev_history + 1, max_history);
+        const float new_history =
+            min(float(prev_length) + 1, min(max_history, MAX_HISTORY_LENGTH));
         const float alpha = max(1. - pc.accum_alpha, 1. / new_history);
 
-        const float4 result = lerp(prev_out, src, alpha);
+        float4 result;
+        int4 out_low = 0;
+        if (accumulate_high_precision) {
+            float4 result_low;
+            result = lerp_precise(prev_out, prev_out_low, src, alpha, result_low);
+            out_low = encode_out_low(result, result_low, rng.next_float4());
+        } else {
+            result = lerp(prev_out, src, alpha);
+        }
 
         out_out.Store(ipos.xy, result);
-        out_history.Store(ipos.xy, encode_history(enc_normal, linear_z, new_history));
+        out_history.Store(ipos.xy,
+                          encode_history(enc_normal, linear_z, uint(round(new_history)), out_low));
     } else {
         out_out.Store(ipos.xy, src);
-        out_history.Store(ipos.xy, encode_history(enc_normal, linear_z, 1.0));
+        out_history.Store(ipos.xy, encode_history(enc_normal, linear_z, 1, 0));
     }
 }

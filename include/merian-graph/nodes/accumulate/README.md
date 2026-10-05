@@ -28,12 +28,16 @@ Outputs:
 | Type       | Output name   | Description                                                 | Format/Resolution           | Persistent |
 |------------|---------------|-------------------------------------------------------------|-----------------------------|------------|
 | VkImageOut | out           | exp average of irradiance in `rgb`, second moment in `a`    | user defined or like irr    | no         |
-| VkImageOut | history       | raw encoded normal in `r`; f16 depth, f16 history in `g`    | R32G32Uint                  | no         |
+| VkImageOut | history       | raw encoded normal in `r`; f16 depth, u16 history in `g`    | R32G32Uint                  | no         |
 
 `history` packs everything the node needs from the previous frame into one 8-byte texel:
 the scattered reprojection reads touch half as many cache lines as gathering the previous
 GBuffer and a separate history image (~14% faster at 1080p). Consumers read the history
-length as `f16tof32(history.g >> 16)`.
+length as `history.g >> 16`; it saturates at 65535.
+
+`high precision` keeps the mean exact for long converged renders: `out` becomes R32G32B32A32Sfloat
+and `history` R32G32B32A32Uint, with 11 more bits per channel of `out` and a 20 bit history length
+in `b` and `a`. The first two channels keep their layout.
 
 Events:
 

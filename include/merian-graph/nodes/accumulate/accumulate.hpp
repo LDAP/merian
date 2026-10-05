@@ -77,6 +77,8 @@ class Accumulate : public Node {
     ShaderCompileContextHandle compile_context;
     // Undefined: keep the format of the input.
     vk::Format overwrite_format = vk::Format::eUndefined;
+    bool high_precision = false;
+    bool compiled_high_precision = false;
 
     static constexpr uint32_t PERCENTILE_LOCAL_SIZE_X = 8;
     static constexpr uint32_t PERCENTILE_LOCAL_SIZE_Y = 8;

@@ -25,6 +25,7 @@ const int SVGF_ITERATIONS = 0;
 // graph-bound
 ParameterBlock<GBuffer> in_gbuffer;
 Sampler2D<float4> in_src;
+[vk::image_format("unknown")]
 Sampler2D<uint2> in_history;
 
 // internal ping-pong (bound by the node)
@@ -153,8 +154,8 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
 
     irr_moments /= sum_w;
 
-    // history length: f16 in the high half of .y
-    const float history = f16tof32(in_history.Load(uint3(mirror_repeat_ipos, 0)).y >> 16);
+    // history length: u16 in the high half of .y
+    const float history = float(in_history.Load(uint3(mirror_repeat_ipos, 0)).y >> 16);
     const float alpha = saturate(params.spatial_bias / pow(history, params.spatial_falloff));
 
     irr_moments = lerp(center_irr_moments, irr_moments, alpha);

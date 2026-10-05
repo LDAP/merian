@@ -3,12 +3,20 @@
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 #include "merian/vk/utils/subresource_ranges.hpp"
 
+#include <fmt/format.h>
+
 namespace merian {
 
 namespace {
 constexpr const char* ACCUMULATE_MODULE = "merian-graph/nodes/accumulate/accumulate.slang";
 constexpr const char* PERCENTILES_MODULE =
     "merian-graph/nodes/accumulate/calculate_percentiles.slang";
+
+std::string constants_module(const bool high_precision) {
+    return fmt::format("module accumulate_constants;\n"
+                       "public static const bool accumulate_high_precision = {};",
+                       high_precision);
+}
 } // namespace
 
 Accumulate::Accumulate() {}
@@ -20,6 +28,7 @@ DeviceSupportInfo Accumulate::query_device_support(const DeviceSupportQueryInfo&
     for (const char* module : {ACCUMULATE_MODULE, PERCENTILES_MODULE}) {
         const auto composition = SlangComposition::create();
         composition->add_composition(GBufferLayout::complete()->get_composition());
+        composition->add_module_from_string("accumulate_constants", constants_module(false));
         composition->add_module_from_path(module, true);
         support = support & SlangProgram::create(query_info.compile_context, composition)
                                 .get()
@@ -41,6 +50,8 @@ void Accumulate::initialize(const ContextHandle& context,
         [this] {
             const auto composition = SlangComposition::create();
             composition->add_composition(gbuffer_layout->get_composition());
+            composition->add_module_from_string("accumulate_constants",
+                                                constants_module(high_precision));
             composition->add_module_from_path(ACCUMULATE_MODULE, true);
             return composition;
         },
@@ -65,10 +76,14 @@ std::vector<InputConnectorDescriptor> Accumulate::describe_inputs() {
 std::vector<OutputConnectorDescriptor> Accumulate::describe_outputs(const NodeIOLayout& io_layout) {
 
     irr_create_info = io_layout[con_src]->get_create_info_or_throw();
-    con_out = ManagedVkImageOut::create(
-        overwrite_format != vk::Format::eUndefined ? overwrite_format : irr_create_info.format,
-        irr_create_info.extent);
-    con_history = ManagedVkImageOut::create(vk::Format::eR32G32Uint, irr_create_info.extent);
+    const vk::Format out_format = high_precision ? vk::Format::eR32G32B32A32Sfloat
+                                  : overwrite_format != vk::Format::eUndefined
+                                      ? overwrite_format
+                                      : irr_create_info.format;
+    con_out = ManagedVkImageOut::create(out_format, irr_create_info.extent);
+    con_history = ManagedVkImageOut::create(high_precision ? vk::Format::eR32G32B32A32Uint
+                                                           : vk::Format::eR32G32Uint,
+                                            irr_create_info.extent);
 
     events.register_listeners(io_layout);
 
@@ -84,8 +99,10 @@ Accumulate::on_connected(const NodeIOLayout& io_layout,
                          [[maybe_unused]] const NodeConnectionInfo& info,
                          [[maybe_unused]] Submission& submission) {
     if (const GBufferLayoutHandle& layout = io[con_gbuffer]->get_layout();
-        !gbuffer_layout || *layout != *gbuffer_layout) {
+        !gbuffer_layout || *layout != *gbuffer_layout ||
+        compiled_high_precision != high_precision) {
         gbuffer_layout = layout;
+        compiled_high_precision = high_precision;
         accumulate_kernel->invalidate();
     }
 
@@ -262,9 +279,15 @@ Accumulate::NodeStatusFlags Accumulate::properties(Properties& config) {
                           percentile_pc.adaptive_alpha_percentile_upper);
 
     config.st_separate();
-    needs_rebuild |=
-        config.config_enum("overwrite format", overwrite_format, Properties::OptionsStyle::COMBO,
-                           "Undefined keeps the format of the input.");
+    needs_rebuild |= config.config_bool(
+        "high precision", high_precision,
+        "Accumulates beyond the precision of a float and up to 2^20 instead of 2^16 frames, for "
+        "long converged renders. Forces a float32 output and widens the history.");
+    if (!high_precision) {
+        needs_rebuild |= config.config_enum("overwrite format", overwrite_format,
+                                            Properties::OptionsStyle::COMBO,
+                                            "Undefined keeps the format of the input.");
+    }
 
     return needs_rebuild ? NodeStatusFlags{NEEDS_RECONNECT} : NodeStatusFlags{};
 }
