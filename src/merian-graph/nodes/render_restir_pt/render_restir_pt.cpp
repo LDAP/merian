@@ -133,6 +133,7 @@ void RenderRestirPT::update_render_constants() {
                     "export static const int merian_restir_pt_spp = {};\n"
                     "export static const int merian_restir_pt_max_path_length = {};\n"
                     "export static const bool merian_restir_pt_russian_roulette = {};\n"
+                    "export static const uint merian_restir_pt_roulette_depth = {}u;\n"
                     "export static const uint merian_restir_pt_shift_mapping = {}u;\n"
                     "export static const bool merian_restir_pt_emission_on_primary = {};\n"
                     "export static const bool merian_restir_pt_area = {};\n"
@@ -160,7 +161,7 @@ void RenderRestirPT::update_render_constants() {
                     "export static const uint merian_restir_pt_debug_view = {}u;\n"
                     "export static const uint merian_restir_pt_record = {}u;\n"
                     "}}",
-                    spp, max_path_length, b(russian_roulette), shift_mapping,
+                    spp, max_path_length, b(russian_roulette), roulette_depth, shift_mapping,
                     b(emission_on_primary), b(area), mask, min_footprint / 100.f, footprint_jitter,
                     min_roughness, roughness_jitter, neighbor_selection, neighbor_count,
                     cgns_candidates, b(early_stopping), b(geometry_rejection), reject_normal,
@@ -574,6 +575,11 @@ RenderRestirPT::NodeStatusFlags RenderRestirPT::properties(Properties& config) {
         "russian roulette", russian_roulette,
         "Terminate low-throughput paths. The target function leaves the roulette out, so it only "
         "decides which candidates are drawn.");
+    if (russian_roulette || !config.is_ui()) {
+        constants_changed |= config.config_uint(
+            "roulette depth", roulette_depth,
+            "Path depth, counted from the primary hit, up to which no path is terminated.", 0, 16);
+    }
     constants_changed |= config.config_bool(
         "area reservoirs", area,
         "Integrate over the pixel's area and the lens (Zhang et al. 2024): every path carries its "

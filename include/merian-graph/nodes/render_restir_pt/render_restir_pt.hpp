@@ -95,6 +95,7 @@ class RenderRestirPT : public Node {
     int32_t emitted_max_path_length = max_path_length;
     uint32_t seed = 0;
     bool russian_roulette = true;
+    uint32_t roulette_depth = 2;
     bool emission_on_primary = true;
     bool area = false;
     bool demodulate_albedo = false;

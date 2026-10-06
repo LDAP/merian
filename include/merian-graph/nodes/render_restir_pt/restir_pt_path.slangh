@@ -14,6 +14,7 @@ namespace merian {
 
 extern static const int merian_restir_pt_max_path_length = 6;
 extern static const bool merian_restir_pt_russian_roulette = true;
+extern static const uint merian_restir_pt_roulette_depth = 2u;
 extern static const uint merian_restir_pt_shift_mapping = RestirPTShiftHybrid;
 extern static const bool merian_restir_pt_emission_on_primary = true;
 // integrate over the pixel area and the lens: both samples become part of the path
@@ -850,7 +851,7 @@ float3 restir_pt_trace_candidates(const ParameterBlock<Scene> scene,
         }
 
         // 3. russian roulette, which the target function leaves out [Lin et al. 2022, 7.4]
-        if (merian_restir_pt_russian_roulette && i > 1) {
+        if (merian_restir_pt_russian_roulette && i > merian_restir_pt_roulette_depth) {
             const float survive = russian_roulette_survival(throughput);
             if (!(rng.next_float() < survive)) {
                 rec.terminal(records, sp.pos);

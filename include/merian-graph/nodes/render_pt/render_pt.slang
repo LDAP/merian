@@ -38,6 +38,7 @@ extern static const int merian_render_surface_guiding_candidates = 2;
 extern static const float merian_render_surface_guiding_share = 0.5;
 extern static const bool merian_render_surface_cache_tail = false;
 extern static const bool merian_render_russian_roulette = true;
+extern static const int merian_render_roulette_depth = 2;
 } // namespace merian
 
 interface IThreadReorder {
@@ -214,7 +215,8 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
             !bsdf_is_delta_only(bsdf.get_lobe_types()) &&
             (merian_render_surface_nee_mode != NEEMode::Mixture ||
              bsdf.effective_alpha >= merian_render_surface_nee_alpha_threshold);
-        const bool roulette = merian_render_russian_roulette && !pass_through;
+        const bool roulette = merian_render_russian_roulette && !pass_through &&
+                              bounce > merian_render_roulette_depth;
         let lights = scene.nee.begin_vertex(
             sp.pos,
             Scene::get_receiver_normal(ray.Direction, ng,

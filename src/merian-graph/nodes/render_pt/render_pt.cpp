@@ -419,6 +419,7 @@ void RenderPT::update_render_constants() {
         "export static const bool merian_render_enable_ser = {};\n"
         "export static const bool merian_render_demodulate_albedo = {};\n"
         "export static const bool merian_render_russian_roulette = {};\n"
+        "export static const int merian_render_roulette_depth = {};\n"
         "export static const bool merian_render_guiding_scale_with_alpha = {};\n"
         "export static const float merian_render_guiding_alpha_threshold = {:f};\n"
         "export static const GuidingDirectTarget merian_render_guiding_direct_target = "
@@ -444,7 +445,7 @@ void RenderPT::update_render_constants() {
         emission_on_primary, static_cast<int32_t>(emitted_debug_output), near_specular_pass_through,
         near_specular_pass_through && has_guiding_model(), near_specular_max_alpha, spp, seed,
         max_path_length, limit_bounces, diffuse_limit, glossy_limit, transmission_limit, mask,
-        enable_ser, demodulate_albedo, russian_roulette, guiding_scale_with_alpha,
+        enable_ser, demodulate_albedo, russian_roulette, roulette_depth, guiding_scale_with_alpha,
         guiding_alpha_threshold, static_cast<int32_t>(guiding_direct_target),
         static_cast<int32_t>(surface.nee_mode), surface.nee_probability(has_guiding()),
         surface_nee_bounces, surface_nee_alpha_threshold,
@@ -563,6 +564,12 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
         constants_changed |=
             config.config_bool("russian roulette", russian_roulette,
                                "Terminate paths in proportion to the light they can still carry.");
+        if (russian_roulette || !config.is_ui()) {
+            constants_changed |= config.config_int(
+                "roulette depth", roulette_depth,
+                "Path depth, counted from the primary hit, up to which no path is terminated.", 0,
+                16);
+        }
         constants_changed |= surface.properties(config, "bsdf", shows_guiding_model, shows_cache);
         config.st_separate("near-specular");
         constants_changed |= config.config_bool(

@@ -122,6 +122,7 @@ class RenderPT : public Node {
     TraceShader trace_shader = TraceShader::Auto;
     bool raygen_preferred = true;
     bool russian_roulette = true;
+    int32_t roulette_depth = 2;
     bool demodulate_albedo = false;
     GuidingModelHandle guiding;
     uint32_t guiding_version = 0;
