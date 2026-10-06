@@ -10,6 +10,7 @@ import merian_shaders.scene.scene;
 import merian_shaders.utils.encoding;
 import merian_shaders.utils.hash;
 import merian_shaders.utils.random;
+import merian_shaders.utils.sampling;
 import merian_shaders.colors.colorspaces;
 #endif
 

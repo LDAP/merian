@@ -16,8 +16,8 @@ struct RenderFrameInfo {
     uint index;
 }
 
-// One bit per followed surface below a leading 1, set where it transmitted. Rough once a surface
-// did not scatter singularly or more than seven were followed.
+// One bit per passed near-specular surface below a leading 1, set where it transmitted. Rough once
+// a surface did not scatter singularly or more than seven were passed.
 static const uint8_t SPECULAR_CHAIN_EMPTY = 1;
 static const uint8_t SPECULAR_CHAIN_ROUGH = 0;
 
@@ -52,13 +52,13 @@ struct PathSegment {
     float3 pos;
     float3 normal;
     uint16_t bounce;
-    // the surfaces followed to reach next_pos
+    // the near-specular surfaces passed to reach next_pos
     uint8_t chain;
 
     float3 wo;
     // over every technique that could have generated wo
     float pdf;
-    // throughput from pos to next_pos, the surfaces followed on the way included
+    // throughput from pos to next_pos, the near-specular surfaces on the way included
     float3 weight;
     bool delta;
     // the integrator gathers nothing beyond next_pos
@@ -67,7 +67,7 @@ struct PathSegment {
     // Set only where a continuation ray was traced. A ray that left the scene is traced.
     bool traced;
     float3 next_pos;
-    // where the light along wo appears to come from, behind every surface the path followed
+    // where the light along wo appears to come from, behind every near-specular surface passed
     float3 aim_pos;
     float3 next_normal;
     half3 next_mv;

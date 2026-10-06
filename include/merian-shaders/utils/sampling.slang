@@ -111,4 +111,8 @@ float3 sample_cone2(const float3 w, const float cos_theta, inout RandomGenerator
     return tangent * sin_theta * cos(phi) + bitangent * sin_theta * sin(phi) - w * cos_theta;
 }
 
+float russian_roulette_survival(const float3 throughput) {
+    return min(1.0f, sqrt(max(throughput.x, max(throughput.y, throughput.z))));
+}
+
 }

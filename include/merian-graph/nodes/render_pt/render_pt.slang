@@ -5,6 +5,7 @@ import merian_shaders.gbuffer;
 import merian_shaders.scene.scene;
 import merian_shaders.scene.virtual_image;
 import merian_shaders.utils.random;
+import merian_shaders.utils.sampling;
 import merian_shaders.utils.hash;
 import merian_shaders.utils.textures;
 import merian_shaders.colors.colorspaces;
@@ -25,8 +26,9 @@ extern static const uint merian_render_max_transmission_bounces = 255u;
 extern static const uint merian_render_instance_mask = 0xFFu;
 extern static const bool merian_render_enable_ser = false;
 extern static const bool merian_render_demodulate_albedo = false;
-extern static const bool merian_render_follow_specular = true;
-extern static const float merian_render_follow_max_alpha = 0.0625f;
+extern static const bool merian_render_near_specular_pass_through = true;
+extern static const bool merian_render_near_specular_follow = true;
+extern static const float merian_render_near_specular_max_alpha = 0.0625f;
 extern static const NEEMode merian_render_surface_nee_mode = NEEMode::Resampled;
 extern static const float merian_render_surface_nee_probability = 0.f;
 extern static const int merian_render_surface_nee_bounces = 0;
@@ -144,7 +146,7 @@ struct BounceCounts {
 }
 
 bool survives_roulette(inout float3 throughput, inout RandomGenerator rng) {
-    const float survive = min(1.f, yuv_luminance(throughput));
+    const float survive = russian_roulette_survival(throughput);
     if (rng.next_float() >= survive) {
         return false;
     }
@@ -202,17 +204,23 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
         const float3 ng = sp.get_face_normal();
         const float spawn_offset = sp.spawn_offset;
         let bsdf = sp.surface_material.get_bsdf();
-        const bool nee_surface = nee &&
-                                 (merian_render_surface_nee_bounces <= 0 ||
-                                  bounce <= merian_render_surface_nee_bounces) &&
-                                 bsdf.effective_alpha >= merian_render_surface_nee_alpha_threshold;
+        const bool pass_through = merian_render_near_specular_pass_through && bounce > 1 &&
+                                  bsdf.effective_alpha < merian_render_near_specular_max_alpha &&
+                                  !any(sp.emission > 0.f);
+        const bool nee_surface =
+            nee && !pass_through &&
+            (merian_render_surface_nee_bounces <= 0 ||
+             bounce <= merian_render_surface_nee_bounces) &&
+            !bsdf_is_delta_only(bsdf.get_lobe_types()) &&
+            (merian_render_surface_nee_mode != NEEMode::Mixture ||
+             bsdf.effective_alpha >= merian_render_surface_nee_alpha_threshold);
+        const bool roulette = merian_render_russian_roulette && !pass_through;
         let lights = scene.nee.begin_vertex(
             sp.pos,
             Scene::get_receiver_normal(ray.Direction, ng,
                                        bsdf_is_transmissive(bsdf.get_lobe_types())),
             rng);
-        if (merian_render_russian_roulette && roulette_first &&
-            !survives_roulette(throughput, rng)) {
+        if (roulette && roulette_first && !survives_roulette(throughput, rng)) {
             break;
         }
         const LightOrScatter techniques =
@@ -262,8 +270,7 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
                 rng);
         }
 
-        if (merian_render_russian_roulette && !roulette_first &&
-            !survives_roulette(throughput, rng)) {
+        if (roulette && !roulette_first && !survives_roulette(throughput, rng)) {
             break;
         }
 
@@ -447,12 +454,12 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
             chain_weight *= medium.transmittance(distance_travelled);
             image.propagate(distance_travelled);
 
-            if (!merian_render_follow_specular || !sp.has_surface_material ||
+            if (!merian_render_near_specular_follow || !sp.has_surface_material ||
                 any(sp.emission > 0.f)) {
                 break;
             }
             let follow_bsdf = sp.surface_material.get_bsdf();
-            if (follow_bsdf.effective_alpha >= merian_render_follow_max_alpha) {
+            if (follow_bsdf.effective_alpha >= merian_render_near_specular_max_alpha) {
                 break;
             }
 
@@ -461,6 +468,8 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
             const Optional<ShadingFunctionSample> chain_sample =
                 follow_bsdf.sample_eval(chain_wi, rng);
             if (!chain_sample.hasValue) {
+                // a refused sample ends the path
+                sp.has_surface_material = false;
                 break;
             }
             const float3 chain_wo_local = chain_sample.value.wo;
@@ -469,6 +478,7 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
             const Optional<RayDesc> chain_ray =
                 sp.make_ray(-ray.Direction, chain_wo, chain_transmission);
             if (!chain_ray.hasValue) {
+                sp.has_surface_material = false;
                 break;
             }
 

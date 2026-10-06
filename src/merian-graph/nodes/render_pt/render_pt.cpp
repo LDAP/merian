@@ -405,8 +405,9 @@ void RenderPT::update_render_constants() {
         "namespace merian {{\n"
         "export static const bool merian_render_emission_on_primary = {};\n"
         "export static const DebugOutput merian_render_debug_output = DebugOutput({});\n"
-        "export static const bool merian_render_follow_specular = {};\n"
-        "export static const float merian_render_follow_max_alpha = {:f};\n"
+        "export static const bool merian_render_near_specular_pass_through = {};\n"
+        "export static const bool merian_render_near_specular_follow = {};\n"
+        "export static const float merian_render_near_specular_max_alpha = {:f};\n"
         "export static const int merian_render_spp = {};\n"
         "export static const uint merian_render_seed = {}u;\n"
         "export static const int merian_render_max_path_length = {};\n"
@@ -440,12 +441,13 @@ void RenderPT::update_render_constants() {
         "export static const float merian_render_distance_guiding_share = {:f};\n"
         "export static const float merian_render_volume_forward_project_min_z = {:f};\n"
         "}}",
-        emission_on_primary, static_cast<int32_t>(emitted_debug_output), follow_specular,
-        follow_max_alpha, spp, seed, max_path_length, limit_bounces, diffuse_limit, glossy_limit,
-        transmission_limit, mask, enable_ser, demodulate_albedo, russian_roulette,
-        guiding_scale_with_alpha, guiding_alpha_threshold,
-        static_cast<int32_t>(guiding_direct_target), static_cast<int32_t>(surface.nee_mode),
-        surface.nee_probability(has_guiding()), surface_nee_bounces, surface_nee_alpha_threshold,
+        emission_on_primary, static_cast<int32_t>(emitted_debug_output), near_specular_pass_through,
+        near_specular_pass_through && has_guiding_model(), near_specular_max_alpha, spp, seed,
+        max_path_length, limit_bounces, diffuse_limit, glossy_limit, transmission_limit, mask,
+        enable_ser, demodulate_albedo, russian_roulette, guiding_scale_with_alpha,
+        guiding_alpha_threshold, static_cast<int32_t>(guiding_direct_target),
+        static_cast<int32_t>(surface.nee_mode), surface.nee_probability(has_guiding()),
+        surface_nee_bounces, surface_nee_alpha_threshold,
         static_cast<int32_t>(surface.guiding_mode), surface.guiding_candidates,
         surface.guided_probability(has_guiding()), surface.cache_tail && has_irradiance_cache(),
         volume_spp, static_cast<int32_t>(volume.nee_mode),
@@ -562,6 +564,18 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
             config.config_bool("russian roulette", russian_roulette,
                                "Terminate paths in proportion to the light they can still carry.");
         constants_changed |= surface.properties(config, "bsdf", shows_guiding_model, shows_cache);
+        config.st_separate("near-specular");
+        constants_changed |= config.config_bool(
+            "near-specular pass-through", near_specular_pass_through,
+            "Near-specular surfaces sample no lights, end no path by roulette and have no guiding "
+            "lobe. With a guiding method, the vertex before them guides towards the light behind "
+            "them.");
+        if (near_specular_pass_through) {
+            constants_changed |= config.config_float(
+                "near-specular alpha", near_specular_max_alpha,
+                "Surfaces with a smaller GGX alpha (roughness squared) are near-specular.", 0.001f,
+                0.f, 1.f);
+        }
         config.st_end_child();
     }
 
@@ -601,55 +615,44 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
     if (config.st_begin_child("nee", "NEE")) {
         constants_changed |= config.config_int(
             "bounces", surface_nee_bounces,
-            "Path depth, counted from the primary hit and including the followed specular "
+            "Path depth, counted from the primary hit and including the near-specular "
             "surfaces, up to which surface vertices sample lights; 0 = all.",
             0, 16);
-        constants_changed |= config.config_float(
-            "alpha threshold", surface_nee_alpha_threshold,
-            "Below this GGX alpha (roughness squared) a surface samples no lights.", 0.001f, 0.f,
-            1.f);
+        if (surface.nee_mode == NEEMode::Mixture || !config.is_ui()) {
+            constants_changed |= config.config_float(
+                "alpha threshold", surface_nee_alpha_threshold,
+                "Below this GGX alpha (roughness squared) a surface draws no light sample in the "
+                "mixture.",
+                0.001f, 0.f, 1.f);
+        }
         config.st_end_child();
     }
 
-    if (config.st_begin_child("guiding", "Guiding")) {
+    if (shows_guiding && config.st_begin_child("guiding", "Guiding")) {
         constants_changed |= config.config_bool(
-            "follow specular", follow_specular,
-            "Follow a smooth surface instead of making it a path vertex: no guiding lobe and no "
-            "light sampler resolves it, so it costs a guiding query and a write for nothing, and "
-            "leaves the vertex before it aiming at the surface rather than at the light behind "
-            "it.");
-        if (follow_specular) {
-            constants_changed |= config.config_float(
-                "follow below alpha", follow_max_alpha,
-                "Surfaces with a smaller GGX alpha (roughness squared) are followed.", 0.001f, 0.f,
-                1.f);
+            "scale with alpha", guiding_scale_with_alpha,
+            "Scale the guiding share with the GGX alpha of the surface, so a narrow lobe "
+            "keeps its own sampling.");
+        constants_changed |= config.config_float(
+            "alpha threshold", guiding_alpha_threshold,
+            "Below this GGX alpha the guiding lobes are broader than the shading function "
+            "itself, so nothing is guided.",
+            0.001f, 0.f, 1.f);
+        int direct_target_index = static_cast<int>(guiding_direct_target);
+        if (config.config_options(
+                "direct light target", direct_target_index, {"full", "MIS", "none"},
+                Properties::OptionsStyle::COMBO,
+                "What a method learns from a vertex that ended on a light: the emission "
+                "whole, only the share the scatter technique pays for, or nothing.")) {
+            guiding_direct_target = static_cast<DirectTarget>(direct_target_index);
+            constants_changed = true;
         }
-        if (shows_guiding) {
-            constants_changed |= config.config_bool(
-                "scale with alpha", guiding_scale_with_alpha,
-                "Scale the guiding share with the GGX alpha of the surface, so a narrow lobe "
-                "keeps its own sampling.");
-            constants_changed |= config.config_float(
-                "alpha threshold", guiding_alpha_threshold,
-                "Below this GGX alpha the guiding lobes are broader than the shading function "
-                "itself, so nothing is guided.",
-                0.001f, 0.f, 1.f);
-            int direct_target_index = static_cast<int>(guiding_direct_target);
-            if (config.config_options(
-                    "direct light target", direct_target_index, {"full", "MIS", "none"},
-                    Properties::OptionsStyle::COMBO,
-                    "What a method learns from a vertex that ended on a light: the emission "
-                    "whole, only the share the scatter technique pays for, or nothing.")) {
-                guiding_direct_target = static_cast<DirectTarget>(direct_target_index);
-                constants_changed = true;
-            }
-            const float p_nee = surface.nee_probability(true);
-            const float p_guided = (1.f - p_nee) * surface.guided_probability(true) *
-                                   (guiding_scale_with_alpha ? 0.5f : 1.f);
-            config.output_text(fmt::format(
-                "at alpha 0.5: {:.0f} % guided, {:.0f} % lights, {:.0f} % shading function",
-                p_guided * 100.f, p_nee * 100.f, (1.f - p_nee - p_guided) * 100.f));
-        }
+        const float p_nee = surface.nee_probability(true);
+        const float p_guided = (1.f - p_nee) * surface.guided_probability(true) *
+                               (guiding_scale_with_alpha ? 0.5f : 1.f);
+        config.output_text(
+            fmt::format("at alpha 0.5: {:.0f} % guided, {:.0f} % lights, {:.0f} % shading function",
+                        p_guided * 100.f, p_nee * 100.f, (1.f - p_nee - p_guided) * 100.f));
         config.st_end_child();
     }
 

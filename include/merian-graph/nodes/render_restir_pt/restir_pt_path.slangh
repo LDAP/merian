@@ -851,7 +851,7 @@ float3 restir_pt_trace_candidates(const ParameterBlock<Scene> scene,
 
         // 3. russian roulette, which the target function leaves out [Lin et al. 2022, 7.4]
         if (merian_restir_pt_russian_roulette && i > 1) {
-            const float survive = min(1.f, yuv_luminance(throughput));
+            const float survive = russian_roulette_survival(throughput);
             if (!(rng.next_float() < survive)) {
                 rec.terminal(records, sp.pos);
                 light_record.record(rec, records, sp.pos, i - 1, material);

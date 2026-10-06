@@ -138,8 +138,8 @@ class RenderPT : public Node {
 
     DebugOutput debug_output = DebugOutput::ScatterStatistics;
     bool debug_connected = false;
-    bool follow_specular = true;
-    float follow_max_alpha = 0.0625f;
+    bool near_specular_pass_through = true;
+    float near_specular_max_alpha = 0.0625f;
 
     Sampling surface;
     int32_t surface_nee_bounces = 0;
