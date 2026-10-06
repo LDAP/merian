@@ -255,10 +255,11 @@ restir_pt_project(const Camera camera,
         return none;
     const float2 plane = lens_pos + length(camera.W) / cos_w * float2(dot(dir, u), dot(dir, v));
     const float2 ndc = plane / float2(length(camera.U), length(camera.V));
-    if (any(ndc < -1.f) || any(ndc >= 1.f))
+    const float2 image_pos = float2(0.5f * ndc.x + 0.5f, 0.5f - 0.5f * ndc.y) * float2(dim);
+    if (!(all(image_pos >= 0.f) && all(image_pos < float2(dim))))
         return none;
     RestirPTProjection p;
-    p.image_pos = float2(0.5f * ndc.x + 0.5f, 0.5f - 0.5f * ndc.y) * float2(dim);
+    p.image_pos = image_pos;
     p.density = (distant ? 1.f : abs(dot(n, dir)) / dist2) / (cos_w * cos_w * cos_w);
     return p;
 }
