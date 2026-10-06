@@ -8,6 +8,8 @@ static const uint CDF_PUBLISHED = 1;
 struct LightCdfBinding {
     StructuredBuffer<EmissiveLightProxy, ScalarDataLayout> proxies;
     StructuredBuffer<uint> order;
+    // the fourth power of the radius instead of the flux
+    bool extent;
     RWStructuredBuffer<float2> cdf;
     // zeroed: the blocks started, then per block a flag and its total
     RWStructuredBuffer<uint> state;
@@ -112,10 +114,15 @@ float2 block_prefix(const RWStructuredBuffer<uint> state,
 scan(uint thread_id : SV_GroupIndex, ParameterBlock<LightCdfBinding> params) {
     const uint block = start_block(params.state, thread_id);
     const uint i = block * CDF_GROUP_SIZE + thread_id;
-    const float flux = i < params.count ? params.proxies[params.order[i]].flux : 0.f;
+    float value = 0.f;
+    if (i < params.count) {
+        const EmissiveLightProxy proxy = params.proxies[params.order[i]];
+        value =
+            params.extent ? proxy.radius * proxy.radius * proxy.radius * proxy.radius : proxy.flux;
+    }
 
     float2 total;
-    const float2 prefix = group_scan(float2(max(flux, 0.f), 0.f), thread_id, total);
+    const float2 prefix = group_scan(float2(max(value, 0.f), 0.f), thread_id, total);
     const float2 before = block_prefix(params.state, block, total, thread_id);
     if (i < params.count)
         params.cdf[i] = ff_add(before, prefix);

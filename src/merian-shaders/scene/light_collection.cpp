@@ -184,11 +184,13 @@ void LightCollection::ensure_pipelines(const SlangCompositionHandle& scene_compo
             return ComputePipeline::create(ep->get_pipeline_layout(context), ep->specialize());
         });
         cdf_pipeline.depends_on(cdf_entry_point);
-        cdf_params = Versioned<ShaderObject>([this] {
-            return cdf_entry_point->create_shader_object_for_parameter(context, "params",
-                                                                       allocator);
-        });
-        cdf_params.depends_on(cdf_entry_point);
+        for (Versioned<ShaderObject>* params : {&cdf_params, &extent_params}) {
+            *params = Versioned<ShaderObject>([this] {
+                return cdf_entry_point->create_shader_object_for_parameter(context, "params",
+                                                                           allocator);
+            });
+            params->depends_on(cdf_entry_point);
+        }
     }
 }
 
@@ -238,6 +240,10 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
                       cmd);
         ensure_buffer(tree_cdf_state_buffer, cdf_state_size(triangle_count),
                       "LightCollection::tree_cdf_state", cmd);
+        ensure_buffer(tree_extent_buffer, triangle_count * sizeof(float2),
+                      "LightCollection::tree_extent", cmd);
+        ensure_buffer(tree_extent_state_buffer, cdf_state_size(triangle_count),
+                      "LightCollection::tree_extent_state", cmd);
         ensure_buffer(setup_state_buffer, LIGHT_GRID_SETUP_STATE * sizeof(uint32_t),
                       "LightCollection::setup_state", cmd);
         ensure_buffer(sort_state_buffer, sort_state_size(), "LightCollection::sort_state", cmd);
@@ -380,6 +386,7 @@ void LightCollection::update(const CommandBufferHandle& cmd,
         cmd->fill(setup_state_buffer);
         cmd->fill(sort_state_buffer, 0, sort_state_size());
         cmd->fill(tree_cdf_state_buffer, 0, cdf_state_size(triangle_count));
+        cmd->fill(tree_extent_state_buffer, 0, cdf_state_size(triangle_count));
     }
     if (env_emissive && !env_importance_built)
         cmd->fill(env_cdf_state_buffer, 0,
@@ -429,6 +436,7 @@ void LightCollection::update(const CommandBufferHandle& cmd,
         c["proxies"] = proxies_buffer;
         c["tree_keys"] = tree_keys_buffer[0];
         c["tree_cdf"] = tree_cdf_buffer;
+        c["tree_extent"] = tree_extent_buffer;
         c["env_cdf"] = env_listed ? env_cdf_buffer : dummy;
         c["env_size"] = env_listed ? env_size : 0u;
         c["env_cones"] = env_listed ? env_cones_buffer : dummy;
@@ -553,14 +561,19 @@ void LightCollection::update(const CommandBufferHandle& cmd,
 
     if (triangle_count > 0) {
         MERIAN_PROFILE_SCOPE_GPU(cmd, "cdf");
-        const auto params = cdf_params.get();
-        auto c = params->get_cursor();
-        c["proxies"] = proxies_buffer;
-        c["order"] = tree_values_buffer[0];
-        c["cdf"] = tree_cdf_buffer;
-        c["state"] = tree_cdf_state_buffer;
-        c["count"] = triangle_count;
-        run(cdf_entry_point, cdf_pipeline, params, cdf_block_count(triangle_count));
+        const auto scan = [&](const ShaderObjectHandle& params, const bool extent,
+                              const BufferHandle& cdf, const BufferHandle& state) {
+            auto c = params->get_cursor();
+            c["proxies"] = proxies_buffer;
+            c["order"] = tree_values_buffer[0];
+            c["extent"] = extent;
+            c["cdf"] = cdf;
+            c["state"] = state;
+            c["count"] = triangle_count;
+            run(cdf_entry_point, cdf_pipeline, params, cdf_block_count(triangle_count));
+        };
+        scan(cdf_params.get(), false, tree_cdf_buffer, tree_cdf_state_buffer);
+        scan(extent_params.get(), true, tree_extent_buffer, tree_extent_state_buffer);
         barrier();
     }
 

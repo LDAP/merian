@@ -13,6 +13,8 @@ struct LightPreprocessBinding {
     StructuredBuffer<EmissiveLightProxy, ScalarDataLayout> proxies;
     StructuredBuffer<uint> tree_keys;
     StructuredBuffer<float2> tree_cdf;
+    // prefix sum of the triangles' radii to the fourth
+    StructuredBuffer<float2> tree_extent;
     StructuredBuffer<float2> env_cdf;
     // 0 where the cells do not list the environment
     uint env_size;
@@ -394,7 +396,11 @@ TreeNode tree_node(const LightPreprocessBinding params, const uint first, const 
         const float3 size = float3(uint3(1u) << axis_free);
         const LightTreeInfo info = params.tree_info[0];
         node.center = info.origin + (float3(lo) + 0.5f * size) / info.inv_cell_size;
-        node.radius = 0.5f * length(size) / info.inv_cell_size;
+        // the box holds the centroids; the L4 norm of the radii bounds the largest
+        const float extent = max(ff_diff(params.tree_extent[end - 1],
+                                         first > 0 ? params.tree_extent[first - 1] : float2(0)),
+                                 0.f);
+        node.radius = 0.5f * length(size) / info.inv_cell_size + sqrt(sqrt(extent));
         return node;
     }
 

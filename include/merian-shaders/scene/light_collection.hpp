@@ -218,6 +218,8 @@ class LightCollection {
     BufferHandle tree_rank_buffer;
     BufferHandle tree_cdf_buffer;
     BufferHandle tree_cdf_state_buffer;
+    BufferHandle tree_extent_buffer;
+    BufferHandle tree_extent_state_buffer;
     BufferHandle tree_info_buffer[2];
     BufferHandle setup_state_buffer;
     BufferHandle sort_state_buffer;
@@ -280,6 +282,7 @@ class LightCollection {
     Versioned<SlangProgramEntryPoint> cdf_entry_point;
     Versioned<Pipeline> cdf_pipeline;
     Versioned<ShaderObject> cdf_params;
+    Versioned<ShaderObject> extent_params;
 };
 
 } // namespace merian

@@ -150,6 +150,8 @@ struct EmissiveRegion {
 struct EmissiveLightProxy {
     float3 centroid;
     float flux;
+    // of the sphere around the centroid that holds the triangle
+    float radius;
 
 #ifndef __cplusplus
     bool is_valid() {
@@ -335,7 +337,7 @@ uint find_light_geometry(const StructuredBuffer<LightGeometry, ScalarDataLayout>
 static_assert(sizeof(EmissiveTriangle) == 64,
               "EmissiveTriangle must match the Slang scalar layout");
 static_assert(sizeof(LightGeometry) == 40, "LightGeometry layout mismatch");
-static_assert(sizeof(EmissiveLightProxy) == 16, "EmissiveLightProxy layout mismatch");
+static_assert(sizeof(EmissiveLightProxy) == 20, "EmissiveLightProxy layout mismatch");
 static_assert(sizeof(LightBound) == 24, "LightBound layout mismatch");
 static_assert(sizeof(EmissiveRegion) == 16, "EmissiveRegion layout mismatch");
 #endif

@@ -134,5 +134,8 @@ main(uint3 group_id : SV_GroupID,
     EmissiveLightProxy proxy;
     proxy.centroid = (tri.p0 + tri.p1 + tri.p2) * (1.f / 3.f);
     proxy.flux = tri.flux;
+    proxy.radius = sqrt(max(max(dot(tri.p0 - proxy.centroid, tri.p0 - proxy.centroid),
+                                dot(tri.p1 - proxy.centroid, tri.p1 - proxy.centroid)),
+                            dot(tri.p2 - proxy.centroid, tri.p2 - proxy.centroid)));
     params.proxies[i] = proxy;
 }
