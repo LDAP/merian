@@ -16,4 +16,8 @@ inline float yuv_luminance(const float3& color) {
     return merian::dot(color, float3(0.299, 0.587, 0.114));
 }
 
+inline float srgb_to_linear(const float c) {
+    return c <= 0.04045f ? c / 12.92f : std::pow((c + 0.055f) / 1.055f, 2.4f);
+}
+
 } // namespace merian

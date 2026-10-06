@@ -44,6 +44,11 @@ class AABB {
         b_max = max(v, b_max);
     }
 
+    float distance_sq(const float3& p) const {
+        const float3 d = max(max(b_min - p, float3(0)), p - b_max);
+        return dot(d, d);
+    }
+
     // Resets the AABB to [max,lowest] to be expanded
     void reset() {
         b_min = float3(std::numeric_limits<float>::max());

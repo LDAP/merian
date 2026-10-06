@@ -30,6 +30,13 @@ test_versioned = executable(
 )
 test('versioned', test_versioned, timeout: 30)
 
+test_geometry_utils = executable(
+    'test-geometry-utils',
+    'test_geometry_utils.cpp',
+    dependencies: [merian_dep, gtest_main_dep],
+)
+test('geometry_utils', test_geometry_utils, timeout: 30)
+
 test_omm_bake = executable(
     'test-omm-bake',
     'test_omm_bake.cpp',
