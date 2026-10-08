@@ -80,6 +80,7 @@ class SwapchainManager {
                 image_index_sync_group = swapchain->acquire(framebuffer_extent(), timeout);
             } catch (const Swapchain::needs_recreate& e) {
                 swapchain = std::make_shared<Swapchain>(swapchain);
+                image_views.clear();
                 recreated = true;
             }
         }

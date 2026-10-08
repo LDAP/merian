@@ -195,8 +195,14 @@ vk::Extent2D Swapchain::create_swapchain(const uint32_t width, const uint32_t he
                  capabilities.minImageExtent.width, capabilities.minImageExtent.height,
                  capabilities.maxImageExtent.width, capabilities.maxImageExtent.height);
 
+    // A minimized window can report its restored framebuffer size while the surface has none.
+    const vk::Extent2D extent = make_extent2D(capabilities, width, height);
+    if (extent.width == 0 || extent.height == 0) {
+        return extent;
+    }
+
     info = SwapchainInfo();
-    info->extent = make_extent2D(capabilities, width, height);
+    info->extent = extent;
 
     if (capabilities.maxImageCount > 0 && capabilities.maxImageCount < new_min_images) {
         SPDLOG_WARN("requested {} swapchain images but max is {}", new_min_images,
@@ -303,7 +309,11 @@ Swapchain::acquire(const vk::Extent2D extent, const uint64_t timeout) {
     assert(!swapchain || info);
 
     if (!swapchain) {
-        create_swapchain(extent.width, extent.height);
+        const vk::Extent2D surface_extent = create_swapchain(extent.width, extent.height);
+        if (surface_extent.width == 0 || surface_extent.height == 0) {
+            SPDLOG_DEBUG("acquire failed: surface extent is 0");
+            return std::nullopt;
+        }
     } else if (extent != info->extent) {
         info.reset();
         throw needs_recreate("changed framebuffer size");
@@ -375,22 +385,16 @@ void Swapchain::present(const QueueHandle& queue, const uint32_t image_idx) {
     SPDLOG_TRACE("swapchain {} presenting image index {} ({})", fmt::ptr(VkSwapchainKHR(swapchain)),
                  image_idx, fmt::ptr(VkImage(info->images[image_idx])));
 
-    vk::Result result = queue->present(vk::PresentInfoKHR{
-        **sync_groups[image_idx].written_semaphore,
-        swapchain,
-        image_idx,
-    });
-
-    if (result == vk::Result::eSuccess || result == vk::Result::eSuboptimalKHR) {
-        return;
-    }
-
-    if (result == vk::Result::eErrorOutOfDateKHR) {
+    try {
+        queue->present(vk::PresentInfoKHR{
+            **sync_groups[image_idx].written_semaphore,
+            swapchain,
+            image_idx,
+        });
+    } catch (const vk::OutOfDateKHRError&) {
         info.reset(); // purposefully invalidate, to signal present failed.
-        throw needs_recreate(result);
-        return;
+        throw needs_recreate(vk::Result::eErrorOutOfDateKHR);
     }
-    check_result(result, "present failed");
 }
 
 } // namespace merian
