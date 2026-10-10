@@ -31,6 +31,22 @@ T exact_sub<T : IFloat>(const T a, const T b) {
     };
 }
 
+T exact_mul<T : IFloat>(const T a, const T b) {
+    return spirv_asm {
+        %product : $$T = OpFMul $a $b;
+        OpDecorate %product NoContraction;
+        result : $$T = OpCopyObject %product;
+    };
+}
+
+T exact_fma<T : IFloat>(const T a, const T b, const T c) {
+    return spirv_asm {
+        %fused : $$T = OpExtInst glsl450 Fma $a $b $c;
+        OpDecorate %fused NoContraction;
+        result : $$T = OpCopyObject %fused;
+    };
+}
+
 // a + b == sum + error exactly (Knuth, TAOCP Vol. 2, TwoSum)
 T two_sum<T : IFloat>(const T a, const T b, out T error) {
     const T sum = exact_add(a, b);

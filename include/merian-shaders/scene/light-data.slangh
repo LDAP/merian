@@ -7,6 +7,7 @@
 __exported import merian_shaders.scene.light_select;
 import merian_shaders.scene.scene_data;
 import merian_shaders.utils.bit_twiddling;
+import merian_shaders.utils.math;
 #endif
 
 #include "merian-shaders/scene/micromap.slangh"
@@ -200,15 +201,15 @@ struct LightBound {
 #ifndef __cplusplus
 // Double-float sum (hi, lo), Knuth's TwoSum.
 float2 ff_add(const float2 a, const float2 b) {
-    precise const float s = a.x + b.x;
-    precise const float v = s - a.x;
-    precise const float e = (a.x - (s - v)) + (b.x - v) + a.y + b.y;
-    precise const float h = s + e;
-    return float2(h, e - (h - s));
+    float error;
+    const float sum = two_sum(a.x, b.x, error);
+    const float e = exact_add(exact_add(error, a.y), b.y);
+    const float hi = exact_add(sum, e);
+    return float2(hi, exact_sub(e, exact_sub(hi, sum)));
 }
 
 float ff_diff(const float2 a, const float2 b) {
-    return (a.x - b.x) + (a.y - b.y);
+    return exact_add(exact_sub(a.x, b.x), exact_sub(a.y, b.y));
 }
 
 float range_share(const StructuredBuffer<float2> cdf,
@@ -223,10 +224,10 @@ float range_share(const StructuredBuffer<float2> cdf,
 
 // Double-float product, with a fused multiply-add for the error of the leading one (Dekker 1971).
 float2 ff_mul(const float2 a, const float2 b) {
-    precise const float p = a.x * b.x;
-    precise const float e = fma(a.x, b.x, -p) + (a.x * b.y + a.y * b.x);
-    precise const float h = p + e;
-    return float2(h, e - (h - p));
+    const float p = exact_mul(a.x, b.x);
+    const float e = exact_add(exact_fma(a.x, b.x, -p), a.x * b.y + a.y * b.x);
+    const float hi = exact_add(p, e);
+    return float2(hi, exact_sub(e, exact_sub(hi, p)));
 }
 
 bool ff_greater(const float2 a, const float2 b) {
