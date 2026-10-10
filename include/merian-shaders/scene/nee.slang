@@ -122,6 +122,14 @@ struct LightGrid {
                                 base.dimension);
     }
 
+    float cell_scale(const uint cell) {
+        const LightGridInfo base = cascades[0];
+        const uint cascade = merian_nee_source == int(LightSource::LightSourceScene)
+                                 ? base.cascade_count - 1u
+                                 : cell / (base.dimension * base.dimension * base.dimension);
+        return light_cell_scale(cascades[cascade].inv_cell_size);
+    }
+
     bool weighs_at_cell() {
         return merian_nee_slot_weighing == int(LightSlotWeighing::LightSlotWeighingCell);
     }

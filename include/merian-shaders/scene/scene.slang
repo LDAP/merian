@@ -727,13 +727,15 @@ struct Scene {
             float learned = 0.f;
             float actual = 0.f;
             const uint base = light_bucket_base(vertex.cell);
+            const float to_relative = 1.f / nee.grid.cell_scale(vertex.cell);
             for (uint slot = 0; slot < LIGHT_GRID_SLOTS; slot++) {
                 const uint2 range = nee.grid.slot_range(base + slot);
                 if (range.x >= range.y)
                     continue;
                 listed += 1.f;
                 const float p = nee.grid.slot_share(vertex, base + slot, weights);
-                learned += p * nee.grid.contribution[base + slot].x;
+                learned += p * nee.grid.contribution[base + slot].x *
+                           nee.grid.estimate[base + slot] * to_relative;
                 uint texel;
                 const uint drawn = nee.draw_in_slot(base + slot, rng, texel);
                 let lp = nee.light_point(vertex, drawn, texel, base + slot, rng);

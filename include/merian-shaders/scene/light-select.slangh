@@ -72,6 +72,8 @@ static const uint LIGHT_GRID_FRESH_SPLITS = 8;
 static const float LIGHT_GRID_MAX_CONTRIBUTION = 64.f;
 static const float LIGHT_GRID_CONTRIBUTION_SCALE = 256.f;
 static const float LIGHT_GRID_CONTRIBUTION_SQUARE_SCALE = 4.f;
+// node geometry in cell sizes, scaled clear of denormals
+static const float LIGHT_GRID_GEOMETRY_SCALE = 65536.f;
 // samples per slot and frame whose fixed-point sums cannot wrap
 static const uint LIGHT_GRID_FEEDBACK_SAMPLES =
     0xFFFFFFFFu / (uint(LIGHT_GRID_MAX_CONTRIBUTION *
@@ -87,6 +89,10 @@ uint light_bucket_base(const uint bucket) {
 
 uint light_cell_index(const uint cascade, const uint3 coord, const uint dimension) {
     return coord.x + dimension * (coord.y + dimension * (coord.z + dimension * cascade));
+}
+
+float light_cell_scale(const float inv_cell_size) {
+    return LIGHT_GRID_GEOMETRY_SCALE / (inv_cell_size * inv_cell_size);
 }
 #endif
 
