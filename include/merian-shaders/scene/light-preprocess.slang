@@ -23,9 +23,9 @@ struct LightPreprocessBinding {
     StructuredBuffer<LightTreeInfo, ScalarDataLayout> tree_info_prev;
     RWStructuredBuffer<uint> grid_keys;
     StructuredBuffer<uint> grid_keys_prev;
-    RWStructuredBuffer<float3, ScalarDataLayout> grid_contribution;
-    StructuredBuffer<float3, ScalarDataLayout> grid_contribution_prev;
-    RWStructuredBuffer<float> grid_estimate;
+    // w: the estimate xyz is relative to
+    RWStructuredBuffer<float4> grid_contribution;
+    StructuredBuffer<float4> grid_contribution_prev;
     RWStructuredBuffer<uint> grid_feedback;
     StructuredBuffer<uint> grid_feedback_prev;
     // per cell: whether its feedback holds anything
@@ -465,6 +465,17 @@ Contribution halve_contribution(const Contribution parent,
                         min(parent.z, 4.f * LIGHT_GRID_PRIOR_SAMPLES));
 }
 
+Contribution absorb_contribution(const Contribution c,
+                                 const float flux,
+                                 const float3 geometry,
+                                 const float merged_flux,
+                                 const float3 merged_geometry) {
+    if (!(merged_flux > 0.f) || !(merged_geometry.x > 0.f))
+        return c;
+    const Contribution a = rescale_contribution(c, geometry.x / merged_geometry.x);
+    return Contribution(flux / merged_flux * a.xy, a.z);
+}
+
 struct CutSlot {
     TreeNode node;
     float3 geometry;
@@ -668,9 +679,9 @@ void store_cut<S : ISlotGroup>(const S slots,
 
     const uint entry = cell * LIGHT_GRID_SLOTS + slot;
     params.grid_keys[entry] = key;
-    params.grid_contribution[entry] = contribution;
+    params.grid_contribution[entry] =
+        float4(contribution, s.geometry.x > 0.f ? 1.f / s.geometry.x : 0.f);
     params.grid_starts[entry] = listed ? first : lights;
-    params.grid_estimate[entry] = emits && !s.node.distant ? 1.f / s.geometry.x : 1.f;
     if (touched) {
         for (uint i = 0; i < LIGHT_GRID_FEEDBACK_STRIDE; i++)
             params.grid_feedback[LIGHT_GRID_FEEDBACK_STRIDE * entry + i] = 0;
@@ -692,6 +703,8 @@ void store_cut<S : ISlotGroup>(const S slots,
 groupshared uint s_compact_key[LIGHT_GRID_SLOTS];
 groupshared uint s_compact_first[LIGHT_GRID_SLOTS];
 groupshared Contribution s_compact_contribution[LIGHT_GRID_SLOTS];
+groupshared float s_compact_flux[LIGHT_GRID_SLOTS];
+groupshared float3 s_compact_geometry[LIGHT_GRID_SLOTS];
 
 /* Each cell holds a cut through the light tree: a partition of all lights into nodes, drawn by
  * flux over squared distance times their learned contribution, and by flux within a node. A cell
@@ -702,8 +715,6 @@ void grid_cell<S : ISlotGroup>(const S slots,
                                const LightPreprocessBinding params,
                                const uint cell,
                                const uint slot) {
-    const uint dim = params.grid_info[0].dimension;
-    const uint cells_per_cascade = dim * dim * dim;
     const bool global = params.single_cut;
     // slot 0 clears it once stored
     const bool touched = slots.broadcast(slot == 0 ? params.grid_touched[cell] : 0u, 0) != 0;
@@ -725,11 +736,14 @@ void grid_cell<S : ISlotGroup>(const S slots,
 
     uint key = LIGHT_TREE_NO_KEY;
     Contribution contribution = Contribution(0.f);
+    float learned_estimate = 0.f;
     float samples = 0.f;
     if (carried || inherited) {
         const uint prev_entry = prev_cell * LIGHT_GRID_SLOTS + slot;
         key = params.grid_keys_prev[prev_entry];
-        contribution = params.grid_contribution_prev[prev_entry];
+        const float4 learned = params.grid_contribution_prev[prev_entry];
+        contribution = learned.xyz;
+        learned_estimate = learned.w;
         if (carried && params.grid_touched_prev[prev_cell] != 0) {
             const uint feedback_at = LIGHT_GRID_FEEDBACK_STRIDE * prev_entry;
             const uint3 feedback = uint3(params.grid_feedback_prev[feedback_at],
@@ -779,15 +793,12 @@ void grid_cell<S : ISlotGroup>(const S slots,
     {
         if (fresh) {
             contribution = prior_contribution(geometry, prior_mean(params, node.distant));
-        } else if (inherited && geometry.x > 0.f) {
-            const LightGridInfo coarser = params.grid_info_prev[prev_cell / cells_per_cascade];
-            const float3 coarser_center =
-                coarser.origin +
-                (floor((cg.center - coarser.origin) * coarser.inv_cell_size) + 0.5f) /
-                    coarser.inv_cell_size;
-            const float3 there = node_geometry(node, coarser_center, 0.f, nearest);
-            contribution = rescale_contribution(contribution, there.x / geometry.x);
-            contribution.z = min(contribution.z, LIGHT_GRID_PRIOR_SAMPLES);
+        } else {
+            if (learned_estimate > 0.f && geometry.x > 0.f)
+                contribution =
+                    rescale_contribution(contribution, 1.f / (learned_estimate * geometry.x));
+            if (inherited)
+                contribution.z = min(contribution.z, LIGHT_GRID_PRIOR_SAMPLES);
         }
     }
     CutSlot s = cut_slot(node, geometry, contribution);
@@ -810,13 +821,22 @@ void grid_cell<S : ISlotGroup>(const S slots,
                 s_compact_key[at] = key;
                 s_compact_first[at] = first;
                 s_compact_contribution[at] = contribution;
+                s_compact_flux[at] = node.flux;
+                s_compact_geometry[at] = geometry;
             }
             GroupMemoryBarrierWithGroupSync();
             const uint kept = slots.count(keep);
             key = slot < kept ? s_compact_key[slot] : LIGHT_TREE_NO_KEY;
             first = slot < kept ? s_compact_first[slot] : lights;
             contribution = slot < kept ? s_compact_contribution[slot] : Contribution(0.f);
-            evaluated = false;
+            const uint merged_end = cut_end(slots, first, slot, lights);
+            s = cut_slot(params, cg, first, slot < kept ? merged_end : first, contribution);
+            if (slot < kept) {
+                contribution =
+                    absorb_contribution(contribution, s_compact_flux[slot],
+                                        s_compact_geometry[slot], s.node.flux, s.geometry);
+                s = cut_slot(s.node, s.geometry, contribution);
+            }
         }
     }
 

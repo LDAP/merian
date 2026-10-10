@@ -81,8 +81,8 @@ struct LightGrid {
     // in cells
     float jitter;
     float even_share;
-    StructuredBuffer<float3, ScalarDataLayout> contribution;
-    StructuredBuffer<float> estimate;
+    // w: the estimate xyz is relative to
+    StructuredBuffer<float4> contribution;
     StructuredBuffer<LightBound, ScalarDataLayout> slot_bounds;
     StructuredBuffer<float> probability;
     RWStructuredBuffer<uint> feedback;
@@ -423,7 +423,7 @@ struct NEE {
             return none;
         const EmissiveTriangle tri = table.triangles[index];
         const float3 scaled_n = tri.get_scaled_normal();
-        if (length(scaled_n) <= 0.f)
+        if (!(tri.flux > 0.f) || length(scaled_n) <= 0.f)
             return none;
         const float3 bary = merian::sample_triangle(rng);
         const float3 light_pos =
@@ -536,7 +536,7 @@ struct NEE {
             entry = grid.slot_of(vertex.cell, position);
         float contribution = delivery(index, dir, radiance);
         if (contribution > 0.f && index != LIGHT_ENV_INDEX)
-            contribution *= grid.estimate[entry] / max(dist * dist, 1e-8f);
+            contribution *= grid.contribution[entry].w / max(dist * dist, 1e-8f);
         grid.count_sample(entry, contribution, rng.next_float2());
     }
 
@@ -603,6 +603,8 @@ struct NEE {
                                           const MaterialSystem material_system,
                                           const float time) {
         const EmissiveTriangle tri = table.triangles[index];
+        if (!(tri.flux > 0.f))
+            return none;
         const EmissiveRegion region = table.regions[index];
         const float3 uniform = merian::sample_triangle(rng);
         const float3 bary = region.to_triangle(uniform, rng.next_float());

@@ -279,7 +279,7 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
                 grid_touched_buffer[i]};
             ensure_buffer(grid_keys_buffer[i], slot_count * sizeof(uint32_t),
                           "LightCollection::grid_keys", cmd);
-            ensure_buffer(grid_contribution_buffer[i], slot_count * sizeof(float3),
+            ensure_buffer(grid_contribution_buffer[i], slot_count * sizeof(float4),
                           "LightCollection::grid_contribution", cmd);
             ensure_buffer(grid_feedback_buffer[i],
                           LIGHT_GRID_FEEDBACK_STRIDE * slot_count * sizeof(uint32_t),
@@ -295,8 +295,6 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
         }
         ensure_buffer(grid_starts_buffer, slot_count * sizeof(uint32_t),
                       "LightCollection::grid_starts", cmd);
-        ensure_buffer(grid_estimate_buffer, slot_count * sizeof(float),
-                      "LightCollection::grid_estimate", cmd);
         if (slot_weighing == LightSlotWeighing::LightSlotWeighingShadingPoint) {
             ensure_buffer(grid_slot_bounds_buffer, slot_count * sizeof(LightBound),
                           "LightCollection::grid_slot_bounds", cmd);
@@ -443,7 +441,6 @@ void LightCollection::update(const CommandBufferHandle& cmd,
         c["grid_touched"] = or_dummy(grid_touched_buffer[grid_slot]);
         c["grid_touched_prev"] = or_dummy(grid_touched_buffer[grid_slot ^ 1]);
         c["grid_starts"] = or_dummy(grid_starts_buffer);
-        c["grid_estimate"] = or_dummy(grid_estimate_buffer);
         c["grid_probability"] = or_dummy(grid_probability_buffer);
         c["grid_slot_bounds"] = or_dummy(grid_slot_bounds_buffer);
         c["grid_info"] = grid_info_buffer[grid_slot];
@@ -613,7 +610,6 @@ void LightCollection::write_to(ShaderCursor cursor) const {
     grid["jitter"] = debug_jitter ? grid_jitter : 0.f;
     grid["even_share"] = grid_even_share;
     grid["contribution"] = active ? grid_contribution_buffer[grid_slot] : dummy;
-    grid["estimate"] = active ? grid_estimate_buffer : dummy;
     grid["slot_bounds"] = active && grid_slot_bounds_buffer ? grid_slot_bounds_buffer : dummy;
     grid["probability"] = active && grid_probability_buffer ? grid_probability_buffer : dummy;
     grid["feedback"] = active ? grid_feedback_buffer[grid_slot] : dummy;

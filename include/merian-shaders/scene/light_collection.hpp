@@ -228,7 +228,6 @@ class LightCollection {
     // zeroed in the next update
     bool grid_feedback_fresh = false;
     BufferHandle grid_starts_buffer;
-    BufferHandle grid_estimate_buffer;
     BufferHandle grid_slot_bounds_buffer;
     BufferHandle grid_probability_buffer;
     BufferHandle grid_info_buffer[2];
