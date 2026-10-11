@@ -65,14 +65,15 @@ interface BSDF : ShadingFunction {
 }
 
 struct NullBSDF : BSDF {
-    float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) {
-        return float3(0);
-    }
     Optional<float3> sample(const float3 wi, inout RandomGenerator rng) {
         return none;
     }
     float pdf(const float3 wi, const float3 wo) {
         return 0;
+    }
+    float3 eval_pdf(const float3 wi, const float3 wo, inout RandomGenerator rng, out float pdf) {
+        pdf = 0;
+        return float3(0);
     }
     Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
         return sample_eval_impl<This>(this, wi, rng);

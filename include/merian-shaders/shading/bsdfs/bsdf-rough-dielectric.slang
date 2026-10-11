@@ -27,26 +27,6 @@ struct RoughDielectricBSDF : BSDF {
         return eta == 1.0f || alpha < BSDF_SMOOTH_ALPHA;
     }
 
-    float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) {
-        if (is_delta() || wi.z < BSDF_MIN_COS_THETA) {
-            return float3(0.0f);
-        }
-        if (wo.z > BSDF_MIN_COS_THETA) {
-            // Reflection: Fresnel at the reflection half-vector, weighting the GGX reflection lobe.
-            const float3 h = normalize(wi + wo);
-            const float R = fresnel_dielectric(abs(dot(wi, h)), eta);
-            return R * GGXBRDF(alpha).eval(wi, wo, rng);
-        }
-        if (wo.z < -BSDF_MIN_COS_THETA) {
-            // Refraction: 1 - R times the GGX transmission lobe (which carries the eta^2 factor).
-            float3 h = normalize(wo + wi * eta);
-            h *= sign(h.z);
-            const float R = fresnel_dielectric(abs(dot(wi, h)), eta);
-            return (1.0f - R) * GGXBTDF(alpha, eta, tint).eval(wi, wo, rng);
-        }
-        return float3(0.0f);
-    }
-
     Optional<float3> sample(const float3 wi, inout RandomGenerator rng) {
         if (let s = sample_eval(wi, rng)) {
             return s.wo;
@@ -73,6 +53,28 @@ struct RoughDielectricBSDF : BSDF {
             return (1.0f - R) * ggx_VNDF_H_pdf(wi, h, alpha_squared) * abs(wodoth) / pow2(denom);
         }
         return 0.0f;
+    }
+
+    float3 eval_pdf(const float3 wi, const float3 wo, inout RandomGenerator rng, out float pdf) {
+        pdf = 0.0f;
+        if (is_delta() || wi.z < BSDF_MIN_COS_THETA) {
+            return float3(0.0f);
+        }
+        if (wo.z > BSDF_MIN_COS_THETA) {
+            const float R = fresnel_dielectric(abs(dot(wi, normalize(wi + wo))), eta);
+            const float3 f = GGXBRDF(alpha).eval_pdf(wi, wo, rng, pdf);
+            pdf *= R;
+            return R * f;
+        }
+        if (wo.z < -BSDF_MIN_COS_THETA) {
+            float3 h = normalize(wo + wi * eta);
+            h *= sign(h.z);
+            const float T = 1.0f - fresnel_dielectric(abs(dot(wi, h)), eta);
+            const float3 f = GGXBTDF(alpha, eta, tint).eval_pdf(wi, wo, rng, pdf);
+            pdf *= T;
+            return T * f;
+        }
+        return float3(0.0f);
     }
 
     override Optional<ShadingFunctionSample> sample_eval(const float3 wi,

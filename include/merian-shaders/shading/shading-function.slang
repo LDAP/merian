@@ -65,16 +65,6 @@ struct ShadingFunctionSample {
 // Common base for BSDFs and PhaseFunctions.
 interface ShadingFunction {
 
-    /** Evaluates the ShadingFunction. BSDFs assume a local tangent space with n = (0, 0, 1), t =
-     * (1, 0, 0), b = (0, 1, 0). The incident and outgoing direction point away from the shading
-     * location.
-     *
-     *  Returns solid angle: f(wi, wo) * dot(wo, n)
-     */
-    float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng);
-
-    // -----------------------------
-
     /** Samples the ShadingFunction. BSDFs assume a local tangent space with n = (0, 0, 1), t = (1,
      * 0, 0), b = (0, 1, 0). The incident and outgoing direction point away from the shading
      * location.
@@ -93,6 +83,14 @@ interface ShadingFunction {
      */
     float pdf(const float3 wi, const float3 wo);
 
+    /** Evaluates the ShadingFunction and pdf(). BSDFs assume a local tangent space with n = (0, 0,
+     * 1), t = (1, 0, 0), b = (0, 1, 0). The incident and outgoing direction point away from the
+     * shading location.
+     *
+     *  Returns solid angle: f(wi, wo) * dot(wo, n)
+     */
+    float3 eval_pdf(const float3 wi, const float3 wo, inout RandomGenerator rng, out float pdf);
+
     /** Samples and evaluates the ShadingFunction. BSDFs assume a local tangent space with n = (0,
      * 0, 1), t = (1, 0, 0), b = (0, 1, 0). The incident and outgoing direction point away from the
      * shading location.
@@ -101,14 +99,22 @@ interface ShadingFunction {
     Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng);
 }
 
+extension<T : ShadingFunction> T {
+    float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) {
+        float pdf;
+        return eval_pdf(wi, wo, rng, pdf);
+    }
+}
+
 // Utility for default implementations of sample_eval (Slang issue prevents a default
 // implementation)
 Optional<ShadingFunctionSample>
 sample_eval_impl<T : ShadingFunction>(const T sf, const float3 wi, inout RandomGenerator rng) {
     const Optional<float3> optional_wo = sf.sample(wi, rng);
     if (let wo = optional_wo) {
-        const float p = sf.pdf(wi, wo);
-        return ShadingFunctionSample(wo, p, sf.eval(wi, wo, rng) / p);
+        float p;
+        const float3 f = sf.eval_pdf(wi, wo, rng, p);
+        return ShadingFunctionSample(wo, p, f / p);
     }
     return none;
 }

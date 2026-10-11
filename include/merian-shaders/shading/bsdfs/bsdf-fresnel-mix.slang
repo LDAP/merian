@@ -15,11 +15,17 @@ struct FresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
         this.ior_f0 = ior_f0;
     }
 
-    float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) {
+    float3 eval_pdf(const float3 wi, const float3 wo, inout RandomGenerator rng, out float pdf) {
+        const float F_wi = fresnel_schlick(abs(wi.z), ior_f0);
         // a transmitted direction has no half vector with wi, so mix by the incidence angle
-        const float F = wi.z * wo.z > 0.0f ? fresnel_schlick(dot(wi, normalize(wi + wo)), ior_f0)
-                                           : fresnel_schlick(abs(wi.z), ior_f0);
-        return lerp(base.eval(wi, wo, rng), layer.eval(wi, wo, rng), F);
+        const float F =
+            wi.z * wo.z > 0.0f ? fresnel_schlick(dot(wi, normalize(wi + wo)), ior_f0) : F_wi;
+        float base_pdf;
+        float layer_pdf;
+        const float3 base_e = base.eval_pdf(wi, wo, rng, base_pdf);
+        const float3 layer_e = layer.eval_pdf(wi, wo, rng, layer_pdf);
+        pdf = lerp(base_pdf, layer_pdf, F_wi);
+        return lerp(base_e, layer_e, F);
     }
 
     Optional<float3> sample(const float3 wi, inout RandomGenerator rng) {
@@ -48,8 +54,9 @@ struct FresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
                 return ShadingFunctionSample(s.wo, (take_layer ? F : 1.0f - F) * s.pdf, s.weight,
                                              s.lobe);
             }
-            const float p = this.pdf(wi, s.wo);
-            return ShadingFunctionSample(s.wo, p, this.eval(wi, s.wo, rng) / p, s.lobe);
+            float p;
+            const float3 f = this.eval_pdf(wi, s.wo, rng, p);
+            return ShadingFunctionSample(s.wo, p, f / p, s.lobe);
         }
         return none;
     }

@@ -47,7 +47,7 @@ struct MCPGRecord {
 // All candidates are kept: their densities form the stochastic MIS weight.
 struct MCPGDistribution : GuidingDistribution<float3> {
     VonMisesFisher3<false> vmfs[merian_guiding_mc_samples];
-    float scores[merian_guiding_mc_samples];
+    float weights[merian_guiding_mc_samples];
     float score_sum;
     float raw_sum;
 
@@ -57,9 +57,9 @@ struct MCPGDistribution : GuidingDistribution<float3> {
     float pdf(const float3 s) {
         float p = 0.0;
         for (int i = 0; i < merian_guiding_mc_samples; i++) {
-            p += scores[i] * vmfs[i].pdf(s);
+            p += weights[i] * vmfs[i].shape(s);
         }
-        return p / score_sum;
+        return p;
     }
 
     float3 sample(inout RandomGenerator rng) {
@@ -128,6 +128,7 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
 
         const float3 xi = float3(rng.next_float(), rng.next_float(), rng.next_float());
 
+        float scores[merian_guiding_mc_samples];
         for (int i = 0; i < merian_guiding_mc_samples; i++) {
             HashGridPos grid_pos;
             uint level;
@@ -144,13 +145,17 @@ struct MCPGGuiding<let MC_BUFFER_SIZE : uint,
                 dist.selected = s;
                 dist.selected_pos = grid_pos;
                 dist.vmfs[i] = dist.vmfs[0];
-                dist.scores[i] = dist.scores[0];
-                dist.scores[0] = score;
+                scores[i] = scores[0];
+                scores[0] = score;
                 dist.vmfs[0] = s.get_vmf(vertex.pos);
             } else {
-                dist.scores[i] = score;
+                scores[i] = score;
                 dist.vmfs[i] = s.get_vmf(vertex.pos);
             }
+        }
+        const float inv_score_sum = dist.score_sum > 0.0 ? 1.0 / dist.score_sum : 0.0;
+        for (int i = 0; i < merian_guiding_mc_samples; i++) {
+            dist.weights[i] = scores[i] * inv_score_sum * dist.vmfs[i].normalization();
         }
 
         return dist;

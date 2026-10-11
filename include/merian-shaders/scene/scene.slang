@@ -573,13 +573,16 @@ struct Scene {
         for (uint i = 0; i < draws; i++) {
             uint entry;
             bool delivers = false;
-            if (let ls = nee.sample_light(vertex, weights, rng, material_system, env_map, time, i,
-                                          entry)) {
-                const float light_pdf =
-                    nee.pdf_lights(vertex, ls.index, ls.wo, ls.pdf, weights, entry);
-                const float3 unshadowed = target.unshadowed(ls, rng);
-                delivers = yuv_luminance(unshadowed) > 0.f;
-                reservoir.add_light(ls, unshadowed, light_pdf, target.scatter_pdf(ls), rng);
+            if (let c = nee.draw_light(vertex, weights, i, rng, entry)) {
+                if (target.receives(c.wo)) {
+                    if (let ls = nee.light_sample(vertex, c, material_system, env_map, time)) {
+                        const float light_pdf = nee.pdf_lights(vertex, c, weights);
+                        float scatter_pdf;
+                        const float3 unshadowed = target.unshadowed(ls, rng, scatter_pdf);
+                        delivers = yuv_luminance(unshadowed) > 0.f;
+                        reservoir.add_light(ls, unshadowed, light_pdf, scatter_pdf, entry, rng);
+                    }
+                }
             }
             // only the winner is traced; a draw the receiver cannot see delivers nothing
             if (!delivers)
@@ -592,6 +595,7 @@ struct Scene {
         s.value = reservoir.resolve();
         s.light_pos = reservoir.light_pos;
         s.light_index = reservoir.light_index;
+        s.light_entry = reservoir.light_entry;
         s.radiance = reservoir.light_radiance;
         s.realized_pdf = reservoir.realized_pdf();
         return s;
@@ -602,13 +606,13 @@ struct Scene {
                                               inout RandomGenerator rng) {
         const LightCellWeights weights = nee.grid.weigh_cell(vertex, 1, rng);
         uint entry;
-        if (let ls =
-                nee.sample_light(vertex, weights, rng, material_system, env_map, time, 0, entry)) {
-            LightSample s = ls;
-            s.pdf =
-                nee.mixture_pdf(nee.pdf_lights(vertex, ls.index, ls.wo, ls.pdf, weights, entry));
-            if (s.pdf > 0.f)
-                return s;
+        if (let c = nee.draw_light(vertex, weights, 0, rng, entry)) {
+            if (let ls = nee.light_sample(vertex, c, material_system, env_map, time)) {
+                LightSample s = ls;
+                s.pdf = nee.mixture_pdf(nee.pdf_lights(vertex, c, weights));
+                if (s.pdf > 0.f)
+                    return s;
+            }
         }
         return none;
     }
@@ -658,29 +662,6 @@ struct Scene {
         return reaches_light(trace_ray(ray, light_ray_flags(distant), instances_mask), distant);
     }
 
-    RayDesc make_light_ray(const float3 pos,
-                           const float3 face_normal,
-                           const float spawn_offset,
-                           const DirectLightSample direct) {
-        return make_light_ray(pos, face_normal, spawn_offset, direct.light_pos,
-                              direct.light_index == LIGHT_ENV_INDEX);
-    }
-
-    uint light_ray_flags(const DirectLightSample direct) {
-        return light_ray_flags(direct.light_index == LIGHT_ENV_INDEX);
-    }
-
-    float3 resolve_direct_light(const DirectLightVertex vertex,
-                                const DirectLightSample direct,
-                                const Hit hit,
-                                inout RandomGenerator rng) {
-        const bool visible = reaches_light(hit, direct.light_index == LIGHT_ENV_INDEX);
-        nee.record_contribution(
-            vertex, direct.light_index, normalize(direct.light_pos - vertex.pos),
-            visible ? direct.radiance : 0.f, distance(direct.light_pos, vertex.pos), rng);
-        return visible ? direct.value : float3(0);
-    }
-
     float3 resolve_direct_light(const DirectLightVertex vertex,
                                 const float3 face_normal,
                                 const float spawn_offset,
@@ -690,11 +671,13 @@ struct Scene {
         if (!direct.hasValue)
             return float3(0);
         const DirectLightSample s = direct.value;
-        return resolve_direct_light(
-            vertex, s,
-            trace_ray(make_light_ray(vertex.pos, face_normal, spawn_offset, s), light_ray_flags(s),
-                      instances_mask),
-            rng);
+        const bool visible =
+            trace_light_visibility(vertex.pos, face_normal, spawn_offset, s.light_pos,
+                                   s.light_index == LIGHT_ENV_INDEX, instances_mask);
+        nee.record_contribution(vertex, s.light_index, normalize(s.light_pos - vertex.pos),
+                                visible ? s.radiance : 0.f, distance(s.light_pos, vertex.pos), rng,
+                                s.light_entry);
+        return visible ? s.value : float3(0);
     }
 
     static float3
@@ -727,15 +710,18 @@ struct Scene {
             float learned = 0.f;
             float actual = 0.f;
             const uint base = light_bucket_base(vertex.cell);
+            const float inv_cell_scale = 1.f / nee.grid.cell_scale(vertex.cell);
             for (uint slot = 0; slot < LIGHT_GRID_SLOTS; slot++) {
                 const uint2 range = nee.grid.slot_range(base + slot);
                 if (range.x >= range.y)
                     continue;
                 listed += 1.f;
                 const float p = nee.grid.slot_share(vertex, base + slot, weights);
-                learned += p * nee.grid.contribution[base + slot].x;
+                learned += p * nee.grid.contribution[base + slot].x *
+                           nee.grid.estimate[base + slot] * inv_cell_scale;
                 uint texel;
-                const uint drawn = nee.draw_in_slot(base + slot, rng, texel);
+                float share_in_slot;
+                const uint drawn = nee.draw_in_slot(base + slot, rng, texel, share_in_slot);
                 let lp = nee.light_point(vertex, drawn, texel, base + slot, rng);
                 if (!lp.hasValue)
                     continue;
@@ -811,9 +797,13 @@ struct Scene {
 
     // LIGHT_ENV_INDEX for the environment, LIGHT_INVALID_INDEX for a non-emitter
     uint get_light_index(const Hit hit) {
-        if (!hit.is_valid() ||
-            (get_geometry_data(hit.get_geometry_id()).flags & GeometryDataFlags::UseEnvMap) != 0)
+        if (!hit.is_valid())
             return LIGHT_ENV_INDEX;
+        const GeometryDataFlags flags = get_geometry_data(hit.get_geometry_id()).flags;
+        if ((flags & GeometryDataFlags::UseEnvMap) != 0)
+            return LIGHT_ENV_INDEX;
+        if ((flags & GeometryDataFlags::Emissive) == 0)
+            return LIGHT_INVALID_INDEX;
         if (let index = nee.get_triangle_index(hit.get_geometry_id(), hit.primitive_id))
             return index;
         return LIGHT_INVALID_INDEX;

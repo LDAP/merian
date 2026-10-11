@@ -38,6 +38,21 @@ struct LightPoint {
     uint entry;
 }
 
+struct LightCandidate {
+    float3 wo;
+    float dist;
+    // solid angle, of the point on the light alone
+    float pdf;
+    float cut_pdf;
+    // not offset; for the environment at ENV_MAP_DISTANCE along wo
+    float3 pos;
+    uint index;
+    // towards the receiver
+    float3 normal;
+    float2 uv;
+    bool front_facing;
+}
+
 struct DirectLightVertex {
     uint cell;
     float3 pos;
@@ -68,6 +83,7 @@ struct LightTable {
 
 struct LightTree {
     StructuredBuffer<float2> cdf;
+    StructuredBuffer<uint> guide;
     StructuredBuffer<uint> order;
     StructuredBuffer<uint> rank;
     // 0 where the cells do not list the environment
@@ -86,8 +102,6 @@ struct LightGrid {
     StructuredBuffer<LightBound, ScalarDataLayout> slot_bounds;
     StructuredBuffer<float> probability;
     RWStructuredBuffer<uint> feedback;
-    // per cell: whether any of its slots got feedback
-    RWStructuredBuffer<uint> touched;
     uint light_count;
 
     int3 cell_coord(const uint cascade, const float3 pos, const float3 offset) {
@@ -120,6 +134,14 @@ struct LightGrid {
             coord = cell_coord(++cascade, pos, offset);
         return light_cell_index(cascade, uint3(clamp(coord, 0, int(base.dimension) - 1)),
                                 base.dimension);
+    }
+
+    float cell_scale(const uint cell) {
+        const LightGridInfo base = cascades[0];
+        return light_cell_scale(
+            cascades[light_cell_cascade(cell, base.dimension, base.cascade_count,
+                                        merian_nee_source == int(LightSource::LightSourceScene))]
+                .inv_cell_size);
     }
 
     bool weighs_at_cell() {
@@ -181,8 +203,9 @@ struct LightGrid {
             const float total = probability[base + LIGHT_GRID_SLOTS - 1u];
             if (!(total > 0.f))
                 return weights;
+            const float u0 = rng.next_float();
             for (uint draw = 0; draw < draws; draw++) {
-                const float u = rng.next_float() * total;
+                const float u = frac(u0 + float(draw) / float(draws)) * total;
                 uint lo = 0;
                 for (uint step = LIGHT_GRID_SLOTS >> 1; step > 0; step >>= 1) {
                     if (probability[base + lo + step - 1u] <= u)
@@ -281,7 +304,6 @@ struct LightGrid {
     // fixed point, rounded stochastically
     void count_sample(const uint entry, const float contribution, const float2 u) {
         const uint at = LIGHT_GRID_FEEDBACK_STRIDE * entry;
-        touched[entry / LIGHT_GRID_SLOTS] = 1u;
         uint counted;
         InterlockedAdd(feedback[at], 1u, counted);
         if (contribution > 0.f && counted < LIGHT_GRID_FEEDBACK_SAMPLES) {
@@ -398,9 +420,10 @@ struct NEE {
     sample_point(const DirectLightVertex vertex, inout RandomGenerator rng, out uint entry) {
         entry = LIGHT_INVALID_INDEX;
         uint texel = 0;
-        const uint index =
-            has_cuts() ? draw_cell(vertex, grid.weigh_cell(vertex, 1, rng), 0, rng, entry, texel)
-                       : LIGHT_ENV_INDEX;
+        float share_in_slot;
+        const uint index = has_cuts() ? draw_cell(vertex, grid.weigh_cell(vertex, 1, rng), 0, rng,
+                                                  entry, texel, share_in_slot)
+                                      : LIGHT_ENV_INDEX;
         return light_point(vertex, index, texel, entry, rng);
     }
 
@@ -529,11 +552,12 @@ struct NEE {
                              uint entry = LIGHT_INVALID_INDEX) {
         if (!vertex.has_cell() || index == LIGHT_INVALID_INDEX)
             return;
-        const uint position = tree_position(index, dir);
-        if (position == LIGHT_INVALID_INDEX)
-            return;
-        if (entry == LIGHT_INVALID_INDEX)
+        if (entry == LIGHT_INVALID_INDEX) {
+            const uint position = tree_position(index, dir);
+            if (position == LIGHT_INVALID_INDEX)
+                return;
             entry = grid.slot_of(vertex.cell, position);
+        }
         float contribution = delivery(index, dir, radiance);
         if (contribution > 0.f && index != LIGHT_ENV_INDEX)
             contribution *= grid.estimate[entry] / max(dist * dist, 1e-8f);
@@ -545,14 +569,21 @@ struct NEE {
                    const uint draw,
                    inout RandomGenerator rng,
                    out uint entry,
-                   out uint texel) {
+                   out uint texel,
+                   out float share_in_slot) {
         texel = 0;
+        share_in_slot = 0.f;
         entry = grid.draw_slot(vertex, weights, draw);
-        return entry != LIGHT_INVALID_INDEX ? draw_in_slot(entry, rng, texel) : LIGHT_INVALID_INDEX;
+        return entry != LIGHT_INVALID_INDEX ? draw_in_slot(entry, rng, texel, share_in_slot)
+                                            : LIGHT_INVALID_INDEX;
     }
 
-    uint draw_in_slot(const uint entry, inout RandomGenerator rng, out uint texel) {
+    uint draw_in_slot(const uint entry,
+                      inout RandomGenerator rng,
+                      out uint texel,
+                      out float share_in_slot) {
         texel = 0;
+        share_in_slot = 0.f;
         const uint2 range = grid.slot_range(entry);
         const uint count = table.triangle_count;
         if (range.x >= range.y)
@@ -564,7 +595,10 @@ struct NEE {
                                  rng.next_float2());
             return LIGHT_ENV_INDEX;
         }
-        return tree.order[search_range(tree.cdf, range.x, range.y, rng.next_float2())];
+        const uint position =
+            search_range_guided(tree.cdf, tree.guide, count, range.x, range.y, rng.next_float2());
+        share_in_slot = range_share(tree.cdf, range.x, range.y, position);
+        return tree.order[position];
     }
 
     float pdf_cell(const DirectLightVertex vertex,
@@ -597,27 +631,25 @@ struct NEE {
                float(tree.env_texels) / MERIAN_FOUR_PI;
     }
 
-    Optional<LightSample> sample_triangle(const uint index,
-                                          const float3 pos,
-                                          inout RandomGenerator rng,
-                                          const MaterialSystem material_system,
-                                          const float time) {
+    Optional<LightCandidate> draw_triangle(const uint index,
+                                           const float3 pos,
+                                           const float cut_pdf,
+                                           inout RandomGenerator rng) {
         const EmissiveTriangle tri = table.triangles[index];
-        const EmissiveRegion region = table.regions[index];
         const float3 uniform = merian::sample_triangle(rng);
-        const float3 bary = region.to_triangle(uniform, rng.next_float());
-        const float3 light_pos = tri.get_position(bary);
-        const float2 uv = tri.get_uv(bary);
-        // a cutout texel is no surface: the tracer passes through it, so it emits nothing
-        if (tri.is_alpha_tested() && material_system.alpha_test(tri.material_id, uv))
-            return none;
-
+        const float u_region = rng.next_float();
         const float3 scaled_n = tri.get_scaled_normal();
+        if (!tri.is_two_sided() && dot(scaled_n, pos - tri.p0) <= 0.f)
+            return none;
+        const EmissiveRegion region = table.regions[index];
+        const float3 bary = region.to_triangle(uniform, u_region);
+
         const float area2 = length(scaled_n);
         if (area2 <= 0.f)
             return none;
         float3 n = scaled_n / area2;
 
+        const float3 light_pos = tri.get_position(bary);
         const float3 to_light = light_pos - pos;
         const float dist2 = dot(to_light, to_light);
         if (dist2 <= 0.f)
@@ -636,17 +668,79 @@ struct NEE {
         if (cos_l <= 0.f)
             return none;
 
-        const ShadingData sd = ShadingData(-wo, light_pos, uv, time, OrthonormalFrame(n), n,
-                                           uint16_t(1), front_facing);
+        LightCandidate c;
+        c.wo = wo;
+        c.dist = dist;
+        c.pdf = dist2 / (cos_l * 0.5f * area2 * region.get_fraction());
+        c.cut_pdf = cut_pdf;
+        c.pos = light_pos;
+        c.index = index;
+        c.normal = n;
+        c.uv = tri.get_uv(bary);
+        c.front_facing = front_facing;
+        return c;
+    }
 
+    // entry: the cell slot drawn from, also where the draw yields no candidate.
+    Optional<LightCandidate> draw_light(const DirectLightVertex vertex,
+                                        const LightCellWeights weights,
+                                        const uint draw,
+                                        inout RandomGenerator rng,
+                                        out uint entry) {
+        entry = LIGHT_INVALID_INDEX;
+        uint texel = 0;
+        float share_in_slot = 0.f;
+        const uint index = has_cuts()
+                               ? draw_cell(vertex, weights, draw, rng, entry, texel, share_in_slot)
+                               : LIGHT_ENV_INDEX;
+        if (index == LIGHT_ENV_INDEX) {
+            if (let es = draw_env(texel, rng)) {
+                LightCandidate c;
+                c.wo = es.dir;
+                c.dist = SCENE_RAY_TMAX;
+                c.pdf = es.pdf;
+                c.cut_pdf = 0.f;
+                c.pos = vertex.pos + es.dir * ENV_MAP_DISTANCE;
+                c.index = LIGHT_ENV_INDEX;
+                c.normal = -es.dir;
+                c.uv = float2(0);
+                c.front_facing = true;
+                return c;
+            }
+            return none;
+        }
+        if (index == LIGHT_INVALID_INDEX)
+            return none;
+        return draw_triangle(index, vertex.pos,
+                             grid.slot_share(vertex, entry, weights) * share_in_slot, rng);
+    }
+
+    Optional<LightSample> light_sample<Env : IEnvMap>(const DirectLightVertex vertex,
+                                                      const LightCandidate c,
+                                                      const MaterialSystem material_system,
+                                                      const Env env_map,
+                                                      const float time) {
         LightSample ls;
-        ls.wo = wo;
-        ls.dist = dist;
+        ls.wo = c.wo;
+        ls.dist = c.dist;
+        ls.pdf = c.pdf;
+        ls.index = c.index;
+        if (c.index == LIGHT_ENV_INDEX) {
+            ls.Li = env_map.eval(make_env_shading_data(c.wo, vertex.pos, time),
+                                 material_system.texture_manager, DefaultLODSampler());
+            ls.pos = c.pos;
+            return ls;
+        }
+        const EmissiveTriangle tri = table.triangles[c.index];
+        // a cutout texel is no surface: the tracer passes through it, so it emits nothing
+        if (tri.is_alpha_tested() && material_system.alpha_test(tri.material_id, c.uv))
+            return none;
+        const ShadingData sd = ShadingData(-c.wo, c.pos, c.uv, time, OrthonormalFrame(c.normal),
+                                           c.normal, uint16_t(1), c.front_facing);
         ls.Li = material_system.get_emission(tri.material_id, sd, DefaultLODSampler());
-        ls.pdf = dist2 / (cos_l * 0.5f * area2 * region.get_fraction());
-        ls.pos = offset_ray_origin(
-            light_pos, n, triangle_spawn_offset(light_pos, tri.p1 - tri.p0, tri.p2 - tri.p0), n);
-        ls.index = index;
+        ls.pos = offset_ray_origin(c.pos, c.normal,
+                                   triangle_spawn_offset(c.pos, tri.p1 - tri.p0, tri.p2 - tri.p0),
+                                   c.normal);
         return ls;
     }
 
@@ -720,6 +814,14 @@ struct NEE {
                point_pdf;
     }
 
+    float pdf_lights(const DirectLightVertex vertex,
+                     const LightCandidate c,
+                     const LightCellWeights weights) {
+        if (c.index == LIGHT_ENV_INDEX)
+            return pdf_env(vertex, c.wo, weights);
+        return float(draw_count()) * c.cut_pdf * c.pdf;
+    }
+
     float pdf_env(const DirectLightVertex vertex,
                   const float3 dir,
                   const Optional<LightCellWeights> weights = none) {
@@ -734,45 +836,6 @@ struct NEE {
             return weights;
         return grid.weigh_cell(vertex);
     }
-
-    LightSample env_light_sample<Env : IEnvMap>(const EnvSample es,
-                                                const float3 pos,
-                                                const MaterialSystem material_system,
-                                                const Env env_map,
-                                                const float time) {
-        LightSample ls;
-        ls.wo = es.dir;
-        ls.dist = SCENE_RAY_TMAX;
-        ls.Li = env_map.eval(make_env_shading_data(es.dir, pos, time),
-                             material_system.texture_manager, DefaultLODSampler());
-        ls.pdf = es.pdf;
-        ls.pos = pos + es.dir * ENV_MAP_DISTANCE;
-        ls.index = LIGHT_ENV_INDEX;
-        return ls;
-    }
-
-    // entry: the cell slot drawn from, also where the draw yields no sample.
-    Optional<LightSample> sample_light<Env : IEnvMap>(const DirectLightVertex vertex,
-                                                      const LightCellWeights weights,
-                                                      inout RandomGenerator rng,
-                                                      const MaterialSystem material_system,
-                                                      const Env env_map,
-                                                      const float time,
-                                                      const uint draw,
-                                                      out uint entry) {
-        entry = LIGHT_INVALID_INDEX;
-        uint texel = 0;
-        const uint index =
-            has_cuts() ? draw_cell(vertex, weights, draw, rng, entry, texel) : LIGHT_ENV_INDEX;
-        if (index == LIGHT_ENV_INDEX) {
-            if (let es = draw_env(texel, rng))
-                return env_light_sample(es, vertex.pos, material_system, env_map, time);
-            return none;
-        }
-        if (index == LIGHT_INVALID_INDEX)
-            return none;
-        return sample_triangle(index, vertex.pos, rng, material_system, time);
-    }
 }
 
 // Resampling weight p_hat / (M p_light + p_scatter), p_hat the luminance of the unshadowed
@@ -784,6 +847,7 @@ struct DirectLightReservoir {
     float light_share;
     float3 light_pos;
     uint light_index;
+    uint light_entry;
     float light_radiance;
 
     __init() {
@@ -791,6 +855,7 @@ struct DirectLightReservoir {
         value = float3(0);
         light_share = 0.f;
         light_index = LIGHT_INVALID_INDEX;
+        light_entry = LIGHT_INVALID_INDEX;
         light_radiance = 0.f;
     }
 
@@ -798,6 +863,7 @@ struct DirectLightReservoir {
                               const float3 candidate_value,
                               const float light_pdf,
                               const float scatter_pdf,
+                              const uint entry,
                               inout RandomGenerator rng) {
         const float weight = yuv_luminance(candidate_value) / (light_pdf + scatter_pdf);
         if (!(weight > 0.f))
@@ -808,6 +874,7 @@ struct DirectLightReservoir {
             light_share = light_pdf / (light_pdf + scatter_pdf);
             light_pos = ls.pos;
             light_index = ls.index;
+            light_entry = entry;
             light_radiance = yuv_luminance(ls.Li);
         }
     }
@@ -828,9 +895,10 @@ struct DirectLightReservoir {
 }
 
 interface IDirectLightTarget {
-    float3 unshadowed(const LightSample ls, inout RandomGenerator rng);
+    // false only where unshadowed is zero for every light in direction wo
+    bool receives(const float3 wo);
 
-    float scatter_pdf(const LightSample ls);
+    float3 unshadowed(const LightSample ls, inout RandomGenerator rng, out float scatter_pdf);
 }
 
 struct DirectLightSample {
@@ -838,6 +906,7 @@ struct DirectLightSample {
     float3 value;
     float3 light_pos;
     uint light_index;
+    uint light_entry;
     float realized_pdf;
     float radiance;
 }

@@ -283,14 +283,11 @@ struct ScatterMixture {
         p_guiding = share;
     }
 
-    // The guiding term comes first: it consumes the candidates before the material switch.
-    float pdf<B : ShadingFunction, G : GuidingDistribution<float3>>(const B bsdf,
-                                                                    const G guiding,
-                                                                    const float3 wi_local,
-                                                                    const float3 wo_local,
-                                                                    const float3 wo_world) {
+    float pdf<G : GuidingDistribution<float3>>(const float bsdf_pdf,
+                                               const G guiding,
+                                               const float3 wo_world) {
         const float p_guided = p_guiding > 0.f ? p_guiding * guiding.pdf(wo_world) : 0.f;
-        return p_guided + (1.f - p_guiding) * bsdf.pdf(wi_local, wo_local);
+        return p_guided + (1.f - p_guiding) * bsdf_pdf;
     }
 
     Optional<ScatterSample>
@@ -304,17 +301,16 @@ struct ScatterMixture {
         s.lobe = BSDFLobe::None;
         s.guided = p_guiding > 0.f && rng.next_float() < p_guiding;
 
-        float3 wo_local;
+        float bsdf_pdf;
         if (s.guided) {
             s.wo = guiding.sample(rng);
-            wo_local = frame.to_local(s.wo);
+            s.f_cos = bsdf.eval_pdf(wi_local, frame.to_local(s.wo), rng, bsdf_pdf);
         } else {
             const Optional<ShadingFunctionSample> bs = bsdf.sample_eval(wi_local, rng);
             if (!bs.hasValue) {
                 return none;
             }
-            wo_local = bs.value.wo;
-            s.wo = frame.to_world(wo_local);
+            s.wo = frame.to_world(bs.value.wo);
             s.lobe = bs.value.lobe;
             if (bsdf_lobe_is_delta(bs.value.lobe)) {
                 s.f_cos = bs.value.weight;
@@ -323,10 +319,11 @@ struct ScatterMixture {
                 s.delta = true;
                 return s;
             }
+            bsdf_pdf = bs.value.pdf;
+            s.f_cos = bsdf_pdf > 0.f ? bs.value.weight * bsdf_pdf : float3(0.f);
         }
 
-        s.f_cos = bsdf.eval(wi_local, wo_local, rng);
-        s.pdf = pdf(bsdf, guiding, wi_local, wo_local, s.wo);
+        s.pdf = pdf(bsdf_pdf, guiding, s.wo);
         s.realized_pdf = s.pdf;
         return s;
     }

@@ -41,6 +41,9 @@ enum GeometryDataFlags : uint16_t {
 
     // Hits pass through texels that fail the material's alpha test.
     AlphaTested = 0x800,
+
+    // Its triangles are lights of the light collection.
+    Emissive = 0x1000,
 };
 
 // See scene.hpp for details.

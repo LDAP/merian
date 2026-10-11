@@ -14,8 +14,37 @@ struct LightCdfBinding {
     uint count;
 };
 
+struct LightGuideBinding {
+    StructuredBuffer<float2> cdf;
+    RWStructuredBuffer<uint> guide;
+    uint count;
+    uint buckets;
+};
+
+[shader("compute")][numthreads(CDF_GROUP_SIZE, 1, 1)] void
+guide(uint bucket : SV_DispatchThreadID, ParameterBlock<LightGuideBinding> params) {
+    if (bucket > params.buckets)
+        return;
+    const float total = params.cdf[params.count - 1].x;
+    const float scale = total > 0.f ? float(params.buckets) / total : 0.f;
+    if (bucket == 0)
+        params.guide[params.buckets + 1] = asuint(scale);
+    uint lo = 0;
+    uint hi = params.count;
+    while (lo < hi) {
+        const uint mid = (lo + hi) >> 1;
+        if (cdf_bucket(params.cdf[mid].x, scale, params.buckets) >= bucket)
+            hi = mid;
+        else
+            lo = mid + 1;
+    }
+    params.guide[bucket] = lo;
+}
+
 // One entry per wave; a wave size of one would mean one per thread.
 groupshared float2 s_wave_total[CDF_GROUP_SIZE];
+groupshared float2 s_wave_offset[CDF_GROUP_SIZE];
+groupshared float2 s_group_total;
 groupshared uint s_block;
 
 float2 wave_scan(float2 value) {
@@ -33,21 +62,32 @@ float2 wave_scan(float2 value) {
 float2 group_scan(const float2 value, const uint thread_id, out float2 total) {
     const uint lane_count = WaveGetLaneCount();
     const uint wave = thread_id / lane_count;
+    const uint lane = WaveGetLaneIndex();
 
     const float2 wave_prefix = wave_scan(value);
-    if (WaveGetLaneIndex() == lane_count - 1)
+    if (lane == lane_count - 1)
         s_wave_total[wave] = wave_prefix;
     GroupMemoryBarrierWithGroupSync();
 
-    const uint wave_count = CDF_GROUP_SIZE / lane_count;
-    float2 offset = float2(0);
-    total = float2(0);
-    for (uint w = 0; w < wave_count; w++) {
-        if (w == wave)
-            offset = total;
-        total = ff_add(total, s_wave_total[w]);
+    if (wave == 0) {
+        const uint wave_count = CDF_GROUP_SIZE / lane_count;
+        float2 carry = float2(0);
+        for (uint first = 0; first < wave_count; first += lane_count) {
+            const uint w = first + lane;
+            const float2 inclusive =
+                ff_add(carry, wave_scan(w < wave_count ? s_wave_total[w] : float2(0)));
+            const float2 previous = WaveShuffle(inclusive, lane > 0 ? lane - 1 : 0);
+            if (w < wave_count)
+                s_wave_offset[w] = lane > 0 ? previous : carry;
+            carry = WaveReadLaneAt(inclusive, lane_count - 1);
+        }
+        if (lane == 0)
+            s_group_total = carry;
     }
-    return ff_add(offset, wave_prefix);
+    GroupMemoryBarrierWithGroupSync();
+
+    total = s_group_total;
+    return ff_add(s_wave_offset[wave], wave_prefix);
 }
 
 // Blocks in launch order, so every block one waits for has started.

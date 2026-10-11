@@ -21,7 +21,8 @@ struct DiffuseTransmissionBSDF : BSDF {
         return r + t > 0.0f ? r / (r + t) : 1.0f;
     }
 
-    float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) {
+    float3 eval_pdf(const float3 wi, const float3 wo, inout RandomGenerator rng, out float pdf) {
+        pdf = this.pdf(wi, wo);
         if (min(abs(wi.z), abs(wo.z)) < BSDF_MIN_COS_THETA) {
             return float3(0.0f);
         }

@@ -26,9 +26,17 @@ float3 vmf_sample_wenzel(float kappa, float2 random) {
 
 // Based on Yusuke Tokuyoshi, A Numerically Stable Implementation of the von Mises–Fisher
 // Distribution on S2
+float vmf_normalization_tokuyoshi(float kappa) {
+    return x_over_expm1((-2.0f) * kappa) / MERIAN_FOUR_PI;
+}
+
+float vmf_shape_tokuyoshi(float3 w, float3 mu, float kappa) {
+    const float3 d = w - mu;
+    return exp(((-0.5f) * kappa) * dot(d, d));
+}
+
 float vmf_pdf_tokuyoshi(float3 w, float3 mu, float kappa) {
-    float3 d = w - mu;
-    return (exp(((-0.5f) * kappa) * dot(d, d)) * x_over_expm1((-2.0f) * kappa)) / MERIAN_FOUR_PI;
+    return vmf_normalization_tokuyoshi(kappa) * vmf_shape_tokuyoshi(w, mu, kappa);
 }
 
 float3 vmf_sample_tokuyosh(float kappa, float2 random) {
@@ -72,10 +80,18 @@ struct VonMisesFisher3<bool centered = false> : Distribution<float3> {
     }
 
     override float pdf(const float3 s) {
+        return normalization() * shape(s);
+    }
+
+    float normalization() {
+        return vmf_normalization_tokuyoshi(kappa);
+    }
+
+    float shape(const float3 s) {
         if (let mu = c_mu.get()) {
-            return vmf_pdf_tokuyoshi(s, mu, kappa);
+            return vmf_shape_tokuyoshi(s, mu, kappa);
         } else {
-            return vmf_pdf_tokuyoshi(s, float3(0, 0, 1), kappa);
+            return vmf_shape_tokuyoshi(s, float3(0, 0, 1), kappa);
         }
     }
 

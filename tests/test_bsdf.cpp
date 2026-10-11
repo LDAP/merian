@@ -51,6 +51,9 @@ constexpr float FLOAT_EQ_TOL = 1e-4f;
 constexpr float WEIGHT_REL_TOL = 1e-4f;
 constexpr float PDF_REL_TOL = 1e-3f;
 
+// eval_pdf() may share or reorder terms of pdf().
+constexpr float EVAL_PDF_REL_TOL = 1e-4f;
+
 // Midpoint quadrature error of a smooth pdf on the 256x512 grid.
 constexpr float QUADRATURE_TOL = 1e-3f;
 
@@ -237,6 +240,7 @@ class BSDFTest : public ::testing::Test {
         float3 albedo;          // get_albedo(wi).reflection (should equal the directional albedo)
         uint32_t delta_samples; // samples drawn from a delta lobe
         float max_delta_err;    // max eval()/pdf() left at a delta direction
+        float max_eval_pdf_err; // max relative |eval_pdf pdf - pdf|
     };
 
     static float as_float(uint32_t u) {
@@ -260,7 +264,7 @@ class BSDFTest : public ::testing::Test {
         const auto pipeline = ComputePipeline::create(pipe_layout, entry_point.get()->specialize());
         const auto obj_allocator = std::make_shared<SimpleShaderObjectAllocator>(allocator);
 
-        constexpr uint32_t SLOTS = 18;
+        constexpr uint32_t SLOTS = 19;
         const auto output_buffer = allocator->create_buffer(
             SLOTS * sizeof(uint32_t),
             vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
@@ -304,16 +308,18 @@ class BSDFTest : public ::testing::Test {
                             as_float(slots[12]),
                             {as_float(slots[13]), as_float(slots[14]), as_float(slots[15])},
                             slots[16],
-                            as_float(slots[17])};
+                            as_float(slots[17]),
+                            as_float(slots[18])};
         std::fprintf(stderr,
                      "DUMP furnace=%.6g,%.6g,%.6g fse=%.3g,%.3g,%.3g albedo=%.6g,%.6g,%.6g "
                      "meancos=%.7f secos=%.4g werr=%.4g perr=%.4g pdfint=%.7f reciperr=%.4g "
-                     "acc=%.5f delta=%.5f derr=%.4g\n",
+                     "acc=%.5f delta=%.5f derr=%.4g eperr=%.4g\n",
                      r.furnace.x, r.furnace.y, r.furnace.z, r.furnace_stderr.x, r.furnace_stderr.y,
                      r.furnace_stderr.z, r.albedo.x, r.albedo.y, r.albedo.z, r.mean_cos,
                      r.stderr_cos, r.max_weight_err, r.max_pdf_err, r.pdf_integral, r.max_recip_err,
                      float(r.valid) / float(n_samples), float(r.delta_samples) / float(n_samples),
-                     r.max_delta_err);
+                     r.max_delta_err, r.max_eval_pdf_err);
+        EXPECT_LT(r.max_eval_pdf_err, EVAL_PDF_REL_TOL) << "eval_pdf() pdf against pdf()";
         return r;
     }
 

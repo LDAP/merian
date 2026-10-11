@@ -47,12 +47,13 @@ struct SheenBRDF : BSDF {
                       sheen_lambda(ndoti));
     }
 
-    float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) {
+    float3 eval_pdf(const float3 wi, const float3 wo, inout RandomGenerator rng, out float pdf) {
+        pdf = this.pdf(wi, wo);
         if (min(wi.z, wo.z) < BSDF_MIN_COS_THETA) {
             return float3(0.f);
         }
         const float3 h = normalize(wi + wo);
-        // eval returns f * wo.z, so one foreshortening cosine cancels.
+        // eval_pdf returns f * wo.z, so one foreshortening cosine cancels.
         return sheen_D(h.z) * sheen_G(wo.z, wi.z) * color / (4.f * wi.z);
     }
 

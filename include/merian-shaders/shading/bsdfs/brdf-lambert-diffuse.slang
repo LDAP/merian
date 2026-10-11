@@ -13,14 +13,6 @@ struct LambertDiffuseBRDF : BSDF {
         this.albedo = albedo;
     }
 
-    float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) {
-        if (min(wi.z, wo.z) < BSDF_MIN_COS_THETA) {
-            return float3(0.0f);
-        }
-
-        return MERIAN_INV_PI * albedo * wo.z;
-    }
-
     Optional<float3> sample(const float3 wi, inout RandomGenerator rng) {
         const float3 wo = sample_cos(rng);
         if (min(wi.z, wo.z) < BSDF_MIN_COS_THETA) {
@@ -45,6 +37,11 @@ struct LambertDiffuseBRDF : BSDF {
         }
 
         return MERIAN_INV_PI * wo.z;
+    }
+
+    float3 eval_pdf(const float3 wi, const float3 wo, inout RandomGenerator rng, out float pdf) {
+        pdf = this.pdf(wi, wo);
+        return albedo * pdf;
     }
 
     Albedo get_albedo(const float3 wi) {

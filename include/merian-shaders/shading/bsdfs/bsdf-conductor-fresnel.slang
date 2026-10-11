@@ -12,22 +12,22 @@ struct ConductorFresnelBSDF<Inner : BSDF> : BSDF {
         this.f0 = f0;
     }
 
-    float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) {
-        // opposite hemispheres have no half vector, and a conductor does not transmit
-        if (min(wi.z, wo.z) < BSDF_MIN_COS_THETA) {
-            return float3(0.0f);
-        }
-        const float3 h = normalize(wi + wo);
-        const float3 F = fresnel_schlick(dot(wi, h), f0);
-        return F * bsdf.eval(wi, wo, rng);
-    }
-
     Optional<float3> sample(const float3 wi, inout RandomGenerator rng) {
         return bsdf.sample(wi, rng);
     }
 
     float pdf(const float3 wi, const float3 wo) {
         return bsdf.pdf(wi, wo);
+    }
+
+    float3 eval_pdf(const float3 wi, const float3 wo, inout RandomGenerator rng, out float pdf) {
+        // opposite hemispheres have no half vector, and a conductor does not transmit
+        if (min(wi.z, wo.z) < BSDF_MIN_COS_THETA) {
+            pdf = bsdf.pdf(wi, wo);
+            return float3(0.0f);
+        }
+        const float3 F = fresnel_schlick(dot(wi, normalize(wi + wo)), f0);
+        return F * bsdf.eval_pdf(wi, wo, rng, pdf);
     }
 
     override Optional<ShadingFunctionSample> sample_eval(const float3 wi,

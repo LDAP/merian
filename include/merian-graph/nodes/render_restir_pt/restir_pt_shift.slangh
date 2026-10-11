@@ -69,8 +69,8 @@ RestirPTShift restir_pt_reconnect(const ParameterBlock<Scene> scene,
     let bsdf = sp.surface_material.get_bsdf();
     const float3 wi_local = frame.to_local(wi);
     const float3 dir_local = frame.to_local(dir);
-    const float3 f_prev = bsdf.eval(wi_local, dir_local, rng);
-    const float p_prev = bsdf.pdf(wi_local, dir_local);
+    float p_prev;
+    const float3 f_prev = bsdf.eval_pdf(wi_local, dir_local, rng, p_prev);
     if (!any(f_prev > 0.f) || !(geometry > 0.f))
         return failed;
 
@@ -134,8 +134,8 @@ RestirPTShift restir_pt_reconnect(const ParameterBlock<Scene> scene,
         let bsdf_rc = rc_sp.surface_material.get_bsdf();
         const float3 wi_rc = frame_rc.to_local(-dir);
         const float3 wo_rc = frame_rc.to_local(r.rc_wo);
-        const float3 f_rc = bsdf_rc.eval(wi_rc, wo_rc, rng);
-        const float p_rc = bsdf_rc.pdf(wi_rc, wo_rc);
+        float p_rc;
+        const float3 f_rc = bsdf_rc.eval_pdf(wi_rc, wo_rc, rng, p_rc);
         if (!any(f_rc > 0.f))
             return failed;
         if (hybrid && inverse_geometry / p_rc < limit)

@@ -41,6 +41,7 @@ struct Params {
     float max_weight_err = 0;
     float max_pdf_err = 0;
     float max_delta_err = 0;
+    float max_eval_pdf_err = 0;
 
     for (uint i = 0; i < params.n_samples; ++i) {
         // A below-horizon / clamped draw contributes zero and is still counted
@@ -51,6 +52,7 @@ struct Params {
         max_delta_err = merian::bsdf_validate_err(max_delta_err, check.err_delta);
         max_pdf_err = merian::bsdf_validate_err(max_pdf_err, check.err_pdf);
         max_weight_err = merian::bsdf_validate_err(max_weight_err, check.err_weight);
+        max_eval_pdf_err = merian::bsdf_validate_err(max_eval_pdf_err, check.err_eval_pdf);
 
         // the albedo is the energy fraction; transmission also compresses radiance by eta^2
         const float3 weight =
@@ -92,6 +94,7 @@ struct Params {
                 merian::bsdf_validate_direction(bsdf, wi, wo, rng);
             pdf_integral += check.pdf * st * dtheta * dphi;
             max_recip_err = merian::bsdf_validate_err(max_recip_err, check.err_reciprocity);
+            max_eval_pdf_err = merian::bsdf_validate_err(max_eval_pdf_err, check.err_eval_pdf);
             quadrature_sane = quadrature_sane && check.sane;
         }
     }
@@ -118,4 +121,5 @@ struct Params {
     params.output[15] = asuint(albedo.b);
     params.output[16] = delta_samples;
     params.output[17] = asuint(max_delta_err);
+    params.output[18] = asuint(max_eval_pdf_err);
 }

@@ -35,21 +35,21 @@ struct IridescentConductorBSDF<Inner : BSDF> : BSDF {
         return lerp(schlick, fresnel_iridescent(1.0f, film_ior, f0, thickness, vdoth), iridescence);
     }
 
-    float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) {
-        // opposite hemispheres have no half vector, and a conductor does not transmit
-        if (min(wi.z, wo.z) < BSDF_MIN_COS_THETA) {
-            return float3(0.0f);
-        }
-        const float3 h = normalize(wi + wo);
-        return fresnel(dot(wi, h)) * bsdf.eval(wi, wo, rng);
-    }
-
     Optional<float3> sample(const float3 wi, inout RandomGenerator rng) {
         return bsdf.sample(wi, rng);
     }
 
     float pdf(const float3 wi, const float3 wo) {
         return bsdf.pdf(wi, wo);
+    }
+
+    float3 eval_pdf(const float3 wi, const float3 wo, inout RandomGenerator rng, out float pdf) {
+        // opposite hemispheres have no half vector, and a conductor does not transmit
+        if (min(wi.z, wo.z) < BSDF_MIN_COS_THETA) {
+            pdf = bsdf.pdf(wi, wo);
+            return float3(0.0f);
+        }
+        return fresnel(dot(wi, normalize(wi + wo))) * bsdf.eval_pdf(wi, wo, rng, pdf);
     }
 
     override Optional<ShadingFunctionSample> sample_eval(const float3 wi,
@@ -120,9 +120,12 @@ struct IridescentFresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
         this.iridescence = iridescence;
     }
 
-    float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) {
-        const float3 base_e = base.eval(wi, wo, rng);
-        const float3 layer_e = layer.eval(wi, wo, rng);
+    float3 eval_pdf(const float3 wi, const float3 wo, inout RandomGenerator rng, out float pdf) {
+        float base_pdf;
+        float layer_pdf;
+        const float3 base_e = base.eval_pdf(wi, wo, rng, base_pdf);
+        const float3 layer_e = layer.eval_pdf(wi, wo, rng, layer_pdf);
+        pdf = lerp(base_pdf, layer_pdf, fresnel_dielectric(wi.z, eta));
 
         // Reflect/transmit split at the microfacet angle (VdotH); the full dielectric form keeps
         // TIR -> 1 so transmissive glass reflects past the critical angle instead of going dark.
@@ -173,8 +176,9 @@ struct IridescentFresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
                 return ShadingFunctionSample(s.wo, (take_layer ? f : 1.0f - f) * s.pdf, s.weight,
                                              s.lobe);
             }
-            const float pdf = this.pdf(wi, s.wo);
-            return ShadingFunctionSample(s.wo, pdf, this.eval(wi, s.wo, rng) / pdf, s.lobe);
+            float pdf;
+            const float3 value = this.eval_pdf(wi, s.wo, rng, pdf);
+            return ShadingFunctionSample(s.wo, pdf, value / pdf, s.lobe);
         }
         return none;
     }
@@ -258,26 +262,6 @@ struct IridescentRoughDielectricBSDF : BSDF {
         return eta == 1.0f || alpha < BSDF_SMOOTH_ALPHA;
     }
 
-    float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) {
-        if (is_delta() || wi.z < BSDF_MIN_COS_THETA) {
-            return float3(0.0f);
-        }
-        if (wo.z > BSDF_MIN_COS_THETA) {
-            // Reflection: thin-film reflectance at the reflection half-vector weights the GGX lobe.
-            const float3 h = normalize(wi + wo);
-            return reflectance(abs(dot(wi, h))) * GGXBRDF(alpha).eval(wi, wo, rng);
-        }
-        if (wo.z < -BSDF_MIN_COS_THETA) {
-            // Refraction: (1 - R) per channel times the GGX transmission lobe (with the eta^2
-            // term).
-            float3 h = normalize(wo + wi * eta);
-            h *= sign(h.z);
-            return (1.0f - reflectance(abs(dot(wi, h)))) *
-                   GGXBTDF(alpha, eta, tint).eval(wi, wo, rng);
-        }
-        return float3(0.0f);
-    }
-
     Optional<float3> sample(const float3 wi, inout RandomGenerator rng) {
         if (let s = sample_eval(wi, rng)) {
             return s.wo;
@@ -304,6 +288,28 @@ struct IridescentRoughDielectricBSDF : BSDF {
             return (1.0f - p) * ggx_VNDF_H_pdf(wi, h, alpha_squared) * abs(wodoth) / pow2(denom);
         }
         return 0.0f;
+    }
+
+    float3 eval_pdf(const float3 wi, const float3 wo, inout RandomGenerator rng, out float pdf) {
+        pdf = 0.0f;
+        if (is_delta() || wi.z < BSDF_MIN_COS_THETA) {
+            return float3(0.0f);
+        }
+        if (wo.z > BSDF_MIN_COS_THETA) {
+            const float3 R = reflectance(abs(dot(wi, normalize(wi + wo))));
+            const float3 f = GGXBRDF(alpha).eval_pdf(wi, wo, rng, pdf);
+            pdf *= max3(R);
+            return R * f;
+        }
+        if (wo.z < -BSDF_MIN_COS_THETA) {
+            float3 h = normalize(wo + wi * eta);
+            h *= sign(h.z);
+            const float3 R = reflectance(abs(dot(wi, h)));
+            const float3 f = GGXBTDF(alpha, eta, tint).eval_pdf(wi, wo, rng, pdf);
+            pdf *= 1.0f - max3(R);
+            return (1.0f - R) * f;
+        }
+        return float3(0.0f);
     }
 
     override Optional<ShadingFunctionSample> sample_eval(const float3 wi,

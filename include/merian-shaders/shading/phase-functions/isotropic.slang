@@ -24,10 +24,6 @@ struct IsotropicPhaseFunction : PhaseFunction {
         return MERIAN_INV_FOUR_PI;
     }
 
-    float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) {
-        return MERIAN_INV_FOUR_PI;
-    }
-
     Optional<float3> sample(const float3 wi, inout RandomGenerator rng) {
         return sample_sphere(rng);
     }
@@ -39,6 +35,11 @@ struct IsotropicPhaseFunction : PhaseFunction {
 
     float pdf(const float3 wi, const float3 wo) {
         return MERIAN_INV_FOUR_PI;
+    }
+
+    float3 eval_pdf(const float3 wi, const float3 wo, inout RandomGenerator rng, out float pdf) {
+        pdf = MERIAN_INV_FOUR_PI;
+        return pdf;
     }
 }
 

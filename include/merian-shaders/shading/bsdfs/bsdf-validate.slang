@@ -16,6 +16,10 @@ float bsdf_validate_err(const float acc, const float value) {
     return isfinite(value) ? max(acc, value) : BSDF_VALIDATE_SENTINEL;
 }
 
+float bsdf_validate_relative_err(const float a, const float b) {
+    return bsdf_validate_err(0.f, abs(a - b) / (max(abs(a), abs(b)) + 1e-6f));
+}
+
 struct BSDFSampleCheck {
     float3 wo;
     // f * cos / pdf, zero for a rejected draw so the mean over all draws stays unbiased:
@@ -29,6 +33,8 @@ struct BSDFSampleCheck {
     float err_pdf;
     // eval() and pdf() must vanish at a singular direction: the largest of them
     float err_delta;
+    // relative deviation of eval_pdf()'s pdf from pdf()
+    float err_eval_pdf;
     BSDFLobe lobe;
     bool valid;       // sample() returned a direction
     bool delta;       // the draw came from a singular lobe
@@ -46,6 +52,7 @@ bsdf_validate_sample<B : BSDF>(const B bsdf, const float3 wi, inout RandomGenera
     check.err_weight = 0.f;
     check.err_pdf = 0.f;
     check.err_delta = 0.f;
+    check.err_eval_pdf = 0.f;
     check.lobe = BSDFLobe::None;
     check.valid = false;
     check.delta = false;
@@ -60,8 +67,10 @@ bsdf_validate_sample<B : BSDF>(const B bsdf, const float3 wi, inout RandomGenera
         check.delta = bsdf_lobe_is_delta(smp.lobe);
         check.transmitted = smp.wo.z * wi.z < 0.f;
 
-        const float3 eval = bsdf.eval(wi, smp.wo, rng);
+        float eval_pdf;
+        const float3 eval = bsdf.eval_pdf(wi, smp.wo, rng, eval_pdf);
         const float pdf = bsdf.pdf(wi, smp.wo);
+        check.err_eval_pdf = bsdf_validate_relative_err(eval_pdf, pdf);
         if (check.delta) {
             check.err_delta = bsdf_validate_err(0.f, pdf);
             check.err_delta = bsdf_validate_err(check.err_delta, max(max(eval.x, eval.y), eval.z));
@@ -70,8 +79,7 @@ bsdf_validate_sample<B : BSDF>(const B bsdf, const float3 wi, inout RandomGenera
         } else {
             // pdf() rebuilds the half vector from wi + wo while sample_eval may reuse the
             // sampled one, so compare relatively
-            check.err_pdf =
-                bsdf_validate_err(0.f, abs(smp.pdf - pdf) / (max(abs(smp.pdf), abs(pdf)) + 1e-6f));
+            check.err_pdf = bsdf_validate_relative_err(smp.pdf, pdf);
             if (pdf > 0.f) {
                 const float3 reference = eval / pdf;
                 check.err_weight = bsdf_validate_err(0.f, length(smp.weight - reference) /
@@ -91,6 +99,8 @@ struct BSDFDirectionCheck {
     // |f(wi, wo) - f(wo, wi)| relative, and 0 where symmetry does not apply: refraction scales
     // radiance by eta^2 between the two sides, so only reflection is reciprocal
     float err_reciprocity;
+    // relative deviation of eval_pdf()'s pdf from pdf()
+    float err_eval_pdf;
     // pdf and eval were finite; a non-finite direction contributes zero to the integrals
     bool sane;
 };
@@ -102,10 +112,12 @@ BSDFDirectionCheck bsdf_validate_direction<B : BSDF>(const B bsdf,
                                                      inout RandomGenerator rng) {
     BSDFDirectionCheck check;
     const float pdf = bsdf.pdf(wi, wo);
-    const float3 eval = bsdf.eval(wi, wo, rng);
+    float eval_pdf;
+    const float3 eval = bsdf.eval_pdf(wi, wo, rng, eval_pdf);
     check.sane = isfinite(pdf) && all(isfinite(eval));
     check.pdf = isfinite(pdf) ? pdf : 0.f;
     check.eval = all(isfinite(eval)) ? eval : float3(0.f);
+    check.err_eval_pdf = bsdf_validate_relative_err(eval_pdf, pdf);
     check.err_reciprocity = 0.f;
     if (wo.z * wi.z > 0.f) {
         // eval() carries the cosine, so divide it out to compare the BSDF itself

@@ -7,6 +7,7 @@
 __exported import merian_shaders.scene.light_select;
 import merian_shaders.scene.scene_data;
 import merian_shaders.utils.bit_twiddling;
+import merian_shaders.utils.math;
 #endif
 
 #include "merian-shaders/scene/micromap.slangh"
@@ -114,16 +115,23 @@ struct EmissiveRegion {
         if (record == nullptr)
             return bary;
         uint k = min(uint(u * float(count)), count - 1);
-        uint index = 0;
-        for (uint word = 0; word < emission_bit_words(level); word++) {
-            const uint bits = record[EMISSION_RECORD_BITS + word];
-            const uint set = countbits(bits);
-            if (k < set) {
-                index = 32 * word + select_set_bit(bits, k);
-                break;
-            }
-            k -= set;
+        const uint words = emission_bit_words(level);
+        uint bits[EMISSION_MAX_BIT_WORDS];
+        for (uint word = 0; word < EMISSION_MAX_BIT_WORDS; word++) {
+            bits[word] = word < words ? record[EMISSION_RECORD_BITS + word] : 0u;
         }
+        uint chosen_word = 0;
+        uint chosen_bits = 0;
+        bool found = false;
+        for (uint word = 0; word < EMISSION_MAX_BIT_WORDS; word++) {
+            const uint set = countbits(bits[word]);
+            const bool here = !found && k < set;
+            chosen_word = here ? word : chosen_word;
+            chosen_bits = here ? bits[word] : chosen_bits;
+            k = found || here ? k : k - set;
+            found = found || here;
+        }
+        const uint index = 32 * chosen_word + select_set_bit(chosen_bits, k);
         const MicroTriangle micro = emission_grid_to_bary(index, level);
         const float2 uv = micro.p0 * bary.x + micro.p1 * bary.y + micro.p2 * bary.z;
         const float3 mesh = float3(1.f - uv.x - uv.y, uv);
@@ -198,17 +206,17 @@ struct LightBound {
 };
 
 #ifndef __cplusplus
-// Double-float sum (hi, lo), Knuth's TwoSum.
+// Double-float sum (hi, lo).
 float2 ff_add(const float2 a, const float2 b) {
-    precise const float s = a.x + b.x;
-    precise const float v = s - a.x;
-    precise const float e = (a.x - (s - v)) + (b.x - v) + a.y + b.y;
-    precise const float h = s + e;
-    return float2(h, e - (h - s));
+    float error;
+    const float sum = two_sum(a.x, b.x, error);
+    const float e = exact_add(exact_add(error, a.y), b.y);
+    const float hi = exact_add(sum, e);
+    return float2(hi, exact_sub(e, exact_sub(hi, sum)));
 }
 
 float ff_diff(const float2 a, const float2 b) {
-    return (a.x - b.x) + (a.y - b.y);
+    return exact_add(exact_sub(a.x, b.x), exact_sub(a.y, b.y));
 }
 
 float range_share(const StructuredBuffer<float2> cdf,
@@ -223,10 +231,10 @@ float range_share(const StructuredBuffer<float2> cdf,
 
 // Double-float product, with a fused multiply-add for the error of the leading one (Dekker 1971).
 float2 ff_mul(const float2 a, const float2 b) {
-    precise const float p = a.x * b.x;
-    precise const float e = fma(a.x, b.x, -p) + (a.x * b.y + a.y * b.x);
-    precise const float h = p + e;
-    return float2(h, e - (h - p));
+    const float p = exact_mul(a.x, b.x);
+    const float e = exact_add(exact_fma(a.x, b.x, -p), a.x * b.y + a.y * b.x);
+    const float hi = exact_add(p, e);
+    return float2(hi, exact_sub(e, exact_sub(hi, p)));
 }
 
 bool ff_greater(const float2 a, const float2 b) {
@@ -242,6 +250,31 @@ float2 range_threshold(const StructuredBuffer<float2> cdf,
     const float2 base = first > 0 ? cdf[first - 1] : float2(0);
     const float2 total = ff_add(cdf[end - 1], -base);
     return ff_add(base, ff_mul(total, float2(u.x, u.y * (1.f / 16777216.f))));
+}
+
+uint cdf_bucket(const float value, const float scale, const uint buckets) {
+    return min(buckets - 1, uint(value * scale));
+}
+
+// search_range from the guide's bucket on (Chen and Asau 1974)
+uint search_range_guided(const StructuredBuffer<float2> cdf,
+                         const StructuredBuffer<uint> guide,
+                         const uint buckets,
+                         const uint first,
+                         const uint end,
+                         const float2 u) {
+    const float2 threshold = range_threshold(cdf, first, end, u);
+    const uint bucket = cdf_bucket(threshold.x, asfloat(guide[buckets + 1]), buckets);
+    uint lo = clamp(guide[bucket], first, end - 1);
+    uint hi = clamp(guide[bucket + 1], lo, end - 1);
+    while (lo < hi) {
+        const uint mid = (lo + hi) >> 1;
+        if (ff_greater(cdf[mid], threshold))
+            hi = mid;
+        else
+            lo = mid + 1;
+    }
+    return lo;
 }
 
 uint search_range(const StructuredBuffer<float2> cdf,

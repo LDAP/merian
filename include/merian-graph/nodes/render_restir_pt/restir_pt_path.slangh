@@ -501,8 +501,8 @@ Optional<RestirPTScatter> restir_pt_scatter<B : BSDF>(const B bsdf,
         RestirPTScatter s;
         s.lobe = restir_pt_sample_lobe(sample.lobe);
         const float3 wo_local = sample.wo;
-        s.f = s.is_delta() ? sample.weight : bsdf.eval(wi_local, wo_local, rng);
-        s.pdf = s.is_delta() ? 1.f : bsdf.pdf(wi_local, wo_local);
+        s.f = s.is_delta() ? sample.weight : sample.weight * sample.pdf;
+        s.pdf = s.is_delta() ? 1.f : sample.pdf;
         if (!any(s.f > 0.f) || !(s.pdf > 0.f))
             return none;
         s.transmission = wi_local.z * wo_local.z < 0.f;
@@ -578,8 +578,7 @@ restir_pt_direct<B : BSDF>(const ParameterBlock<Scene> scene,
         const float3 wo_local = frame.to_local(ls.wo);
         RestirPTDirect d;
         d.ls = ls;
-        d.f = bsdf.eval(wi_local, wo_local, rng);
-        d.p_scatter = bsdf.pdf(wi_local, wo_local);
+        d.f = bsdf.eval_pdf(wi_local, wo_local, rng, d.p_scatter);
         d.mis = ls.pdf / (ls.pdf + d.p_scatter);
         if (any(d.f > 0.f) && scene.trace_light_visibility(
                                   sp.pos, sp.get_face_normal(), sp.spawn_offset, ls.shadow_pos,

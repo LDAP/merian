@@ -34,9 +34,14 @@ struct SheenLayerBSDF<Base : BSDF> : BSDF {
         return clamp(max_sheen_color * sheen_directional_albedo(ndotv, sheen_alpha), 0.f, 0.9f);
     }
 
-    float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) {
+    float3 eval_pdf(const float3 wi, const float3 wo, inout RandomGenerator rng, out float pdf) {
         const float scaling = min(albedo_scaling(wi.z), albedo_scaling(wo.z));
-        return sheen.eval(wi, wo, rng) + base.eval(wi, wo, rng) * scaling;
+        float sheen_pdf;
+        float base_pdf;
+        const float3 f =
+            sheen.eval_pdf(wi, wo, rng, sheen_pdf) + base.eval_pdf(wi, wo, rng, base_pdf) * scaling;
+        pdf = lerp(base_pdf, sheen_pdf, prob_sheen(wi.z));
+        return f;
     }
 
     Optional<float3> sample(const float3 wi, inout RandomGenerator rng) {
@@ -66,8 +71,9 @@ struct SheenLayerBSDF<Base : BSDF> : BSDF {
                 return ShadingFunctionSample(s.wo, (1.0f - p) * s.pdf,
                                              scaling * s.weight / (1.0f - p), s.lobe);
             }
-            const float pdf = this.pdf(wi, s.wo);
-            return ShadingFunctionSample(s.wo, pdf, this.eval(wi, s.wo, rng) / pdf, s.lobe);
+            float pdf;
+            const float3 f = this.eval_pdf(wi, s.wo, rng, pdf);
+            return ShadingFunctionSample(s.wo, pdf, f / pdf, s.lobe);
         }
         return none;
     }

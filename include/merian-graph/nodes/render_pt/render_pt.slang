@@ -77,19 +77,23 @@ struct ScatterTarget<B : ShadingFunction, G : GuidingDistribution<float3>, V : H
     OrthonormalFrame frame;
     float3 wi_local;
     float3 shading_normal;
-    float3 face_normal;
+    float3 geo_normal;
+    bool transmissive;
 
-    float3 unshadowed(const LightSample ls, inout RandomGenerator rng) {
-        const float3 ng = dot(face_normal, shading_normal) < 0.f ? -face_normal : face_normal;
-        if ((dot(ls.wo, shading_normal) < 0.f) != (dot(ls.wo, ng) < 0.f)) {
-            return float3(0);
-        }
-        return bsdf.eval(wi_local, frame.to_local(ls.wo), rng) * ls.Li *
-               medium.transmittance(ls.dist);
+    bool receives(const float3 wo) {
+        const bool below = dot(wo, geo_normal) < 0.f;
+        return (dot(wo, shading_normal) < 0.f) == below && (!below || transmissive);
     }
 
-    float scatter_pdf(const LightSample ls) {
-        return mixture.pdf(bsdf, guiding, wi_local, frame.to_local(ls.wo), ls.wo);
+    float3 unshadowed(const LightSample ls, inout RandomGenerator rng, out float scatter_pdf) {
+        scatter_pdf = 0.f;
+        if (!receives(ls.wo)) {
+            return float3(0);
+        }
+        float bsdf_pdf;
+        const float3 f = bsdf.eval_pdf(wi_local, frame.to_local(ls.wo), rng, bsdf_pdf);
+        scatter_pdf = mixture.pdf(bsdf_pdf, guiding, ls.wo);
+        return f * ls.Li * medium.transmittance(ls.dist);
     }
 }
 
@@ -102,9 +106,10 @@ make_scatter_target<B : ShadingFunction, G : GuidingDistribution<float3>, V : Ho
     const OrthonormalFrame frame,
     const float3 wi_local,
     const float3 shading_normal,
-    const float3 face_normal) {
-    ScatterTarget<B, G, V> target = {bsdf,  guiding,  mixture,        medium,
-                                     frame, wi_local, shading_normal, face_normal};
+    const float3 geo_normal,
+    const bool transmissive) {
+    ScatterTarget<B, G, V> target = {bsdf,     guiding,        mixture,    medium,      frame,
+                                     wi_local, shading_normal, geo_normal, transmissive};
     return target;
 }
 
@@ -268,13 +273,19 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
         if (merian_render_surface_nee_mode == NEEMode::Resampled && nee_surface) {
             direct = scene.sample_direct_light(
                 lights,
-                make_scatter_target(bsdf, guiding, mixture, medium, frame, wi_local, ns, ng),
+                make_scatter_target(bsdf, guiding, mixture, medium, frame, wi_local, ns,
+                                    vertex.geo_normal, vertex.transmissive),
                 rng);
         }
 
         if (roulette && !roulette_first && !survives_roulette(throughput, rng)) {
             break;
         }
+
+        const float3 direct_light =
+            throughput * scene.resolve_direct_light(lights, ng, spawn_offset, direct, rng,
+                                                    merian_render_instance_mask);
+        radiance += direct_light;
 
         // 3. scatter direction, from a light or from the mixture. The light technique's density
         // joins the mixture once the hit says which light the ray reached.
@@ -290,9 +301,9 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
             scattered = sampled_light != LIGHT_INVALID_INDEX;
             wo_world = light_dir;
             if (scattered) {
-                const float3 wo_l = frame.to_local(wo_world);
-                f_cos = bsdf.eval(wi_local, wo_l, rng);
-                scatter_pdf = mixture.pdf(bsdf, guiding, wi_local, wo_l, wo_world);
+                float bsdf_pdf;
+                f_cos = bsdf.eval_pdf(wi_local, frame.to_local(wo_world), rng, bsdf_pdf);
+                scatter_pdf = mixture.pdf(bsdf_pdf, guiding, wo_world);
                 realized_pdf = scatter_pdf;
             }
         } else if (let s = sample_scatter(mixture, bsdf, guiding, frame, wi_local,
@@ -354,12 +365,9 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
             rec.vertex(params.path_records, vertex.pos, wo_world, record_pdf,
                        segment.pdf > 0.f ? record_f_cos / segment.pdf : float3(0),
                        uint(bounce) - 1u, record_lobe, record_method, record_material);
-            if (!direct.hasValue) {
-                record_connection(rec, params, vertex.pos,
-                                  merian_render_surface_nee_mode == NEEMode::Resampled &&
-                                      nee_surface,
-                                  none, throughput, float3(0), uint(bounce) - 1u, record_material);
-            }
+            record_connection(rec, params, vertex.pos,
+                              merian_render_surface_nee_mode == NEEMode::Resampled && nee_surface,
+                              direct, throughput, direct_light, uint(bounce) - 1u, record_material);
         }
 
         Optional<RayDesc> next_ray = none;
@@ -394,23 +402,9 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
         VirtualImage image = VirtualImage();
         bool through_specular = false;
 
-        // the light ray shares the continuation's traversal call site
-        bool light_pass = direct.hasValue;
         bool light_reached = false;
-        while (light_pass || continues) {
-            const Hit hit = scene.trace_ray(
-                light_pass ? scene.make_light_ray(vertex.pos, ng, spawn_offset, direct.value) : ray,
-                light_pass ? scene.light_ray_flags(direct.value) : RAY_FLAG_NONE,
-                merian_render_instance_mask);
-            if (light_pass) {
-                light_pass = false;
-                const float3 direct_light =
-                    throughput * scene.resolve_direct_light(lights, direct.value, hit, rng);
-                radiance += direct_light;
-                record_connection(rec, params, vertex.pos, true, direct, throughput, direct_light,
-                                  uint(bounce) - 1u, record_material);
-                continue;
-            }
+        while (continues) {
+            const Hit hit = scene.trace_ray(ray, RAY_FLAG_NONE, merian_render_instance_mask);
 
             // before the hit is shaded; no light sampler reaches past a singular surface
             if (!through_specular && nee_surface && !delta) {
@@ -605,9 +599,13 @@ void render_pixel<Reorder : IThreadReorder>(const uint2 pixel,
             uint(merian_render_max_path_length) *
                     (merian_render_surface_nee_mode == NEEMode::Resampled ? 2u : 1u) +
                 1u);
-        const float3 contrib = trace_path<Reorder>(scene, params, pixel, primary_ray, primary_sp,
-                                                   uint16_t(s), rng, scatter_stats, rec) /
-                               demod_albedo;
+        const float3 contrib =
+            trace_path<Reorder>(scene, params, pixel, primary_ray,
+                                merian_render_spp == 1
+                                    ? primary_sp
+                                    : scene.get_shading_point(primary_ray, primary_hit),
+                                uint16_t(s), rng, scatter_stats, rec) /
+            demod_albedo;
         if (!any(isnan(contrib)) && !any(isinf(contrib))) {
             irradiance += contrib;
             const float l = yuv_luminance(contrib);

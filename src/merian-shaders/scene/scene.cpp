@@ -1296,8 +1296,9 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
                     (static_cast<uint64_t>(info.serial) << 32) | node.serial;
 
                 has_sky_portals |= (mesh.flags & MeshFlags::UseEnvMap);
-                if (!(mesh.flags & MeshFlags::UseEnvMap) &&
-                    material_system->is_emissive(mesh.material_id)) {
+                const bool is_light = !(mesh.flags & MeshFlags::UseEnvMap) &&
+                                      material_system->is_emissive(mesh.material_id);
+                if (is_light) {
                     LightCollection::EmissiveGeometry& emissive =
                         emissive_geometries.emplace_back(LightCollection::EmissiveGeometry{
                             static_cast<GeometryID>(geometries.size()), instance_index,
@@ -1349,6 +1350,9 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
                 }
                 if (!mesh.is_opaque() && material_system->has_alpha_texture(mesh.material_id)) {
                     gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::AlphaTested);
+                }
+                if (is_light) {
+                    gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::Emissive);
                 }
 
                 geometries.emplace_back(gd);

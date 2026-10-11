@@ -348,19 +348,6 @@ struct GGXBRDF : BSDF {
         return max(alpha_xy.x, alpha_xy.y) < BSDF_SMOOTH_ALPHA;
     }
 
-    float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) {
-        if (is_delta() || min(wi.z, wo.z) < BSDF_MIN_COS_THETA) {
-            return float3(0.0f);
-        }
-
-        const float3 h = normalize(wo + wi);
-        const float G2_over_widotn = smith_g2_over_widotn(wo, wi, alpha_xy);
-        const float D = ggx_NDF(h, alpha_xy);
-
-        // wo.z cancels
-        return float3((D * G2_over_widotn) / 4.0f);
-    }
-
     Optional<float3> sample(const float3 wi, inout RandomGenerator rng) {
         if (wi.z < BSDF_MIN_COS_THETA) {
             return none;
@@ -387,6 +374,21 @@ struct GGXBRDF : BSDF {
 
         const float3 h = normalize(wi + wo);
         return ggx_VNDF_pdf_wo(wi, h, alpha_xy);
+    }
+
+    float3 eval_pdf(const float3 wi, const float3 wo, inout RandomGenerator rng, out float pdf) {
+        if (is_delta() || min(wi.z, wo.z) < BSDF_MIN_COS_THETA) {
+            pdf = 0.0f;
+            return float3(0.0f);
+        }
+
+        const float3 h = normalize(wo + wi);
+        pdf = ggx_VNDF_pdf_wo(wi, h, alpha_xy);
+        const float G2_over_widotn = smith_g2_over_widotn(wo, wi, alpha_xy);
+        const float D = ggx_NDF(h, alpha_xy);
+
+        // wo.z cancels
+        return float3((D * G2_over_widotn) / 4.0f);
     }
 
     override Optional<ShadingFunctionSample> sample_eval(const float3 wi,
@@ -457,25 +459,6 @@ struct GGXBTDF : BSDF {
         return eta == 1.0f || alpha < BSDF_SMOOTH_ALPHA;
     }
 
-    float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) {
-        if (is_delta() || wi.z < BSDF_MIN_COS_THETA || wo.z > -BSDF_MIN_COS_THETA) {
-            return float3(0.0f);
-        }
-
-        float3 h = normalize(wo + (wi * eta));
-        h *= sign(h.z);
-        const float widoth = dot(wi, h);
-        const float wodoth = dot(wo, h);
-        const float alpha_squared = pow2(alpha);
-        const float G2_over_widotn = smith_g2_over_widotn(abs(wo.z), wi.z, alpha_squared);
-        const float D = ggx_NDF(h, alpha_squared);
-
-        const float denom = wodoth + (eta * widoth);
-        const float jacobian = pow2(eta) * widoth * wodoth / pow2(denom);
-        // wo.z cancels
-        return tint * (D * G2_over_widotn * abs(jacobian));
-    }
-
     Optional<float3> sample(const float3 wi, inout RandomGenerator rng) {
         if (wi.z < BSDF_MIN_COS_THETA) {
             return none;
@@ -502,6 +485,27 @@ struct GGXBTDF : BSDF {
         const float denom = wodoth + (eta * dot(wi, h));
         /* * abs(wodoth) / pow2(denom) is the Jacobian of the refraction */
         return ggx_VNDF_H_pdf(wi, h, pow2(alpha)) * abs(wodoth) / pow2(denom);
+    }
+
+    float3 eval_pdf(const float3 wi, const float3 wo, inout RandomGenerator rng, out float pdf) {
+        if (is_delta() || wi.z < BSDF_MIN_COS_THETA || wo.z > -BSDF_MIN_COS_THETA) {
+            pdf = 0.0f;
+            return float3(0.0f);
+        }
+
+        float3 h = normalize(wo + (wi * eta));
+        h *= sign(h.z);
+        const float widoth = dot(wi, h);
+        const float wodoth = dot(wo, h);
+        const float alpha_squared = pow2(alpha);
+        const float G2_over_widotn = smith_g2_over_widotn(abs(wo.z), wi.z, alpha_squared);
+        const float D = ggx_NDF(h, alpha_squared);
+
+        const float denom = wodoth + (eta * widoth);
+        pdf = ggx_VNDF_H_pdf(wi, h, alpha_squared) * abs(wodoth) / pow2(denom);
+        const float jacobian = pow2(eta) * widoth * wodoth / pow2(denom);
+        // wo.z cancels
+        return tint * (D * G2_over_widotn * abs(jacobian));
     }
 
     override Optional<ShadingFunctionSample> sample_eval(const float3 wi,

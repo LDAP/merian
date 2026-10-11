@@ -130,6 +130,10 @@ class LightCollection {
     static vk::DeviceSize cdf_state_size(const uint32_t count) {
         return (1 + 3 * static_cast<vk::DeviceSize>(cdf_block_count(count))) * sizeof(uint32_t);
     }
+    // per bucket the first entry reaching it, then the entry count and the scale
+    static vk::DeviceSize guide_size(const uint32_t buckets) {
+        return (static_cast<vk::DeviceSize>(buckets) + 2) * sizeof(uint32_t);
+    }
     uint32_t setup_group_count() const {
         const uint32_t per_group = LIGHT_GRID_SETUP_GROUP * LIGHT_GRID_SETUP_ITEMS;
         return (triangle_count + per_group - 1) / per_group;
@@ -218,13 +222,13 @@ class LightCollection {
     BufferHandle tree_rank_buffer;
     BufferHandle tree_cdf_buffer;
     BufferHandle tree_cdf_state_buffer;
+    BufferHandle tree_guide_buffer;
     BufferHandle tree_info_buffer[2];
     BufferHandle setup_state_buffer;
     BufferHandle sort_state_buffer;
     BufferHandle grid_keys_buffer[2];
     BufferHandle grid_contribution_buffer[2];
     BufferHandle grid_feedback_buffer[2];
-    BufferHandle grid_touched_buffer[2];
     // zeroed in the next update
     bool grid_feedback_fresh = false;
     BufferHandle grid_starts_buffer;
@@ -280,6 +284,9 @@ class LightCollection {
     Versioned<SlangProgramEntryPoint> cdf_entry_point;
     Versioned<Pipeline> cdf_pipeline;
     Versioned<ShaderObject> cdf_params;
+    Versioned<SlangProgramEntryPoint> guide_entry_point;
+    Versioned<Pipeline> guide_pipeline;
+    Versioned<ShaderObject> guide_params;
 };
 
 } // namespace merian

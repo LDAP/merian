@@ -32,13 +32,15 @@ struct PhaseTarget<P : ShadingFunction, G : GuidingDistribution<float3>, V : Hom
     OrthonormalFrame frame;
     float3 wi_local;
 
-    float3 unshadowed(const LightSample ls, inout RandomGenerator rng) {
-        return phase.eval(wi_local, frame.to_local(ls.wo), rng) * ls.Li *
-               medium.transmittance(ls.dist);
+    bool receives(const float3 wo) {
+        return true;
     }
 
-    float scatter_pdf(const LightSample ls) {
-        return mixture.pdf(phase, guiding, wi_local, frame.to_local(ls.wo), ls.wo);
+    float3 unshadowed(const LightSample ls, inout RandomGenerator rng, out float scatter_pdf) {
+        float phase_pdf;
+        const float3 f = phase.eval_pdf(wi_local, frame.to_local(ls.wo), rng, phase_pdf);
+        scatter_pdf = mixture.pdf(phase_pdf, guiding, ls.wo);
+        return f * ls.Li * medium.transmittance(ls.dist);
     }
 }
 
@@ -157,9 +159,9 @@ void render_pixel(const uint2 pixel,
             if (let lp = scene.nee.sample_point(lights, rng, sampled_entry)) {
                 wo_world = normalize(lp.pos - scatter_pos);
                 sampled_light = lp.index;
-                const float3 wo_local = frame.to_local(wo_world);
-                f_cos = phase.eval(wi_local, wo_local, rng);
-                scatter_pdf = mixture.pdf(phase, guiding, wi_local, wo_local, wo_world);
+                float phase_pdf;
+                f_cos = phase.eval_pdf(wi_local, frame.to_local(wo_world), rng, phase_pdf);
+                scatter_pdf = mixture.pdf(phase_pdf, guiding, wo_world);
                 scattered = true;
             }
         } else if (let sc = sample_scatter(mixture, phase, guiding, frame, wi_local,

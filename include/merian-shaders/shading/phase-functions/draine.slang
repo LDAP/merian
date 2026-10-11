@@ -104,10 +104,6 @@ struct DrainePhaseFunction : PhaseFunction {
         return eval(cos_theta, g, a);
     }
 
-    float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) {
-        return eval(dot(-wi, wo));
-    }
-
     Optional<float3> sample(const float3 wi, inout RandomGenerator rng) {
         return sample(rng, wi, g, a);
     }
@@ -121,6 +117,11 @@ struct DrainePhaseFunction : PhaseFunction {
 
     float pdf(const float3 wi, const float3 wo) {
         return eval(dot(-wi, wo));
+    }
+
+    float3 eval_pdf(const float3 wi, const float3 wo, inout RandomGenerator rng, out float pdf) {
+        pdf = eval(dot(-wi, wo));
+        return pdf;
     }
 }
 

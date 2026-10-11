@@ -19,10 +19,6 @@ struct ThinDielectricBSDF : BSDF {
         return R < 1.0f ? R + pow2(1.0f - R) * R / (1.0f - pow2(R)) : 1.0f;
     }
 
-    float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) {
-        return float3(0.0f);
-    }
-
     Optional<float3> sample(const float3 wi, inout RandomGenerator rng) {
         if (abs(wi.z) < BSDF_MIN_COS_THETA) {
             return none;
@@ -32,6 +28,11 @@ struct ThinDielectricBSDF : BSDF {
 
     float pdf(const float3 wi, const float3 wo) {
         return 0.0f;
+    }
+
+    float3 eval_pdf(const float3 wi, const float3 wo, inout RandomGenerator rng, out float pdf) {
+        pdf = 0.0f;
+        return float3(0.0f);
     }
 
     Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {

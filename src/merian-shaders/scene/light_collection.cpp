@@ -189,6 +189,17 @@ void LightCollection::ensure_pipelines(const SlangCompositionHandle& scene_compo
                                                                        allocator);
         });
         cdf_params.depends_on(cdf_entry_point);
+        guide_entry_point = SlangProgramEntryPoint::create(cdf_program, "guide");
+        guide_pipeline = Versioned<Pipeline>([this] {
+            const auto ep = guide_entry_point.get();
+            return ComputePipeline::create(ep->get_pipeline_layout(context), ep->specialize());
+        });
+        guide_pipeline.depends_on(guide_entry_point);
+        guide_params = Versioned<ShaderObject>([this] {
+            return guide_entry_point->create_shader_object_for_parameter(context, "params",
+                                                                         allocator);
+        });
+        guide_params.depends_on(guide_entry_point);
     }
 }
 
@@ -238,6 +249,8 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
                       cmd);
         ensure_buffer(tree_cdf_state_buffer, cdf_state_size(triangle_count),
                       "LightCollection::tree_cdf_state", cmd);
+        ensure_buffer(tree_guide_buffer, guide_size(triangle_count), "LightCollection::tree_guide",
+                      cmd);
         ensure_buffer(setup_state_buffer, LIGHT_GRID_SETUP_STATE * sizeof(uint32_t),
                       "LightCollection::setup_state", cmd);
         ensure_buffer(sort_state_buffer, sort_state_size(), "LightCollection::sort_state", cmd);
@@ -274,9 +287,8 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
         allocated_cells = cells;
         const vk::DeviceSize slot_count = static_cast<vk::DeviceSize>(cells) * LIGHT_GRID_SLOTS;
         for (uint32_t i = 0; i < 2; i++) {
-            const std::array<BufferHandle, 4> previous = {
-                grid_keys_buffer[i], grid_contribution_buffer[i], grid_feedback_buffer[i],
-                grid_touched_buffer[i]};
+            const std::array<BufferHandle, 3> previous = {
+                grid_keys_buffer[i], grid_contribution_buffer[i], grid_feedback_buffer[i]};
             ensure_buffer(grid_keys_buffer[i], slot_count * sizeof(uint32_t),
                           "LightCollection::grid_keys", cmd);
             ensure_buffer(grid_contribution_buffer[i], slot_count * sizeof(float3),
@@ -284,12 +296,10 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
             ensure_buffer(grid_feedback_buffer[i],
                           LIGHT_GRID_FEEDBACK_STRIDE * slot_count * sizeof(uint32_t),
                           "LightCollection::grid_feedback", cmd);
-            ensure_buffer(grid_touched_buffer[i], cells * sizeof(uint32_t),
-                          "LightCollection::grid_touched", cmd);
             const bool reallocated =
-                previous !=
-                std::array<BufferHandle, 4>{grid_keys_buffer[i], grid_contribution_buffer[i],
-                                            grid_feedback_buffer[i], grid_touched_buffer[i]};
+                previous != std::array<BufferHandle, 3>{grid_keys_buffer[i],
+                                                        grid_contribution_buffer[i],
+                                                        grid_feedback_buffer[i]};
             grid_reset |= reallocated;
             grid_feedback_fresh |= reallocated;
         }
@@ -387,7 +397,6 @@ void LightCollection::update(const CommandBufferHandle& cmd,
     if (grid_feedback_fresh) {
         for (uint32_t i = 0; i < 2; i++) {
             cmd->fill(grid_feedback_buffer[i]);
-            cmd->fill(grid_touched_buffer[i]);
         }
         grid_feedback_fresh = false;
     }
@@ -440,8 +449,6 @@ void LightCollection::update(const CommandBufferHandle& cmd,
         c["grid_contribution_prev"] = or_dummy(grid_contribution_buffer[grid_slot ^ 1]);
         c["grid_feedback"] = or_dummy(grid_feedback_buffer[grid_slot]);
         c["grid_feedback_prev"] = or_dummy(grid_feedback_buffer[grid_slot ^ 1]);
-        c["grid_touched"] = or_dummy(grid_touched_buffer[grid_slot]);
-        c["grid_touched_prev"] = or_dummy(grid_touched_buffer[grid_slot ^ 1]);
         c["grid_starts"] = or_dummy(grid_starts_buffer);
         c["grid_estimate"] = or_dummy(grid_estimate_buffer);
         c["grid_probability"] = or_dummy(grid_probability_buffer);
@@ -564,6 +571,18 @@ void LightCollection::update(const CommandBufferHandle& cmd,
         barrier();
     }
 
+    if (triangle_count > 0) {
+        MERIAN_PROFILE_SCOPE_GPU(cmd, "guide");
+        const auto params = guide_params.get();
+        auto c = params->get_cursor();
+        c["cdf"] = tree_cdf_buffer;
+        c["guide"] = tree_guide_buffer;
+        c["count"] = triangle_count;
+        c["buckets"] = triangle_count;
+        run(guide_entry_point, guide_pipeline, params, cdf_block_count(triangle_count + 1));
+        barrier();
+    }
+
     {
         MERIAN_PROFILE_SCOPE_GPU(cmd, "grid");
         if (triangle_count > 0) {
@@ -602,6 +621,7 @@ void LightCollection::write_to(ShaderCursor cursor) const {
     const uint32_t env_texels = env_listed ? env_importance_size() * env_importance_size() : 0u;
     auto tree = cursor["tree"];
     tree["cdf"] = active ? tree_cdf_buffer : dummy;
+    tree["guide"] = active ? tree_guide_buffer : dummy;
     tree["order"] = active ? tree_values_buffer[0] : dummy;
     tree["rank"] = active ? tree_rank_buffer : dummy;
     tree["env_texels"] = env_texels;
@@ -617,7 +637,6 @@ void LightCollection::write_to(ShaderCursor cursor) const {
     grid["slot_bounds"] = active && grid_slot_bounds_buffer ? grid_slot_bounds_buffer : dummy;
     grid["probability"] = active && grid_probability_buffer ? grid_probability_buffer : dummy;
     grid["feedback"] = active ? grid_feedback_buffer[grid_slot] : dummy;
-    grid["touched"] = active ? grid_touched_buffer[grid_slot] : dummy;
     grid["light_count"] = triangle_count + env_texels;
 
     cursor["has_sky_portals"] = has_sky_portals;
