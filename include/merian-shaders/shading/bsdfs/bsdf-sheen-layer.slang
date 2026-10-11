@@ -57,7 +57,8 @@ struct SheenLayerBSDF<Base : BSDF> : BSDF {
         return lerp(base.pdf(wi, wo), sheen.pdf(wi, wo), prob_sheen(wi.z));
     }
 
-    Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
+    override Optional<ShadingFunctionSample> sample_eval(const float3 wi,
+                                                         inout RandomGenerator rng) {
         // Sample sheen or base, but evaluate the combined pdf/weight. Delegate to the chosen
         // sub-BSDF so its lobe classification propagates.
         const float p = prob_sheen(wi.z);

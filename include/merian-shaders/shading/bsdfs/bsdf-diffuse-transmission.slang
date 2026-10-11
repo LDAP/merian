@@ -51,7 +51,8 @@ struct DiffuseTransmissionBSDF : BSDF {
         return MERIAN_INV_PI * abs(wo.z) * (wi.z * wo.z > 0.0f ? p : 1.0f - p);
     }
 
-    Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
+    override Optional<ShadingFunctionSample> sample_eval(const float3 wi,
+                                                         inout RandomGenerator rng) {
         if (abs(wi.z) < BSDF_MIN_COS_THETA) {
             return none;
         }

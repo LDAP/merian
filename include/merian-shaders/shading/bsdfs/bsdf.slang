@@ -75,9 +75,6 @@ struct NullBSDF : BSDF {
         pdf = 0;
         return float3(0);
     }
-    Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
-        return sample_eval_impl<This>(this, wi, rng);
-    }
     Albedo get_albedo(const float3 wi) {
         return Albedo(float3(0), float3(0));
     }

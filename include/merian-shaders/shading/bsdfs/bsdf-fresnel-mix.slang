@@ -41,7 +41,8 @@ struct FresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
         return lerp(base.pdf(wi, wo), layer.pdf(wi, wo), F);
     }
 
-    Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
+    override Optional<ShadingFunctionSample> sample_eval(const float3 wi,
+                                                         inout RandomGenerator rng) {
         // Sample one of the two lobes by Fresnel, but evaluate the combined pdf/weight (one-sample
         // MIS). Delegate to the chosen sub-BSDF so its lobe classification propagates.
         const float F = fresnel_schlick(abs(wi.z), ior_f0);

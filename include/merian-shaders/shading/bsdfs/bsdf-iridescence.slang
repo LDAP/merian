@@ -163,7 +163,8 @@ struct IridescentFresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
         return lerp(base.pdf(wi, wo), layer.pdf(wi, wo), f);
     }
 
-    Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
+    override Optional<ShadingFunctionSample> sample_eval(const float3 wi,
+                                                         inout RandomGenerator rng) {
         // Sample layer or base by Fresnel, evaluate the combined pdf/weight, propagate the
         // chosen sub-BSDF's lobe.
         const float f = fresnel_dielectric(wi.z, eta);

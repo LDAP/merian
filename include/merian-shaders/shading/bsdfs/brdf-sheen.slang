@@ -72,11 +72,12 @@ struct SheenBRDF : BSDF {
         return MERIAN_INV_PI * wo.z;
     }
 
-    Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
-        if (let s = sample_eval_impl<This>(this, wi, rng)) {
-            ShadingFunctionSample r = s;
-            r.lobe = BSDFLobe::DiffuseReflection;
-            return r;
+    override Optional<ShadingFunctionSample> sample_eval(const float3 wi,
+                                                         inout RandomGenerator rng) {
+        if (let wo = sample(wi, rng)) {
+            float p;
+            const float3 f = eval_pdf(wi, wo, rng, p);
+            return ShadingFunctionSample(wo, p, f / p, BSDFLobe::DiffuseReflection);
         }
         return none;
     }

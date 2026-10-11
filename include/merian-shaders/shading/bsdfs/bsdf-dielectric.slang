@@ -34,7 +34,8 @@ struct SmoothDielectricBSDF : BSDF {
         return float3(0.0f);
     }
 
-    Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
+    override Optional<ShadingFunctionSample> sample_eval(const float3 wi,
+                                                         inout RandomGenerator rng) {
         if (wi.z < BSDF_MIN_COS_THETA) {
             return none;
         }

@@ -96,27 +96,19 @@ interface ShadingFunction {
      * shading location.
      *
      */
-    Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng);
-}
+    Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
+        if (let wo = sample(wi, rng)) {
+            float p;
+            const float3 f = eval_pdf(wi, wo, rng, p);
+            return ShadingFunctionSample(wo, p, f / p);
+        }
+        return none;
+    }
 
-extension<T : ShadingFunction> T {
     float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) {
         float pdf;
         return eval_pdf(wi, wo, rng, pdf);
     }
-}
-
-// Utility for default implementations of sample_eval (Slang issue prevents a default
-// implementation)
-Optional<ShadingFunctionSample>
-sample_eval_impl<T : ShadingFunction>(const T sf, const float3 wi, inout RandomGenerator rng) {
-    const Optional<float3> optional_wo = sf.sample(wi, rng);
-    if (let wo = optional_wo) {
-        float p;
-        const float3 f = sf.eval_pdf(wi, wo, rng, p);
-        return ShadingFunctionSample(wo, p, f / p);
-    }
-    return none;
 }
 
 } // namespace merian

@@ -43,7 +43,8 @@ struct MixBSDF<B0 : BSDF, B1 : BSDF> : BSDF {
         return lerp(p0, p1, weight);
     }
 
-    Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
+    override Optional<ShadingFunctionSample> sample_eval(const float3 wi,
+                                                         inout RandomGenerator rng) {
         // weight > 0.0f check enables dead code elimination
         if (weight > 0.0f && rng.next_float() < weight) {
             if (let s = bsdf1.sample_eval(wi, rng)) {
