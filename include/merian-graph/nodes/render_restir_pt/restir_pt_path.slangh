@@ -782,7 +782,7 @@ float3 restir_pt_trace_candidates(const ParameterBlock<Scene> scene,
         }
 
         if (i >= max_length || !sp.has_surface_material ||
-            all(throughput < SCENE_THROUGHPUT_THRESHOLD)) {
+            all(throughput <= 0.f)) {
             rec.terminal(records, sp.pos);
             break;
         }

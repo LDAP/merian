@@ -203,7 +203,7 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
     BounceCounts bounces = {0u};
 
     for (uint16_t bounce = 1; bounce < merian_render_max_path_length; bounce++) {
-        if (!sp.has_surface_material || all(throughput < SCENE_THROUGHPUT_THRESHOLD)) {
+        if (!sp.has_surface_material || all(throughput <= 0.f)) {
             break;
         }
 
