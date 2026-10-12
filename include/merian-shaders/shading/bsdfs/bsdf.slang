@@ -64,6 +64,42 @@ interface BSDF : ShadingFunction {
     uint get_lobe_types();
 }
 
+BSDFLobe
+bsdf_lobe_at(const BSDFLobe lobe, const uint lobe_types, const float3 wi, const float3 wo) {
+    if (lobe != BSDFLobe::None) {
+        return lobe;
+    }
+    const uint side =
+        wi.z * wo.z < 0.0f ? uint(BSDFLobe::Transmission) : uint(BSDFLobe::Reflection);
+    return BSDFLobe(lobe_types & side);
+}
+
+BSDFLobe pick_lobe(inout RandomGenerator rng,
+                   const float selected_pdf0,
+                   const float selected_pdf1,
+                   const float select1,
+                   const BSDFLobe lobe0,
+                   const BSDFLobe lobe1) {
+    const float u = rng.next_float();
+    const float sum = selected_pdf0 + selected_pdf1;
+    return (sum > 0.0f ? u * sum < selected_pdf1 : u < select1) ? lobe1 : lobe0;
+}
+
+float3 eval_pdf_part<B : BSDF, let LOBE : bool>(const B part,
+                                               const float3 wi,
+                                               const float3 wo,
+                                               inout RandomGenerator rng,
+                                               out float pdf,
+                                               out BSDFLobe lobe) {
+    lobe = BSDFLobe::None;
+    if (LOBE) {
+        const float3 f = part.eval_pdf_lobe(wi, wo, rng, pdf, lobe);
+        lobe = bsdf_lobe_at(lobe, part.get_lobe_types(), wi, wo);
+        return f;
+    }
+    return part.eval_pdf(wi, wo, rng, pdf);
+}
+
 struct NullBSDF : BSDF {
     Optional<float3> sample(const float3 wi, inout RandomGenerator rng) {
         return none;

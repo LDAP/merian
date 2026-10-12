@@ -15,17 +15,40 @@ struct MixBSDF<B0 : BSDF, B1 : BSDF> : BSDF {
     }
 
     float3 eval_pdf(const float3 wi, const float3 wo, inout RandomGenerator rng, out float pdf) {
+        BSDFLobe lobe;
+        return eval_pdf_impl<false>(wi, wo, rng, pdf, lobe);
+    }
+
+    override float3 eval_pdf_lobe(const float3 wi,
+                                  const float3 wo,
+                                  inout RandomGenerator rng,
+                                  out float pdf,
+                                  out BSDFLobe lobe) {
+        return eval_pdf_impl<true>(wi, wo, rng, pdf, lobe);
+    }
+
+    float3 eval_pdf_impl<let LOBE : bool>(const float3 wi,
+                                          const float3 wo,
+                                          inout RandomGenerator rng,
+                                          out float pdf,
+                                          out BSDFLobe lobe) {
         float p0 = 0.0f;
         float p1 = 0.0f;
         float3 e0 = float3(0.0f);
         float3 e1 = float3(0.0f);
+        BSDFLobe l0 = BSDFLobe::None;
+        BSDFLobe l1 = BSDFLobe::None;
         if (weight < 1.0f) {
-            e0 = bsdf0.eval_pdf(wi, wo, rng, p0);
+            e0 = eval_pdf_part<B0, LOBE>(bsdf0, wi, wo, rng, p0, l0);
         }
         if (weight > 0.0f) {
-            e1 = bsdf1.eval_pdf(wi, wo, rng, p1);
+            e1 = eval_pdf_part<B1, LOBE>(bsdf1, wi, wo, rng, p1, l1);
         }
         pdf = lerp(p0, p1, weight);
+        lobe = BSDFLobe::None;
+        if (LOBE) {
+            lobe = pick_lobe(rng, (1.0f - weight) * p0, weight * p1, weight, l0, l1);
+        }
         return lerp(e0, e1, weight);
     }
 

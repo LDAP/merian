@@ -21,13 +21,31 @@ struct ConductorFresnelBSDF<Inner : BSDF> : BSDF {
     }
 
     float3 eval_pdf(const float3 wi, const float3 wo, inout RandomGenerator rng, out float pdf) {
+        BSDFLobe lobe;
+        return eval_pdf_impl<false>(wi, wo, rng, pdf, lobe);
+    }
+
+    override float3 eval_pdf_lobe(const float3 wi,
+                                  const float3 wo,
+                                  inout RandomGenerator rng,
+                                  out float pdf,
+                                  out BSDFLobe lobe) {
+        return eval_pdf_impl<true>(wi, wo, rng, pdf, lobe);
+    }
+
+    float3 eval_pdf_impl<let LOBE : bool>(const float3 wi,
+                                          const float3 wo,
+                                          inout RandomGenerator rng,
+                                          out float pdf,
+                                          out BSDFLobe lobe) {
         // opposite hemispheres have no half vector, and a conductor does not transmit
         if (min(wi.z, wo.z) < BSDF_MIN_COS_THETA) {
             pdf = bsdf.pdf(wi, wo);
+            lobe = BSDFLobe::None;
             return float3(0.0f);
         }
         const float3 F = fresnel_schlick(dot(wi, normalize(wi + wo)), f0);
-        return F * bsdf.eval_pdf(wi, wo, rng, pdf);
+        return F * eval_pdf_part<Inner, LOBE>(bsdf, wi, wo, rng, pdf, lobe);
     }
 
     override Optional<ShadingFunctionSample> sample_eval(const float3 wi,

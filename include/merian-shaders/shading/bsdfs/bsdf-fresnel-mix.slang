@@ -16,15 +16,40 @@ struct FresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
     }
 
     float3 eval_pdf(const float3 wi, const float3 wo, inout RandomGenerator rng, out float pdf) {
+        BSDFLobe lobe;
+        return eval_pdf_impl<false>(wi, wo, rng, pdf, lobe);
+    }
+
+    override float3 eval_pdf_lobe(const float3 wi,
+                                  const float3 wo,
+                                  inout RandomGenerator rng,
+                                  out float pdf,
+                                  out BSDFLobe lobe) {
+        return eval_pdf_impl<true>(wi, wo, rng, pdf, lobe);
+    }
+
+    float3 eval_pdf_impl<let LOBE : bool>(const float3 wi,
+                                          const float3 wo,
+                                          inout RandomGenerator rng,
+                                          out float pdf,
+                                          out BSDFLobe lobe) {
         const float F_wi = fresnel_schlick(abs(wi.z), ior_f0);
         // a transmitted direction has no half vector with wi, so mix by the incidence angle
         const float F =
             wi.z * wo.z > 0.0f ? fresnel_schlick(dot(wi, normalize(wi + wo)), ior_f0) : F_wi;
         float base_pdf;
         float layer_pdf;
-        const float3 base_e = base.eval_pdf(wi, wo, rng, base_pdf);
-        const float3 layer_e = layer.eval_pdf(wi, wo, rng, layer_pdf);
+        BSDFLobe base_lobe;
+        BSDFLobe layer_lobe;
+        const float3 base_e = eval_pdf_part<Base, LOBE>(base, wi, wo, rng, base_pdf, base_lobe);
+        const float3 layer_e =
+            eval_pdf_part<Layer, LOBE>(layer, wi, wo, rng, layer_pdf, layer_lobe);
         pdf = lerp(base_pdf, layer_pdf, F_wi);
+        lobe = BSDFLobe::None;
+        if (LOBE) {
+            lobe = pick_lobe(rng, (1.0f - F_wi) * base_pdf, F_wi * layer_pdf, F_wi, base_lobe,
+                             layer_lobe);
+        }
         return lerp(base_e, layer_e, F);
     }
 

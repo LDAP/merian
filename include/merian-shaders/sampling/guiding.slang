@@ -304,7 +304,7 @@ struct ScatterMixture {
         float bsdf_pdf;
         if (s.guided) {
             s.wo = guiding.sample(rng);
-            s.f_cos = bsdf.eval_pdf(wi_local, frame.to_local(s.wo), rng, bsdf_pdf);
+            s.f_cos = bsdf.eval_pdf_lobe(wi_local, frame.to_local(s.wo), rng, bsdf_pdf, s.lobe);
         } else {
             const Optional<ShadingFunctionSample> bs = bsdf.sample_eval(wi_local, rng);
             if (!bs.hasValue) {

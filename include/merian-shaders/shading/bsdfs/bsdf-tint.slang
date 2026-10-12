@@ -24,6 +24,14 @@ struct TintBSDF<Base : BSDF> : BSDF {
         return tint * base.eval_pdf(wi, wo, rng, pdf);
     }
 
+    override float3 eval_pdf_lobe(const float3 wi,
+                                  const float3 wo,
+                                  inout RandomGenerator rng,
+                                  out float pdf,
+                                  out BSDFLobe lobe) {
+        return tint * base.eval_pdf_lobe(wi, wo, rng, pdf, lobe);
+    }
+
     override Optional<ShadingFunctionSample> sample_eval(const float3 wi,
                                                          inout RandomGenerator rng) {
         if (let s = base.sample_eval(wi, rng)) {

@@ -35,12 +35,37 @@ struct SheenLayerBSDF<Base : BSDF> : BSDF {
     }
 
     float3 eval_pdf(const float3 wi, const float3 wo, inout RandomGenerator rng, out float pdf) {
+        BSDFLobe lobe;
+        return eval_pdf_impl<false>(wi, wo, rng, pdf, lobe);
+    }
+
+    override float3 eval_pdf_lobe(const float3 wi,
+                                  const float3 wo,
+                                  inout RandomGenerator rng,
+                                  out float pdf,
+                                  out BSDFLobe lobe) {
+        return eval_pdf_impl<true>(wi, wo, rng, pdf, lobe);
+    }
+
+    float3 eval_pdf_impl<let LOBE : bool>(const float3 wi,
+                                          const float3 wo,
+                                          inout RandomGenerator rng,
+                                          out float pdf,
+                                          out BSDFLobe lobe) {
         const float scaling = min(albedo_scaling(wi.z), albedo_scaling(wo.z));
         float sheen_pdf;
         float base_pdf;
+        BSDFLobe sheen_lobe;
+        BSDFLobe base_lobe;
         const float3 f =
-            sheen.eval_pdf(wi, wo, rng, sheen_pdf) + base.eval_pdf(wi, wo, rng, base_pdf) * scaling;
-        pdf = lerp(base_pdf, sheen_pdf, prob_sheen(wi.z));
+            eval_pdf_part<SheenBRDF, LOBE>(sheen, wi, wo, rng, sheen_pdf, sheen_lobe) +
+            eval_pdf_part<Base, LOBE>(base, wi, wo, rng, base_pdf, base_lobe) * scaling;
+        const float p = prob_sheen(wi.z);
+        pdf = lerp(base_pdf, sheen_pdf, p);
+        lobe = BSDFLobe::None;
+        if (LOBE) {
+            lobe = pick_lobe(rng, (1.0f - p) * base_pdf, p * sheen_pdf, p, base_lobe, sheen_lobe);
+        }
         return f;
     }
 

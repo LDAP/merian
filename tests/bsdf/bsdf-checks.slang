@@ -14,6 +14,21 @@ import merian_shaders.utils.random;
 import bsdf.bsdf_test_common;
 import bsdf_config;
 
+uint lobe_bin(const merian::BSDFLobe lobe) {
+    switch (lobe) {
+    case merian::BSDFLobe::DiffuseReflection:
+        return 0;
+    case merian::BSDFLobe::GlossyReflection:
+        return 1;
+    case merian::BSDFLobe::DiffuseTransmission:
+        return 2;
+    case merian::BSDFLobe::GlossyTransmission:
+        return 3;
+    default:
+        return 4;
+    }
+}
+
 struct Params {
     float3 wi;
     uint n_samples;
@@ -42,6 +57,8 @@ struct Params {
     float max_pdf_err = 0;
     float max_delta_err = 0;
     float max_eval_pdf_err = 0;
+    uint drawn_lobes[5] = {0, 0, 0, 0, 0};
+    uint picked_lobes[5] = {0, 0, 0, 0, 0};
 
     for (uint i = 0; i < params.n_samples; ++i) {
         // A below-horizon / clamped draw contributes zero and is still counted
@@ -53,6 +70,17 @@ struct Params {
         max_pdf_err = merian::bsdf_validate_err(max_pdf_err, check.err_pdf);
         max_weight_err = merian::bsdf_validate_err(max_weight_err, check.err_weight);
         max_eval_pdf_err = merian::bsdf_validate_err(max_eval_pdf_err, check.err_eval_pdf);
+
+        if (check.valid && !check.delta) {
+            float pdf;
+            merian::BSDFLobe lobe;
+            bsdf.eval_pdf_lobe(wi, check.wo, rng, pdf, lobe);
+            max_eval_pdf_err = merian::bsdf_validate_err(
+                max_eval_pdf_err, merian::bsdf_validate_relative_err(pdf, bsdf.pdf(wi, check.wo)));
+            drawn_lobes[lobe_bin(check.lobe)]++;
+            lobe = merian::bsdf_lobe_at(lobe, bsdf.get_lobe_types(), wi, check.wo);
+            picked_lobes[lobe_bin(lobe)]++;
+        }
 
         // the albedo is the energy fraction; transmission also compresses radiance by eta^2
         const float3 weight =
@@ -122,4 +150,11 @@ struct Params {
     params.output[16] = delta_samples;
     params.output[17] = asuint(max_delta_err);
     params.output[18] = asuint(max_eval_pdf_err);
+
+    float max_lobe_share_err = 0;
+    for (uint b = 0; b < 5; ++b) {
+        max_lobe_share_err =
+            max(max_lobe_share_err, abs(float(drawn_lobes[b]) - float(picked_lobes[b])) * inv_n);
+    }
+    params.output[19] = asuint(max_lobe_share_err);
 }

@@ -119,13 +119,7 @@ enum BounceKind {
     Transmission,
 }
 
-BounceKind
-bounce_kind(const BSDFLobe lobe, const bool transmission, const bool diffuse_reflection) {
-    if (lobe == BSDFLobe::None) {
-        return transmission         ? BounceKind::Transmission
-               : diffuse_reflection ? BounceKind::Diffuse
-                                    : BounceKind::Glossy;
-    }
+BounceKind bounce_kind(const BSDFLobe lobe) {
     if ((uint(lobe) & uint(BSDFLobe::Transmission)) != 0u) {
         return BounceKind::Transmission;
     }
@@ -260,8 +254,6 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
                                    false,
                                    dot(ng, ns) < 0.f ? -ng : ng,
                                    bsdf_is_transmissive(bsdf.get_lobe_types())};
-        const bool diffuse_reflection =
-            (bsdf.get_lobe_types() & uint(BSDFLobe::DiffuseReflection)) != 0u;
 
         // 1. guiding
         let guiding = params.guiding.get_distribution(guiding_state, frame_info, vertex, rng);
@@ -302,7 +294,8 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
             wo_world = light_dir;
             if (scattered) {
                 float bsdf_pdf;
-                f_cos = bsdf.eval_pdf(wi_local, frame.to_local(wo_world), rng, bsdf_pdf);
+                f_cos = bsdf.eval_pdf_lobe(wi_local, frame.to_local(wo_world), rng, bsdf_pdf,
+                                           scatter_lobe);
                 scatter_pdf = mixture.pdf(bsdf_pdf, guiding, wo_world);
                 realized_pdf = scatter_pdf;
             }
@@ -346,7 +339,8 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
 
         const bool transmission = wi_local.z * wo_local.z < 0.f;
         if (merian_render_limit_bounces && scattered) {
-            bounces.add(bounce_kind(scatter_lobe, transmission, diffuse_reflection));
+            bounces.add(
+                bounce_kind(bsdf_lobe_at(scatter_lobe, bsdf.get_lobe_types(), wi_local, wo_local)));
             segment.is_last =
                 !merian_render_surface_cache_tail &&
                 (bounce + uint16_t(1) >= merian_render_max_path_length || bounces.used_up());
@@ -507,7 +501,7 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
             through_specular = true;
             bounce++;
             if (merian_render_limit_bounces) {
-                bounces.add(bounce_kind(chain_sample.value.lobe, chain_transmission, false));
+                bounces.add(bounce_kind(chain_sample.value.lobe));
             }
         }
 

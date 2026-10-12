@@ -44,12 +44,31 @@ struct IridescentConductorBSDF<Inner : BSDF> : BSDF {
     }
 
     float3 eval_pdf(const float3 wi, const float3 wo, inout RandomGenerator rng, out float pdf) {
+        BSDFLobe lobe;
+        return eval_pdf_impl<false>(wi, wo, rng, pdf, lobe);
+    }
+
+    override float3 eval_pdf_lobe(const float3 wi,
+                                  const float3 wo,
+                                  inout RandomGenerator rng,
+                                  out float pdf,
+                                  out BSDFLobe lobe) {
+        return eval_pdf_impl<true>(wi, wo, rng, pdf, lobe);
+    }
+
+    float3 eval_pdf_impl<let LOBE : bool>(const float3 wi,
+                                          const float3 wo,
+                                          inout RandomGenerator rng,
+                                          out float pdf,
+                                          out BSDFLobe lobe) {
         // opposite hemispheres have no half vector, and a conductor does not transmit
         if (min(wi.z, wo.z) < BSDF_MIN_COS_THETA) {
             pdf = bsdf.pdf(wi, wo);
+            lobe = BSDFLobe::None;
             return float3(0.0f);
         }
-        return fresnel(dot(wi, normalize(wi + wo))) * bsdf.eval_pdf(wi, wo, rng, pdf);
+        return fresnel(dot(wi, normalize(wi + wo))) *
+               eval_pdf_part<Inner, LOBE>(bsdf, wi, wo, rng, pdf, lobe);
     }
 
     override Optional<ShadingFunctionSample> sample_eval(const float3 wi,
@@ -121,11 +140,37 @@ struct IridescentFresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
     }
 
     float3 eval_pdf(const float3 wi, const float3 wo, inout RandomGenerator rng, out float pdf) {
+        BSDFLobe lobe;
+        return eval_pdf_impl<false>(wi, wo, rng, pdf, lobe);
+    }
+
+    override float3 eval_pdf_lobe(const float3 wi,
+                                  const float3 wo,
+                                  inout RandomGenerator rng,
+                                  out float pdf,
+                                  out BSDFLobe lobe) {
+        return eval_pdf_impl<true>(wi, wo, rng, pdf, lobe);
+    }
+
+    float3 eval_pdf_impl<let LOBE : bool>(const float3 wi,
+                                          const float3 wo,
+                                          inout RandomGenerator rng,
+                                          out float pdf,
+                                          out BSDFLobe lobe) {
         float base_pdf;
         float layer_pdf;
-        const float3 base_e = base.eval_pdf(wi, wo, rng, base_pdf);
-        const float3 layer_e = layer.eval_pdf(wi, wo, rng, layer_pdf);
-        pdf = lerp(base_pdf, layer_pdf, fresnel_dielectric(wi.z, eta));
+        BSDFLobe base_lobe;
+        BSDFLobe layer_lobe;
+        const float3 base_e = eval_pdf_part<Base, LOBE>(base, wi, wo, rng, base_pdf, base_lobe);
+        const float3 layer_e =
+            eval_pdf_part<Layer, LOBE>(layer, wi, wo, rng, layer_pdf, layer_lobe);
+        const float f_wi = fresnel_dielectric(wi.z, eta);
+        pdf = lerp(base_pdf, layer_pdf, f_wi);
+        lobe = BSDFLobe::None;
+        if (LOBE) {
+            lobe = pick_lobe(rng, (1.0f - f_wi) * base_pdf, f_wi * layer_pdf, f_wi, base_lobe,
+                             layer_lobe);
+        }
 
         // Reflect/transmit split at the microfacet angle (VdotH); the full dielectric form keeps
         // TIR -> 1 so transmissive glass reflects past the critical angle instead of going dark.

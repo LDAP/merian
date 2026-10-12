@@ -109,6 +109,18 @@ interface ShadingFunction {
         float pdf;
         return eval_pdf(wi, wo, rng, pdf);
     }
+
+    /** eval_pdf() that also draws the lobe sample_eval() reaches wo from, with the probability
+     * that it does. None where only one lobe reaches that side.
+     */
+    float3 eval_pdf_lobe(const float3 wi,
+                         const float3 wo,
+                         inout RandomGenerator rng,
+                         out float pdf,
+                         out BSDFLobe lobe) {
+        lobe = BSDFLobe::None;
+        return eval_pdf(wi, wo, rng, pdf);
+    }
 }
 
 } // namespace merian
