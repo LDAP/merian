@@ -273,21 +273,24 @@ class DescriptorContainer : public std::enable_shared_from_this<DescriptorContai
         return resources[layout->get_binding_offset(binding, array_element)];
     }
 
-    // this can be called exactly ONCE for a queued update.
-    void apply_update_for(const uint32_t binding, const uint32_t array_element = 0) {
+    // this can be called exactly ONCE for a queued update. Returns false if the descriptor already
+    // held the queued info.
+    bool apply_update_for(const uint32_t binding, const uint32_t array_element = 0) {
         const uint32_t index = layout->get_binding_offset(binding, array_element);
         assert(index < resources.size());
         assert(index < write_resources.size());
         assert(write_resources[index] && "this can be called exactly ONCE for a queued update");
 
+        const bool changed = !resources[index] || infos[index] != write_infos[index];
         resources[index] = std::move(write_resources[index]);
         infos[index] = write_infos[index];
+        return changed;
     }
 
   private:
     const DescriptorSetLayoutHandle layout;
 
-    // Committed state (after apply_update_for)
+    // Committed state (after apply_update_for), resources keep the handles in infos alive
     std::vector<std::shared_ptr<Resource>> resources;
     std::vector<DescriptorInfo> infos;
     // Queued state (before apply_update_for)

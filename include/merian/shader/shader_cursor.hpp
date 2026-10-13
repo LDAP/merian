@@ -6,6 +6,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <vector>
 
@@ -13,6 +14,8 @@ namespace merian {
 
 class ShaderObject;
 using ShaderObjectHandle = std::shared_ptr<ShaderObject>;
+
+struct ShaderStructFields;
 
 /**
  * @brief Lightweight cursor for navigating and writing shader parameter space.
@@ -36,32 +39,32 @@ class ShaderCursor {
     // Navigation
 
     /**
-     * @brief Navigate to a struct field by name.
+     * @brief Navigate to a struct field by name. Throws if it does not exist.
      */
-    ShaderCursor field(const std::string& name);
+    ShaderCursor field(std::string_view name);
 
     /**
      * @brief Navigate to a struct field by name, or return an invalid cursor if it does not
      * exist.
      */
-    ShaderCursor find(const std::string& name);
+    ShaderCursor find(std::string_view name);
 
     /**
-     * @brief Navigate to a struct field by name.
+     * @brief Navigate to a struct field by name. Throws if it does not exist.
      */
-    ShaderCursor operator[](const std::string& name) {
+    ShaderCursor operator[](const std::string_view name) {
         return field(name);
     }
 
     /**
      * @brief Navigate to an array element, matrix, vector or field index, depending on current
-     * location.
+     * location. Throws if the location cannot be indexed.
      */
     ShaderCursor element(uint32_t index);
 
     /**
      * @brief Navigate to an array element, matrix, vector or field index, depending on current
-     * location.
+     * location. Throws if the location cannot be indexed.
      */
     ShaderCursor operator[](uint32_t index);
 
@@ -123,7 +126,7 @@ class ShaderCursor {
     }
 
     slang::TypeReflection::Kind get_kind() const {
-        return type_layout->getType()->getKind();
+        return kind;
     }
 
     bool is_parameter_block() const {
@@ -158,7 +161,6 @@ class ShaderCursor {
         return get_kind() == slang::TypeReflection::Kind::Matrix;
     }
 
-    // ---------------------------------------------------------------
     // Struct introspection
 
     /**
@@ -181,14 +183,8 @@ class ShaderCursor {
      */
     std::vector<std::string> get_field_names() const;
 
-    /**
-     * @brief Check if a field with the given name exists.
-     */
-    bool has_field(const std::string& name) const {
-        return type_layout->findFieldIndexByName(name.c_str()) >= 0;
-    }
+    bool has_field(std::string_view name) const;
 
-    // ---------------------------------------------------------------
     // Array / Vector / Matrix introspection
 
     /**
@@ -212,7 +208,6 @@ class ShaderCursor {
         return type_layout->getElementTypeLayout();
     }
 
-    // ---------------------------------------------------------------
     // Size and type info
 
     /**
@@ -236,7 +231,6 @@ class ShaderCursor {
         return type_layout->getBindingRangeCount();
     }
 
-    // ---------------------------------------------------------------
     // Raw accessors
 
     slang::TypeLayoutReflection* get_type_layout() const {
@@ -252,10 +246,9 @@ class ShaderCursor {
     }
 
   private:
-    /**
-     * @brief Navigate to a struct field by index.
-     */
-    ShaderCursor field(uint32_t index);
+    ShaderCursor field(const ShaderStructFields& struct_fields, uint32_t index) const;
+
+    const ShaderStructFields& get_struct_fields() const;
 
     /**
      * @brief Dereference a ParameterBlock/ConstantBuffer cursor into its element type,
@@ -266,6 +259,7 @@ class ShaderCursor {
   private:
     ShaderObject* base_object = nullptr;
     slang::TypeLayoutReflection* type_layout = nullptr;
+    slang::TypeReflection::Kind kind = slang::TypeReflection::Kind::None;
     ShaderOffset offset;
 
     friend class ShaderObject;

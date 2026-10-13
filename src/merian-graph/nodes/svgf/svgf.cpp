@@ -15,25 +15,20 @@ SVGF::SVGF() {}
 SVGF::~SVGF() {}
 
 DeviceSupportInfo SVGF::query_device_support(const DeviceSupportQueryInfo& query_info) {
-    ShaderCompileContextHandle compilation_ctx = ShaderCompileContext::create(
-        query_info.file_loader->get_search_paths(), query_info.physical_device);
-    compilation_ctx->add_search_path("merian-graph/nodes/svgf");
-
     const auto entry_point = [&](const std::string& module_path) {
         const auto composition = SlangComposition::create();
         composition->add_composition(GBufferLayout::complete()->get_composition());
         composition->add_module_from_path(module_path, true);
-        return SlangProgramEntryPoint::create(SlangProgram::create(compilation_ctx, composition),
-                                              "main")
+        return SlangProgramEntryPoint::create(
+                   SlangProgram::create(query_info.compile_context, composition), "main")
             .get();
     };
 
-    // Compile the three SVGF shaders
-    const auto filter_program = entry_point("svgf_filter.slang");
-    const auto variance_program = entry_point("svgf_variance_estimate.slang");
-    const auto taa_program = entry_point("svgf_taa.slang");
+    const auto filter_program = entry_point("merian-graph/nodes/svgf/svgf_filter.slang");
+    const auto variance_program =
+        entry_point("merian-graph/nodes/svgf/svgf_variance_estimate.slang");
+    const auto taa_program = entry_point("merian-graph/nodes/svgf/svgf_taa.slang");
 
-    // Get SPIR-V binaries and reflect to determine requirements
     auto filter_binary = filter_program->get_program()->get_binary();
     auto variance_binary = variance_program->get_program()->get_binary();
     auto taa_binary = taa_program->get_program()->get_binary();
@@ -141,37 +136,31 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
     }
 
     {
-        ShaderCompileContextHandle compilation_session_desc = ShaderCompileContext::create(context);
-        compilation_session_desc->set_preprocessor_macro("FILTER_TYPE",
-                                                         std::to_string(filter_type));
-        if (kaleidoscope) {
-            compilation_session_desc->set_preprocessor_macro("KALEIDOSCOPE", "1");
-            if (kaleidoscope_use_shmem) {
-                compilation_session_desc->set_preprocessor_macro("KALEIDOSCOPE_USE_SHMEM", "1");
-            }
-        }
-        compilation_session_desc->add_search_path("merian-graph/nodes/svgf");
-
-        // sigma keeps the variance channel in the same range as the colour it sits next to, which
-        // is what half-precision ping-pong images need
-        const std::string constants = fmt::format(
-            "namespace merian {{\n"
-            "export static const bool svgf_variance_as_sigma = {};\n"
-            "}}",
-            irr_create_info.format == vk::Format::eR16G16B16A16Sfloat ? "true" : "false");
+        const std::string constants =
+            fmt::format("import merian_graph.nodes.svgf.options;\n"
+                        "namespace merian {{\n"
+                        "export static const bool svgf_variance_as_sigma = {};\n"
+                        "export static const SVGFFilter svgf_filter = SVGFFilter({});\n"
+                        "export static const bool svgf_kaleidoscope = {};\n"
+                        "export static const bool svgf_kaleidoscope_use_shmem = {};\n"
+                        "}}",
+                        irr_create_info.format == vk::Format::eR16G16B16A16Sfloat, filter_type,
+                        kaleidoscope, kaleidoscope_use_shmem);
         const auto entry_point = [&](const std::string& module_path) {
             const auto composition = SlangComposition::create();
             composition->add_composition(io[con_gbuffer]->get_layout()->get_composition());
             composition->add_module_from_path(module_path, true);
             composition->add_module_from_string("svgf_constants", constants);
             return SlangProgramEntryPoint::create(
-                       SlangProgram::create(compilation_session_desc, composition), "main")
+                       SlangProgram::create(context->get_shader_compile_context(), composition),
+                       "main")
                 .get();
         };
 
-        filter_module = entry_point("svgf_filter.slang");
-        variance_estimate_module = entry_point("svgf_variance_estimate.slang");
-        taa_module = entry_point("svgf_taa.slang");
+        filter_module = entry_point("merian-graph/nodes/svgf/svgf_filter.slang");
+        variance_estimate_module =
+            entry_point("merian-graph/nodes/svgf/svgf_variance_estimate.slang");
+        taa_module = entry_point("merian-graph/nodes/svgf/svgf_taa.slang");
 
         {
             auto spec_builder = SpecializationInfoBuilder();

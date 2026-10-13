@@ -14,6 +14,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <string_view>
 #include <variant>
 #include <vector>
 
@@ -42,15 +43,12 @@ class ShaderObject : public std::enable_shared_from_this<ShaderObject> {
     // The element object of a container, created lazily.
     const ShaderObjectHandle& get_element();
 
-    // ---------------------------------------------------------------
     // Sub-objects (struct kind; containers forward to their element)
 
-    ShaderObjectHandle create_subobject(const std::string& field_name);
+    ShaderObjectHandle create_subobject(std::string_view field_name);
 
-    void set_subobject(const std::string& field_name, const ShaderObjectHandle& object);
+    void set_subobject(std::string_view field_name, const ShaderObjectHandle& object);
 
-    // Writes the ConstantBuffer's uniform-buffer descriptor into every attached ParameterBlock
-    // at set time (not bind time) so frames with no state changes issue no descriptor writes.
     void set_subobject(uint32_t subobject_range_index, const ShaderObjectHandle& object);
 
     const ShaderObjectHandle& get_subobject(uint32_t subobject_range_index);
@@ -59,7 +57,6 @@ class ShaderObject : public std::enable_shared_from_this<ShaderObject> {
         return object_layout->get_subobject_range_count();
     }
 
-    // ---------------------------------------------------------------
     // Binding (ParameterBlock kind)
 
     // True if this block or any nested ParameterBlock records a uniform upload on its next
@@ -74,7 +71,6 @@ class ShaderObject : public std::enable_shared_from_this<ShaderObject> {
                                  uint32_t set_index,
                                  const ShaderObjectAllocatorHandle& obj_allocator);
 
-    // ---------------------------------------------------------------
     // Writes (struct kind, called through ShaderCursor)
 
     void write(const ShaderOffset& offset,
@@ -87,8 +83,6 @@ class ShaderObject : public std::enable_shared_from_this<ShaderObject> {
     void write(const ShaderOffset& offset, const SamplerHandle& sampler);
     void write(const ShaderOffset& offset, const AccelerationStructureHandle& as);
     void write(const ShaderOffset& offset, const void* data, std::size_t size);
-
-    // ---------------------------------------------------------------
 
     slang::TypeLayoutReflection* get_type_layout() const {
         return object_layout->get_type_layout();

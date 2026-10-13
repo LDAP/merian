@@ -34,6 +34,7 @@ ShaderObjectLayout::ShaderObjectLayout(const ContextHandle& context,
     : type_layout(type_layout), program(program), context(context) {
     assert(type_layout);
     assert(program);
+    type_kind = type_layout->getType()->getKind();
 
     switch (type_layout->getKind()) {
     case slang::TypeReflection::Kind::ParameterBlock:

@@ -330,9 +330,7 @@ RenderPT::process(const NodeIO& io, const NodeProcessInfo& info, Submission& sub
         if (io.is_connected(con_irradiance_cache)) {
             volume_cursor["irradiance_cache"] = io[con_irradiance_cache].r();
         }
-        // resources do not convert to descriptors: assigning them falls into the byte-copy
-        // overload, so bind the texture explicitly
-        if (auto field = volume_cursor["prev_volume_depth"];
+        if (auto field = volume_cursor.find("prev_volume_depth");
             field.is_valid() && io.is_connected(con_prev_volume_depth)) {
             field.write(io[con_prev_volume_depth].get_texture(), vk::ImageLayout::eGeneral);
         }

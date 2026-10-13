@@ -465,7 +465,8 @@ Vulkan resources and an element object for `T` that records writes. The same app
 
 **`SlangProgram`** -- Wraps a compiled Slang program. Provides access to program
 reflection (`ProgramLayout*`) and SPIR-V binary, and owns the per-program
-`ShaderObjectLayout` cache (`get_or_create_object_layout`). Layouts are deduplicated
+`ShaderObjectLayout` cache (`get_or_create_object_layout`) and the struct field tables cursors
+look fields up in (`get_struct_fields`). Layouts are deduplicated
 per program — not globally — because link-time constants make binding layouts
 program-dependent. Keeps the Slang session alive so all reflection pointers remain
 valid.
@@ -502,9 +503,10 @@ the role:
   ConstantBuffer is set into (or removed from) ParameterBlocks — this also covers
   ConstantBuffer-in-ConstantBuffer and ConstantBuffers shared across ParameterBlocks.
 
-**`ShaderCursor`** -- Lightweight `(ShaderObject*, TypeLayout*, ShaderOffset)` tuple for
+**`ShaderCursor`** -- Lightweight `(ShaderObject*, TypeLayout*, kind, ShaderOffset)` tuple for
 navigating the parameter space of a struct object. Supports
-`cursor["field"]["nested_field"] = value` syntax. Navigating to a ConstantBuffer or
+`cursor["field"]["nested_field"] = value` syntax; a missing field throws, `find()` returns an
+invalid cursor instead. Navigating to a ConstantBuffer or
 ParameterBlock field auto-creates the container sub-object (which creates its element)
 and dereferences into the element. `get_cursor()` on a container returns the element's
 cursor, so the container/element split is invisible at the call site.
@@ -518,7 +520,8 @@ the current frame's cache slot.
 
 All descriptor writes happen eagerly when the user sets a value (via cursor or
 `set_subobject`), NOT at bind time. A steady-state frame where nothing changed requires
-zero descriptor writes.
+zero descriptor writes; rewriting a descriptor or uniform with the value it already holds is
+dropped.
 
 ```
 Update time (cursor assignment):                   Bind time (dispatch):

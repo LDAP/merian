@@ -67,19 +67,14 @@ class DescriptorSet : public DescriptorContainer {
             return;
         }
 
-        for (uint32_t i = 0; i < queued_writes.size(); i++) {
-            vk::WriteDescriptorSet& write = queued_writes[i];
-
-            // For now only descriptorCount 1 is implemented. Otherwise: If the dstBinding has
-            // fewer than descriptorCount array elements remaining starting from
-            // dstArrayElement, then the remainder will be used to update the subsequent binding
-            // - dstBinding+1 starting at array element zero. In this case we'd have multiple
-            // infos and resources i guess?
+        std::erase_if(queued_writes, [this](const vk::WriteDescriptorSet& write) {
             assert(write.descriptorCount == 1);
-            apply_update_for(write.dstBinding, write.dstArrayElement);
-        }
+            return !apply_update_for(write.dstBinding, write.dstArrayElement);
+        });
 
-        pool->get_context()->get_device()->get_device().updateDescriptorSets(queued_writes, {});
+        if (!queued_writes.empty()) {
+            pool->get_context()->get_device()->get_device().updateDescriptorSets(queued_writes, {});
+        }
 
         queued_writes.clear();
     }

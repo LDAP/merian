@@ -165,6 +165,10 @@ class ShaderObjectLayout {
         return type_layout;
     }
 
+    slang::TypeReflection::Kind get_type_kind() const {
+        return type_kind;
+    }
+
     const SlangProgramHandle& get_program() const {
         return program;
     }
@@ -179,6 +183,7 @@ class ShaderObjectLayout {
 
   private:
     slang::TypeLayoutReflection* type_layout;
+    slang::TypeReflection::Kind type_kind;
     SlangProgramHandle program; // keeps session alive so type_layout pointers remain valid
     ContextHandle context;      // for lazy DescriptorSetLayout building
     Kind kind;

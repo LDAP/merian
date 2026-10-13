@@ -6,7 +6,9 @@ const int workgroup_size_x = 1;
 [vk::constant_id(1)]
 const int workgroup_size_y = 1;
 
+import merian_graph.nodes.svgf.options;
 import merian_shaders.gbuffer;
+import merian_shaders.utils.encoding;
 import merian_shaders.utils.textures;
 import merian_shaders.utils.shared_memory;
 import merian_shaders.colors.colorspaces;
@@ -29,14 +31,9 @@ const int ITERATION = 0;
 [vk::constant_id(4)]
 const int LAST_ITERATION = 0;
 
-// the reference implementation does that but it looks better without
 // #define FILTER_VARIANCE
 
-// defined by compiler:
-// #define KALEIDOSCOPE
-// #define KALEIDOSCOPE_USE_SHMEM
-
-// commet to disable; two variants to reconstruct (0, 1) Reiner recommends using 1
+// two variants to reconstruct (0, 1), Reiner recommends 1
 // #define KALEIDOSCOPE_USE_MIRRORING 1
 
 struct PushConstant {
@@ -49,13 +46,8 @@ struct PushConstant {
 [vk::push_constant]
 ConstantBuffer<PushConstant> params;
 
-// --------------------------------------------------------------
-
 static int2 ipos;
-
-#ifdef KALEIDOSCOPE_USE_SHMEM
 static int2 ipos_shared;
-#endif // KALEIDOSCOPE_USE_SHMEM
 
 static float4 filter_irr_var;
 
@@ -75,8 +67,6 @@ static float sigma_l;
 
 static float z_bias_depth_mix;
 static float z_bias_normals_mix;
-
-// --------------------------------------------------------------
 
 #ifdef FILTER_VARIANCE
 
@@ -103,14 +93,8 @@ float get_sigma_l(float center, int2 ipos) {
 
 #endif // FILTER_VARIANCE
 
-#ifdef KALEIDOSCOPE
-#ifdef KALEIDOSCOPE_USE_SHMEM
-
-#define WORKGROUP_SIZE_X workgroup_size_x
-#define WORKGROUP_SIZE_Y workgroup_size_y
-
-#define SHARED_SIZE_X (WORKGROUP_SIZE_X + SVGF_FILTER_HALO_RADIUS * 2)
-#define SHARED_SIZE_Y (WORKGROUP_SIZE_Y + SVGF_FILTER_HALO_RADIUS * 2)
+#define SHARED_SIZE_X (workgroup_size_x + SVGF_FILTER_HALO_RADIUS * 2)
+#define SHARED_SIZE_Y (workgroup_size_y + SVGF_FILTER_HALO_RADIUS * 2)
 
 // remember to update config.h if anything is changed here!
 // FILTER_SHARED_MEMORY_PER_PIXEL = 2 * 4 * 4
@@ -137,52 +121,33 @@ void shmem_write(const int2 pos, const float4 irrfilter, const float3 n, const f
     SHARED_TILE_u32vec4_B[pos.y][pos.x] = float4(n, z);
 }
 
-#endif // KALEIDOSCOPE_USE_SHMEM
-#endif // KALEIDOSCOPE
-
-// --------------------------------------------------------------
-
-#ifdef KALEIDOSCOPE
-#define tap(offset, weight) _tap(offset, weight)
-#else
-#define tap(offset, weight) _tap(offset* GAP, weight)
-#endif
-
-void _tap(const int2 offset, const float kernel_weight) {
-
-#ifdef KALEIDOSCOPE
-#ifdef KALEIDOSCOPE_USE_SHMEM
+// the kaleidoscope swizzle stores the pixels GAP apart next to each other
+void tap(const int2 offset, const float kernel_weight) {
     float4 p_irr_var;
     float3 p_n;
     float p_z;
-    shmem_read(ipos_shared + offset, p_n, p_z, p_irr_var);
-#else
-    const float4 p_irr_var = load_irr_var(ipos + offset);
-    const float3 p_n = decode_normal(img_gbuf_in[ipos + offset].x);
-    const float p_z = asfloat(img_gbuf_in[ipos + offset].y);
-#endif
-
-#define grad_offset (offset * GAP)
-#else
-    const float4 p_irr_var = load_irr_var(ipos + offset);
-    let p_texels = in_gbuffer.load(uint2(ipos + offset));
-    const float3 p_n = p_texels.normal;
-    const float p_z = p_texels.linear_z;
-#define grad_offset offset
-#endif
+    if (svgf_kaleidoscope && svgf_kaleidoscope_use_shmem) {
+        shmem_read(ipos_shared + offset, p_n, p_z, p_irr_var);
+    } else if (svgf_kaleidoscope) {
+        p_irr_var = load_irr_var(ipos + offset);
+        p_n = decode_normal(img_gbuf_in[ipos + offset].x);
+        p_z = asfloat(img_gbuf_in[ipos + offset].y);
+    } else {
+        p_irr_var = load_irr_var(ipos + offset * GAP);
+        let p_texels = in_gbuffer.load(uint2(ipos + offset * GAP));
+        p_n = p_texels.normal;
+        p_z = p_texels.linear_z;
+    }
 
     const float w_l = abs(p_irr_var.r - c_l) * sigma_l; // we use yuv in irr, so r is luminance
-    const float w_z = exp(params.param_z * abs(c_z + dot(c_grad_z, grad_offset) - p_z));
+    const float w_z = exp(params.param_z * abs(c_z + dot(c_grad_z, offset * GAP) - p_z));
     const float w_n = smoothstep(params.param_n, 1.0, dot(p_n, c_n));
-    // was: pow(max(0, dot(p_n, c_n)), params.param_n);
 
     const float w = exp(-w_l * w_l) * lerp(w_z, 1.0, z_bias_depth_mix) *
                     lerp(w_n, 1.0, z_bias_normals_mix) * kernel_weight;
 
     filter_irr_var += p_irr_var * float4(w, w, w, w * w);
     filter_w += w;
-
-#undef grad_offset
 }
 
 [numthreads(workgroup_size_x, workgroup_size_y, 1)]
@@ -192,19 +157,17 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
           const uint group_index: SV_GroupIndex,
           const uint2 group_id: SV_GroupID) {
 
-#ifdef KALEIDOSCOPE
-#ifdef KALEIDOSCOPE_USE_SHMEM
-
     ipos = int2(dispatch_thread_id);
-    ipos_shared = int2(group_thread_id) + SVGF_FILTER_HALO_RADIUS;
+    uint3 c_gbuf = 0;
+    if (svgf_kaleidoscope && svgf_kaleidoscope_use_shmem) {
+        ipos_shared = int2(group_thread_id) + SVGF_FILTER_HALO_RADIUS;
 
-    filter_irr_var = load_irr_var(ipos);
-    const uint3 c_gbuf = img_gbuf_in[ipos].rgb;
-    c_n = decode_normal(c_gbuf.x);
-    c_z = asfloat(c_gbuf.y);
-    c_grad_z = unpackHalf2x16ToFloat(c_gbuf.z);
+        filter_irr_var = load_irr_var(ipos);
+        c_gbuf = img_gbuf_in[ipos].rgb;
+        c_n = decode_normal(c_gbuf.x);
+        c_z = asfloat(c_gbuf.y);
+        c_grad_z = unpackHalf2x16ToFloat(c_gbuf.z);
 
-    {
         // center
         shmem_write(ipos_shared, filter_irr_var, c_n, c_z);
         // halo
@@ -219,32 +182,26 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
                         asfloat(p_gbuf.y));
         }
         GroupMemoryBarrierWithGroupSync();
+
+        if (not_on_texture(ipos, img_filter_out))
+            return;
+    } else {
+        if (not_on_texture(ipos, img_filter_out))
+            return;
+
+        filter_irr_var = load_irr_var(ipos);
+        if (svgf_kaleidoscope) {
+            c_gbuf = img_gbuf_in[ipos].rgb;
+            c_n = decode_normal(c_gbuf.x);
+            c_z = asfloat(c_gbuf.y);
+            c_grad_z = unpackHalf2x16ToFloat(c_gbuf.z);
+        } else {
+            const SurfaceData c_surf = in_gbuffer.get_surface(uint2(ipos));
+            c_n = c_surf.normal;
+            c_z = c_surf.linear_z;
+            c_grad_z = float2(c_surf.grad_z);
+        }
     }
-
-    if (not_on_texture(ipos, img_filter_out))
-        return;
-#else // NO KALEIDOSCOPE_SHMEM:
-    ipos = int2(dispatch_thread_id);
-    if (not_on_texture(ipos, img_filter_out))
-        return;
-
-    filter_irr_var = load_irr_var(ipos);
-    const uint3 c_gbuf = img_gbuf_in[ipos].rgb;
-    c_n = decode_normal(c_gbuf.x);
-    c_z = asfloat(c_gbuf.y);
-    c_grad_z = unpackHalf2x16ToFloat(c_gbuf.z);
-#endif
-#else // NO KALEIDOSCOPE:
-    ipos = int2(dispatch_thread_id);
-    if (not_on_texture(ipos, img_filter_out))
-        return;
-
-    filter_irr_var = load_irr_var(ipos);
-    const SurfaceData c_surf = in_gbuffer.get_surface(uint2(ipos));
-    c_n = c_surf.normal;
-    c_z = c_surf.linear_z;
-    c_grad_z = float2(c_surf.grad_z);
-#endif
 
     c_l = filter_irr_var.r;
 
@@ -267,45 +224,42 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
     if (c_z > 0 && filter_irr_var.a > .0) {
         filter_w = 1.0;
 
-#if FILTER_TYPE == 0
-        // atrous
-        const float kernel[] = { 1., 2. / 3., 1. / 6. };
-        [unroll]
-        for (int j = -2; j <= 2; j++) {
+        if (svgf_filter == SVGFFilter.Atrous) {
+            const float kernel[] = { 1., 2. / 3., 1. / 6. };
             [unroll]
-            for (int i = -2; i <= 2; i++) {
-                if (i != 0 || j != 0) {
-                    const float weight = kernel[abs(i)] * kernel[abs(j)];
-                    tap(int2(i, j), weight);
+            for (int j = -2; j <= 2; j++) {
+                [unroll]
+                for (int i = -2; i <= 2; i++) {
+                    if (i != 0 || j != 0) {
+                        const float weight = kernel[abs(i)] * kernel[abs(j)];
+                        tap(int2(i, j), weight);
+                    }
                 }
             }
-        }
-#elif FILTER_TYPE == 1
-        // box3
-        const int r = 1;
-        [unroll]
-        for (int yy = -r; yy <= r; yy++) {
+        } else if (svgf_filter == SVGFFilter.Box) {
+            const int r = 1;
             [unroll]
-            for (int xx = -r; xx <= r; xx++) {
-                if (xx != 0 || yy != 0) {
-                    tap(int2(xx, yy), 1.0);
+            for (int yy = -r; yy <= r; yy++) {
+                [unroll]
+                for (int xx = -r; xx <= r; xx++) {
+                    if (xx != 0 || yy != 0) {
+                        tap(int2(xx, yy), 1.0);
+                    }
                 }
             }
+        } else if (svgf_filter == SVGFFilter.Subsampled) {
+            if ((ITERATION & 1) == 0) {
+                tap(int2(-2, 0), 1.0);
+                tap(int2(2, 0), 1.0);
+            } else {
+                tap(int2(0, -2), 1.0);
+                tap(int2(0, 2), 1.0);
+            }
+            tap(int2(-1, 1), 1.0);
+            tap(int2(1, 1), 1.0);
+            tap(int2(-1, -1), 1.0);
+            tap(int2(1, -1), 1.0);
         }
-#elif FILTER_TYPE == 2
-        // subsampled
-        if ((ITERATION & 1) == 0) {
-            tap(int2(-2, 0), 1.0);
-            tap(int2(2, 0), 1.0);
-        } else {
-            tap(int2(0, -2), 1.0);
-            tap(int2(0, 2), 1.0);
-        }
-        tap(int2(-1, 1), 1.0);
-        tap(int2(1, 1), 1.0);
-        tap(int2(-1, -1), 1.0);
-        tap(int2(1, -1), 1.0);
-#endif
 
         filter_irr_var.rgb /= filter_w;
         filter_irr_var.a /= filter_w * filter_w;
@@ -315,64 +269,67 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
         filter_irr_var.rgb = yuv_to_rgb(filter_irr_var.rgb);
     }
 
-// --------------------------------------------------------------
-// Reiners Kaleidoscope-SVGF Swizzle
-#ifdef KALEIDOSCOPE
-    if (ITERATION != LAST_ITERATION) {
-        int2 hid = ipos / 2;
-        int2 odd = ipos & 1;
-        int2 viewport_size_half = texture_dimensions(img_filter_out) / 2;
-
-#ifdef KALEIDOSCOPE_USE_MIRRORING
-        if (ITERATION == 0) {
-            if (odd.x > 0) {
-                hid.x = viewport_size_half.x - hid.x - 1;
-            }
-            if (odd.y > 0) {
-                hid.y = viewport_size_half.y - hid.y - 1;
-            }
-        }
-#endif
-
-        ipos = hid + odd * (viewport_size_half);
-        img_gbuf_out.Store(ipos, uint4(c_gbuf, 0));
-    } else {
-        int2 viewport_size = texture_dimensions(img_filter_out);
-        int32_t wcnt = 1 << ITERATION;
-        int2 sizew = viewport_size / wcnt;
-        int2 o = ipos / sizew;
-        int2 wid = ipos - sizew * o;
-
-#if defined(KALEIDOSCOPE_USE_MIRRORING) && KALEIDOSCOPE_USE_MIRRORING == 0
-        int2 odd = o & 1;
-        if (odd.x > 0) {
-            wid.x = sizew.x - wid.x - 1;
-            o.x = wcnt - o.x;
-        }
-        if (odd.y > 0) {
-            wid.y = sizew.y - wid.y - 1;
-            o.y = wcnt - o.y;
-        }
-#endif
-
-        ipos = o + wid * wcnt;
-
-#if defined(KALEIDOSCOPE_USE_MIRRORING) && KALEIDOSCOPE_USE_MIRRORING == 1
-        if (ITERATION != 0 /* skip if we're doing exactly one iteration */) {
+    // Reiners Kaleidoscope-SVGF Swizzle
+    if (svgf_kaleidoscope) {
+        if (ITERATION != LAST_ITERATION) {
             int2 hid = ipos / 2;
             int2 odd = ipos & 1;
             int2 viewport_size_half = texture_dimensions(img_filter_out) / 2;
+
+#ifdef KALEIDOSCOPE_USE_MIRRORING
+            if (ITERATION == 0) {
+                if (odd.x > 0) {
+                    hid.x = viewport_size_half.x - hid.x - 1;
+                }
+                if (odd.y > 0) {
+                    hid.y = viewport_size_half.y - hid.y - 1;
+                }
+            }
+#endif
+
+            ipos = hid + odd * (viewport_size_half);
+            img_gbuf_out.Store(ipos, uint4(c_gbuf, 0));
+        } else {
+            int2 viewport_size = texture_dimensions(img_filter_out);
+            int32_t wcnt = 1 << ITERATION;
+            int2 sizew = viewport_size / wcnt;
+            int2 o = ipos / sizew;
+            int2 wid = ipos - sizew * o;
+
+#ifdef KALEIDOSCOPE_USE_MIRRORING
+#if KALEIDOSCOPE_USE_MIRRORING == 0
+            int2 odd = o & 1;
             if (odd.x > 0) {
-                hid.x = viewport_size_half.x - hid.x - 1;
+                wid.x = sizew.x - wid.x - 1;
+                o.x = wcnt - o.x;
             }
             if (odd.y > 0) {
-                hid.y = viewport_size_half.y - hid.y - 1;
+                wid.y = sizew.y - wid.y - 1;
+                o.y = wcnt - o.y;
             }
-            ipos = hid * 2 + odd;
+#endif
+#endif
+
+            ipos = o + wid * wcnt;
+
+#ifdef KALEIDOSCOPE_USE_MIRRORING
+#if KALEIDOSCOPE_USE_MIRRORING == 1
+            if (ITERATION != 0 /* skip if we're doing exactly one iteration */) {
+                int2 hid = ipos / 2;
+                int2 odd = ipos & 1;
+                int2 viewport_size_half = texture_dimensions(img_filter_out) / 2;
+                if (odd.x > 0) {
+                    hid.x = viewport_size_half.x - hid.x - 1;
+                }
+                if (odd.y > 0) {
+                    hid.y = viewport_size_half.y - hid.y - 1;
+                }
+                ipos = hid * 2 + odd;
+            }
+#endif
+#endif
         }
-#endif
     }
-#endif
 
     filter_irr_var.a = svgf_encode_variance(filter_irr_var.a);
     img_filter_out.Store(ipos, filter_irr_var);

@@ -59,7 +59,8 @@ class Micromaps {
     void update(const CommandBufferHandle& cmd,
                 const std::vector<MeshGeometry>& meshes,
                 const MaterialSystemHandle& material_system,
-                std::vector<uint32_t>& changed);
+                std::vector<uint32_t>& changed,
+                const ShaderObjectAllocatorHandle& obj_allocator);
 
     bool get_opacity(const uint32_t mesh_id,
                      vk::AccelerationStructureTrianglesOpacityMicromapEXT& omm) const;
@@ -170,7 +171,6 @@ class Micromaps {
     Versioned<SlangProgramEntryPoint> bake_entry_point;
     Versioned<Pipeline> bake_pipeline;
     Versioned<ShaderObject> bake_params;
-    ShaderObjectAllocatorHandle obj_allocator;
 
     std::unordered_map<uint32_t, Entry> entries;
 

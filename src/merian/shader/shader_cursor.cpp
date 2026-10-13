@@ -1,10 +1,18 @@
 #include "merian/shader/shader_cursor.hpp"
 #include "merian/shader/shader_object.hpp"
 
+#include <stdexcept>
+
 namespace merian {
 
+static std::string_view type_name_of(slang::TypeLayoutReflection* type_layout) {
+    const char* const name = type_layout->getName();
+    return name != nullptr ? name : "<unnamed>";
+}
+
 ShaderCursor::ShaderCursor(ShaderObject* base_object)
-    : base_object(base_object), type_layout(base_object->get_type_layout()) {
+    : base_object(base_object), type_layout(base_object->get_type_layout()),
+      kind(base_object->get_object_layout()->get_type_kind()) {
     assert(base_object->get_object_layout()->is_struct() &&
            "create cursors through ShaderObject::get_cursor()");
 }
@@ -28,74 +36,73 @@ ShaderCursor ShaderCursor::dereference() {
         base_object->set_subobject(subobject_range_index, subobject);
     }
 
-    // Containers dereference into their element.
     return subobject->get_cursor();
 }
 
-ShaderCursor ShaderCursor::field(const std::string& name) {
+ShaderCursor ShaderCursor::field(const std::string_view name) {
     if (!is_valid()) {
-        SPDLOG_ERROR("Cannot navigate field '{}' on invalid cursor", name);
-        return ShaderCursor();
+        throw std::invalid_argument{fmt::format("field '{}' on an invalid cursor", name)};
     }
 
-    // Auto-dereference ParameterBlock/ConstantBuffer to navigate into their element type
     if (is_parameter_block() || is_constant_buffer()) {
         return dereference().field(name);
     }
 
-    const ShaderCursor found = find(name);
-    if (!found.is_valid()) {
-        const char* const type_name = type_layout->getName();
-        SPDLOG_ERROR("Field '{}' not found in type {}", name,
-                     type_name != nullptr ? type_name : "<unnamed>");
+    const ShaderStructFields& struct_fields = get_struct_fields();
+    const int32_t field_index = struct_fields.find(name);
+    if (field_index < 0) {
+        throw std::invalid_argument{
+            fmt::format("field '{}' not found in type {}", name, type_name_of(type_layout))};
     }
-    return found;
+    return field(struct_fields, static_cast<uint32_t>(field_index));
 }
 
-ShaderCursor ShaderCursor::find(const std::string& name) {
+ShaderCursor ShaderCursor::find(const std::string_view name) {
     if (!is_valid()) {
         return ShaderCursor();
     }
     if (is_parameter_block() || is_constant_buffer()) {
         return dereference().find(name);
     }
-    const SlangInt field_index = type_layout->findFieldIndexByName(name.c_str());
-    return field_index < 0 ? ShaderCursor() : field(static_cast<uint32_t>(field_index));
+    const ShaderStructFields& struct_fields = get_struct_fields();
+    const int32_t field_index = struct_fields.find(name);
+    return field_index < 0 ? ShaderCursor()
+                           : field(struct_fields, static_cast<uint32_t>(field_index));
 }
 
-ShaderCursor ShaderCursor::field(uint32_t index) {
-    if (!is_valid()) {
-        SPDLOG_ERROR("Cannot navigate field {} on invalid cursor", index);
-        return ShaderCursor();
-    }
+bool ShaderCursor::has_field(const std::string_view name) const {
+    return get_struct_fields().find(name) >= 0;
+}
 
-    assert(index < get_field_count());
-
-    slang::VariableLayoutReflection* field_var = type_layout->getFieldByIndex(index);
-    slang::TypeLayoutReflection* field_type_layout = field_var->getTypeLayout();
+ShaderCursor ShaderCursor::field(const ShaderStructFields& struct_fields,
+                                 const uint32_t index) const {
+    assert(index < struct_fields.fields.size());
+    const ShaderStructFields::Field& struct_field = struct_fields.fields[index];
 
     ShaderCursor result;
     result.base_object = base_object;
-    result.type_layout = field_type_layout;
+    result.type_layout = struct_field.type_layout;
+    result.kind = struct_field.kind;
     result.offset = offset;
-    result.offset.uniform_byte_offset += field_var->getOffset();
-    result.offset.binding_range_offset += type_layout->getFieldBindingRangeOffset(index);
+    result.offset.uniform_byte_offset += struct_field.uniform_offset;
+    result.offset.binding_range_offset += struct_field.binding_range_offset;
 
     return result;
 }
 
+const ShaderStructFields& ShaderCursor::get_struct_fields() const {
+    return base_object->get_object_layout()->get_program()->get_struct_fields(type_layout);
+}
+
 ShaderCursor ShaderCursor::element(uint32_t index) {
     if (!is_valid()) {
-        SPDLOG_ERROR("Cannot navigate element {} on invalid cursor", index);
-        return ShaderCursor();
+        throw std::invalid_argument{fmt::format("element {} on an invalid cursor", index)};
     }
 
-    // Auto-dereference ParameterBlock and ConstantBuffer to navigate into their element type
     if (is_parameter_block() || is_constant_buffer()) {
         return dereference().element(index);
     }
 
-    const slang::TypeReflection::Kind kind = get_kind();
     switch (kind) {
     case slang::TypeReflection::Kind::Array: {
         assert(get_element_type_layout());
@@ -104,6 +111,7 @@ ShaderCursor ShaderCursor::element(uint32_t index) {
         ShaderCursor result;
         result.base_object = base_object;
         result.type_layout = get_element_type_layout();
+        result.kind = result.type_layout->getType()->getKind();
         result.offset = offset;
         result.offset.uniform_byte_offset += index * get_element_stride();
         result.offset.binding_array_index =
@@ -118,16 +126,17 @@ ShaderCursor ShaderCursor::element(uint32_t index) {
         ShaderCursor result;
         result.base_object = base_object;
         result.type_layout = get_element_type_layout();
+        result.kind = result.type_layout->getType()->getKind();
         result.offset = offset;
         result.offset.uniform_byte_offset += index * get_element_stride();
         return result;
     }
     case slang::TypeReflection::Kind::Struct:
-        return field(index);
+        return field(get_struct_fields(), index);
     default:
-        SPDLOG_ERROR("Type {} of kind {} cannot be accessed by element", type_layout->getName(),
-                     slang_type_kind_to_string(kind));
-        return ShaderCursor();
+        throw std::invalid_argument{fmt::format("type {} of kind {} cannot be accessed by element",
+                                                type_name_of(type_layout),
+                                                slang_type_kind_to_string(kind))};
     }
 }
 
@@ -180,10 +189,7 @@ ShaderCursor& ShaderCursor::write(const void* data, std::size_t size) {
 }
 
 ShaderCursor& ShaderCursor::write(const ShaderObjectHandle& object) {
-    const slang::TypeReflection::Kind kind = get_kind();
-
-    if (kind == slang::TypeReflection::Kind::ConstantBuffer ||
-        kind == slang::TypeReflection::Kind::ParameterBlock) {
+    if (is_constant_buffer() || is_parameter_block()) {
         int32_t subobject_range_index =
             base_object->get_object_layout()->find_subobject_range_index(
                 offset.binding_range_offset);

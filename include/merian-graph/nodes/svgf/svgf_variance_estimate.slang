@@ -7,7 +7,9 @@ const int workgroup_size_x = 1;
 [vk::constant_id(1)]
 const int workgroup_size_y = 1;
 
+import merian_graph.nodes.svgf.options;
 import merian_shaders.gbuffer;
+import merian_shaders.utils.encoding;
 import merian_shaders.utils.textures;
 import merian_shaders.utils.shared_memory;
 import merian_shaders.colors.colorspaces;
@@ -112,11 +114,11 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
         if (not_on_texture(dispatch_thread_id, img_filter_in))
             return;
 
-#ifdef KALEIDOSCOPE
-        img_gbuf_in.Store(dispatch_thread_id,
-                          uint4(encode_normal(center_normal), asuint(center_linear_z),
-                                packHalf2x16(center_grad_z), 0));
-#endif
+        if (svgf_kaleidoscope) {
+            img_gbuf_in.Store(dispatch_thread_id,
+                              uint4(encode_normal(center_normal), asuint(center_linear_z),
+                                    packHalf2x16(center_grad_z), 0));
+        }
     }
 
     float sum_w = 1.0;

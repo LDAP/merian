@@ -1787,7 +1787,8 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
     }
 }
 
-void Scene::ensure_micromaps(const CommandBufferHandle& cmd) {
+void Scene::ensure_micromaps(const CommandBufferHandle& cmd,
+                             const ShaderObjectAllocatorHandle& obj_allocator) {
     if (!micromaps) {
         return;
     }
@@ -1842,7 +1843,7 @@ void Scene::ensure_micromaps(const CommandBufferHandle& cmd) {
     }
 
     std::vector<MeshID> changed;
-    micromaps->update(cmd, baked, material_system, changed);
+    micromaps->update(cmd, baked, material_system, changed, obj_allocator);
 
     for (const MeshID mesh_id : changed) {
         if (mesh_id >= mesh_to_group.size() || mesh_to_group[mesh_id] == MESH_GROUP_ID_INVALID) {
@@ -1857,10 +1858,11 @@ void Scene::ensure_micromaps(const CommandBufferHandle& cmd) {
     }
 }
 
-void Scene::build_blas(const CommandBufferHandle& cmd) {
+void Scene::build_blas(const CommandBufferHandle& cmd,
+                       const ShaderObjectAllocatorHandle& obj_allocator) {
     MERIAN_PROFILE_SCOPE_GPU(cmd, "Scene::build_blas");
 
-    ensure_micromaps(cmd);
+    ensure_micromaps(cmd, obj_allocator);
 
     blas_geometries.assign(mesh_groups.size(), {});
 
@@ -2096,10 +2098,16 @@ void Scene::update(const CommandBufferHandle& cmd,
                    const float time,
                    const float time_diff,
                    const uint32_t frame,
-                   const ShaderObjectAllocatorHandle& obj_allocator) {
+                   const ShaderObjectAllocatorHandle& obj_allocator_in) {
     MERIAN_PROFILE_SCOPE_GPU(cmd, "Scene::update");
     current_frame = frame;
     frame_stats = {};
+
+    if (!obj_allocator_in && !fallback_obj_allocator) {
+        fallback_obj_allocator = std::make_shared<SimpleShaderObjectAllocator>(allocator);
+    }
+    const ShaderObjectAllocatorHandle& obj_allocator =
+        obj_allocator_in ? obj_allocator_in : fallback_obj_allocator;
 
     {
         MERIAN_PROFILE_SCOPE_GPU(cmd, "on_update");
@@ -2183,9 +2191,9 @@ void Scene::update(const CommandBufferHandle& cmd,
         vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eAccelerationStructureReadKHR,
     });
 
-    // TODO: compact static BLASes to reduce memory bandwidth.
     if (as_supported) {
-        build_blas(cmd);
+        // binds the material system object, every write to it must precede this
+        build_blas(cmd, obj_allocator);
 
         tlas_dirty |= needs_regroup || transforms_changed;
         if (tlas_dirty || !tlas) {

@@ -1,8 +1,11 @@
 #include "merian/shader/slang_session.hpp"
+#include "merian/shader/shader_compiler.hpp"
+#include "merian/shader/slang_global_session.hpp"
 #include "merian/shader/slang_program.hpp"
 #include "merian/utils/hash.hpp"
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cctype>
 #include <chrono>
@@ -12,7 +15,10 @@
 #include <fstream>
 #include <functional>
 #include <iterator>
+#include <mutex>
 #include <random>
+#include <ranges>
+#include <set>
 #include <system_error>
 #include <unordered_set>
 #include <vector>
@@ -20,6 +26,29 @@
 namespace merian {
 
 namespace {
+
+std::string diagnostics_as_string(const Slang::ComPtr<slang::IBlob>& diagnostics) {
+    if (diagnostics == nullptr) {
+        return {};
+    }
+    return static_cast<const char*>(diagnostics->getBufferPointer());
+}
+
+// Throws the diagnostics on failure, logs them otherwise.
+void check_result(const SlangResult result,
+                  const Slang::ComPtr<slang::IBlob>& diagnostics,
+                  const std::string_view action) {
+    if (SLANG_FAILED(result)) {
+        throw ShaderCompiler::compilation_failed(diagnostics_as_string(diagnostics));
+    }
+    if (diagnostics != nullptr) {
+        SPDLOG_DEBUG("slang {}: {}", action, diagnostics_as_string(diagnostics));
+    }
+}
+
+constexpr SlangDebugInfoLevel debug_info_level(const bool generate_debug_info) {
+    return generate_debug_info ? SLANG_DEBUG_INFO_LEVEL_MAXIMAL : SLANG_DEBUG_INFO_LEVEL_NONE;
+}
 
 std::string to_hex(const void* data, const size_t size) {
     static constexpr std::string_view digits = "0123456789abcdef";
@@ -315,13 +344,86 @@ class ModuleFileSystem final : public ISlangFileSystemExt {
 
 } // namespace
 
+SlangSession::SlangSession(const ShaderCompileContextHandle& shader_compile_context)
+    : weak_compile_context(shader_compile_context) {
+    const auto global_session = get_global_slang_session();
+
+    slang::SessionDesc slang_session_desc = {};
+
+    slang::TargetDesc target_desc = {};
+    target_desc.format = SLANG_SPIRV;
+    const SpirvVersion target = shader_compile_context->get_target();
+    target_desc.profile =
+        global_session->findProfile(fmt::format("spirv_{}_{}", MERIAN_SPIRV_VERSION_MAJOR(target),
+                                                MERIAN_SPIRV_VERSION_MINOR(target))
+                                        .c_str());
+    if (target_desc.profile == SLANG_PROFILE_UNKNOWN) {
+        SPDLOG_WARN("unknown SPIR-V target, using 1.6");
+        target_desc.profile = global_session->findProfile("spirv_1_6");
+    }
+
+    slang_session_desc.targets = &target_desc;
+    slang_session_desc.targetCount = 1;
+
+    std::vector<slang::PreprocessorMacroDesc> preprocessor_macros;
+    preprocessor_macros.reserve(shader_compile_context->get_preprocessor_macros().size());
+    for (const auto& macro : shader_compile_context->get_preprocessor_macros()) {
+        preprocessor_macros.emplace_back(macro.first.c_str(), macro.second.c_str());
+    }
+    slang_session_desc.preprocessorMacros = preprocessor_macros.data();
+    slang_session_desc.preprocessorMacroCount = static_cast<SlangInt>(preprocessor_macros.size());
+
+    // conversion for Windows...
+    std::vector<std::string> str_search_paths;
+    std::vector<const char*> search_paths;
+    for (const auto& search_path : shader_compile_context->get_search_path_file_loader()) {
+        str_search_paths.emplace_back(search_path.string());
+    }
+    search_paths.reserve(str_search_paths.size());
+    for (const auto& search_path : str_search_paths) {
+        search_paths.emplace_back(search_path.c_str());
+    }
+    slang_session_desc.searchPaths = search_paths.data();
+    slang_session_desc.searchPathCount = static_cast<SlangInt>(search_paths.size());
+
+    if (cache_enabled()) {
+        file_system = create_file_system(module_cache_dir(*shader_compile_context),
+                                         [this] { return modules_canonically_named(); });
+        slang_session_desc.fileSystem = file_system.get();
+    }
+
+    const auto int_option = [](const slang::CompilerOptionName name, const int32_t value) {
+        return slang::CompilerOptionEntry{
+            .name = name,
+            .value = {.kind = slang::CompilerOptionValueKind::Int, .intValue0 = value}};
+    };
+    std::array options = {
+        int_option(slang::CompilerOptionName::UseUpToDateBinaryModule, 1),
+        int_option(slang::CompilerOptionName::VulkanUseEntryPointName, 1),
+        int_option(slang::CompilerOptionName::EmitSpirvDirectly, 1),
+        int_option(slang::CompilerOptionName::EmitSpirvViaGLSL, 0),
+        int_option(slang::CompilerOptionName::Optimization,
+                   static_cast<int32_t>(shader_compile_context->get_optimization_level())),
+        int_option(slang::CompilerOptionName::DebugInformation,
+                   static_cast<int32_t>(
+                       debug_info_level(shader_compile_context->should_generate_debug_info()))),
+    };
+    slang_session_desc.compilerOptionEntries = options.data();
+    slang_session_desc.compilerOptionEntryCount = options.size();
+    target_desc.compilerOptionEntries = options.data();
+    target_desc.compilerOptionEntryCount = options.size();
+
+    global_session->createSession(slang_session_desc, session.writeRef());
+}
+
 SlangSessionHandle SlangSession::create(const ShaderCompileContextHandle& shader_compile_context) {
     SPDLOG_DEBUG("create slang session");
     return SlangSessionHandle(new SlangSession(shader_compile_context));
 }
 
 SlangSession::~SlangSession() {
-    cache_evict();
+    static std::once_flag evicted;
+    std::call_once(evicted, cache_evict);
 }
 
 // --- on-disk shader cache ---
@@ -441,8 +543,7 @@ void SlangSession::cache_evict() {
         return;
     }
 
-    // Nothing under another build tag can be read again, so it goes before the size cap gets to
-    // evict what this session just compiled.
+    // nothing under another build tag can be read again
     for (std::filesystem::directory_iterator it(root, ec), end; it != end; it.increment(ec)) {
         if (ec) {
             break;
@@ -504,7 +605,7 @@ SlangSession::load_module_from_source(const std::string& name,
                                       const std::string& source,
                                       const std::optional<std::filesystem::path>& path) {
     const auto start = std::chrono::steady_clock::now();
-    Slang::ComPtr<slang::IBlob> diagnostics_blob;
+    Slang::ComPtr<slang::IBlob> diagnostics;
     Slang::ComPtr<slang::IModule> module;
 
     const std::optional<std::filesystem::path> file =
@@ -513,23 +614,23 @@ SlangSession::load_module_from_source(const std::string& name,
         // loaded like an import, so each file is one module under every spelling
         module = session->loadModule(
             canonical_module_name(*file).value_or(file->generic_string()).c_str(),
-            diagnostics_blob.writeRef());
+            diagnostics.writeRef());
     } else {
         // the path is the identity: a source string's identity is otherwise its content
         const std::string identity = path ? path->generic_string() : name;
         module = session->loadModuleFromSourceString(name.c_str(), identity.c_str(), source.c_str(),
-                                                     diagnostics_blob.writeRef());
+                                                     diagnostics.writeRef());
         if (module != nullptr) {
             source_strings_by_identity.insert_or_assign(module->getFilePath(), module);
         }
     }
 
     if (module == nullptr) {
-        throw ShaderCompiler::compilation_failed(diagnostics_as_string(diagnostics_blob));
+        throw ShaderCompiler::compilation_failed(diagnostics_as_string(diagnostics));
     }
-    if (diagnostics_blob != nullptr) {
+    if (diagnostics != nullptr) {
         SPDLOG_DEBUG("Slang loading module {}. Diagnostics: {}", name,
-                     diagnostics_as_string(diagnostics_blob));
+                     diagnostics_as_string(diagnostics));
     }
     check_no_replaced_dependency(module);
     SPDLOG_INFO("slang: module {} {} ({:.1f} ms)", name,
@@ -748,6 +849,56 @@ SlangSession::ensure_module(SlangComposition::SlangModule& module) {
         .first->second.module;
 }
 
+Slang::ComPtr<slang::ITypeConformance>
+SlangSession::create_type_conformance(const Slang::ComPtr<slang::IComponentType>& component,
+                                      const std::string& type_name,
+                                      const std::string& interface_name,
+                                      const int64_t id) {
+    slang::TypeReflection* type = component->getLayout()->findTypeByName(type_name.c_str());
+    if (type == nullptr) {
+        throw ShaderCompiler::compilation_failed{fmt::format("type {} not found", type_name)};
+    }
+    slang::TypeReflection* interface =
+        component->getLayout()->findTypeByName(interface_name.c_str());
+    if (interface == nullptr) {
+        throw ShaderCompiler::compilation_failed{
+            fmt::format("interface {} not found", interface_name)};
+    }
+
+    Slang::ComPtr<slang::ITypeConformance> type_conformance;
+    Slang::ComPtr<slang::IBlob> diagnostics;
+    check_result(session->createTypeConformanceComponentType(
+                     type, interface, type_conformance.writeRef(), id, diagnostics.writeRef()),
+                 diagnostics, "creating type conformance");
+    return type_conformance;
+}
+
+Slang::ComPtr<slang::IComponentType> SlangSession::compose_components(
+    const std::vector<Slang::ComPtr<slang::IComponentType>>& components) {
+    std::vector<slang::IComponentType*> component_pointers;
+    component_pointers.reserve(components.size());
+    for (const auto& component : components) {
+        component_pointers.push_back(component.get());
+    }
+
+    Slang::ComPtr<slang::IComponentType> composed;
+    Slang::ComPtr<slang::IBlob> diagnostics;
+    check_result(session->createCompositeComponentType(
+                     component_pointers.data(), static_cast<SlangInt>(component_pointers.size()),
+                     composed.writeRef(), diagnostics.writeRef()),
+                 diagnostics, "composing");
+    return composed;
+}
+
+Slang::ComPtr<slang::IComponentType>
+SlangSession::link(const Slang::ComPtr<slang::IComponentType>& composed_program) {
+    Slang::ComPtr<slang::IComponentType> linked;
+    Slang::ComPtr<slang::IBlob> diagnostics;
+    check_result(composed_program->link(linked.writeRef(), diagnostics.writeRef()), diagnostics,
+                 "linking");
+    return linked;
+}
+
 Slang::ComPtr<slang::IComponentType>
 SlangSession::compose(const SlangCompositionHandle& composition) {
     std::unordered_map<std::string, uint64_t> sources;
@@ -798,11 +949,11 @@ SlangSession::compose_tree(const SlangCompositionHandle& composition) {
         components.emplace_back(slang_module.get());
 
         if (module.get_with_entry_points()) {
-            for (uint32_t entry_point_index = 0;
-                 entry_point_index < get_defined_entry_point_count(slang_module);
+            for (SlangInt32 entry_point_index = 0;
+                 entry_point_index < slang_module->getDefinedEntryPointCount();
                  entry_point_index++) {
-                Slang::ComPtr<slang::IEntryPoint> entry_point =
-                    get_defined_entry_point(slang_module, entry_point_index);
+                Slang::ComPtr<slang::IEntryPoint> entry_point;
+                slang_module->getDefinedEntryPoint(entry_point_index, entry_point.writeRef());
                 const char* name = entry_point->getFunctionReflection()->getName();
                 auto rename_it = module.get_entry_point_map().find(name);
                 if (rename_it == module.get_entry_point_map().end()) {
@@ -816,19 +967,18 @@ SlangSession::compose_tree(const SlangCompositionHandle& composition) {
         }
     }
 
-    Slang::ComPtr<slang::IComponentType> composed_modules = compose(components);
+    const Slang::ComPtr<slang::IComponentType> composed_modules = compose_components(components);
     components.clear();
     components.emplace_back(composed_modules);
 
-    for (auto& [type_conformance, c_id] : composition->type_conformances) {
-        auto it = type_conformance_cache.find(type_conformance);
+    for (const auto& [type_conformance, dispatch_id] : composition->type_conformances) {
+        const std::pair key{type_conformance, dispatch_id};
+        auto it = type_conformance_cache.find(key);
         if (it == type_conformance_cache.end()) {
-            int64_t id = c_id;
             it = type_conformance_cache
-                     .emplace(type_conformance,
-                              create_type_conformance(composed_modules,
-                                                      type_conformance.get_type_name(),
-                                                      type_conformance.get_interface_name(), id))
+                     .emplace(key, create_type_conformance(
+                                       composed_modules, type_conformance.get_type_name(),
+                                       type_conformance.get_interface_name(), dispatch_id))
                      .first;
         }
         components.emplace_back(it->second);
@@ -838,32 +988,33 @@ SlangSession::compose_tree(const SlangCompositionHandle& composition) {
                                                       std::views::all(additional_entry_points)})) {
         auto it = entry_point_cache.find(ep);
         if (it == entry_point_cache.end()) {
-            Slang::ComPtr<slang::IModule> module = bound_modules.at(ep.get_module()).module;
-
-            it = entry_point_cache
-                     .emplace(
-                         ep, std::make_pair(find_entry_point_or_fail(module, ep.get_defined_name()),
-                                            nullptr))
-                     .first;
-
-            it->second.first->renameEntryPoint(ep.get_export_name().c_str(),
-                                               it->second.second.writeRef());
+            const Slang::ComPtr<slang::IModule>& module = bound_modules.at(ep.get_module()).module;
+            Slang::ComPtr<slang::IEntryPoint> entry_point;
+            module->findEntryPointByName(ep.get_defined_name().c_str(), entry_point.writeRef());
+            if (entry_point == nullptr) {
+                throw ShaderCompiler::compilation_failed(
+                    fmt::format("entrypoint {} could not be found in module {}",
+                                ep.get_defined_name(), module->getName()));
+            }
+            Slang::ComPtr<slang::IComponentType> renamed;
+            entry_point->renameEntryPoint(ep.get_export_name().c_str(), renamed.writeRef());
+            it = entry_point_cache.emplace(ep, renamed).first;
         }
-        components.push_back(it->second.second);
+        components.push_back(it->second);
     }
 
-    return compose(components);
+    return compose_components(components);
 }
 
 Slang::ComPtr<slang::IBlob>
-SlangSession::compile(const Slang::ComPtr<slang::IComponentType>& linked_programm,
-                      const uint32_t entrypoint_index) {
+SlangSession::compile(const Slang::ComPtr<slang::IComponentType>& linked_program,
+                      const uint32_t entry_point_index) {
     const auto start = std::chrono::steady_clock::now();
     const char* name =
-        linked_programm->getLayout()->getEntryPointByIndex(entrypoint_index)->getNameOverride();
+        linked_program->getLayout()->getEntryPointByIndex(entry_point_index)->getNameOverride();
 
     const std::optional<std::filesystem::path> spv_path =
-        spirv_cache_path(linked_programm, entrypoint_index);
+        spirv_cache_path(linked_program, entry_point_index);
     if (spv_path) {
         if (Slang::ComPtr<slang::IBlob> cached = cache_read(*spv_path)) {
             SPDLOG_INFO("slang: entry point {} loaded from cache ({:.1f} ms)", name,
@@ -873,20 +1024,10 @@ SlangSession::compile(const Slang::ComPtr<slang::IComponentType>& linked_program
     }
 
     Slang::ComPtr<slang::IBlob> compiled;
-    Slang::ComPtr<slang::IBlob> diagnostics_blob;
-
-    SlangResult result =
-        linked_programm->getEntryPointCode(entrypoint_index,
-                                           0, // targetIndex, currently only one supported
-                                           compiled.writeRef(), diagnostics_blob.writeRef());
-
-    if (SLANG_FAILED(result)) {
-        throw ShaderCompiler::compilation_failed(diagnostics_as_string(diagnostics_blob));
-    }
-
-    if (diagnostics_blob != nullptr) {
-        SPDLOG_DEBUG("Slang compiling. Diagnostics: {}", diagnostics_as_string(diagnostics_blob));
-    }
+    Slang::ComPtr<slang::IBlob> diagnostics;
+    check_result(linked_program->getEntryPointCode(entry_point_index, 0, compiled.writeRef(),
+                                                   diagnostics.writeRef()),
+                 diagnostics, "compiling");
 
     if (spv_path) {
         cache_write(*spv_path, compiled->getBufferPointer(), compiled->getBufferSize());
@@ -897,37 +1038,27 @@ SlangSession::compile(const Slang::ComPtr<slang::IComponentType>& linked_program
 }
 
 Slang::ComPtr<slang::IBlob>
-SlangSession::compile(const Slang::ComPtr<slang::IComponentType>& linked_programm) {
+SlangSession::compile(const Slang::ComPtr<slang::IComponentType>& linked_program) {
     const auto start = std::chrono::steady_clock::now();
 
-    const std::optional<std::filesystem::path> spv_path = spirv_cache_path(linked_programm);
+    const std::optional<std::filesystem::path> spv_path = spirv_cache_path(linked_program);
     if (spv_path) {
         if (Slang::ComPtr<slang::IBlob> cached = cache_read(*spv_path)) {
             SPDLOG_INFO("slang: entry points {} loaded from cache ({:.1f} ms)",
-                        entry_point_names(linked_programm), milliseconds_since(start));
+                        entry_point_names(linked_program), milliseconds_since(start));
             return cached;
         }
     }
 
     Slang::ComPtr<slang::IBlob> compiled;
-    Slang::ComPtr<slang::IBlob> diagnostics_blob;
-
-    SlangResult result =
-        linked_programm->getTargetCode(0, // targetIndex, currently only one supported,
-                                       compiled.writeRef(), diagnostics_blob.writeRef());
-
-    if (SLANG_FAILED(result)) {
-        throw ShaderCompiler::compilation_failed(diagnostics_as_string(diagnostics_blob));
-    }
-
-    if (diagnostics_blob != nullptr) {
-        SPDLOG_DEBUG("Slang compiling. Diagnostics: {}", diagnostics_as_string(diagnostics_blob));
-    }
+    Slang::ComPtr<slang::IBlob> diagnostics;
+    check_result(linked_program->getTargetCode(0, compiled.writeRef(), diagnostics.writeRef()),
+                 diagnostics, "compiling");
 
     if (spv_path) {
         cache_write(*spv_path, compiled->getBufferPointer(), compiled->getBufferSize());
     }
-    SPDLOG_INFO("slang: entry points {} compiled ({:.1f} ms)", entry_point_names(linked_programm),
+    SPDLOG_INFO("slang: entry points {} compiled ({:.1f} ms)", entry_point_names(linked_program),
                 milliseconds_since(start));
 
     return compiled;
@@ -1000,16 +1131,6 @@ SlangSession::get_type_layout(const ShaderCompileContextHandle& compile_context,
                               const SlangCompositionHandle& composition,
                               const std::string& type_name) {
     const SlangProgramHandle program = SlangProgram::create(compile_context, composition).get();
-    auto* type_layout = find_type_layout(program->get_program_reflection(), type_name);
-    return {type_layout, program};
-}
-
-SlangSession::TypeLayoutResult
-SlangSession::get_type_layout(const ShaderCompileContextHandle& compile_context,
-                              const std::filesystem::path& module_path,
-                              const std::string& type_name) {
-    const SlangProgramHandle program =
-        SlangProgram::create(compile_context, module_path, false).get();
     auto* type_layout = find_type_layout(program->get_program_reflection(), type_name);
     return {type_layout, program};
 }

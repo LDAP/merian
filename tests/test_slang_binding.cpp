@@ -185,6 +185,17 @@ TEST_F(SlangBindingTest, ScalarTypes) {
     EXPECT_EQ(result.data[2], 123u);
 }
 
+TEST_F(SlangBindingTest, MissingFieldThrows) {
+    dispatch_and_readback(
+        "scalar_types", 3,
+        [](const SlangProgramEntryPointHandle&, ShaderCursor& cursor, const BufferHandle& output) {
+            EXPECT_THROW(cursor["val_flaot"], std::invalid_argument);
+            EXPECT_THROW(cursor["val_float"][0u], std::invalid_argument);
+            EXPECT_FALSE(cursor.find("val_flaot").is_valid());
+            cursor["output"] = output;
+        });
+}
+
 TEST_F(SlangBindingTest, VectorTypes) {
     struct float2 {
         float x, y;
@@ -819,6 +830,9 @@ TEST_F(SlangBindingTest, GlobalResource) {
 
     auto globals = entry_point.get()->create_global_shader_object(context, allocator);
     auto cursor = globals->get_cursor();
+    EXPECT_TRUE(cursor.has_field("output"));
+    EXPECT_FALSE(cursor.has_field("outptu"));
+    EXPECT_THROW(cursor[0u], std::invalid_argument);
     cursor["cb"]["x"] = 3.14f;
     cursor["cb"]["y"] = -42;
     cursor["output"] = output_buffer;

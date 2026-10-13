@@ -106,6 +106,30 @@ SlangProgram::get_or_create_object_layout(const ContextHandle& context,
     return layout;
 }
 
+const ShaderStructFields&
+SlangProgram::get_struct_fields(slang::TypeLayoutReflection* type_layout) {
+    if (const auto it = struct_fields_cache.find(type_layout); it != struct_fields_cache.end()) {
+        return it->second;
+    }
+
+    ShaderStructFields struct_fields;
+    const uint32_t field_count = type_layout->getFieldCount();
+    struct_fields.fields.reserve(field_count);
+    for (uint32_t field_index = 0; field_index < field_count; field_index++) {
+        slang::VariableLayoutReflection* field = type_layout->getFieldByIndex(field_index);
+        slang::TypeLayoutReflection* field_type_layout = field->getTypeLayout();
+        struct_fields.fields.push_back({
+            .type_layout = field_type_layout,
+            .kind = field_type_layout->getType()->getKind(),
+            .uniform_offset = field->getOffset(),
+            .binding_range_offset =
+                static_cast<uint32_t>(type_layout->getFieldBindingRangeOffset(field_index)),
+        });
+        struct_fields.index_by_name.try_emplace(field->getVariable()->getName(), field_index);
+    }
+    return struct_fields_cache.emplace(type_layout, std::move(struct_fields)).first->second;
+}
+
 ShaderObjectHandle
 SlangProgram::create_shader_object_for_type(const ContextHandle& context,
                                             const std::string& type_name,

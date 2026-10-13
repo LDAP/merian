@@ -207,8 +207,6 @@ class LightCollection {
     uint32_t triangle_count = 0;
     bool tables_dirty = false;
 
-    ShaderObjectAllocatorHandle fallback_obj_allocator;
-
     BufferHandle env_importance_built_buffer;
     BufferHandle env_pool_buffer;
     BufferHandle env_cdf_buffer;

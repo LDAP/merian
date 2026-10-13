@@ -71,7 +71,7 @@ void HashGrid::reset(const CommandBufferHandle& cmd) {
 
 void HashGrid::write_to(ShaderCursor cursor) const {
     // Specialization may eliminate the unused keys buffer from the parameter block.
-    if (auto keys_cursor = cursor["keys"]; keys_cursor.is_valid()) {
+    if (auto keys_cursor = cursor.find("keys"); keys_cursor.is_valid()) {
         keys_cursor = keys;
     }
     cursor["data"] = data;

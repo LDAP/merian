@@ -216,8 +216,7 @@ Micromaps::Micromaps(const ShaderCompileContextHandle& compile_context,
       max_blocks_per_update(context->get_physical_device()
                                 ->get_properties()
                                 .get_properties()
-                                .limits.maxComputeWorkGroupCount[0]),
-      obj_allocator(std::make_shared<SimpleShaderObjectAllocator>(allocator)) {
+                                .limits.maxComputeWorkGroupCount[0]) {
     if (is_opacity_supported(context)) {
         builder.emplace(context, allocator);
     }
@@ -496,7 +495,8 @@ void Micromaps::clear(const CommandBufferHandle& cmd, std::vector<uint32_t>& cha
 void Micromaps::update(const CommandBufferHandle& cmd,
                        const std::vector<MeshGeometry>& meshes,
                        const MaterialSystemHandle& material_system,
-                       std::vector<uint32_t>& changed) {
+                       std::vector<uint32_t>& changed,
+                       const ShaderObjectAllocatorHandle& obj_allocator) {
     const float threshold = material_system->get_alpha_test_threshold();
     if (threshold != alpha_threshold) {
         clear(cmd, changed);

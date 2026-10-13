@@ -332,6 +332,30 @@ TEST_F(SlangHotReloadTest, RebindingAnImportedModulePicksUpNewSource) {
     EXPECT_EQ(dispatch_output(composition_reading(3)), 3u);
 }
 
+TEST_F(SlangHotReloadTest, ConformanceDispatchIdsFollowEachComposition) {
+    const auto composition_dispatching = [](const int64_t a_id, const int64_t b_id) {
+        const auto composition = SlangComposition::create();
+        composition->add_module_from_string("dispatch_by_id", R"(
+            interface IValue { uint value(); };
+            struct ValueA : IValue { uint payload; uint value() { return 10u; } };
+            struct ValueB : IValue { uint payload; uint value() { return 20u; } };
+            struct Params { RWStructuredBuffer<uint> output; };
+            [shader("compute")]
+            [numthreads(1, 1, 1)]
+            void main(ParameterBlock<Params> params) {
+                params.output[0] = createDynamicObject<IValue>(1u, 0u).value();
+            }
+        )",
+                                            true);
+        composition->add_type_conformance("IValue", "ValueA", a_id);
+        composition->add_type_conformance("IValue", "ValueB", b_id);
+        return composition;
+    };
+
+    EXPECT_EQ(dispatch_output(composition_dispatching(0, 1)), 20u);
+    EXPECT_EQ(dispatch_output(composition_dispatching(1, 0)), 10u);
+}
+
 // ---------------------------------------------------------------------------
 // On-disk cache: every source a shader depends on reaches it, across launches and within one.
 // ---------------------------------------------------------------------------

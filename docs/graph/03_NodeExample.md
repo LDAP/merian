@@ -47,10 +47,9 @@ class MyProcessNode : public merian::Node {
             .add_push_constant<MyPushConstants>()
             .build_pipeline_layout();
 
-        auto session = merian::SlangSession::create(
-            merian::ShaderCompileContext::create(context));
-        auto entry_point = session->load_module_from_path_and_compile_entry_point(
-            context, "my_shader.slang");
+        const auto entry_point = merian::SlangProgramEntryPoint::create(
+                                     context->get_shader_compile_context(), "my_shader.slang")
+                                     .get();
         pipeline = merian::ComputePipeline::create(pipeline_layout, entry_point);
 
         return {};

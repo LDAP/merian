@@ -456,9 +456,7 @@ class Scene : public std::enable_shared_from_this<Scene> {
     static SlangCompositionHandle
     query_device_support_composition(const DeviceSupportQueryInfo& query_info);
 
-    // ------------------------------
-
-    // obj_allocator binds the scene for the light update pass; falls back to a non-caching one.
+    // obj_allocator binds the scene's update passes; falls back to a non-caching one.
     void update(const CommandBufferHandle& cmd,
                 float time,
                 float time_diff,
@@ -712,9 +710,11 @@ class Scene : public std::enable_shared_from_this<Scene> {
     // uploads the meshes, geometry data, and instance transforms
     void upload_meshes(const CommandBufferHandle& cmd);
 
-    void build_blas(const CommandBufferHandle& cmd);
+    void build_blas(const CommandBufferHandle& cmd,
+                    const ShaderObjectAllocatorHandle& obj_allocator);
 
-    void ensure_micromaps(const CommandBufferHandle& cmd);
+    void ensure_micromaps(const CommandBufferHandle& cmd,
+                          const ShaderObjectAllocatorHandle& obj_allocator);
     void build_tlas(const CommandBufferHandle& cmd);
 
     // Grows one shared buffer: re-suballocates every live region into a new backing buffer and
@@ -799,6 +799,7 @@ class Scene : public std::enable_shared_from_this<Scene> {
     uint32_t current_frame = 0;
 
     std::unique_ptr<Micromaps> micromaps;
+    ShaderObjectAllocatorHandle fallback_obj_allocator;
     bool opacity_micromaps_enabled = true;
     bool emission_micromaps_enabled = true;
 

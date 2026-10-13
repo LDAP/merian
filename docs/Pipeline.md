@@ -20,28 +20,21 @@ auto specialized = entry_point->specialize(spec_info);
 
 ### Slang shaders
 
-Slang shaders are compiled via a `SlangSession`. For simple cases there is a shortcut:
+Slang shaders are compiled through the context's `ShaderCompileContext`, which shares one Slang session. For a single module:
 
 ```c++
-// Context already holds a ShaderCompileContext with the project's search paths.
-auto compile_ctx = ShaderCompileContext::create(context);
-auto session     = SlangSession::create(compile_ctx);
-
-// Simple path: load module + compose + link + compile in one call.
-EntryPointHandle entry_point = session->load_module_from_path_and_compile_entry_point(
-    context, "my_shader.slang", "main");
+EntryPointHandle entry_point =
+    SlangProgramEntryPoint::create(context->get_shader_compile_context(), "my_shader.slang", "main")
+        .get();
 ```
 
-For complex compositions (multiple modules, type conformances, specialization) use `SlangComposition` and `SlangSession::compose()`.
+For complex compositions (multiple modules, type conformances, link-time constants) build a `SlangComposition` and pass it to `SlangProgram::create()`.
 
 ### Example (Slang compute pipeline)
 
 ```c++
-auto compile_ctx = ShaderCompileContext::create(context);
-auto session     = SlangSession::create(compile_ctx);
-
-EntryPointHandle entry_point = session->load_module_from_path_and_compile_entry_point(
-    context, "my_shader.slang");
+EntryPointHandle entry_point =
+    SlangProgramEntryPoint::create(context->get_shader_compile_context(), "my_shader.slang").get();
 
 // Specialization constants
 // add_entry(T) returns uint32_t id; variadic add_entry(T...) returns std::vector<uint32_t>

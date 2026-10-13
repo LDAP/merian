@@ -1,6 +1,7 @@
 #include "merian/shader/shader_object.hpp"
 
 #include <cassert>
+#include <cstring>
 #include <spdlog/spdlog.h>
 
 namespace merian {
@@ -57,7 +58,6 @@ ShaderCursor ShaderObject::get_cursor() {
     return ShaderCursor(this);
 }
 
-// ---------------------------------------------------------------
 // Sub-objects
 
 const ShaderObjectHandle& ShaderObject::get_subobject(const uint32_t subobject_range_index) {
@@ -106,45 +106,21 @@ void ShaderObject::set_subobject(const uint32_t subobject_range_index,
     });
 }
 
-ShaderObjectHandle ShaderObject::create_subobject(const std::string& field_name) {
-    if (object_layout->is_container()) {
-        return get_element()->create_subobject(field_name);
-    }
-
-    auto* type_layout = object_layout->get_type_layout();
-    const SlangInt field_index = type_layout->findFieldIndexByName(field_name.c_str());
-    assert(field_index >= 0 && "Field not found");
-
-    const uint32_t binding_range_index =
-        type_layout->getFieldBindingRangeOffset(static_cast<uint32_t>(field_index));
+ShaderObjectHandle ShaderObject::create_subobject(const std::string_view field_name) {
+    const ShaderCursor field = get_cursor()[field_name];
+    const ShaderObjectLayoutHandle& layout = field.get_base_object()->get_object_layout();
     const int32_t subobject_range_index =
-        object_layout->find_subobject_range_index(binding_range_index);
+        layout->find_subobject_range_index(field.get_offset().binding_range_offset);
     assert(subobject_range_index >= 0 && "Field must be a ConstantBuffer or ParameterBlock");
-
-    const auto& range_info = object_layout->get_subobject_range_info(subobject_range_index);
-    assert(range_info.container_layout);
-
-    return std::make_shared<ShaderObject>(range_info.container_layout, allocator);
+    return std::make_shared<ShaderObject>(
+        layout->get_subobject_range_info(subobject_range_index).container_layout, allocator);
 }
 
-void ShaderObject::set_subobject(const std::string& field_name, const ShaderObjectHandle& object) {
-    if (object_layout->is_container()) {
-        get_element()->set_subobject(field_name, object);
-        return;
-    }
-
-    auto* type_layout = object_layout->get_type_layout();
-    const SlangInt field_index = type_layout->findFieldIndexByName(field_name.c_str());
-    assert(field_index >= 0 && "Field not found");
-
-    const int32_t subobject_range_index = object_layout->find_subobject_range_index(
-        type_layout->getFieldBindingRangeOffset(static_cast<uint32_t>(field_index)));
-    assert(subobject_range_index >= 0 && "Field must be a ConstantBuffer or ParameterBlock");
-
-    set_subobject(static_cast<uint32_t>(subobject_range_index), object);
+void ShaderObject::set_subobject(const std::string_view field_name,
+                                 const ShaderObjectHandle& object) {
+    get_cursor()[field_name] = object;
 }
 
-// ---------------------------------------------------------------
 // Attachment / replay
 
 void ShaderObject::attach(const ShaderObjectHandle& parameter_block, const uint32_t binding_base) {
@@ -284,7 +260,6 @@ void ShaderObject::for_each_descriptor_container(
     }
 }
 
-// ---------------------------------------------------------------
 // Writes
 
 void ShaderObject::write(const ShaderOffset& offset, const void* data, const std::size_t size) {
@@ -306,7 +281,11 @@ void ShaderObject::write_uniform(const std::size_t byte_offset,
         static_cast<std::size_t>(object_layout->get_element_uniform_offset()) + byte_offset;
     assert(offset + size <= uniform_staging.size());
 
-    std::memcpy(uniform_staging.data() + offset, data, size);
+    uint8_t* const destination = uniform_staging.data() + offset;
+    if (std::memcmp(destination, data, size) == 0) {
+        return;
+    }
+    std::memcpy(destination, data, size);
     uniform_dirty = true;
     mark_uploads_pending();
 }
@@ -406,7 +385,6 @@ void ShaderObject::write(const ShaderOffset& offset, const AccelerationStructure
     });
 }
 
-// ---------------------------------------------------------------
 // Binding
 
 void ShaderObject::upload_uniform_buffers(const CommandBufferHandle& cmd) {

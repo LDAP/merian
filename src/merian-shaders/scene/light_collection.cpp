@@ -364,19 +364,12 @@ void LightCollection::update_constants(const SlangCompositionHandle& scene_compo
 void LightCollection::update(const CommandBufferHandle& cmd,
                              const SlangCompositionHandle& scene_composition,
                              const ShaderObjectHandle& scene_object,
-                             const ShaderObjectAllocatorHandle& obj_allocator_in) {
+                             const ShaderObjectAllocatorHandle& obj_allocator) {
     if (!enabled || (triangle_count == 0 && !env_emissive))
         return;
 
     MERIAN_PROFILE_SCOPE_GPU(cmd, "LightCollection::update");
     ensure_pipelines(scene_composition);
-
-    ShaderObjectAllocatorHandle obj_allocator = obj_allocator_in;
-    if (!obj_allocator) {
-        if (!fallback_obj_allocator)
-            fallback_obj_allocator = std::make_shared<SimpleShaderObjectAllocator>(allocator);
-        obj_allocator = fallback_obj_allocator;
-    }
 
     // the renderer's reads and feedback, from any stage
     cmd->barrier(vk::MemoryBarrier2{

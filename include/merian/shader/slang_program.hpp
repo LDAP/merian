@@ -11,6 +11,7 @@
 #include "slang.h"
 
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -24,6 +25,31 @@ using ShaderObjectLayoutHandle = std::shared_ptr<ShaderObjectLayout>;
 
 struct DeviceSupportInfo;
 struct DeviceSupportQueryInfo;
+
+struct ShaderStructFields {
+    struct Field {
+        slang::TypeLayoutReflection* type_layout;
+        slang::TypeReflection::Kind kind;
+        std::size_t uniform_offset;
+        uint32_t binding_range_offset;
+    };
+
+    // -1 if no field has this name.
+    int32_t find(const std::string_view name) const {
+        const auto it = index_by_name.find(name);
+        return it == index_by_name.end() ? -1 : static_cast<int32_t>(it->second);
+    }
+
+    struct NameHash {
+        using is_transparent = void;
+        std::size_t operator()(const std::string_view name) const {
+            return std::hash<std::string_view>{}(name);
+        }
+    };
+
+    std::vector<Field> fields;
+    std::unordered_map<std::string, uint32_t, NameHash, std::equal_to<>> index_by_name;
+};
 
 class SlangProgram;
 // Holding a handle keeps the program's session and reflection pointers alive.
@@ -59,13 +85,12 @@ class SlangProgram : public std::enable_shared_from_this<SlangProgram> {
 
     slang::TypeLayoutReflection* get_type_layout(const std::string& type_name) const;
 
-    // Layouts are deduplicated per program: link-time constants (extern static const array
-    // sizes) make binding layouts program-dependent, so sharing across programs is not safe.
     ShaderObjectLayoutHandle get_or_create_object_layout(const ContextHandle& context,
                                                          slang::TypeLayoutReflection* type_layout);
 
+    const ShaderStructFields& get_struct_fields(slang::TypeLayoutReflection* type_layout);
+
     // Creates a ParameterBlock<type_name> shader object from a named Slang type.
-    // Create-for-parameter counterpart: SlangProgramEntryPoint::create_shader_object_for_parameter.
     ShaderObjectHandle create_shader_object_for_type(const ContextHandle& context,
                                                      const std::string& type_name,
                                                      const ResourceAllocatorHandle& allocator);
@@ -117,6 +142,7 @@ class SlangProgram : public std::enable_shared_from_this<SlangProgram> {
 
     std::unordered_map<slang::TypeLayoutReflection*, std::weak_ptr<ShaderObjectLayout>>
         object_layout_cache;
+    std::unordered_map<slang::TypeLayoutReflection*, ShaderStructFields> struct_fields_cache;
 };
 
 } // namespace merian
