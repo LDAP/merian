@@ -66,6 +66,7 @@ class GLTFMesh : public Scene::Mesh,
     uint32_t vertex_count = 0;
 
     const uint8_t* idx_base = nullptr; // null -> sequential indices
+    bool widen_byte_indices = false;
     uint32_t primitive_count = 0;
 
     void set_indices(const uint8_t* base, int gltf_component_type, uint32_t prim_count) {
@@ -79,7 +80,9 @@ class GLTFMesh : public Scene::Mesh,
         } else if (gltf_component_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT) {
             index_type = vk::IndexType::eUint32;
         } else {
-            index_type = vk::IndexType::eUint8;
+            // acceleration structures take no 8-bit indices
+            index_type = vk::IndexType::eUint16;
+            widen_byte_indices = true;
         }
     }
 
@@ -121,6 +124,10 @@ class GLTFMesh : public Scene::Mesh,
 
     void write(void* dst) const override {
         assert(idx_base != nullptr);
+        if (widen_byte_indices) {
+            std::copy_n(idx_base, primitive_count * 3, static_cast<uint16_t*>(dst));
+            return;
+        }
         std::memcpy(dst, idx_base, primitive_count * 3 * size_for_index_type(index_type));
     }
 

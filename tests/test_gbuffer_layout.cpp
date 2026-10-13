@@ -89,20 +89,26 @@ TEST(GBufferLayout, ExactTexturesTakeNoOtherFields) {
 }
 
 TEST(GBufferLayout, NextToTheGroupInTheFormItHas) {
-    const GBufferLayout layout({
+    const GBufferLayout normal({
         {{Field::Normal, Field::GradZ}},
         {{Field::Normal, Field::MotionVectors}},
         {{Field::Normal, Field::LinearZ}},
+    });
+    for (const Field field : {Field::Normal, Field::GradZ, Field::MotionVectors, Field::LinearZ}) {
+        EXPECT_TRUE(placement_of(normal, field).packed);
+    }
+    EXPECT_EQ(normal.get_texture_index(Field::LinearZ), normal.get_texture_index(Field::Normal));
+
+    const GBufferLayout delta_z({
         {{Field::Hit, Field::DeltaZ}},
         {{Field::DeltaZ, Field::ViewDepth}},
         {{Field::DeltaZ, Field::ProjectedDepth}},
     });
-    for (const Field field : {Field::Normal, Field::GradZ, Field::MotionVectors, Field::LinearZ,
-                              Field::DeltaZ, Field::ViewDepth, Field::ProjectedDepth}) {
-        EXPECT_TRUE(placement_of(layout, field).packed);
+    for (const Field field : {Field::DeltaZ, Field::ViewDepth, Field::ProjectedDepth}) {
+        EXPECT_TRUE(placement_of(delta_z, field).packed);
     }
-    EXPECT_EQ(layout.get_texture_index(Field::LinearZ), layout.get_texture_index(Field::Normal));
-    EXPECT_EQ(layout.get_texture_index(Field::ViewDepth), layout.get_texture_index(Field::DeltaZ));
+    EXPECT_EQ(delta_z.get_texture_index(Field::ViewDepth),
+              delta_z.get_texture_index(Field::DeltaZ));
 }
 
 TEST(GBufferLayout, TextureGroupPrefixIsShared) {
@@ -121,6 +127,18 @@ TEST(GBufferLayout, EmptyStillHasATexture) {
 TEST(GBufferLayout, EqualGroupsEqualLayouts) {
     EXPECT_TRUE(GBufferLayout(SURFACE_DENOISER) == GBufferLayout(SURFACE_DENOISER));
     EXPECT_FALSE(GBufferLayout(SURFACE_DENOISER) == GBufferLayout(RAY_RECONSTRUCTION));
+}
+
+TEST(GBufferLayout, HalfFloatsStayOutOfFullFloatTextures) {
+    const GBufferLayout layout({{{Field::ViewDepth}}, {{Field::MotionVectors}}});
+    EXPECT_EQ(texture_of(layout, Field::MotionVectors).storage, Storage::Float16);
+}
+
+TEST(GBufferLayout, GroupOrderDoesNotMatter) {
+    for (const std::vector<GBufferGroup>& groups : {SURFACE_DENOISER, RAY_RECONSTRUCTION}) {
+        const std::vector<GBufferGroup> reversed(groups.rbegin(), groups.rend());
+        EXPECT_TRUE(GBufferLayout(reversed) == GBufferLayout(groups));
+    }
 }
 
 // ROUND_TRIP_SOURCE writes one result per field in GBufferField order, then the derived

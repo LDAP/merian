@@ -307,3 +307,19 @@ TEST_F(SceneTest, RemoveNodeCascadesAndDetachesInstances) {
     (void)child;
     (void)leaf;
 }
+
+TEST_F(SceneTest, RemoveNodeRetransformsTheRemainingInstance) {
+    auto scene = std::make_shared<TestScene>(compile_context, context, allocator, material_system);
+    scene->add_camera(std::make_shared<Camera>());
+
+    const NodeID n0 = scene->add_node({});
+    const NodeID n1 = scene->add_node({});
+    const MeshID m = scene->add_mesh(make_triangle(0));
+    scene->add_mesh_instance(m, n0);
+    scene->add_mesh_instance(m, n1);
+    // as after the upload of the instanced vertices
+    scene->get_mesh(m).mesh->vertices_dirty = false;
+
+    scene->remove_node(n1);
+    EXPECT_TRUE(scene->get_mesh(m).mesh->vertices_dirty);
+}

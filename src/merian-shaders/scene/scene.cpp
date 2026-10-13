@@ -21,6 +21,7 @@
 #include <cmath>
 #include <fmt/format.h>
 #include <unordered_map>
+#include <utility>
 
 namespace merian {
 
@@ -222,6 +223,7 @@ Scene::NodeID Scene::add_node(Node node) {
         scene_graph[node.parent]->children.push_back(id);
     }
 
+    node.meshes.clear();
     node.serial = next_serial++;
     scene_graph[id] = std::move(node);
     return id;
@@ -264,10 +266,12 @@ void Scene::add_mesh_instance(const MeshID mesh_id, const NodeID node_id) {
 
     MeshInfo& info = mesh_infos[mesh_id];
 
-    if (info.instances.size() == 1 && (!info.is_dynamic() || pretransform_animated)) {
+    // vertices may still be pretransformed for an earlier instance
+    if (info.instances.size() <= 1 && (!info.is_dynamic() || pretransform_animated)) {
         info.mesh->vertices_dirty = true;
     }
     info.instances.insert(node_id);
+    scene_graph[node_id]->meshes.insert(mesh_id);
     if (scene_graph[node_id]->is_animated)
         info.animated_instance_count++;
     needs_regroup = true;
@@ -280,6 +284,7 @@ void Scene::remove_mesh_instance(const MeshID mesh_id, const NodeID node_id) {
     MeshInfo& info = mesh_infos[mesh_id];
 
     if (info.instances.erase(node_id) > 0) {
+        scene_graph[node_id]->meshes.erase(mesh_id);
         if (scene_graph[node_id]->is_animated) {
             assert(info.animated_instance_count > 0);
             info.animated_instance_count--;
@@ -299,6 +304,10 @@ void Scene::remove_mesh(const MeshID mesh_id) {
         group.cached_blas_size_info.reset();
         if (group.blas)
             pending_blas_releases.push_back(std::move(group.blas));
+    }
+
+    for (const NodeID node_id : mesh_infos[mesh_id].instances) {
+        scene_graph[node_id]->meshes.erase(mesh_id);
     }
 
     // Dropping the MeshInfo also drops its MeshBufferRegion suballocation handles, returning the
@@ -328,14 +337,8 @@ void Scene::remove_node(const NodeID node_id) {
         remove_node(node.children.back());
     }
 
-    // Remove all instances on this node.
-    for (const MeshID mesh_id : mesh_ids) {
-        MeshInfo& info = mesh_infos[mesh_id];
-        assert(info.mesh);
-        if (info.instances.erase(node_id) > 0 && node.is_animated) {
-            assert(info.animated_instance_count > 0);
-            info.animated_instance_count--;
-        }
+    for (const MeshID mesh_id : std::exchange(node.meshes, {})) {
+        remove_mesh_instance(mesh_id, node_id);
     }
 
     needs_regroup = true;
@@ -1080,16 +1083,14 @@ void Scene::compute_mesh_groups() {
     std::unordered_map<uint32_t, MeshGroupID> groups_static;
     // dynamic with pretransform_animated: pretransformed, BLAS rebuilt as needed
     std::unordered_map<uint32_t, MeshGroupID> groups_dynamic_pretransformed;
-    // morphed on non-animated node, pretransform OFF: not pretransformed
-    std::unordered_map<uint32_t, MeshGroupID> groups_morphed_static;
-    // animated node, pretransform OFF: not pretransformed, per-node
-    std::unordered_map<uint64_t, MeshGroupID> groups_animated_per_node;
+    // dynamic, pretransform OFF: not pretransformed, per-node
+    std::unordered_map<uint64_t, MeshGroupID> groups_dynamic_per_node;
     // instanced
     std::unordered_map<SmallSet<NodeID, 1>, std::unordered_map<uint32_t, MeshGroupID>>
         groups_instanced;
 
     groups_static.reserve(32);
-    groups_animated_per_node.reserve(node_ids.count() * 2);
+    groups_dynamic_per_node.reserve(node_ids.count() * 2);
 
     const auto get_or_create = [&](auto& map, auto key) -> MeshGroupID {
         const auto [it, inserted] = map.try_emplace(key, mesh_groups.size());
@@ -1115,18 +1116,15 @@ void Scene::compute_mesh_groups() {
         } else {
             assert(info.instances.size() == 1);
             const NodeID node_id = *info.instances.begin();
-            const bool node_animated = scene_graph[node_id]->is_animated;
-            const bool is_dynamic = node_animated || mesh.is_morphed();
+            const bool is_dynamic = scene_graph[node_id]->is_animated || mesh.is_morphed();
 
             if (!is_dynamic) {
                 group_id = get_or_create(groups_static, key);
             } else if (pretransform_animated) {
                 group_id = get_or_create(groups_dynamic_pretransformed, key);
-            } else if (!node_animated) {
-                group_id = get_or_create(groups_morphed_static, key);
             } else {
                 const uint64_t node_key = (static_cast<uint64_t>(key) << 32) | node_id;
-                group_id = get_or_create(groups_animated_per_node, node_key);
+                group_id = get_or_create(groups_dynamic_per_node, node_key);
             }
         }
 
@@ -1391,14 +1389,23 @@ void Scene::upload_prev_geometry_remap(const CommandBufferHandle& cmd,
                                        const std::vector<uint32_t>& instance_indices) {
     prev_geometry_remap.clear();
     if (geometry_keys != prev_geometry_keys) {
+        // keys are unique, so a key that moved lands where the key changed
+        const auto unchanged = [&](const GeometryID geometry_id) {
+            return geometry_id < geometry_keys.size() && geometry_id < prev_geometry_keys.size() &&
+                   geometry_keys[geometry_id] == prev_geometry_keys[geometry_id];
+        };
         geometry_of_key.clear();
-        geometry_of_key.reserve(geometry_keys.size());
         for (GeometryID geometry_id = 0; geometry_id < geometry_keys.size(); geometry_id++)
-            geometry_of_key.try_emplace(geometry_keys[geometry_id], geometry_id);
+            if (!unchanged(geometry_id))
+                geometry_of_key.try_emplace(geometry_keys[geometry_id], geometry_id);
 
         prev_geometry_remap.reserve(prev_geometry_keys.size());
-        for (const uint64_t key : prev_geometry_keys) {
-            const auto it = geometry_of_key.find(key);
+        for (GeometryID prev_id = 0; prev_id < prev_geometry_keys.size(); prev_id++) {
+            if (unchanged(prev_id)) {
+                prev_geometry_remap.push_back({prev_id, instance_indices[prev_id]});
+                continue;
+            }
+            const auto it = geometry_of_key.find(prev_geometry_keys[prev_id]);
             if (it == geometry_of_key.end())
                 prev_geometry_remap.push_back({GEOMETRY_ID_GONE, 0});
             else
@@ -1590,8 +1597,11 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                 if (needs_prev != has_prev)
                     mesh.vertices_dirty = true;
 
-                mesh.vertices_dirty |=
-                    check_node_transform && scene_graph[*info.instances.begin()]->transform_dirty;
+                // prev vertices hold the last motion until the frame after the node stopped
+                if (check_node_transform) {
+                    const Node& node = *scene_graph[*info.instances.begin()];
+                    mesh.vertices_dirty |= node.transform_dirty || node.transform_dirty_last_frame;
+                }
                 if (!mesh.is_dirty())
                     continue;
 
@@ -2215,7 +2225,9 @@ void Scene::update(const CommandBufferHandle& cmd,
     });
 
     for (const NodeID& nid : node_ids) {
-        scene_graph[nid]->transform_dirty = false;
+        Node& node = *scene_graph[nid];
+        node.transform_dirty_last_frame = node.transform_dirty;
+        node.transform_dirty = false;
     }
     last_update_changes.geometry_changed = needs_regroup;
     last_update_changes.transform_changed = transforms_changed;

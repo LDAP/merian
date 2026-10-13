@@ -72,6 +72,10 @@ float from_ordered(const uint u) {
     return asfloat((u & 0x80000000u) != 0 ? u & 0x7FFFFFFFu : ~u);
 }
 
+float wide_sum(const StructuredBuffer<uint> words, const uint at) {
+    return float(words[at + 1]) * 4294967296.f + float(words[at]);
+}
+
 void merge_maximum(const LightPreprocessBinding params, const uint at, const float value) {
     uint previous;
     InterlockedMax(params.setup_state[at], ordered(value), previous);
@@ -746,12 +750,11 @@ void grid_cell<S : ISlotGroup>(const S slots,
         contribution = params.grid_contribution_prev[prev_entry];
         if (carried) {
             const uint feedback_at = LIGHT_GRID_FEEDBACK_STRIDE * prev_entry;
-            const uint3 feedback = uint3(params.grid_feedback_prev[feedback_at],
-                                         params.grid_feedback_prev[feedback_at + 1],
-                                         params.grid_feedback_prev[feedback_at + 2]);
-            samples = float(min(feedback.x, LIGHT_GRID_FEEDBACK_SAMPLES));
-            feedback_sums = float2(feedback.yz) / float2(LIGHT_GRID_CONTRIBUTION_SCALE,
-                                                         LIGHT_GRID_CONTRIBUTION_SQUARE_SCALE);
+            samples = float(params.grid_feedback_prev[feedback_at]);
+            feedback_sums =
+                float2(wide_sum(params.grid_feedback_prev, feedback_at + 1),
+                       wide_sum(params.grid_feedback_prev, feedback_at + 3)) /
+                float2(LIGHT_GRID_CONTRIBUTION_SCALE, LIGHT_GRID_CONTRIBUTION_SQUARE_SCALE);
         }
     }
 

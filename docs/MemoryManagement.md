@@ -66,7 +66,7 @@ int main() {
 
 ### Staging memory
 
-The `ResourceAllocator` uses a `StagingMemoryManager` for uploads and downloads to and from device-local storage. Staging memory is automatically released when the command pool resets.
+The `ResourceAllocator` uses a `StagingMemoryManager` for uploads and downloads to and from device-local storage. Staging memory is reclaimed once the command pool resets.
 
 ```c++
 // Upload data in a command buffer

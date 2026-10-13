@@ -97,7 +97,8 @@ void ASBuilder::queue_update(
     const AccelerationStructureHandle& as,
     const vk::AccelerationStructureBuildSizesInfoKHR& size_info,
     const vk::BuildAccelerationStructureFlagsKHR build_flags) {
-    queue_update(geometry.data(), range_info.data(), as, size_info, build_flags);
+    assert(geometry.size() == range_info.size());
+    queue_update(geometry.data(), range_info.data(), as, size_info, build_flags, geometry.size());
 }
 
 void ASBuilder::queue_update(const vk::AccelerationStructureGeometryKHR* geometry,
@@ -134,14 +135,14 @@ void ASBuilder::get_cmds_blas(const CommandBufferHandle& cmd, BufferHandle& scra
         cmd->keep_until_pool_reset(pending_blas[idx].as);
     }
 
+    // earlier builds, also of previous submissions, write the same scratch buffer
+    cmd->barrier(vk::MemoryBarrier2{vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
+                                    vk::AccessFlagBits2::eAccelerationStructureWriteKHR,
+                                    vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
+                                    vk::AccessFlagBits2::eAccelerationStructureReadKHR |
+                                        vk::AccessFlagBits2::eAccelerationStructureWriteKHR});
     cmd->get_command_buffer().buildAccelerationStructuresKHR(pending_blas_build_infos,
                                                              pending_blas_range_infos);
-
-    const vk::MemoryBarrier barrier{vk::AccessFlagBits::eAccelerationStructureWriteKHR,
-                                    vk::AccessFlagBits::eAccelerationStructureReadKHR |
-                                        vk::AccessFlagBits::eAccelerationStructureWriteKHR};
-    cmd->barrier(vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
-                 vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR, barrier);
 
     pending_blas.clear();
     pending_blas_build_infos.clear();

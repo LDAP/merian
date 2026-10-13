@@ -72,8 +72,7 @@ class BumpMemoryAllocation : public MemoryAllocation {
 };
 
 // A monotonic bump allocator over a single base buffer. Suballocations cannot be freed
-// individually; the entire allocator dies when its last reference is dropped (which only happens
-// after the manager replaces it AND every suballocation it handed out is released).
+// individually; the allocator is reset or dropped as a whole.
 class BumpMemoryAllocator : public MemoryAllocator {
   private:
     explicit BumpMemoryAllocator(const BufferHandle& buffer);

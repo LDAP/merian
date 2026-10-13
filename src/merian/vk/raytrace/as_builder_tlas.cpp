@@ -128,6 +128,12 @@ void ASBuilder::get_cmds_tlas(const CommandBufferHandle& cmd, BufferHandle& scra
         cmd->keep_until_pool_reset(pending_tlas[idx].as);
     }
 
+    // earlier builds, also of previous submissions, write the same scratch buffer
+    cmd->barrier(vk::MemoryBarrier2{vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
+                                    vk::AccessFlagBits2::eAccelerationStructureWriteKHR,
+                                    vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
+                                    vk::AccessFlagBits2::eAccelerationStructureReadKHR |
+                                        vk::AccessFlagBits2::eAccelerationStructureWriteKHR});
     cmd->get_command_buffer().buildAccelerationStructuresKHR(pending_tlas_build_infos,
                                                              range_info_ptrs);
 

@@ -304,14 +304,20 @@ struct LightGrid {
     // fixed point, rounded stochastically
     void count_sample(const uint entry, const float contribution, const float2 u) {
         const uint at = LIGHT_GRID_FEEDBACK_STRIDE * entry;
-        uint counted;
-        InterlockedAdd(feedback[at], 1u, counted);
-        if (contribution > 0.f && counted < LIGHT_GRID_FEEDBACK_SAMPLES) {
+        InterlockedAdd(feedback[at], 1u);
+        if (contribution > 0.f) {
             const float c = min(contribution, LIGHT_GRID_MAX_CONTRIBUTION);
-            InterlockedAdd(feedback[at + 1], uint(c * LIGHT_GRID_CONTRIBUTION_SCALE + u.x));
-            InterlockedAdd(feedback[at + 2],
-                           uint(c * c * LIGHT_GRID_CONTRIBUTION_SQUARE_SCALE + u.y));
+            add_wide(at + 1, uint(c * LIGHT_GRID_CONTRIBUTION_SCALE + u.x));
+            add_wide(at + 3, uint(c * c * LIGHT_GRID_CONTRIBUTION_SQUARE_SCALE + u.y));
         }
+    }
+
+    // every wrap of the low word carries once, so the sum does not depend on the order
+    void add_wide(const uint at, const uint value) {
+        uint low;
+        InterlockedAdd(feedback[at], value, low);
+        if (low > 0xFFFFFFFFu - value)
+            InterlockedAdd(feedback[at + 1], 1u);
     }
 }
 

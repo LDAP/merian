@@ -18,7 +18,6 @@
 #include <array>
 #include <memory>
 #include <optional>
-#include <span>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -75,7 +74,6 @@ class Micromaps {
     struct BlockKey {
         uint64_t alpha_texture_serial;
         uint64_t emission_texture_serial;
-        uint32_t material_content;
         uint32_t level;
         bool opacity;
         bool emission;
@@ -117,7 +115,6 @@ class Micromaps {
         TextureID emission_texture_id;
         uint64_t alpha_texture_serial;
         uint64_t emission_texture_serial;
-        std::vector<uint8_t> material_data;
 
         uint32_t subdivision_level;
         vk::Extent2D alpha_size;
@@ -137,17 +134,28 @@ class Micromaps {
 
     static constexpr uint32_t NO_OFFSET = ~0u;
 
+    static bool same_geometry(const Entry& entry, const MeshGeometry& mesh);
+
     static bool is_current(const Entry& entry,
                            const MeshGeometry& mesh,
                            const MaterialSystemHandle& material_system);
+
+    static bool textures_current(const Entry& entry, const TextureManager& textures);
 
     Entry create_entry(const CommandBufferHandle& cmd,
                        const MeshGeometry& mesh,
                        const MaterialSystemHandle& material_system);
 
-    uint32_t intern_material_content(const std::span<const uint8_t> material_data);
-
     void release(const CommandBufferHandle& cmd, const Entry& entry);
+
+    void deactivate(const CommandBufferHandle& cmd, const uint32_t mesh_id, Entry&& entry);
+
+    std::optional<Entry> reactivate(const MeshGeometry& mesh,
+                                    const MaterialSystemHandle& material_system);
+
+    void release_stale_inactive(const CommandBufferHandle& cmd,
+                                const std::unordered_map<uint32_t, const MeshGeometry*>& mesh_of_id,
+                                const TextureManager& textures);
 
     uint32_t allocate(Pool& pool, const uint32_t words);
 
@@ -173,9 +181,9 @@ class Micromaps {
     Versioned<ShaderObject> bake_params;
 
     std::unordered_map<uint32_t, Entry> entries;
+    std::unordered_map<uint32_t, std::vector<Entry>> inactive_entries;
 
     std::unordered_map<BlockKey, uint32_t, BlockKeyHash> block_of_key;
-    std::unordered_map<std::string, uint32_t> material_contents;
     std::vector<Block> blocks;
     Pool opacity_pool;
     Pool emission_pool;

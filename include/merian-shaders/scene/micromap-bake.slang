@@ -2,7 +2,6 @@
 
 __exported import merian_shaders.scene.scene_data;
 __exported import merian_shaders.shading.materials.material_system;
-import merian_shaders.colors.colorspaces;
 import merian_shaders.utils.textures;
 
 #include "merian-shaders/scene/micromap-bake.slangh"
@@ -89,18 +88,15 @@ struct TexelGrid {
     }
 }
 
-float emitted_luminance(const MaterialSystem material_system,
-                        const MaterialID material_id,
-                        const float2 uv,
-                        const ExplicitLODSampler lod) {
-    const float3 n = float3(0, 0, 1);
-    return yuv_luminance(material_system.get_emission(
-        material_id,
-        ShadingData(n, float3(0), uv, 0.f, OrthonormalFrame(n), n, uint16_t(1), true), lod));
+bool emitting(const MaterialSystem material_system,
+              const TextureID texture_id,
+              const float2 uv,
+              const ExplicitLODSampler lod) {
+    return any(lod.sample(material_system.texture_manager.get_sampler2D(texture_id), uv).rgb > 0.f);
 }
 
 uint scan(const MaterialSystem material_system,
-          const MaterialID material_id,
+          const MicromapBakeJob job,
           const MicromapKind kind,
           const TexelGrid grid,
           const ExplicitLODSampler lod,
@@ -124,12 +120,13 @@ uint scan(const MaterialSystem material_system,
 
             const float2 uv = grid.texel_center(x, y);
             if (kind == MicromapKind::Emission) {
-                seen |= emitted_luminance(material_system, material_id, uv, lod) > 0.f
+                seen |= emitting(material_system, TextureID(job.emission_texture_id), uv, lod)
                             ? SEEN_EMITTING
                             : SEEN_DARK;
             } else {
-                seen |= material_system.alpha_test(material_id, uv, lod) ? SEEN_TRANSPARENT
-                                                                         : SEEN_OPAQUE;
+                seen |= material_system.alpha_test(job.geometry.material_id, uv, lod)
+                            ? SEEN_TRANSPARENT
+                            : SEEN_OPAQUE;
             }
             if ((seen & settled) == settled)
                 return seen;
@@ -163,7 +160,6 @@ void bake_opacity(const MaterialSystem material_system,
                   const float2 uv1,
                   const float2 uv2,
                   const uint thread) {
-    const MaterialID material_id = job.geometry.material_id;
     const TexelGrid grid = TexelGrid(float2(float(job.alpha_width), float(job.alpha_height)),
                                      float(1 + MERIAN_MICROMAP_TEXEL_SLACK), uv0, uv1, uv2);
     const ExplicitLODSampler lod = ExplicitLODSampler(0.f);
@@ -175,7 +171,7 @@ void bake_opacity(const MaterialSystem material_system,
     GroupMemoryBarrierWithGroupSync();
     uint dummy;
     InterlockedOr(opacity_seen,
-                  scan(material_system, material_id, MicromapKind::Opacity, grid, lod,
+                  scan(material_system, job, MicromapKind::Opacity, grid, lod,
                        grid.triangle_footprint(), int(thread), int(BAKE_GROUP_SIZE)),
                   dummy);
     GroupMemoryBarrierWithGroupSync();
@@ -204,8 +200,8 @@ void bake_opacity(const MaterialSystem material_system,
         const uint index = base + thread;
         if (index < micro_triangles) {
             const TexelFootprint footprint = grid.footprint(micromap_index_to_bary(index, level));
-            const uint state = omm_state(scan(material_system, material_id, MicromapKind::Opacity,
-                                              grid, lod, footprint, 0, 1));
+            const uint state = omm_state(
+                scan(material_system, job, MicromapKind::Opacity, grid, lod, footprint, 0, 1));
             InterlockedOr(omm_words[thread / OMM_STATES_PER_WORD],
                           state << ((thread % OMM_STATES_PER_WORD) * OMM_STATE_BITS), dummy);
         }
@@ -225,7 +221,6 @@ void bake_emission(const MaterialSystem material_system,
                    const float2 uv1,
                    const float2 uv2,
                    const uint thread) {
-    const MaterialID material_id = job.geometry.material_id;
     const uint level = job.subdivision_level;
     const float2 finest_size = float2(float(job.emission_width), float(job.emission_height));
     const float2 e1 = (uv1 - uv0) * finest_size;
@@ -252,7 +247,7 @@ void bake_emission(const MaterialSystem material_system,
     GroupMemoryBarrierWithGroupSync();
     uint dummy;
     InterlockedOr(emission_seen,
-                  scan(material_system, material_id, MicromapKind::Emission, grid, lod,
+                  scan(material_system, job, MicromapKind::Emission, grid, lod,
                        grid.triangle_footprint(), int(thread), int(BAKE_GROUP_SIZE)),
                   dummy);
     GroupMemoryBarrierWithGroupSync();
@@ -270,11 +265,11 @@ void bake_emission(const MaterialSystem material_system,
             const MicroTriangle bary = micromap_index_to_bary(index, level);
             bool emits = true;
             if (emission_mixed)
-                emits = (settle_emission(scan(material_system, material_id, MicromapKind::Emission,
-                                              grid, lod, grid.footprint(bary), 0, 1)) &
+                emits = (settle_emission(scan(material_system, job, MicromapKind::Emission, grid,
+                                              lod, grid.footprint(bary), 0, 1)) &
                          SEEN_EMITTING) != 0;
             if (emits && alpha_tested)
-                emits = scan(material_system, material_id, MicromapKind::Cutout, alpha_grid, lod0,
+                emits = scan(material_system, job, MicromapKind::Cutout, alpha_grid, lod0,
                              alpha_grid.footprint(bary), 0, 1) != SEEN_TRANSPARENT;
             if (emits) {
                 const uint grid_index = emission_grid_index_of_micro_triangle(bary, level);

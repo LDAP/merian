@@ -94,9 +94,8 @@ class ASBuilder {
     AccelerationStructureHandle
     queue_build(const vk::AccelerationStructureGeometryKHR* geometry,
                 const vk::AccelerationStructureBuildRangeInfoKHR* range_info,
-                const vk::BuildAccelerationStructureFlagsKHR build_flags =
-                    vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace,
-                const uint32_t geometry_count = 1);
+                const vk::BuildAccelerationStructureFlagsKHR build_flags,
+                const uint32_t geometry_count);
 
     // Enqueues a BLAS to be (re)build with the next get_cmds().
     //
@@ -127,7 +126,7 @@ class ASBuilder {
                      const AccelerationStructureHandle& as,
                      const vk::AccelerationStructureBuildSizesInfoKHR& size_info,
                      const vk::BuildAccelerationStructureFlagsKHR build_flags,
-                     const uint32_t geometry_count = 1);
+                     const uint32_t geometry_count);
 
     // Enqueues a BLAS to be updated with the next get_cmds().
     //
@@ -158,7 +157,7 @@ class ASBuilder {
                       const AccelerationStructureHandle& as,
                       const vk::AccelerationStructureBuildSizesInfoKHR& size_info,
                       const vk::BuildAccelerationStructureFlagsKHR build_flags,
-                      const uint32_t geometry_count = 1);
+                      const uint32_t geometry_count);
 
     // TLAS BUILDS
     // ---------------------------------------------------------------------------
@@ -270,11 +269,12 @@ class ASBuilder {
     // it is large enough else it is replaced with a larger one. The scratch buffer is kept alive on
     // the pool.
     //
-    // This command inserts a barrier for the BLAS that are built.
+    // The build is ordered after earlier builds. Any use of the BLAS other than a following
+    // get_cmds_tlas needs a barrier.
     void get_cmds_blas(const CommandBufferHandle& cmd, BufferHandle& scratch_buffer);
 
-    // Note: This method does not insert a synchronization barrier. You must enure proper
-    // synchronization before using the TLAS (you can use the helper cmd_barrier()).
+    // The build is ordered after earlier builds. You must ensure proper synchronization before
+    // using the TLAS (you can use the helper cmd_barrier()).
     //
     // Provide a BufferHandle to a (optinally null) scratch_buffer. The scratch buffer is reused if
     // it is large enough else it is replaced with a larger one. The scratch buffer is kept alive on

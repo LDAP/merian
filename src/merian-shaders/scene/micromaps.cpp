@@ -27,6 +27,8 @@ constexpr uint64_t MAX_TEXEL_STEPS_PER_UPDATE = 1'600'000'000;
 
 constexpr vk::DeviceSize MIN_RECLAIMED_WORDS = 32ull << 20;
 
+constexpr size_t MAX_INACTIVE_STATES = 16;
+
 constexpr double EMISSION_TARGET_EDGE_TEXELS = 1.0;
 
 uint32_t micro_triangles(const uint32_t subdivision_level) {
@@ -230,8 +232,8 @@ Micromaps::Micromaps(const ShaderCompileContextHandle& compile_context,
 }
 
 size_t Micromaps::BlockKeyHash::operator()(const BlockKey& key) const noexcept {
-    return hash_val(key.alpha_texture_serial, key.emission_texture_serial, key.material_content,
-                    key.level, key.opacity, key.emission, key.uv[0], key.uv[1], key.uv[2]);
+    return hash_val(key.alpha_texture_serial, key.emission_texture_serial, key.level, key.opacity,
+                    key.emission, key.uv[0], key.uv[1], key.uv[2]);
 }
 
 bool Micromaps::is_opacity_supported(const ContextHandle& context) {
@@ -259,35 +261,37 @@ void Micromaps::ensure_pipeline(const SlangCompositionHandle& material_system_co
     bake_params.depends_on(bake_entry_point);
 }
 
+bool Micromaps::same_geometry(const Entry& entry, const MeshGeometry& mesh) {
+    return entry.mesh_serial == mesh.mesh_serial && entry.vertices == mesh.geometry.vertices &&
+           entry.indices == mesh.geometry.indices &&
+           entry.primitive_count == mesh.geometry.primitive_count &&
+           entry.uv_version == mesh.uv_version;
+}
+
 bool Micromaps::is_current(const Entry& entry,
                            const MeshGeometry& mesh,
                            const MaterialSystemHandle& material_system) {
-    if (entry.mesh_serial != mesh.mesh_serial || entry.vertices != mesh.geometry.vertices ||
-        entry.indices != mesh.geometry.indices ||
-        entry.primitive_count != mesh.geometry.primitive_count ||
-        entry.uv_version != mesh.uv_version || entry.alpha_tested != mesh.alpha_tested ||
+    if (!same_geometry(entry, mesh) || entry.alpha_tested != mesh.alpha_tested ||
         entry.opacity != mesh.opacity || entry.emission != mesh.emission) {
         return false;
     }
     const MaterialID material_id = mesh.geometry.material_id;
-    const TextureManager& textures = *material_system->get_texture_manager();
-    if (entry.alpha_tested) {
-        const TextureID alpha_texture_id = material_system->get_alpha_texture_id(material_id);
-        if (entry.alpha_texture_id != alpha_texture_id ||
-            entry.alpha_texture_serial != textures.get_texture_serial(alpha_texture_id)) {
-            return false;
-        }
+    if (entry.alpha_tested &&
+        entry.alpha_texture_id != material_system->get_alpha_texture_id(material_id)) {
+        return false;
     }
-    if (entry.emission) {
-        const TextureID emission_texture_id = material_system->get_emission_texture_id(material_id);
-        if (entry.emission_texture_id != emission_texture_id ||
-            entry.emission_texture_serial != textures.get_texture_serial(emission_texture_id) ||
-            !std::ranges::equal(entry.material_data,
-                                material_system->get_material_data(material_id))) {
-            return false;
-        }
+    if (entry.emission &&
+        entry.emission_texture_id != material_system->get_emission_texture_id(material_id)) {
+        return false;
     }
-    return true;
+    return textures_current(entry, *material_system->get_texture_manager());
+}
+
+bool Micromaps::textures_current(const Entry& entry, const TextureManager& textures) {
+    return (!entry.alpha_tested ||
+            entry.alpha_texture_serial == textures.get_texture_serial(entry.alpha_texture_id)) &&
+           (!entry.emission || entry.emission_texture_serial ==
+                                   textures.get_texture_serial(entry.emission_texture_id));
 }
 
 uint32_t Micromaps::allocate(Pool& pool, const uint32_t words) {
@@ -309,13 +313,6 @@ void Micromaps::ensure_capacity(const CommandBufferHandle& cmd, Pool& pool) {
         cmd->keep_until_pool_reset(pool.buffer);
     }
     pool.buffer = grown;
-}
-
-uint32_t Micromaps::intern_material_content(const std::span<const uint8_t> material_data) {
-    const auto [it, inserted] =
-        material_contents.try_emplace(std::string(material_data.begin(), material_data.end()),
-                                      static_cast<uint32_t>(material_contents.size()));
-    return it->second;
 }
 
 Micromaps::Entry Micromaps::create_entry(const CommandBufferHandle& cmd,
@@ -346,7 +343,6 @@ Micromaps::Entry Micromaps::create_entry(const CommandBufferHandle& cmd,
 
     uint32_t level = 0;
     uint32_t max_level = std::numeric_limits<uint32_t>::max();
-    uint32_t material_content = NO_OFFSET;
     if (entry.opacity) {
         level = choose_subdivision_level(entry.alpha_size, MERIAN_OMM_TARGET_EDGE_TEXELS,
                                          max_opacity_subdivision_level);
@@ -361,10 +357,6 @@ Micromaps::Entry Micromaps::create_entry(const CommandBufferHandle& cmd,
         if (is_magnified_nearest(textures, entry.emission_texture_id)) {
             bake_flags |= MicromapBakeFlags::EmissionNearestFilter;
         }
-        const std::span<const uint8_t> material_data =
-            material_system->get_material_data(material_id);
-        entry.material_data.assign(material_data.begin(), material_data.end());
-        material_content = intern_material_content(material_data);
         level = std::max(level,
                          choose_subdivision_level(entry.emission_size, EMISSION_TARGET_EDGE_TEXELS,
                                                   EMISSION_MAX_LEVEL));
@@ -424,7 +416,6 @@ Micromaps::Entry Micromaps::create_entry(const CommandBufferHandle& cmd,
             const auto [it, inserted] = block_of_key.try_emplace(
                 BlockKey{entry.alpha_texture_serial,
                          entry.emission_texture_serial,
-                         material_content,
                          level,
                          entry.opacity,
                          entry.emission,
@@ -474,6 +465,54 @@ void Micromaps::release(const CommandBufferHandle& cmd, const Entry& entry) {
     cmd->keep_until_pool_reset(entry.emission_offsets);
 }
 
+void Micromaps::deactivate(const CommandBufferHandle& cmd, const uint32_t mesh_id, Entry&& entry) {
+    std::vector<Entry>& states = inactive_entries[mesh_id];
+    if (states.size() == MAX_INACTIVE_STATES) {
+        release(cmd, states.front());
+        states.erase(states.begin());
+    }
+    states.push_back(std::move(entry));
+}
+
+std::optional<Micromaps::Entry> Micromaps::reactivate(const MeshGeometry& mesh,
+                                                      const MaterialSystemHandle& material_system) {
+    const auto it = inactive_entries.find(mesh.mesh_id);
+    if (it == inactive_entries.end()) {
+        return std::nullopt;
+    }
+    std::vector<Entry>& states = it->second;
+    const auto state = std::ranges::find_if(
+        states, [&](const Entry& entry) { return is_current(entry, mesh, material_system); });
+    if (state == states.end()) {
+        return std::nullopt;
+    }
+    Entry entry = std::move(*state);
+    states.erase(state);
+    if (states.empty()) {
+        inactive_entries.erase(it);
+    }
+    return entry;
+}
+
+void Micromaps::release_stale_inactive(
+    const CommandBufferHandle& cmd,
+    const std::unordered_map<uint32_t, const MeshGeometry*>& mesh_of_id,
+    const TextureManager& textures) {
+    for (auto it = inactive_entries.begin(); it != inactive_entries.end();) {
+        const auto mesh = mesh_of_id.find(it->first);
+        // texture serials only grow, so a state baked from a replaced texture never returns
+        std::erase_if(it->second, [&](const Entry& entry) {
+            if (mesh != mesh_of_id.end() && same_geometry(entry, *mesh->second) &&
+                textures_current(entry, textures)) {
+                return false;
+            }
+            release(cmd, entry);
+            return true;
+        });
+        it = it->second.empty() ? inactive_entries.erase(it) : std::next(it);
+    }
+}
+
 void Micromaps::clear(const CommandBufferHandle& cmd, std::vector<uint32_t>& changed) {
     for (const auto& [mesh_id, entry] : entries) {
         if (entry.micromap) {
@@ -482,8 +521,13 @@ void Micromaps::clear(const CommandBufferHandle& cmd, std::vector<uint32_t>& cha
         release(cmd, entry);
     }
     entries.clear();
+    for (const auto& [mesh_id, states] : inactive_entries) {
+        for (const Entry& entry : states) {
+            release(cmd, entry);
+        }
+    }
+    inactive_entries.clear();
     block_of_key.clear();
-    material_contents.clear();
     blocks.clear();
     live_words = 0;
     for (Pool* pool : {&opacity_pool, &emission_pool}) {
@@ -517,16 +561,29 @@ void Micromaps::update(const CommandBufferHandle& cmd,
         if (it->second.micromap) {
             changed.push_back(it->first);
         }
-        release(cmd, it->second);
+        if (mesh != mesh_of_id.end() && same_geometry(it->second, *mesh->second)) {
+            deactivate(cmd, it->first, std::move(it->second));
+        } else {
+            release(cmd, it->second);
+        }
         it = entries.erase(it);
     }
+    release_stale_inactive(cmd, mesh_of_id, *material_system->get_texture_manager());
 
     // 1. new meshes
     const vk::DeviceSize opacity_used = opacity_pool.used_words;
     const vk::DeviceSize emission_used = emission_pool.used_words;
     const auto create_entries = [&] {
         for (const MeshGeometry& mesh : meshes) {
-            if (!entries.contains(mesh.mesh_id)) {
+            if (entries.contains(mesh.mesh_id)) {
+                continue;
+            }
+            if (std::optional<Entry> entry = reactivate(mesh, material_system)) {
+                if (entry->micromap) {
+                    changed.push_back(mesh.mesh_id);
+                }
+                entries.try_emplace(mesh.mesh_id, std::move(*entry));
+            } else {
                 entries.try_emplace(mesh.mesh_id, create_entry(cmd, mesh, material_system));
             }
         }
@@ -574,7 +631,7 @@ void Micromaps::update(const CommandBufferHandle& cmd,
                                    : vk::DeviceAddress{0},
                     entry.subdivision_level, entry.alpha_size.width, entry.alpha_size.height,
                     entry.emission_size.width, entry.emission_size.height, entry.emission_max_mip,
-                    entry.bake_flags, 0});
+                    entry.bake_flags, entry.emission_texture_id});
             }
             bake_blocks.emplace_back(MicromapBakeBlock{job_index, entry.block_triangle[local],
                                                        block.opacity_offset,

@@ -17,27 +17,44 @@ StagingMemoryManager::StagingMemoryManager(const MemoryAllocatorHandle& memory_a
         this->download_usage |= vk::BufferUsageFlagBits::eShaderDeviceAddress;
     }
 
-    create_upload_block();
+    replace_block(upload_block, spare_upload_block, this->upload_usage,
+                  MemoryMappingType::HOST_ACCESS_SEQUENTIAL_WRITE, "staging upload block");
 }
 
 StagingMemoryManager::~StagingMemoryManager() = default;
 
 // -------------------------------------------------------------------------
 
-void StagingMemoryManager::create_upload_block() {
-    SPDLOG_DEBUG("creating new upload staging block ({})", format_size(block_size));
-    const BufferHandle buffer = allocator->create_buffer(
-        vk::BufferCreateInfo{{}, block_size, upload_usage},
-        MemoryMappingType::HOST_ACCESS_SEQUENTIAL_WRITE, "staging upload block");
-    upload_block = BumpMemoryAllocator::create(buffer);
+namespace {
+
+BumpMemoryAllocatorHandle reuse_if_released(BumpMemoryAllocatorHandle& spare) {
+    if (!spare) {
+        return nullptr;
+    }
+    const bool has_suballocations = spare.use_count() > 1;
+    const bool kept_by_commands = spare->get_base_buffer().use_count() > 1;
+    if (has_suballocations || kept_by_commands) {
+        return nullptr;
+    }
+    spare->reset();
+    return std::move(spare);
 }
 
-void StagingMemoryManager::create_download_block() {
-    SPDLOG_DEBUG("creating new download staging block ({})", format_size(block_size));
-    const BufferHandle buffer =
-        allocator->create_buffer(vk::BufferCreateInfo{{}, block_size, download_usage},
-                                 MemoryMappingType::HOST_ACCESS_RANDOM, "staging download block");
-    download_block = BumpMemoryAllocator::create(buffer);
+} // namespace
+
+void StagingMemoryManager::replace_block(BumpMemoryAllocatorHandle& block,
+                                         BumpMemoryAllocatorHandle& spare,
+                                         const vk::BufferUsageFlags usage,
+                                         const MemoryMappingType mapping,
+                                         const char* name) {
+    BumpMemoryAllocatorHandle next = reuse_if_released(spare);
+    if (!next) {
+        SPDLOG_DEBUG("creating new {} ({})", name, format_size(block_size));
+        next = BumpMemoryAllocator::create(
+            allocator->create_buffer(vk::BufferCreateInfo{{}, block_size, usage}, mapping, name));
+    }
+    spare = std::move(block);
+    block = std::move(next);
 }
 
 MemoryAllocationHandle StagingMemoryManager::suballocate(BumpMemoryAllocatorHandle& block,
@@ -58,7 +75,8 @@ MemoryAllocationHandle StagingMemoryManager::get_upload_staging_space(
 
     if (size <= block_size) {
         if (upload_block->get_free_size() < size + STAGING_ALIGNMENT) {
-            create_upload_block();
+            replace_block(upload_block, spare_upload_block, upload_usage,
+                          MemoryMappingType::HOST_ACCESS_SEQUENTIAL_WRITE, "staging upload block");
         }
         try {
             return suballocate(upload_block, size, upload_buffer, upload_buffer_offset);
@@ -80,7 +98,8 @@ StagingMemoryManager::get_download_staging_space(const vk::DeviceSize size,
 
     if (size <= block_size) {
         if (!download_block || download_block->get_free_size() < size + STAGING_ALIGNMENT) {
-            create_download_block();
+            replace_block(download_block, spare_download_block, download_usage,
+                          MemoryMappingType::HOST_ACCESS_RANDOM, "staging download block");
         }
         try {
             return suballocate(download_block, size, download_buffer, download_buffer_offset);

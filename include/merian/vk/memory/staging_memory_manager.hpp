@@ -49,7 +49,7 @@ class StagingMemoryManager : public std::enable_shared_from_this<StagingMemoryMa
     StagingMemoryManager() = delete;
     StagingMemoryManager(
         const MemoryAllocatorHandle& memory_allocator,
-        const vk::DeviceSize block_size = vk::DeviceSize(128) * 1024 * 1024,
+        const vk::DeviceSize block_size = vk::DeviceSize(64) * 1024 * 1024,
         const vk::BufferUsageFlags upload_usage = vk::BufferUsageFlagBits::eTransferSrc,
         const vk::BufferUsageFlags download_usage = vk::BufferUsageFlagBits::eTransferDst);
 
@@ -189,9 +189,14 @@ class StagingMemoryManager : public std::enable_shared_from_this<StagingMemoryMa
 
     BumpMemoryAllocatorHandle upload_block;
     BumpMemoryAllocatorHandle download_block;
+    BumpMemoryAllocatorHandle spare_upload_block;
+    BumpMemoryAllocatorHandle spare_download_block;
 
-    void create_upload_block();
-    void create_download_block();
+    void replace_block(BumpMemoryAllocatorHandle& block,
+                       BumpMemoryAllocatorHandle& spare,
+                       const vk::BufferUsageFlags usage,
+                       const MemoryMappingType mapping,
+                       const char* name);
 
     MemoryAllocationHandle suballocate(BumpMemoryAllocatorHandle& block,
                                        vk::DeviceSize size,

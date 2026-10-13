@@ -29,9 +29,8 @@ struct Material {
     virtual bool is_emissive() const {
         return false;
     }
-    // The texture that decides where on the surface get_emission is non-zero, or -1 to sample the
-    // whole surface. Emission that changes over time must change the material data, and each
-    // distinct state costs an emission micromap bake.
+    // A texture that is non-black wherever get_emission is non-zero, or -1 to sample the whole
+    // surface. Emission that changes over time must change the material data.
     virtual TextureID get_emission_texture_id() const {
         return TextureID(-1);
     }

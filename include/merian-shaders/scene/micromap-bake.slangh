@@ -38,7 +38,7 @@ struct MicromapBakeJob {
     uint32_t emission_height;
     uint32_t emission_max_mip;
     MicromapBakeFlags flags;
-    uint32_t _pad;
+    uint32_t emission_texture_id;
 };
 
 struct MicromapBakeBlock {

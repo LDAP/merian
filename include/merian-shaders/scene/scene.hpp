@@ -141,6 +141,9 @@ class Scene : public std::enable_shared_from_this<Scene> {
         std::optional<float4x4> prev_global_inverse_transposed;
 
         bool transform_dirty = true;
+        bool transform_dirty_last_frame = false;
+
+        SmallSet<MeshID, 1> meshes;
 
         uint32_t serial = 0;
     };
@@ -392,8 +395,6 @@ class Scene : public std::enable_shared_from_this<Scene> {
         }
 
         // True if vertices are uploaded pretransformed and the TLAS instance transform is identity.
-        // TODO: pretransforming animated non-morphed meshes makes them effectively morphed and
-        //       requires a prev vertex buffer for motion vectors.
         bool is_pretransformed(const std::vector<MeshInfo>& mesh_infos,
                                bool pretransform_animated) const {
             assert(!mesh_infos.empty());
@@ -423,8 +424,7 @@ class Scene : public std::enable_shared_from_this<Scene> {
     //   instanced                           -> group by (instance set, split flags)
     // pretransform_animated OFF:
     //   static non-morphed non-animated     -> pretransformed, group by split flags, built once
-    //   morphed non-animated                -> not pretransformed, group by split flags
-    //   animated non-instanced              -> not pretransformed, group by (split flags, NodeID)
+    //   dynamic (morphed OR animated)       -> not pretransformed, group by (split flags, NodeID)
     //   instanced                           -> group by (instance set, split flags)
     //
     // TLAS

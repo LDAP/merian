@@ -154,6 +154,12 @@ void fill_fresh_textures(std::vector<GBufferLayout::Texture>& textures,
     }
 }
 
+Storage float_storage(const GBufferGroup& group) {
+    return std::ranges::max(group.fields | std::views::transform([](const GBufferField field) {
+                                return traits(field).float_storage;
+                            }));
+}
+
 vk::DeviceSize bytes_per_pixel(const std::vector<GBufferField>& fields, const bool packed) {
     std::vector<GBufferLayout::Texture> textures;
     fill_fresh_textures(textures, fields, packed);
@@ -279,9 +285,19 @@ GBufferLayout::GBufferLayout(const std::vector<GBufferGroup>& groups) {
             sorted.push_back(&group);
         }
     }
-    // texture groups first, then the largest
-    std::ranges::stable_sort(sorted, [](const GBufferGroup* a, const GBufferGroup* b) {
-        return std::pair(b->texture, b->fields.size()) < std::pair(a->texture, a->fields.size());
+    // texture groups first, then the largest, then those half floats hold; the fields break ties
+    // so that the order of the groups does not matter
+    std::ranges::sort(sorted, [](const GBufferGroup* a, const GBufferGroup* b) {
+        if (a->texture != b->texture) {
+            return a->texture;
+        }
+        if (a->fields.size() != b->fields.size()) {
+            return a->fields.size() > b->fields.size();
+        }
+        if (float_storage(*a) != float_storage(*b)) {
+            return float_storage(*a) < float_storage(*b);
+        }
+        return b->fields < a->fields;
     });
 
     for (const GBufferGroup* group : sorted) {
