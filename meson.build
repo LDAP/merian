@@ -8,7 +8,7 @@ project(
         'b_lto=true',
         'b_ndebug=if-release',
     ],
-    meson_version: '>=1.5.0',
+    meson_version: '>=1.9.0',
 )
 
 # attempt to stick to Vulkan SDK versions (vulkan-sdk-X.X.XXX.X tags and update the version in the wrap file).
