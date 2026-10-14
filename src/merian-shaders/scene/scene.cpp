@@ -2267,7 +2267,6 @@ void Scene::update(const CommandBufferHandle& cmd,
     lights.set_env_emissive(env_map->is_emissive());
     lights.set_env_state(env_map->get_version(), env_map->is_static());
     lights.set_camera(cam->get_position());
-    lights.set_frame(frame);
     lights.prepare(cmd);
     lights.write_to(c["nee"]);
     lights.update(cmd, composition, shader_object.get(), obj_allocator);

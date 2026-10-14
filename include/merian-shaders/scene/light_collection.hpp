@@ -79,9 +79,8 @@ class LightCollection {
         enabled = value;
     }
 
-    // Whether the scene's environment map emits; false routes all samples to the triangles.
     // The importance map is a function of the environment alone, so a static one is built once
-    // and kept until it changes. The per-frame texel pool is drawn from it either way.
+    // and kept until it changes.
     void set_env_state(const uint64_t version, const bool is_static) {
         if (version != env_version || !is_static) {
             env_importance_built = false;
@@ -89,6 +88,7 @@ class LightCollection {
         env_version = version;
     }
 
+    // Whether the scene's environment map emits; false routes all samples to the triangles.
     void set_env_emissive(const bool value) {
         env_emissive = value;
     }
@@ -96,10 +96,6 @@ class LightCollection {
     // The grid follows the camera.
     void set_camera(const float3& position) {
         camera_position = position;
-    }
-
-    void set_frame(const uint32_t frame_index) {
-        frame = frame_index;
     }
 
     // Whether UseEnvMap geometry exists (rays to the environment must not stop at it).
@@ -114,9 +110,6 @@ class LightCollection {
     }
     bool uses_grid() const {
         return source == LightSource::LightSourceGrid;
-    }
-    bool uses_env_pool() const {
-        return env_selection == EnvSelection::EnvSelectionPool && triangle_count == 0;
     }
     bool lists_env() const {
         return triangle_count > 0 && env_emissive && env_cdf_buffer;
@@ -171,8 +164,6 @@ class LightCollection {
 
     uint32_t min_subgroup_size;
     bool enabled = true;
-    int32_t env_selection = EnvSelection::EnvSelectionPool;
-    int32_t env_pool_size = 8192;
     int32_t source = LightSource::LightSourceGrid;
     int32_t draws = 4;
     int32_t grid_dimension = 16;
@@ -191,7 +182,6 @@ class LightCollection {
     // set for a frame the carried-over grid cannot describe
     bool grid_reset = true;
     float3 camera_position{0.f};
-    uint32_t frame = 0;
     uint32_t allocated_cells = 0;
     bool env_emissive = false;
     bool has_sky_portals = false;
@@ -208,7 +198,6 @@ class LightCollection {
     bool tables_dirty = false;
 
     BufferHandle env_importance_built_buffer;
-    BufferHandle env_pool_buffer;
     BufferHandle env_cdf_buffer;
     BufferHandle env_cdf_state_buffer;
     BufferHandle env_cones_buffer;
@@ -270,9 +259,6 @@ class LightCollection {
 
     SlangCompositionHandle env_composition;
     Versioned<SlangProgram> env_program;
-    Versioned<SlangProgramEntryPoint> env_pool_entry_point;
-    Versioned<Pipeline> env_pool_pipeline;
-    Versioned<ShaderObject> env_pool_params;
     Versioned<SlangProgramEntryPoint> env_build_entry_point;
     Versioned<Pipeline> env_build_pipeline;
     Versioned<ShaderObject> env_build_params;

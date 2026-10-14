@@ -66,18 +66,6 @@ struct EnvImportance {
         return texel_sample(texel, u);
     }
 
-    // The pool holds texels drawn this frame by the same distribution.
-    Optional<EnvSample> pool_sample(const StructuredBuffer<uint> pool,
-                                    const uint pool_size,
-                                    inout RandomGenerator rng) {
-        if (!is_valid() || pool_size == 0)
-            return none;
-        const uint packed = pool[min(uint(rng.next_float() * pool_size), pool_size - 1)];
-        if (packed == 0xFFFFFFFFu)
-            return none;
-        return texel_sample(uint2(packed & 0xFFFFu, packed >> 16u), rng.next_float2());
-    }
-
     float texel_value(const uint2 texel) {
         const uint i = morton_encode2d(texel);
         return max(ff_diff(cdf[i], i > 0 ? cdf[i - 1] : float2(0)), 0.f);

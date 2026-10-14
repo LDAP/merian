@@ -24,14 +24,6 @@ enum LightDebugView : uint32_t {
     LightDebugCoverage = 3,
 };
 
-// How a direction towards the environment is chosen.
-enum EnvSelection : uint32_t {
-    // A binary search over the importance prefix sum, per sample.
-    EnvSelectionSearch = 0,
-    // Per-frame pool of texels drawn by that search; the sample is one load plus a jitter.
-    EnvSelectionPool = 1,
-};
-
 static const uint32_t LIGHT_GRID_SLOTS = 32;
 static const uint32_t LIGHT_GRID_MAX_DRAWS = 6;
 static const uint32_t LIGHT_GRID_SLOT_BITS = 5;

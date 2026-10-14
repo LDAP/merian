@@ -323,9 +323,6 @@ struct LightGrid {
 
 struct EnvLight {
     EnvImportance importance;
-    // texels drawn from importance this frame; empty to search per sample
-    StructuredBuffer<uint> pool;
-    uint pool_size;
 }
 
 // All densities are per solid angle at the receiver.
@@ -469,8 +466,6 @@ struct NEE {
             return env.importance.texel_sample(morton_decode2d(texel), rng.next_float2());
         if (!has_env())
             return none;
-        if (env.pool_size > 0)
-            return env.importance.pool_sample(env.pool, env.pool_size, rng);
         return env.importance.sample_direction(rng);
     }
 

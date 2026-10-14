@@ -150,17 +150,6 @@ void LightCollection::ensure_pipelines(const SlangCompositionHandle& scene_compo
         env_composition->add_module_from_path("merian-shaders/scene/env-importance-build.slang",
                                               true);
         env_program = SlangProgram::create(compile_context, env_composition);
-        env_pool_entry_point = SlangProgramEntryPoint::create(env_program, "env_pool");
-        env_pool_pipeline = Versioned<Pipeline>([this] {
-            const auto ep = env_pool_entry_point.get();
-            return ComputePipeline::create(ep->get_pipeline_layout(context), ep->specialize());
-        });
-        env_pool_pipeline.depends_on(env_pool_entry_point);
-        env_pool_params = Versioned<ShaderObject>([this] {
-            return env_pool_entry_point->create_shader_object_for_parameter(context, "params",
-                                                                            allocator);
-        });
-        env_pool_params.depends_on(env_pool_entry_point);
         env_build_entry_point = SlangProgramEntryPoint::create(env_program, "build");
         env_build_pipeline = Versioned<Pipeline>([this] {
             const auto ep = env_build_entry_point.get();
@@ -220,12 +209,6 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
         }
         ensure_buffer(env_cdf_state_buffer, cdf_state_size(texels),
                       "LightCollection::env_cdf_state", cmd);
-        if (uses_env_pool()) {
-            ensure_buffer(env_pool_buffer, static_cast<uint32_t>(env_pool_size) * sizeof(uint32_t),
-                          "LightCollection::env_pool", cmd);
-        } else {
-            retire_buffer(env_pool_buffer, cmd);
-        }
         if (lists_env()) {
             const BufferHandle previous = env_cones_buffer;
             ensure_buffer(env_cones_buffer, 2 * texels * sizeof(float4),
@@ -365,7 +348,7 @@ void LightCollection::update(const CommandBufferHandle& cmd,
                              const SlangCompositionHandle& scene_composition,
                              const ShaderObjectHandle& scene_object,
                              const ShaderObjectAllocatorHandle& obj_allocator) {
-    if (!enabled || (triangle_count == 0 && !env_emissive))
+    if (!enabled || (triangle_count == 0 && (!env_emissive || env_importance_built)))
         return;
 
     MERIAN_PROFILE_SCOPE_GPU(cmd, "LightCollection::update");
@@ -502,17 +485,6 @@ void LightCollection::update(const CommandBufferHandle& cmd,
 
     {
         MERIAN_PROFILE_SCOPE_GPU(cmd, "setup");
-        if (env_emissive && uses_env_pool()) {
-            const auto params = env_pool_params.get();
-            auto c = params->get_cursor();
-            c["importance"]["cdf"] = env_cdf_buffer;
-            c["importance"]["size"] = env_size;
-            c["pool"] = env_pool_buffer;
-            c["pool_size"] = static_cast<uint32_t>(env_pool_size);
-            c["frame"] = frame;
-            run(env_pool_entry_point, env_pool_pipeline, params,
-                (static_cast<uint32_t>(env_pool_size) + 63) / 64);
-        }
         if (triangle_count > 0) {
             run(setup_entry_point, setup_pipeline, write_preprocess(setup_params.get()),
                 setup_group_count());
@@ -637,8 +609,6 @@ void LightCollection::write_to(ShaderCursor cursor) const {
 
     const bool env_active = enabled && env_emissive && env_cdf_buffer;
     auto env = cursor["env"];
-    env["pool"] = env_active && env_pool_buffer ? env_pool_buffer : dummy;
-    env["pool_size"] = env_active && uses_env_pool() ? static_cast<uint32_t>(env_pool_size) : 0u;
     auto importance = env["importance"];
     importance["cdf"] = env_active ? env_cdf_buffer : dummy;
     importance["size"] = env_active ? env_importance_size() : 0u;
@@ -729,14 +699,6 @@ void LightCollection::properties(Properties& props) {
     }
 
     if (props.st_begin_child("environment", "Environment")) {
-        props.config_options("sampling", env_selection, {"search", "pool"},
-                             Properties::OptionsStyle::COMBO,
-                             "Without emissive triangles: search the importance map per draw, or "
-                             "load from a pool of directions drawn once per frame.");
-        if (env_selection == EnvSelection::EnvSelectionPool) {
-            props.config_int("pool size", env_pool_size, "Directions in the per-frame pool.", 64,
-                             262144);
-        }
         int32_t env_size_option = env_importance_log2 - 6;
         if (props.config_options("importance map", env_size_option, {"64", "128", "256", "512"},
                                  Properties::OptionsStyle::COMBO,

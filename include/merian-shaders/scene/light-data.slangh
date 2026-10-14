@@ -293,38 +293,6 @@ uint search_range(const StructuredBuffer<float2> cdf,
     }
     return lo;
 }
-
-// The entry search_range finds, with eight-way steps.
-uint search_range_wide(const StructuredBuffer<float2> cdf,
-                       const uint first,
-                       const uint end,
-                       const float2 u) {
-    const float2 threshold = range_threshold(cdf, first, end, u);
-    uint lo = first;
-    uint hi = end - 1;
-    while (lo + 8u <= hi) {
-        const uint step = (hi - lo) / 8u;
-        uint next_lo = lo;
-        uint next_hi = hi;
-        for (uint k = 1; k < 8; k++) {
-            const uint pivot = lo + k * step;
-            if (ff_greater(cdf[pivot], threshold))
-                next_hi = min(next_hi, pivot);
-            else
-                next_lo = max(next_lo, pivot + 1u);
-        }
-        lo = min(next_lo, next_hi);
-        hi = next_hi;
-    }
-    while (lo < hi) {
-        const uint mid = (lo + hi) >> 1;
-        if (ff_greater(cdf[mid], threshold))
-            hi = mid;
-        else
-            lo = mid + 1;
-    }
-    return lo;
-}
 #endif
 
 // An emissive geometry as seen by the light update pass.
