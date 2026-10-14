@@ -695,7 +695,7 @@ struct Scene {
         const float3 normal = get_receiver_normal(
             ray.Direction, ng,
             bsdf_is_transmissive(sp.surface_material.get_bsdf().get_lobe_types()));
-        let vertex = nee.begin_vertex(sp.pos, normal, rng);
+        let vertex = nee.begin_vertex(sp.pos, ng, normal, rng);
 
         switch (nee.debug_view) {
         case LightDebugView::LightDebugCell:

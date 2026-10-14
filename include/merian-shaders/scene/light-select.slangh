@@ -27,9 +27,14 @@ enum LightDebugView : uint32_t {
 static const uint32_t LIGHT_GRID_SLOTS = 32;
 static const uint32_t LIGHT_GRID_MAX_DRAWS = 6;
 static const uint32_t LIGHT_GRID_SLOT_BITS = 5;
+// the face normal's dominant signed axis, then LIGHT_GRID_NO_ORIENTATION
+static const uint32_t LIGHT_GRID_ORIENTATIONS = 7;
 // samples, then the contribution sum and the squared contribution sum as low and high words
 static const uint32_t LIGHT_GRID_FEEDBACK_STRIDE = 5;
 static const uint32_t LIGHT_DISPATCH_ROW = 32768;
+static const uint32_t LIGHT_GRID_MAX_CASCADES = 16;
+static const uint32_t LIGHT_GRID_ALLOCATE_GROUP = 1024;
+static const uint32_t LIGHT_GRID_ALLOCATE_ITEMS = 8;
 static const uint32_t LIGHT_GRID_SETUP_GROUP = 256;
 static const uint32_t LIGHT_GRID_SETUP_ITEMS = 4;
 // the bounds as seven ordered maxima, then the groups done
@@ -61,6 +66,12 @@ static const float LIGHT_GRID_CONTRIBUTION_MEMORY = 64.f;
 static const float LIGHT_GRID_REFINE_MARGIN = 2.f;
 static const float LIGHT_GRID_DEAD_SAMPLES = 16.f;
 static const uint LIGHT_GRID_FRESH_SPLITS = 8;
+static const uint LIGHT_GRID_NO_ORIENTATION = LIGHT_GRID_ORIENTATIONS - 1u;
+// holds the cut over the whole scene
+static const uint LIGHT_GRID_FALLBACK_BLOCK = 0;
+// set in a cell's index entry once a lookup found it
+static const uint LIGHT_GRID_VISITED = 0x80000000u;
+static const uint LIGHT_GRID_IDLE_FREE = 0xFFFFFFFFu;
 static const float LIGHT_GRID_MAX_CONTRIBUTION = 64.f;
 static const float LIGHT_GRID_CONTRIBUTION_SCALE = 256.f;
 static const float LIGHT_GRID_CONTRIBUTION_SQUARE_SCALE = 4.f;
@@ -75,15 +86,39 @@ uint light_bucket_base(const uint bucket) {
     return bucket * LIGHT_GRID_SLOTS;
 }
 
-uint light_cell_index(const uint cascade, const uint3 coord, const uint dimension) {
-    return coord.x + dimension * (coord.y + dimension * (coord.z + dimension * cascade));
+uint light_cell_index(const uint cascade,
+                      const uint3 coord,
+                      const uint orientation,
+                      const uint dimension) {
+    return orientation +
+           LIGHT_GRID_ORIENTATIONS *
+               (coord.x + dimension * (coord.y + dimension * (coord.z + dimension * cascade)));
 }
 
-uint light_cell_cascade(const uint cell,
-                        const uint dimension,
-                        const uint cascade_count,
-                        const bool single_cut) {
-    return single_cut ? cascade_count - 1u : cell / (dimension * dimension * dimension);
+uint light_cell_cascade(const uint cell, const uint dimension) {
+    return cell / (LIGHT_GRID_ORIENTATIONS * dimension * dimension * dimension);
+}
+
+uint3 light_cell_coord(const uint cell, const uint dimension) {
+    const uint local = (cell / LIGHT_GRID_ORIENTATIONS) % (dimension * dimension * dimension);
+    return uint3(local % dimension, (local / dimension) % dimension,
+                 local / (dimension * dimension));
+}
+
+uint light_cell_orientation(const uint cell) {
+    return cell % LIGHT_GRID_ORIENTATIONS;
+}
+
+uint light_cell_block(const uint entry) {
+    return entry & ~LIGHT_GRID_VISITED;
+}
+
+uint light_orientation(const float3 normal) {
+    const float3 a = abs(normal);
+    if (!(max(a.x, max(a.y, a.z)) > 0.f))
+        return LIGHT_GRID_NO_ORIENTATION;
+    const uint axis = a.x >= a.y && a.x >= a.z ? 0u : a.y >= a.z ? 1u : 2u;
+    return 2u * axis + (normal[axis] < 0.f ? 1u : 0u);
 }
 
 float light_cell_scale(const float inv_cell_size) {
@@ -106,9 +141,21 @@ struct LightTreeInfo {
     float inv_cell_size;
 };
 
+struct LightGridBlock {
+    // in cells of the block's size from the world origin
+    int3 coord;
+    float inv_cell_size;
+    uint32_t orientation;
+    // frames since a lookup last found its cell, or LIGHT_GRID_IDLE_FREE
+    uint32_t idle;
+    // held the same cell last frame
+    uint32_t kept;
+};
+
 #ifdef __cplusplus
 static_assert(sizeof(LightGridInfo) == 24, "LightGridInfo layout mismatch");
 static_assert(sizeof(LightTreeInfo) == 16, "LightTreeInfo layout mismatch");
+static_assert(sizeof(LightGridBlock) == 28, "LightGridBlock layout mismatch");
 #endif
 
 } // namespace merian
