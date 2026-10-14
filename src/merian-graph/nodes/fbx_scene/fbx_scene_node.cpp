@@ -21,7 +21,6 @@ void FBXSceneNode::initialize([[maybe_unused]] const ContextHandle& context,
                               [[maybe_unused]] const ResourceAllocatorHandle& allocator) {
 #ifdef MERIAN_UFBX_ENABLED
     this->context = context;
-    this->allocator = allocator;
     compile_context = context->get_shader_compile_context();
     texture_manager = std::make_shared<TextureManager>(compile_context, context, allocator, 4096);
     material_system =
@@ -36,7 +35,7 @@ std::vector<InputConnectorDescriptor> FBXSceneNode::describe_inputs() {
 
 std::vector<OutputConnectorDescriptor>
 FBXSceneNode::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
-    return {{"scene", con_scene}};
+    return {{.name = "scene", .connector = con_scene, .persistent = true}};
 }
 
 [[nodiscard]] FBXSceneNode::NodeStatusFlags

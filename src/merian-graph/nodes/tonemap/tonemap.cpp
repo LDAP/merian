@@ -67,7 +67,10 @@ void Tonemap::apply_agx_look() {
 
 std::vector<InputConnectorDescriptor> Tonemap::describe_inputs() {
     return {
-        {"src", con_src, ConnectorAccess::compute_read},
+        {.name = "src",
+         .connector = con_src,
+         .access = ConnectorAccess::compute_read,
+         .pass_through = "out"},
     };
 }
 

@@ -23,7 +23,7 @@ class SSMMGuidingModel : public GuidingModel {
 
     std::string get_type_name() const override;
 
-    void on_extent(const vk::Extent3D& extent);
+    void on_extent(const ResourceAllocatorHandle& allocator, const vk::Extent3D& extent);
 
     void set_gbuffer_output(const std::weak_ptr<GBufferOut>& output);
 
@@ -44,7 +44,6 @@ class SSMMGuidingModel : public GuidingModel {
   private:
     GBufferLayoutHandle get_gbuffer_layout() const;
 
-    ResourceAllocatorHandle allocator;
     std::weak_ptr<GBufferOut> gbuffer_output;
     mutable GBufferLayoutHandle gbuffer_layout;
     ShaderObjectHandle gbuffer;

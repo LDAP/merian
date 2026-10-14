@@ -30,15 +30,7 @@ VkImageIn::on_pre_process([[maybe_unused]] Submission& submission,
 }
 
 void VkImageIn::on_connect_output(const OutputConnectorHandle& output) {
-    const auto casted_output = std::dynamic_pointer_cast<VkImageOut>(output);
-
-    if (!casted_output) {
-        throw graph_errors::invalid_connection{
-            "This connector cannot receive from output. Only connectors "
-            "derived from VkImageOut are supported."};
-    }
-
-    array_size = casted_output->get_array_size();
+    array_size = debugable_ptr_cast<VkImageOut>(output)->get_array_size();
 }
 
 bool VkImageIn::can_receive_from(const OutputConnectorHandle& output) const {

@@ -21,11 +21,8 @@ class PtrIn : public InputConnector,
   public:
     PtrIn() = default;
 
-    void on_connect_output(const OutputConnectorHandle& output) override {
-        auto casted_output = std::dynamic_pointer_cast<PtrOut<T>>(output);
-        if (!casted_output) {
-            throw graph_errors::invalid_connection{"PtrIn cannot receive from output."};
-        }
+    bool can_receive_from(const OutputConnectorHandle& output) const override {
+        return std::dynamic_pointer_cast<PtrOut<T>>(output) != nullptr;
     }
 
     const std::shared_ptr<T>& resource(const GraphResourceHandle& resource) override {

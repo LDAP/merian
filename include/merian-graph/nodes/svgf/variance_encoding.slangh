@@ -1,5 +1,5 @@
 // Variance is a squared quantity and therefore needs twice the exponent range of the luminance it
-// derives from, which caps a half-precision ping-pong at a usable luminance of sqrt(65504) ~ 256.
+// derives from, which caps a half-precision image at a usable luminance of sqrt(65504) ~ 256.
 // Storing sigma instead keeps the channel within the range its colour neighbours already occupy.
 // Filtering stays linear in the variance itself: decode on load, encode on store.
 namespace merian {

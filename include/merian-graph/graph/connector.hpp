@@ -39,7 +39,8 @@ class Connector : public std::enable_shared_from_this<Connector> {
     }
 
     // Write the resource into the shader cursor field named after this connector.
-    // resource is null if an optional input is not connected - write a dummy then.
+    // resource is null if an optional input is not connected or an output is disabled - write a
+    // dummy then, or throw node_error if there is none.
     // access is the declared ConnectorAccess of the port.
     virtual void bind([[maybe_unused]] ShaderCursor& cursor,
                       [[maybe_unused]] const GraphResourceHandle& resource,
@@ -48,14 +49,11 @@ class Connector : public std::enable_shared_from_this<Connector> {
         throw std::runtime_error{"connector does not support shader binding"};
     }
 
-    // Called right after the node with this connector has finished node.pre_process() and before
-    // node.process(). This is the place to insert barriers, if necessary. Prefer adding your
-    // barriers to the supplied vectors instead of adding them directlty to the command buffer (for
-    // performance reasons).
+    // Called before the layer of the node runs, after all node.pre_process() calls. Add the
+    // barriers the resource needs to the supplied vectors.
     //
     // Also, you can validate here that the node did use the output correctly (set the resource in
-    // pre_process or do not access the same image with different layouts for example) and throw
-    // merian::graph_errors::connector_error if not.
+    // pre_process for example) and throw merian::graph_errors::connector_error if not.
     //
     // The graph supplies here the resource for the current iteration (depending on delay and such).
     [[nodiscard]]
@@ -68,9 +66,9 @@ class Connector : public std::enable_shared_from_this<Connector> {
         return {};
     }
 
-    // Called right after the node with this connector has finished node.process(). For example, you
-    // can validate here that the node did use the output correctly (set the resource for example)
-    // and throw merian::graph_errors::connector_error if not.
+    // Called after the layer of the node ran; the barriers are recorded like in on_pre_process. For
+    // example, you can validate here that the node did use the output correctly (set the resource
+    // for example) and throw merian::graph_errors::connector_error if not.
     //
     // The graph supplies here the resource for the current iteration (depending on delay and such).
     [[nodiscard]]

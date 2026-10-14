@@ -3,19 +3,20 @@
 namespace merian {
 
 std::vector<InputConnectorDescriptor> SwapchainBlit::describe_inputs() {
-    return {{"src", con_src, ConnectorAccess::transfer_src, 0, true}, {"acquire", con_acquire}};
-}
-
-std::vector<OutputConnectorDescriptor>
-SwapchainBlit::describe_outputs(const NodeIOLayout& /*io_layout*/) {
-    return {{"acquire", con_acquire_out}};
+    return {{.name = "src",
+             .connector = con_src,
+             .access = ConnectorAccess::transfer_src,
+             .optional = true},
+            {.name = "canvas",
+             .connector = con_canvas,
+             .access = ConnectorAccess::transfer_dst,
+             .in_place = true}};
 }
 
 [[nodiscard]] SwapchainBlit::NodeStatusFlags SwapchainBlit::process(
     const NodeIO& io, [[maybe_unused]] const NodeProcessInfo& info, Submission& submission) {
-    const std::shared_ptr<SwapchainAcquireResult>& acquire = io[con_acquire];
-    io[con_acquire_out] = acquire;
-    if (!acquire) {
+    const ImageHandle& dst_image = io[con_canvas].get_image();
+    if (!dst_image) {
         return {};
     }
 
@@ -34,9 +35,8 @@ SwapchainBlit::describe_outputs(const NodeIOLayout& /*io_layout*/) {
         return {};
     }
 
-    // The acquired image's contents are undefined, so discard them on the transfer-dst barrier.
+    // the blit covers the whole canvas
     const CommandBufferHandle& cmd = submission.get_cmd();
-    const ImageHandle dst_image = acquire->image_view->get_image();
     cmd->barrier(dst_image->barrier2(vk::ImageLayout::eTransferDstOptimal, true));
 
     const vk::Filter filter =

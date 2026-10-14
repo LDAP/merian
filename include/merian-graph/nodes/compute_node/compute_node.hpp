@@ -57,7 +57,6 @@ class AbstractCompute : public Node {
     void invalidate_shader();
 
     ContextHandle context;
-    ResourceAllocatorHandle allocator;
     ShaderCompileContextHandle compile_context;
     const std::optional<uint32_t> push_constant_size;
 

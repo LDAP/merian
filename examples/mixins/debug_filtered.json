@@ -17,7 +17,7 @@
         },
         "debug": {
             "outputs": [
-                "acquire->imgui.acquire",
+                "canvas->imgui.canvas",
                 "filtered->accum_filtered.src"
             ],
             "properties": {

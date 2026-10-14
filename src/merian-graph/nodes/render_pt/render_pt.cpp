@@ -53,9 +53,8 @@ DeviceSupportInfo RenderPT::query_device_support(const DeviceSupportQueryInfo& q
            program.get()->query_device_support(query_info);
 }
 
-void RenderPT::initialize(const ContextHandle& context, const ResourceAllocatorHandle& allocator) {
-    this->context = context;
-    this->resource_allocator = allocator;
+void RenderPT::initialize(const ContextHandle& context,
+                          [[maybe_unused]] const ResourceAllocatorHandle& allocator) {
     this->compile_context = context->get_shader_compile_context();
 
     // the ray tracing pipeline caps the registers on AMD
@@ -73,26 +72,27 @@ std::vector<InputConnectorDescriptor> RenderPT::describe_inputs() {
     }
     con_gbuffer = GBufferIn::create(gbuffer_groups);
 
-    return {
-        {.name = "scene", .connector = con_scene},
-        {.name = "gbuffer", .connector = con_gbuffer, .access = ConnectorAccess::ray_tracing_read},
-        {.name = "guiding",
-         .connector = con_guiding,
-         .access = ConnectorAccess::ray_tracing_read,
-         .optional = true},
-        {.name = "distance_guiding",
-         .connector = con_distance_guiding,
-         .access = ConnectorAccess::compute_read,
-         .optional = true},
-        {.name = "irradiance_cache",
-         .connector = con_irradiance_cache,
-         .access = ConnectorAccess::ray_tracing_read,
-         .optional = true},
-        {.name = "prev_volume_depth",
-         .connector = con_prev_volume_depth,
-         .access = ConnectorAccess::compute_read,
-         .delay = 1,
-         .optional = true}};
+    return {{.name = "scene", .connector = con_scene},
+            {.name = "gbuffer",
+             .connector = con_gbuffer,
+             .access = ConnectorAccess::ray_tracing_read | ConnectorAccess::compute_read},
+            {.name = "guiding",
+             .connector = con_guiding,
+             .access = ConnectorAccess::ray_tracing_read | ConnectorAccess::compute_read,
+             .optional = true},
+            {.name = "distance_guiding",
+             .connector = con_distance_guiding,
+             .access = ConnectorAccess::compute_read,
+             .optional = true},
+            {.name = "irradiance_cache",
+             .connector = con_irradiance_cache,
+             .access = ConnectorAccess::ray_tracing_read | ConnectorAccess::compute_read,
+             .optional = true},
+            {.name = "prev_volume_depth",
+             .connector = con_prev_volume_depth,
+             .access = ConnectorAccess::compute_read,
+             .delay = 1,
+             .optional = true}};
 }
 
 std::vector<OutputConnectorDescriptor> RenderPT::describe_outputs(const NodeIOLayout& io_layout) {
@@ -123,24 +123,26 @@ std::vector<OutputConnectorDescriptor> RenderPT::describe_outputs(const NodeIOLa
     const bool no_volume = !volume_available;
     return {{.name = "irradiance",
              .connector = con_irradiance,
-             .access = ConnectorAccess::ray_tracing_write},
+             .access = ConnectorAccess::ray_tracing_write | ConnectorAccess::compute_write |
+                       ConnectorAccess::transfer_dst},
             {.name = "debug",
              .connector = con_debug,
-             .access = ConnectorAccess::ray_tracing_write | ConnectorAccess::compute_write},
+             .access = ConnectorAccess::ray_tracing_write | ConnectorAccess::compute_write |
+                       ConnectorAccess::transfer_dst},
             {.name = "volume",
              .connector = con_volume,
-             .access = ConnectorAccess::compute_write,
+             .access = ConnectorAccess::compute_write | ConnectorAccess::transfer_dst,
              .disabled = no_volume},
             {.name = "volume_depth",
              .connector = con_volume_depth,
-             .access = ConnectorAccess::compute_write,
+             .access = ConnectorAccess::compute_write | ConnectorAccess::transfer_dst,
              .disabled = no_volume},
             {.name = "volume_mv",
              .connector = con_volume_mv,
-             .access = ConnectorAccess::compute_read_write,
+             .access = ConnectorAccess::compute_read_write | ConnectorAccess::transfer_dst,
              .disabled = no_volume},
-            path_records.describe_output(context, extent, static_cast<uint32_t>(spp),
-                                         recorded_vertices_per_path())};
+            path_records.describe_output(io_layout.get_context(), extent,
+                                         static_cast<uint32_t>(spp), recorded_vertices_per_path())};
 }
 
 RenderPT::NodeStatusFlags RenderPT::on_connected(const NodeIOLayout& io_layout,
@@ -170,7 +172,7 @@ RenderPT::NodeStatusFlags RenderPT::on_connected(const NodeIOLayout& io_layout,
     gbuffer_composition = io[con_gbuffer]->get_layout()->get_composition();
 
     if (const SceneHandle& scene = io[con_scene]; scene && scene->is_ready()) {
-        ensure_pipeline(scene);
+        ensure_pipeline(io.get_context(), io.get_allocator(), scene);
     }
 
     return {};
@@ -195,7 +197,9 @@ void RenderPT::update_guiding_slot() {
                     distance_guiding->get_type_name(), irradiance_cache->get_type_name()));
 }
 
-void RenderPT::ensure_pipeline(const SceneHandle& scene) {
+void RenderPT::ensure_pipeline(const ContextHandle& context,
+                               const ResourceAllocatorHandle& allocator,
+                               const SceneHandle& scene) {
     if (composition) {
         return;
     }
@@ -211,7 +215,7 @@ void RenderPT::ensure_pipeline(const SceneHandle& scene) {
     entry_point = SlangProgramEntryPoint::create(program, use_raygen() ? "main" : "main_compute");
 
     if (use_raygen()) {
-        pipeline = Versioned<Pipeline>([this] {
+        pipeline = Versioned<Pipeline>([this, context] {
             const auto ep = entry_point.get();
             return RayTracingPipelineBuilder()
                 .add_raygen_group(ep->specialize())
@@ -219,34 +223,34 @@ void RenderPT::ensure_pipeline(const SceneHandle& scene) {
         });
         pipeline.depends_on(entry_point);
 
-        sbt = Versioned<ShaderBindingTable>([this] {
+        sbt = Versioned<ShaderBindingTable>([this, allocator] {
             return ShaderBindingTable::create(
-                std::dynamic_pointer_cast<RayTracingPipeline>(pipeline.get()), resource_allocator);
+                std::dynamic_pointer_cast<RayTracingPipeline>(pipeline.get()), allocator);
         });
         sbt.depends_on(pipeline);
     } else {
-        pipeline = Versioned<Pipeline>([this] {
+        pipeline = Versioned<Pipeline>([this, context] {
             const auto ep = entry_point.get();
             return ComputePipeline::create(ep->get_pipeline_layout(context), ep->specialize());
         });
         pipeline.depends_on(entry_point);
     }
 
-    params = Versioned<ShaderObject>([this] {
-        return entry_point->create_shader_object_for_parameter(context, "params",
-                                                               resource_allocator);
+    params = Versioned<ShaderObject>([this, context, allocator] {
+        return entry_point->create_shader_object_for_parameter(context, "params", allocator);
     });
 
-    const auto build_volume_pass = [this](VolumePass& pass, const std::string& name) {
+    const auto build_volume_pass = [this, &context, &allocator](VolumePass& pass,
+                                                                const std::string& name) {
         pass.entry_point = SlangProgramEntryPoint::create(program, name);
-        pass.pipeline = Versioned<Pipeline>([&pass, this] {
+        pass.pipeline = Versioned<Pipeline>([&pass, context] {
             const auto ep = pass.entry_point.get();
             return ComputePipeline::create(ep->get_pipeline_layout(context), ep->specialize());
         });
         pass.pipeline.depends_on(pass.entry_point);
-        pass.params = Versioned<ShaderObject>([&pass, this] {
+        pass.params = Versioned<ShaderObject>([&pass, context, allocator] {
             return pass.entry_point->create_shader_object_for_parameter(context, "params",
-                                                                        resource_allocator);
+                                                                        allocator);
         });
         pass.params.depends_on(pass.entry_point);
     };
@@ -261,8 +265,17 @@ RenderPT::process(const NodeIO& io, const NodeProcessInfo& info, Submission& sub
     const auto& cmd = submission.get_cmd();
     const auto& scene = io[con_scene];
     const auto gbuf = io[con_gbuffer];
-    if (!scene || !scene->is_ready())
+    const auto clear_outputs = [&](const std::initializer_list<ManagedVkImageOutHandle> outputs) {
+        for (const ManagedVkImageOutHandle& output : outputs) {
+            if (io.is_connected(output)) {
+                cmd->clear(io[output]);
+            }
+        }
+    };
+    if (!scene || !scene->is_ready()) {
+        clear_outputs({con_irradiance, con_debug, con_volume, con_volume_depth, con_volume_mv});
         return {};
+    }
 
     if (max_path_length != emitted_max_path_length) {
         emitted_max_path_length = max_path_length;
@@ -272,10 +285,11 @@ RenderPT::process(const NodeIO& io, const NodeProcessInfo& info, Submission& sub
     if (const bool available = volume_spp > 0 && scene->has_exterior_volume();
         available != volume_available) {
         volume_available = available;
+        clear_outputs({con_irradiance, con_debug, con_volume, con_volume_depth, con_volume_mv});
         return NodeStatusFlagBits::NEEDS_RECONNECT;
     }
 
-    ensure_pipeline(scene);
+    ensure_pipeline(io.get_context(), io.get_allocator(), scene);
     const ShaderObjectAllocatorHandle& obj_allocator = info.get_shader_object_allocator();
 
     const auto ep = entry_point.get();

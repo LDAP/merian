@@ -142,8 +142,9 @@ GraphDescription Graph::to_description() {
         description.set_profiler_properties(dump_props.get());
     }
 
-    // Store nodes
-    for (const auto& [identifier, node] : node_for_identifier) {
+    // Store top-level nodes: a parent's properties hold its children
+    for (const NodeHandle& node : top_level_nodes()) {
+        const std::string& identifier = node_data.at(node).identifier;
         const std::string node_type = NodeRegistry::get_instance().node_type_name(node);
         const nlohmann::json config = node->dump_config();
         const bool enabled = node_data.at(node).enabled;
@@ -162,13 +163,11 @@ GraphDescription Graph::to_description() {
     }
 
     // Store connections
-    for (const auto& [src, node] : node_for_identifier) {
-        const auto& data = node_data.at(node);
-        for (const auto& connection : data.desired_outgoing_connections) {
-            const std::string& dst = node_data.at(connection.dst).identifier;
-            description.add_connection(src, dst, connection.src_output, connection.dst_input);
-            SPDLOG_DEBUG("Storing connection {} ({}) -> {} ({})", src, connection.src_output, dst,
-                         connection.dst_input);
+    for (const NodeHandle& node : top_level_nodes()) {
+        const NodeData& data = node_data.at(node);
+        for (const auto& [input, source] : data.desired_incoming_connections) {
+            description.add_connection(node_data.at(source.node).identifier, data.identifier,
+                                       source.name, input);
         }
     }
 

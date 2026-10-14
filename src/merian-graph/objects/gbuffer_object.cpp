@@ -11,9 +11,6 @@ GBufferObject::GBufferObject(const CreateInfo& create_info)
       layout(create_info.layout ? create_info.layout : GBufferLayout::complete()) {}
 
 void GBufferObject::allocate(const ShaderObjectAllocateInfo& info) {
-    gbuffer = std::make_shared<GBuffer>(info.compile_context, info.context, info.allocator, extent,
-                                        layout);
-
     for (uint32_t i = 0; i < layout->get_textures().size(); i++) {
         const vk::ImageCreateInfo create_info{
             {},
@@ -27,12 +24,9 @@ void GBufferObject::allocate(const ShaderObjectAllocateInfo& info) {
             vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled |
                 vk::ImageUsageFlagBits::eTransferDst | info.combined_access.image_usage,
         };
-        const ImageHandle& image = images.emplace_back(info.allocator->create_image(
-            create_info, MemoryMappingType::NONE, fmt::format("gbuffer tex{}", i)));
-        views.emplace_back(
-            info.allocator->create_image_view(image, image->make_view_create_info()));
+        images.emplace_back(info.allocator->create_image(create_info, MemoryMappingType::NONE,
+                                                         fmt::format("gbuffer tex{}", i)));
     }
-    gbuffer->set_resources(views);
 }
 
 const ShaderObjectHandle& GBufferObject::object(const ShaderAccess access) const {
@@ -40,8 +34,18 @@ const ShaderObjectHandle& GBufferObject::object(const ShaderAccess access) const
                                         : gbuffer->get_write_shader_object();
 }
 
-void GBufferObject::on_connected(Submission& submission) {
-    const CommandBufferHandle& cmd = submission.get_cmd();
+void GBufferObject::on_connected(const ShaderObjectConnectInfo& info, Submission& submission) {
+    gbuffer = std::make_shared<GBuffer>(info.compile_context, info.context, info.allocator, extent,
+                                        layout);
+    for (const ImageHandle& image : images) {
+        views.emplace_back(
+            info.allocator->create_image_view(image, image->make_view_create_info()));
+    }
+    gbuffer->set_resources(views);
+    clear(submission.get_cmd());
+}
+
+void GBufferObject::clear(const CommandBufferHandle& cmd) const {
     constexpr vk::AccessFlags2 all_access =
         vk::AccessFlagBits2::eMemoryWrite | vk::AccessFlagBits2::eMemoryRead;
     constexpr vk::PipelineStageFlags2 all_stages = vk::PipelineStageFlagBits2::eAllCommands;
@@ -69,11 +73,11 @@ const ImageViewHandle& GBufferObject::get_view(const GBufferField field) const {
     return views[layout->get_texture_index(field)];
 }
 
-GBufferOut::GBufferOut(const vk::Extent3D& extent, const bool persistent)
-    : ShaderObjectOut({.extent = extent}, persistent) {}
+GBufferOut::GBufferOut(const vk::Extent3D& extent)
+    : ShaderObjectOut({.extent = extent, .layout = nullptr}) {}
 
-GBufferOutHandle GBufferOut::create(const vk::Extent3D& extent, const bool persistent) {
-    return std::make_shared<GBufferOut>(extent, persistent);
+GBufferOutHandle GBufferOut::create(const vk::Extent3D& extent) {
+    return std::make_shared<GBufferOut>(extent);
 }
 
 std::shared_ptr<GBufferObject> GBufferOut::create_instance(

@@ -22,7 +22,7 @@ class AnyIn : public InputConnector,
 
     const std::any& resource(const GraphResourceHandle& resource) override;
 
-    void on_connect_output(const OutputConnectorHandle& output) override;
+    bool can_receive_from(const OutputConnectorHandle& output) const override;
 
     Connector::ConnectorStatusFlags
     on_post_process(Submission& submission,

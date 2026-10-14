@@ -31,8 +31,7 @@ const std::string& GraphDescription::add_node(const std::string& node_type,
     const auto [it, inserted] = nodes.emplace(node_id, std::move(info));
     assert(inserted);
 
-    hash++;           // Structure changed
-    return it->first; // Return the key from the map
+    return it->first;
 }
 
 bool GraphDescription::remove_node(const std::string& identifier) {
@@ -40,14 +39,9 @@ bool GraphDescription::remove_node(const std::string& identifier) {
         return false;
     }
 
-    // Remove all connections to/from this node
-    // First, remove outgoing connections from other nodes that target this node
     for (auto& [node_id, node_info] : nodes) {
-        // Remove from incoming connections
         std::erase_if(node_info.incoming_connections,
                       [&identifier](const auto& conn) { return conn.second.first == identifier; });
-
-        // Remove from outgoing connections
         for (auto& [output_name, output_info] : node_info.outgoing_connections) {
             std::erase_if(output_info.target,
                           [&identifier](const auto& target) { return target.first == identifier; });
@@ -55,7 +49,6 @@ bool GraphDescription::remove_node(const std::string& identifier) {
     }
 
     nodes.erase(identifier);
-    hash++; // Structure changed
     return true;
 }
 
@@ -63,17 +56,17 @@ void GraphDescription::add_connection(const std::string& src,
                                       const std::string& dst,
                                       const std::string& src_output,
                                       const std::string& dst_input) {
-    // Add to outgoing connections of source node
     const auto src_node_it = nodes.find(src);
-    assert(src_node_it != nodes.end());
-    src_node_it->second.outgoing_connections[src_output].target[dst].insert(dst_input);
-
-    // Add to incoming connections of destination node
     const auto dst_node_it = nodes.find(dst);
-    assert(dst_node_it != nodes.end());
+    for (const auto& [identifier, it] :
+         {std::pair{src, src_node_it}, std::pair{dst, dst_node_it}}) {
+        if (it == nodes.end()) {
+            throw std::invalid_argument(fmt::format("connection {}.{} -> {}.{}: no node {}", src,
+                                                    src_output, dst, dst_input, identifier));
+        }
+    }
+    src_node_it->second.outgoing_connections[src_output].target[dst].insert(dst_input);
     dst_node_it->second.incoming_connections[dst_input] = {src, src_output};
-
-    hash++; // Structure changed
 }
 
 bool GraphDescription::remove_connection(const std::string& src,
@@ -94,19 +87,15 @@ bool GraphDescription::remove_connection(const std::string& src,
     }
 
     if (removed) {
-        // Remove from source node's outgoing connections
         assert(nodes.contains(src));
         auto& src_node = nodes.at(src);
         assert(src_node.outgoing_connections.contains(src_output));
         auto& output_info = src_node.outgoing_connections.at(src_output);
         assert(output_info.target.contains(dst));
         output_info.target.at(dst).erase(dst_input);
-        // If no more inputs to this dst, remove the dst entry
         if (output_info.target.at(dst).empty()) {
             output_info.target.erase(dst);
         }
-
-        hash++; // Structure changed
     }
 
     return removed;
@@ -332,17 +321,17 @@ void GraphDescription::parse_graph_v4(const nlohmann::json& json, GraphDescripti
 
 void GraphDescription::validate_identifier(const std::string& identifier,
                                            const std::string& context) {
-    if (identifier.find('.') != std::string::npos) {
-        throw std::invalid_argument(
-            fmt::format("{} '{}' contains reserved character '.'", context, identifier));
+    if (identifier.empty()) {
+        throw std::invalid_argument(fmt::format("{} cannot be empty", context));
     }
-    if (identifier.find("->") != std::string::npos) {
-        throw std::invalid_argument(
-            fmt::format("{} '{}' contains reserved sequence '->'", context, identifier));
+    if (identifier == "user" || identifier == "graph") {
+        throw std::invalid_argument(fmt::format("{} '{}' is reserved", context, identifier));
     }
-    if (identifier.find('/') != std::string::npos) {
-        throw std::invalid_argument(
-            fmt::format("{} '{}' contains reserved character '/'", context, identifier));
+    for (const std::string_view reserved : {".", "->", "/", ":"}) {
+        if (identifier.find(reserved) != std::string::npos) {
+            throw std::invalid_argument(
+                fmt::format("{} '{}' contains reserved '{}'", context, identifier, reserved));
+        }
     }
 }
 

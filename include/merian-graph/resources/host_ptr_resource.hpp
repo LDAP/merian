@@ -27,7 +27,7 @@ template <typename T> class PtrResource : public GraphResource {
 
     // reset after output, increased after input
     // if processed_inputs == num_inputs reset ptr if output is not persistent.
-    int32_t processed_inputs;
+    int32_t processed_inputs = 0;
 
     std::shared_ptr<T> ptr;
 };

@@ -1,123 +1,33 @@
 #pragma once
 
-#include "merian-graph/connectors/image/vk_image_in_sampled.hpp"
-#include "merian-graph/connectors/image/vk_image_out_managed.hpp"
-#include "merian-graph/connectors/shader_object_in.hpp"
-#include "merian-graph/graph/node.hpp"
-#include "merian-graph/objects/gbuffer_object.hpp"
-
-#include "merian/shader/slang_entry_point.hpp"
-#include "merian/vk/memory/resource_allocator.hpp"
-#include "merian/vk/pipeline/pipeline.hpp"
-
-#include <optional>
+#include "merian-graph/nodes/svgf/filter.hpp"
+#include "merian-graph/nodes/svgf/options.hpp"
+#include "merian-graph/nodes/svgf/taa.hpp"
+#include "merian-graph/nodes/svgf/variance_estimate.hpp"
 
 namespace merian {
 
+// Spatiotemporal variance-guided filtering: Schied et al. 2017, Spatiotemporal Variance-Guided
+// Filtering: Real-Time Reconstruction for Path-Traced Global Illumination.
 class SVGF : public Node {
-  private:
-    struct VarianceEstimatePushConstant {
-        float normal_reject_cos = 0.8;
-        float depth_accept = 10; // larger reuses more
-        float spatial_falloff = 3.0;
-        float spatial_bias = 8.0;
-    };
-
-    struct FilterPushConstant {
-        float param_z = 10; // parameter for depth      = 1   larger blurs more
-        float param_n = .8; // parameter for normals    cos(alpha) for lower threshold
-        float param_l = 8;  // parameter for brightness = 4   larger blurs more
-        float z_bias_normals = -1.0;
-        float z_bias_depth = -1.0;
-    };
-
-    struct TAAPushConstant {
-        float blend_alpha = 0.0;
-        float rejection_threshold = 1.0;
-    };
-
   public:
-    SVGF();
-
-    ~SVGF();
-
-    DeviceSupportInfo query_device_support(const DeviceSupportQueryInfo& query_info) override;
-
-    void initialize(const ContextHandle& context,
-                    const ResourceAllocatorHandle& allocator) override;
-
-    std::vector<InputConnectorDescriptor> describe_inputs() override;
-
-    std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
-
-    NodeStatusFlags on_connected(const NodeIOLayout& io_layout,
-                                 const NodeIO& io,
-                                 const NodeConnectionInfo& info,
-                                 Submission& submission) override;
-
-    [[nodiscard]] NodeStatusFlags
-    process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) override;
+    Subgraph describe_subgraph() override;
 
     NodeStatusFlags properties(Properties& config) override;
 
   private:
-    ContextHandle context;
-    ResourceAllocatorHandle allocator;
-    // Undefined: keep the format of the input.
+    void set_filter_levels(const uint32_t level_count);
+
+    const std::shared_ptr<SVGFVarianceEstimate> variance_estimate =
+        std::make_shared<SVGFVarianceEstimate>();
+    std::vector<std::shared_ptr<SVGFFilter>> filters;
+    const std::shared_ptr<SVGFTAA> taa = std::make_shared<SVGFTAA>();
+
+    int filter_levels = 0;
+    SVGFOptions options;
+    SVGFFilterParameters filter_parameters;
+    // Undefined: keep the format of the source.
     vk::Format overwrite_format = vk::Format::eUndefined;
-
-    // depends on available shared memory
-    uint32_t variance_estimate_local_size;
-    uint32_t filter_local_size;
-    uint32_t taa_local_size;
-
-    VkSampledImageInHandle con_prev_out = VkSampledImageIn::create();
-    VkSampledImageInHandle con_src = VkSampledImageIn::create();
-    VkSampledImageInHandle con_history = VkSampledImageIn::create();
-    GBufferInHandle con_gbuffer;
-    // Optional: overrides the gbuffer motion vectors, for signals that are not on the first hit.
-    VkSampledImageInHandle con_mv = VkSampledImageIn::create();
-
-    ManagedVkImageOutHandle con_out;
-
-    std::shared_ptr<SlangProgramEntryPoint> variance_estimate_module;
-    std::shared_ptr<SlangProgramEntryPoint> filter_module;
-    std::shared_ptr<SlangProgramEntryPoint> taa_module;
-
-    ShaderObjectHandle variance_estimate_globals;
-    // [d] reads ping_pong_res[d], writes ping_pong_res[d ^ 1]
-    std::array<ShaderObjectHandle, 2> filter_globals;
-    ShaderObjectHandle taa_globals;
-
-    VarianceEstimatePushConstant variance_estimate_pc;
-    FilterPushConstant filter_pc;
-    TAAPushConstant taa_pc;
-
-    vk::ImageCreateInfo irr_create_info;
-
-    PipelineHandle variance_estimate;
-    std::vector<PipelineHandle> filters;
-    PipelineHandle taa;
-
-    int svgf_iterations = 0;
-
-    struct EAWRes {
-        TextureHandle ping_pong;
-        TextureHandle gbuf_ping_pong;
-    };
-    std::array<EAWRes, 2> ping_pong_res; // Ping pong textures
-
-    int filter_type = 2;
-
-    int taa_debug = 0;
-    int taa_filter_prev = 0;
-    int taa_clamping = 0;
-    int taa_mv_sampling = 0;
-    bool enable_mv = true;
-    bool taa_modulate_albedo = true;
-
-    bool kaleidoscope = false;
-    bool kaleidoscope_use_shmem = true;
 };
 
 } // namespace merian

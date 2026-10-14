@@ -37,8 +37,6 @@ DeviceSupportInfo ErrorPlot::query_device_support(const DeviceSupportQueryInfo& 
 }
 
 void ErrorPlot::initialize(const ContextHandle& context, const ResourceAllocatorHandle& allocator) {
-    this->context = context;
-    this->allocator = allocator;
     this->compile_context = context->get_shader_compile_context();
 
     auto error_spec = SpecializationInfoBuilder();
@@ -84,7 +82,8 @@ std::vector<OutputConnectorDescriptor> ErrorPlot::describe_outputs(const NodeIOL
 
     con_error = ManagedVkBufferOut::create(vk::BufferCreateInfo(
         {}, buffer_size * sizeof(float4),
-        vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferSrc));
+        vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferSrc |
+            vk::BufferUsageFlagBits::eTransferDst));
 
     // blit target for the split view and color attachment for the overlay
     const vk::ImageCreateInfo out_info{
@@ -104,13 +103,14 @@ std::vector<OutputConnectorDescriptor> ErrorPlot::describe_outputs(const NodeIOL
     };
     con_out = ManagedVkImageOut::create(out_info);
 
-    return {
-        {"out", con_out, ConnectorAccess::transfer_dst},
-        {"error", con_error, ConnectorAccess::compute_read_write | ConnectorAccess::transfer_src}};
+    return {{"out", con_out, ConnectorAccess::transfer_dst | ConnectorAccess::color_attachment},
+            {"error", con_error,
+             ConnectorAccess::compute_read_write | ConnectorAccess::transfer_src |
+                 ConnectorAccess::transfer_dst}};
 }
 
 ErrorPlot::NodeStatusFlags ErrorPlot::on_connected(const NodeIOLayout& io_layout,
-                                                   [[maybe_unused]] const NodeIO& io,
+                                                   const NodeIO& io,
                                                    const NodeConnectionInfo& info,
                                                    [[maybe_unused]] Submission& submission) {
     io_layout.register_event_listener(
@@ -124,9 +124,9 @@ ErrorPlot::NodeStatusFlags ErrorPlot::on_connected(const NodeIOLayout& io_layout
     readback_buffers.resize(info.iterations_in_flight);
     for (BufferHandle& buffer : readback_buffers) {
         if (!buffer) {
-            buffer = allocator->create_buffer(sizeof(float4), vk::BufferUsageFlagBits::eTransferDst,
-                                              MemoryMappingType::HOST_ACCESS_RANDOM,
-                                              "error_plot readback");
+            buffer = io.get_allocator()->create_buffer(
+                sizeof(float4), vk::BufferUsageFlagBits::eTransferDst,
+                MemoryMappingType::HOST_ACCESS_RANDOM, "error_plot readback");
         }
     }
 
@@ -143,6 +143,9 @@ ErrorPlot::process(const NodeIO& io, const NodeProcessInfo& info, Submission& su
     }
     if (!reference_texture && !io.is_connected(con_reference)) {
         record_output(io, info, submission); // nothing to compare against yet, still pass through
+        if (io.is_connected(con_error)) {
+            cmd->fill(io[con_error]);
+        }
         return {};
     }
 
@@ -304,7 +307,7 @@ void ErrorPlot::load_reference(const NodeIO& io, Submission& submission) {
 
     reference_texture = reference_path.empty()
                             ? nullptr
-                            : image_load_texture(allocator, submission, reference_path,
+                            : image_load_texture(io.get_allocator(), submission, reference_path,
                                                  vk::ImageUsageFlagBits::eTransferSrc);
     if (!reference_texture) {
         return;
@@ -341,6 +344,7 @@ void ErrorPlot::take_snapshot(const NodeIO& io, Submission& submission) {
         {},
         vk::ImageLayout::eUndefined,
     };
+    const ResourceAllocatorHandle& allocator = io.get_allocator();
     const ImageHandle image =
         allocator->create_image(info, MemoryMappingType::NONE, "error_plot snapshot");
 

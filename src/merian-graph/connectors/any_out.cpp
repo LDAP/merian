@@ -5,17 +5,9 @@
 
 namespace merian {
 
-AnyOut::AnyOut(const bool persistent) : OutputConnector(!persistent), persistent(persistent) {}
-
-GraphResourceHandle
-AnyOut::create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
-                        [[maybe_unused]] const ConnectorAccess& combined_access,
-                        [[maybe_unused]] const ResourceAllocatorHandle& allocator,
-                        [[maybe_unused]] const ResourceAllocatorHandle& aliasing_allocator,
-                        [[maybe_unused]] const uint32_t resource_index,
-                        [[maybe_unused]] const uint32_t ring_size) {
-
-    return std::make_shared<AnyResource>(persistent ? -1 : (int32_t)inputs.size());
+GraphResourceHandle AnyOut::create_resource(const ResourceCreateInfo& info) {
+    return std::make_shared<AnyResource>(
+        info.persistent ? -1 : static_cast<int32_t>(info.inputs.size()));
 }
 
 std::any& AnyOut::resource(const GraphResourceHandle& resource) {
@@ -29,7 +21,7 @@ AnyOut::on_pre_process([[maybe_unused]] Submission& submission,
                        [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
                        [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
     const auto& res = debugable_ptr_cast<AnyResource>(resource);
-    if (!persistent) {
+    if (res->num_inputs != -1) {
         res->any.reset();
     }
 
@@ -51,8 +43,8 @@ AnyOut::on_post_process([[maybe_unused]] Submission& submission,
     return {};
 }
 
-AnyOutHandle AnyOut::create(const bool persistent) {
-    return std::make_shared<AnyOut>(persistent);
+AnyOutHandle AnyOut::create() {
+    return std::make_shared<AnyOut>();
 }
 
 } // namespace merian

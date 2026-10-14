@@ -32,7 +32,7 @@ inline uint32_t lcm(std::vector<uint32_t> numbers) noexcept {
 }
 
 inline uint32_t round_up(const uint32_t number, const uint32_t multiple) noexcept {
-    return ((number + multiple / 2) / multiple) * multiple;
+    return ((number + multiple - 1) / multiple) * multiple;
 }
 
 inline uint32_t wrap(const int32_t value, const uint32_t size) noexcept {

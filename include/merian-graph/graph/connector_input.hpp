@@ -10,16 +10,13 @@ namespace merian {
 class InputConnector : public Connector {
 
   public:
-    // Throw invalid_connection, if the resource cannot interface with the supplied connector (try
-    // dynamic cast or use merian::test_shared_ptr_types). Can also be used to pre-compute barriers
-    // or similar.
-    virtual void on_connect_output([[maybe_unused]] const OutputConnectorHandle& output) {}
-
-    // Side-effect free variant of on_connect_output for probing a connection before offering it.
-    // on_connect_output must throw exactly when this returns false.
+    // Whether the input can receive from the output. Side-effect free.
     virtual bool can_receive_from([[maybe_unused]] const OutputConnectorHandle& output) const {
         return true;
     }
+
+    // Called for each connection, with an output it can receive from.
+    virtual void on_connect_output([[maybe_unused]] const OutputConnectorHandle& output) {}
 };
 
 using InputConnectorHandle = std::shared_ptr<InputConnector>;

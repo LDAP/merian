@@ -39,7 +39,7 @@ std::vector<OutputConnectorDescriptor> ABSplit::describe_outputs(const NodeIOLay
     const ImageHandle& result = io[con_out];
 
     cmd_blit_fit(cmd, b, vk::ImageLayout::eGeneral, b->get_extent(), result,
-                 vk::ImageLayout::eGeneral, result->get_extent());
+                 vk::ImageLayout::eGeneral, result->get_extent(), vk::ClearColorValue());
 
     cmd->barrier(result->barrier2(vk::ImageLayout::eGeneral));
 

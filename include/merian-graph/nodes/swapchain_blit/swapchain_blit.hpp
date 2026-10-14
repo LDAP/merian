@@ -1,22 +1,16 @@
 #pragma once
 
 #include "merian-graph/connectors/image/vk_image_in.hpp"
-#include "merian-graph/connectors/ptr_in.hpp"
-#include "merian-graph/connectors/ptr_out.hpp"
 #include "merian-graph/graph/node.hpp"
 
 #include "merian/vk/utils/blits.hpp"
-#include "merian/vk/window/swapchain_manager.hpp"
 
 namespace merian {
 
-// Blits a graph image ("src") onto a Window node's acquired swapchain image ("acquire"). The
-// Window node owns acquisition and presentation; this node only records the blit.
+// Blits a graph image ("src") onto a Window node's swapchain image ("canvas", written in place).
 class SwapchainBlit : public Node {
   public:
     std::vector<InputConnectorDescriptor> describe_inputs() override;
-
-    std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
     [[nodiscard]] NodeStatusFlags
     process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) override;
@@ -29,10 +23,7 @@ class SwapchainBlit : public Node {
     BlitMode mode = FIT;
 
     VkImageInHandle con_src = VkImageIn::create();
-    PtrInHandle<SwapchainAcquireResult> con_acquire = PtrIn<SwapchainAcquireResult>::create();
-    // Passed through so further nodes (e.g. ImGui) chain after this blit and render on top.
-    PtrOutHandle<SwapchainAcquireResult> con_acquire_out =
-        PtrOut<SwapchainAcquireResult>::create_optional();
+    VkImageInHandle con_canvas = VkImageIn::create();
 };
 
 } // namespace merian

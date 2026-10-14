@@ -69,8 +69,6 @@ class AutoExposure : public Node {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
-    ContextHandle context;
-    ResourceAllocatorHandle allocator;
     ShaderCompileContextHandle compile_context;
 
     VkSampledImageInHandle con_src = VkSampledImageIn::create();

@@ -15,14 +15,11 @@ import merian_shaders.colors.colorspaces;
 
 using merian;
 
-// graph-bound
 ParameterBlock<GBuffer> in_gbuffer;
-
-// internal ping-pong (bound by the node)
-Sampler2D<float4> img_filter_in;
-RWTexture2D<float4> img_filter_out;
-Sampler2D<uint4> img_gbuf_in;
-RWTexture2D<uint4> img_gbuf_out;
+Sampler2D<float4> in_src;
+RWTexture2D<float4> out_out;
+Sampler2D<uint4> in_gbuf_src;
+RWTexture2D<uint4> out_gbuf;
 
 [vk::constant_id(2)]
 const int GAP = 1;
@@ -52,7 +49,7 @@ static int2 ipos_shared;
 static float4 filter_irr_var;
 
 float4 load_irr_var(const int2 pos) {
-    float4 irr_var = img_filter_in[pos];
+    float4 irr_var = in_src[pos];
     irr_var.a = svgf_decode_variance(irr_var.a);
     return irr_var;
 }
@@ -81,7 +78,7 @@ float get_sigma_l(float center, int2 ipos) {
         for (int xx = -r; xx <= r; xx++) {
             if (xx != 0 || yy != 0) {
                 const int2 p = ipos + int2(xx, yy);
-                const float v = svgf_decode_variance(img_filter_in[p].a);
+                const float v = svgf_decode_variance(in_src[p].a);
                 const float w = gaussian_kernel[xx + 1][yy + 1];
                 sum += v * w;
             }
@@ -130,8 +127,8 @@ void tap(const int2 offset, const float kernel_weight) {
         shmem_read(ipos_shared + offset, p_n, p_z, p_irr_var);
     } else if (svgf_kaleidoscope) {
         p_irr_var = load_irr_var(ipos + offset);
-        p_n = decode_normal(img_gbuf_in[ipos + offset].x);
-        p_z = asfloat(img_gbuf_in[ipos + offset].y);
+        p_n = decode_normal(in_gbuf_src[ipos + offset].x);
+        p_z = asfloat(in_gbuf_src[ipos + offset].y);
     } else {
         p_irr_var = load_irr_var(ipos + offset * GAP);
         let p_texels = in_gbuffer.load(uint2(ipos + offset * GAP));
@@ -163,7 +160,7 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
         ipos_shared = int2(group_thread_id) + SVGF_FILTER_HALO_RADIUS;
 
         filter_irr_var = load_irr_var(ipos);
-        c_gbuf = img_gbuf_in[ipos].rgb;
+        c_gbuf = in_gbuf_src[ipos].rgb;
         c_n = decode_normal(c_gbuf.x);
         c_z = asfloat(c_gbuf.y);
         c_grad_z = unpackHalf2x16ToFloat(c_gbuf.z);
@@ -176,22 +173,22 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
         if (load_halo_index(SVGF_FILTER_HALO_RADIUS, WorkgroupSize().xy, group_id, group_index,
                             shared_index, global_index)) {
             const int2 global_read =
-                texturewrap_mirror_repeat(global_index, texture_dimensions(img_filter_in, 0));
-            const uint3 p_gbuf = img_gbuf_in[global_read].rgb;
+                texturewrap_mirror_repeat(global_index, texture_dimensions(in_src, 0));
+            const uint3 p_gbuf = in_gbuf_src[global_read].rgb;
             shmem_write(shared_index, load_irr_var(global_read), decode_normal(p_gbuf.x),
                         asfloat(p_gbuf.y));
         }
         GroupMemoryBarrierWithGroupSync();
 
-        if (not_on_texture(ipos, img_filter_out))
+        if (not_on_texture(ipos, out_out))
             return;
     } else {
-        if (not_on_texture(ipos, img_filter_out))
+        if (not_on_texture(ipos, out_out))
             return;
 
         filter_irr_var = load_irr_var(ipos);
         if (svgf_kaleidoscope) {
-            c_gbuf = img_gbuf_in[ipos].rgb;
+            c_gbuf = in_gbuf_src[ipos].rgb;
             c_n = decode_normal(c_gbuf.x);
             c_z = asfloat(c_gbuf.y);
             c_grad_z = unpackHalf2x16ToFloat(c_gbuf.z);
@@ -274,7 +271,7 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
         if (ITERATION != LAST_ITERATION) {
             int2 hid = ipos / 2;
             int2 odd = ipos & 1;
-            int2 viewport_size_half = texture_dimensions(img_filter_out) / 2;
+            int2 viewport_size_half = texture_dimensions(out_out) / 2;
 
 #ifdef KALEIDOSCOPE_USE_MIRRORING
             if (ITERATION == 0) {
@@ -288,9 +285,9 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
 #endif
 
             ipos = hid + odd * (viewport_size_half);
-            img_gbuf_out.Store(ipos, uint4(c_gbuf, 0));
+            out_gbuf.Store(ipos, uint4(c_gbuf, 0));
         } else {
-            int2 viewport_size = texture_dimensions(img_filter_out);
+            int2 viewport_size = texture_dimensions(out_out);
             int32_t wcnt = 1 << ITERATION;
             int2 sizew = viewport_size / wcnt;
             int2 o = ipos / sizew;
@@ -317,7 +314,7 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
             if (ITERATION != 0 /* skip if we're doing exactly one iteration */) {
                 int2 hid = ipos / 2;
                 int2 odd = ipos & 1;
-                int2 viewport_size_half = texture_dimensions(img_filter_out) / 2;
+                int2 viewport_size_half = texture_dimensions(out_out) / 2;
                 if (odd.x > 0) {
                     hid.x = viewport_size_half.x - hid.x - 1;
                 }
@@ -332,5 +329,5 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
     }
 
     filter_irr_var.a = svgf_encode_variance(filter_irr_var.a);
-    img_filter_out.Store(ipos, filter_irr_var);
+    out_out.Store(ipos, filter_irr_var);
 }

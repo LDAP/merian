@@ -120,6 +120,14 @@ class VMAMemoryAllocator : public MemoryAllocator {
                              const MemoryMappingType mapping_type = MemoryMappingType::NONE,
                              const std::string& debug_name = {}) override;
 
+    std::optional<uint32_t>
+    find_memory_type(const vk::BufferCreateInfo& buffer_create_info,
+                     const MemoryMappingType mapping_type = MemoryMappingType::NONE) override;
+
+    std::optional<uint32_t>
+    find_memory_type(const vk::ImageCreateInfo& image_create_info,
+                     const MemoryMappingType mapping_type = MemoryMappingType::NONE) override;
+
     // ------------------------------------------------------------------------------------
 
   private:

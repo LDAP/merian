@@ -10,9 +10,12 @@ std::vector<OutputConnectorDescriptor>
 ColorImage::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     needs_run = true;
 
-    con_out = ManagedVkImageOut::create(format, extent, true);
+    con_out = ManagedVkImageOut::create(format, extent);
 
-    return {{"out", con_out, ConnectorAccess::transfer_dst}};
+    return {{.name = "out",
+             .connector = con_out,
+             .access = ConnectorAccess::transfer_dst,
+             .persistent = true}};
 }
 
 [[nodiscard]] ColorImage::NodeStatusFlags ColorImage::process(

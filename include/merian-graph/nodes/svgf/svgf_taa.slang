@@ -10,14 +10,12 @@ import merian_shaders.utils.textures;
 
 using merian;
 
-// graph-bound
 ParameterBlock<GBuffer> in_gbuffer;
+// the filtered irradiance
+Sampler2D<float4> in_src;
 Sampler2D<float2> in_mv; // only read when MV_OVERRIDE
 Sampler2D<float4> in_prev_out;
 RWTexture2D<float4> out_out;
-
-// internal: final filter iteration result (bound by the node)
-Sampler2D<float4> img_filter_result;
 
 [vk::constant_id(2)]
 const int DEBUG = 0;
@@ -39,6 +37,7 @@ const bool MV_OVERRIDE = false;
 struct PushConstant {
     float blend_alpha;
     float rejection_threshold;
+    int reset;
 };
 
 [vk::push_constant]
@@ -65,7 +64,7 @@ void main(const int2 ipos: SV_DispatchThreadID) {
         mv = float2(0);
     }
 
-    float4 filter_result = img_filter_result[ipos];
+    float4 filter_result = in_src[ipos];
     filter_result.a = svgf_decode_variance(filter_result.a);
 
     if (DEBUG == 1) {
@@ -117,7 +116,7 @@ void main(const int2 ipos: SV_DispatchThreadID) {
             catmull_rom(in_prev_out, (ipos + mv + 0.5) / float2(texture_dimensions(out_out))).rgb;
     }
 
-    if (any(isnan(prev_out)) || any(isinf(prev_out))) {
+    if (params.reset != 0 || any(isnan(prev_out)) || any(isinf(prev_out))) {
         prev_out = irr * albedo;
     }
 
@@ -128,7 +127,7 @@ void main(const int2 ipos: SV_DispatchThreadID) {
         for (int j = -1; j <= 1; ++j) {
             for (int i = -1; i <= 1; ++i) {
                 const float3 a = modulation_albedo(uint2(ipos + int2(i, j)));
-                const float3 irr = img_filter_result.Load(uint3(ipos + int2(i, j), 0)).rgb;
+                const float3 irr = in_src.Load(uint3(ipos + int2(i, j), 0)).rgb;
                 const float3 color = (a * irr);
                 neigh_clamp_min_color = min(neigh_clamp_min_color, color);
                 neigh_clamp_max_color = max(neigh_clamp_max_color, color);
@@ -143,7 +142,7 @@ void main(const int2 ipos: SV_DispatchThreadID) {
         for (int yy = -r; yy <= r; yy++)
             for (int xx = -r; xx <= r; xx++) {
                 const float3 a = modulation_albedo(uint2(ipos + int2(xx, yy)));
-                const float3 irr = img_filter_result.Load(uint3(ipos + int2(xx, yy), 0)).rgb;
+                const float3 irr = in_src.Load(uint3(ipos + int2(xx, yy), 0)).rgb;
                 const float3 b = (a * irr);
                 m1 += b;
                 m2 += b * b;

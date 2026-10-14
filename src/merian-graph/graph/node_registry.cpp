@@ -93,7 +93,7 @@ NodeRegistry::NodeRegistry() {
     register_node_type<LDRImageRead>("LDR Image", "Loads a LDR image.");
     register_node_type<ImageWrite>("Image Write", "Stores a graph output as image file.");
     register_node_type<ImGuiNode>("ImGui",
-                                  "Renders ImGui draw callbacks onto a window's acquired image.");
+                                  "Renders ImGui draw callbacks onto a window's canvas, in place.");
     register_node_type<MeanToBuffer>(
         "Mean", "Computes the mean of an image and outputs it as a single buffer element.");
     register_node_type<MedianApproxNode>("Median (Approximation)",
@@ -124,8 +124,14 @@ NodeRegistry::NodeRegistry() {
     register_node_type<Shadertoy>("Shadertoy",
                                   "Execute Shadertoy-like shaders (Limited implementation).");
     register_node_type<SVGF>("Denoiser (SVGF)", "Spatiotemporal Variance-Guided Filtering.");
-    register_node_type<SwapchainBlit>(
-        "Swapchain Blit", "Blits a graph image onto a Window node's acquired swapchain image.");
+    register_node_type<SVGFVarianceEstimate>(
+        "SVGF Variance Estimate", "Estimates the variance of accumulated irradiance for SVGF.",
+        false);
+    register_node_type<SVGFFilter>("SVGF Filter", "One edge-avoiding filter level of SVGF.", false);
+    register_node_type<SVGFTAA>(
+        "SVGF TAA", "Temporal anti-aliasing of SVGF that re-modulates the albedo.", false);
+    register_node_type<SwapchainBlit>("Swapchain Blit",
+                                      "Blits a graph image onto a Window node's canvas, in place.");
     register_node_type<TAA>("TAA", "Temporal Anti-Aliasing.");
     register_node_type<Tonemap>("Tonemap", "Convert a HDR image to LDR using various tonemaps.");
     register_node_type<VideoRead>("Video Read",

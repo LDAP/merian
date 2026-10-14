@@ -19,24 +19,20 @@ Filter with magnitude dilation and different clamping modes.
 | Type  | Input name | Description                                       | Delay |
 |-------|------------|---------------------------------------------------|-------|
 | Image | src        | the current frame                                 | no    |
-| Image | feedback   | the previous frame (the previous output)          | 1     |
+| Image | prev_src   | the previous output, connected by default         | 1     |
 | Image | mv         | motion vectors in `r` and `g` channel in pixels   | no    |
 
 #### Outputs:
 
 | Type  | Output name | Description         | Format/Resolution        | Persistent |
 |-------|-------------|---------------------|--------------------------|------------|
-| Image | out         | the blended image   | like `current`           | no         |
+| Image | out         | the blended image   | like `src`, or the overwrite format | no |
 
 
 #### Example
 
 ```c++
-auto taa = std::make_shared<merian::TAANode>(context, alloc, MERIAN_NODES_TAA_CLAMP_MIN_MAX);
-
-graph.add_node("taa", taa);
-
-graph.connect_image(taa, taa, "output", "previous"); // feedback
-graph.connect_image(aliased_image, taa, "out", "current");
-graph.connect_image(aliased_image_mv, taa, "out_mv", "mv");
+graph->add_node("TAA", "taa");
+graph->add_connection("render", "taa", "out", "src");
+graph->add_connection("render", "taa", "mv", "mv");
 ```

@@ -19,9 +19,9 @@ template <typename Model> class GuidingNodeBase : public Node {
     describe_outputs(const NodeIOLayout& io_layout) override {
         configure(io_layout);
         con_guiding =
-            ShaderObjectOut<SlotObject<Model>>::create({.model = model, .version = version}, true);
+            ShaderObjectOut<SlotObject<Model>>::create({.model = model, .version = version});
         needs_reset = true;
-        return {{.name = "guiding", .connector = con_guiding}};
+        return {{.name = "guiding", .connector = con_guiding, .persistent = true}};
     }
 
     NodeStatusFlags
@@ -61,10 +61,11 @@ class GuidingNode : public GuidingNodeBase<GuidingModel> {
             GuidingNodeBase::describe_outputs(io_layout);
         const IrradianceCacheHandle cache = model->get_irradiance_cache();
         con_irradiance_cache = ShaderObjectOut<IrradianceCacheObject>::create(
-            {.model = cache ? cache : std::make_shared<NullIrradianceCache>(), .version = version},
-            true);
-        outputs.push_back(
-            {.name = "irradiance_cache", .connector = con_irradiance_cache, .disabled = !cache});
+            {.model = cache ? cache : std::make_shared<NullIrradianceCache>(), .version = version});
+        outputs.push_back({.name = "irradiance_cache",
+                           .connector = con_irradiance_cache,
+                           .disabled = !cache,
+                           .persistent = true});
         return outputs;
     }
 

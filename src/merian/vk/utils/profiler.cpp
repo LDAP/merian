@@ -43,8 +43,13 @@ void Profiler::enter_child(std::vector<SectionType>& sections,
     }
 
     const auto& children = sections[parent_idx].children;
-    const auto it = std::find_if(children.begin(), children.end(),
-                                 [&](const auto& kv) { return kv.first == name; });
+    // sections usually repeat in the same order
+    const uint32_t cursor = sections[parent_idx].child_cursor;
+    const auto it = cursor < children.size() && children[cursor].first == name
+                        ? children.begin() + cursor
+                        : std::find_if(
+                              children.begin(), children.end(),
+                              [&](const auto& kv) { return kv.first == name; });
     if (it != children.end()) {
         const auto pos = static_cast<uint32_t>(std::distance(children.begin(), it));
         current_idx = it->second;

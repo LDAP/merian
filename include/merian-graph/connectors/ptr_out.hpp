@@ -18,17 +18,15 @@ template <typename T>
 class PtrOut : public OutputConnector, public AccessibleConnector<std::shared_ptr<T>&> {
 
   public:
-    PtrOut(const bool persistent, const bool optional)
-        : OutputConnector(!persistent), persistent(persistent), optional(optional) {}
+    PtrOut(const bool optional) : optional(optional) {}
 
-    GraphResourceHandle
-    create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
-                    [[maybe_unused]] const ConnectorAccess& combined_access,
-                    [[maybe_unused]] const ResourceAllocatorHandle& allocator,
-                    [[maybe_unused]] const ResourceAllocatorHandle& aliasing_allocator,
-                    [[maybe_unused]] const uint32_t resource_index,
-                    [[maybe_unused]] const uint32_t ring_size) override {
-        return std::make_shared<PtrResource<T>>(persistent ? -1 : (int32_t)inputs.size());
+    bool supports_in_place() const override {
+        return true;
+    }
+
+    GraphResourceHandle create_resource(const ResourceCreateInfo& info) override {
+        return std::make_shared<PtrResource<T>>(
+            info.persistent ? -1 : static_cast<int32_t>(info.inputs.size()));
     }
 
     std::shared_ptr<T>& resource(const GraphResourceHandle& resource) override {
@@ -51,18 +49,17 @@ class PtrOut : public OutputConnector, public AccessibleConnector<std::shared_pt
     }
 
   public:
-    static PtrOutHandle<T> create(const bool persistent = false) {
-        return std::make_shared<PtrOut<T>>(persistent, false);
+    static PtrOutHandle<T> create() {
+        return std::make_shared<PtrOut<T>>(false);
     }
 
     // An output a node may leave empty in an iteration. Every consumer has to handle the null
     // pointer, and the producer has to clear it: nothing resets the resource between iterations.
-    static PtrOutHandle<T> create_optional(const bool persistent = false) {
-        return std::make_shared<PtrOut<T>>(persistent, true);
+    static PtrOutHandle<T> create_optional() {
+        return std::make_shared<PtrOut<T>>(true);
     }
 
   private:
-    const bool persistent;
     const bool optional;
 };
 

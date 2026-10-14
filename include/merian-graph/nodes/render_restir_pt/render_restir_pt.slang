@@ -987,7 +987,8 @@ void restir_pt_pass_duplication(const uint2 pixel,
     const uint index = restir_pt_index(pixel, dim);
     const int2 prev = int2(round(float2(pixel) + params.gbuffer.get_motion_vectors(pixel)));
     uint age = 0;
-    if (own != 0 && restir_pt_in_screen(prev, dim)) {
+    if (own != 0 && (pc.flags & RestirPTPassPreviousReservoirs) != 0 &&
+        restir_pt_in_screen(prev, dim)) {
         const uint prev_index = restir_pt_index(uint2(prev), dim);
         if (pc.reservoirs_prev[prev_index].seed == own)
             age = min((pc.prev_duplication[prev_index] >> 16) + 1, 0xFFFFu);

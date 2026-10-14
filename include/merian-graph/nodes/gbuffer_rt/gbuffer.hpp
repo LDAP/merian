@@ -48,11 +48,11 @@ class GBufferRTNode : public Node {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
-    void ensure_pipeline(const SceneHandle& scene);
+    void ensure_pipeline(const ContextHandle& context,
+                         const ResourceAllocatorHandle& allocator,
+                         const SceneHandle& scene);
     void update_gbuffer_constants();
 
-    ContextHandle context;
-    ResourceAllocatorHandle resource_allocator;
     ShaderCompileContextHandle compile_context;
 
     // Connectors

@@ -15,13 +15,6 @@ constexpr const char* PROJECT_MODULE =
 
 } // namespace
 
-void MCPGDistanceGuidingNode::initialize(const ContextHandle& context,
-                                         const ResourceAllocatorHandle& allocator) {
-    this->context = context;
-    this->resource_allocator = allocator;
-    DistanceGuidingNode::initialize(context, allocator);
-}
-
 std::vector<InputConnectorDescriptor> MCPGDistanceGuidingNode::describe_inputs() {
     return {{.name = "scene", .connector = con_scene},
             {.name = "gbuffer", .connector = con_gbuffer, .access = ConnectorAccess::compute_read}};
@@ -36,18 +29,20 @@ void MCPGDistanceGuidingNode::configure(const NodeIOLayout& io_layout) {
     }
 }
 
-void MCPGDistanceGuidingNode::ensure_pipelines(const SceneHandle& scene) {
-    const auto build = [this](Pass& pass, const Versioned<SlangProgram>& prog,
-                              const std::string& name) {
+void MCPGDistanceGuidingNode::ensure_pipelines(const ContextHandle& context,
+                                               const ResourceAllocatorHandle& allocator,
+                                               const SceneHandle& scene) {
+    const auto build = [&context, &allocator](Pass& pass, const Versioned<SlangProgram>& prog,
+                                              const std::string& name) {
         pass.entry_point = SlangProgramEntryPoint::create(prog, name);
-        pass.pipeline = Versioned<Pipeline>([&pass, this] {
+        pass.pipeline = Versioned<Pipeline>([&pass, context] {
             const auto ep = pass.entry_point.get();
             return ComputePipeline::create(ep->get_pipeline_layout(context), ep->specialize());
         });
         pass.pipeline.depends_on(pass.entry_point);
-        pass.params = Versioned<ShaderObject>([&pass, this] {
+        pass.params = Versioned<ShaderObject>([&pass, context, allocator] {
             return pass.entry_point->create_shader_object_for_parameter(context, "params",
-                                                                        resource_allocator);
+                                                                        allocator);
         });
         pass.params.depends_on(pass.entry_point);
     };
@@ -70,9 +65,9 @@ void MCPGDistanceGuidingNode::ensure_pipelines(const SceneHandle& scene) {
             SlangProgram::create(context->get_shader_compile_context(), project_composition);
         build(project, project_program, "main");
         for (auto& level_params : project_params) {
-            level_params = Versioned<ShaderObject>([this] {
+            level_params = Versioned<ShaderObject>([this, context, allocator] {
                 return project.entry_point->create_shader_object_for_parameter(context, "params",
-                                                                               resource_allocator);
+                                                                               allocator);
             });
             level_params.depends_on(project.entry_point);
         }
@@ -85,7 +80,7 @@ MCPGDistanceGuidingNode::NodeStatusFlags MCPGDistanceGuidingNode::process(
     if (!scene || !scene->is_ready()) {
         return {};
     }
-    ensure_pipelines(scene);
+    ensure_pipelines(io.get_context(), io.get_allocator(), scene);
 
     const CommandBufferHandle& cmd = submission.get_cmd();
     const ShaderObjectAllocatorHandle& obj_allocator = info.get_shader_object_allocator();

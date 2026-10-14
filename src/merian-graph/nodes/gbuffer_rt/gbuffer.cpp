@@ -36,9 +36,7 @@ DeviceSupportInfo GBufferRTNode::query_device_support(const DeviceSupportQueryIn
 }
 
 void GBufferRTNode::initialize(const ContextHandle& context,
-                               const ResourceAllocatorHandle& allocator) {
-    this->context = context;
-    this->resource_allocator = allocator;
+                               [[maybe_unused]] const ResourceAllocatorHandle& allocator) {
     this->compile_context = context->get_shader_compile_context();
 }
 
@@ -53,7 +51,8 @@ GBufferRTNode::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) 
 
     return {
         {"gbuffer", con_gbuffer, ConnectorAccess::ray_tracing_write},
-        {"emission", con_emission, ConnectorAccess::ray_tracing_write},
+        {"emission", con_emission,
+         ConnectorAccess::ray_tracing_write | ConnectorAccess::transfer_dst},
     };
 }
 
@@ -84,13 +83,15 @@ GBufferRTNode::on_connected(const NodeIOLayout& io_layout,
     gbuffer_composition = con_gbuffer->get_layout()->get_composition();
 
     if (const SceneHandle& scene = io[con_scene]; scene && scene->is_ready()) {
-        ensure_pipeline(scene);
+        ensure_pipeline(io.get_context(), io.get_allocator(), scene);
     }
 
     return {};
 }
 
-void GBufferRTNode::ensure_pipeline(const SceneHandle& scene) {
+void GBufferRTNode::ensure_pipeline(const ContextHandle& context,
+                                    const ResourceAllocatorHandle& allocator,
+                                    const SceneHandle& scene) {
     if (composition) {
         return;
     }
@@ -104,7 +105,7 @@ void GBufferRTNode::ensure_pipeline(const SceneHandle& scene) {
     program = SlangProgram::create(compile_context, composition);
     entry_point = SlangProgramEntryPoint::create(program, "main");
 
-    pipeline = Versioned<RayTracingPipeline>([this] {
+    pipeline = Versioned<RayTracingPipeline>([this, context] {
         const auto ep = entry_point.get();
         return RayTracingPipelineBuilder()
             .add_raygen_group(ep->specialize())
@@ -113,11 +114,12 @@ void GBufferRTNode::ensure_pipeline(const SceneHandle& scene) {
     pipeline.depends_on(entry_point);
 
     sbt = Versioned<ShaderBindingTable>(
-        [this] { return ShaderBindingTable::create(pipeline.get(), resource_allocator); });
+        [this, allocator] { return ShaderBindingTable::create(pipeline.get(), allocator); });
     sbt.depends_on(pipeline);
 
-    globals_obj = Versioned<ShaderObject>(
-        [this] { return entry_point->create_global_shader_object(context, resource_allocator); });
+    globals_obj = Versioned<ShaderObject>([this, context, allocator] {
+        return entry_point->create_global_shader_object(context, allocator);
+    });
     globals_obj.depends_on(entry_point);
 }
 
@@ -142,7 +144,7 @@ GBufferRTNode::process(const NodeIO& io, const NodeProcessInfo& info, Submission
     const auto& cmd = submission.get_cmd();
     const auto& scene = io[con_scene];
 
-    ensure_pipeline(scene);
+    ensure_pipeline(io.get_context(), io.get_allocator(), scene);
 
     const ShaderObjectAllocatorHandle& obj_allocator = info.get_shader_object_allocator();
 
@@ -167,6 +169,11 @@ GBufferRTNode::process(const NodeIO& io, const NodeProcessInfo& info, Submission
         ep->bind("gbuffer", io[con_gbuffer].w(), cmd, pipe, obj_allocator);
         ep->bind_global(globals, cmd, pipe, obj_allocator);
         cmd->trace_rays(sbt.get(), extent);
+    } else {
+        io[con_gbuffer]->clear(cmd);
+        if (io.is_connected(con_emission)) {
+            cmd->clear(io[con_emission]);
+        }
     }
     return {};
 }

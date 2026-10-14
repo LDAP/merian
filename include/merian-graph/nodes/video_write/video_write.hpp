@@ -65,7 +65,6 @@ class VideoWrite : public Node, public TimeProvider {
 
   private:
     ContextHandle context;
-    ResourceAllocatorHandle allocator;
     std::optional<ComputeKernel> kernel;
     Versioned<SpecializationInfo> spec_info{MERIAN_SPECIALIZATION_INFO_NONE};
 

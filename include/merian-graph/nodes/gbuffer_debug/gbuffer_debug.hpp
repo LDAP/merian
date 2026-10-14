@@ -44,8 +44,6 @@ class GBufferDebugNode : public Node {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
-    ContextHandle context;
-    ResourceAllocatorHandle resource_allocator;
     ShaderCompileContextHandle compile_context;
 
     // Connectors

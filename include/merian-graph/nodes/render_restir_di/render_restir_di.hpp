@@ -56,12 +56,12 @@ class RenderRestirDI : public Node {
   private:
     vk::Format irradiance_format = vk::Format::eR32G32B32A32Sfloat;
 
-    void ensure_pipeline(const SceneHandle& scene);
+    void ensure_pipeline(const ContextHandle& context,
+                         const ResourceAllocatorHandle& allocator,
+                         const SceneHandle& scene);
     vk::BufferCreateInfo reservoir_buffer_create_info() const;
     void update_render_constants();
 
-    ContextHandle context;
-    ResourceAllocatorHandle resource_allocator;
     ShaderCompileContextHandle compile_context;
 
     PtrInHandle<Scene> con_scene = PtrIn<Scene>::create();
@@ -80,6 +80,8 @@ class RenderRestirDI : public Node {
     bool demodulate_albedo = false;
 
     bool temporal_enable = true;
+    // the previous reservoirs and gbuffer were written
+    bool previous_iteration_traced = false;
     float temporal_normal_reject_cos = 0.96f;
     float temporal_depth_reject = 0.1f;
     int32_t temporal_clamp_m = 32 * 20;

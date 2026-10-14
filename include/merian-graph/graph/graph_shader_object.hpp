@@ -16,35 +16,45 @@ enum class ShaderAccess : uint8_t {
 
 struct ShaderObjectAllocateInfo {
     ContextHandle context;
-    ShaderCompileContextHandle compile_context;
+    // Memory for this copy, not bound before on_connected.
     ResourceAllocatorHandle allocator;
-    ResourceAllocatorHandle aliasing_allocator;
     // Union of the declared ConnectorAccess over all connected ports - incorporate the usage
     // flags into allocations.
     ConnectorAccess combined_access;
-    // 0 <= resource_index <= max_delay: which ring slot this instance is.
-    uint32_t resource_index;
-    uint32_t ring_size;
+    // The producer relies on the contents surviving iterations.
+    bool persistent;
+    // Copy c is written in the iterations i with i % copy_count == c.
+    uint32_t copy_index;
+    uint32_t copy_count;
+};
+
+struct ShaderObjectConnectInfo {
+    ContextHandle context;
+    ShaderCompileContextHandle compile_context;
+    // Of the producing node, for the shader objects, views and uploads.
+    ResourceAllocatorHandle allocator;
 };
 
 // A device object transported through the graph via ShaderObjectOut / ShaderObjectIn.
 //
-// The graph allocates one instance per ring slot (delayed inputs receive the previous
-// iteration's instance). Allocation is free-form: device resources, host-side preparation,
-// building and wiring the shader object(s).
+// The graph creates one instance per copy.
 class GraphShaderObject {
   public:
+    // The instances are independent: a delayed input can read the one of an earlier iteration.
+    static constexpr bool supports_delay = true;
+
     virtual ~GraphShaderObject() = default;
 
-    virtual void allocate(const ShaderObjectAllocateInfo& info) = 0;
+    // Create the images and buffers of this copy.
+    virtual void allocate([[maybe_unused]] const ShaderObjectAllocateInfo& info) {}
 
-    // The shader object to bind for the given access. Types without an access split return the
-    // same object for both.
+    // Called once after (re)connect, before the first run: build the shader objects here and
+    // initialize the resources a delayed input may read before the producer wrote them.
+    virtual void on_connected(const ShaderObjectConnectInfo& info, Submission& submission) = 0;
+
+    // The shader object to bind for the given access, valid after on_connected. Types without an
+    // access split return the same object for both.
     virtual const ShaderObjectHandle& object(ShaderAccess access) const = 0;
-
-    // Called once after (re)connect, before the first run. Initialize device resources here:
-    // delayed inputs read a ring slot before its producer ever ran on it.
-    virtual void on_connected([[maybe_unused]] Submission& submission) {}
 };
 
 using GraphShaderObjectHandle = std::shared_ptr<GraphShaderObject>;

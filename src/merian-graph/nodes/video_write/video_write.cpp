@@ -38,7 +38,6 @@ DeviceSupportInfo VideoWrite::query_device_support(const DeviceSupportQueryInfo&
 void VideoWrite::initialize(const ContextHandle& context,
                             const ResourceAllocatorHandle& allocator) {
     this->context = context;
-    this->allocator = allocator;
     if (const auto provider = context->find_provider<VideoDeviceProvider>(true)) {
         codecs = provider->get_encoder_codecs();
     }

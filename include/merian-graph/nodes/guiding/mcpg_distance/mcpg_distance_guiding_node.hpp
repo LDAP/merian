@@ -16,9 +16,6 @@ class MCPGDistanceGuidingNode : public DistanceGuidingNode {
   public:
     MCPGDistanceGuidingNode() : DistanceGuidingNode(std::make_shared<MCPGDistanceGuidingModel>()) {}
 
-    void initialize(const ContextHandle& context,
-                    const ResourceAllocatorHandle& allocator) override;
-
     std::vector<InputConnectorDescriptor> describe_inputs() override;
 
     NodeStatusFlags
@@ -28,14 +25,13 @@ class MCPGDistanceGuidingNode : public DistanceGuidingNode {
     void configure(const NodeIOLayout& io_layout) override;
 
   private:
-    void ensure_pipelines(const SceneHandle& scene);
+    void ensure_pipelines(const ContextHandle& context,
+                          const ResourceAllocatorHandle& allocator,
+                          const SceneHandle& scene);
 
     MCPGDistanceGuidingModel& chains() const {
         return static_cast<MCPGDistanceGuidingModel&>(*model);
     }
-
-    ContextHandle context;
-    ResourceAllocatorHandle resource_allocator;
 
     PtrInHandle<Scene> con_scene = PtrIn<Scene>::create();
     GBufferInHandle con_gbuffer = GBufferIn::create({});

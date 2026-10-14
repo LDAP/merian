@@ -10,7 +10,6 @@ namespace merian {
 
 void WindowNode::initialize(const ContextHandle& context,
                             const ResourceAllocatorHandle& /*allocator*/) {
-    this->context = context;
     providers = context->find_providers<WindowProvider>();
     if (providers.empty()) {
         throw graph_errors::node_error{"WindowNode requires at least one WindowProvider"};
@@ -18,11 +17,12 @@ void WindowNode::initialize(const ContextHandle& context,
 }
 
 WindowNode::NodeStatusFlags WindowNode::on_connected(const NodeIOLayout& /*io_layout*/,
-                                                     const NodeIO& /*io*/,
+                                                     const NodeIO& io,
                                                      const NodeConnectionInfo& /*info*/,
                                                      Submission& /*submission*/) {
     const auto& selected = get_selected_provider();
     if (!window || selected != active_provider) {
+        const ContextHandle& context = io.get_context();
         window = selected->create_window(context->get_device(), create_info);
         active_provider = selected;
 
@@ -41,7 +41,9 @@ std::vector<InputConnectorDescriptor> WindowNode::describe_inputs() {
 }
 
 std::vector<OutputConnectorDescriptor> WindowNode::describe_outputs(const NodeIOLayout& /*io*/) {
-    return {{"acquire", con_acquire}, {"controller", con_controller}, {"window", con_window}};
+    return {{"canvas", con_canvas, ConnectorAccess::transfer_dst},
+            {"controller", con_controller},
+            {"window", con_window}};
 }
 
 WindowNode::NodeStatusFlags WindowNode::pre_process([[maybe_unused]] const NodeIO& io,
@@ -74,10 +76,8 @@ WindowNode::process(const NodeIO& io, const NodeProcessInfo& info, Submission& s
         acquire = swapchain_manager->acquire(window, acquire_timeout_ns);
     }
 
-    // A minimised window, a timed out acquire or an exhausted recreate all leave the iteration
-    // without an image. The window and its controller exist either way; the acquire is cleared
-    // explicitly so that no consumer picks up the one left in this ring slot.
-    io[con_acquire] = acquire ? std::make_shared<SwapchainAcquireResult>(*acquire) : nullptr;
+    // A minimised window, a timed out acquire or an exhausted recreate leave no image.
+    io[con_canvas].set(acquire ? acquire->image_view : nullptr);
     io[con_controller] = window->get_input_controller();
     io[con_window] = window;
 
@@ -86,14 +86,15 @@ WindowNode::process(const NodeIO& io, const NodeProcessInfo& info, Submission& s
         const ImageHandle image = acquire->image_view->get_image();
 
         // Provide the swapchain image as a canvas: blit the optional "src" input, or clear.
-        // Downstream nodes consuming "acquire" composite on top (load-preserving the result).
         cmd->barrier(image->barrier2(vk::ImageLayout::eTransferDstOptimal, true));
 
         ImageHandle src_image;
         if (io.is_connected(image_in)) {
             current_src_array_size = io[image_in].get_array_size();
-            src_array_element = std::min(src_array_element, current_src_array_size - 1);
-            src_image = io[image_in].get_image(src_array_element);
+            if (current_src_array_size > 0) {
+                src_array_element = std::min(src_array_element, current_src_array_size - 1);
+                src_image = io[image_in].get_image(src_array_element);
+            }
         } else {
             current_src_array_size = 0;
         }
@@ -114,8 +115,7 @@ WindowNode::process(const NodeIO& io, const NodeProcessInfo& info, Submission& s
             }
         }
 
-        // Transition to present once the canvas and any downstream "acquire" consumer have
-        // rendered.
+        // Transition to present once every node wrote the canvas.
         submission.add_pre_submit_callback([image](Submission& submission) {
             submission.get_cmd()->barrier(image->barrier2(vk::ImageLayout::ePresentSrcKHR));
         });

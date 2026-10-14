@@ -35,9 +35,12 @@ LDRImageRead::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
         throw graph_errors::node_error{e.what()};
     }
 
-    con_out = ManagedVkImageOut::create(format, width, height, 1, true);
+    con_out = ManagedVkImageOut::create(format, width, height);
     needs_run = true;
-    return {{"out", con_out, ConnectorAccess::transfer_dst}};
+    return {{.name = "out",
+             .connector = con_out,
+             .access = ConnectorAccess::transfer_dst,
+             .persistent = true}};
 }
 
 [[nodiscard]] LDRImageRead::NodeStatusFlags

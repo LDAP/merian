@@ -44,8 +44,11 @@ void print_usage() {
         "                                ends a fixed-length render)\n"
         "  --time-delta=<ms>             advance the graph time by a fixed delta per iteration\n"
         "                                instead of following the wall clock\n"
-        "  --print-times                 print the profiler report after the last iteration,\n"
-        "                                averaged over the whole run\n"
+        "  --print-times                 enable the profiler and print its report after the last\n"
+        "                                iteration, averaged over the whole run, and of the last\n"
+        "                                graph build\n"
+        "  --print-memory                print where the graph allocates memory after the last\n"
+        "                                iteration\n"
         "  --<name> <value>              set an override declared in the graph's \"cli\" block;\n"
         "                                may appear before or after graph.json, in any order\n"
         "                                variant selections persist when the graph is stored;\n"
@@ -63,6 +66,7 @@ struct Options {
     std::optional<float> time_delta_ms;
     std::string exit_on_event = "//end";
     bool print_times = false;
+    bool print_memory = false;
     // Non-runner tokens in command-line order; classified against the graph's cli block once
     // the config is loaded. A pre-config override's value is kept adjacent to its --name.
     std::vector<std::string> graph_args;
@@ -101,6 +105,8 @@ std::optional<Options> parse(const std::vector<std::string>& args) {
             options.time_delta_ms = std::stof(arg.substr(arg.find('=') + 1));
         } else if (arg == "--print-times") {
             options.print_times = true;
+        } else if (arg == "--print-memory") {
+            options.print_memory = true;
         } else if (arg.starts_with("--loglevel=")) {
             spdlog::set_level(spdlog::level::from_str(arg.substr(arg.find('=') + 1)));
         } else if (arg.starts_with("--plugin-path=")) {
@@ -130,7 +136,7 @@ std::optional<Options> parse(const std::vector<std::string>& args) {
 void build_default_graph(const merian::GraphHandle& graph) {
     const std::string window = graph->add_node("Window", "window");
     const std::string imgui = graph->add_node("ImGui", "imgui");
-    graph->add_connection(window, imgui, "acquire", "acquire");
+    graph->add_connection(window, imgui, "canvas", "canvas");
     graph->add_connection(window, imgui, "window", "window");
     // Closing the window shuts the app down rather than removing the node.
     graph->find_node_for_identifier_and_type<merian::WindowNode>(window)->set_on_should_close(
@@ -255,6 +261,7 @@ int main(const int argc, const char** argv) {
         graph->set_time_source_delta(*options->time_delta_ms);
     }
     if (options->print_times) {
+        graph->set_profiler_enabled(true);
         // Suppress the periodic report, so the one taken at the end spans every iteration.
         graph->set_profiler_report_interval(std::numeric_limits<uint32_t>::max());
     }
@@ -310,6 +317,10 @@ int main(const int argc, const char** argv) {
 
     if (options->print_times) {
         fmt::print("{}", merian::Profiler::get_report_str(graph->get_run_report()));
+        fmt::print("Graph build:\n{}", merian::Profiler::get_report_str(graph->get_build_report()));
+    }
+    if (options->print_memory) {
+        fmt::print("{}", graph->get_memory_report());
     }
 
     SPDLOG_INFO("shutting down");

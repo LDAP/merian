@@ -72,6 +72,9 @@ vk::BufferDeviceAddressInfo Buffer::get_buffer_device_address_info() const {
 vk::DeviceAddress Buffer::get_device_address() const {
     assert(create_info.usage & vk::BufferUsageFlagBits::eShaderDeviceAddress);
     if (!cached_device_address_) {
+        if (!memory) {
+            throw std::logic_error{"device addresses need bound memory"};
+        }
         cached_device_address_ =
             context->get_device()->get_device().getBufferAddress(get_buffer_device_address_info());
     }

@@ -10,6 +10,9 @@ namespace merian {
 
 template <typename Model> class SlotObject : public GraphShaderObject {
   public:
+    // the instances share the model
+    static constexpr bool supports_delay = false;
+
     struct CreateInfo {
         std::shared_ptr<Model> model;
         // bumped whenever the model's properties changed what a consumer bakes into its program
@@ -18,7 +21,8 @@ template <typename Model> class SlotObject : public GraphShaderObject {
 
     SlotObject(const CreateInfo& create_info) : model(create_info.model) {}
 
-    void allocate(const ShaderObjectAllocateInfo& info) override {
+    void on_connected(const ShaderObjectConnectInfo& info,
+                      [[maybe_unused]] Submission& submission) override {
         const SlangProgramHandle program =
             SlangProgram::create(info.compile_context, model->get_composition()).get();
         shader_object = program->create_shader_object_for_type(info.context, model->get_type_name(),

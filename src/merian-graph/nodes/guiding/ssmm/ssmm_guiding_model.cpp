@@ -14,9 +14,7 @@ constexpr const char* GUIDING_MODULE = "merian-graph/nodes/guiding/ssmm/ssmm-gui
 } // namespace
 
 void SSMMGuidingModel::initialize([[maybe_unused]] const ContextHandle& context,
-                                  const ResourceAllocatorHandle& allocator) {
-    this->allocator = allocator;
-}
+                                  [[maybe_unused]] const ResourceAllocatorHandle& allocator) {}
 
 SlangCompositionHandle SSMMGuidingModel::query_device_support_composition() {
     const auto composition = SlangComposition::create();
@@ -50,7 +48,8 @@ std::string SSMMGuidingModel::get_type_name() const {
     return fmt::format("merian::SSMMGuiding<{}>", get_gbuffer_layout()->get_type_name(false));
 }
 
-void SSMMGuidingModel::on_extent(const vk::Extent3D& new_extent) {
+void SSMMGuidingModel::on_extent(const ResourceAllocatorHandle& allocator,
+                                 const vk::Extent3D& new_extent) {
     if (new_extent == extent) {
         return;
     }

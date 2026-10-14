@@ -34,13 +34,6 @@ class build_error : public graph_error {
     build_error(const std::string& what_arg) : graph_error(what_arg) {}
 };
 
-// attempted to build() a graph with an illegal connection present. For example, an input does not
-// support the resource / output that is connected into it.)
-class invalid_connection : public build_error {
-  public:
-    invalid_connection(const std::string& what_arg) : build_error(what_arg) {}
-};
-
 // attempted to build() a graph with a missing connection. Meaning a node input was not connected
 // to an node output.
 class connection_missing : public build_error {

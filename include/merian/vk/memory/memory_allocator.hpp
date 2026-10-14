@@ -128,6 +128,16 @@ class MemoryAllocator : public std::enable_shared_from_this<MemoryAllocator> {
                                      const MemoryMappingType mapping_type = MemoryMappingType::NONE,
                                      const std::string& debug_name = {});
 
+    // The memory type create_buffer selects; nullopt if the allocator cannot tell.
+    virtual std::optional<uint32_t>
+    find_memory_type(const vk::BufferCreateInfo& buffer_create_info,
+                     const MemoryMappingType mapping_type = MemoryMappingType::NONE);
+
+    // The memory type create_image selects; nullopt if the allocator cannot tell.
+    virtual std::optional<uint32_t>
+    find_memory_type(const vk::ImageCreateInfo& image_create_info,
+                     const MemoryMappingType mapping_type = MemoryMappingType::NONE);
+
     // ------------------------------------------------------------------------------------
 
   public:
@@ -137,11 +147,7 @@ class MemoryAllocator : public std::enable_shared_from_this<MemoryAllocator> {
 
   private:
     const ContextHandle context;
-
-    std::function<vk::MemoryRequirements(const vk::ImageCreateInfo& image_create_info)>
-        get_image_memory_requirements_func;
-    std::function<vk::MemoryRequirements(const vk::BufferCreateInfo& buffer_create_info)>
-        get_buffer_memory_requirements_func;
+    const bool has_maintenance4;
 };
 
 struct MemoryAllocationInfo {

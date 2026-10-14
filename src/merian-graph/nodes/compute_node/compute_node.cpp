@@ -16,7 +16,6 @@ void AbstractCompute::invalidate_shader() {
 void AbstractCompute::initialize(const ContextHandle& context,
                                  const ResourceAllocatorHandle& allocator) {
     this->context = context;
-    this->allocator = allocator;
     this->compile_context = context->get_shader_compile_context();
 
     kernel.emplace(

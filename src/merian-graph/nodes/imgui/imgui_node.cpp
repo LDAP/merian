@@ -15,18 +15,17 @@ void ImGuiNode::initialize(const ContextHandle& context, const ResourceAllocator
 }
 
 std::vector<InputConnectorDescriptor> ImGuiNode::describe_inputs() {
-    return {{"acquire", con_acquire}, {"window", con_window}};
-}
-
-std::vector<OutputConnectorDescriptor> ImGuiNode::describe_outputs(const NodeIOLayout& /*io*/) {
-    return {{"acquire", con_acquire_out}};
+    return {{.name = "canvas",
+             .connector = con_canvas,
+             .access = ConnectorAccess::color_attachment,
+             .in_place = true},
+            {.name = "window", .connector = con_window}};
 }
 
 [[nodiscard]] ImGuiNode::NodeStatusFlags
 ImGuiNode::process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) {
-    const std::shared_ptr<SwapchainAcquireResult>& acquire = io[con_acquire];
-    io[con_acquire_out] = acquire;
-    if (!acquire) {
+    const TextureHandle& canvas = io[con_canvas].get_texture();
+    if (!canvas) {
         return {};
     }
 
@@ -51,7 +50,7 @@ ImGuiNode::process(const NodeIO& io, const NodeProcessInfo& info, Submission& su
         ImGui::End();
     });
 
-    imgui_renderer->render(submission.get_cmd(), acquire->image_view);
+    imgui_renderer->render(submission.get_cmd(), canvas->get_view());
     return {};
 }
 

@@ -23,11 +23,8 @@ class ShaderObjectIn : public InputConnector,
   public:
     ShaderObjectIn() = default;
 
-    void on_connect_output(const OutputConnectorHandle& output) override {
-        if (!std::dynamic_pointer_cast<ShaderObjectOut<T>>(output)) {
-            throw graph_errors::invalid_connection{
-                "ShaderObjectIn expects a ShaderObjectOut of the same type."};
-        }
+    bool can_receive_from(const OutputConnectorHandle& output) const override {
+        return std::dynamic_pointer_cast<ShaderObjectOut<T>>(output) != nullptr;
     }
 
     ShaderObjectAccess<T> resource(const GraphResourceHandle& resource) override {

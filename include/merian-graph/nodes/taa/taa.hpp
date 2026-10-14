@@ -21,6 +21,8 @@ class TAA : public AbstractCompute {
         float temporal_alpha;
         int clamp_method;
         VkBool32 enable_mv;
+        // the previous output was not written yet
+        VkBool32 reset;
     };
 
   public:

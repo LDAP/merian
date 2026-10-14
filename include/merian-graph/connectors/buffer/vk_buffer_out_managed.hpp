@@ -13,17 +13,9 @@ using ManagedVkBufferOutHandle = std::shared_ptr<ManagedVkBufferOut>;
 class ManagedVkBufferOut : public VkBufferOut,
                            public AccessibleConnector<const BufferArrayResource&> {
   public:
-    ManagedVkBufferOut(const vk::BufferCreateInfo& create_info,
-                       const bool persistent = false,
-                       const uint32_t array_size = 1);
+    ManagedVkBufferOut(const vk::BufferCreateInfo& create_info, const uint32_t array_size = 1);
 
-    GraphResourceHandle
-    create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
-                    const ConnectorAccess& combined_access,
-                    const ResourceAllocatorHandle& allocator,
-                    const ResourceAllocatorHandle& aliasing_allocator,
-                    const uint32_t resource_index,
-                    const uint32_t ring_size) override;
+    GraphResourceHandle create_resource(const ResourceCreateInfo& info) override;
 
     BufferArrayResource& resource(const GraphResourceHandle& resource) override;
 
@@ -38,7 +30,6 @@ class ManagedVkBufferOut : public VkBufferOut,
 
   public:
     static ManagedVkBufferOutHandle create(const vk::BufferCreateInfo& create_info,
-                                           const bool persistent = false,
                                            const uint32_t array_size = 1);
 
   public:

@@ -3,8 +3,7 @@
 
 namespace merian {
 
-VkImageOut::VkImageOut(const bool persistent, const uint32_t array_size)
-    : OutputConnector(!persistent), persistent(persistent), array_size(array_size) {}
+VkImageOut::VkImageOut(const uint32_t array_size) : array_size(array_size) {}
 
 uint32_t VkImageOut::get_array_size() const {
     return array_size;

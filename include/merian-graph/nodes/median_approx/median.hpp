@@ -48,8 +48,6 @@ class MedianApproxNode : public Node {
   private:
     void make_spec_info();
 
-    ContextHandle context;
-    ResourceAllocatorHandle allocator;
     ShaderCompileContextHandle compile_context;
     int component = 0;
 

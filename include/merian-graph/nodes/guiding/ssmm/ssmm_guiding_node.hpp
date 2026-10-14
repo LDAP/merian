@@ -26,7 +26,8 @@ class SSMMGuidingNode : public GuidingNode {
 
   protected:
     void configure(const NodeIOLayout& io_layout) override {
-        ssmm().on_extent(io_layout[con_gbuffer]->get_create_info().extent);
+        ssmm().on_extent(io_layout.get_allocator(),
+                         io_layout[con_gbuffer]->get_create_info().extent);
         ssmm().set_gbuffer_output(std::dynamic_pointer_cast<GBufferOut>(io_layout[con_gbuffer]));
     }
 

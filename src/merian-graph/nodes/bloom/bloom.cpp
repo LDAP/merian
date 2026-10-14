@@ -26,8 +26,6 @@ DeviceSupportInfo Bloom::query_device_support(const DeviceSupportQueryInfo& quer
 }
 
 void Bloom::initialize(const ContextHandle& context, const ResourceAllocatorHandle& allocator) {
-    this->context = context;
-    this->allocator = allocator;
     this->compile_context = context->get_shader_compile_context();
 
     auto spec_builder = SpecializationInfoBuilder();
@@ -39,7 +37,10 @@ void Bloom::initialize(const ContextHandle& context, const ResourceAllocatorHand
 }
 
 std::vector<InputConnectorDescriptor> Bloom::describe_inputs() {
-    return {{"src", con_src, ConnectorAccess::compute_read}};
+    return {{.name = "src",
+             .connector = con_src,
+             .access = ConnectorAccess::compute_read,
+             .pass_through = "out"}};
 }
 
 std::vector<OutputConnectorDescriptor> Bloom::describe_outputs(const NodeIOLayout& io_layout) {

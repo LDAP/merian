@@ -22,9 +22,6 @@ class ImageWrite : public Node, public TimeProvider {
 
     virtual ~ImageWrite();
 
-    void initialize(const ContextHandle& context,
-                    const ResourceAllocatorHandle& allocator) override;
-
     virtual std::vector<InputConnectorDescriptor> describe_inputs() override;
 
     virtual NodeStatusFlags pre_process(const NodeIO& io, const NodeProcessInfo& info) override;
@@ -71,9 +68,6 @@ class ImageWrite : public Node, public TimeProvider {
     }
 
   private:
-    ContextHandle context;
-    ResourceAllocatorHandle allocator;
-
     VkImageInHandle con_src = VkImageIn::create();
 
     std::function<void()> callback;

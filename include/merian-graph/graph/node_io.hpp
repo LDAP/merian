@@ -78,6 +78,11 @@ class NodeIOLayout {
     void register_event_listener(const std::string& event_pattern,
                                  const GraphEvent::Listener& event_listener) const;
 
+    const ContextHandle& get_context() const;
+
+    // The memory of the node, alive until the node is removed.
+    const ResourceAllocatorHandle& get_allocator() const;
+
   private:
     OutputConnectorHandle output_for_input(const InputConnectorHandle& input_connector) const;
     bool input_optional(const InputConnectorHandle& input_connector) const;
@@ -93,10 +98,12 @@ class NodeIO {
     NodeIO(Graph* graph,
            graph_internal::NodeData* data,
            const NodeHandle& node,
-           const uint32_t set_idx)
-        : graph(graph), data(data), node(node), set_idx(set_idx) {}
+           const uint32_t set_idx,
+           const bool allow_transient_outputs = true)
+        : graph(graph), data(data), node(node), set_idx(set_idx),
+          allow_transient_outputs(allow_transient_outputs) {}
 
-    // Behavior undefined if an optional input connector is not connected.
+    // Throws node_error if the input is not connected.
     template <typename T,
               typename ResourceAccessType = T::resource_access_type,
               std::enable_if_t<std::is_base_of_v<AccessibleConnector<ResourceAccessType>, T> &&
@@ -104,14 +111,10 @@ class NodeIO {
                                bool> = true>
     ResourceAccessType operator[](const std::shared_ptr<T>& input_connector) const {
         assert(input_connector && "input connector cannot be null");
-        assert((input_optional(input_connector) || resource_for_input(input_connector)) &&
-               "non-optional input connector is not connected. This should be prevented by the "
-               "Graph.");
-        assert((!input_optional(input_connector) || resource_for_input(input_connector)) &&
-               "optional input connector is not connected");
-        return input_connector->resource(resource_for_input(input_connector));
+        return input_connector->resource(connected_resource_for_input(input_connector));
     }
 
+    // Throws node_error if the output is disabled, or not persistent in on_connected.
     template <typename T,
               typename ResourceAccessType = T::resource_access_type,
               std::enable_if_t<std::is_base_of_v<AccessibleConnector<ResourceAccessType>, T> &&
@@ -147,7 +150,9 @@ class NodeIO {
     // Binds every shader-visible input and output whose name matches a cursor field:
     // input "src" -> "in_src", output "irr" -> "out_irr", either at the cursor root or inside
     // a "graph_in" / "graph_out" struct field. Unmatched ports are skipped (the shader may not
-    // need them); unconnected optional inputs with a matching field receive a dummy.
+    // need them); unconnected optional inputs and disabled image and buffer outputs with a matching
+    // field receive a dummy. An in-place input binds as in_<name>. Throws node_error for a
+    // non-persistent output in on_connected.
     void bind(const ShaderObjectHandle& object) const;
     void bind(ShaderCursor cursor) const;
 
@@ -155,9 +160,19 @@ class NodeIO {
                     const GraphEvent::Data& event_data = {},
                     const bool notify_all = true) const;
 
+    const ContextHandle& get_context() const;
+
+    // The memory of the node, alive until the node is removed.
+    const ResourceAllocatorHandle& get_allocator() const;
+
   private:
-    GraphResourceHandle resource_for_input(const InputConnectorHandle& input_connector) const;
-    GraphResourceHandle resource_for_output(const OutputConnectorHandle& output_connector) const;
+    // null if not connected
+    const GraphResourceHandle&
+    resource_for_input(const InputConnectorHandle& input_connector) const;
+    const GraphResourceHandle&
+    connected_resource_for_input(const InputConnectorHandle& input_connector) const;
+    const GraphResourceHandle&
+    resource_for_output(const OutputConnectorHandle& output_connector) const;
     bool input_optional(const InputConnectorHandle& input_connector) const;
     std::any& get_frame_data() const;
 
@@ -165,6 +180,7 @@ class NodeIO {
     graph_internal::NodeData* data;
     NodeHandle node;
     uint32_t set_idx;
+    bool allow_transient_outputs;
 };
 
 } // namespace merian

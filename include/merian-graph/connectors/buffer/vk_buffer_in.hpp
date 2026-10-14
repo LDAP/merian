@@ -19,6 +19,8 @@ class VkBufferIn : public InputConnector,
   public:
     VkBufferIn() = default;
 
+    bool can_receive_from(const OutputConnectorHandle& output) const override;
+
     void on_connect_output(const OutputConnectorHandle& output) override;
 
     const BufferArrayResource& resource(const GraphResourceHandle& resource) override;

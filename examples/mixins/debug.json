@@ -27,7 +27,7 @@
         "debug": {
             "enabled": true,
             "outputs": [
-                "acquire->imgui.acquire"
+                "canvas->imgui.canvas"
             ],
             "type": "Path Debugger"
         },
@@ -38,7 +38,7 @@
         },
         "output": {
             "outputs": [
-                "acquire->debug.acquire",
+                "canvas->debug.canvas",
                 "controller->debug.controller",
                 "controller->scene.controller",
                 "window->debug.window",

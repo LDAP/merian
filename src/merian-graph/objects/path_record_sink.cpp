@@ -17,12 +17,16 @@ OutputConnectorDescriptor PathRecordSink::describe_output(const ContextHandle& c
         size = stream_size(spp, vertices_per_path);
     }
     emitted_size = size;
+    // the consumer writes the header that the next iteration's renderer reads
     con = ManagedVkBufferOut::create(vk::BufferCreateInfo(
         {}, size,
         vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst |
             vk::BufferUsageFlagBits::eTransferSrc));
-    return {"path_records", con,
-            ConnectorAccess::ray_tracing_read_write | ConnectorAccess::compute_read_write};
+    return {.name = "path_records",
+            .connector = con,
+            .access = ConnectorAccess::ray_tracing_read_write |
+                      ConnectorAccess::compute_read_write | ConnectorAccess::transfer_dst,
+            .persistent = true};
 }
 
 bool PathRecordSink::update_connected(const NodeIOLayout& io_layout) {

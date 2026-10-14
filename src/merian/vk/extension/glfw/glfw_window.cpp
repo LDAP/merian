@@ -416,7 +416,7 @@ const char* GLFWWindow::get_clipboard_text() {
             return glfwGetClipboardString(nullptr);
         } catch (merian::ExtensionGLFW::glfw_error& e) {
             if (t++ > tries) {
-                SPDLOG_ERROR("glfw failed to set the clipboard: {}", e.what());
+                SPDLOG_ERROR("glfw failed to get the clipboard: {}", e.what());
                 return nullptr;
             }
         }

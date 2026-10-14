@@ -60,6 +60,8 @@ RESTIR_PT_UNSCOPED enum RestirPTPassFlags : uint32_t {
     RestirPTPassTemporalShifts = 0x2,
     // the shifts of this dispatch move previous reservoirs into their neighbors
     RestirPTPassCoverageShifts = 0x4,
+    // the previous reservoirs were written
+    RestirPTPassPreviousReservoirs = 0x8,
 };
 
 RESTIR_PT_UNSCOPED enum RestirPTShiftMapping : uint32_t {

@@ -68,15 +68,15 @@ class RenderRestirPT : public Node {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
-    void ensure_pipeline(const SceneHandle& scene);
+    void ensure_pipeline(const ContextHandle& context,
+                         const ResourceAllocatorHandle& allocator,
+                         const SceneHandle& scene);
     void update_render_constants();
-    void upload_pairing(Submission& submission);
+    void upload_pairing(const ResourceAllocatorHandle& allocator, Submission& submission);
     uint32_t recorded_paths_per_pixel() const;
     uint32_t recorded_vertices_per_path() const;
     bool use_raygen() const;
 
-    ContextHandle context;
-    ResourceAllocatorHandle resource_allocator;
     ShaderCompileContextHandle compile_context;
 
     PtrInHandle<Scene> con_scene = PtrIn<Scene>::create();
@@ -113,6 +113,8 @@ class RenderRestirPT : public Node {
 
     // temporal reuse
     bool temporal_enable = true;
+    // the previous reservoirs and gbuffer were written
+    bool previous_iteration_traced = false;
     float history_cap = 20.f;
     bool stochastic_backprojection = false;
     bool disocclusion_motion = false;

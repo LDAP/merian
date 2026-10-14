@@ -27,7 +27,9 @@ class ExtensionVkDebugUtils : public ContextExtension {
 
     // Overrides
     ~ExtensionVkDebugUtils() {
-        (**instance).destroyDebugUtilsMessengerEXT(messenger);
+        if (instance) {
+            (**instance).destroyDebugUtilsMessengerEXT(messenger);
+        }
     }
 
     InstanceSupportInfo

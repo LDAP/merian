@@ -14,6 +14,8 @@ Merian provides concrete implementations of these interfaces:
 
 - `MemoryAllocatorVMA`: An implementation of `MemoryAllocator` using the [Vulkan Memory Allocator](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator) (VMA).
 - `ResourceAllocator`: Uses a `MemoryAllocator` to create and destroy resources.
+- `TrackingMemoryAllocator`: Forwards to another `MemoryAllocator` and reports the size of its live allocations.
+- `TransientMemoryAllocator`: Places resources whose times of use (a bitset over the positions of a cycle) do not overlap into shared memory. `create_scope(lifetime, fallback)` returns a `MemoryAllocator` whose resources are created unbound; `commit` places them greedy by size (Pisarchyk & Lee 2020) into blocks per memory type and binds them. What cannot be placed goes to the fallback.
 
 ### Resource allocations
 

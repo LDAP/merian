@@ -123,8 +123,6 @@ class ErrorPlot : public Node {
 
     void draw_overlay(uint32_t width, uint32_t height) const;
 
-    ContextHandle context;
-    ResourceAllocatorHandle allocator;
     ShaderCompileContextHandle compile_context;
 
     // both inputs are sampled by the metric shader and blitted into the split view

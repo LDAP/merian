@@ -27,6 +27,12 @@ StagingMemoryManager::~StagingMemoryManager() = default;
 
 namespace {
 
+template <typename T> void check_bound(const T& resource) {
+    if (!resource->get_memory()) {
+        throw std::logic_error{"upload to a resource without memory"};
+    }
+}
+
 BumpMemoryAllocatorHandle reuse_if_released(BumpMemoryAllocatorHandle& spare) {
     if (!spare) {
         return nullptr;
@@ -122,6 +128,7 @@ StagingMemoryManager::to_device(const ImageHandle& image,
                                 const vk::ImageSubresourceLayers& subresource,
                                 const vk::Offset3D offset,
                                 const std::optional<vk::Extent3D> optional_extent) {
+    check_bound(image);
     assert(data);
     assert(offset < image->get_extent());
     assert(!optional_extent || *optional_extent <= image->get_extent());
@@ -198,6 +205,7 @@ StagingMemoryManager::to_device(const BufferHandle& buffer,
                                 const void* data,
                                 const vk::DeviceSize offset,
                                 const std::optional<vk::DeviceSize> optional_size) {
+    check_bound(buffer);
     assert(offset < buffer->get_size());
     assert(!optional_size || *optional_size <= buffer->get_size());
     assert(!optional_size || *optional_size + offset <= buffer->get_size());
@@ -224,7 +232,7 @@ void StagingMemoryManager::cmd_to_device(const CommandBufferHandle& cmd,
                                          const void* data,
                                          const vk::DeviceSize offset,
                                          const std::optional<vk::DeviceSize> optional_size) {
-
+    check_bound(buffer);
     assert(offset < buffer->get_size());
     assert(!optional_size || *optional_size <= buffer->get_size());
     assert(!optional_size || *optional_size + offset <= buffer->get_size());
@@ -251,6 +259,7 @@ StagingMemoryManager::cmd_to_device(const CommandBufferHandle& cmd,
                                     const BufferHandle& buffer,
                                     const vk::DeviceSize offset,
                                     const std::optional<vk::DeviceSize> optional_size) {
+    check_bound(buffer);
     assert(offset < buffer->get_size());
     assert(!optional_size || *optional_size <= buffer->get_size());
     assert(!optional_size || offset + *optional_size <= buffer->get_size());

@@ -122,8 +122,6 @@ DeviceSupportInfo PathDebugNode::query_device_support(const DeviceSupportQueryIn
 
 void PathDebugNode::initialize(const ContextHandle& context,
                                const ResourceAllocatorHandle& allocator) {
-    this->context = context;
-    this->allocator = allocator;
     this->compile_context = context->get_shader_compile_context();
 
     spec_info.set(SpecializationInfoBuilder().build());
@@ -138,7 +136,7 @@ void PathDebugNode::initialize(const ContextHandle& context,
     finalize_kernel.emplace(context, allocator, compile_context, FINALIZE_MODULE, spec_info);
     filter_render_kernel.emplace(context, allocator, compile_context, FILTER_RENDER_MODULE,
                                  spec_info);
-    build_gbuffer_kernels();
+    build_gbuffer_kernels(context, allocator);
 
     state_buffer = allocator->create_buffer(vk::DeviceSize{STATE_UINTS} * 4,
                                             vk::BufferUsageFlagBits::eStorageBuffer |
@@ -164,7 +162,8 @@ void PathDebugNode::initialize(const ContextHandle& context,
     ImGuiContext::set_current(prev_imgui_ctx);
 }
 
-void PathDebugNode::build_gbuffer_kernels() {
+void PathDebugNode::build_gbuffer_kernels(const ContextHandle& context,
+                                          const ResourceAllocatorHandle& allocator) {
     const bool connected = gbuffer_connected;
     const auto layout = gbuffer_composition;
     const auto make = [connected, layout](const char* module) {
@@ -186,15 +185,17 @@ void PathDebugNode::build_gbuffer_kernels() {
     overlay_program = SlangProgram::create(compile_context, overlay_composition);
     overlay_vertex = SlangProgramEntryPoint::create(overlay_program, "vertex_main");
     overlay_fragment = SlangProgramEntryPoint::create(overlay_program, "fragment_main");
-    overlay_globals = Versioned<ShaderObject>(
-        [this] { return overlay_vertex.get()->create_global_shader_object(context, allocator); });
+    overlay_globals = Versioned<ShaderObject>([this, context, allocator] {
+        return overlay_vertex.get()->create_global_shader_object(context, allocator);
+    });
     overlay_globals.depends_on(overlay_vertex);
     overlay_format = vk::Format::eUndefined;
 }
 
-void PathDebugNode::build_overlay_pipeline(const vk::Format color_format) {
+void PathDebugNode::build_overlay_pipeline(const ContextHandle& context,
+                                           const vk::Format color_format) {
     overlay_format = color_format;
-    overlay_pipeline = Versioned<Pipeline>([this, color_format] {
+    overlay_pipeline = Versioned<Pipeline>([this, context, color_format] {
         const auto vertex = overlay_vertex.get();
         return GraphicsPipelineBuilder()
             .set_vertex_shader(vertex->specialize())
@@ -214,7 +215,9 @@ void PathDebugNode::build_overlay_pipeline(const vk::Format color_format) {
     overlay_pipeline.depends_on(overlay_fragment);
 }
 
-void PathDebugNode::ensure_scene_pipeline(ScenePipeline& kernel,
+void PathDebugNode::ensure_scene_pipeline(const ContextHandle& context,
+                                          const ResourceAllocatorHandle& allocator,
+                                          ScenePipeline& kernel,
                                           const SceneHandle& scene,
                                           const char* module) {
     if (kernel.composition) {
@@ -227,12 +230,12 @@ void PathDebugNode::ensure_scene_pipeline(ScenePipeline& kernel,
 
     kernel.program = SlangProgram::create(compile_context, kernel.composition);
     kernel.entry_point = SlangProgramEntryPoint::create(kernel.program, "main");
-    kernel.pipeline = Versioned<Pipeline>([this, &kernel] {
+    kernel.pipeline = Versioned<Pipeline>([&kernel, context] {
         const auto ep = kernel.entry_point.get();
         return ComputePipeline::create(ep->get_pipeline_layout(context), ep->specialize());
     });
     kernel.pipeline.depends_on(kernel.entry_point);
-    kernel.globals = Versioned<ShaderObject>([this, &kernel] {
+    kernel.globals = Versioned<ShaderObject>([&kernel, context, allocator] {
         return kernel.entry_point.get()->create_global_shader_object(context, allocator);
     });
     kernel.globals.depends_on(kernel.entry_point);
@@ -246,7 +249,7 @@ std::vector<InputConnectorDescriptor> PathDebugNode::describe_inputs() {
     return {
         {"scene", con_scene},
         {"records", con_records,
-         ConnectorAccess::compute_read_write |
+         ConnectorAccess::compute_read_write | ConnectorAccess::transfer_dst |
              ConnectorAccess{vk::PipelineStageFlagBits2::eVertexShader,
                              vk::AccessFlagBits2::eShaderRead,
                              {},
@@ -257,7 +260,11 @@ std::vector<InputConnectorDescriptor> PathDebugNode::describe_inputs() {
          true},
         {"controller", con_controller, {}, 0, true},
         {"window", con_window, {}, 0, true},
-        {"acquire", con_acquire, ConnectorAccess::transfer_dst, 0, true},
+        {.name = "canvas",
+         .connector = con_canvas,
+         .access = ConnectorAccess::transfer_dst,
+         .optional = true,
+         .in_place = true},
     };
 }
 
@@ -288,6 +295,7 @@ PathDebugNode::describe_outputs(const NodeIOLayout& io_layout) {
     con_filtered_b = ManagedVkImageOut::create(vk::Format::eR32G32B32A32Sfloat, extent);
 
     const vk::DeviceSize pixels = vk::DeviceSize{extent.width} * extent.height;
+    const ResourceAllocatorHandle& allocator = io_layout.get_allocator();
     moments_buffer = allocator->create_buffer(pixels * 6 * 4,
                                               vk::BufferUsageFlagBits::eStorageBuffer |
                                                   vk::BufferUsageFlagBits::eTransferDst,
@@ -314,8 +322,7 @@ PathDebugNode::describe_outputs(const NodeIOLayout& io_layout) {
              ConnectorAccess::compute_write | ConnectorAccess::color_attachment |
                  ConnectorAccess::transfer_src},
             {"filtered", con_filtered, ConnectorAccess::compute_write},
-            {"filtered_b", con_filtered_b, ConnectorAccess::compute_write},
-            {"acquire", con_acquire_out}};
+            {"filtered_b", con_filtered_b, ConnectorAccess::compute_write}};
 }
 
 PathDebugNode::NodeStatusFlags
@@ -327,7 +334,8 @@ PathDebugNode::on_connected(const NodeIOLayout& io_layout,
     gbuffer_composition =
         (gbuffer_connected ? io[con_gbuffer]->get_layout() : GBufferLayout::complete())
             ->get_composition();
-    build_gbuffer_kernels();
+    const ResourceAllocatorHandle& allocator = io.get_allocator();
+    build_gbuffer_kernels(io.get_context(), allocator);
     bsdf_map = {};
     bsdf_check = {};
     maps_dirty = true;
@@ -396,7 +404,7 @@ PathDebugNode::on_connected(const NodeIOLayout& io_layout,
 PathDebugNode::NodeStatusFlags
 PathDebugNode::process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) {
     handle_input(io);
-    load_reference(submission);
+    load_reference(io.get_allocator(), submission);
 
     const PathRecordCapacities capacities = path_record_capacities(io[con_records]->get_size());
     const ReadbackFeedback fed = apply_readback_feedback(info, capacities);
@@ -892,7 +900,8 @@ void PathDebugNode::record_analysis(const NodeIO& io,
     }
     if (pdf_stale && activity.maps_active && gbuffer_connected) {
         MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "bsdf map");
-        ensure_scene_pipeline(bsdf_map, scene, BSDF_MAP_MODULE);
+        ensure_scene_pipeline(io.get_context(), io.get_allocator(), bsdf_map, scene,
+                              BSDF_MAP_MODULE);
         record_scene_kernel(bsdf_map, io, info, submission,
                             vk::Extent3D{params.map_res, params.map_res, 1});
         pdf_stale = false;
@@ -903,7 +912,8 @@ void PathDebugNode::record_analysis(const NodeIO& io,
         cmd->update(stats_buffer, sizeof(uint32_t) * PATH_DEBUG_CHECK,
                     vk::ArrayProxy<const uint32_t>(zero));
         cmd->barrier(transfer_to_compute(stats_buffer));
-        ensure_scene_pipeline(bsdf_check, scene, BSDF_CHECK_MODULE);
+        ensure_scene_pipeline(io.get_context(), io.get_allocator(), bsdf_check, scene,
+                              BSDF_CHECK_MODULE);
         record_scene_kernel(bsdf_check, io, info, submission,
                             vk::Extent3D{PATH_DEBUG_CHECK_DIM, PATH_DEBUG_CHECK_DIM, 1});
     }
@@ -927,6 +937,7 @@ void PathDebugNode::record_analysis(const NodeIO& io,
     }
     if (params.heat_mode != PATH_DEBUG_HEAT_OFF) {
         MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "heat");
+        cmd->barrier(compute_to_compute(state_buffer));
         {
             const auto pipe = heat_decay_kernel->bind(io, info, submission);
             cmd->dispatch(params.grid_slots / PATH_DEBUG_WG, 1, 1);
@@ -960,7 +971,7 @@ void PathDebugNode::record_overlay_lines(const NodeIO& io,
     const BufferHandle& records = io[con_records];
     MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "lines");
     if (overlay_format != io[con_out]->get_format()) {
-        build_overlay_pipeline(io[con_out]->get_format());
+        build_overlay_pipeline(io.get_context(), io[con_out]->get_format());
     }
     const auto vertex = overlay_vertex.get();
     const auto pipe = overlay_pipeline.get();
@@ -1058,7 +1069,7 @@ void PathDebugNode::record_export(const NodeIO& io,
     submission.get_cmd()->barrier(io[con_out]->barrier2(
         vk::ImageLayout::eTransferSrcOptimal, {}, vk::AccessFlagBits2::eTransferRead,
         vk::PipelineStageFlagBits2::eAllCommands, vk::PipelineStageFlagBits2::eTransfer));
-    image_export(allocator, submission, info.get_profiler(), io[con_out],
+    image_export(io.get_allocator(), submission, info.get_profiler(), io[con_out],
                  vk::Extent2D{extent.width, extent.height},
                  std::filesystem::absolute(
                      export_path + image_format_extension(IMAGE_EXPORT_FORMATS.at(export_format))),
@@ -1120,18 +1131,16 @@ void PathDebugNode::record_readback(const NodeIO& io,
 
 void PathDebugNode::record_present(const NodeIO& io, Submission& submission) {
     presenting = false;
-    if (!io.is_connected(con_acquire)) {
+    if (!io.is_connected(con_canvas)) {
         return;
     }
-    const std::shared_ptr<SwapchainAcquireResult>& acquire = io[con_acquire];
-    io[con_acquire_out] = acquire;
-    if (!acquire) {
+    const ImageHandle& dst = io[con_canvas].get_image();
+    if (!dst) {
         return;
     }
 
     const CommandBufferHandle& cmd = submission.get_cmd();
     const ImageHandle& src = io[con_out].get_image();
-    const ImageHandle dst = acquire->image_view->get_image();
     cmd->barrier(dst->barrier2(vk::ImageLayout::eTransferDstOptimal, true));
     cmd->barrier(
         src->barrier2(vk::ImageLayout::eTransferSrcOptimal, vk::AccessFlagBits2::eMemoryWrite,
@@ -1153,7 +1162,8 @@ void PathDebugNode::record_present(const NodeIO& io, Submission& submission) {
     presenting = true;
 }
 
-void PathDebugNode::load_reference(Submission& submission) {
+void PathDebugNode::load_reference(const ResourceAllocatorHandle& allocator,
+                                   Submission& submission) {
     if (!reference_dirty && reference_texture) {
         return;
     }

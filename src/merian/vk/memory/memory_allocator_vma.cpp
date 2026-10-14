@@ -1,6 +1,7 @@
 #include "merian/vk/memory/memory_allocator_vma.hpp"
 #include "merian/vk/extension/extension_vma.hpp"
 #include "merian/vk/memory/resource_allocations.hpp"
+#include "merian/vk/utils/check_result.hpp"
 #include <spdlog/spdlog.h>
 
 namespace {
@@ -96,9 +97,11 @@ ImageHandle VMAMemoryAllocation::create_aliasing_image(const vk::ImageCreateInfo
     std::lock_guard<std::mutex> lock(allocation_mutex);
 
     vk::Image image;
-    vmaCreateAliasingImage2(allocator->vma_allocator, m_allocation, allocation_offset,
-                            reinterpret_cast<const VkImageCreateInfo*>(&image_create_info),
-                            reinterpret_cast<VkImage*>(&image));
+    check_result(
+        vmaCreateAliasingImage2(allocator->vma_allocator, m_allocation, allocation_offset,
+                                reinterpret_cast<const VkImageCreateInfo*>(&image_create_info),
+                                reinterpret_cast<VkImage*>(&image)),
+        "creating an aliasing image failed");
 
     return Image::create(image, shared_from_this(), image_create_info,
                          image_create_info.initialLayout);
@@ -110,24 +113,28 @@ VMAMemoryAllocation::create_aliasing_buffer(const vk::BufferCreateInfo& buffer_c
     std::lock_guard<std::mutex> lock(allocation_mutex);
 
     vk::Buffer buffer;
-    vmaCreateAliasingBuffer2(allocator->vma_allocator, m_allocation, allocation_offset,
-                             reinterpret_cast<const VkBufferCreateInfo*>(&buffer_create_info),
-                             reinterpret_cast<VkBuffer*>(&buffer));
+    check_result(
+        vmaCreateAliasingBuffer2(allocator->vma_allocator, m_allocation, allocation_offset,
+                                 reinterpret_cast<const VkBufferCreateInfo*>(&buffer_create_info),
+                                 reinterpret_cast<VkBuffer*>(&buffer)),
+        "creating an aliasing buffer failed");
 
     return Buffer::create(buffer, shared_from_this(), buffer_create_info);
 }
 
 void VMAMemoryAllocation::bind_to_image(const ImageHandle& image,
                                         const vk::DeviceSize allocation_offset) {
-    vmaBindImageMemory2(allocator->vma_allocator, m_allocation, allocation_offset, **image,
-                        nullptr);
+    check_result(vmaBindImageMemory2(allocator->vma_allocator, m_allocation, allocation_offset,
+                                     **image, nullptr),
+                 "binding image memory failed");
     image->_set_memory_allocation(shared_from_this());
 }
 
 void VMAMemoryAllocation::bind_to_buffer(const BufferHandle& buffer,
                                          const vk::DeviceSize allocation_offset) {
-    vmaBindBufferMemory2(allocator->vma_allocator, m_allocation, allocation_offset, **buffer,
-                         nullptr);
+    check_result(vmaBindBufferMemory2(allocator->vma_allocator, m_allocation, allocation_offset,
+                                      **buffer, nullptr),
+                 "binding buffer memory failed");
     buffer->_set_memory_allocation(shared_from_this());
 }
 
@@ -286,6 +293,36 @@ ImageHandle VMAMemoryAllocator::create_image(const vk::ImageCreateInfo image_cre
     log_allocation(allocation_info, memory, debug_name);
 
     return image_handle;
+}
+
+std::optional<uint32_t>
+VMAMemoryAllocator::find_memory_type(const vk::BufferCreateInfo& buffer_create_info,
+                                     const MemoryMappingType mapping_type) {
+    const VmaAllocationCreateInfo allocation_create_info =
+        make_create_info(VMA_MEMORY_USAGE_AUTO, {}, {}, mapping_type, false, 1.0);
+    const VkBufferCreateInfo c_buffer_create_info = buffer_create_info;
+    uint32_t memory_type_index;
+    if (vmaFindMemoryTypeIndexForBufferInfo(vma_allocator, &c_buffer_create_info,
+                                            &allocation_create_info,
+                                            &memory_type_index) != VK_SUCCESS) {
+        return std::nullopt;
+    }
+    return memory_type_index;
+}
+
+std::optional<uint32_t>
+VMAMemoryAllocator::find_memory_type(const vk::ImageCreateInfo& image_create_info,
+                                     const MemoryMappingType mapping_type) {
+    const VmaAllocationCreateInfo allocation_create_info =
+        make_create_info(VMA_MEMORY_USAGE_AUTO, {}, {}, mapping_type, false, 1.0);
+    const VkImageCreateInfo c_image_create_info = image_create_info;
+    uint32_t memory_type_index;
+    if (vmaFindMemoryTypeIndexForImageInfo(vma_allocator, &c_image_create_info,
+                                           &allocation_create_info,
+                                           &memory_type_index) != VK_SUCCESS) {
+        return std::nullopt;
+    }
+    return memory_type_index;
 }
 
 std::shared_ptr<VMAMemoryAllocator> VMAMemoryAllocator::create(const ContextHandle& context) {

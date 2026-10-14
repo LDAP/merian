@@ -12,11 +12,8 @@ const std::any& AnyIn::resource(const GraphResourceHandle& resource) {
     return debugable_ptr_cast<AnyResource>(resource)->any;
 }
 
-void AnyIn::on_connect_output(const OutputConnectorHandle& output) {
-    auto casted_output = std::dynamic_pointer_cast<AnyOut>(output);
-    if (!casted_output) {
-        throw graph_errors::invalid_connection{"AnyIn cannot receive from output."};
-    }
+bool AnyIn::can_receive_from(const OutputConnectorHandle& output) const {
+    return std::dynamic_pointer_cast<AnyOut>(output) != nullptr;
 }
 
 Connector::ConnectorStatusFlags

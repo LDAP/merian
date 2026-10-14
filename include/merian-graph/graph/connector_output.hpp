@@ -10,52 +10,54 @@ namespace merian {
 class InputConnector;
 using InputConnectorHandle = std::shared_ptr<InputConnector>;
 
+struct ResourceCreateInfo {
+    // The inputs it feeds, also through versions written in place.
+    const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs;
+    // The union of the declared accesses of this port and all connected inputs: allocate with its
+    // usage flags.
+    ConnectorAccess combined_access;
+    // Memory for this copy, not bound before on_connected.
+    ResourceAllocatorHandle allocator;
+    // The node relies on the contents surviving iterations.
+    bool persistent;
+    // Copy c is written in the iterations i with i % copy_count == c.
+    uint32_t copy_index;
+    uint32_t copy_count;
+    std::string debug_name;
+};
+
+struct ResourceConnectInfo {
+    // Of the producing node, for views, descriptors and uploads.
+    ResourceAllocatorHandle allocator;
+    uint32_t copy_index;
+};
+
 // The base class for all output connectors.
 class OutputConnector : public Connector {
   public:
-    OutputConnector(const bool supports_delay) : supports_delay(supports_delay) {}
+    // Called once per copy and connect.
+    virtual GraphResourceHandle create_resource(const ResourceCreateInfo& info) = 0;
 
-    // Create the resource for this output. This is called max_delay + 1 times per graph build.
-    //
-    // If the resource is availible via descriptors you must ensure needs_descriptor_update.
-    //
-    // If using aliasing_allocator the graph might alias the underlying memory, meaning it is only
-    // valid when the node is executed and no guarantees about the contents of the memory can be
-    // made. However, it is guaranteed between calls to connector.on_pre_process and
-    // connector.on_post_process with this resource the memory is not in use and syncronization is
-    // ensured.
-    //
-    // The inputs are supplied in the order they are serialized by the graph. combined_access is
-    // the union of the declared ConnectorAccess of this port and all connected inputs (use its
-    // usage flags for allocation).
-    //
-    // resource_index: 0 <= i <= max_delay
-    // ring_size: Number of iterations in flight
-    virtual GraphResourceHandle
-    create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
-                    const ConnectorAccess& combined_access,
-                    const ResourceAllocatorHandle& allocator,
-                    const ResourceAllocatorHandle& aliasing_allocator,
-                    const uint32_t resource_index,
-                    const uint32_t ring_size) = 0;
+    // Called once per copy after the memory of all copies is bound: create views and query device
+    // addresses here. Recorded commands are submitted and awaited before the first run; what they
+    // write is kept for a delayed input that reads a copy before its first write.
+    virtual void on_connected([[maybe_unused]] const ResourceConnectInfo& info,
+                              [[maybe_unused]] Submission& submission,
+                              [[maybe_unused]] const GraphResourceHandle& resource) {}
 
-    // Throw invalid_connection, if the resource cannot interface with the supplied connector (try
-    // dynamic cast or use merian::test_shared_ptr_types). Can also be used to pre-compute barriers
-    // or similar.
-    virtual void on_connect_input([[maybe_unused]] const InputConnectorHandle& input) {}
-
-    // Called once after the graph is connected with all resources of this output (one per ring
-    // slot). Record one-time device initialization; it is submitted and awaited before the first
-    // run.
-    virtual void on_connected([[maybe_unused]] Submission& submission,
-                              [[maybe_unused]] const std::vector<GraphResourceHandle>& resources) {}
-
-    virtual void properties(Properties& config) {
-        config.output_text(fmt::format("supports delay: {}", supports_delay));
+    // A delayed input can read it: create_resource makes independent resources.
+    virtual bool supports_delay() const {
+        return true;
     }
 
-  public:
-    const bool supports_delay;
+    // An in-place input can write the resource and pass it on.
+    virtual bool supports_in_place() const {
+        return false;
+    }
+
+    virtual void properties(Properties& config) {
+        config.output_text(fmt::format("supports delay: {}", supports_delay()));
+    }
 };
 
 using OutputConnectorHandle = std::shared_ptr<OutputConnector>;

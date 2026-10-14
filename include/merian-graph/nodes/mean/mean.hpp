@@ -48,8 +48,6 @@ class MeanToBuffer : public Node {
     process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) override;
 
   private:
-    ContextHandle context;
-    ResourceAllocatorHandle allocator;
     ShaderCompileContextHandle compile_context;
 
     VkSampledImageInHandle con_src = VkSampledImageIn::create();

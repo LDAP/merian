@@ -67,7 +67,6 @@ class VideoRead : public Node, public TimeProvider {
     void advance_to(const std::chrono::nanoseconds& time);
 
     ContextHandle context;
-    ResourceAllocatorHandle allocator;
     SamplerHandle sampler;
     std::optional<ComputeKernel> kernel;
     Versioned<SpecializationInfo> spec_info{MERIAN_SPECIALIZATION_INFO_NONE};

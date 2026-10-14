@@ -29,13 +29,12 @@ void main(int2 ipos: SV_DispatchThreadID, int local_index: SV_GroupIndex) {
         count = 0;
     GroupMemoryBarrierWithGroupSync();
 
-    if (is_on_texture(ipos, out_out)) {
+    if (is_on_texture(ipos, in_src)) {
         bool mask;
-        int2 tex_dims = texture_dimensions(out_out);
+        int2 tex_dims = texture_dimensions(in_src);
         if (params.metering == 0) {
             mask = true;
         } else if (params.metering == 1) {
-            // Dirty but works :D
             mask = true;
             mask = mask && (ipos.x % max(uint(smoothstep(.1 * tex_dims.r / 2, tex_dims.r / 2,
                                                          distance(tex_dims / 2, ipos)) *

@@ -40,7 +40,6 @@ DeviceSupportInfo VideoRead::query_device_support(const DeviceSupportQueryInfo& 
 
 void VideoRead::initialize(const ContextHandle& context, const ResourceAllocatorHandle& allocator) {
     this->context = context;
-    this->allocator = allocator;
     sampler = allocator->get_sampler_pool()->linear_clamp_to_edge();
 
     auto spec_builder = SpecializationInfoBuilder();
@@ -89,7 +88,7 @@ std::vector<OutputConnectorDescriptor> VideoRead::describe_outputs(const NodeIOL
                                   : vk::Format::eR16G16B16A16Sfloat;
 
     con_out = ManagedVkImageOut::create(format, extent);
-    return {{"out", con_out, ConnectorAccess::compute_write}};
+    return {{"out", con_out, ConnectorAccess::compute_write | ConnectorAccess::transfer_dst}};
 }
 
 std::chrono::nanoseconds VideoRead::presentation_time(const VideoFrameHandle& frame) const {
@@ -182,7 +181,8 @@ void VideoRead::advance_to(const std::chrono::nanoseconds& time) {
     }
 }
 
-VideoRead::NodeStatusFlags VideoRead::pre_process(const NodeIO& io, const NodeProcessInfo& info) {
+VideoRead::NodeStatusFlags VideoRead::pre_process([[maybe_unused]] const NodeIO& io,
+                                                  const NodeProcessInfo& info) {
     if (!decoder) {
         return {};
     }
@@ -222,6 +222,9 @@ VideoRead::NodeStatusFlags VideoRead::pre_process(const NodeIO& io, const NodePr
 VideoRead::NodeStatusFlags
 VideoRead::process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) {
     if (!current) {
+        if (io.is_connected(con_out)) {
+            submission.get_cmd()->clear(io[con_out]);
+        }
         return {};
     }
     // hold the frame until this iteration finished on the GPU

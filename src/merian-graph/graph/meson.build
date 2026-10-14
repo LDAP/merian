@@ -6,8 +6,12 @@ merian_graph_src += files(
     'graph.cpp',
     'graph_edit.cpp',
     'graph_connect.cpp',
+    'graph_subgraph.cpp',
+    'graph_layers.cpp',
     'graph_properties.cpp',
     'graph_events.cpp',
     'graph_description.cpp',
     'graph_load_store.cpp',
+    'graph_memory_report.cpp',
+    'subgraph.cpp',
 )

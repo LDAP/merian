@@ -15,7 +15,7 @@
         "blit": {
             "enabled": true,
             "outputs": [
-                "acquire->imgui.acquire"
+                "canvas->imgui.canvas"
             ],
             "type": "Swapchain Blit"
         },
@@ -47,7 +47,7 @@
         "window": {
             "enabled": true,
             "outputs": [
-                "acquire->blit.acquire",
+                "canvas->blit.canvas",
                 "window->imgui.window"
             ],
             "properties": {

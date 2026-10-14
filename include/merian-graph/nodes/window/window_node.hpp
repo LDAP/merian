@@ -1,6 +1,7 @@
 #pragma once
 
 #include "merian-graph/connectors/image/vk_image_in.hpp"
+#include "merian-graph/connectors/image/vk_image_out_external.hpp"
 #include "merian-graph/connectors/ptr_out.hpp"
 #include "merian-graph/graph/node.hpp"
 
@@ -58,7 +59,6 @@ class WindowNode : public Node {
     uint32_t src_array_element = 0;
     uint32_t current_src_array_size = 1;
 
-    ContextHandle context;
     std::vector<std::shared_ptr<WindowProvider>> providers;
     int selected_provider = 0;
     std::shared_ptr<WindowProvider> active_provider;
@@ -71,8 +71,8 @@ class WindowNode : public Node {
 
     VkImageInHandle image_in = VkImageIn::create();
 
-    PtrOutHandle<SwapchainAcquireResult> con_acquire =
-        PtrOut<SwapchainAcquireResult>::create_optional();
+    // the acquired swapchain image, blitted from src or cleared; null when there is none
+    ExternalVkImageOutHandle con_canvas = ExternalVkImageOut::create();
     PtrOutHandle<InputController> con_controller = PtrOut<InputController>::create();
     PtrOutHandle<Window> con_window = PtrOut<Window>::create();
 

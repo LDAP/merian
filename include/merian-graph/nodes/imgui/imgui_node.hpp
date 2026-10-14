@@ -1,7 +1,7 @@
 #pragma once
 
+#include "merian-graph/connectors/image/vk_image_in.hpp"
 #include "merian-graph/connectors/ptr_in.hpp"
-#include "merian-graph/connectors/ptr_out.hpp"
 #include "merian-graph/graph/node.hpp"
 
 #include "merian/utils/stopwatch.hpp"
@@ -9,21 +9,18 @@
 #include "merian/vk/imgui/imgui_merian_backend.hpp"
 #include "merian/vk/imgui/imgui_renderer.hpp"
 #include "merian/vk/imgui/imgui_theme.hpp"
-#include "merian/vk/window/swapchain_manager.hpp"
 #include "merian/vk/window/window.hpp"
 
 namespace merian {
 
-// Draws a UI window onto a Window node's acquired swapchain image. Each frame it sends a graph
-// event carrying a Properties; listeners (the graph, plugins) render their controls into it.
+// Draws a UI window onto a Window node's swapchain image ("canvas", written in place). Each frame
+// it sends a graph event carrying a Properties for listeners to render their controls into.
 class ImGuiNode : public Node {
   public:
     void initialize(const ContextHandle& context,
                     const ResourceAllocatorHandle& allocator) override;
 
     std::vector<InputConnectorDescriptor> describe_inputs() override;
-
-    std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
     [[nodiscard]] NodeStatusFlags
     process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) override;
@@ -40,10 +37,8 @@ class ImGuiNode : public Node {
     std::string imgui_event = "ui";
     ImGuiTheme theme = ImGuiTheme::Mocha;
 
-    PtrInHandle<SwapchainAcquireResult> con_acquire = PtrIn<SwapchainAcquireResult>::create();
+    VkImageInHandle con_canvas = VkImageIn::create();
     PtrInHandle<Window> con_window = PtrIn<Window>::create();
-    PtrOutHandle<SwapchainAcquireResult> con_acquire_out =
-        PtrOut<SwapchainAcquireResult>::create_optional();
 };
 
 } // namespace merian

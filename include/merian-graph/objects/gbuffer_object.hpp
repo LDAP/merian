@@ -7,8 +7,8 @@
 
 namespace merian {
 
-// GBuffer transported as a graph object: the graph allocates the textures per ring slot and keeps
-// them synchronized; consumers bind merian::GBuffer / merian::WGBuffer.
+// GBuffer transported as a graph object: the graph allocates the textures per copy and keeps them
+// synchronized; consumers bind merian::GBuffer / merian::WGBuffer.
 class GBufferObject : public GraphShaderObject {
   public:
     struct CreateInfo {
@@ -21,10 +21,12 @@ class GBufferObject : public GraphShaderObject {
 
     void allocate(const ShaderObjectAllocateInfo& info) override;
 
-    const ShaderObjectHandle& object(ShaderAccess access) const override;
+    // Clears every field: out-of-bounds ids in a gbuffer hang the GPU.
+    void on_connected(const ShaderObjectConnectInfo& info, Submission& submission) override;
 
-    // Cleared so consumers never see garbage (out-of-bounds ids in a gbuffer hang the GPU).
-    void on_connected(Submission& submission) override;
+    void clear(const CommandBufferHandle& cmd) const;
+
+    const ShaderObjectHandle& object(ShaderAccess access) const override;
 
     vk::Extent3D get_extent() const {
         return extent;
@@ -77,14 +79,14 @@ using GBufferOutHandle = std::shared_ptr<GBufferOut>;
 // Outputs a GBufferObject that holds the fields its GBufferIns request.
 class GBufferOut : public ShaderObjectOut<GBufferObject> {
   public:
-    GBufferOut(const vk::Extent3D& extent, bool persistent);
+    GBufferOut(const vk::Extent3D& extent);
 
     // Null until the graph allocates the output.
     const GBufferLayoutHandle& get_layout() const {
         return layout;
     }
 
-    static GBufferOutHandle create(const vk::Extent3D& extent, bool persistent = false);
+    static GBufferOutHandle create(const vk::Extent3D& extent);
 
   protected:
     std::shared_ptr<GBufferObject> create_instance(

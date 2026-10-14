@@ -22,7 +22,10 @@ void ExtensionGLFW::on_context_initializing(const PFN_vkGetInstanceProcAddr load
     glfwInitVulkanLoader(loader);
 
     SPDLOG_DEBUG("Initialize GLFW {}...", glfwGetVersionString());
+    glfwSetErrorCallback(
+        [](const int id, const char* desc) { SPDLOG_WARN("GLFW: {}: {}", id, desc); });
     glfw_initialized = glfwInit();
+    glfwSetErrorCallback(glfw_error_callback);
 
     if (glfw_initialized == GLFW_TRUE) {
         SPDLOG_DEBUG("Querying Vulkan support...");

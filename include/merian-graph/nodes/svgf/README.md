@@ -15,25 +15,23 @@ But modifies the original code in that:
 - Slightly modified edge detecting functions
 - Provides a bunch of debugging options
 
+A subgraph: `variance estimate` -> `filter 0` .. `filter N-1` -> `taa`, with N the `iterations`.
+
 #### Inputs:
 
 | Type   | Input name   | Description                                                 | Delay |
 |--------|--------------|-------------------------------------------------------------|-------|
-| Image  | prev_out     | feedback last `out`                                         | 1     |
-|        |
+| Image  | prev_out     | feedback last `out`, the own `out` if not connected         | 1     |
 | Image  | src          | (accumulated) noisy irradiance, second moment in `a`        | no    |
 | Image  | history      | packed history: f16 history length in high half of `g` (see accumulate) | no    |
-|        |
-| Image  | albedo       | the demodulated albedo                                      | no    |
-| Image  | mv           | motion vectors in `r` and `g` channel                       | no    |
-|        |
-| Buffer | gbuffer      | GBuffer (see `gbuffer.slang`)                              | no    |
+| Image  | mv           | motion vectors in `r` and `g` channel, optional             | no    |
+| GBuffer| gbuffer      | GBuffer (see `gbuffer.slang`)                               | no    |
 
 #### Outputs:
 
 | Type  | Output name | Description                                                 | Format/Resolution        | Persistent |
 |-------|-------------|-------------------------------------------------------------|--------------------------|------------|
-| Image | out         | the final image (containing remaining variance in a)        | same as `irr`            | no         |
+| Image | out         | the final image (containing remaining variance in a)        | `src` or the overwrite format, gbuffer extent | no |
 
 
 #### Copyright notice

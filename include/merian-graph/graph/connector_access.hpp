@@ -40,7 +40,6 @@ struct ConnectorAccess {
     static const ConnectorAccess ray_tracing_read;
     static const ConnectorAccess ray_tracing_write;
     static const ConnectorAccess ray_tracing_read_write;
-    static const ConnectorAccess acceleration_structure_read;
 };
 
 inline const ConnectorAccess ConnectorAccess::compute_read{
@@ -97,12 +96,6 @@ inline const ConnectorAccess ConnectorAccess::ray_tracing_read_write{
     vk::PipelineStageFlagBits2::eRayTracingShaderKHR,
     vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
     vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled,
-    {}};
-
-inline const ConnectorAccess ConnectorAccess::acceleration_structure_read{
-    vk::PipelineStageFlagBits2::eRayTracingShaderKHR | vk::PipelineStageFlagBits2::eComputeShader,
-    vk::AccessFlagBits2::eAccelerationStructureReadKHR,
-    {},
     {}};
 
 } // namespace merian

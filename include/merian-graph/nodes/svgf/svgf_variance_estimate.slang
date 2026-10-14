@@ -18,21 +18,18 @@ using merian;
 
 /*
  * Reads the accumulated irradiance and the moments, estimates the variance,
- * and prepares the filter input `img_filter_in`.
+ * and prepares the input of the first filter level.
  */
 
 [vk::constant_id(2)]
 const int SVGF_ITERATIONS = 0;
 
-// graph-bound
 ParameterBlock<GBuffer> in_gbuffer;
 Sampler2D<float4> in_src;
 [vk::image_format("unknown")]
 Sampler2D<uint2> in_history;
-
-// internal ping-pong (bound by the node)
-RWTexture2D<float4> img_filter_in;
-RWTexture2D<uint4> img_gbuf_in;
+RWTexture2D<float4> out_out;
+RWTexture2D<uint4> out_gbuf;
 
 struct PushConstant {
     float normal_reject_cos;
@@ -58,9 +55,9 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
           const uint group_index: SV_GroupIndex,
           const uint2 group_id: SV_GroupID) {
     if (SVGF_ITERATIONS == 0) {
-        if (is_on_texture(dispatch_thread_id, img_filter_in))
-            img_filter_in.Store(dispatch_thread_id,
-                                float4(in_src.Load(uint3(dispatch_thread_id, 0)).rgb, 0));
+        if (is_on_texture(dispatch_thread_id, out_out))
+            out_out.Store(dispatch_thread_id,
+                          float4(in_src.Load(uint3(dispatch_thread_id, 0)).rgb, 0));
         return;
     }
 
@@ -111,13 +108,13 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
             GroupMemoryBarrierWithGroupSync();
         }
 
-        if (not_on_texture(dispatch_thread_id, img_filter_in))
+        if (not_on_texture(dispatch_thread_id, out_out))
             return;
 
         if (svgf_kaleidoscope) {
-            img_gbuf_in.Store(dispatch_thread_id,
-                              uint4(encode_normal(center_normal), asuint(center_linear_z),
-                                    packHalf2x16(center_grad_z), 0));
+            out_gbuf.Store(dispatch_thread_id,
+                           uint4(encode_normal(center_normal), asuint(center_linear_z),
+                                 packHalf2x16(center_grad_z), 0));
         }
     }
 
@@ -163,5 +160,5 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
     irr_moments = lerp(center_irr_moments, irr_moments, alpha);
 
     const float variance = max(0.0, irr_moments.a - irr_moments.r * irr_moments.r);
-    img_filter_in.Store(dispatch_thread_id, float4(irr_moments.rgb, svgf_encode_variance(variance)));
+    out_out.Store(dispatch_thread_id, float4(irr_moments.rgb, svgf_encode_variance(variance)));
 }

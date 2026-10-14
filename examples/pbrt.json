@@ -25,7 +25,7 @@
         "blit": {
             "enabled": true,
             "outputs": [
-                "acquire->imgui.acquire"
+                "canvas->imgui.canvas"
             ],
             "type": "Swapchain Blit"
         },
@@ -78,7 +78,7 @@
             "enabled": true,
             "outputs": [
                 "controller->scene.controller",
-                "acquire->blit.acquire",
+                "canvas->blit.canvas",
                 "window->imgui.window"
             ],
             "properties": {

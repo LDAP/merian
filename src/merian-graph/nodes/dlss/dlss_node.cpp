@@ -107,8 +107,8 @@ DeviceSupportInfo DLSSNode::query_device_support(const DeviceSupportQueryInfo& q
     return super_resolution->query_device_support(query_info);
 }
 
-void DLSSNode::initialize(const ContextHandle& context, const ResourceAllocatorHandle& allocator) {
-    this->allocator = allocator;
+void DLSSNode::initialize(const ContextHandle& context,
+                          const ResourceAllocatorHandle& /*allocator*/) {
     dlss_super_resolution = context->get_context_extension<ExtensionDLSSSuperResolution>();
     dlss_ray_reconstruction = context->get_context_extension<ExtensionDLSSRayReconstruction>(true);
 }
@@ -137,9 +137,12 @@ std::vector<InputConnectorDescriptor> DLSSNode::describe_inputs() {
     }
 
     return {
-        {"scene", con_scene},
-        {"gbuffer", con_gbuffer, ConnectorAccess::compute_read},
-        {"src", con_src, ConnectorAccess::compute_read | ConnectorAccess::transfer_src},
+        {.name = "scene", .connector = con_scene},
+        {.name = "gbuffer", .connector = con_gbuffer, .access = ConnectorAccess::compute_read},
+        {.name = "src",
+         .connector = con_src,
+         .access = ConnectorAccess::compute_read | ConnectorAccess::transfer_src,
+         .pass_through = "out"},
     };
 }
 
@@ -158,7 +161,7 @@ std::vector<OutputConnectorDescriptor> DLSSNode::describe_outputs(const NodeIOLa
 }
 
 DLSSNode::NodeStatusFlags DLSSNode::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
-                                                 [[maybe_unused]] const NodeIO& io,
+                                                 const NodeIO& io,
                                                  [[maybe_unused]] const NodeConnectionInfo& info,
                                                  Submission& submission) {
     // NGX refuses a second feature for the same slot while the old one is alive.
@@ -216,6 +219,7 @@ DLSSNode::NodeStatusFlags DLSSNode::on_connected([[maybe_unused]] const NodeIOLa
             vk::ImageTiling::eOptimal,
             vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
         };
+        const ResourceAllocatorHandle& allocator = io.get_allocator();
         const ImageHandle image =
             allocator->create_image(create_info, MemoryMappingType::NONE, "DLSS responsivity");
         submission.get_cmd()->barrier(vk::PipelineStageFlagBits::eTopOfPipe,
@@ -268,11 +272,12 @@ DLSSNode::pre_process(const NodeIO& io, [[maybe_unused]] const NodeProcessInfo& 
     }
 
     const SceneHandle& scene = io[con_scene];
-    if (!scene || !scene->is_ready()) {
-        return {};
-    }
-    const CameraHandle camera = scene->get_active_camera();
+    const CameraHandle camera =
+        scene && scene->is_ready() ? scene->get_active_camera() : CameraHandle{};
     if (!camera) {
+        if (io.is_connected(con_out)) {
+            submission.get_cmd()->clear(io[con_out]);
+        }
         return {};
     }
 

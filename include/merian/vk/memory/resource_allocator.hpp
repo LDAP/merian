@@ -32,6 +32,10 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
                       const SamplerPoolHandle& samplerPool,
                       const DescriptorSetAllocatorHandle& descriptor_pool);
 
+    // Allocates memory from memAllocator and shares everything else with base.
+    ResourceAllocator(const std::shared_ptr<ResourceAllocator>& base,
+                      const MemoryAllocatorHandle& memAllocator);
+
     // All staging buffers must be cleared before
     virtual ~ResourceAllocator() {
         SPDLOG_DEBUG("destroy ResourceAllocator ({})", fmt::ptr(this));

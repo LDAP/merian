@@ -110,9 +110,7 @@ DeviceSupportInfo RenderRestirPT::query_device_support(const DeviceSupportQueryI
 }
 
 void RenderRestirPT::initialize(const ContextHandle& context,
-                                const ResourceAllocatorHandle& allocator) {
-    this->context = context;
-    this->resource_allocator = allocator;
+                                [[maybe_unused]] const ResourceAllocatorHandle& allocator) {
     this->compile_context = context->get_shader_compile_context();
 
     // the ray tracing pipeline caps the registers on AMD
@@ -201,16 +199,21 @@ std::vector<InputConnectorDescriptor> RenderRestirPT::describe_inputs() {
     con_gbuffer = GBufferIn::create(gbuffer_groups);
     con_prev_gbuffer = GBufferIn::create({{{GBufferField::Hit}}, surface});
 
+    // the initial candidates are traced in a ray tracing pipeline on some devices
     return {{.name = "scene", .connector = con_scene},
-            {.name = "gbuffer", .connector = con_gbuffer, .access = ConnectorAccess::compute_read},
+            {.name = "gbuffer",
+             .connector = con_gbuffer,
+             .access = ConnectorAccess::compute_read | ConnectorAccess::ray_tracing_read},
             {.name = "prev_gbuffer",
              .connector = con_prev_gbuffer,
-             .access = ConnectorAccess::compute_read,
-             .delay = 1},
+             .access = ConnectorAccess::compute_read | ConnectorAccess::ray_tracing_read,
+             .delay = 1,
+             .auto_connect = AutoConnect::input("gbuffer")},
             {.name = "prev_reservoirs",
              .connector = con_prev_reservoirs,
-             .access = ConnectorAccess::compute_read,
-             .delay = 1}};
+             .access = ConnectorAccess::compute_read | ConnectorAccess::ray_tracing_read,
+             .delay = 1,
+             .auto_connect = AutoConnect::output("reservoirs")}};
 }
 
 std::vector<OutputConnectorDescriptor>
@@ -219,14 +222,16 @@ RenderRestirPT::describe_outputs(const NodeIOLayout& io_layout) {
     con_irradiance = ManagedVkImageOut::create(irradiance_format, extent);
     con_reservoirs = ManagedVkBufferOut::create(buffer_create_info(
         vk::DeviceSize(extent.width) * extent.height * sizeof(RestirPTReservoir)));
-    return {{.name = "irradiance",
-             .connector = con_irradiance,
-             .access = ConnectorAccess::compute_read_write},
-            {.name = "reservoirs",
-             .connector = con_reservoirs,
-             .access = ConnectorAccess::compute_read_write},
-            path_records.describe_output(context, extent, recorded_paths_per_pixel(),
-                                         recorded_vertices_per_path())};
+    return {
+        {.name = "irradiance",
+         .connector = con_irradiance,
+         .access = ConnectorAccess::compute_read_write | ConnectorAccess::ray_tracing_read_write |
+                   ConnectorAccess::transfer_dst},
+        {.name = "reservoirs",
+         .connector = con_reservoirs,
+         .access = ConnectorAccess::compute_read_write | ConnectorAccess::ray_tracing_read_write},
+        path_records.describe_output(io_layout.get_context(), extent, recorded_paths_per_pixel(),
+                                     recorded_vertices_per_path())};
 }
 
 RenderRestirPT::NodeStatusFlags
@@ -235,6 +240,7 @@ RenderRestirPT::on_connected(const NodeIOLayout& io_layout,
                              [[maybe_unused]] const NodeConnectionInfo& info,
                              Submission& submission) {
     composition = nullptr;
+    previous_iteration_traced = false;
     if (path_records.update_connected(io_layout)) {
         return NEEDS_RECONNECT;
     }
@@ -255,59 +261,56 @@ RenderRestirPT::on_connected(const NodeIOLayout& io_layout,
 
     const vk::DeviceSize pixels = vk::DeviceSize(extent.width) * extent.height;
     const vk::DeviceSize slots = pixels * RESTIR_PT_MAX_NEIGHBORS;
+    const ResourceAllocatorHandle& allocator = io.get_allocator();
     pong_reservoirs =
-        resource_allocator->create_buffer(buffer_create_info(pixels * sizeof(RestirPTReservoir)),
-                                          MemoryMappingType::NONE, "ReSTIR PT reservoirs");
-    history = resource_allocator->create_buffer(buffer_create_info(slots * sizeof(RestirPTSuffix)),
-                                                MemoryMappingType::NONE, "ReSTIR PT history");
-    splat_counts =
-        resource_allocator->create_buffer(buffer_create_info(pixels * sizeof(uint32_t)),
-                                          MemoryMappingType::NONE, "ReSTIR PT splat counts");
-    shifts =
-        resource_allocator->create_buffer(buffer_create_info(slots * 2 * sizeof(RestirPTShift)),
-                                          MemoryMappingType::NONE, "ReSTIR PT shifts");
-    neighbors = resource_allocator->create_buffer(buffer_create_info(slots * sizeof(uint32_t)),
-                                                  MemoryMappingType::NONE, "ReSTIR PT neighbors");
+        allocator->create_buffer(buffer_create_info(pixels * sizeof(RestirPTReservoir)),
+                                 MemoryMappingType::NONE, "ReSTIR PT reservoirs");
+    history = allocator->create_buffer(buffer_create_info(slots * sizeof(RestirPTSuffix)),
+                                       MemoryMappingType::NONE, "ReSTIR PT history");
+    splat_counts = allocator->create_buffer(buffer_create_info(pixels * sizeof(uint32_t)),
+                                            MemoryMappingType::NONE, "ReSTIR PT splat counts");
+    shifts = allocator->create_buffer(buffer_create_info(slots * 2 * sizeof(RestirPTShift)),
+                                      MemoryMappingType::NONE, "ReSTIR PT shifts");
+    neighbors = allocator->create_buffer(buffer_create_info(slots * sizeof(uint32_t)),
+                                         MemoryMappingType::NONE, "ReSTIR PT neighbors");
     confidence_sums =
-        resource_allocator->create_buffer(buffer_create_info(pixels * sizeof(float)),
-                                          MemoryMappingType::NONE, "ReSTIR PT confidence sums");
-    backprojected = resource_allocator->create_buffer(
-        buffer_create_info(pixels * sizeof(RestirPTReservoir)), MemoryMappingType::NONE,
-        "ReSTIR PT backprojected reservoirs");
+        allocator->create_buffer(buffer_create_info(pixels * sizeof(float)),
+                                 MemoryMappingType::NONE, "ReSTIR PT confidence sums");
+    backprojected =
+        allocator->create_buffer(buffer_create_info(pixels * sizeof(RestirPTReservoir)),
+                                 MemoryMappingType::NONE, "ReSTIR PT backprojected reservoirs");
     temporal_domains =
-        resource_allocator->create_buffer(buffer_create_info(pixels * 4 * sizeof(uint32_t)),
-                                          MemoryMappingType::NONE, "ReSTIR PT temporal domains");
-    splat_samples =
-        resource_allocator->create_buffer(buffer_create_info(slots * 2 * sizeof(uint32_t)),
-                                          MemoryMappingType::NONE, "ReSTIR PT splat samples");
-    queue = resource_allocator->create_buffer(
+        allocator->create_buffer(buffer_create_info(pixels * 4 * sizeof(uint32_t)),
+                                 MemoryMappingType::NONE, "ReSTIR PT temporal domains");
+    splat_samples = allocator->create_buffer(buffer_create_info(slots * 2 * sizeof(uint32_t)),
+                                             MemoryMappingType::NONE, "ReSTIR PT splat samples");
+    queue = allocator->create_buffer(
         buffer_create_info(sizeof(RestirPTQueueHeader) + slots * 2 * sizeof(uint32_t)),
         MemoryMappingType::NONE, "ReSTIR PT shift queue");
-    pairing = resource_allocator->create_buffer(
+    pairing = allocator->create_buffer(
         buffer_create_info((RESTIR_PT_PAIRING_EXTENT * RESTIR_PT_PAIRING_EXTENT + 1) *
                            RESTIR_PT_MAX_NEIGHBORS * sizeof(uint32_t)),
         MemoryMappingType::NONE, "ReSTIR PT pairing");
     for (BufferHandle& d : duplication) {
-        d = resource_allocator->create_buffer(buffer_create_info(pixels * sizeof(uint32_t)),
-                                              MemoryMappingType::NONE, "ReSTIR PT duplication");
+        d = allocator->create_buffer(buffer_create_info(pixels * sizeof(uint32_t)),
+                                     MemoryMappingType::NONE, "ReSTIR PT duplication");
         submission.get_cmd()->fill(d);
     }
     pairing_dirty = true;
 
-    // the first temporal pass resamples from reservoirs that no pass has written yet
-    submission.get_cmd()->fill(io[con_reservoirs]);
     submission.get_cmd()->fill(pong_reservoirs);
 
     if (const SceneHandle& scene = io[con_scene]; scene && scene->is_ready()) {
-        ensure_pipeline(scene);
+        ensure_pipeline(io.get_context(), allocator, scene);
     }
 
     return {};
 }
 
-void RenderRestirPT::upload_pairing(Submission& submission) {
+void RenderRestirPT::upload_pairing(const ResourceAllocatorHandle& allocator,
+                                    Submission& submission) {
     const std::vector<uint32_t> tables = generate_pairing(spatial_radius, seed);
-    resource_allocator->get_staging()->cmd_to_device(submission.get_cmd(), pairing, tables);
+    allocator->get_staging()->cmd_to_device(submission.get_cmd(), pairing, tables);
     submission.get_cmd()->barrier(vk::PipelineStageFlagBits::eTransfer,
                                   vk::PipelineStageFlagBits::eComputeShader,
                                   pairing->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
@@ -315,7 +318,9 @@ void RenderRestirPT::upload_pairing(Submission& submission) {
     pairing_dirty = false;
 }
 
-void RenderRestirPT::ensure_pipeline(const SceneHandle& scene) {
+void RenderRestirPT::ensure_pipeline(const ContextHandle& context,
+                                     const ResourceAllocatorHandle& allocator,
+                                     const SceneHandle& scene) {
     if (composition) {
         return;
     }
@@ -336,7 +341,7 @@ void RenderRestirPT::ensure_pipeline(const SceneHandle& scene) {
         entry_points[p] = SlangProgramEntryPoint::create(program, name);
 
         if (raygen) {
-            pipelines[p] = Versioned<Pipeline>([this, p] {
+            pipelines[p] = Versioned<Pipeline>([this, context, p] {
                 const auto ep = entry_points[p].get();
                 return RayTracingPipelineBuilder()
                     .add_raygen_group(ep->specialize())
@@ -344,14 +349,14 @@ void RenderRestirPT::ensure_pipeline(const SceneHandle& scene) {
             });
             pipelines[p].depends_on(entry_points[p]);
 
-            initial_sbt = Versioned<ShaderBindingTable>([this] {
+            initial_sbt = Versioned<ShaderBindingTable>([this, allocator] {
                 return ShaderBindingTable::create(
                     std::dynamic_pointer_cast<RayTracingPipeline>(pipelines[Initial].get()),
-                    resource_allocator);
+                    allocator);
             });
             initial_sbt.depends_on(pipelines[p]);
         } else {
-            pipelines[p] = Versioned<Pipeline>([this, p] {
+            pipelines[p] = Versioned<Pipeline>([this, context, p] {
                 const auto ep = entry_points[p].get();
                 if (p == Initial || p == Shift) {
                     return ComputePipeline::create(ep->get_pipeline_layout(context),
@@ -365,9 +370,9 @@ void RenderRestirPT::ensure_pipeline(const SceneHandle& scene) {
             pipelines[p].depends_on(entry_points[p]);
         }
 
-        params[p] = Versioned<ShaderObject>([this, p] {
+        params[p] = Versioned<ShaderObject>([this, context, allocator, p] {
             return entry_points[p]->create_shader_object_for_parameter(context, "params",
-                                                                       resource_allocator);
+                                                                       allocator);
         });
         params[p].depends_on(entry_points[p]);
     }
@@ -377,23 +382,30 @@ void RenderRestirPT::ensure_pipeline(const SceneHandle& scene) {
 RenderRestirPT::process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) {
     const auto& cmd = submission.get_cmd();
     const auto& scene = io[con_scene];
-    if (!scene || !scene->is_ready())
+    if (!scene || !scene->is_ready()) {
+        if (io.is_connected(con_irradiance)) {
+            cmd->clear(io[con_irradiance]);
+        }
+        previous_iteration_traced = false;
         return {};
+    }
 
     if (max_path_length != emitted_max_path_length) {
         emitted_max_path_length = max_path_length;
         io.send_event("bounces_changed");
     }
 
-    ensure_pipeline(scene);
+    ensure_pipeline(io.get_context(), io.get_allocator(), scene);
     path_records.process(cmd, io, info.get_iteration(), {});
     if (pairing_dirty) {
-        upload_pairing(submission);
+        upload_pairing(io.get_allocator(), submission);
     }
     const ShaderObjectAllocatorHandle& obj_allocator = info.get_shader_object_allocator();
 
     const uint64_t iteration = info.get_iteration();
-    const bool temporal = temporal_enable && iteration > 0;
+    const bool previous_reservoirs = previous_iteration_traced;
+    previous_iteration_traced = true;
+    const bool temporal = temporal_enable && previous_reservoirs;
     const int32_t rounds = neighbor_count > 0 ? spatial_rounds : 0;
     const BufferHandle out = io[con_reservoirs];
     const BufferHandle& dup_now = duplication[iteration % 2];
@@ -483,6 +495,12 @@ RenderRestirPT::process(const NodeIO& io, const NodeProcessInfo& info, Submissio
     const auto run_shifts = [&](const Pass neighbor_pass, const BufferHandle& in,
                                 const uint32_t flags) {
         const RestirPTQueueHeader empty{0, 1, 1, 0};
+        cmd->barrier(stages | vk::PipelineStageFlagBits::eDrawIndirect,
+                     vk::PipelineStageFlagBits::eTransfer,
+                     queue->buffer_barrier(vk::AccessFlagBits::eShaderRead |
+                                               vk::AccessFlagBits::eShaderWrite |
+                                               vk::AccessFlagBits::eIndirectCommandRead,
+                                           vk::AccessFlagBits::eTransferWrite));
         cmd->update(queue, 0, sizeof(empty), &empty);
         cmd->barrier(vk::PipelineStageFlagBits::eTransfer,
                      vk::PipelineStageFlagBits::eComputeShader,
@@ -553,7 +571,8 @@ RenderRestirPT::process(const NodeIO& io, const NodeProcessInfo& info, Submissio
 
     {
         MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "duplication");
-        run(Duplication, current, nullptr, 0u);
+        run(Duplication, current, nullptr,
+            previous_reservoirs ? RestirPTPassPreviousReservoirs : 0u);
     }
 
     return {};

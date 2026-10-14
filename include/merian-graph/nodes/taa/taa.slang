@@ -25,6 +25,7 @@ struct PushConstant {
     float temporal_alpha;
     int clamp_method;
     int enable_mv;
+    int reset;
 }
 
 [vk::push_constant]
@@ -95,8 +96,8 @@ void main(const int2 pixel: SV_DispatchThreadID) {
     float4 previous_color =
         catmull_rom(in_prev_src, (pixel + motion_vector + .5) / float2(resolution));
 
-    // previous texture is never initialized and might contain NaN (prevent poisoning)
-    if (any(isnan(previous_color)) || any(isinf(previous_color)))
+    // NaN and Inf would poison the history
+    if (params.reset != 0 || any(isnan(previous_color)) || any(isinf(previous_color)))
         previous_color = current_color;
 
     const float4 merged = merge_frames(current_color, previous_color, params.temporal_alpha, pixel);

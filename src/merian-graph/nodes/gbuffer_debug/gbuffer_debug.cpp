@@ -65,9 +65,7 @@ DeviceSupportInfo GBufferDebugNode::query_device_support(const DeviceSupportQuer
 }
 
 void GBufferDebugNode::initialize(const ContextHandle& context,
-                                  const ResourceAllocatorHandle& allocator) {
-    this->context = context;
-    this->resource_allocator = allocator;
+                                  [[maybe_unused]] const ResourceAllocatorHandle& allocator) {
     this->compile_context = context->get_shader_compile_context();
 }
 
@@ -80,7 +78,7 @@ std::vector<OutputConnectorDescriptor>
 GBufferDebugNode::describe_outputs(const NodeIOLayout& io_layout) {
     extent = io_layout[con_gbuffer]->get_create_info().extent;
     con_output = ManagedVkImageOut::create(vk::Format::eR16G16B16A16Sfloat, extent);
-    return {{"image", con_output, ConnectorAccess::compute_write}};
+    return {{"image", con_output, ConnectorAccess::compute_write | ConnectorAccess::transfer_dst}};
 }
 
 GBufferDebugNode::NodeStatusFlags
@@ -113,8 +111,12 @@ GBufferDebugNode::process(const NodeIO& io, const NodeProcessInfo& info, Submiss
     const auto& cmd = submission.get_cmd();
     const auto& scene = io[con_scene];
     const auto gbuf = io[con_gbuffer];
-    if (!scene || !scene->is_ready())
+    if (!scene || !scene->is_ready()) {
+        if (io.is_connected(con_output)) {
+            cmd->clear(io[con_output]);
+        }
         return {};
+    }
 
     if (!composition) {
         composition = SlangComposition::create();
@@ -126,15 +128,16 @@ GBufferDebugNode::process(const NodeIO& io, const NodeProcessInfo& info, Submiss
         program = SlangProgram::create(compile_context, composition);
         entry_point = SlangProgramEntryPoint::create(program, "main");
 
-        pipeline = Versioned<Pipeline>([this] {
+        const ContextHandle& context = io.get_context();
+        const ResourceAllocatorHandle& allocator = io.get_allocator();
+        pipeline = Versioned<Pipeline>([this, context] {
             const auto ep = entry_point.get();
             return ComputePipeline::create(ep->get_pipeline_layout(context), ep->specialize());
         });
         pipeline.depends_on(entry_point);
 
-        params = Versioned<ShaderObject>([this] {
-            return entry_point->create_shader_object_for_parameter(context, "params",
-                                                                   resource_allocator);
+        params = Versioned<ShaderObject>([this, context, allocator] {
+            return entry_point->create_shader_object_for_parameter(context, "params", allocator);
         });
         params.depends_on(entry_point);
     }

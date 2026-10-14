@@ -27,9 +27,7 @@ DeviceSupportInfo RenderRestirDI::query_device_support(const DeviceSupportQueryI
 }
 
 void RenderRestirDI::initialize(const ContextHandle& context,
-                                const ResourceAllocatorHandle& allocator) {
-    this->context = context;
-    this->resource_allocator = allocator;
+                                [[maybe_unused]] const ResourceAllocatorHandle& allocator) {
     this->compile_context = context->get_shader_compile_context();
 }
 
@@ -70,10 +68,19 @@ std::vector<InputConnectorDescriptor> RenderRestirDI::describe_inputs() {
     con_gbuffer = GBufferIn::create(gbuffer_groups);
     con_prev_gbuffer = GBufferIn::create({surface});
 
-    return {{"scene", con_scene},
-            {"gbuffer", con_gbuffer, ConnectorAccess::ray_tracing_read},
-            {"prev_gbuffer", con_prev_gbuffer, ConnectorAccess::ray_tracing_read, 1},
-            {"prev_reservoirs", con_prev_reservoirs, ConnectorAccess::ray_tracing_read, 1}};
+    return {
+        {.name = "scene", .connector = con_scene},
+        {.name = "gbuffer", .connector = con_gbuffer, .access = ConnectorAccess::ray_tracing_read},
+        {.name = "prev_gbuffer",
+         .connector = con_prev_gbuffer,
+         .access = ConnectorAccess::ray_tracing_read,
+         .delay = 1,
+         .auto_connect = AutoConnect::input("gbuffer")},
+        {.name = "prev_reservoirs",
+         .connector = con_prev_reservoirs,
+         .access = ConnectorAccess::ray_tracing_read,
+         .delay = 1,
+         .auto_connect = AutoConnect::output("reservoirs")}};
 }
 
 std::vector<OutputConnectorDescriptor>
@@ -81,9 +88,10 @@ RenderRestirDI::describe_outputs(const NodeIOLayout& io_layout) {
     extent = io_layout[con_gbuffer]->get_create_info().extent;
     con_irradiance = ManagedVkImageOut::create(irradiance_format, extent);
     con_reservoirs = ManagedVkBufferOut::create(reservoir_buffer_create_info());
-    return {{"irradiance", con_irradiance, ConnectorAccess::ray_tracing_write},
+    return {{"irradiance", con_irradiance,
+             ConnectorAccess::ray_tracing_write | ConnectorAccess::transfer_dst},
             {"reservoirs", con_reservoirs, ConnectorAccess::ray_tracing_read_write},
-            path_records.describe_output(context, extent, 1, 2)};
+            path_records.describe_output(io_layout.get_context(), extent, 1, 2)};
 }
 
 RenderRestirDI::NodeStatusFlags
@@ -92,6 +100,7 @@ RenderRestirDI::on_connected(const NodeIOLayout& io_layout,
                              [[maybe_unused]] const NodeConnectionInfo& info,
                              Submission& submission) {
     composition = nullptr;
+    previous_iteration_traced = false;
     if (path_records.update_connected(io_layout)) {
         return NEEDS_RECONNECT;
     }
@@ -110,21 +119,21 @@ RenderRestirDI::on_connected(const NodeIOLayout& io_layout,
 
     gbuffer_composition = io[con_gbuffer]->get_layout()->get_composition();
 
-    pong_buffer = resource_allocator->create_buffer(
+    pong_buffer = io.get_allocator()->create_buffer(
         reservoir_buffer_create_info(), MemoryMappingType::NONE, "ReSTIR DI reservoirs");
 
-    // the temporal pass resamples from reservoirs of the previous iteration
     submission.get_cmd()->fill(pong_buffer);
-    submission.get_cmd()->fill(io[con_reservoirs]);
 
     if (const SceneHandle& scene = io[con_scene]; scene && scene->is_ready()) {
-        ensure_pipeline(scene);
+        ensure_pipeline(io.get_context(), io.get_allocator(), scene);
     }
 
     return {};
 }
 
-void RenderRestirDI::ensure_pipeline(const SceneHandle& scene) {
+void RenderRestirDI::ensure_pipeline(const ContextHandle& context,
+                                     const ResourceAllocatorHandle& allocator,
+                                     const SceneHandle& scene) {
     if (composition) {
         return;
     }
@@ -139,7 +148,7 @@ void RenderRestirDI::ensure_pipeline(const SceneHandle& scene) {
     for (uint32_t p = 0; p < PassCount; p++) {
         entry_points[p] = SlangProgramEntryPoint::create(program, PASS_ENTRY_POINTS[p]);
 
-        pipelines[p] = Versioned<RayTracingPipeline>([this, p] {
+        pipelines[p] = Versioned<RayTracingPipeline>([this, context, p] {
             const auto ep = entry_points[p].get();
             return RayTracingPipelineBuilder()
                 .add_raygen_group(ep->specialize())
@@ -147,14 +156,14 @@ void RenderRestirDI::ensure_pipeline(const SceneHandle& scene) {
         });
         pipelines[p].depends_on(entry_points[p]);
 
-        sbts[p] = Versioned<ShaderBindingTable>([this, p] {
-            return ShaderBindingTable::create(pipelines[p].get(), resource_allocator);
+        sbts[p] = Versioned<ShaderBindingTable>([this, allocator, p] {
+            return ShaderBindingTable::create(pipelines[p].get(), allocator);
         });
         sbts[p].depends_on(pipelines[p]);
 
-        params[p] = Versioned<ShaderObject>([this, p] {
+        params[p] = Versioned<ShaderObject>([this, context, allocator, p] {
             return entry_points[p]->create_shader_object_for_parameter(context, "params",
-                                                                       resource_allocator);
+                                                                       allocator);
         });
         params[p].depends_on(entry_points[p]);
     }
@@ -166,10 +175,15 @@ RenderRestirDI::process(const NodeIO& io, const NodeProcessInfo& info, Submissio
     const auto& scene = io[con_scene];
     const auto gbuf = io[con_gbuffer];
     const auto prev_gbuf = io[con_prev_gbuffer];
-    if (!scene || !scene->is_ready())
+    if (!scene || !scene->is_ready()) {
+        if (io.is_connected(con_irradiance)) {
+            cmd->clear(io[con_irradiance]);
+        }
+        previous_iteration_traced = false;
         return {};
+    }
 
-    ensure_pipeline(scene);
+    ensure_pipeline(io.get_context(), io.get_allocator(), scene);
 
     const ShaderObjectAllocatorHandle& obj_allocator = info.get_shader_object_allocator();
 
@@ -227,7 +241,7 @@ RenderRestirDI::process(const NodeIO& io, const NodeProcessInfo& info, Submissio
     run_pass(Generate, 0, gen_buffer);
     sync(gen_handle);
 
-    if (temporal_enable && info.get_iteration() > 0) {
+    if (temporal_enable && previous_iteration_traced) {
         run_pass(Temporal, gen_buffer, gen_buffer);
         sync(gen_handle);
     }
@@ -238,6 +252,7 @@ RenderRestirDI::process(const NodeIO& io, const NodeProcessInfo& info, Submissio
     }
 
     run_pass(Shade, out, out);
+    previous_iteration_traced = true;
     return {};
 }
 

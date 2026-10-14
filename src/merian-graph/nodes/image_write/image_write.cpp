@@ -17,12 +17,6 @@ ImageWrite::ImageWrite() {}
 
 ImageWrite::~ImageWrite() {}
 
-void ImageWrite::initialize(const ContextHandle& context,
-                            const ResourceAllocatorHandle& allocator) {
-    this->context = context;
-    this->allocator = allocator;
-}
-
 std::vector<InputConnectorDescriptor> ImageWrite::describe_inputs() {
     return {{"src", con_src, ConnectorAccess::transfer_src}};
 }
@@ -179,7 +173,7 @@ ImageWrite::process(const NodeIO& io, const NodeProcessInfo& info, Submission& s
     last_record_time_millis = std::max(time_millis, optimal_timing);
 
     // RECORD FRAME
-    image_export(allocator, submission, info.get_profiler(), src,
+    image_export(io.get_allocator(), submission, info.get_profiler(), src,
                  vk::Extent2D{scaled.width, scaled.height}, path,
                  IMAGE_EXPORT_FORMATS.at(this->format),
                  embed_metadata ? info.get_metadata() : ImageMetadata{}, !keep_alpha);

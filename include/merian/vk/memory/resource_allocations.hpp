@@ -248,6 +248,10 @@ class Image : public std::enable_shared_from_this<Image>, public Resource {
         return create_info.mipLevels;
     }
 
+    uint32_t get_array_layers() const {
+        return create_info.arrayLayers;
+    }
+
     const ContextHandle& get_context() const {
         return context;
     }

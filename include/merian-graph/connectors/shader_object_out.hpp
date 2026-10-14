@@ -1,6 +1,7 @@
 #pragma once
 
 #include "merian-graph/graph/connector_output.hpp"
+#include "merian-graph/graph/errors.hpp"
 #include "merian-graph/graph/graph_shader_object.hpp"
 #include "merian-graph/graph/resource.hpp"
 
@@ -57,38 +58,29 @@ template <typename T>
 class ShaderObjectOut;
 template <typename T> using ShaderObjectOutHandle = std::shared_ptr<ShaderObjectOut<T>>;
 
-// Outputs a graph-allocated GraphShaderObject. One instance per ring slot: connect a delayed
-// input to receive the previous iteration's instance.
+// Outputs a graph-allocated GraphShaderObject. One instance per copy: connect a delayed input to
+// receive the instance of an earlier iteration.
 template <typename T>
     requires std::derived_from<T, GraphShaderObject>
 class ShaderObjectOut : public OutputConnector, public AccessibleConnector<ShaderObjectAccess<T>> {
   public:
     using CreateInfo = typename T::CreateInfo;
 
-    ShaderObjectOut(const CreateInfo& create_info, const bool persistent)
-        : OutputConnector(!persistent), create_info(create_info), persistent(persistent) {}
+    ShaderObjectOut(const CreateInfo& create_info) : create_info(create_info) {}
 
     const CreateInfo& get_create_info() const {
         return create_info;
     }
 
-    GraphResourceHandle
-    create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
-                    const ConnectorAccess& combined_access,
-                    const ResourceAllocatorHandle& allocator,
-                    const ResourceAllocatorHandle& aliasing_allocator,
-                    const uint32_t resource_index,
-                    const uint32_t ring_size) override {
-        const std::shared_ptr<T> instance = create_instance(inputs);
-        const ContextHandle& context = allocator->get_context();
+    GraphResourceHandle create_resource(const ResourceCreateInfo& info) override {
+        const std::shared_ptr<T> instance = create_instance(info.inputs);
         instance->allocate(ShaderObjectAllocateInfo{
-            .context = context,
-            .compile_context = context->get_shader_compile_context(),
-            .allocator = allocator,
-            .aliasing_allocator = aliasing_allocator,
-            .combined_access = combined_access,
-            .resource_index = resource_index,
-            .ring_size = ring_size,
+            .context = info.allocator->get_context(),
+            .allocator = info.allocator,
+            .combined_access = info.combined_access,
+            .persistent = info.persistent,
+            .copy_index = info.copy_index,
+            .copy_count = info.copy_count,
         });
         return std::make_shared<ShaderObjectResource>(instance);
     }
@@ -99,6 +91,10 @@ class ShaderObjectOut : public OutputConnector, public AccessibleConnector<Shade
                 ShaderAccess::READ_WRITE};
     }
 
+    bool supports_delay() const override {
+        return T::supports_delay;
+    }
+
     bool shader_bindable() const override {
         return true;
     }
@@ -107,25 +103,33 @@ class ShaderObjectOut : public OutputConnector, public AccessibleConnector<Shade
               const GraphResourceHandle& resource,
               [[maybe_unused]] const ResourceAllocatorHandle& allocator,
               const ConnectorAccess& access) override {
+        if (!resource) {
+            throw graph_errors::node_error{"a disabled shader object output cannot be bound"};
+        }
         cursor.write(debugable_ptr_cast<ShaderObjectResource>(resource)->instance->object(
             access.is_write() ? ShaderAccess::READ_WRITE : ShaderAccess::READ));
     }
 
-    void on_connected(Submission& submission,
-                      const std::vector<GraphResourceHandle>& resources) override {
-        for (const GraphResourceHandle& resource : resources) {
-            debugable_ptr_cast<ShaderObjectResource>(resource)->instance->on_connected(submission);
-        }
+    void on_connected(const ResourceConnectInfo& info,
+                      Submission& submission,
+                      const GraphResourceHandle& resource) override {
+        const ContextHandle& context = info.allocator->get_context();
+        debugable_ptr_cast<ShaderObjectResource>(resource)->instance->on_connected(
+            ShaderObjectConnectInfo{
+                .context = context,
+                .compile_context = context->get_shader_compile_context(),
+                .allocator = info.allocator,
+            },
+            submission);
     }
 
   public:
-    static ShaderObjectOutHandle<T> create(const CreateInfo& create_info,
-                                           const bool persistent = false) {
-        return std::make_shared<ShaderObjectOut<T>>(create_info, persistent);
+    static ShaderObjectOutHandle<T> create(const CreateInfo& create_info) {
+        return std::make_shared<ShaderObjectOut<T>>(create_info);
     }
 
   protected:
-    // The instance for one ring slot, before it is allocated.
+    // The instance for one copy, before it is allocated.
     virtual std::shared_ptr<T> create_instance(
         [[maybe_unused]] const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs) {
         return std::make_shared<T>(create_info);
@@ -133,9 +137,6 @@ class ShaderObjectOut : public OutputConnector, public AccessibleConnector<Shade
 
   private:
     const CreateInfo create_info;
-
-  public:
-    const bool persistent;
 };
 
 } // namespace merian

@@ -72,8 +72,6 @@ class Accumulate : public Node {
     void request_clear();
 
   private:
-    ContextHandle context;
-    ResourceAllocatorHandle allocator;
     ShaderCompileContextHandle compile_context;
     // Undefined: keep the format of the input.
     vk::Format overwrite_format = vk::Format::eUndefined;

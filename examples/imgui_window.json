@@ -13,7 +13,7 @@
         "window": {
             "enabled": true,
             "outputs": [
-                "acquire->imgui.acquire",
+                "canvas->imgui.canvas",
                 "window->imgui.window"
             ],
             "properties": {

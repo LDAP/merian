@@ -79,8 +79,10 @@
                 "out->svgf.prev_out"
             ],
             "properties": {
-                "SVGF iterations": 5,
-                "TAA alpha": 0.9
+                "iterations": 5,
+                "taa": {
+                    "alpha": 0.9
+                }
             },
             "type": "Denoiser (SVGF)"
         }

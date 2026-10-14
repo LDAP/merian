@@ -4,6 +4,7 @@
 #include "merian/utils/properties.hpp"
 #include "merian/utils/string.hpp"
 #include "merian/vk/extension/extension_registry.hpp"
+#include "merian/vk/utils/subresource_ranges.hpp"
 
 #include <any>
 #include <spdlog/spdlog.h>
@@ -70,17 +71,15 @@ Graph::~Graph() {
 }
 
 void Graph::run() {
-    // Apply a reload requested from the UI here, before any processing of this iteration.
-    if (pending_load) {
-        const std::filesystem::path path = *pending_load;
-        pending_load.reset();
-        wait();
-        load_from_file(path);
+    {
+        const BusyScope busy_scope(*this);
+        run_once();
     }
+    apply_deferred_edits();
+}
 
+void Graph::run_once() {
     // PREPARE RUN: wait for fence, release resources, reset cmd pool
-    run_in_progress = true;
-
     if (flush_thread_pool_at_run_start) {
         thread_pool->wait_empty();
     }
@@ -124,14 +123,14 @@ void Graph::run() {
     // CONNECT and PREPROCESS
     // the time source may be a node, so the topology has to exist before the clock advances
     while (needs_reconnect) {
-        connect();
+        connect_graph();
     }
     advance_time();
 
     do {
         // While connection nodes can signalize that they need to reconnect
         while (needs_reconnect) {
-            connect();
+            connect_graph();
         }
 
         shader_object_allocator->set_iteration(ring_fences.current_cycle_index());
@@ -158,11 +157,17 @@ void Graph::run() {
             for (auto& layer : layers)
                 for (auto& node : layer.nodes) {
                     NodeData& data = node_data.at(node);
-                    MERIAN_PROFILE_SCOPE(profiler, fmt::format("{} ({})", data.identifier,
-                                                               registry.node_type_name(node)));
+                    MERIAN_PROFILE_SCOPE(profiler, data.label);
                     const uint32_t set_idx = data.set_index(run_iteration);
-                    Node::NodeStatusFlags flags =
-                        node->pre_process(data.resource_maps[set_idx], run_info);
+                    Node::NodeStatusFlags flags = 0;
+                    collect_node_errors(data.errors_queued, [&] {
+                        flags = node->pre_process(data.resource_maps[set_idx], run_info);
+                    });
+                    if (!data.errors_queued.empty()) {
+                        SPDLOG_ERROR("preprocessing {} failed:\n - {}", data.label,
+                                     fmt::join(data.errors_queued, "\n   - "));
+                        request_reconnect();
+                    }
                     if ((flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT) != 0u) {
                         SPDLOG_DEBUG("node {} requested reconnect in pre_process", data.identifier);
                         request_reconnect();
@@ -186,26 +191,49 @@ void Graph::run() {
     }
     {
         MERIAN_PROFILE_SCOPE_GPU(profiler, submission.get_cmd(), "Run nodes");
-        for (auto& layer : layers) {
-            if (layer.barrier.dstStageMask) {
-                submission.get_cmd()->barrier(layer.barrier);
+        const CommandBufferHandle& cmd = submission.get_cmd();
+        // left over if a connector threw
+        image_barriers.clear();
+        buffer_barriers.clear();
+        for (const Layer& layer : layers) {
+            const Layer::Set& set = layer.sets[run_iteration % period];
+            for (const ImageHandle& image : set.discards) {
+                constexpr vk::AccessFlags2 all_access =
+                    vk::AccessFlagBits2::eMemoryWrite | vk::AccessFlagBits2::eMemoryRead;
+                constexpr vk::PipelineStageFlags2 all_stages =
+                    vk::PipelineStageFlagBits2::eAllCommands;
+                image_barriers.push_back(image->barrier2(
+                    vk::ImageLayout::eGeneral, all_access, all_access, all_stages, all_stages,
+                    VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
+                    all_levels_and_layers(format_aspect_flags(image->get_format())), true));
             }
+            for (const NodeHandle& node : layer.nodes) {
+                pre_process_connectors(submission, node, node_data.at(node));
+            }
+            flush_barriers(submission, set.barrier);
 
-            for (auto& node : layer.nodes) {
-                NodeData& data = node_data.at(node);
-
-                if (debug_utils) {
-                    const std::string node_debug_name =
-                        fmt::format("{} ({})", data.identifier, registry.node_type_name(node));
-                    debug_utils->cmd_begin_label(*submission.get_cmd(), node_debug_name);
-                    SPDLOG_TRACE("running node: {}", node_debug_name);
+            // nodes of a layer overlap, unless profiled
+            for (const NodeHandle& node : layer.nodes) {
+                if (profiler) {
+                    cmd->barrier(vk::MemoryBarrier2{vk::PipelineStageFlagBits2::eAllCommands,
+                                                    {},
+                                                    vk::PipelineStageFlagBits2::eAllCommands,
+                                                    {}});
                 }
-
-                run_node(submission, node, data, profiler);
-
-                if (debug_utils)
-                    debug_utils->cmd_end_label(*submission.get_cmd());
+                NodeData& data = node_data.at(node);
+                if (debug_utils) {
+                    debug_utils->cmd_begin_label(*cmd, data.label);
+                }
+                process_node(submission, node, data, profiler);
+                if (debug_utils) {
+                    debug_utils->cmd_end_label(*cmd);
+                }
             }
+
+            for (const NodeHandle& node : layer.nodes) {
+                post_process_connectors(submission, node, node_data.at(node));
+            }
+            flush_barriers(submission);
         }
     }
 
@@ -229,14 +257,6 @@ void Graph::run() {
 
     ++run_iteration;
     ++total_iteration;
-    run_in_progress = false;
-
-    {
-        MERIAN_PROFILE_SCOPE(profiler, "on_run_finished_tasks");
-        for (const auto& task : on_run_finished_tasks)
-            task();
-        on_run_finished_tasks.clear();
-    }
 
     cpu_time = std::chrono::high_resolution_clock::now() - run_start;
 }
@@ -250,6 +270,7 @@ void Graph::wait() {
 void Graph::reset() {
     wait();
 
+    reset_connections();
     node_data.clear();
     node_for_identifier.clear();
     loaded_description = {};
@@ -259,6 +280,10 @@ void Graph::reset() {
     }
 
     needs_reconnect = true;
+}
+
+NodeState Graph::get_node_state(const std::string& identifier) const {
+    return node_data.at(node_for(identifier)).state();
 }
 
 void Graph::request_reconnect() {
@@ -274,6 +299,10 @@ std::vector<NodeHandle> Graph::time_providers() const {
     std::vector<NodeHandle> providers;
     for (const auto& layer : layers) {
         for (const auto& node : layer.nodes) {
+            // removed since the last connect
+            if (!node_data.contains(node)) {
+                continue;
+            }
             const auto provider = std::dynamic_pointer_cast<TimeProvider>(node);
             if (provider && provider->provides_time()) {
                 providers.emplace_back(node);
@@ -333,6 +362,12 @@ void Graph::advance_time() {
     time_delta = std::max(duration_elapsed - last_elapsed, 0ns);
 }
 
+void Graph::set_profiler_enabled([[maybe_unused]] const bool enabled) {
+#ifdef MERIAN_PROFILER_ENABLE
+    profiler_enable = enabled;
+#endif
+}
+
 void Graph::set_profiler_report_interval(const uint32_t millis) {
     profiler_report_intervall_ms = millis;
 }
@@ -342,6 +377,10 @@ Profiler::Report Graph::get_run_report() {
         return {};
     }
     return run_profiler->get_report();
+}
+
+const Profiler::Report& Graph::get_build_report() const {
+    return last_build_report;
 }
 
 bool Graph::get_needs_reconnect() const {
@@ -372,123 +411,114 @@ ProfilerHandle Graph::prepare_profiler_for_run(InFlightData& in_flight_data) {
     return run_profiler;
 }
 
-void Graph::run_node(Submission& submission,
-                     const NodeHandle& node,
-                     NodeData& data,
-                     [[maybe_unused]] const ProfilerHandle& profiler) {
+void Graph::pre_process_connectors(Submission& submission, const NodeHandle& node, NodeData& data) {
     const uint32_t set_idx = data.set_index(run_iteration);
-
-    MERIAN_PROFILE_SCOPE_GPU(
-        profiler, submission.get_cmd(),
-        fmt::format("{} ({})", data.identifier, registry.node_type_name(node)));
-
-    std::vector<vk::ImageMemoryBarrier2> image_barriers;
-    std::vector<vk::BufferMemoryBarrier2> buffer_barriers;
-
-    {
-        // Call connector callbacks (pre_process) and record descriptor set updates
-        for (auto& [input, per_input_info] : data.input_connections) {
-            if (!per_input_info.node) {
-                // optional input not connected
-                continue;
-            }
-
-            auto& [resource, resource_index] = per_input_info.precomputed_resources[set_idx];
-            const Connector::ConnectorStatusFlags flags =
-                input->on_pre_process(submission, resource, node, image_barriers, buffer_barriers);
-            if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) != 0u) {
-                SPDLOG_DEBUG("input connector {} at node {} requested reconnect.",
-                             data.input_name_for_connector.at(input), data.identifier);
-                request_reconnect();
-            }
+    for (const auto& [input, per_input_info] : data.input_connections) {
+        if (!per_input_info.node) {
+            continue;
         }
-        for (auto& [output, per_output_info] : data.output_connections) {
-            auto& [resource, resource_index] = per_output_info.precomputed_resources[set_idx];
-            const Connector::ConnectorStatusFlags flags =
-                output->on_pre_process(submission, resource, node, image_barriers, buffer_barriers);
-            if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) != 0u) {
-                SPDLOG_DEBUG("output connector {} at node {} requested reconnect.",
-                             data.output_name_for_connector.at(output), data.identifier);
-                request_reconnect();
-            }
-        }
-
-        if (!image_barriers.empty()) {
-            submission.get_cmd()->barrier(image_barriers);
-            image_barriers.clear();
-        }
-        if (!buffer_barriers.empty()) {
-            submission.get_cmd()->barrier(buffer_barriers);
-            buffer_barriers.clear();
-        }
-    }
-
-    {
-        try {
-            const Node::NodeStatusFlags flags =
-                node->process(data.resource_maps[set_idx], run_info, submission);
-            if ((flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT) != 0u) {
-                SPDLOG_DEBUG("node {} requested reconnect in process", data.identifier);
-                request_reconnect();
-            }
-            if ((flags & Node::NodeStatusFlagBits::REMOVE_NODE) != 0u) {
-                remove_node(data.identifier);
-            }
-        } catch (const graph_errors::node_error& e) {
-            data.errors_queued.emplace_back(fmt::format("node error: {}", e.what()));
-        } catch (const GLSLShaderCompiler::compilation_failed& e) {
-            data.errors_queued.emplace_back(fmt::format("compilation failed: {}", e.what()));
-        }
-        if (!data.errors_queued.empty()) {
-            SPDLOG_ERROR("executing node '{}' failed:\n - {}", data.identifier,
-                         fmt::join(data.errors_queued, "\n   - "));
+        const GraphResourceHandle& resource =
+            std::get<0>(per_input_info.precomputed_resources[set_idx]);
+        if ((input->on_pre_process(submission, resource, node, image_barriers, buffer_barriers) &
+             Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) != 0u) {
+            SPDLOG_DEBUG("input {} of {} requested a reconnect",
+                         data.input_descriptors.at(input).name, data.label);
             request_reconnect();
-            SPDLOG_ERROR("emergency reconnect.");
         }
     }
-
-    {
-        // Call connector callbacks (post_process) and record descriptor set updates
-        for (auto& [input, per_input_info] : data.input_connections) {
-            if (!per_input_info.node) {
-                // optional input not connected
-                continue;
-            }
-
-            auto& [resource, resource_index] = per_input_info.precomputed_resources[set_idx];
-            const Connector::ConnectorStatusFlags flags =
-                input->on_post_process(submission, resource, node, image_barriers, buffer_barriers);
-            if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) != 0u) {
-                SPDLOG_DEBUG("input connector {} at node {} requested reconnect.",
-                             data.input_name_for_connector.at(input), data.identifier);
-                request_reconnect();
-            }
+    for (const auto& [output, per_output_info] : data.output_connections) {
+        const GraphResourceHandle& resource =
+            std::get<0>(per_output_info.precomputed_resources[set_idx]);
+        // a version was prepared at the producer of its root
+        if (!resource || per_output_info.version_of) {
+            continue;
         }
-        for (auto& [output, per_output_info] : data.output_connections) {
-            auto& [resource, resource_index] = per_output_info.precomputed_resources[set_idx];
-            Connector::ConnectorStatusFlags flags = 0;
-            try {
-                flags = output->on_post_process(submission, resource, node, image_barriers,
-                                                buffer_barriers);
-            } catch (const graph_errors::connector_error& e) {
-                throw graph_errors::connector_error{fmt::format(
-                    "output '{}' of node '{}': {}", data.output_name_for_connector.at(output),
-                    data.identifier, e.what())};
-            }
-            if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) != 0u) {
-                SPDLOG_DEBUG("output connector {} at node {} requested reconnect.",
-                             data.output_name_for_connector.at(output), data.identifier);
-                request_reconnect();
-            }
-        }
-
-        if (!image_barriers.empty()) {
-            submission.get_cmd()->barrier(image_barriers);
-        }
-        if (!buffer_barriers.empty()) {
-            submission.get_cmd()->barrier(buffer_barriers);
+        if ((output->on_pre_process(submission, resource, node, image_barriers, buffer_barriers) &
+             Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) != 0u) {
+            SPDLOG_DEBUG("output {} of {} requested a reconnect",
+                         data.output_descriptors.at(output).name, data.label);
+            request_reconnect();
         }
     }
+}
+
+void Graph::process_node(Submission& submission,
+                         const NodeHandle& node,
+                         NodeData& data,
+                         [[maybe_unused]] const ProfilerHandle& profiler) {
+    MERIAN_PROFILE_SCOPE_GPU(profiler, submission.get_cmd(), data.label);
+    Node::NodeStatusFlags flags = 0;
+    collect_node_errors(data.errors_queued, [&] {
+        flags =
+            node->process(data.resource_maps[data.set_index(run_iteration)], run_info, submission);
+    });
+    if (!data.errors_queued.empty()) {
+        SPDLOG_ERROR("executing {} failed:\n - {}", data.label,
+                     fmt::join(data.errors_queued, "\n   - "));
+        request_reconnect();
+    }
+    if ((flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT) != 0u) {
+        SPDLOG_DEBUG("{} requested a reconnect in process", data.label);
+        request_reconnect();
+    }
+    if ((flags & Node::NodeStatusFlagBits::REMOVE_NODE) != 0u) {
+        remove_node(data.identifier);
+    }
+}
+
+void Graph::post_process_connectors(Submission& submission,
+                                    const NodeHandle& node,
+                                    NodeData& data) {
+    const uint32_t set_idx = data.set_index(run_iteration);
+    for (const auto& [input, per_input_info] : data.input_connections) {
+        if (!per_input_info.node) {
+            continue;
+        }
+        const GraphResourceHandle& resource =
+            std::get<0>(per_input_info.precomputed_resources[set_idx]);
+        if ((input->on_post_process(submission, resource, node, image_barriers, buffer_barriers) &
+             Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) != 0u) {
+            SPDLOG_DEBUG("input {} of {} requested a reconnect",
+                         data.input_descriptors.at(input).name, data.label);
+            request_reconnect();
+        }
+    }
+    for (const auto& [output, per_output_info] : data.output_connections) {
+        const GraphResourceHandle& resource =
+            std::get<0>(per_output_info.precomputed_resources[set_idx]);
+        if (!resource || per_output_info.version_of) {
+            continue;
+        }
+        Connector::ConnectorStatusFlags flags = 0;
+        try {
+            flags = output->on_post_process(submission, resource, node, image_barriers,
+                                            buffer_barriers);
+        } catch (const graph_errors::connector_error& e) {
+            throw graph_errors::connector_error{fmt::format("output {} of {}: {}",
+                                                            data.output_descriptors.at(output).name,
+                                                            data.label, e.what())};
+        }
+        if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) != 0u) {
+            SPDLOG_DEBUG("output {} of {} requested a reconnect",
+                         data.output_descriptors.at(output).name, data.label);
+            request_reconnect();
+        }
+    }
+}
+
+void Graph::flush_barriers(Submission& submission, const vk::MemoryBarrier2& memory_barrier) {
+    if (!memory_barrier.dstStageMask && image_barriers.empty() && buffer_barriers.empty()) {
+        return;
+    }
+    submission.get_cmd()->barrier(vk::DependencyInfo{{},
+                                                     memory_barrier.dstStageMask ? 1u : 0u,
+                                                     &memory_barrier,
+                                                     static_cast<uint32_t>(buffer_barriers.size()),
+                                                     buffer_barriers.data(),
+                                                     static_cast<uint32_t>(image_barriers.size()),
+                                                     image_barriers.data()});
+    image_barriers.clear();
+    buffer_barriers.clear();
 }
 
 } // namespace merian

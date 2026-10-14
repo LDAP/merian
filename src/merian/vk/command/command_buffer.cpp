@@ -110,7 +110,12 @@ void CommandBuffer::copy(const ImageHandle& src_image,
 
 void CommandBuffer::copy(const ImageHandle& src_image, const ImageHandle& dst_image) {
     copy(src_image, src_image->get_current_layout(), dst_image, dst_image->get_current_layout(),
-         vk::ImageCopy{all_layers(), {}, all_layers(), {}, src_image->get_extent()});
+         vk::ImageCopy{
+             {format_aspect_flags(src_image->get_format()), 0, 0, src_image->get_array_layers()},
+             {},
+             {format_aspect_flags(dst_image->get_format()), 0, 0, dst_image->get_array_layers()},
+             {},
+             src_image->get_extent()});
 }
 
 void CommandBuffer::blit(const ImageHandle& src_image,

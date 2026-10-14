@@ -1,100 +1,133 @@
 ## Node Implementation Example
 
-A complete example of a custom compute node that reads a sampled image and writes a storage image.
+A compute node that blends its input with its own output of the previous iteration.
 
 ```cpp
-#include "merian-graph/graph/node.hpp"
-#include "merian-graph/connectors/image/vk_image_in_sampled.hpp"  // VkSampledImageIn
+#include "merian-graph/connectors/image/vk_image_in_sampled.hpp"
 #include "merian-graph/connectors/image/vk_image_out_managed.hpp"
+#include "merian-graph/graph/node.hpp"
 
-class MyProcessNode : public merian::Node {
+#include "merian/shader/slang_entry_point.hpp"
+#include "merian/vk/pipeline/pipeline_compute.hpp"
+#include "merian/vk/pipeline/specialization_info_builder.hpp"
+
+class Blend : public merian::Node {
   public:
-    // Connector handles declared as members so they remain accessible in all lifecycle callbacks.
-    merian::VkSampledImageInHandle input;
-    merian::ManagedVkImageOutHandle output;
-
-    // Optional: request context extensions before Context creation.
-    std::vector<std::string> request_context_extensions() override {
-        return {};
-    }
-
-    // Declare inputs. Called once when the node is added to the graph.
+    // Called on every connect.
     std::vector<merian::InputConnectorDescriptor> describe_inputs() override {
-        input = merian::VkSampledImageIn::compute_read();
-        return {{"input", input}};
+        return {
+            {.name = "src", .connector = con_src, .access = merian::ConnectorAccess::compute_read},
+            // the output of the previous iteration, unless the user connects it otherwise
+            {.name = "prev_out",
+             .connector = con_prev_out,
+             .access = merian::ConnectorAccess::compute_read,
+             .delay = 1,
+             .auto_connect = merian::AutoConnect::output("out")},
+        };
     }
 
-    // Declare outputs. Called each reconnect, after all inputs are resolved.
-    // io[input] gives the upstream output connector, from which format/extent can be queried.
+    // Called on every connect, once the sources of the undelayed inputs described their outputs.
     std::vector<merian::OutputConnectorDescriptor>
-    describe_outputs(const merian::NodeIOLayout& io) override {
-        // Mirror the upstream image format and extent.
-        auto upstream = io[input];
-        vk::Format format = upstream->create_info.format;
-        vk::Extent3D extent = upstream->create_info.extent;
-
-        output = merian::ManagedVkImageOut::compute_write(format, extent);
-        return {{"output", output}};
+    describe_outputs(const merian::NodeIOLayout& io_layout) override {
+        const vk::ImageCreateInfo src = io_layout[con_src]->get_create_info_or_throw();
+        con_out = merian::ManagedVkImageOut::create(src.format, src.extent);
+        return {{.name = "out",
+                 .connector = con_out,
+                 .access = merian::ConnectorAccess::compute_write}};
     }
 
-    // Called after the graph is fully connected. Build pipelines here.
-    merian::NodeStatusFlags
-    on_connected(const merian::NodeIOLayout& io,
-                 const merian::DescriptorSetLayoutHandle& layout) override {
-        // layout contains bindings for all connectors in declaration order.
-        pipeline_layout = merian::PipelineLayoutBuilder(context)
-            .add_descriptor_set_layout(layout)
-            .add_push_constant<MyPushConstants>()
-            .build_pipeline_layout();
-
-        const auto entry_point = merian::SlangProgramEntryPoint::create(
-                                     context->get_shader_compile_context(), "my_shader.slang")
-                                     .get();
-        pipeline = merian::ComputePipeline::create(pipeline_layout, entry_point);
-
+    // Called after every connect, when no work is in flight: build pipelines here. Only persistent
+    // outputs can be accessed.
+    NodeStatusFlags on_connected([[maybe_unused]] const merian::NodeIOLayout& io_layout,
+                                 const merian::NodeIO& io,
+                                 [[maybe_unused]] const merian::NodeConnectionInfo& info,
+                                 [[maybe_unused]] merian::Submission& submission) override {
+        const merian::ContextHandle& context = io.get_context();
+        entry_point = merian::SlangProgramEntryPoint::create(
+                          merian::SlangProgram::create(context->get_shader_compile_context(),
+                                                       "blend.slang"),
+                          "main")
+                          .get();
+        auto spec_builder = merian::SpecializationInfoBuilder();
+        spec_builder.add_entry(local_size, local_size);
+        pipeline = merian::ComputePipeline::create(entry_point->get_pipeline_layout(context),
+                                                   entry_point->specialize(spec_builder.build()));
+        globals = entry_point->create_global_shader_object(context, io.get_allocator());
         return {};
     }
 
-    // CPU-side work before GPU dispatch. Return NEEDS_RECONNECT to trigger a graph rebuild.
-    merian::NodeStatusFlags pre_process(const merian::GraphRun& run,
-                                        const merian::NodeIO& io) override {
-        // Example: force reconnect if a parameter changed that affects output size.
-        if (output_size_changed) {
-            return Node::NEEDS_RECONNECT;
-        }
-        return {};
-    }
-
-    // GPU work. Record commands into run.get_cmd().
-    void process(merian::GraphRun& run,
-                 const merian::DescriptorSetHandle& desc,
-                 const merian::NodeIO& io) override {
-        auto& cmd = run.get_cmd();
-
-        // Access resources via operator[].
-        const auto& in_res  = io[input];   // BufferArrayResource or ImageArrayResource
-        const auto& out_res = io[output];
-
-        // Per-frame persistent data (constructed once per in-flight slot).
-        auto& frame = io.frame_data<MyFrameData>();
-
-        // Push constants and dispatch.
-        MyPushConstants pc{run.get_iteration(), run.get_time_delta()};
-        cmd->push_constant(pipeline, pc);
+    // Records the GPU work. `out` is not persistent: `prev_out` is undefined until it was written.
+    NodeStatusFlags process(const merian::NodeIO& io,
+                            const merian::NodeProcessInfo& info,
+                            merian::Submission& submission) override {
+        const merian::CommandBufferHandle& cmd = submission.get_cmd();
+        // in_src, in_prev_out and out_out in the shader
+        io.bind(globals);
         cmd->bind(pipeline);
-        cmd->bind_descriptor_set(pipeline, 0, desc);
-        cmd->dispatch(out_res.image->get_extent(), 8, 8);
+        entry_point->bind_global(globals, cmd, pipeline, info.get_shader_object_allocator());
+        pc.reset = static_cast<VkBool32>(info.get_iteration() == 0);
+        cmd->push_constant(pipeline, pc);
+        cmd->dispatch(con_out->get_create_info()->extent, local_size, local_size);
+        return {};
+    }
+
+    // Settings and status; stored with the graph. Return NEEDS_RECONNECT for changes that need
+    // new outputs or pipelines.
+    NodeStatusFlags properties(merian::Properties& config) override {
+        config.config_float("alpha", pc.alpha, "More means more reuse.", 0.01f, 0.0f, 1.0f);
+        return {};
     }
 
   private:
-    merian::PipelineLayoutHandle pipeline_layout;
-    merian::PipelineHandle pipeline;
-    merian::ContextHandle context;
-    bool output_size_changed = false;
+    struct PushConstant {
+        float alpha = 0.9f;
+        VkBool32 reset;
+    };
 
-    struct MyPushConstants { uint32_t iteration; float time_delta; };
-    struct MyFrameData { /* per-in-flight-slot data */ };
+    static constexpr uint32_t local_size = 16;
+    PushConstant pc;
+
+    const merian::VkSampledImageInHandle con_src = merian::VkSampledImageIn::create();
+    const merian::VkSampledImageInHandle con_prev_out = merian::VkSampledImageIn::create();
+    merian::ManagedVkImageOutHandle con_out;
+
+    merian::SlangProgramEntryPointHandle entry_point;
+    merian::PipelineHandle pipeline;
+    merian::ShaderObjectHandle globals;
 };
+```
+
+`blend.slang`:
+
+```slang
+[vk::constant_id(0)]
+const int local_size_x = 1;
+[vk::constant_id(1)]
+const int local_size_y = 1;
+
+Sampler2D<float4> in_src;
+Sampler2D<float4> in_prev_out;
+RWTexture2D<float4> out_out;
+
+struct PushConstant {
+    float alpha;
+    int reset;
+};
+
+[vk::push_constant]
+ConstantBuffer<PushConstant> params;
+
+[numthreads(local_size_x, local_size_y, 1)]
+[shader("compute")]
+void main(const uint2 pixel: SV_DispatchThreadID) {
+    uint2 size;
+    out_out.GetDimensions(size.x, size.y);
+    if (any(pixel >= size))
+        return;
+    const float4 src = in_src[pixel];
+    const float4 previous = params.reset != 0 ? src : in_prev_out[pixel];
+    out_out[pixel] = lerp(src, previous, params.alpha);
+}
 ```
 
 ### Status flags
@@ -112,9 +145,10 @@ io[input_connector]                  // Access input resource (type from Accessi
 io[output_connector]                 // Access output resource
 io.is_connected(connector)           // Check whether connector is wired up
 io.frame_data<T>(ctor_args...)       // Per-in-flight-slot persistent storage
-io.get_binding(input_connector)      // Descriptor set binding index for input
-io.get_binding(output_connector)     // Descriptor set binding index for output
+io.bind(shader_object)               // Writes the ports into the fields in_<input> / out_<output>
 io.send_event("name", data)          // Broadcast an inter-node event
+io.get_context()                     // The context
+io.get_allocator()                   // The node's memory, the allocator initialize received
 ```
 
 ### NodeIOLayout quick reference (available in describe_outputs / on_connected)
@@ -122,6 +156,7 @@ io.send_event("name", data)          // Broadcast an inter-node event
 ```cpp
 io[input_connector]                           // Upstream OutputConnector
 io.is_connected(input_connector)              // Is the input wired?
+io.get_context(), io.get_allocator()          // As in NodeIO
 io.register_event_listener("", callback)      // Listen to events (empty = any)
 // Pattern format: "NodeType/identifier/eventName"  (empty field = wildcard)
 ```

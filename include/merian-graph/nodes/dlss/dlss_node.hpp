@@ -90,7 +90,6 @@ class DLSSNode : public Node {
 
     DLSSHandle dlss;
 
-    ResourceAllocatorHandle allocator;
     TextureHandle responsivity_mask;
 };
 

@@ -27,7 +27,6 @@ class GraphDescription {
     struct PerOutputInfo {
         // (dst_node -> set<dst_input>)
         std::map<std::string, std::set<std::string>> target;
-        bool is_graph_output = false;
     };
 
     struct PerNodeInfo {
@@ -83,10 +82,7 @@ class GraphDescription {
      */
     bool remove_node(const std::string& identifier);
 
-    /* Adds a connection between two nodes.
-     *
-     * Does not check if the nodes exist or if the connection is valid.
-     */
+    // Throws invalid_argument if a node does not exist; the ports are not checked.
     void add_connection(const std::string& src,
                         const std::string& dst,
                         const std::string& src_output,
@@ -229,8 +225,8 @@ class GraphDescription {
 
     static void merge_into(nlohmann::json& base, const nlohmann::json& overwrite);
 
-    // Validates that an identifier doesn't contain reserved characters (., ->, /)
-    // Throws std::invalid_argument if validation fails
+    // Throws std::invalid_argument if the identifier is empty, reserved (user, graph) or contains
+    // reserved characters (., ->, /, :).
     static void validate_identifier(const std::string& identifier, const std::string& context);
 
   private:
@@ -264,10 +260,6 @@ class GraphDescription {
     nlohmann::json profiler_properties{};
 
     nlohmann::json cli{};
-
-    // Updated every time the structure changes (nodes and connections).
-    // Node properties do not change the hash if they do not need a graph rebuild.
-    uint64_t hash = 0;
 };
 
 } // namespace merian

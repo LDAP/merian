@@ -49,6 +49,8 @@ merian_src = files(
     'vk/memory/bump_memory_allocator.cpp',
     'vk/memory/frame_staging_block.cpp',
     'vk/memory/memory_allocator.cpp',
+    'vk/memory/memory_allocator_tracking.cpp',
+    'vk/memory/memory_allocator_transient.cpp',
     'vk/memory/memory_allocator_vma.cpp',
     'vk/memory/memory_suballocator_vma.cpp',
     'vk/memory/resource_allocations.cpp',

@@ -39,8 +39,6 @@ DeviceSupportInfo Accumulate::query_device_support(const DeviceSupportQueryInfo&
 
 void Accumulate::initialize(const ContextHandle& context,
                             const ResourceAllocatorHandle& allocator) {
-    this->context = context;
-    this->allocator = allocator;
     this->compile_context = context->get_shader_compile_context();
 
     percentile_kernel.emplace(context, allocator, compile_context, PERCENTILES_MODULE,
@@ -65,11 +63,25 @@ std::vector<InputConnectorDescriptor> Accumulate::describe_inputs() {
     });
 
     return {
-        {"src", con_src, ConnectorAccess::compute_read},
-        {"gbuffer", con_gbuffer, ConnectorAccess::compute_read},
-        {"mv", con_mv, ConnectorAccess::compute_read, 0, true},
-        {"prev_out", con_prev_out, ConnectorAccess::compute_read, 1},
-        {"prev_history", con_prev_history, ConnectorAccess::compute_read, 1},
+        {.name = "src",
+         .connector = con_src,
+         .access = ConnectorAccess::compute_read,
+         .pass_through = "out"},
+        {.name = "gbuffer", .connector = con_gbuffer, .access = ConnectorAccess::compute_read},
+        {.name = "mv",
+         .connector = con_mv,
+         .access = ConnectorAccess::compute_read,
+         .optional = true},
+        {.name = "prev_out",
+         .connector = con_prev_out,
+         .access = ConnectorAccess::compute_read,
+         .delay = 1,
+         .auto_connect = AutoConnect::output("out")},
+        {.name = "prev_history",
+         .connector = con_prev_history,
+         .access = ConnectorAccess::compute_read,
+         .delay = 1,
+         .auto_connect = AutoConnect::output("history")},
     };
 }
 
@@ -128,6 +140,7 @@ Accumulate::on_connected(const NodeIOLayout& io_layout,
     quartile_image_create_info.usage |=
         vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage;
     quartile_image_create_info.setExtent({percentile_group_count_x, percentile_group_count_y, 1});
+    const ResourceAllocatorHandle& allocator = io.get_allocator();
     const ImageHandle quartile_image = allocator->create_image(
         quartile_image_create_info, MemoryMappingType::NONE, "accum node, quartiles");
     vk::ImageViewCreateInfo quartile_image_view_create_info{

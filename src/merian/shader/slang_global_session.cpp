@@ -53,7 +53,9 @@ vk::ShaderStageFlagBits vk_stage_for_slang_stage(SlangStage slang_stage) {
 
 Slang::ComPtr<slang::IGlobalSession> get_global_slang_session() {
     if (global_session.get() == nullptr) {
-        createGlobalSession(global_session.writeRef());
+        SlangGlobalSessionDesc desc{};
+        desc.enableGLSL = true;
+        createGlobalSession(&desc, global_session.writeRef());
     }
     return global_session;
 }

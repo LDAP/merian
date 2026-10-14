@@ -1,10 +1,10 @@
 #pragma once
 
 #include "merian-graph/connectors/buffer/vk_buffer_in.hpp"
+#include "merian-graph/connectors/image/vk_image_in.hpp"
 #include "merian-graph/connectors/image/vk_image_in_sampled.hpp"
 #include "merian-graph/connectors/image/vk_image_out_managed.hpp"
 #include "merian-graph/connectors/ptr_in.hpp"
-#include "merian-graph/connectors/ptr_out.hpp"
 #include "merian-graph/graph/node.hpp"
 #include "merian-graph/nodes/compute_node/compute_kernel.hpp"
 #include "merian-graph/nodes/path_debug/layout.slangh"
@@ -16,7 +16,6 @@
 #include "merian/vk/imgui/imgui_context.hpp"
 #include "merian/vk/imgui/imgui_merian_backend.hpp"
 #include "merian/vk/imgui/imgui_renderer.hpp"
-#include "merian/vk/window/swapchain_manager.hpp"
 #include "merian/vk/window/window.hpp"
 
 #include <array>
@@ -225,10 +224,15 @@ class PathDebugNode : public Node {
     void record_readback(const NodeIO& io, const NodeProcessInfo& info, Submission& submission);
     void record_present(const NodeIO& io, Submission& submission);
 
-    void build_gbuffer_kernels();
-    void build_overlay_pipeline(vk::Format color_format);
-    void ensure_scene_pipeline(ScenePipeline& kernel, const SceneHandle& scene, const char* module);
-    void load_reference(Submission& submission);
+    void build_gbuffer_kernels(const ContextHandle& context,
+                               const ResourceAllocatorHandle& allocator);
+    void build_overlay_pipeline(const ContextHandle& context, vk::Format color_format);
+    void ensure_scene_pipeline(const ContextHandle& context,
+                               const ResourceAllocatorHandle& allocator,
+                               ScenePipeline& kernel,
+                               const SceneHandle& scene,
+                               const char* module);
+    void load_reference(const ResourceAllocatorHandle& allocator, Submission& submission);
 
     void invalidate_selection();
     void clear_selection();
@@ -274,8 +278,6 @@ class PathDebugNode : public Node {
 
     static PathDebugParams default_params();
 
-    ContextHandle context;
-    ResourceAllocatorHandle allocator;
     ShaderCompileContextHandle compile_context;
 
     PtrInHandle<Scene> con_scene = PtrIn<Scene>::create();
@@ -285,10 +287,8 @@ class PathDebugNode : public Node {
     GBufferInHandle con_gbuffer;
     PtrInHandle<InputController> con_controller = PtrIn<InputController>::create();
     PtrInHandle<Window> con_window = PtrIn<Window>::create();
-    PtrInHandle<SwapchainAcquireResult> con_acquire = PtrIn<SwapchainAcquireResult>::create();
+    VkImageInHandle con_canvas = VkImageIn::create();
     ManagedVkImageOutHandle con_out;
-    PtrOutHandle<SwapchainAcquireResult> con_acquire_out =
-        PtrOut<SwapchainAcquireResult>::create_optional();
     ManagedVkImageOutHandle con_filtered;
     ManagedVkImageOutHandle con_filtered_b;
 

@@ -7,13 +7,12 @@ const BufferArrayResource& VkBufferIn::resource(const GraphResourceHandle& resou
     return *debugable_ptr_cast<const BufferArrayResource>(resource);
 }
 
-void VkBufferIn::on_connect_output(const OutputConnectorHandle& output) {
-    auto casted_output = std::dynamic_pointer_cast<VkBufferOut>(output);
-    if (!casted_output) {
-        throw graph_errors::invalid_connection{"VkBufferIn cannot receive from output."};
-    }
+bool VkBufferIn::can_receive_from(const OutputConnectorHandle& output) const {
+    return std::dynamic_pointer_cast<VkBufferOut>(output) != nullptr;
+}
 
-    array_size = casted_output->get_array_size();
+void VkBufferIn::on_connect_output(const OutputConnectorHandle& output) {
+    array_size = debugable_ptr_cast<VkBufferOut>(output)->get_array_size();
 }
 
 void VkBufferIn::bind(ShaderCursor& cursor,

@@ -44,7 +44,6 @@ class GLTFSceneNode : public Node {
   private:
 #ifdef MERIAN_TINYGLTF_ENABLED
     ContextHandle context;
-    ResourceAllocatorHandle allocator;
     ShaderCompileContextHandle compile_context;
     TextureManagerHandle texture_manager;
     MaterialSystemHandle material_system;
@@ -54,7 +53,7 @@ class GLTFSceneNode : public Node {
 
 #endif
 
-    PtrOutHandle<Scene> con_scene = PtrOut<Scene>::create(true);
+    PtrOutHandle<Scene> con_scene = PtrOut<Scene>::create();
 
     PtrInHandle<InputController> con_controller = PtrIn<InputController>::create();
     std::shared_ptr<CameraController> cam_controller = std::make_shared<CameraController>();

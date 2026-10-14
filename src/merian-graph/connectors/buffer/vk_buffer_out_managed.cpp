@@ -6,26 +6,19 @@
 namespace merian {
 
 ManagedVkBufferOut::ManagedVkBufferOut(const vk::BufferCreateInfo& create_info,
-                                       const bool persistent,
                                        const uint32_t array_size)
-    : VkBufferOut(persistent, array_size), create_info(create_info) {}
+    : VkBufferOut(array_size), create_info(create_info) {}
 
-GraphResourceHandle ManagedVkBufferOut::create_resource(
-    [[maybe_unused]] const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
-    const ConnectorAccess& combined_access,
-    const ResourceAllocatorHandle& allocator,
-    const ResourceAllocatorHandle& aliasing_allocator,
-    [[maybe_unused]] const uint32_t resource_index,
-    [[maybe_unused]] const uint32_t ring_size) {
+GraphResourceHandle ManagedVkBufferOut::create_resource(const ResourceCreateInfo& info) {
     vk::BufferCreateInfo buffer_create_info = create_info;
-    buffer_create_info.usage |= combined_access.buffer_usage;
-
-    const ResourceAllocatorHandle alloc = persistent ? allocator : aliasing_allocator;
+    buffer_create_info.usage |= info.combined_access.buffer_usage;
 
     const auto res = std::make_shared<ManagedBufferArrayResource>(get_array_size());
 
     for (uint32_t i = 0; i < get_array_size(); i++) {
-        res->buffers[i] = alloc->create_buffer(buffer_create_info, MemoryMappingType::NONE);
+        res->buffers[i] = info.allocator->create_buffer(
+            buffer_create_info, MemoryMappingType::NONE,
+            get_array_size() == 1 ? info.debug_name : fmt::format("{}[{}]", info.debug_name, i));
     }
 
     return res;
@@ -33,14 +26,17 @@ GraphResourceHandle ManagedVkBufferOut::create_resource(
 
 void ManagedVkBufferOut::bind(ShaderCursor& cursor,
                               const GraphResourceHandle& resource,
-                              [[maybe_unused]] const ResourceAllocatorHandle& allocator,
+                              const ResourceAllocatorHandle& allocator,
                               [[maybe_unused]] const ConnectorAccess& access) {
-    const auto& res = debugable_ptr_cast<BufferArrayResource>(resource);
+    const auto write = [&](ShaderCursor field, const uint32_t index) {
+        field.write(resource ? debugable_ptr_cast<BufferArrayResource>(resource)->get_buffer(index)
+                             : allocator->get_dummy_buffer());
+    };
     if (get_array_size() == 1) {
-        cursor.write(res->get_buffer(0));
+        write(cursor, 0);
     } else {
         for (uint32_t i = 0; i < get_array_size(); i++) {
-            cursor[i].write(res->get_buffer(i));
+            write(cursor[i], i);
         }
     }
 }
@@ -50,9 +46,8 @@ BufferArrayResource& ManagedVkBufferOut::resource(const GraphResourceHandle& res
 }
 
 ManagedVkBufferOutHandle ManagedVkBufferOut::create(const vk::BufferCreateInfo& create_info,
-                                                    const bool persistent,
                                                     const uint32_t array_size) {
-    return std::make_shared<ManagedVkBufferOut>(create_info, persistent, array_size);
+    return std::make_shared<ManagedVkBufferOut>(create_info, array_size);
 }
 
 } // namespace merian

@@ -8,7 +8,6 @@ merian_graph_src += files(
     'image/vk_image_in_sampeled.cpp',
     'image/vk_image_in_storage.cpp',
     'image/vk_image_out.cpp',
+    'image/vk_image_out_external.cpp',
     'image/vk_image_out_managed.cpp',
-    'vk_tlas_in.cpp',
-    'vk_tlas_out.cpp',
 )

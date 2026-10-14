@@ -28,8 +28,6 @@ DeviceSupportInfo AutoExposure::query_device_support(const DeviceSupportQueryInf
 
 void AutoExposure::initialize(const ContextHandle& context,
                               const ResourceAllocatorHandle& allocator) {
-    this->context = context;
-    this->allocator = allocator;
     this->compile_context = context->get_shader_compile_context();
 
     auto spec_builder = SpecializationInfoBuilder();
@@ -42,7 +40,10 @@ void AutoExposure::initialize(const ContextHandle& context,
 }
 
 std::vector<InputConnectorDescriptor> AutoExposure::describe_inputs() {
-    return {{"src", con_src, ConnectorAccess::compute_read}};
+    return {{.name = "src",
+             .connector = con_src,
+             .access = ConnectorAccess::compute_read,
+             .pass_through = "out"}};
 }
 
 std::vector<OutputConnectorDescriptor>
@@ -57,12 +58,15 @@ AutoExposure::describe_outputs(const NodeIOLayout& io_layout) {
         {}, ((vk::DeviceSize)LOCAL_SIZE_X * LOCAL_SIZE_Y * sizeof(uint32_t)) + sizeof(uint32_t),
         vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst));
     con_luminance = ManagedVkBufferOut::create(
-        vk::BufferCreateInfo({}, sizeof(float), vk::BufferUsageFlagBits::eStorageBuffer), true);
+        vk::BufferCreateInfo({}, sizeof(float), vk::BufferUsageFlagBits::eStorageBuffer));
 
     return {{"out", con_out, ConnectorAccess::compute_write},
             {"histogram", con_hist,
              ConnectorAccess::compute_read_write | ConnectorAccess::transfer_dst},
-            {"avg_luminance", con_luminance, ConnectorAccess::compute_read_write}};
+            {.name = "avg_luminance",
+             .connector = con_luminance,
+             .access = ConnectorAccess::compute_read_write,
+             .persistent = true}};
 }
 
 AutoExposure::NodeStatusFlags
@@ -84,23 +88,23 @@ AutoExposure::on_connected(const NodeIOLayout& io_layout,
 [[nodiscard]] AutoExposure::NodeStatusFlags
 AutoExposure::process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) {
     const CommandBufferHandle& cmd = submission.get_cmd();
+
+    // the histogram is transient: clear it also with manual exposure
+    auto bar = io[con_hist]->buffer_barrier(vk::AccessFlagBits::eShaderRead |
+                                                vk::AccessFlagBits::eShaderWrite,
+                                            vk::AccessFlagBits::eTransferWrite);
+    cmd->barrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eTransfer,
+                 bar);
+    cmd->fill(io[con_hist]);
+    bar = io[con_hist]->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
+                                       vk::AccessFlagBits::eShaderRead |
+                                           vk::AccessFlagBits::eShaderWrite);
+    cmd->barrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eComputeShader,
+                 bar);
+
     if (pc.automatic == VK_TRUE) {
         pc.reset = info.get_iteration() == 0 ? VK_TRUE : VK_FALSE;
         pc.timediff = static_cast<float>(info.get_time_delta());
-
-        auto bar = io[con_hist]->buffer_barrier(vk::AccessFlagBits::eShaderRead |
-                                                    vk::AccessFlagBits::eShaderWrite,
-                                                vk::AccessFlagBits::eTransferWrite);
-        cmd->barrier(vk::PipelineStageFlagBits::eComputeShader,
-                     vk::PipelineStageFlagBits::eTransfer, bar);
-
-        cmd->fill(io[con_hist]);
-
-        bar = io[con_hist]->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
-                                           vk::AccessFlagBits::eShaderRead |
-                                               vk::AccessFlagBits::eShaderWrite);
-        cmd->barrier(vk::PipelineStageFlagBits::eTransfer,
-                     vk::PipelineStageFlagBits::eComputeShader, bar);
 
         const auto pipe = histogram_kernel->bind(io, info, submission);
         cmd->push_constant(pipe, pc);
@@ -117,9 +121,9 @@ AutoExposure::process(const NodeIO& io, const NodeProcessInfo& info, Submission&
     cmd->push_constant(luminance_pipe, pc);
     cmd->dispatch(1, 1, 1);
 
-    auto bar = io[con_luminance]->buffer_barrier(vk::AccessFlagBits::eShaderRead |
-                                                     vk::AccessFlagBits::eShaderWrite,
-                                                 vk::AccessFlagBits::eShaderRead);
+    bar = io[con_luminance]->buffer_barrier(vk::AccessFlagBits::eShaderRead |
+                                                vk::AccessFlagBits::eShaderWrite,
+                                            vk::AccessFlagBits::eShaderRead);
     cmd->barrier(vk::PipelineStageFlagBits::eComputeShader,
                  vk::PipelineStageFlagBits::eComputeShader, bar);
 

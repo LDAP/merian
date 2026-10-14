@@ -39,9 +39,19 @@ SlangCompositionHandle TAA::create_composition() {
 
 std::vector<InputConnectorDescriptor> TAA::describe_inputs() {
     return {
-        {"src", con_src, ConnectorAccess::compute_read},
-        {"prev_src", VkSampledImageIn::create(), ConnectorAccess::compute_read, 1},
-        {"mv", con_mv, ConnectorAccess::compute_read, 0, true},
+        {.name = "src",
+         .connector = con_src,
+         .access = ConnectorAccess::compute_read,
+         .pass_through = "out"},
+        {.name = "prev_src",
+         .connector = VkSampledImageIn::create(),
+         .access = ConnectorAccess::compute_read,
+         .delay = 1,
+         .auto_connect = AutoConnect::output("out")},
+        {.name = "mv",
+         .connector = con_mv,
+         .access = ConnectorAccess::compute_read,
+         .optional = true},
     };
 }
 
@@ -59,8 +69,8 @@ TAA::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     };
 }
 
-const void* TAA::get_push_constant([[maybe_unused]] const NodeIO& io,
-                                   [[maybe_unused]] const NodeProcessInfo& info) {
+const void* TAA::get_push_constant([[maybe_unused]] const NodeIO& io, const NodeProcessInfo& info) {
+    pc.reset = static_cast<VkBool32>(info.get_iteration() == 0);
     return &pc;
 }
 

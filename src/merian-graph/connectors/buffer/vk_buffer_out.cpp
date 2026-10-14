@@ -4,8 +4,7 @@
 
 namespace merian {
 
-VkBufferOut::VkBufferOut(const bool persistent, const uint32_t array_size)
-    : OutputConnector(!persistent), persistent(persistent), array_size(array_size) {}
+VkBufferOut::VkBufferOut(const uint32_t array_size) : array_size(array_size) {}
 
 uint32_t VkBufferOut::get_array_size() const {
     return array_size;

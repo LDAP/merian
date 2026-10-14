@@ -78,7 +78,9 @@ class RenderPT : public Node {
                         bool has_cache);
     };
 
-    void ensure_pipeline(const SceneHandle& scene);
+    void ensure_pipeline(const ContextHandle& context,
+                         const ResourceAllocatorHandle& allocator,
+                         const SceneHandle& scene);
     void update_render_constants();
     uint32_t recorded_vertices_per_path() const;
     bool use_raygen() const;
@@ -89,8 +91,6 @@ class RenderPT : public Node {
     float distance_guided_probability() const;
     bool has_irradiance_cache() const;
 
-    ContextHandle context;
-    ResourceAllocatorHandle resource_allocator;
     ShaderCompileContextHandle compile_context;
 
     PtrInHandle<Scene> con_scene = PtrIn<Scene>::create();

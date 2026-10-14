@@ -51,6 +51,13 @@ ResourceAllocator::ResourceAllocator(const ContextHandle& context,
     SPDLOG_DEBUG("Uploaded dummy texture and buffer");
 }
 
+ResourceAllocator::ResourceAllocator(const std::shared_ptr<ResourceAllocator>& base,
+                                     const MemoryAllocatorHandle& memAllocator)
+    : context(base->context), m_memAlloc(memAllocator), m_staging(base->m_staging),
+      m_samplerPool(base->m_samplerPool), descriptor_pool(base->descriptor_pool),
+      debug_utils(base->debug_utils), dummy_storage_image_view(base->dummy_storage_image_view),
+      dummy_texture(base->dummy_texture), dummy_buffer(base->dummy_buffer) {}
+
 BufferHandle ResourceAllocator::create_buffer(const vk::BufferCreateInfo& info,
                                               const MemoryMappingType mapping_type,
                                               const std::string& debug_name,
@@ -231,6 +238,9 @@ ImageViewHandle
 ResourceAllocator::create_image_view(const ImageHandle& image,
                                      const vk::ImageViewCreateInfo& imageViewCreateInfo,
                                      [[maybe_unused]] const std::string& debug_name) {
+    if (!image->get_memory()) {
+        throw std::logic_error{"image views need bound memory"};
+    }
 
     const ImageViewHandle view = ImageView::create(imageViewCreateInfo, image);
 
@@ -271,8 +281,6 @@ TextureHandle ResourceAllocator::create_texture(const ImageHandle& image,
 TextureHandle ResourceAllocator::create_texture(const ImageHandle& image,
                                                 const vk::ImageViewCreateInfo& view_create_info,
                                                 const std::string& debug_name) {
-    const ContextHandle& context = image->get_memory()->get_context();
-
     const vk::FormatProperties props =
         context->get_physical_device()->get_physical_device().getFormatProperties(
             view_create_info.format);

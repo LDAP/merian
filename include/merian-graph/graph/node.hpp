@@ -5,6 +5,7 @@
 #include "connector_output.hpp"
 #include "node_io.hpp"
 #include "node_process_info.hpp"
+#include "subgraph.hpp"
 
 #include "merian/utils/properties.hpp"
 #include "merian/vk/command/submission.hpp"
@@ -14,7 +15,31 @@
 
 namespace merian {
 
-class GraphInfo {};
+// What the graph connects to a delayed input, with its delay: an output of the node, or what
+// another of its inputs receives.
+struct AutoConnect {
+    enum class From : uint8_t {
+        NOTHING,
+        OUTPUT,
+        INPUT,
+    };
+
+    static AutoConnect output(std::string name) {
+        return {From::OUTPUT, std::move(name)};
+    }
+
+    // The named input must not be written in place.
+    static AutoConnect input(std::string name) {
+        return {From::INPUT, std::move(name)};
+    }
+
+    explicit operator bool() const {
+        return from != From::NOTHING;
+    }
+
+    From from = From::NOTHING;
+    std::string name;
+};
 
 /**
  * @brief Descriptor for a named input connector.
@@ -31,6 +56,15 @@ struct InputConnectorDescriptor {
     // Receive the resource from delay iterations earlier.
     uint32_t delay = 0;
     bool optional = false;
+    // The node writes the received resource with the declared access; the graph outputs it under
+    // this input's name after the node ran, or unchanged when the node does not run. The node must
+    // not declare an output with this name. Only for inputs without delay.
+    bool in_place = false;
+    // While the node is disabled, consumers of its output with this name receive what this input
+    // receives. Only for inputs without delay.
+    std::string pass_through{};
+    // Unless connected otherwise, the graph connects this once. Only for delayed inputs.
+    AutoConnect auto_connect{};
 };
 
 /**
@@ -46,8 +80,14 @@ struct OutputConnectorDescriptor {
     // it empty.
     ConnectorAccess access{};
     // The output exists but carries nothing this build. Consumers that require it are force
-    // disabled instead of erroring; changing this needs a reconnect.
+    // disabled instead of erroring; changing this needs a reconnect. It has no resource: do not
+    // access it. Image and buffer outputs bind a dummy.
     bool disabled = false;
+    // Memory for the node itself: cannot be connected.
+    bool scratch = false;
+    // The contents survive iterations, so the node may write it only when they change. Cannot be
+    // read delayed.
+    bool persistent = false;
 };
 
 class Node : public std::enable_shared_from_this<Node> {
@@ -140,6 +180,18 @@ class Node : public std::enable_shared_from_this<Node> {
 
     // -----------------------------------------------------------
 
+    // Called each time the graph attempts to connect nodes, before describe_inputs. The children
+    // must be registered node types and connect and run like other nodes; keep them as members to
+    // persist them between connects. The graph does not store them: nest their settings in
+    // properties().
+    //
+    // If you throw node_error or compilation_failed the graph will disable the node for this
+    // connect attempt and set the error state for this node. Its children then stay as they are.
+    [[nodiscard]]
+    virtual Subgraph describe_subgraph() {
+        return {};
+    }
+
     // Called each time the graph attempts to connect nodes.
     // If you need to access the resources directly, you need to maintain a copy of the InputHandle.
     //
@@ -174,7 +226,8 @@ class Node : public std::enable_shared_from_this<Node> {
     // other nodes request reconnects). It can be assumed that at the time of calling processing of
     // all in-flight data has finished, that means old pipelines and such can be safely destroyed.
     //
-    // Here also delayed inputs can be accessed from io_layout.
+    // Here also delayed inputs can be accessed from io_layout. Only persistent outputs can be
+    // accessed here.
     [[nodiscard]]
     virtual NodeStatusFlags on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
                                          [[maybe_unused]] const NodeIO& io,

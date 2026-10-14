@@ -30,6 +30,15 @@ test_versioned = executable(
 )
 test('versioned', test_versioned, timeout: 30)
 
+if get_option('glfw').enable_auto_if(glfw.found()).enabled()
+    test_extension_glfw = executable(
+        'test-extension-glfw',
+        'test_extension_glfw.cpp',
+        dependencies: [merian_dep, gtest_main_dep],
+    )
+    test('extension_glfw', test_extension_glfw, timeout: 60)
+endif
+
 test_geometry_utils = executable(
     'test-geometry-utils',
     'test_geometry_utils.cpp',
@@ -141,3 +150,46 @@ if pbrt_enabled
     )
     test('pbrt_scene', test_pbrt_scene, timeout: 120)
 endif
+
+test_memory_allocator_transient = executable(
+    'test-memory-allocator-transient',
+    'test_memory_allocator_transient.cpp',
+    dependencies: [merian_dep, gtest_main_dep],
+)
+test('memory_allocator_transient', test_memory_allocator_transient, timeout: 120)
+
+test_graph_memory = executable(
+    'test-graph-memory',
+    'test_graph_memory.cpp',
+    dependencies: [merian_dep, gtest_main_dep],
+)
+test('graph_memory', test_graph_memory, timeout: 120)
+
+test_svgf = executable(
+    'test-svgf',
+    'test_svgf.cpp',
+    dependencies: [merian_dep, gtest_main_dep],
+)
+test('svgf', test_svgf, timeout: 120)
+
+foreach name : ['data_flow', 'edit', 'in_place', 'subgraphs']
+    test('graph_' + name, executable(
+        'test-graph-' + name.replace('_', '-'),
+        'test_graph_' + name + '.cpp',
+        dependencies: [merian_dep, gtest_main_dep],
+    ), timeout: 300)
+endforeach
+
+test_graph_connections = executable(
+    'test-graph-connections',
+    'test_graph_connections.cpp',
+    dependencies: [merian_dep, gtest_main_dep],
+)
+test('graph_connections', test_graph_connections, timeout: 120)
+
+test_memory_allocator_tracking = executable(
+    'test-memory-allocator-tracking',
+    'test_memory_allocator_tracking.cpp',
+    dependencies: [merian_dep, gtest_main_dep],
+)
+test('memory_allocator_tracking', test_memory_allocator_tracking, timeout: 120)
