@@ -205,7 +205,7 @@ TEST_F(GraphMemoryTest, ChainPingPongs) {
     ASSERT_TRUE(color);
     EXPECT_EQ(positions(*color).size(), report.layer_count);
     EXPECT_FALSE(color->placement.aliased);
-    EXPECT_TRUE(report.unplaced.empty());
+    EXPECT_TRUE(report.exclusive.empty());
     // at most two neighbors are in use with the source
     ASSERT_EQ(report.in_use.size(), report.layer_count);
     const vk::DeviceSize most_in_use = *std::ranges::max_element(report.in_use);
@@ -236,7 +236,7 @@ TEST_F(GraphMemoryTest, ScratchAndDisabledOutputs) {
     for (const auto& output : report.placed) {
         EXPECT_FALSE(output.output.ends_with(".off")) << output.output;
     }
-    EXPECT_TRUE(report.unplaced.empty());
+    EXPECT_TRUE(report.exclusive.empty());
 
     const auto* a_out = find_placed(report, "a.out");
     const auto* a_tmp = find_placed(report, "a.tmp");
@@ -407,8 +407,8 @@ TEST_F(GraphMemoryTest, PropertiesShowMemory) {
     EXPECT_NE(text.find("Block 0"), std::string::npos);
     EXPECT_NE(text.find("t3.out"), std::string::npos);
     EXPECT_TRUE(props.shows_text(report.format_summary(), {"memory"}));
+    EXPECT_TRUE(props.shows_text(report.format_nodes(), {"memory", "nodes"}));
+    EXPECT_TRUE(props.shows_text(report.format_layers(), {"memory", "layers"}));
+    EXPECT_TRUE(props.shows_text(report.format_outputs(), {"memory", "outputs"}));
     EXPECT_TRUE(props.shows_text(report.format_blocks(), {"memory", "blocks"}));
-    // the overview shows what the node shows
-    EXPECT_TRUE(props.shows_text(report.format_node("t3"), {"memory", "nodes", "t3"}));
-    EXPECT_TRUE(props.shows_text(report.format_node("t3"), {"t3", "memory"}));
 }

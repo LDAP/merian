@@ -17,7 +17,7 @@ TEST_F(GraphResourcesTest, SubgraphsReadWhatWasWritten) {
     EXPECT_TRUE(
         props.shows_text("Receiving from: out, a2 (Pattern)", {"g", "inputs", "inp (public)"}));
     EXPECT_TRUE(props.shows_text("Carried by: g:c2.out", {"g", "outputs", "out (public)"}));
-    EXPECT_TRUE(props.shows_text("g:c0.out", {"g:c0", "memory"}));
+    EXPECT_TRUE(props.shows_text("g:c0.out", {"memory", "blocks"}));
 
     grouped.nodes.at("g").enabled = false;
     set_node_enabled(graph, "g", false);

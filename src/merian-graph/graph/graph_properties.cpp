@@ -9,16 +9,6 @@
 
 namespace merian {
 
-namespace {
-
-void node_memory_properties(Properties& props,
-                            const GraphMemoryReport& report,
-                            const std::string& identifier) {
-    props.output_text(report.format_node(identifier));
-}
-
-} // namespace
-
 void Graph::graph_properties(Properties& props) {
     props.output_text("Run iteration: {}", run_iteration);
     props.output_text("Run Elapsed: {:%H:%M:%S}s", duration_elapsed_since_connect);
@@ -411,10 +401,6 @@ void Graph::node_properties(Properties& props, const NodeHandle& node) {
             props.st_end_child();
         }
         io_props_for_node(props, node, data);
-        if (props.is_ui() && props.st_begin_child("memory", "Memory")) {
-            node_memory_properties(props, memory_view_for_ui().report, data.identifier);
-            props.st_end_child();
-        }
         if (!data.children.empty() && props.st_begin_child("subnodes", "Subnodes")) {
             for (const NodeHandle& child : data.children) {
                 node_properties(props, child);
@@ -449,8 +435,7 @@ GraphMemoryReport Graph::get_memory_report() const {
     for (const NodeHandle& node : nodes) {
         const NodeData& data = node_data.at(node);
         const std::string& identifier = data.identifier;
-        report.node_allocations.emplace_back(identifier, data.label,
-                                             data.memory_tracker->get_allocated_size());
+        report.node_allocations.emplace_back(identifier, data.memory_tracker->get_allocated_size());
 
         // a pending reconnect may have left the outputs half allocated
         if (needs_reconnect) {
@@ -469,13 +454,19 @@ GraphMemoryReport Graph::get_memory_report() const {
                     copies.size() == 1
                         ? fmt::format("{}.{}", identifier, descriptor.name)
                         : fmt::format("{}.{} ({})", identifier, descriptor.name, copy_index);
-                for (const TransientMemoryAllocator::Placement& placement :
-                     scope->get_placements()) {
-                    report.placed.emplace_back(identifier, name, descriptor.scratch, placement,
-                                               scope->get_lifetime());
+                const std::vector<TransientMemoryAllocator::Placement> placements =
+                    scope->get_placements();
+                for (uint32_t resource_index = 0; resource_index < placements.size();
+                     resource_index++) {
+                    report.placed.emplace_back(identifier,
+                                               placements.size() == 1
+                                                   ? name
+                                                   : fmt::format("{} [{}]", name, resource_index),
+                                               descriptor.scratch, descriptor.persistent,
+                                               placements[resource_index], scope->get_lifetime());
                 }
                 for (const TransientMemoryAllocator::Fallback& fallback : scope->get_fallbacks()) {
-                    report.unplaced.emplace_back(identifier, name, descriptor.scratch, fallback);
+                    report.exclusive.emplace_back(identifier, name, descriptor.scratch, fallback);
                 }
             }
         }
@@ -505,7 +496,7 @@ GraphMemoryReport Graph::get_memory_report() const {
         return std::tie(a.placement.block_index, a.placement.offset, a.placement.size, a.output) <
                std::tie(b.placement.block_index, b.placement.offset, b.placement.size, b.output);
     });
-    std::ranges::sort(report.unplaced, [](const auto& a, const auto& b) {
+    std::ranges::sort(report.exclusive, [](const auto& a, const auto& b) {
         return std::tie(b.fallback.size, a.output) < std::tie(a.fallback.size, b.output);
     });
 
@@ -517,10 +508,12 @@ const Graph::MemoryView& Graph::memory_view_for_ui() {
     if (memory_view_dirty || now - memory_view_time > std::chrono::seconds(1)) {
         memory_view_dirty = false;
         memory_view_time = now;
-        memory_view.report = get_memory_report();
-        memory_view.summary = memory_view.report.format_summary();
-        memory_view.in_use = memory_view.report.format_in_use();
-        memory_view.blocks = memory_view.report.format_blocks();
+        const GraphMemoryReport report = get_memory_report();
+        memory_view.summary = report.format_summary();
+        memory_view.nodes = report.format_nodes();
+        memory_view.layers = report.format_layers();
+        memory_view.outputs = report.format_outputs();
+        memory_view.blocks = report.format_blocks();
     }
     return memory_view;
 }
@@ -531,37 +524,21 @@ void Graph::memory_properties(Properties& props) {
     }
 
     const MemoryView& view = memory_view_for_ui();
-    const GraphMemoryReport& report = view.report;
-    if (!report.in_use.empty()) {
-        std::vector<float> in_use_mib;
-        in_use_mib.reserve(report.in_use.size());
-        for (const vk::DeviceSize size : report.in_use) {
-            in_use_mib.push_back(static_cast<float>(size) / (1024 * 1024));
-        }
-        props.output_plot_line("in use (MiB) per layer over the period", in_use_mib.data(),
-                               static_cast<uint32_t>(in_use_mib.size()), 0);
-    }
     props.output_text(view.summary);
-    if (!view.in_use.empty() && props.st_begin_child("in_use", "In Use")) {
-        props.output_text(view.in_use);
-        props.st_end_child();
+    if (!props.st_begin_child("views", "", Properties::ChildFlagBits::TABS)) {
+        return;
     }
-    if (!view.blocks.empty() && props.st_begin_child("blocks", "Blocks")) {
-        props.output_text(view.blocks);
-        props.st_end_child();
-    }
-    if (props.st_begin_child("nodes", "Nodes", Properties::ChildFlagBits::DEFAULT_OPEN)) {
-        for (const GraphMemoryReport::NodeAllocation& node : report.node_allocations) {
-            if (props.st_begin_child(node.node,
-                                     fmt::format("{}: {} allocated, {} placed", node.label,
-                                                 format_size(node.size),
-                                                 format_size(report.placed_size(node.node))))) {
-                node_memory_properties(props, report, node.node);
-                props.st_end_child();
-            }
+    const auto tab = [&](const std::string& id, const std::string& label, const std::string& text) {
+        if (!text.empty() && props.st_begin_child(id, label)) {
+            props.output_text(text);
+            props.st_end_child();
         }
-        props.st_end_child();
-    }
+    };
+    tab("nodes", "Nodes", view.nodes);
+    tab("layers", "Layers", view.layers);
+    tab("outputs", "Outputs", view.outputs);
+    tab("blocks", "Blocks", view.blocks);
+    props.st_end_child();
 }
 
 // Probes which outputs a WindowNode could display. can_receive_from is side-effect free, so one

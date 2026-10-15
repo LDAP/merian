@@ -13,14 +13,15 @@ struct GraphMemoryReport {
     struct Placed {
         // identifier
         std::string node;
-        // with the copy index if the output has more than one
+        // with the copy and resource index where there is more than one
         std::string output;
         bool scratch;
+        bool persistent;
         TransientMemoryAllocator::Placement placement;
         TransientMemoryAllocator::Lifetime lifetime;
     };
 
-    struct Unplaced {
+    struct Exclusive {
         std::string node;
         std::string output;
         bool scratch;
@@ -37,7 +38,7 @@ struct GraphMemoryReport {
 
     struct NodeAllocation {
         std::string node;
-        std::string label;
+        // with its exclusive outputs
         vk::DeviceSize size;
     };
 
@@ -53,23 +54,15 @@ struct GraphMemoryReport {
     // placement fits into fewer than the maximum.
     std::vector<vk::DeviceSize> in_use;
     // Allocated by their node, largest first.
-    std::vector<Unplaced> unplaced;
+    std::vector<Exclusive> exclusive;
     // In run order, then the nodes that do not run.
     std::vector<NodeAllocation> node_allocations;
 
     std::string format_summary() const;
-
-    // The bytes in use at each position with the nodes of its layer.
-    std::string format_in_use() const;
-
-    // The placements of each block.
+    std::string format_nodes() const;
+    std::string format_layers() const;
+    std::string format_outputs() const;
     std::string format_blocks() const;
-
-    // Its allocations and the copies of its outputs.
-    std::string format_node(const std::string& node) const;
-
-    // Of the copies of its outputs, shared with other copies.
-    vk::DeviceSize placed_size(const std::string& node) const;
 };
 
 std::string format_as(const GraphMemoryReport& report);

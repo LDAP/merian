@@ -289,9 +289,10 @@ class Graph : public std::enable_shared_from_this<Graph> {
     void graph_properties(Properties& props);
     void profiler_properties(Properties& props);
     struct MemoryView {
-        GraphMemoryReport report;
         std::string summary;
-        std::string in_use;
+        std::string nodes;
+        std::string layers;
+        std::string outputs;
         std::string blocks;
     };
 
