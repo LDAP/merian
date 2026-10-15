@@ -329,10 +329,12 @@ TEST_F(TransientMemoryAllocatorTest, CyclicLifetimesShareMemory) {
 
 // Three buffers in use together need more than the largest allocation the device allows.
 TEST_F(TransientMemoryAllocatorTest, PlacementsSpillIntoFurtherBlocks) {
-    const vk::DeviceSize limit = context->get_physical_device()
-                                     ->get_properties()
-                                     .get_maintenance3_properties()
-                                     .maxMemoryAllocationSize;
+    const vk::DeviceSize max_allocation_size = context->get_physical_device()
+                                                   ->get_properties()
+                                                   .get_maintenance3_properties()
+                                                   .maxMemoryAllocationSize;
+    const vk::DeviceSize limit =
+        std::min(TransientMemoryAllocator::MAX_BLOCK_SIZE, max_allocation_size);
     const vk::DeviceSize size = limit / 8 * 3;
     const std::optional<uint32_t> memory_type = allocator->get_memory_allocator()->find_memory_type(
         vk::BufferCreateInfo{{}, size, vk::BufferUsageFlagBits::eStorageBuffer});

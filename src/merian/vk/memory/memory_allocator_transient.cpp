@@ -132,10 +132,12 @@ TransientMemoryAllocator::place(const uint32_t memory_type_index,
         physical_device->get_properties().get_properties().limits.bufferImageGranularity;
     const vk::PhysicalDeviceMemoryProperties& memory_properties =
         physical_device->get_memory_properties().memoryProperties;
-    const vk::DeviceSize max_block_size = std::min(
+    const vk::DeviceSize max_block_size = std::min({
+        MAX_BLOCK_SIZE,
         physical_device->get_properties().get_maintenance3_properties().maxMemoryAllocationSize,
         memory_properties.memoryHeaps[memory_properties.memoryTypes[memory_type_index].heapIndex]
-            .size);
+            .size,
+    });
 
     // Greedy by size: Pisarchyk & Lee 2020, Efficient Memory Management for Deep Neural Net
     // Inference.

@@ -183,8 +183,10 @@ if get_option('glslang').enable_auto_if(glslang.found()).enabled()
 endif
 glslc_path = glslc.full_path()
 
-slang = dependency('slang', version: ['>=2026.5.2'], fallback: ['slang', 'slang_dep'])
-slangc = find_program('slangc', required: false)
+slang_min_version = '>=2026.19'
+slang = dependency('slang', version: slang_min_version, fallback: ['slang', 'slang_dep'])
+slangc = find_program('slangc', version: slang_min_version, version_argument: '-version',
+                      required: false)
 if not slangc.found()
     slangc = subproject('slang').get_variable('slangc')
 endif

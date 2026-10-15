@@ -20,6 +20,8 @@ class TransientMemoryAllocator : public std::enable_shared_from_this<TransientMe
     friend TransientMemoryScope;
 
   public:
+    static constexpr vk::DeviceSize MAX_BLOCK_SIZE = vk::DeviceSize{1} << 32;
+
     // The positions of a cycle at which a resource is in use.
     class Lifetime {
       public:

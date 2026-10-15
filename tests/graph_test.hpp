@@ -11,6 +11,7 @@
 #include "merian/vk/extension/extension_resources.hpp"
 #include "merian/vk/extension/extension_vk_validation_layers.hpp"
 
+#include <cstdlib>
 #include <set>
 #include <string>
 
@@ -19,10 +20,20 @@ class GraphTest : public ::testing::Test {
     inline static merian::ContextHandle context;
     inline static merian::ResourceAllocatorHandle allocator;
 
+    static void set_env_default(const char* name, const char* value) {
+#ifdef _WIN32
+        if (std::getenv(name) == nullptr) {
+            _putenv_s(name, value);
+        }
+#else
+        setenv(name, value, 0);
+#endif
+    }
+
     // Call after registering the test node types.
     static void create_context(const std::string& application_name) {
-        setenv("VK_KHRONOS_VALIDATION_VALIDATE_SYNC", "true", 0);
-        setenv("VK_KHRONOS_VALIDATION_SYNCVAL_SHADER_ACCESSES_HEURISTIC", "true", 0);
+        set_env_default("VK_KHRONOS_VALIDATION_VALIDATE_SYNC", "true");
+        set_env_default("VK_KHRONOS_VALIDATION_SYNCVAL_SHADER_ACCESSES_HEURISTIC", "true");
         context = merian::Context::create({
             .context_extensions = {merian::MerianGraphExtension::name,
                                    merian::ExtensionVkValidationLayers::name},

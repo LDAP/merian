@@ -30,7 +30,7 @@ test_versioned = executable(
 )
 test('versioned', test_versioned, timeout: 30)
 
-if get_option('glfw').enable_auto_if(glfw.found()).enabled()
+if get_option('glfw').enable_auto_if(glfw.found()).enabled() and host_machine.system() == 'linux'
     test_extension_glfw = executable(
         'test-extension-glfw',
         'test_extension_glfw.cpp',
