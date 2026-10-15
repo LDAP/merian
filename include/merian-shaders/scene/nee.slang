@@ -93,6 +93,8 @@ struct LightTree {
 struct LightGrid {
     StructuredBuffer<uint> starts;
     StructuredBuffer<LightGridInfo, ScalarDataLayout> cascades;
+    RWStructuredBuffer<uint> index;
+    StructuredBuffer<LightGridBlock, ScalarDataLayout> blocks;
     bool in_use;
     // in cells
     float jitter;
@@ -109,20 +111,21 @@ struct LightGrid {
         return int3(floor((pos - info.origin) * info.inv_cell_size + offset));
     }
 
-    uint lookup(const float3 pos, inout RandomGenerator rng) {
+    uint lookup(const float3 pos, const float3 face_normal, inout RandomGenerator rng) {
         if (!in_use)
             return LIGHT_INVALID_INDEX;
         if (merian_nee_source == int(LightSource::LightSourceScene))
-            return 0u;
+            return LIGHT_GRID_FALLBACK_BLOCK;
         const LightGridInfo base = cascades[0];
 
         // the cascade is picked from the unjittered position, so the jitter cannot walk the
         // lookup across cascades and change the cell size under it
-        const float cell = 1.f / base.inv_cell_size;
-        const float3 to_center = abs(pos - (base.origin + 0.5f * float(base.dimension) * cell));
+        const float cell_size = 1.f / base.inv_cell_size;
+        const float3 to_center =
+            abs(pos - (base.origin + 0.5f * float(base.dimension) * cell_size));
         const float distance = max(to_center.x, max(to_center.y, to_center.z));
         // snapping moves a cascade by up to one cell, so only dimension / 2 - 1 cells are certain
-        const float reach = max(0.5f * float(base.dimension) - 1.f, 1.f) * cell;
+        const float reach = max(0.5f * float(base.dimension) - 1.f, 1.f) * cell_size;
         const uint outermost = base.cascade_count - 1u;
         uint cascade = min(uint(max(ceil(log2(max(distance / reach, 1e-6f))), 0.f)), outermost);
         const float3 offset = jitter * (rng.next_float3() - 0.5f);
@@ -132,16 +135,18 @@ struct LightGrid {
         int3 coord = cell_coord(cascade, pos, offset);
         if ((any(coord < 0) || any(coord >= int(base.dimension))) && cascade < outermost)
             coord = cell_coord(++cascade, pos, offset);
-        return light_cell_index(cascade, uint3(clamp(coord, 0, int(base.dimension) - 1)),
-                                base.dimension);
+        const uint cell = light_cell_index(cascade, uint3(clamp(coord, 0, int(base.dimension) - 1)),
+                                           light_orientation(face_normal), base.dimension);
+        const uint entry = index[cell];
+        if ((entry & LIGHT_GRID_VISITED) == 0)
+            index[cell] = entry | LIGHT_GRID_VISITED;
+        return light_cell_block(entry);
     }
 
-    float cell_scale(const uint cell) {
-        const LightGridInfo base = cascades[0];
-        return light_cell_scale(
-            cascades[light_cell_cascade(cell, base.dimension, base.cascade_count,
-                                        merian_nee_source == int(LightSource::LightSourceScene))]
-                .inv_cell_size);
+    float cell_scale(const uint block) {
+        if (block != LIGHT_GRID_FALLBACK_BLOCK)
+            return light_cell_scale(blocks[block].inv_cell_size);
+        return light_cell_scale(cascades[cascades[0].cascade_count - 1u].inv_cell_size);
     }
 
     bool weighs_at_cell() {
@@ -339,19 +344,18 @@ struct NEE {
         return has_cuts() ? has_emissive_triangles() || lists_env() : has_env();
     }
 
-    // Deterministic per point and random numbers, so a vertex begun again finds the same densities.
+    // Deterministic per point, face normal and random numbers, so a vertex begun again finds the
+    // same densities.
+    // normal faces the receiving side; either is 0 where unknown
     DirectLightVertex begin_vertex(const float3 pos,
+                                   const float3 face_normal,
                                    const float3 normal,
                                    inout RandomGenerator rng) {
         DirectLightVertex vertex;
         vertex.pos = pos;
         vertex.normal = normal;
-        vertex.cell = grid.lookup(pos, rng);
+        vertex.cell = grid.lookup(pos, face_normal, rng);
         return vertex;
-    }
-
-    DirectLightVertex begin_vertex(const float3 pos, inout RandomGenerator rng) {
-        return begin_vertex(pos, float3(0), rng);
     }
 
     // Of the light `index` where the ray from origin along dir meets it, summed over every

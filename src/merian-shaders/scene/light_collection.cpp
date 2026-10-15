@@ -113,6 +113,9 @@ void LightCollection::ensure_pipelines(const SlangCompositionHandle& scene_compo
             params.depends_on(ep);
         };
         make("grid_setup", setup_entry_point, setup_pipeline, setup_params);
+        make("grid_keep", keep_entry_point, keep_pipeline, keep_params);
+        make("grid_allocate", allocate_entry_point, allocate_pipeline, allocate_params);
+        make("grid_assign", assign_entry_point, assign_pipeline, assign_params);
         make("grid", grid_entry_point, grid_pipeline, grid_params);
         make("env_cones", env_cones_entry_point, env_cones_pipeline, env_cones_params);
     }
@@ -195,6 +198,8 @@ void LightCollection::ensure_pipelines(const SlangCompositionHandle& scene_compo
 void LightCollection::prepare(const CommandBufferHandle& cmd) {
     if (!enabled)
         return;
+    grid_cascades = std::clamp(grid_cascades, 1, static_cast<int32_t>(LIGHT_GRID_MAX_CASCADES));
+    grid_cells_kept = std::clamp(grid_cells_kept, 64, 65536);
 
     if (env_emissive) {
         if (env_importance_resized && env_cdf_buffer) {
@@ -219,6 +224,8 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
     }
 
     grid_slot ^= 1u;
+    // the grid passes skip frames without emissive triangles
+    grid_reset |= triangle_count == 0;
     if (triangle_count > 0) {
         for (uint32_t i = 0; i < 2; i++) {
             ensure_buffer(tree_keys_buffer[i], triangle_count * sizeof(uint32_t),
@@ -264,11 +271,24 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
             });
         }
 
-        // a cell index names another cell once the count changes
+        // a cell or block index names another one once the counts change
         const uint32_t cells = cell_count();
-        grid_reset |= cells != allocated_cells;
+        const uint32_t blocks = block_count();
+        grid_reset |= cells != allocated_cells || blocks != allocated_blocks;
         allocated_cells = cells;
-        const vk::DeviceSize slot_count = static_cast<vk::DeviceSize>(cells) * LIGHT_GRID_SLOTS;
+        allocated_blocks = blocks;
+        for (uint32_t i = 0; i < 2; i++) {
+            ensure_buffer(grid_index_buffer[i], cells * sizeof(uint32_t),
+                          "LightCollection::grid_index", cmd);
+        }
+        ensure_buffer(grid_blocks_buffer, blocks * sizeof(LightGridBlock),
+                      "LightCollection::grid_blocks", cmd);
+        ensure_buffer(grid_free_buffer, blocks * sizeof(uint32_t), "LightCollection::grid_free",
+                      cmd);
+        ensure_buffer(grid_offsets_buffer,
+                      (allocate_group_count() + 1 + LIGHT_GRID_MAX_CASCADES) * sizeof(uint32_t),
+                      "LightCollection::grid_offsets", cmd);
+        const vk::DeviceSize slot_count = static_cast<vk::DeviceSize>(blocks) * LIGHT_GRID_SLOTS;
         for (uint32_t i = 0; i < 2; i++) {
             const std::array<BufferHandle, 3> previous = {
                 grid_keys_buffer[i], grid_contribution_buffer[i], grid_feedback_buffer[i]};
@@ -366,6 +386,10 @@ void LightCollection::update(const CommandBufferHandle& cmd,
         cmd->fill(setup_state_buffer);
         cmd->fill(sort_state_buffer, 0, sort_state_size());
         cmd->fill(tree_cdf_state_buffer, 0, cdf_state_size(triangle_count));
+        if (uses_grid()) {
+            cmd->fill(grid_index_buffer[grid_slot]);
+            cmd->fill(grid_offsets_buffer);
+        }
     }
     if (env_emissive && !env_importance_built)
         cmd->fill(env_cdf_state_buffer, 0,
@@ -431,6 +455,11 @@ void LightCollection::update(const CommandBufferHandle& cmd,
         c["grid_slot_bounds"] = or_dummy(grid_slot_bounds_buffer);
         c["grid_info"] = grid_info_buffer[grid_slot];
         c["grid_info_prev"] = grid_info_buffer[grid_slot ^ 1];
+        c["grid_index"] = or_dummy(grid_index_buffer[grid_slot]);
+        c["grid_index_prev"] = or_dummy(grid_index_buffer[grid_slot ^ 1]);
+        c["grid_blocks"] = or_dummy(grid_blocks_buffer);
+        c["grid_free"] = or_dummy(grid_free_buffer);
+        c["grid_offsets"] = or_dummy(grid_offsets_buffer);
         c["grid_coverage"] = grid_coverage;
         c["camera_position"] = camera_position;
         c["triangle_count"] = triangle_count;
@@ -441,7 +470,8 @@ void LightCollection::update(const CommandBufferHandle& cmd,
         c["grid_even_share"] = grid_even_share;
         c["grid_refinements"] = static_cast<uint32_t>(grid_refinements);
         c["cell_count"] = cell_count();
-        c["single_cut"] = !uses_grid();
+        c["block_count"] = block_count();
+        c["allocate_groups"] = allocate_group_count();
         c["triangle_prior"] = triangle_prior;
         c["env_prior"] = env_prior;
         c["setup_state"] = setup_state_buffer;
@@ -551,11 +581,22 @@ void LightCollection::update(const CommandBufferHandle& cmd,
     {
         MERIAN_PROFILE_SCOPE_GPU(cmd, "grid");
         if (triangle_count > 0) {
-            // one group per cell
-            const uint32_t cells = cell_count();
+            if (uses_grid()) {
+                run(keep_entry_point, keep_pipeline, write_preprocess(keep_params.get()),
+                    allocate_group_count());
+                barrier();
+                run(allocate_entry_point, allocate_pipeline,
+                    write_preprocess(allocate_params.get()), 1);
+                barrier();
+                run(assign_entry_point, assign_pipeline, write_preprocess(assign_params.get()),
+                    allocate_group_count());
+                barrier();
+            }
+            // one group per block
+            const uint32_t blocks = block_count();
             run(grid_entry_point, grid_pipeline, write_preprocess(grid_params.get()),
-                std::min(cells, LIGHT_DISPATCH_ROW),
-                (cells + LIGHT_DISPATCH_ROW - 1) / LIGHT_DISPATCH_ROW);
+                std::min(blocks, LIGHT_DISPATCH_ROW),
+                (blocks + LIGHT_DISPATCH_ROW - 1) / LIGHT_DISPATCH_ROW);
         }
     }
     if (triangle_count > 0)
@@ -594,6 +635,8 @@ void LightCollection::write_to(ShaderCursor cursor) const {
     auto grid = cursor["grid"];
     grid["starts"] = active ? grid_starts_buffer : dummy;
     grid["cascades"] = active ? grid_info_buffer[grid_slot] : dummy;
+    grid["index"] = active ? grid_index_buffer[grid_slot] : dummy;
+    grid["blocks"] = active ? grid_blocks_buffer : dummy;
     grid["in_use"] = active;
     grid["jitter"] = debug_jitter ? grid_jitter : 0.f;
     grid["even_share"] = grid_even_share;
@@ -664,17 +707,21 @@ void LightCollection::properties(Properties& props) {
         props.config_int("refinements per frame", grid_refinements,
                          "Groups a cell may split per frame, merging others to make room "
                          "once its slots are full. What a cell learned carries across "
-                         "frames.",
+                         "frames while it holds a cut.",
                          0, static_cast<int32_t>(LIGHT_GRID_SLOTS));
 
         if (uses_grid()) {
             props.st_separate("Grid");
             props.config_int("cells per side", grid_dimension, "Cells per side of every cascade.",
                              4, 64);
+            props.config_int("cells kept", grid_cells_kept,
+                             "Cells that hold a cut of their own; lookups in other cells draw from "
+                             "the cut over the whole scene.",
+                             64, 65536);
             props.config_int("cascades", grid_cascades,
                              "Nested grids around the camera, each with twice the cell size of "
                              "the one inside it.",
-                             1, 16);
+                             1, static_cast<int32_t>(LIGHT_GRID_MAX_CASCADES));
             props.config_float("cell size", grid_cell_size,
                                "World units per cell of the innermost cascade; 0 derives it from "
                                "the distance to the lights.",
@@ -724,7 +771,7 @@ void LightCollection::properties(Properties& props) {
                 "draw outcome: of {} light draws, the share blocked before the light (red), "
                 "reaching it (green), passing through where it is cut out (blue); dark where "
                 "draws produce no ray.\n"
-                "cell: the cell of the lookup.\n"
+                "cell: the cut the lookup draws from.\n"
                 "slots: occupied slots (red), the contribution the cell learned for what it "
                 "picks, relative to its estimate (green), the share of one draw per group that "
                 "reaches it (blue).\n"

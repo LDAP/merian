@@ -6,8 +6,13 @@ import merian_shaders.utils.morton;
 
 using merian;
 
-// Per-frame preprocess for next event estimation: per-cell cuts through the light tree, for the
-// cells of a world-space grid or for one cell over everything.
+// a block whose cell a lookup found within these frames gives way only to finer cells
+static const uint LIGHT_GRID_RECENT_FRAMES = 8;
+static const uint LIGHT_GRID_IDLE_RANKS = 64;
+static const uint LIGHT_GRID_EVICTION_RANKS = LIGHT_GRID_MAX_CASCADES + LIGHT_GRID_IDLE_RANKS;
+
+// Per-frame preprocess for next event estimation: cuts through the light tree for the cells of a
+// world-space grid that rays look up, and one over the whole scene.
 
 struct LightPreprocessBinding {
     StructuredBuffer<EmissiveLightProxy, ScalarDataLayout> proxies;
@@ -33,6 +38,13 @@ struct LightPreprocessBinding {
     RWStructuredBuffer<LightBound, ScalarDataLayout> grid_slot_bounds;
     RWStructuredBuffer<LightGridInfo, ScalarDataLayout> grid_info;
     StructuredBuffer<LightGridInfo, ScalarDataLayout> grid_info_prev;
+    RWStructuredBuffer<uint> grid_index;
+    StructuredBuffer<uint> grid_index_prev;
+    RWStructuredBuffer<LightGridBlock, ScalarDataLayout> grid_blocks;
+    RWStructuredBuffer<uint> grid_free;
+    // per allocate group its missed cells, then their first free block; then the free block count,
+    // then per cascade its missed cells
+    RWStructuredBuffer<uint> grid_offsets;
     // zeroed, see LIGHT_GRID_SETUP_STATE
     RWStructuredBuffer<uint> setup_state;
 
@@ -47,7 +59,8 @@ struct LightPreprocessBinding {
     float grid_even_share;
     uint grid_refinements;
     uint cell_count;
-    bool single_cut;
+    uint block_count;
+    uint allocate_groups;
     float triangle_prior;
     float env_prior;
     uint setup_groups;
@@ -217,22 +230,17 @@ struct CellGeometry {
     float radius;
     float scale;
     uint cascade;
-    uint3 coord;
 };
 
 CellGeometry cell_geometry(const RWStructuredBuffer<LightGridInfo, ScalarDataLayout> grid_info,
-                           const uint cell,
+                           const uint cascade,
+                           const uint3 coord,
                            const float jitter) {
-    const uint dim = grid_info[0].dimension;
-    const uint cells_per_cascade = dim * dim * dim;
-    const uint local = cell % cells_per_cascade;
-
     CellGeometry cg;
-    cg.cascade = cell / cells_per_cascade;
-    cg.coord = uint3(local % dim, (local / dim) % dim, local / (dim * dim));
-    const LightGridInfo info = grid_info[cg.cascade];
+    cg.cascade = cascade;
+    const LightGridInfo info = grid_info[cascade];
     const float cell_size = 1.f / info.inv_cell_size;
-    cg.center = info.origin + (float3(cg.coord) + 0.5f) * cell_size;
+    cg.center = info.origin + (float3(coord) + 0.5f) * cell_size;
     // the sphere the cell stands for: its circumradius, grown by the jitter the lookup adds
     cg.radius = 0.5f * sqrt(3.f) * cell_size * (jitter + 1.f);
     cg.scale = light_cell_scale(info.inv_cell_size);
@@ -243,7 +251,6 @@ CellGeometry
 global_cell_geometry(const RWStructuredBuffer<LightGridInfo, ScalarDataLayout> grid_info) {
     CellGeometry cg;
     cg.cascade = grid_info[0].cascade_count - 1u;
-    cg.coord = uint3(0);
     const LightGridInfo outermost = grid_info[cg.cascade];
     const float extent = float(outermost.dimension) / outermost.inv_cell_size;
     cg.center = outermost.origin + 0.5f * extent;
@@ -252,31 +259,44 @@ global_cell_geometry(const RWStructuredBuffer<LightGridInfo, ScalarDataLayout> g
     return cg;
 }
 
-bool reproject_cell(const StructuredBuffer<LightGridInfo, ScalarDataLayout> grid_info_prev,
-                    const LightGridInfo info,
-                    const uint3 coord,
-                    out uint prev_cell) {
-    prev_cell = 0;
-    const LightGridInfo finest = grid_info_prev[0];
-    if (finest.dimension != info.dimension || !(finest.inv_cell_size > 0.f))
+int3 cascade_offset(const LightGridInfo info) {
+    return int3(floor(info.origin * info.inv_cell_size + 0.25f));
+}
+
+bool block_cell(const LightPreprocessBinding params,
+                const LightGridBlock b,
+                out uint cascade,
+                out uint3 local) {
+    cascade = 0;
+    local = uint3(0);
+    const LightGridInfo finest = params.grid_info[0];
+    if (!(finest.inv_cell_size > 0.f) || !(b.inv_cell_size > 0.f))
         return false;
-    const int cascade = int(round(log2(finest.inv_cell_size / info.inv_cell_size)));
-    if (cascade < 0 || cascade >= int(finest.cascade_count))
+    const int c = int(round(log2(finest.inv_cell_size / b.inv_cell_size)));
+    if (c < 0 || c >= int(finest.cascade_count))
         return false;
-    const LightGridInfo prev = grid_info_prev[cascade];
-    if (abs(prev.inv_cell_size - info.inv_cell_size) > 1e-6f * info.inv_cell_size)
+    const LightGridInfo info = params.grid_info[c];
+    if (abs(info.inv_cell_size - b.inv_cell_size) > 1e-6f * b.inv_cell_size)
         return false;
-    const int3 delta = int3(round((info.origin - prev.origin) * info.inv_cell_size));
-    const int3 c = int3(coord) + delta;
-    if (any(c < 0) || any(c >= int(info.dimension)))
+    const int3 l = b.coord - cascade_offset(info);
+    if (any(l < 0) || any(l >= int(info.dimension)))
         return false;
-    prev_cell = light_cell_index(uint(cascade), uint3(c), info.dimension);
+    cascade = uint(c);
+    local = uint3(l);
     return true;
+}
+
+CellGeometry block_geometry(const LightPreprocessBinding params, const LightGridBlock b) {
+    uint cascade;
+    uint3 coord;
+    block_cell(params, b, cascade, coord);
+    return cell_geometry(params.grid_info, cascade, coord, params.grid_jitter);
 }
 
 bool coarser_cell(const StructuredBuffer<LightGridInfo, ScalarDataLayout> grid_info_prev,
                   const LightGridInfo info,
                   const float3 pos,
+                  const uint orientation,
                   out uint prev_cell) {
     prev_cell = 0;
     const LightGridInfo finest = grid_info_prev[0];
@@ -291,8 +311,237 @@ bool coarser_cell(const StructuredBuffer<LightGridInfo, ScalarDataLayout> grid_i
     const int3 c = int3(floor((pos - prev.origin) * prev.inv_cell_size));
     if (any(c < 0) || any(c >= int(info.dimension)))
         return false;
-    prev_cell = light_cell_index(uint(cascade), uint3(c), info.dimension);
+    prev_cell = light_cell_index(uint(cascade), uint3(c), orientation, info.dimension);
     return true;
+}
+
+groupshared uint s_prefix_wave_totals[LIGHT_GRID_ALLOCATE_GROUP];
+
+uint group_prefix_sum(const uint local_id, const uint value, out uint total) {
+    const uint lanes = WaveGetLaneCount();
+    const uint wave = local_id / lanes;
+    const uint in_wave = WavePrefixSum(value);
+    const uint wave_total = WaveActiveSum(value);
+    if (WaveIsFirstLane())
+        s_prefix_wave_totals[wave] = wave_total;
+    GroupMemoryBarrierWithGroupSync();
+    uint before = 0;
+    total = 0;
+    for (uint w = 0; w < LIGHT_GRID_ALLOCATE_GROUP / lanes; w++) {
+        const uint count = s_prefix_wave_totals[w];
+        before += w < wave ? count : 0u;
+        total += count;
+    }
+    GroupMemoryBarrierWithGroupSync();
+    return before + in_wave;
+}
+
+LightGridBlock prev_cell_block(const LightPreprocessBinding params, const uint prev_cell) {
+    const uint dim = params.grid_dimension;
+    const LightGridInfo prev = params.grid_info_prev[light_cell_cascade(prev_cell, dim)];
+    LightGridBlock b;
+    b.coord = int3(light_cell_coord(prev_cell, dim)) + cascade_offset(prev);
+    b.inv_cell_size = prev.inv_cell_size;
+    b.orientation = light_cell_orientation(prev_cell);
+    b.idle = 0;
+    b.kept = 0;
+    return b;
+}
+
+bool moved_cell(const LightPreprocessBinding params, const LightGridBlock b, out uint cell) {
+    cell = 0;
+    uint cascade;
+    uint3 coord;
+    if (!block_cell(params, b, cascade, coord))
+        return false;
+    cell = light_cell_index(cascade, coord, b.orientation, params.grid_dimension);
+    return true;
+}
+
+uint prev_index_entry(const LightPreprocessBinding params, const uint prev_cell) {
+    return prev_cell < params.cell_count && !params.grid_reset ? params.grid_index_prev[prev_cell]
+                                                               : 0u;
+}
+
+// Carries each held block to its cell in this frame's index and counts visited cells without one.
+[shader("compute")][numthreads(LIGHT_GRID_ALLOCATE_GROUP, 1, 1)] void
+grid_keep(uint3 group_id : SV_GroupID,
+          uint local_id : SV_GroupIndex,
+          ParameterBlock<LightPreprocessBinding> params) {
+    const uint prev_cell = group_id.x * LIGHT_GRID_ALLOCATE_GROUP + local_id;
+    const uint entry = prev_index_entry(params, prev_cell);
+    const uint block = light_cell_block(entry);
+    const bool visited = (entry & LIGHT_GRID_VISITED) != 0;
+    uint cell = 0;
+    const bool moved = entry != 0 && moved_cell(params, prev_cell_block(params, prev_cell), cell);
+    if (block != LIGHT_GRID_FALLBACK_BLOCK) {
+        if (moved) {
+            params.grid_index[cell] = block;
+            params.grid_blocks[block].idle =
+                visited ? 0u
+                        : min(params.grid_blocks[block].idle + 1u,
+                              LIGHT_GRID_RECENT_FRAMES + LIGHT_GRID_IDLE_RANKS - 1u);
+            params.grid_blocks[block].kept = 1;
+        } else {
+            params.grid_blocks[block].idle = LIGHT_GRID_IDLE_FREE;
+        }
+    }
+    const bool missed = entry == LIGHT_GRID_VISITED && moved;
+    if (missed)
+        InterlockedAdd(params.grid_offsets[params.allocate_groups + 1u +
+                                           light_cell_cascade(cell, params.grid_dimension)],
+                       1u);
+    uint total;
+    group_prefix_sum(local_id, uint(missed), total);
+    if (local_id == 0)
+        params.grid_offsets[group_id.x] = total;
+}
+
+bool held_block(const LightPreprocessBinding params, const uint block) {
+    return block < params.block_count && block != LIGHT_GRID_FALLBACK_BLOCK && !params.grid_reset &&
+           params.grid_blocks[block].idle != LIGHT_GRID_IDLE_FREE;
+}
+
+// Higher goes first: the longest unvisited, then the coarsest recently visited.
+uint eviction_rank(const LightPreprocessBinding params, const uint block, out uint cell) {
+    const LightGridBlock b = params.grid_blocks[block];
+    uint cascade;
+    uint3 coord;
+    block_cell(params, b, cascade, coord);
+    cell = light_cell_index(cascade, coord, b.orientation, params.grid_dimension);
+    return b.idle < LIGHT_GRID_RECENT_FRAMES
+               ? cascade
+               : LIGHT_GRID_MAX_CASCADES + b.idle - LIGHT_GRID_RECENT_FRAMES;
+}
+
+groupshared uint s_rank_blocks[LIGHT_GRID_EVICTION_RANKS];
+
+[shader("compute")][numthreads(LIGHT_GRID_ALLOCATE_GROUP, 1, 1)] void
+grid_allocate(uint local_id : SV_GroupIndex, ParameterBlock<LightPreprocessBinding> params) {
+    for (uint rank = local_id; rank < LIGHT_GRID_EVICTION_RANKS; rank += LIGHT_GRID_ALLOCATE_GROUP)
+        s_rank_blocks[rank] = 0;
+    GroupMemoryBarrierWithGroupSync();
+    for (uint block = local_id; block < params.block_count; block += LIGHT_GRID_ALLOCATE_GROUP) {
+        uint cell;
+        if (held_block(params, block))
+            InterlockedAdd(s_rank_blocks[eviction_rank(params, block, cell)], 1u);
+    }
+    GroupMemoryBarrierWithGroupSync();
+
+    // the missed cells take free blocks, then held ones of a higher rank than their cascade's,
+    // the nearest first
+    uint held = 0;
+    uint idle_held = 0;
+    for (uint rank = 0; rank < LIGHT_GRID_EVICTION_RANKS; rank++) {
+        held += s_rank_blocks[rank];
+        idle_held += rank >= LIGHT_GRID_MAX_CASCADES ? s_rank_blocks[rank] : 0u;
+    }
+    const uint unheld = params.block_count - 1u - held;
+    uint coarser = held - idle_held;
+    uint taken = 0;
+    for (uint cascade = 0; cascade < params.grid_cascades; cascade++) {
+        coarser -= s_rank_blocks[cascade];
+        const uint takeable = unheld + idle_held + coarser;
+        taken += min(params.grid_offsets[params.allocate_groups + 1u + cascade],
+                     takeable > taken ? takeable - taken : 0u);
+    }
+    const uint evicted = taken > unheld ? taken - unheld : 0u;
+    uint threshold = LIGHT_GRID_EVICTION_RANKS;
+    uint above = 0;
+    while (threshold > 0 && above + s_rank_blocks[threshold - 1u] <= evicted)
+        above += s_rank_blocks[--threshold];
+    const uint tie_rank = threshold > 0 ? threshold - 1u : 0u;
+    const uint ties_evicted = evicted - above;
+
+    uint free_count = 0;
+    uint ties_seen = 0;
+    for (uint base = 0; base < params.block_count;
+         base += LIGHT_GRID_ALLOCATE_GROUP * LIGHT_GRID_ALLOCATE_ITEMS) {
+        const uint first = base + local_id * LIGHT_GRID_ALLOCATE_ITEMS;
+        uint ranks[LIGHT_GRID_ALLOCATE_ITEMS];
+        uint cells[LIGHT_GRID_ALLOCATE_ITEMS];
+        uint ties = 0;
+        for (uint i = 0; i < LIGHT_GRID_ALLOCATE_ITEMS; i++) {
+            const uint block = first + i;
+            ranks[i] = held_block(params, block) ? eviction_rank(params, block, cells[i])
+                                                 : LIGHT_GRID_EVICTION_RANKS;
+            ties += uint(ranks[i] == tie_rank);
+        }
+        uint ties_total;
+        uint tie = ties_seen + group_prefix_sum(local_id, ties, ties_total);
+        ties_seen += ties_total;
+
+        uint frees = 0;
+        uint free_items = 0;
+        for (uint i = 0; i < LIGHT_GRID_ALLOCATE_ITEMS; i++) {
+            const uint block = first + i;
+            const bool usable = block < params.block_count && block != LIGHT_GRID_FALLBACK_BLOCK;
+            bool free = usable && ranks[i] >= threshold;
+            if (usable && ranks[i] == tie_rank) {
+                free = tie < ties_evicted;
+                tie++;
+            }
+            frees |= uint(free) << i;
+            free_items += uint(free);
+        }
+        uint total;
+        uint at = free_count + group_prefix_sum(local_id, free_items, total);
+        free_count += total;
+        for (uint i = 0; i < LIGHT_GRID_ALLOCATE_ITEMS; i++) {
+            if ((frees & (1u << i)) == 0)
+                continue;
+            const uint block = first + i;
+            params.grid_free[at++] = block;
+            if (ranks[i] < LIGHT_GRID_EVICTION_RANKS)
+                params.grid_index[cells[i]] = LIGHT_GRID_FALLBACK_BLOCK;
+            params.grid_blocks[block].idle = LIGHT_GRID_IDLE_FREE;
+        }
+    }
+
+    uint missed_count = 0;
+    for (uint base = 0; base < params.allocate_groups; base += LIGHT_GRID_ALLOCATE_GROUP) {
+        const uint group = base + local_id;
+        const bool listed = group < params.allocate_groups;
+        uint total;
+        const uint offset =
+            missed_count +
+            group_prefix_sum(local_id, listed ? params.grid_offsets[group] : 0u, total);
+        if (listed)
+            params.grid_offsets[group] = offset;
+        missed_count += total;
+    }
+    if (local_id == 0)
+        params.grid_offsets[params.allocate_groups] = free_count;
+}
+
+bool missed_cell(const LightPreprocessBinding params,
+                 const uint prev_cell,
+                 out LightGridBlock b,
+                 out uint cell) {
+    cell = 0;
+    b = {};
+    if (prev_index_entry(params, prev_cell) != LIGHT_GRID_VISITED)
+        return false;
+    b = prev_cell_block(params, prev_cell);
+    return moved_cell(params, b, cell);
+}
+
+[shader("compute")][numthreads(LIGHT_GRID_ALLOCATE_GROUP, 1, 1)] void
+grid_assign(uint3 group_id : SV_GroupID,
+            uint local_id : SV_GroupIndex,
+            ParameterBlock<LightPreprocessBinding> params) {
+    LightGridBlock b;
+    uint cell;
+    const bool missed =
+        missed_cell(params, group_id.x * LIGHT_GRID_ALLOCATE_GROUP + local_id, b, cell);
+    uint total;
+    const uint at =
+        params.grid_offsets[group_id.x] + group_prefix_sum(local_id, uint(missed), total);
+    if (missed && at < params.grid_offsets[params.allocate_groups]) {
+        const uint block = params.grid_free[at];
+        params.grid_index[cell] = block;
+        params.grid_blocks[block] = b;
+    }
 }
 
 uint env_texels(const LightPreprocessBinding params) {
@@ -664,7 +913,7 @@ CutSlot cut_slot(const LightPreprocessBinding params,
 
 void store_cut<S : ISlotGroup>(const S slots,
                                const LightPreprocessBinding params,
-                               const uint cell,
+                               const uint block,
                                const uint slot,
                                const uint key,
                                const uint first,
@@ -682,7 +931,7 @@ void store_cut<S : ISlotGroup>(const S slots,
         emits ? (1.f - even) * (total > 0.f ? s.importance / total : 0.f) + even / float(emitting)
               : 0.f;
 
-    const uint entry = cell * LIGHT_GRID_SLOTS + slot;
+    const uint entry = block * LIGHT_GRID_SLOTS + slot;
     params.grid_keys[entry] = key;
     params.grid_contribution[entry] = contribution;
     params.grid_starts[entry] = listed ? first : lights;
@@ -711,21 +960,22 @@ groupshared uint s_compact_key[LIGHT_GRID_SLOTS];
 groupshared uint s_compact_first[LIGHT_GRID_SLOTS];
 groupshared Contribution s_compact_contribution[LIGHT_GRID_SLOTS];
 
-/* Each cell holds a cut through the light tree: a partition of all lights into nodes, drawn by
- * flux times their learned contribution, and by flux within a node. A cell splits the node whose
- * lights' contributions vary most and, once full, merges the pair that varies least. Nodes are
- * named by their first Morton code. (Walter et al. 2005; Vevoda et al. 2018.)
+/* Each block holds the cut of a cell, or of the whole scene, through the light tree: a partition of
+ * all lights into nodes, drawn by flux times their learned contribution, and by flux within a
+ * node. A cut splits the node whose lights' contributions vary most and, once full, merges the pair
+ * that varies least. Nodes are named by their first Morton code. (Walter et al. 2005; Vevoda et al.
+ * 2018.)
  */
 void grid_cell<S : ISlotGroup>(const S slots,
                                const LightPreprocessBinding params,
-                               const uint cell,
+                               const uint block,
                                const uint slot) {
-    const uint dim = params.grid_info[0].dimension;
-    const bool global = params.single_cut;
+    const bool global = block == LIGHT_GRID_FALLBACK_BLOCK;
+    const LightGridBlock cell_block = params.grid_blocks[block];
     const bool touched =
-        params.grid_feedback[LIGHT_GRID_FEEDBACK_STRIDE * (cell * LIGHT_GRID_SLOTS + slot)] != 0;
-    const CellGeometry cg = global ? global_cell_geometry(params.grid_info)
-                                   : cell_geometry(params.grid_info, cell, params.grid_jitter);
+        params.grid_feedback[LIGHT_GRID_FEEDBACK_STRIDE * (block * LIGHT_GRID_SLOTS + slot)] != 0;
+    const CellGeometry cg =
+        global ? global_cell_geometry(params.grid_info) : block_geometry(params, cell_block);
     const uint lights = light_count(params);
     const LightGridInfo info = params.grid_info[cg.cascade];
     const uint last_slot = LIGHT_GRID_SLOTS - 1u;
@@ -734,18 +984,22 @@ void grid_cell<S : ISlotGroup>(const S slots,
     // carry the cut, or take the coarser cell's
     const bool lattice_kept =
         !params.grid_reset && same_lattice(params.tree_info[0], params.tree_info_prev[0]);
-    uint prev_cell = cell;
-    const bool carried = lattice_kept && (global || reproject_cell(params.grid_info_prev, info,
-                                                                   cg.coord, prev_cell));
-    const bool inherited = !carried && lattice_kept && !global &&
-                           coarser_cell(params.grid_info_prev, info, cg.center, prev_cell);
+    const bool carried = lattice_kept && (global || cell_block.kept != 0);
+    uint prev_cell = 0;
+    const bool coarser =
+        !global && !carried && lattice_kept &&
+        coarser_cell(params.grid_info_prev, info, cg.center, cell_block.orientation, prev_cell);
+    const uint coarser_block =
+        coarser ? light_cell_block(params.grid_index_prev[prev_cell]) : LIGHT_GRID_FALLBACK_BLOCK;
+    const bool inherited = coarser_block != LIGHT_GRID_FALLBACK_BLOCK;
+    const uint prev_block = inherited ? coarser_block : block;
 
     uint key = LIGHT_TREE_NO_KEY;
     Contribution contribution = Contribution(0.f);
     float samples = 0.f;
     float2 feedback_sums = float2(0.f);
     if (carried || inherited) {
-        const uint prev_entry = prev_cell * LIGHT_GRID_SLOTS + slot;
+        const uint prev_entry = prev_block * LIGHT_GRID_SLOTS + slot;
         key = params.grid_keys_prev[prev_entry];
         contribution = params.grid_contribution_prev[prev_entry];
         if (carried) {
@@ -792,8 +1046,9 @@ void grid_cell<S : ISlotGroup>(const S slots,
             contribution = prior_contribution(geometry, prior_mean(params, node.distant));
         } else {
             if (global || inherited) {
-                const LightGridInfo prev = params.grid_info_prev[light_cell_cascade(
-                    prev_cell, dim, params.grid_info_prev[0].cascade_count, global)];
+                const LightGridInfo prev =
+                    params.grid_info_prev[global ? params.grid_info_prev[0].cascade_count - 1u
+                                                 : light_cell_cascade(prev_cell, info.dimension)];
                 contribution = rescale_contribution(
                     contribution, cg.scale / light_cell_scale(prev.inv_cell_size));
             }
@@ -946,18 +1201,19 @@ void grid_cell<S : ISlotGroup>(const S slots,
         const uint end = cut_end(slots, first, slot, lights);
         s = cut_slot(params, cg, first, key != LIGHT_TREE_NO_KEY ? end : first, contribution);
     }
-    store_cut(slots, params, cell, slot, key, first, contribution, s, touched, cg.scale);
+    store_cut(slots, params, block, slot, key, first, contribution, s, touched, cg.scale);
 }
 
 [shader("compute")][numthreads(LIGHT_GRID_SLOTS, 1, 1)] void
 grid(uint3 group_id : SV_GroupID,
      uint slot : SV_GroupIndex,
      ParameterBlock<LightPreprocessBinding> params) {
-    const uint cell = group_id.x + group_id.y * LIGHT_DISPATCH_ROW;
-    if (cell >= params.cell_count)
+    const uint block = group_id.x + group_id.y * LIGHT_DISPATCH_ROW;
+    if (block >= params.block_count || (block != LIGHT_GRID_FALLBACK_BLOCK &&
+                                        params.grid_blocks[block].idle == LIGHT_GRID_IDLE_FREE))
         return;
     if (WaveGetLaneCount() >= LIGHT_GRID_SLOTS)
-        grid_cell(WaveSlots(), params, cell, slot);
+        grid_cell(WaveSlots(), params, block, slot);
     else
-        grid_cell(SharedSlots(slot), params, cell, slot);
+        grid_cell(SharedSlots(slot), params, block, slot);
 }

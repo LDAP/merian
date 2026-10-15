@@ -352,10 +352,12 @@ struct RestirPTLightSample {
     uint index;
 }
 
-Optional<RestirPTLightSample> restir_pt_sample_light(const ParameterBlock<Scene> scene,
-                                                     const float3 pos,
-                                                     inout RandomGenerator rng) {
-    const DirectLightVertex vertex = scene.nee.begin_vertex(pos, rng);
+Optional<RestirPTLightSample>
+restir_pt_sample_light(const ParameterBlock<Scene> scene,
+                       const float3 pos,
+                       const float3 face_normal,
+                       inout RandomGenerator rng) {
+    const DirectLightVertex vertex = scene.nee.begin_vertex(pos, face_normal, float3(0), rng);
     if (let ls = scene.sample_direct_light(vertex, rng)) {
         RestirPTLightSample s;
         s.wo = ls.wo;
@@ -373,6 +375,7 @@ Optional<RestirPTLightSample> restir_pt_sample_light(const ParameterBlock<Scene>
 // The vertex a segment leaves from, as far as the reconnection criteria and MIS care.
 struct RestirPTFrom {
     float3 pos;
+    float3 face_normal;
     uint vertex;
     // |cos| between its face normal and the direction drawn there
     float cos;
@@ -523,8 +526,9 @@ RestirPTFrom restir_pt_from<B : BSDF>(const ParameterBlock<Scene> scene,
                                       const float min_roughness) {
     RestirPTFrom from;
     from.pos = sp.pos;
+    from.face_normal = sp.get_face_normal();
     from.vertex = vertex;
-    from.cos = abs(dot(sp.get_face_normal(), scatter.wo));
+    from.cos = abs(dot(from.face_normal, scatter.wo));
     from.pdf = scatter.footprint_pdf();
     from.lobes = restir_pt_lobe_bits(scatter.lobe, scatter.transmission);
     from.rough = restir_pt_is_rough(bsdf, scatter.lobe, min_roughness);
@@ -542,8 +546,9 @@ float restir_pt_emitter_light_pdf(const ParameterBlock<Scene> scene,
     if (!from.samples_lights)
         return 0.f;
     RandomGenerator light_rng = random.light(from.vertex);
-    return scene.nee.mixture_pdf(scene.nee.pdf(scene.nee.begin_vertex(from.pos, light_rng),
-                                               scene.get_light_index(hit), from.pos, dir));
+    return scene.nee.mixture_pdf(
+        scene.nee.pdf(scene.nee.begin_vertex(from.pos, from.face_normal, float3(0), light_rng),
+                      scene.get_light_index(hit), from.pos, dir));
 }
 
 // Next event estimation at a vertex: the light sample drawn from the path's own stream, with
@@ -569,7 +574,7 @@ restir_pt_direct<B : BSDF>(const ParameterBlock<Scene> scene,
                            const uint vertex,
                            inout RandomGenerator rng) {
     RandomGenerator light_rng = random.light(vertex);
-    if (let ls = restir_pt_sample_light(scene, sp.pos, light_rng)) {
+    if (let ls = restir_pt_sample_light(scene, sp.pos, sp.get_face_normal(), light_rng)) {
         // a light the geometry hides is not reachable from this surface
         if (!sp.geometric_side_matches_shading(ls.wo))
             return none;
@@ -842,7 +847,7 @@ float3 restir_pt_trace_candidates(const ParameterBlock<Scene> scene,
             } else if (merian_path_record) {
                 // a blocked light sample is still a draw of the light techniques
                 RandomGenerator light_rng = random.light(i);
-                if (let ls = restir_pt_sample_light(scene, sp.pos, light_rng)) {
+                if (let ls = restir_pt_sample_light(scene, sp.pos, ng, light_rng)) {
                     light_record.pos = ls.pos;
                     light_record.pdf = ls.pdf;
                 }

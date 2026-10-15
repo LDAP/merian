@@ -22,7 +22,7 @@ float3 restir_pt_record_light_pos(const ParameterBlock<Scene> scene,
     }
     const RestirPTRandom random = {r.seed};
     RandomGenerator light_rng = random.light(vertex);
-    if (let ls = restir_pt_sample_light(scene, sp.pos, light_rng))
+    if (let ls = restir_pt_sample_light(scene, sp.pos, sp.get_face_normal(), light_rng))
         return ls.pos;
     return sp.pos + r.rc_wo;
 }

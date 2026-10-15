@@ -217,7 +217,7 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
         const bool roulette = merian_render_russian_roulette && !pass_through &&
                               bounce > merian_render_roulette_depth;
         let lights = scene.nee.begin_vertex(
-            sp.pos,
+            sp.pos, ng,
             Scene::get_receiver_normal(ray.Direction, ng,
                                        bsdf_is_transmissive(bsdf.get_lobe_types())),
             rng);

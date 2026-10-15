@@ -139,7 +139,7 @@ void render_pixel(const uint2 pixel,
             ScatterMixture(guided_share(guiding, merian_render_volume_guiding_share, 1.f));
 
         // 3. resampled direct light
-        let lights = scene.nee.begin_vertex(scatter_pos, rng);
+        let lights = scene.nee.begin_vertex(scatter_pos, float3(0), float3(0), rng);
         Optional<DirectLightSample> direct = none;
         if (merian_render_volume_nee_mode == NEEMode::Resampled && nee) {
             direct = scene.sample_direct_light(

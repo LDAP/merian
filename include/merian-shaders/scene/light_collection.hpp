@@ -150,7 +150,15 @@ class LightCollection {
     }
     uint32_t cell_count() const {
         const uint32_t d = static_cast<uint32_t>(grid_dimension);
-        return uses_grid() ? static_cast<uint32_t>(grid_cascades) * d * d * d : 1u;
+        return uses_grid()
+                   ? LIGHT_GRID_ORIENTATIONS * static_cast<uint32_t>(grid_cascades) * d * d * d
+                   : 1u;
+    }
+    uint32_t allocate_group_count() const {
+        return (cell_count() + LIGHT_GRID_ALLOCATE_GROUP - 1) / LIGHT_GRID_ALLOCATE_GROUP;
+    }
+    uint32_t block_count() const {
+        return uses_grid() ? static_cast<uint32_t>(grid_cells_kept) + 1u : 1u;
     }
     void ensure_buffer(BufferHandle& buffer,
                        vk::DeviceSize size,
@@ -168,6 +176,7 @@ class LightCollection {
     int32_t draws = 4;
     int32_t grid_dimension = 16;
     int32_t grid_cascades = 6;
+    int32_t grid_cells_kept = 16384;
     int32_t grid_refinements = 2;
     float grid_cell_size = 0.f; // 0: derived from the distance to the lights
     float grid_coverage = 1.f;
@@ -183,6 +192,7 @@ class LightCollection {
     bool grid_reset = true;
     float3 camera_position{0.f};
     uint32_t allocated_cells = 0;
+    uint32_t allocated_blocks = 0;
     bool env_emissive = false;
     bool has_sky_portals = false;
     int32_t flux_samples = 32;
@@ -223,6 +233,10 @@ class LightCollection {
     BufferHandle grid_slot_bounds_buffer;
     BufferHandle grid_probability_buffer;
     BufferHandle grid_info_buffer[2];
+    BufferHandle grid_index_buffer[2];
+    BufferHandle grid_blocks_buffer;
+    BufferHandle grid_free_buffer;
+    BufferHandle grid_offsets_buffer;
     uint32_t grid_slot = 0;
     BufferHandle triangles_buffer;
     BufferHandle proxies_buffer;
@@ -240,9 +254,18 @@ class LightCollection {
     Versioned<SlangProgram> preprocess_program;
     Versioned<SlangProgramEntryPoint> setup_entry_point;
     Versioned<SlangProgramEntryPoint> grid_entry_point;
+    Versioned<SlangProgramEntryPoint> keep_entry_point;
+    Versioned<SlangProgramEntryPoint> allocate_entry_point;
+    Versioned<SlangProgramEntryPoint> assign_entry_point;
     Versioned<Pipeline> setup_pipeline;
     Versioned<Pipeline> grid_pipeline;
+    Versioned<Pipeline> keep_pipeline;
+    Versioned<Pipeline> allocate_pipeline;
+    Versioned<Pipeline> assign_pipeline;
     Versioned<ShaderObject> setup_params;
+    Versioned<ShaderObject> keep_params;
+    Versioned<ShaderObject> allocate_params;
+    Versioned<ShaderObject> assign_params;
     Versioned<SlangProgramEntryPoint> env_cones_entry_point;
     Versioned<Pipeline> env_cones_pipeline;
     Versioned<ShaderObject> env_cones_params;

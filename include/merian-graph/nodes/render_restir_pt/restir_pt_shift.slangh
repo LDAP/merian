@@ -114,11 +114,11 @@ RestirPTShift restir_pt_reconnect(const ParameterBlock<Scene> scene,
         const bool samples_lights = restir_pt_samples_lights(scene, bsdf) &&
                                     (!nee || sp.geometric_side_matches_shading(dir));
         RandomGenerator light_rng = RestirPTRandom(r.seed).light(k - 1);
-        const float p_light =
-            samples_lights
-                ? scene.nee.mixture_pdf(scene.nee.pdf(scene.nee.begin_vertex(sp.pos, light_rng),
-                                                      index, dir, dist2, surface.face_normal))
-                : 0.f;
+        const float p_light = samples_lights
+                                  ? scene.nee.mixture_pdf(scene.nee.pdf(
+                                        scene.nee.begin_vertex(sp.pos, ng, float3(0), light_rng),
+                                        index, dir, dist2, surface.face_normal))
+                                  : 0.f;
         integrand *= Le * (nee ? p_light : p_prev) / (p_light + p_prev);
     } else {
         // 4b. x_k scatters: re-shade it from the new direction and leave it along rc_wo
@@ -203,6 +203,8 @@ RestirPTReservoir restir_pt_update_suffix(const ParameterBlock<Scene> scene,
     const RestirPTRandom random = {r.seed};
     RestirPTFrom from;
     from.pos = surface.pos;
+    // as a shading point stores it, so x_k finds the cell the path drew from
+    from.face_normal = decode_normal(encode_normal(ng));
     from.vertex = k;
     // only the MIS weight of the light right after x_k reads these
     from.pdf = 1.f;
