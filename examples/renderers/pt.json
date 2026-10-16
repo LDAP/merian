@@ -21,9 +21,6 @@
                     "6": true,
                     "7": true
                 },
-                "output": {
-                    "emission on primary": true
-                },
                 "surface": {
                     "max path length": 5,
                     "samples per pixel": 2
