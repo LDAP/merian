@@ -568,6 +568,35 @@ TEST_F(SlangHotReloadTest, CachedModulesSurviveAnImportUnderAnotherSpelling) {
     std::filesystem::remove_all(dir, ec);
 }
 
+TEST_F(SlangHotReloadTest, StaleSessionRetiresAfterAnEdit) {
+    const std::filesystem::path dir = create_temp_directory("merian-stale-test");
+    CacheSources sources;
+    write_sources(dir, sources);
+    const ShaderCompileContextHandle shader_compile_context = ShaderCompileContext::create(context);
+    shader_compile_context->add_search_path(dir);
+    const auto launch = [&] {
+        return dispatch_output(cache_test_composition(sources), shader_compile_context);
+    };
+
+    EXPECT_EQ(launch(), sources.expected());
+    EXPECT_FALSE(shader_compile_context->retire_stale_session()) << "unchanged";
+
+    sources.leaf = 2;
+    write_file(dir / "leaf.slangh", fmt::format("static const uint LEAF = {}u;\n", sources.leaf));
+    EXPECT_TRUE(shader_compile_context->retire_stale_session())
+        << "header included by an imported library";
+    EXPECT_EQ(launch(), sources.expected());
+    EXPECT_FALSE(shader_compile_context->retire_stale_session()) << "unchanged after the edit";
+
+    sources.entry = 5;
+    write_sources(dir, sources);
+    EXPECT_TRUE(shader_compile_context->retire_stale_session()) << "entry point module";
+    EXPECT_EQ(launch(), sources.expected());
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
 TEST_F(SlangHotReloadTest, ModuleOutsideTheSearchPathsFollowsEdits) {
     const std::filesystem::path dir = create_temp_directory("merian-outside-test");
     const std::filesystem::path module = dir / "outside.slang";

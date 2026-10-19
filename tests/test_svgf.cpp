@@ -14,8 +14,7 @@ class SVGFTest : public GraphTest {
     }
 
     static GraphHandle load(const json& properties) {
-        const GraphHandle graph = create_graph();
-        graph->load_from_json(
+        const GraphHandle graph = create_graph(
             json{{"version", 4},
                  {"nodes", {{"svgf", {{"type", "Denoiser (SVGF)"}, {"properties", properties}}}}}});
         run(graph);
@@ -24,7 +23,7 @@ class SVGFTest : public GraphTest {
 
     static std::set<std::string> children(const GraphHandle& graph) {
         std::set<std::string> identifiers;
-        for (const std::string& identifier : graph->identifiers()) {
+        for (const std::string& identifier : graph->get_identifiers()) {
             if (identifier.starts_with("svgf:")) {
                 identifiers.insert(identifier);
             }
@@ -49,13 +48,13 @@ TEST_F(SVGFTest, SettingsReachTheChildren) {
     ASSERT_TRUE(filter);
     EXPECT_EQ(filter->dump_config().at("depth"), 20.0);
 
-    const json stored = graph->store_to_json();
+    const json stored = graph->to_description().to_json();
     EXPECT_EQ(stored.at("nodes").size(), 1);
     const json& properties = stored.at("nodes").at("svgf").at("properties");
     EXPECT_EQ(properties.at("variance estimate").at("spatial bias"), 4.0);
     EXPECT_EQ(properties.at("taa").at("alpha"), 0.5);
 
-    set_node_properties(graph, "svgf", {{"iterations", 1}, {"filter", {{"depth", 30.0}}}});
+    graph->node_set_properties("svgf", {{"iterations", 1}, {"filter", {{"depth", 30.0}}}});
     run(graph);
     EXPECT_EQ(children(graph),
               (std::set<std::string>{"svgf:variance estimate", "svgf:filter 0", "svgf:taa"}));

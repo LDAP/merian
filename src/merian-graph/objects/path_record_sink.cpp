@@ -87,8 +87,9 @@ bool PathRecordSink::properties(Properties& config,
         return false;
     }
     config.st_separate("path records");
-    config.config_int("capture budget (MB)", budget_mb,
-                      "Size cap for the path record stream consumed by a debugger.", 16, 4096);
+    config.config_int("capture budget", budget_mb,
+                      "Size cap in MB for the path record stream consumed by a debugger.", 16,
+                      4096);
     return stream_size(spp, vertices_per_path) != emitted_size;
 }
 

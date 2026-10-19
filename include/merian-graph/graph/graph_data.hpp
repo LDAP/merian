@@ -8,7 +8,10 @@
 
 #include <algorithm>
 #include <optional>
+#include <string>
 #include <tuple>
+#include <unordered_map>
+#include <vector>
 
 namespace merian {
 
@@ -26,13 +29,34 @@ enum class NodeState : uint8_t {
     ERRORED,
 };
 
+// The connectors of a node as the last connect described them, its connections as edited.
+struct NodeConnectors {
+    struct Input {
+        std::string name;
+        uint32_t delay{};
+        bool optional{};
+    };
+    struct Output {
+        enum class Kind : uint8_t { IMAGE, BUFFER, OTHER };
+
+        std::string name;
+        Kind kind{};
+    };
+    // declared, then the public ones of a subgraph by name
+    std::vector<Input> inputs;
+    // the ones consumers can connect to: declared, then the public ones of a subgraph by name
+    std::vector<Output> outputs;
+    // (input -> (node, output)), also to connectors that are not described
+    std::unordered_map<std::string, std::pair<std::string, std::string>> connections;
+};
+
 namespace graph_internal {
 
-struct Port {
+struct ConnectorRef {
     NodeHandle node;
     std::string name;
 
-    bool operator==(const Port&) const = default;
+    bool operator==(const ConnectorRef&) const = default;
 };
 
 struct Connection {
@@ -84,6 +108,14 @@ struct ResourceData {
     std::vector<Copy> copies;
 };
 
+inline std::string copy_name(const std::string& node,
+                             const std::string& output,
+                             const uint32_t copy_index,
+                             const size_t copy_count) {
+    return copy_count == 1 ? fmt::format("{}.{}", node, output)
+                           : fmt::format("{}.{} ({})", node, output, copy_index);
+}
+
 inline bool reads_before_writer(const InputConnectorDescriptor& descriptor) {
     return !descriptor.in_place && descriptor.delay == 0;
 }
@@ -100,19 +132,21 @@ struct NodeConnectState {
     bool visited{};
     // Dependency layer: 0 for sources, else 1 + max over its predecessors (on build_layers)
     uint32_t level{0};
+    // Of the graph seed and the identifier (on connect)
+    uint32_t seed{0};
 
     // subgraph of a parent without errors
     std::vector<Connection> subgraph_connections;
     // (public input -> the children's inputs it feeds)
-    std::unordered_map<std::string, std::vector<Port>> public_inputs;
+    std::unordered_map<std::string, std::vector<ConnectorRef>> public_inputs;
     // (public output -> the child's output it carries)
-    std::unordered_map<std::string, Port> public_outputs;
+    std::unordered_map<std::string, ConnectorRef> public_outputs;
     // (public output -> public input that passes through to it)
     std::unordered_map<std::string, std::string> public_pass_throughs;
 
     // subgraph of a child
     // (input -> the output of another child connected to it)
-    std::unordered_map<std::string, Port> subgraph_sources;
+    std::unordered_map<std::string, ConnectorRef> subgraph_sources;
     // (input -> the public input of the parent that feeds it)
     std::unordered_map<std::string, std::string> public_feeds;
 
@@ -136,9 +170,9 @@ struct NodeConnectState {
         NodeHandle node{};
         OutputConnectorHandle output{};
 
-        // (resource, copy index) per set, (iteration % period) is the set of an iteration; null and
-        // -1ul if unconnected (on precompute_resources)
-        std::vector<std::tuple<GraphResourceHandle, uint32_t>> precomputed_resources{};
+        // Per set, (iteration % period) is the set of an iteration; null if unconnected (on
+        // precompute_resources)
+        std::vector<GraphResourceHandle> precomputed_resources{};
     };
     std::unordered_map<InputConnectorHandle, PerInputInfo> input_connections{};
     struct PerOutputInfo {
@@ -147,8 +181,8 @@ struct NodeConnectState {
         // null if the output is disabled; versions share their root's (on plan_memory)
         std::shared_ptr<ResourceData> resource_data;
         std::vector<std::tuple<NodeHandle, InputConnectorHandle>> inputs;
-        // (resource, copy index) per set; null and -1ul if disabled (on precompute_resources)
-        std::vector<std::tuple<GraphResourceHandle, uint32_t>> precomputed_resources{};
+        // Per set, copy (set % copies) of resource_data; null if disabled (on precompute_resources)
+        std::vector<GraphResourceHandle> precomputed_resources{};
     };
     std::unordered_map<OutputConnectorHandle, PerOutputInfo> output_connections{};
 
@@ -183,12 +217,12 @@ struct NodeData : NodeConnectState {
     std::vector<NodeHandle> children;
 
     // (input -> output) connected by the user or an auto connection
-    std::unordered_map<std::string, Port> desired_incoming_connections;
+    std::unordered_map<std::string, ConnectorRef> desired_incoming_connections;
     // Inputs whose auto connection was made, or found connected otherwise.
     std::unordered_set<std::string> settled_auto_connections;
     // Auto connected inputs whose connection the graph removed, with its source: made again once
     // the source changes.
-    std::unordered_map<std::string, Port> rejected_auto_connections;
+    std::unordered_map<std::string, ConnectorRef> rejected_auto_connections;
 
     void set_identifier(const std::string& new_identifier) {
         identifier = new_identifier;

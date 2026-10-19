@@ -36,6 +36,9 @@ class FileLoader {
     // Attempts to locate the currently used binary
     static std::filesystem::path binary_path();
 
+    // Attempts to locate the merian library; falls back to binary_path().
+    static std::filesystem::path library_path();
+
     // Attempts to detect a prefix path (like install_prefix) if not installed but packaged.
     static std::optional<std::filesystem::path> portable_prefix();
 

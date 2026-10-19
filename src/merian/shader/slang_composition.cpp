@@ -129,20 +129,24 @@ bool SlangComposition::reload(const FileLoader& file_loader) {
             continue;
         }
 
-        auto resolved = file_loader.find_file(*source_path);
-        if (!resolved) {
-            continue;
+        auto resolved = resolved_paths.find(*source_path);
+        if (resolved == resolved_paths.end()) {
+            const std::optional<std::filesystem::path> found = file_loader.find_file(*source_path);
+            if (!found) {
+                continue;
+            }
+            resolved = resolved_paths.emplace(*source_path, *found).first;
         }
 
         std::error_code ec;
-        auto mtime = std::filesystem::last_write_time(*resolved, ec);
+        auto mtime = std::filesystem::last_write_time(resolved->second, ec);
         if (ec) {
             continue;
         }
 
-        auto it = module_mtimes.find(*resolved);
+        auto it = module_mtimes.find(resolved->second);
         if (it == module_mtimes.end()) {
-            module_mtimes[*resolved] = mtime;
+            module_mtimes[resolved->second] = mtime;
             // edited before the first reload
             source_changed |= mtime > creation_time;
         } else if (it->second != mtime) {

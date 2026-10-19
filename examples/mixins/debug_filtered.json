@@ -1,23 +1,23 @@
 {
+    "include": [
+        "debug.json"
+    ],
     "nodes": {
         "accum_filtered": {
             "enabled": true,
             "outputs": [
-                "history->accum_filtered.prev_history",
-                "out->accum_filtered.prev_out",
                 "out->exposure_filtered.src"
             ],
             "properties": {
                 "alpha": 1.0,
                 "events": {
-                    "clear": "/user/clear,//geometry_changed,//transform_changed,//camera_changed"
+                    "clear": "/user/clear,//geometry_changed,//transform_changed,//camera_changed,//bounces_changed"
                 }
             },
             "type": "Accumulate"
         },
-        "debug": {
-            "outputs": [
-                "canvas->imgui.canvas",
+        "display": {
+            "$+$outputs": [
                 "filtered->accum_filtered.src"
             ],
             "properties": {
@@ -28,7 +28,7 @@
                     "show panels": false
                 },
                 "selection": {
-                    "expression A": ".{1,2}"
+                    "expression a": ".{1,2}"
                 },
                 "backdrop": {
                     "show": "the backdrop input"
@@ -50,7 +50,7 @@
         "tonemap_filtered": {
             "enabled": true,
             "outputs": [
-                "out->debug.backdrop"
+                "out->display.backdrop"
             ],
             "type": "Tonemap"
         }

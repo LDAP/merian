@@ -91,9 +91,9 @@ bool MCPGGuidingModel::properties(Properties& props) {
     if (props.st_begin_child("mc", "Markov Chain Path Guiding",
                              Properties::ChildFlagBits::DEFAULT_OPEN)) {
         constants_changed |= props.config_float(
-            "ML prior", dir_guide_prior,
+            "ml prior", dir_guide_prior,
             "Prior on a chain's lobe width, in squared distance to its target.", 0.01f, 0.f);
-        constants_changed |= props.config_int("MC samples", mc_samples, "", 1, 30);
+        constants_changed |= props.config_int("mc samples", mc_samples, "", 1, 30);
         constants_changed |= props.config_float(
             "width confidence z", mc_conf_z,
             "Sample the lobe width's upper confidence limit at this standard normal quantile "
@@ -120,7 +120,7 @@ bool MCPGGuidingModel::properties(Properties& props) {
         recreate |= props.config_uint("adaptive grid buf size", mc_buffer_size,
                                       "Buffer size backing the hash grid.");
         constants_changed |=
-            props.config_uint("MC probe count", mc_probe_count,
+            props.config_uint("mc probe count", mc_probe_count,
                               "Slots probed before evicting (open addressing).", 1u, 32u);
         recreate |= props.config_bool("split keys/payload", mc_split_storage,
                                       "Store hash+stamp separately from the payload "
@@ -136,17 +136,17 @@ bool MCPGGuidingModel::properties(Properties& props) {
 
     if (props.st_begin_child("lc", "Light cache", Properties::ChildFlagBits::DEFAULT_OPEN)) {
         recreate |=
-            props.config_uint("LC buffer size", lc_buffer_size,
+            props.config_uint("lc buffer size", lc_buffer_size,
                               "Number of cache slots backing the hash grid.", 1u, 100000000u);
-        recreate |= props.config_uint("LC probe count", lc_probe_count,
+        recreate |= props.config_uint("lc probe count", lc_probe_count,
                                       "Slots probed before evicting (open addressing).", 1u, 16u);
-        recreate |= props.config_bool("LC stochastic interpolation", lc_stochastic_interpolation,
+        recreate |= props.config_bool("lc stochastic interpolation", lc_stochastic_interpolation,
                                       "Jitter the grid cell per sample (smoother but noisier) "
                                       "instead of snapping to the nearest cell.");
-        recreate |= props.config_bool("LC split keys/payload", lc_split_storage,
+        recreate |= props.config_bool("lc split keys/payload", lc_split_storage,
                                       "Store hash+stamp separately from the payload "
                                       "(probe-friendly) instead of one combined record per slot.");
-        if (props.config_uint("LC locality bits", lc_locality_bits,
+        if (props.config_uint("lc locality bits", lc_locality_bits,
                               "Give each 2^n-wide cell tile a contiguous Morton-ordered slot "
                               "range so nearby cells share cache lines (0 = scatter every cell).",
                               0u, 5u)) {
@@ -156,7 +156,7 @@ bool MCPGGuidingModel::properties(Properties& props) {
             constants_changed = true;
         }
         constants_changed |= props.config_float(
-            "LC min pdf", lc_min_pdf,
+            "lc min pdf", lc_min_pdf,
             "Increase to reduce fireflies in the irradiance cache and bias the guiding towards "
             "direct light, especially useful for short maximum path lengths.",
             0.1f, 0.0f);

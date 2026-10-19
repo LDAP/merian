@@ -1,16 +1,17 @@
 #include "graph_resources_test.hpp"
 
+#include <ranges>
+
 TEST_F(GraphResourcesTest, SubgraphsReadWhatWasWritten) {
     GroupedSpec grouped = subgraph_spec();
-    const GraphHandle graph = create_graph();
-    graph->load_from_json(describe(grouped, true, 2));
+    const GraphHandle graph = create_graph(describe(grouped, true, 2));
     run_and_check(graph, grouped, 6, "loaded");
     for (const uint32_t iterations_in_flight : {1u, 3u, 2u}) {
         set_graph_properties(graph, true, iterations_in_flight);
         run_and_check(graph, grouped, 6, fmt::format("{} in flight", iterations_in_flight));
     }
     const UIProperties props = draw(graph);
-    EXPECT_EQ(graph->get_node_state("g"), NodeState::OK);
+    EXPECT_EQ(graph->node_get_state("g"), NodeState::OK);
     EXPECT_TRUE(props.shows_label("Subnodes"));
     EXPECT_TRUE(props.shows_label("[OK] g:c2:c1 (Pattern)"));
     EXPECT_TRUE(props.shows_text("Feeds: [g:c0.inp]", {"g", "inputs", "inp (public)"}));
@@ -25,8 +26,8 @@ TEST_F(GraphResourcesTest, SubgraphsReadWhatWasWritten) {
     run_and_check(graph, grouped, 4, "g disabled");
     EXPECT_GT(passed_on_records, passed_on_before);
     const UIProperties disabled = draw(graph);
-    EXPECT_EQ(graph->get_node_state("g"), NodeState::BYPASSED);
-    EXPECT_EQ(graph->get_node_state("g:c2:c0"), NodeState::FORCE_DISABLED);
+    EXPECT_EQ(graph->node_get_state("g"), NodeState::BYPASSED);
+    EXPECT_EQ(graph->node_get_state("g:c2:c0"), NodeState::FORCE_DISABLED);
     EXPECT_TRUE(disabled.shows_text("g is disabled", {"g:c2:c0"}));
 
     grouped.nodes.at("g").enabled = true;
@@ -37,7 +38,7 @@ TEST_F(GraphResourcesTest, SubgraphsReadWhatWasWritten) {
     for (const uint32_t delay : {1u, 0u}) {
         GroupSpec& group = grouped.groups.at("h");
         group.children.front().shape.delays[2] = delay;
-        set_node_properties(graph, "h", group_properties(group));
+        graph->node_set_properties("h", group_properties(group));
         if (delay == 1) {
             grouped.nodes.at("h").inputs["in2"] = {"h", 0};
             graph->add_connection("h", "h", "out", "in2");
@@ -52,8 +53,7 @@ TEST_F(GraphResourcesTest, SubgraphRebuilds) {
     for (uint32_t seed = 0; seed < 4; seed++) {
         std::mt19937 rng(seed);
         GroupedSpec grouped = subgraph_spec();
-        GraphHandle graph = create_graph();
-        graph->load_from_json(describe(grouped, true, 2));
+        GraphHandle graph = create_graph(describe(grouped, true, 2));
         run_and_check(graph, grouped, 3, fmt::format("seed {} loaded", seed));
 
         uint32_t id = 200;
@@ -111,7 +111,7 @@ TEST_F(GraphResourcesTest, SubgraphRebuilds) {
                 if (grouped.nodes.at(identifier).enabled) {
                     node->set_properties(group_properties(group));
                 } else {
-                    set_node_properties(graph, identifier, group_properties(group));
+                    graph->node_set_properties(identifier, group_properties(group));
                 }
                 grouped.groups.at(identifier) = group;
                 run_and_check(graph, grouped, 4, phase + " rebuilt " + identifier);
@@ -140,9 +140,8 @@ TEST_F(GraphResourcesTest, SubgraphRebuilds) {
                 continue;
             }
             default: {
-                const json stored = graph->store_to_json();
-                graph = create_graph();
-                graph->load_from_json(stored);
+                const json stored = graph->to_description().to_json();
+                graph = create_graph(stored);
                 run_and_check(graph, grouped, 4, phase + " stored and loaded");
             }
             }
@@ -153,8 +152,7 @@ TEST_F(GraphResourcesTest, SubgraphRebuilds) {
 TEST_F(GraphResourcesTest, AutoConnectionsGiveWayToPublicInputs) {
     GroupedSpec grouped = subgraph_spec();
     grouped.nodes.at("h").inputs["in2"] = {"a", 0};
-    const GraphHandle graph = create_graph();
-    graph->load_from_json(describe(grouped, true, 2));
+    const GraphHandle graph = create_graph(describe(grouped, true, 2));
     run_and_check(graph, grouped, 4, "auto connected");
     const auto group = graph->find_node_for_identifier_and_type<PatternGroup>("h");
     ASSERT_TRUE(group);
@@ -172,7 +170,7 @@ TEST_F(GraphResourcesTest, AutoConnectionsGiveWayToPublicInputs) {
     settings.broken = static_cast<uint32_t>(PatternGroup::Broken::NO);
     settings.public_in1 = true;
     // an erroneous node is not pre-processed
-    set_node_properties(graph, "h", group_properties(grouped.groups.at("h")));
+    graph->node_set_properties("h", group_properties(grouped.groups.at("h")));
     run_and_check(graph, grouped, 4, "public in1 after failing");
 }
 
@@ -180,8 +178,7 @@ TEST_F(GraphResourcesTest, AutoConnectionsGiveWayToPublicInputs) {
 TEST_F(GraphResourcesTest, UnwiredPublicInputsLeaveAutoConnections) {
     GroupedSpec grouped = subgraph_spec();
     grouped.groups.at("h").settings.public_in1 = true;
-    const GraphHandle graph = create_graph();
-    graph->load_from_json(describe(grouped, true, 2));
+    const GraphHandle graph = create_graph(describe(grouped, true, 2));
     run_and_check(graph, grouped, 4, "unwired");
 
     grouped.nodes.at("h").inputs["in2"] = {"a", 0};
@@ -195,8 +192,7 @@ TEST_F(GraphResourcesTest, UnwiredPublicInputsLeaveAutoConnections) {
 
 TEST_F(GraphResourcesTest, ChildrenBelongToTheirParent) {
     GroupedSpec grouped = subgraph_spec();
-    const GraphHandle graph = create_graph();
-    graph->load_from_json(describe(grouped, true, 2));
+    const GraphHandle graph = create_graph(describe(grouped, true, 2));
     run_and_check(graph, grouped, 2, "loaded");
 
     EXPECT_THROW(graph->add_connection("a", "g:c0", "out", "in1"), std::invalid_argument);
@@ -205,7 +201,7 @@ TEST_F(GraphResourcesTest, ChildrenBelongToTheirParent) {
     EXPECT_FALSE(graph->remove_node("g:c0"));
     json described = describe(grouped, true, 2);
     described["nodes"]["x:y"] = {{"type", "Pattern"}};
-    EXPECT_THROW(create_graph()->load_from_json(described), std::invalid_argument);
+    EXPECT_THROW(create_graph(described), std::invalid_argument);
     run_and_check(graph, grouped, 2, "rejected edits");
 
     ASSERT_TRUE(graph->find_node_for_identifier("g:c2:c0"));
@@ -223,19 +219,17 @@ TEST_F(GraphResourcesTest, UnsupportedAndBrokenSubgraphs) {
     grouped.nodes.at("r").shape.required[0] = true;
     json described = describe(grouped, true, 2);
     described["nodes"]["h"]["type"] = "Unsupported Pattern Group";
-    GraphHandle graph = create_graph();
-    graph->load_from_json(described);
+    GraphHandle graph = create_graph(described);
     for (uint32_t i = 0; i < 3; i++) {
         graph->run();
     }
     graph->wait();
-    EXPECT_EQ(stored_connections(graph->store_to_json()), stored_connections(described));
-    EXPECT_EQ(graph->get_node_state("h"), NodeState::UNSUPPORTED);
-    EXPECT_EQ(graph->get_node_state("r"), NodeState::FORCE_DISABLED);
+    EXPECT_EQ(stored_connections(graph), stored_connections(described));
+    EXPECT_EQ(graph->node_get_state("h"), NodeState::UNSUPPORTED);
+    EXPECT_EQ(graph->node_get_state("r"), NodeState::FORCE_DISABLED);
     EXPECT_FALSE(graph->find_node_for_identifier("h:c0"));
 
-    graph = create_graph();
-    graph->load_from_json(describe(grouped, true, 2));
+    graph = create_graph(describe(grouped, true, 2));
     run_and_check(graph, grouped, 3, "supported");
     const auto group = graph->find_node_for_identifier_and_type<PatternGroup>("g");
     ASSERT_TRUE(group);
@@ -249,14 +243,14 @@ TEST_F(GraphResourcesTest, UnsupportedAndBrokenSubgraphs) {
         group->set_properties(group_properties(spec));
         run_and_check(graph, grouped, 3, phase);
         const UIProperties props = draw(graph);
-        EXPECT_EQ(graph->get_node_state("g"), NodeState::ERRORED) << phase;
-        EXPECT_EQ(graph->get_node_state("g:c2:c1"), NodeState::FORCE_DISABLED) << phase;
+        EXPECT_EQ(graph->node_get_state("g"), NodeState::ERRORED) << phase;
+        EXPECT_EQ(graph->node_get_state("g:c2:c1"), NodeState::FORCE_DISABLED) << phase;
         EXPECT_TRUE(props.shows_text("g has an error", {"g:c2:c1"})) << phase;
         EXPECT_EQ(graph->find_node_for_identifier("g:c2:c1"), child) << phase;
 
         spec.settings.broken = static_cast<uint32_t>(PatternGroup::Broken::NO);
         // an erroneous node is not pre-processed
-        set_node_properties(graph, "g", group_properties(spec));
+        graph->node_set_properties("g", group_properties(spec));
         run_and_check(graph, grouped, 3, phase + " fixed");
     }
 }
@@ -266,25 +260,36 @@ TEST_F(GraphResourcesTest, ParentsWithPortsOfTheirOwn) {
     grouped.groups.at("g").settings.own_input = "in2";
     grouped.groups.at("h").settings.own_input = "own";
     grouped.nodes.at("h").inputs["own"] = {"h", 0, "out"};
-    const GraphHandle graph = create_graph();
-    graph->load_from_json(describe(grouped, true, 2));
+    const GraphHandle graph = create_graph(describe(grouped, true, 2));
     run_and_check(graph, grouped, 3, "own inputs");
     const UIProperties props = draw(graph);
     EXPECT_TRUE(props.shows_text("Receiving from: out, a (Pattern)", {"g", "inputs", "in2"}));
     EXPECT_FALSE(props.shows_text("Optional input not connected.", {"g", "inputs", "in2"}));
     EXPECT_TRUE(props.shows_text("Receiving from: out, h:c0 (Pattern)", {"h", "inputs", "own"}));
-    EXPECT_EQ(graph->get_node_state("h"), NodeState::OK);
+    EXPECT_EQ(graph->node_get_state("h"), NodeState::OK);
+
+    const NodeConnectors connectors = graph->node_get_connectors("g");
+    const auto names = connectors.inputs | std::views::transform(&NodeConnectors::Input::name);
+    ASSERT_FALSE(names.empty());
+    EXPECT_EQ(names.front(), "in2");
+    EXPECT_TRUE(std::ranges::is_sorted(names | std::views::drop(1)));
+    EXPECT_NE(std::ranges::find(names, "inp"), names.end());
+    EXPECT_NE(std::ranges::find(connectors.outputs, "out", &NodeConnectors::Output::name),
+              connectors.outputs.end());
+    EXPECT_EQ(connectors.connections.at("in2"), (std::pair<std::string, std::string>{"a", "out"}));
+    EXPECT_EQ(connectors.connections.at("inp"), (std::pair<std::string, std::string>{"a2", "out"}));
 
     grouped.groups.at("g").settings.own_output = true;
-    set_node_properties(graph, "g", {{"own output", true}});
+    graph->node_set_properties("g", {{"own output", true}});
     run_and_check(graph, grouped, 3, "own output");
     const UIProperties own_output = draw(graph);
-    EXPECT_EQ(graph->get_node_state("g"), NodeState::ERRORED);
+    EXPECT_EQ(graph->node_get_state("g"), NodeState::ERRORED);
     EXPECT_TRUE(own_output.shows_text("declares output out, which its subgraph provides", {"g"}));
-    EXPECT_EQ(graph->get_node_state("g:c0"), NodeState::FORCE_DISABLED);
+    EXPECT_EQ(graph->node_get_state("g:c0"), NodeState::FORCE_DISABLED);
+    EXPECT_EQ(graph->node_get_connectors("g").connections.at("in2").first, "a");
 
     grouped.groups.at("g").settings.own_output = false;
-    set_node_properties(graph, "g", {{"own output", false}});
+    graph->node_set_properties("g", {{"own output", false}});
     run_and_check(graph, grouped, 3, "own output removed");
 }
 
@@ -304,8 +309,7 @@ TEST_F(GraphResourcesTest, ParentsStoppingLateStopTheirChildren) {
     bypassed.inputs["in0"] = {"z", 0};
     grouped.nodes.at("g").inputs["own"] = {"y", 1};
     const json described = describe(grouped, true, 2);
-    const GraphHandle graph = create_graph();
-    graph->load_from_json(described);
+    const GraphHandle graph = create_graph(described);
     for (uint32_t i = 0; i < 3; i++) {
         graph->run();
     }
@@ -316,14 +320,14 @@ TEST_F(GraphResourcesTest, ParentsStoppingLateStopTheirChildren) {
     }
     graph->wait();
 
-    EXPECT_EQ(stored_connections(graph->store_to_json()), stored_connections(described));
+    EXPECT_EQ(stored_connections(graph), stored_connections(described));
     const UIProperties props = draw(graph);
-    EXPECT_EQ(graph->get_node_state("g"), NodeState::ERRORED);
+    EXPECT_EQ(graph->node_get_state("g"), NodeState::ERRORED);
     EXPECT_TRUE(props.shows_text("output is persistent", {"g"}));
-    EXPECT_EQ(graph->get_node_state("y"), NodeState::BYPASSED);
-    EXPECT_EQ(graph->get_node_state("z"), NodeState::OK);
+    EXPECT_EQ(graph->node_get_state("y"), NodeState::BYPASSED);
+    EXPECT_EQ(graph->node_get_state("z"), NodeState::OK);
     for (const std::string identifier : {"g:c0", "g:c1", "g:c2:c0", "g:c2:c1"}) {
-        EXPECT_EQ(graph->get_node_state(identifier), NodeState::FORCE_DISABLED) << identifier;
+        EXPECT_EQ(graph->node_get_state(identifier), NodeState::FORCE_DISABLED) << identifier;
         EXPECT_EQ(graph->find_node_for_identifier_and_type<PatternNode>(identifier)->process_count,
                   0u)
             << identifier;
@@ -331,12 +335,12 @@ TEST_F(GraphResourcesTest, ParentsStoppingLateStopTheirChildren) {
 }
 
 TEST_F(GraphResourcesTest, SubgraphsSwappingNames) {
-    const GraphHandle graph = create_graph();
-    graph->load_from_json(json{{"version", 4},
-                               {"nodes",
-                                {{"s", {{"type", "Swap Group"}, {"outputs", {"out->r.in0"}}}},
-                                 {"src", {{"type", "Pattern"}, {"outputs", {"out->s.in0"}}}},
-                                 {"r", {{"type", "Pattern"}}}}}});
+    const GraphHandle graph =
+        create_graph(json{{"version", 4},
+                          {"nodes",
+                           {{"s", {{"type", "Swap Group"}, {"outputs", {"out->r.in0"}}}},
+                            {"src", {{"type", "Pattern"}, {"outputs", {"out->s.in0"}}}},
+                            {"r", {{"type", "Pattern"}}}}}});
     const auto group = graph->find_node_for_identifier_and_type<SwapGroup>("s");
     ASSERT_TRUE(group);
     const std::array<std::shared_ptr<PatternGroup>, 2>& groups = group->groups;
@@ -348,7 +352,7 @@ TEST_F(GraphResourcesTest, SubgraphsSwappingNames) {
         graph->wait();
     };
     for (const bool swapped : {false, true, false, true}) {
-        set_node_properties(graph, "s", {{"swapped", swapped}});
+        graph->node_set_properties("s", {{"swapped", swapped}});
         run();
         const std::array<std::string, 2> names =
             swapped ? std::array<std::string, 2>{"b", "a"} : std::array<std::string, 2>{"a", "b"};
@@ -363,18 +367,18 @@ TEST_F(GraphResourcesTest, SubgraphsSwappingNames) {
                 EXPECT_EQ(groups[i]->children[c]->initialize_count, 1u) << identifier;
             }
         }
-        EXPECT_EQ(std::ranges::distance(graph->identifiers()), swapped ? 8 : 9) << swapped;
+        EXPECT_EQ(std::ranges::distance(graph->get_identifiers()), swapped ? 8 : 9) << swapped;
         ASSERT_FALSE(graph->find_node_for_identifier_and_type<PatternNode>("r")->records.empty());
     }
 
     // the first group fails while renamed: its children, also the one it lost, follow it and stop
-    set_node_properties(graph, "s", {{"swapped", false}});
+    graph->node_set_properties("s", {{"swapped", false}});
     run();
     const std::vector<std::shared_ptr<PatternNode>> first_children = groups[0]->children;
-    set_node_properties(graph, "s", {{"swapped", true}, {"fail", true}});
+    graph->node_set_properties("s", {{"swapped", true}, {"fail", true}});
     run();
-    EXPECT_EQ(graph->get_node_state("s:b"), NodeState::ERRORED);
-    EXPECT_EQ(std::ranges::distance(graph->identifiers()), 9);
+    EXPECT_EQ(graph->node_get_state("s:b"), NodeState::ERRORED);
+    EXPECT_EQ(std::ranges::distance(graph->get_identifiers()), 9);
     for (uint32_t c = 0; c < 2; c++) {
         const std::string identifier = fmt::format("s:b:c{}", c);
         EXPECT_EQ(graph->find_node_for_identifier(identifier), first_children[c]) << identifier;
@@ -384,20 +388,20 @@ TEST_F(GraphResourcesTest, SubgraphsSwappingNames) {
             << identifier;
         EXPECT_GT(groups[1]->children[c]->process_count, 0u) << identifier;
     }
-    set_node_properties(graph, "s", {{"fail", false}});
+    graph->node_set_properties("s", {{"fail", false}});
     run();
-    EXPECT_EQ(std::ranges::distance(graph->identifiers()), 8);
+    EXPECT_EQ(std::ranges::distance(graph->get_identifiers()), 8);
     EXPECT_FALSE(graph->find_node_for_identifier("s:b:c1"));
     EXPECT_GT(first_children[0]->process_count, 0u);
 }
 
 TEST_F(GraphResourcesTest, InvalidSubgraphsError) {
-    const GraphHandle graph = create_graph();
-    graph->load_from_json(json{{"version", 4},
-                               {"nodes",
-                                {{"s", {{"type", "Scripted Group"}, {"outputs", {"out->r.in0"}}}},
-                                 {"src", {{"type", "Pattern"}, {"outputs", {"out->s.in"}}}},
-                                 {"r", {{"type", "Pattern"}}}}}});
+    const GraphHandle graph =
+        create_graph(json{{"version", 4},
+                          {"nodes",
+                           {{"s", {{"type", "Scripted Group"}, {"outputs", {"out->r.in0"}}}},
+                            {"src", {{"type", "Pattern"}, {"outputs", {"out->s.in"}}}},
+                            {"r", {{"type", "Pattern"}}}}}});
     const auto group = graph->find_node_for_identifier_and_type<ScriptedGroup>("s");
     ASSERT_TRUE(group);
     const auto valid = [](ScriptedGroup& scripted) {
@@ -411,7 +415,7 @@ TEST_F(GraphResourcesTest, InvalidSubgraphsError) {
         return subgraph;
     };
     const auto run = [&] {
-        graph->request_reconnect();
+        graph->restart_run();
         forget_runs(graph);
         for (uint32_t i = 0; i < 3; i++) {
             graph->run();
@@ -421,7 +425,7 @@ TEST_F(GraphResourcesTest, InvalidSubgraphsError) {
     const std::set<std::string> wiring = {"src.out->s.in", "s.out->r.in0"};
     group->script = valid;
     run();
-    ASSERT_EQ(graph->get_node_state("s"), NodeState::OK);
+    ASSERT_EQ(graph->node_get_state("s"), NodeState::OK);
 
     const NodeHandle unregistered = std::make_shared<UnregisteredNode>();
     const std::vector<std::pair<std::string, std::function<void(ScriptedGroup&, Subgraph&)>>>
@@ -442,15 +446,16 @@ TEST_F(GraphResourcesTest, InvalidSubgraphsError) {
              [&](ScriptedGroup&, Subgraph& g) {
                  g.add_node("x", graph->find_node_for_identifier("src"));
              }},
-            {"connects two public ports",
+            {"connects two public connectors",
              [](ScriptedGroup&, Subgraph& g) { g.add_connection(".in", ".other"); }},
             {"connected twice",
              [](ScriptedGroup&, Subgraph& g) { g.add_connection(".in", "c1.in0"); }},
             {"connected twice",
              [](ScriptedGroup&, Subgraph& g) { g.add_connection("c0.out", ".out"); }},
-            {"unknown port",
+            {"unknown connector",
              [](ScriptedGroup&, Subgraph& g) { g.add_connection("x.out", ".out"); }},
-            {"unknown port", [](ScriptedGroup&, Subgraph& g) { g.add_connection("c0", ".out"); }},
+            {"unknown connector",
+             [](ScriptedGroup&, Subgraph& g) { g.add_connection("c0", ".out"); }},
             {"invalid pass-through",
              [](ScriptedGroup&, Subgraph& g) { g.add_pass_through(".in", ".other"); }},
             {"invalid pass-through",
@@ -478,9 +483,9 @@ TEST_F(GraphResourcesTest, InvalidSubgraphsError) {
         };
         run();
         const UIProperties props = draw(graph);
-        EXPECT_EQ(graph->get_node_state("s"), NodeState::ERRORED) << error;
+        EXPECT_EQ(graph->node_get_state("s"), NodeState::ERRORED) << error;
         EXPECT_TRUE(props.shows_text(error, {"s"})) << error;
-        EXPECT_EQ(stored_connections(graph->store_to_json()), wiring) << error;
+        EXPECT_EQ(stored_connections(graph), wiring) << error;
         for (uint32_t c = 0; c < 2; c++) {
             EXPECT_EQ(graph->find_node_for_identifier(fmt::format("s:c{}", c)), group->children[c])
                 << error;
@@ -490,7 +495,7 @@ TEST_F(GraphResourcesTest, InvalidSubgraphsError) {
         group->inputs.clear();
         group->script = valid;
         run();
-        EXPECT_EQ(graph->get_node_state("s"), NodeState::OK) << error;
+        EXPECT_EQ(graph->node_get_state("s"), NodeState::OK) << error;
         EXPECT_GT(group->children[1]->process_count, 0u) << error;
     }
 
@@ -505,7 +510,7 @@ TEST_F(GraphResourcesTest, InvalidSubgraphsError) {
         return subgraph;
     };
     run();
-    EXPECT_EQ(stored_connections(graph->store_to_json()), wiring);
+    EXPECT_EQ(stored_connections(graph), wiring);
     EXPECT_TRUE(draw(graph).shows_text("Optional input not connected.", {"r", "inputs", "in0"}));
     group->script = valid;
     run();
@@ -517,23 +522,23 @@ TEST_F(GraphResourcesTest, InvalidSubgraphsError) {
         return subgraph;
     };
     run();
-    EXPECT_EQ(graph->get_node_state("s:t"), NodeState::UNSUPPORTED);
-    EXPECT_EQ(graph->get_node_state("s"), NodeState::OK);
+    EXPECT_EQ(graph->node_get_state("s:t"), NodeState::UNSUPPORTED);
+    EXPECT_EQ(graph->node_get_state("s"), NodeState::OK);
     group->script = valid;
     run();
 
     graph->add_connection("src", "s", "buf", "in");
     run();
-    EXPECT_EQ(stored_connections(graph->store_to_json()), std::set<std::string>({"s.out->r.in0"}));
+    EXPECT_EQ(stored_connections(graph), std::set<std::string>({"s.out->r.in0"}));
 
     graph->add_connection("src", "s", "out", "in");
     run();
-    EXPECT_EQ(stored_connections(graph->store_to_json()), wiring);
+    EXPECT_EQ(stored_connections(graph), wiring);
     JSONLoadProperties props(
         json{{"nodes", {{"s", {{"inputs", {{"in (public)", {{"Remove Connection", true}}}}}}}}}});
-    graph->properties(props);
+    graph->draw_ui(props);
     run();
-    EXPECT_EQ(stored_connections(graph->store_to_json()), std::set<std::string>({"s.out->r.in0"}));
+    EXPECT_EQ(stored_connections(graph), std::set<std::string>({"s.out->r.in0"}));
 }
 
 TEST_F(GraphResourcesTest, AutoConnectionsThroughPublicInputsKeepTheWiring) {
@@ -545,20 +550,19 @@ TEST_F(GraphResourcesTest, AutoConnectionsThroughPublicInputsKeepTheWiring) {
     PatternShape with_defaults{.defaults = true};
     with_defaults.delays[4] = 1;
     grouped.groups["h"] = {.children = {{100, with_defaults, {}}}};
-    const GraphHandle graph = create_graph();
-    graph->load_from_json(describe(grouped, true, 2));
+    const GraphHandle graph = create_graph(describe(grouped, true, 2));
     run_and_check(graph, grouped, 4, "persistent source");
     EXPECT_TRUE(
         draw(graph).shows_text("Optional input not connected.", {"h:c0", "inputs", "bin1"}));
 }
 
 TEST_F(GraphResourcesTest, ChildrenMovingBetweenParents) {
-    const GraphHandle graph = create_graph();
-    graph->load_from_json(json{{"version", 4},
-                               {"nodes",
-                                {{"m", {{"type", "Move Group"}, {"outputs", {"out->r.in0"}}}},
-                                 {"src", {{"type", "Pattern"}, {"outputs", {"out->m.in0"}}}},
-                                 {"r", {{"type", "Pattern"}}}}}});
+    const GraphHandle graph =
+        create_graph(json{{"version", 4},
+                          {"nodes",
+                           {{"m", {{"type", "Move Group"}, {"outputs", {"out->r.in0"}}}},
+                            {"src", {{"type", "Pattern"}, {"outputs", {"out->m.in0"}}}},
+                            {"r", {{"type", "Pattern"}}}}}});
     const auto group = graph->find_node_for_identifier_and_type<MoveGroup>("m");
     ASSERT_TRUE(group);
     using Place = MoveGroup::Place;
@@ -567,36 +571,36 @@ TEST_F(GraphResourcesTest, ChildrenMovingBetweenParents) {
     for (const Place place :
          {Place::A, Place::B, Place::A, Place::HERE, Place::B, Place::HERE, Place::A}) {
         const std::string phase = identifiers.at(place);
-        set_node_properties(graph, "m", {{"place", static_cast<uint32_t>(place)}});
+        graph->node_set_properties("m", {{"place", static_cast<uint32_t>(place)}});
         forget_runs(graph);
         for (uint32_t i = 0; i < 3; i++) {
             graph->run();
         }
         graph->wait();
-        EXPECT_EQ(graph->get_node_state("m"), NodeState::OK) << phase;
+        EXPECT_EQ(graph->node_get_state("m"), NodeState::OK) << phase;
         EXPECT_EQ(graph->find_node_for_identifier(phase), group->x) << phase;
         EXPECT_EQ(group->x->initialize_count, 1u) << phase;
         EXPECT_GT(group->x->process_count, 0u) << phase;
         // m, a, b, their first children, x, src, r
-        EXPECT_EQ(std::ranges::distance(graph->identifiers()), 8) << phase;
+        EXPECT_EQ(std::ranges::distance(graph->get_identifiers()), 8) << phase;
     }
 }
 
 // A child moving to a later parent leaves its name to a new child of its old parent.
 TEST_F(GraphResourcesTest, ChildrenMovingLeaveTheirName) {
-    const GraphHandle graph = create_graph();
-    graph->load_from_json(json{{"version", 4},
-                               {"nodes",
-                                {{"m", {{"type", "Move Group"}, {"outputs", {"out->r.in0"}}}},
-                                 {"src", {{"type", "Pattern"}, {"outputs", {"out->m.in0"}}}},
-                                 {"r", {{"type", "Pattern"}}}}}});
+    const GraphHandle graph =
+        create_graph(json{{"version", 4},
+                          {"nodes",
+                           {{"m", {{"type", "Move Group"}, {"outputs", {"out->r.in0"}}}},
+                            {"src", {{"type", "Pattern"}, {"outputs", {"out->m.in0"}}}},
+                            {"r", {{"type", "Pattern"}}}}}});
     const auto group = graph->find_node_for_identifier_and_type<MoveGroup>("m");
     ASSERT_TRUE(group);
-    set_node_properties(graph, "m", {{"replace", true}});
+    graph->node_set_properties("m", {{"replace", true}});
     using Place = MoveGroup::Place;
     for (const Place place : {Place::A, Place::B, Place::A, Place::B}) {
         const std::string phase = place == Place::A ? "in a" : "in b";
-        set_node_properties(graph, "m", {{"place", static_cast<uint32_t>(place)}});
+        graph->node_set_properties("m", {{"place", static_cast<uint32_t>(place)}});
         run(graph);
         EXPECT_EQ(graph->find_node_for_identifier("m:a:c1"),
                   place == Place::A ? group->x : group->stand_ins[0])
@@ -605,14 +609,13 @@ TEST_F(GraphResourcesTest, ChildrenMovingLeaveTheirName) {
                   place == Place::B ? group->x : group->stand_ins[1])
             << phase;
         // m, a, b, their two children, src, r
-        EXPECT_EQ(std::ranges::distance(graph->identifiers()), 9) << phase;
+        EXPECT_EQ(std::ranges::distance(graph->get_identifiers()), 9) << phase;
         EXPECT_EQ(group->x->initialize_count, 1u) << phase;
     }
 }
 
 TEST_F(GraphResourcesTest, DisabledParentsPassVersionsOn) {
-    const GraphHandle graph = create_graph();
-    graph->load_from_json(
+    const GraphHandle graph = create_graph(
         json{{"version", 4},
              {"nodes",
               {{"s", {{"type", "Scripted Group"}, {"enabled", false}, {"outputs", {"out->r.in0"}}}},
@@ -631,7 +634,7 @@ TEST_F(GraphResourcesTest, DisabledParentsPassVersionsOn) {
         subgraph.add_pass_through(".b", ".out");
         return subgraph;
     };
-    graph->request_reconnect();
+    graph->restart_run();
     for (uint32_t i = 0; i < 3; i++) {
         graph->run();
     }
@@ -645,8 +648,7 @@ TEST_F(GraphResourcesTest, DisabledParentsPassVersionsOn) {
 }
 
 TEST_F(GraphResourcesTest, ParentsPassThrough) {
-    const GraphHandle graph = create_graph();
-    graph->load_from_json(
+    const GraphHandle graph = create_graph(
         json{{"version", 4},
              {"nodes",
               {{"s", {{"type", "Scripted Group"}, {"enabled", false}, {"outputs", {"out->r.in0"}}}},
@@ -673,14 +675,14 @@ TEST_F(GraphResourcesTest, ParentsPassThrough) {
             }
             return subgraph;
         };
-        graph->request_reconnect();
+        graph->restart_run();
         forget_runs(graph);
         for (uint32_t i = 0; i < 3; i++) {
             graph->run();
         }
         graph->wait();
         const UIProperties props = draw(graph);
-        EXPECT_EQ(graph->get_node_state("s"), NodeState::BYPASSED) << own;
+        EXPECT_EQ(graph->node_get_state("s"), NodeState::BYPASSED) << own;
         EXPECT_TRUE(props.shows_text("Receiving from: out, src (Pattern)", {"r", "inputs", "in0"}))
             << own;
         EXPECT_EQ(group->children[0]->process_count, 0u) << own;

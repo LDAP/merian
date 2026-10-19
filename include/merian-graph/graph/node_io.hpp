@@ -3,6 +3,8 @@
 #include "connector_input.hpp"
 
 #include <any>
+#include <string>
+#include <vector>
 
 namespace merian {
 
@@ -17,8 +19,6 @@ struct NodeData;
 class GraphEvent {
   public:
     struct Info {
-        // nullptr sent by the user or graph
-        const NodeHandle& sender_node;
         // "" sent by the user or graph
         const std::string& node_name;
         // "user" if sent by the user or "graph" if sent by runtime
@@ -27,9 +27,24 @@ class GraphEvent {
         const std::string& event_name;
     };
 
+    // "node type/identifier/event", empty parts match any. User and graph events have the
+    // identifier "user" and "graph" and no node type.
+    struct Pattern {
+        std::string node_name;
+        std::string identifier;
+        std::string event_name;
+
+        bool matches(const Info& info) const;
+
+        // A comma-separated list of patterns. Throws std::invalid_argument for a malformed one,
+        // unless skip_invalid, which skips it with a warning.
+        static std::vector<Pattern> parse(const std::string& patterns,
+                                          const bool skip_invalid = false);
+    };
+
     using Data = std::any;
 
-    using Listener = std::function<bool(const GraphEvent::Info&, const GraphEvent::Data&)>;
+    using Listener = std::function<void(const GraphEvent::Info&, const GraphEvent::Data&)>;
 };
 
 // Access the outputs that are connected to your inputs.
@@ -66,14 +81,12 @@ class NodeIOLayout {
      * Event pattern:
      * - nodeType/nodeIdentifier/eventName
      * - /user/eventName (user events, sent using the graph methods)
-     * - /graph/eventName (user events, sent using the graph methods)
+     * - /graph/eventName (events the graph sends itself)
      * - comma separated list of those patterns
      *
      * Empty nodeType, nodeIdentifier, eventName mean "any".
      *
-     * The listener recives info about the event and optional data. The listener can return if the
-     * event was processed. In this case processing ends if "notify_all = false", otherwise the
-     * event is distributed to all listeners.
+     * The listener receives info about the event and optional data, once per event.
      */
     void register_event_listener(const std::string& event_pattern,
                                  const GraphEvent::Listener& event_listener) const;
@@ -149,21 +162,22 @@ class NodeIO {
 
     // Binds every shader-visible input and output whose name matches a cursor field:
     // input "src" -> "in_src", output "irr" -> "out_irr", either at the cursor root or inside
-    // a "graph_in" / "graph_out" struct field. Unmatched ports are skipped (the shader may not
+    // a "graph_in" / "graph_out" struct field. Unmatched connectors are skipped (the shader may not
     // need them); unconnected optional inputs and disabled image and buffer outputs with a matching
     // field receive a dummy. An in-place input binds as in_<name>. Throws node_error for a
     // non-persistent output in on_connected.
     void bind(const ShaderObjectHandle& object) const;
     void bind(ShaderCursor cursor) const;
 
-    void send_event(const std::string& event_name,
-                    const GraphEvent::Data& event_data = {},
-                    const bool notify_all = true) const;
+    void send_event(const std::string& event_name, const GraphEvent::Data& event_data = {}) const;
 
     const ContextHandle& get_context() const;
 
     // The memory of the node, alive until the node is removed.
     const ResourceAllocatorHandle& get_allocator() const;
+
+    // Of this node, from the graph seed and the identifier; changes only with a connect.
+    uint32_t get_seed() const;
 
   private:
     // null if not connected

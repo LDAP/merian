@@ -38,13 +38,12 @@ class GraphResourcesTest : public GraphTest {
     }
 
     static GraphHandle load(const GraphSpec& spec) {
-        const GraphHandle graph = create_graph();
-        graph->load_from_json(describe(spec, true, 2));
+        const GraphHandle graph = create_graph(describe(spec, true, 2));
         return graph;
     }
 
     static void forget_runs(const GraphHandle& graph) {
-        for (const std::string& identifier : graph->identifiers()) {
+        for (const std::string& identifier : graph->get_identifiers()) {
             if (const auto node =
                     graph->find_node_for_identifier_and_type<PatternNode>(identifier)) {
                 node->records.clear();
@@ -61,9 +60,7 @@ class GraphResourcesTest : public GraphTest {
             graph->run();
         }
         graph->wait();
-        EXPECT_EQ(stored_connections(graph->store_to_json()),
-                  stored_connections(describe(spec, true, 1)))
-            << phase;
+        EXPECT_EQ(stored_connections(graph), stored_connections(describe(spec, true, 1))) << phase;
         check_reads(graph, spec, iterations, phase);
     }
 
@@ -75,7 +72,7 @@ class GraphResourcesTest : public GraphTest {
             graph->run();
         }
         graph->wait();
-        const json stored = graph->store_to_json();
+        const json stored = graph->to_description().to_json();
         const json expected = describe(grouped, true, 1);
         EXPECT_EQ(stored_connections(stored), stored_connections(expected)) << phase;
         EXPECT_EQ(stored.at("nodes").size(), expected.at("nodes").size()) << phase;
@@ -85,8 +82,9 @@ class GraphResourcesTest : public GraphTest {
         }
 
         const FlatSpec flat = flatten(grouped);
-        EXPECT_EQ(std::set<std::string>(graph->identifiers().begin(), graph->identifiers().end()),
-                  flat.nodes)
+        EXPECT_EQ(
+            std::set<std::string>(graph->get_identifiers().begin(), graph->get_identifiers().end()),
+            flat.nodes)
             << phase;
         std::set<std::string> groups;
         std::ranges::copy(grouped.groups | std::views::keys, std::inserter(groups, groups.end()));
@@ -98,10 +96,10 @@ class GraphResourcesTest : public GraphTest {
                      const uint32_t iterations,
                      const std::string& phase,
                      const std::set<std::string>& skipped = {}) {
-        const GraphMemoryReport report = graph->get_memory_report();
-        std::ignore = fmt::format("{}", report);
+        const GraphMemoryReport report = graph->memory_get_report();
+        std::ignore = report.to_text();
         aliased_checks += std::ranges::any_of(
-            report.placed, [](const auto& output) { return output.placement.aliased; });
+            report.transient, [](const auto& output) { return output.placement.aliased; });
 
         const auto [running, rejected] = running_nodes(spec);
         in_place_errors += rejected.size();
@@ -136,10 +134,12 @@ class GraphResourcesTest : public GraphTest {
             for (const std::string output : {"out", "buf"}) {
                 const uint32_t copy_count = copies(output);
                 const std::string name = fmt::format("{}.{}", identifier, output);
-                const auto placed_copies = std::ranges::count_if(report.placed, [&](const auto& p) {
-                    return copy_count == 1 ? p.output == name : p.output.starts_with(name + " (");
-                });
-                EXPECT_EQ(placed_copies, copy_count) << phase << ": " << name;
+                const auto transient_copies =
+                    std::ranges::count_if(report.transient, [&](const auto& p) {
+                        return copy_count == 1 ? p.output == name
+                                               : p.output.starts_with(name + " (");
+                    });
+                EXPECT_EQ(transient_copies, copy_count) << phase << ": " << name;
             }
         }
 

@@ -1,7 +1,6 @@
 #include "merian-graph/nodes/compute_node/compute_node.hpp"
 
 #include "merian/shader/shader_object.hpp"
-#include "merian/shader/slang_global_session.hpp"
 
 namespace merian {
 
@@ -10,7 +9,6 @@ AbstractCompute::AbstractCompute(const std::optional<uint32_t> push_constant_siz
 
 void AbstractCompute::invalidate_shader() {
     kernel->invalidate();
-    bump_slang_source_epoch();
 }
 
 void AbstractCompute::initialize(const ContextHandle& context,
@@ -30,7 +28,6 @@ AbstractCompute::on_connected(const NodeIOLayout& io_layout,
     io_layout.register_event_listener(
         "/graph/reload_shaders", [this](const GraphEvent::Info&, const GraphEvent::Data& force) {
             kernel->reload(std::any_cast<bool>(force), compile_context);
-            return true;
         });
 
     return {};

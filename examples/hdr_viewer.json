@@ -5,18 +5,12 @@
             "required": true
         }
     },
-    "graph_properties": {
-        "flush thread pool": true,
-        "fps limiter": false,
-        "iterations in flight": 2,
-        "time source": "Auto"
-    },
+    "include": [
+        "parts/mixins.json"
+    ],
     "nodes": {
-        "blit": {
+        "display": {
             "enabled": true,
-            "outputs": [
-                "canvas->imgui.canvas"
-            ],
             "type": "Swapchain Blit"
         },
         "image": {
@@ -27,40 +21,33 @@
             "properties": {
                 "path": ""
             },
-            "type": "HDR Image"
+            "type": "HDR Image Source"
         },
-        "imgui": {
+        "output": {
             "enabled": true,
-            "type": "ImGui"
+            "outputs": [
+                "canvas->display.canvas"
+            ],
+            "properties": {
+                "backend": "auto",
+                "on close": {
+                    "remove node": false,
+                    "send event": true
+                },
+                "present mode": "Fifo"
+            },
+            "type": "Window"
         },
         "tonemap": {
             "enabled": true,
             "outputs": [
-                "out->blit.src"
+                "out->display.src"
             ],
             "properties": {
                 "exposure bias": 2.0,
                 "tonemap": "Uncharted 2"
             },
             "type": "Tonemap"
-        },
-        "window": {
-            "enabled": true,
-            "outputs": [
-                "canvas->blit.canvas",
-                "window->imgui.window"
-            ],
-            "properties": {
-                "backend": "SDL3 (Video Subsystem)",
-                "blit mode": "FIT",
-                "on_should_close_actions": {
-                    "remove node": false,
-                    "send sigint": true,
-                    "send sigterm": false
-                },
-                "present mode": "Fifo"
-            },
-            "type": "Window"
         }
     },
     "version": 4

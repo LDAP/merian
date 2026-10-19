@@ -7,11 +7,15 @@ using merian;
 #include "merian-graph/nodes/path_debug/layout.slangh"
 #include "merian-graph/nodes/path_debug/common.slangh"
 
-void count_overlay_path(const uint path_index, const float luminance) {
+void count_overlay_path(const PathRecordPath p) {
     InterlockedAdd(state[PATH_DEBUG_STATE_MATCHED], 1);
-    path_debug_resample_offer(path_index, luminance);
-    if (params.overlay_rank != PATH_DEBUG_RANK_ANY) {
-        InterlockedAdd(state[PATH_DEBUG_STATE_HIST + path_debug_lum_bin(luminance)], 1);
+    if (params.overlay_rank == PATH_DEBUG_RANK_FIREFLIES) {
+        InterlockedAdd(state[PATH_DEBUG_STATE_HIST + path_debug_lum_bin(p.luminance)], 1);
+    } else if (path_debug_keeps_top() && params.overlay_keep_update != 0) {
+        const uint key = path_debug_top_key(p);
+        if (key != 0) {
+            InterlockedAdd(state[PATH_DEBUG_STATE_HIST + path_debug_key_bin(key)], 1);
+        }
     }
 }
 
@@ -47,7 +51,7 @@ void main(uint3 gid: SV_DispatchThreadID) {
     }
 
     if (params.overlay_source == PATH_DEBUG_SOURCE_ALL) {
-        count_overlay_path(i, p.luminance);
+        count_overlay_path(p);
     }
 
     const bool finite = !isnan(p.luminance) && !isinf(p.luminance);
@@ -86,6 +90,6 @@ void main(uint3 gid: SV_DispatchThreadID) {
 
     if (params.overlay_source != PATH_DEBUG_SOURCE_ALL &&
         path_debug_in_source(i, params.overlay_source)) {
-        count_overlay_path(i, p.luminance);
+        count_overlay_path(p);
     }
 }

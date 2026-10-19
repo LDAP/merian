@@ -1,6 +1,7 @@
 #include "merian/vk/extension/glfw/glfw_window.hpp"
 #include "merian/vk/extension/glfw/extension_glfw.hpp"
 #include "merian/vk/extension/glfw/glfw_surface.hpp"
+#include "merian/vk/window/surface_swapchain.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -279,9 +280,10 @@ vk::Extent2D GLFWWindow::window_extent() {
     return vk::Extent2D{static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
 }
 
-SurfaceHandle GLFWWindow::get_surface() {
-    return std::make_shared<GLFWSurface>(device,
-                                         std::static_pointer_cast<GLFWWindow>(shared_from_this()));
+SwapchainHandle GLFWWindow::create_swapchain(const ContextHandle& context) {
+    return std::make_shared<SurfaceSwapchain>(
+        context, std::make_shared<GLFWSurface>(
+                     device, std::static_pointer_cast<GLFWWindow>(shared_from_this())));
 }
 
 bool GLFWWindow::should_close() const {

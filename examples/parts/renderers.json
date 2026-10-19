@@ -1,0 +1,9 @@
+{
+    "presets": {
+        "renderer": {
+            "folder": "renderers",
+            "default": "pt",
+            "order": 0
+        }
+    }
+}

@@ -1,4 +1,5 @@
 merian_graph_src += files(
+    'errors.cpp',
     'node.cpp',
     'node_events.cpp',
     'node_io.cpp',
@@ -9,6 +10,8 @@ merian_graph_src += files(
     'graph_subgraph.cpp',
     'graph_layers.cpp',
     'graph_properties.cpp',
+    'graph_reports.cpp',
+    'graph_ui.cpp',
     'graph_events.cpp',
     'graph_description.cpp',
     'graph_load_store.cpp',

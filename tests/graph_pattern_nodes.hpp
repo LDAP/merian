@@ -550,9 +550,9 @@ class PatternGroup : public Node {
             subgraph.add_connection(".in2", stages.front() + ".in1");
         }
         if (const std::optional<uint32_t> writer = in_place_stage()) {
-            for (const std::string port : {"inp", "binp"}) {
-                subgraph.add_connection("." + port, stages[*writer] + "." + port);
-                subgraph.add_connection(stages[*writer] + "." + port, "." + port);
+            for (const std::string public_input : {"inp", "binp"}) {
+                subgraph.add_connection("." + public_input, stages[*writer] + "." + public_input);
+                subgraph.add_connection(stages[*writer] + "." + public_input, "." + public_input);
             }
         }
         if (settings.broken == static_cast<uint32_t>(Broken::MISSING_INPUT)) {

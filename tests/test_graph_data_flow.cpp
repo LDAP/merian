@@ -10,11 +10,10 @@ TEST_F(GraphResourcesTest, ChainReadsWhatWasWritten) {
             spec[node_name(index)].inputs["bin0"] = {node_name(index - 1), 0};
         }
     }
-    const GraphHandle graph = create_graph();
-    graph->load_from_json(describe(spec, true, 2));
+    const GraphHandle graph = create_graph(describe(spec, true, 2));
     run_and_check(graph, spec, 6, "chain");
-    EXPECT_LT(graph->get_memory_report().blocks.at(0).size,
-              graph->get_memory_report().blocks.at(0).requested_size);
+    EXPECT_LT(graph->memory_get_report().blocks.at(0).size,
+              graph->memory_get_report().blocks.at(0).requested_size);
 }
 
 TEST_F(GraphResourcesTest, LayersReadWhatWasWrittenWhileProfiled) {
@@ -32,13 +31,12 @@ TEST_F(GraphResourcesTest, LayersReadWhatWasWrittenWhileProfiled) {
 
     const GraphHandle graph = load(spec);
     run_and_check(graph, spec, 6, "overlapping");
-    graph->set_profiler_enabled(true);
+    graph->profiler_set_enabled(true);
     run_and_check(graph, spec, 6, "profiled");
 #ifdef MERIAN_PROFILER_ENABLE
-    const Profiler::Report report = graph->get_run_report();
-    const auto run_nodes =
-        std::ranges::find(report.gpu_report, "Run nodes", &Profiler::ReportEntry::name);
-    ASSERT_NE(run_nodes, report.gpu_report.end());
+    const ProfilerReport report = graph->profiler_get_report(ProfilerReportKind::RUN);
+    const auto run_nodes = std::ranges::find(report.gpu, "Run nodes", &ProfilerReport::Entry::name);
+    ASSERT_NE(run_nodes, report.gpu.end());
     EXPECT_EQ(run_nodes->children.size(), spec.size());
 #endif
 }
@@ -51,8 +49,7 @@ TEST_F(GraphResourcesTest, RandomGraphsReadWhatWasWritten) {
         const std::string name = fmt::format("graph {} ({} nodes)", test, node_count);
         SCOPED_TRACE(name);
 
-        const GraphHandle graph = create_graph();
-        graph->load_from_json(describe(spec, true, random_uint(rng, 1, 3)));
+        const GraphHandle graph = create_graph(describe(spec, true, random_uint(rng, 1, 3)));
         run_and_check(graph, spec, 7, "load");
 
         set_graph_properties(graph, false, 2);
@@ -78,7 +75,7 @@ TEST_F(GraphResourcesTest, RandomGraphsReadWhatWasWritten) {
         // the delays must change together with the connections, not one run later
         graph->find_node_for_identifier_and_type<PatternNode>(node_name(rewired))->shape =
             after.shape;
-        graph->request_reconnect();
+        graph->restart_run();
         for (const auto& [input, src] : before.inputs) {
             graph->remove_connection(src.src, node_name(rewired), input);
         }
@@ -117,12 +114,12 @@ TEST_F(GraphResourcesTest, RandomGraphsReadWhatWasWritten) {
         spec.at(disabled).enabled = false;
         run_and_check(graph, spec, 6, "disable");
 
-        const json stored = graph->store_to_json();
-        const GraphHandle restored = create_graph();
-        restored->load_from_json(stored);
+        const json stored = graph->to_description().to_json();
+        const GraphHandle restored = create_graph(stored);
         run_and_check(restored, spec, 6, "restore");
-        EXPECT_EQ(restored->store_to_json().at("nodes"), stored.at("nodes"));
-        EXPECT_EQ(restored->store_to_json().at("graph_properties"), stored.at("graph_properties"));
+        EXPECT_EQ(restored->to_description().to_json().at("nodes"), stored.at("nodes"));
+        EXPECT_EQ(restored->to_description().to_json().at("graph_properties"),
+                  stored.at("graph_properties"));
 
         set_node_enabled(restored, disabled, true);
         spec.at(disabled).enabled = true;
@@ -149,7 +146,7 @@ TEST_F(GraphResourcesTest, RuntimeErrorsAndRejectionsSettle) {
 
     const GraphHandle graph = load(spec);
     run_and_check(graph, spec, 4, "settle");
-    graph->request_reconnect();
+    graph->restart_run();
     run_and_check(graph, spec, 4, "settle again");
     EXPECT_EQ(running_nodes(spec).rejected, (std::set<std::string>{"w1", "w2"}));
 
@@ -189,5 +186,5 @@ TEST_F(GraphResourcesTest, RuntimeErrorsAndRejectionsSettle) {
     failing_graph->wait();
     forget_runs(failing_graph);
     run_and_check(failing_graph, failing, 4, "failed while processing");
-    EXPECT_EQ(failing_graph->get_node_state("w"), NodeState::ERRORED);
+    EXPECT_EQ(failing_graph->node_get_state("w"), NodeState::ERRORED);
 }

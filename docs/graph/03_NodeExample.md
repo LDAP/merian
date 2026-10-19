@@ -145,10 +145,11 @@ io[input_connector]                  // Access input resource (type from Accessi
 io[output_connector]                 // Access output resource
 io.is_connected(connector)           // Check whether connector is wired up
 io.frame_data<T>(ctor_args...)       // Per-in-flight-slot persistent storage
-io.bind(shader_object)               // Writes the ports into the fields in_<input> / out_<output>
+io.bind(shader_object)               // Writes the connectors into the fields in_<input> / out_<output>
 io.send_event("name", data)          // Broadcast an inter-node event
 io.get_context()                     // The context
 io.get_allocator()                   // The node's memory, the allocator initialize received
+io.get_seed()                        // The node's seed, from the graph seed and the identifier
 ```
 
 ### NodeIOLayout quick reference (available in describe_outputs / on_connected)
@@ -157,8 +158,8 @@ io.get_allocator()                   // The node's memory, the allocator initial
 io[input_connector]                           // Upstream OutputConnector
 io.is_connected(input_connector)              // Is the input wired?
 io.get_context(), io.get_allocator()          // As in NodeIO
-io.register_event_listener("", callback)      // Listen to events (empty = any)
-// Pattern format: "NodeType/identifier/eventName"  (empty field = wildcard)
+io.register_event_listener("//", callback)    // Listen to events ("//" = any)
+// Pattern format: "NodeType/identifier/eventName"  (empty field = wildcard), comma-separated
 ```
 
 Send a fixed event name and let the receiver pick what listens to it. For a node that offers

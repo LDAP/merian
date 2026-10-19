@@ -156,7 +156,7 @@ uint32_t crc32(const uint8_t* data, const std::size_t size) {
 std::string png_keyword(const std::string& key) {
     std::string keyword;
     for (const unsigned char c : key) {
-        const bool printable = (c >= 32 && c <= 126) || (c >= 161 && c <= 255);
+        const bool printable = (c >= 32 && c <= 126) || c >= 161;
         if (!printable || (c == ' ' && (keyword.empty() || keyword.back() == ' '))) {
             continue;
         }
@@ -177,7 +177,7 @@ std::string png_text(const std::string& value) {
     std::string text;
     text.reserve(value.size());
     for (const unsigned char c : value) {
-        const bool printable = (c >= 32 && c <= 126) || (c >= 161 && c <= 255);
+        const bool printable = (c >= 32 && c <= 126) || c >= 161;
         text += static_cast<char>(printable || c == '\n' ? c : ' ');
     }
     return text;
@@ -373,8 +373,7 @@ bool rgba8_is_opaque(const uint8_t* data, const size_t texel_count) {
 
 BlobHandle
 image_load_u8(const std::filesystem::path& path, ImageInfo& info, const int desired_channels) {
-    // BCn-compressed DDS files are not handled by stb; decode them to RGBA8 here so every consumer
-    // (e.g. the Image Read node) can load them. srgb-ness is irrelevant for the raw decoded bytes.
+    // stb does not handle BCn-compressed DDS files; srgb-ness is irrelevant for the decoded bytes
     if (is_dds(path)) {
         return dds_decode_rgba8(dds_load(path, false), info);
     }

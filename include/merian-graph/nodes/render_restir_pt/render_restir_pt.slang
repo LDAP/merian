@@ -51,7 +51,8 @@ uint restir_pt_shift_index(const uint index, const uint slot, const uint directi
 }
 
 RandomGenerator restir_pt_rng(const uint2 pixel, const RestirPTPass pass) {
-    return PCG(xxhash32(uint4(pixel, pc.frame * RestirPTPassCount + pass, pc.seed + pc.round)));
+    return PCG(xxhash32(
+        uint4(pixel, pc.frame * RestirPTPassCount + pass, xxhash32(uint2(pc.seed, pc.round)))));
 }
 
 bool restir_pt_in_screen(const int2 pixel, const uint2 dim) {
@@ -162,7 +163,8 @@ void restir_pt_pass_initial(const uint2 pixel,
     float3 primary_emission = float3(0);
     for (int s = 0; s < merian_restir_pt_spp; s++) {
         // zero marks "no path" in the duplication map
-        candidates.seed = max(xxhash32(uint4(pixel, pc.frame, uint(s) ^ (pc.seed << 8))), 1u);
+        candidates.seed =
+            max(xxhash32(uint4(pixel, pc.frame, xxhash32(uint3(pc.seed, uint(s), 0xCA4Du)))), 1u);
         const RestirPTPrimary primary = restir_pt_primary(
             scene, params.gbuffer, false,
             float2(pixel) + restir_pt_unpack_unorm(RestirPTRandom(candidates.seed).film()), dim,

@@ -29,7 +29,7 @@ class AutoExposure : public Node {
 
         // Manual exposure
         float shutter_time = .1;
-        float aperature = 16.0;
+        float aperture = 16.0;
 
         // Auto exposure
         float K = 8.0;

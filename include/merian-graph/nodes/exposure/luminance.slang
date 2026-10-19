@@ -15,7 +15,7 @@ void main(int local_index: SV_GroupIndex) {
 
     float max_luminance;
     if (params.automatic == 0) {
-        const float ev = ev_100(params.aperature, params.shutter_time, params.iso);
+        const float ev = ev_100(params.aperture, params.shutter_time, params.iso);
         max_luminance = ev_100_to_max_luminance(ev, params.iso, params.q);
     } else {
         const uint local_bin = out_histogram[local_index];

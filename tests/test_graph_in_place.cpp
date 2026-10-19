@@ -29,7 +29,7 @@ TEST_F(GraphResourcesTest, InPlaceVersions) {
     set_node_enabled(graph, "w1", false);
     spec.at("w1").enabled = false;
     run_and_check(graph, spec, 6, "in place, w1 disabled");
-    EXPECT_EQ(graph->get_node_state("w1"), NodeState::BYPASSED);
+    EXPECT_EQ(graph->node_get_state("w1"), NodeState::BYPASSED);
     set_node_enabled(graph, "w1", true);
     spec.at("w1").enabled = true;
     run_and_check(graph, spec, 6, "in place, w1 enabled");
@@ -37,18 +37,17 @@ TEST_F(GraphResourcesTest, InPlaceVersions) {
     const auto set_required = [&](const bool required) {
         spec.at("w1").shape.required[2] = required;
         graph->find_node_for_identifier_and_type<PatternNode>("w1")->shape = spec.at("w1").shape;
-        graph->request_reconnect();
+        graph->restart_run();
     };
     set_required(true);
     run_and_check(graph, spec, 6, "in place, w1 errors");
     set_required(false);
     run_and_check(graph, spec, 6, "in place, w1 recovers");
 
-    const json stored = graph->store_to_json();
-    const GraphHandle restored = create_graph();
-    restored->load_from_json(stored);
+    const json stored = graph->to_description().to_json();
+    const GraphHandle restored = create_graph(stored);
     run_and_check(restored, spec, 6, "in place, restored");
-    EXPECT_EQ(restored->store_to_json().at("nodes"), stored.at("nodes"));
+    EXPECT_EQ(restored->to_description().to_json().at("nodes"), stored.at("nodes"));
 
     restored->remove_node("w1");
     spec.erase("w1");
@@ -82,13 +81,13 @@ TEST_F(GraphResourcesTest, ChainsUseTheResourceOfTheirRoot) {
     EXPECT_EQ(out.post_processed, iterations);
     EXPECT_TRUE(out.access.image_usage & vk::ImageUsageFlagBits::eSampled);
 
-    const GraphMemoryReport report = graph->get_memory_report();
+    const GraphMemoryReport report = graph->memory_get_report();
     const auto root = std::ranges::find_if(
-        report.placed, [](const auto& output) { return output.output.starts_with("a.out"); });
-    ASSERT_NE(root, report.placed.end());
+        report.transient, [](const auto& output) { return output.output.starts_with("a.out"); });
+    ASSERT_NE(root, report.transient.end());
     EXPECT_TRUE(root->lifetime.contains(report.layer_count - 1));
     EXPECT_FALSE(std::ranges::any_of(
-        report.placed, [](const auto& output) { return output.output.ends_with(".inp"); }));
+        report.transient, [](const auto& output) { return output.output.ends_with(".inp"); }));
 }
 
 TEST_F(GraphResourcesTest, WritersThatStopLatePassOn) {
@@ -186,7 +185,7 @@ TEST_F(GraphResourcesTest, WritersThatStopLatePassOn) {
     for (const std::string node : {"w3", "w4", "y", "w6", "f3"}) {
         EXPECT_FALSE(running.contains(node)) << node;
     }
-    EXPECT_EQ(graph->get_node_state("f3"), NodeState::FORCE_DISABLED);
+    EXPECT_EQ(graph->node_get_state("f3"), NodeState::FORCE_DISABLED);
 }
 
 TEST_F(GraphResourcesTest, WritersOfPlainSourcesThatStopLateStop) {
@@ -204,8 +203,8 @@ TEST_F(GraphResourcesTest, WritersOfPlainSourcesThatStopLateStop) {
 
     const GraphHandle graph = load(spec);
     run_and_check(graph, spec, 4, "stopped late");
-    EXPECT_EQ(graph->get_node_state("a"), NodeState::FORCE_DISABLED);
-    EXPECT_EQ(graph->get_node_state("w"), NodeState::FORCE_DISABLED);
+    EXPECT_EQ(graph->node_get_state("a"), NodeState::FORCE_DISABLED);
+    EXPECT_EQ(graph->node_get_state("w"), NodeState::FORCE_DISABLED);
 }
 
 TEST_F(GraphResourcesTest, DelayedReadsOfVersionsStayWired) {
@@ -236,7 +235,7 @@ TEST_F(GraphResourcesTest, InvalidInPlaceWritesError) {
         run_and_check(graph, spec, 4, phase);
         EXPECT_EQ(running_nodes(spec).rejected, errors) << phase;
         for (const auto& [identifier, node] : spec) {
-            EXPECT_EQ(graph->get_node_state(identifier),
+            EXPECT_EQ(graph->node_get_state(identifier),
                       errors.contains(identifier) ? NodeState::ERRORED : NodeState::OK)
                 << phase << ": " << identifier;
         }
@@ -299,8 +298,7 @@ TEST_F(GraphResourcesTest, InvalidInPlaceWritesError) {
 }
 
 TEST_F(GraphResourcesTest, PointersInPlace) {
-    const GraphHandle graph = create_graph();
-    graph->load_from_json(json::parse(R"({
+    const GraphHandle graph = create_graph(json::parse(R"({
         "version": 4,
         "nodes": {
             "s": {"type": "Int Source", "outputs": ["out->w.inp", "out->r0.in"]},
@@ -326,8 +324,7 @@ TEST_F(GraphResourcesTest, PointersInPlace) {
 }
 
 TEST_F(GraphResourcesTest, SourcesThatCannotBeWrittenInPlace) {
-    const GraphHandle graph = create_graph();
-    graph->load_from_json(json::parse(R"({
+    const GraphHandle graph = create_graph(json::parse(R"({
         "version": 4,
         "nodes": {
             "s": {"type": "Fixed Int Source", "outputs": ["out->w.inp"]},
@@ -340,15 +337,14 @@ TEST_F(GraphResourcesTest, SourcesThatCannotBeWrittenInPlace) {
         graph->run();
     }
     graph->wait();
-    EXPECT_EQ(graph->get_node_state("w"), NodeState::ERRORED);
+    EXPECT_EQ(graph->node_get_state("w"), NodeState::ERRORED);
     std::vector<int> expected(iterations);
     std::iota(expected.begin(), expected.end(), 0);
     EXPECT_EQ(graph->find_node_for_identifier_and_type<IntReader>("r")->values, expected);
 }
 
 TEST_F(GraphResourcesTest, CanvasesWrittenInPlace) {
-    const GraphHandle graph = create_graph();
-    graph->load_from_json(json::parse(R"({
+    const GraphHandle graph = create_graph(json::parse(R"({
         "version": 4,
         "nodes": {
             "a": {"type": "Pattern", "properties": {"id": 7}, "outputs": ["out->blit.src"]},
@@ -359,7 +355,7 @@ TEST_F(GraphResourcesTest, CanvasesWrittenInPlace) {
     })"));
     const auto check = [&](const uint32_t iterations, const bool gaps) {
         graph->find_node_for_identifier_and_type<CanvasSource>("canvas")->gaps = gaps;
-        graph->request_reconnect();
+        graph->restart_run();
         for (uint32_t i = 0; i < iterations; i++) {
             graph->run();
         }
@@ -377,5 +373,5 @@ TEST_F(GraphResourcesTest, CanvasesWrittenInPlace) {
     };
     check(4, false);
     check(5, true);
-    EXPECT_EQ(graph->get_node_state("blit"), NodeState::OK);
+    EXPECT_EQ(graph->node_get_state("blit"), NodeState::OK);
 }

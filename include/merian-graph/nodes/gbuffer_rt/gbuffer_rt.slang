@@ -11,9 +11,9 @@ import merian_shaders.utils.random;
 namespace merian {
 
 RWTexture2D<float4> emission;
-// 8-bit TLAS instance cull mask used by the primary ray query. Per-frame from the host.
 struct GBufferParams {
     uint instance_mask;
+    uint seed;
 };
 ConstantBuffer<GBufferParams> params;
 
@@ -128,7 +128,7 @@ SpecularChain specular_chain(const ParameterBlock<Scene> scene,
                              const ShadingPoint sp,
                              const uint2 pixel) {
     if (merian_gbuffer_specular_lobe == 0) {
-        RandomGenerator rng = XorShift32(pcg3d16(uint3(pixel, scene.frame)));
+        RandomGenerator rng = XorShift32(pcg3d16(uint3(pixel, scene.frame)) ^ params.seed);
         return trace_specular_chain(scene, instance_mask, ray, hit, sp, rng);
     }
     RandomGenerator rng = ConstantRandom(merian_gbuffer_specular_lobe == 1   ? 0.f

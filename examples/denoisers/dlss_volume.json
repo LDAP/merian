@@ -1,4 +1,9 @@
 {
+    "include": [
+        "../parts/dlss.json",
+        "../parts/volume.json",
+        "../parts/volume_scene.json"
+    ],
     "nodes": {
         "add": {
             "enabled": true,

@@ -100,7 +100,6 @@ GBufferDebugNode::on_connected(const NodeIOLayout& io_layout,
                     composition->reload(compile_context->get_search_path_file_loader());
                 }
             }
-            return true;
         });
 
     return {};

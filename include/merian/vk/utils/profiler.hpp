@@ -1,16 +1,45 @@
 #pragma once
 
-#include "merian/utils/properties.hpp"
 #include "merian/utils/stopwatch.hpp"
 #include "merian/vk/utils/query_pool.hpp"
 
+#include <array>
 #include <limits>
+#include <nlohmann/json.hpp>
 #include <optional>
+#include <string>
 
 namespace merian {
 
 class ProfileScope;
 class ProfileScopeGPU;
+
+struct ProfilerReport {
+    struct Entry {
+        std::string name;
+        double duration_ms;
+        double std_deviation_ms;
+        // set if the section did not run in the period: the time since it last ran
+        std::optional<double> last_seen_ms_ago;
+        std::vector<Entry> children;
+
+        std::string to_text() const;
+    };
+
+    std::vector<Entry> cpu;
+    std::vector<Entry> gpu;
+
+    bool empty() const;
+
+    double cpu_total_ms() const;
+    double cpu_total_std_deviation_ms() const;
+    double gpu_total_ms() const;
+    double gpu_total_std_deviation_ms() const;
+
+    std::string to_text() const;
+
+    nlohmann::json to_json() const;
+};
 
 /**
  * @brief      A profiler for CPU and GPU code.
@@ -20,19 +49,19 @@ class ProfileScopeGPU;
  *
  * Remember to export MERIAN_PROFILER_ENABLE if you want to use the profiler.
  *
+ * With a query pool per iteration in flight:
  *
- * while (True) {
- *     auto& frame_data = ring_fences->next_cycle_wait_and_get();
- *     // now the timestamps from iteration i - RING_SIZE are ready
-
- *     // collects the results of iteration i - RING_SIZE from the GPU
- *     // and resets the query pool
- *     profiler.set_query_pool(frame_data.query_pool);
- *     profiler.collect();
+ * while (true) {
+ *     auto& frame_data = ring_fences.next_cycle_wait_get();
+ *
+ *     // collects the timestamps of the iteration that used the query pool before and resets it
+ *     if (const auto report = profiler->set_collect_get_every(frame_data.query_pool, 1000)) {
+ *         SPDLOG_INFO("{}", report->to_text());
+ *     }
  *
  *     // use profiler...
  *
- *     queue.submit(... fence);
+ *     queue->submit(..., fence);
  * }
  *
  * Does not support overlapping sub-regions. Use two profilers in that case.
@@ -43,14 +72,30 @@ class ProfileScopeGPU;
  *
  */
 class Profiler : public std::enable_shared_from_this<Profiler> {
+  public:
+    // Accumulated independently: INTERVAL restarts with each report, TOTAL only with clear().
+    enum class Period : uint8_t {
+        INTERVAL,
+        TOTAL,
+    };
+
   private:
+    static constexpr std::size_t PERIOD_COUNT = 2;
+
     using chrono_clock = std::chrono::high_resolution_clock;
     friend ProfileScope;
     friend ProfileScopeGPU;
 
+    struct Accumulator {
+        uint32_t num_captures{0};
+        uint64_t sum_duration_ns{0};
+        double sq_sum_duration_ns{0};
+
+        void add(const uint64_t duration_ns);
+    };
+
     struct CPUSection {
         chrono_clock::time_point start;
-        chrono_clock::time_point end;
         chrono_clock::time_point last_seen{};
 
         std::size_t parent_index;
@@ -58,9 +103,7 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
         std::vector<std::pair<std::string, uint32_t>> children;
         uint32_t child_cursor{0};
 
-        uint32_t num_captures{0};
-        uint64_t sum_duration_ns{0};
-        uint64_t sq_sum_duration_ns{0};
+        std::array<Accumulator, PERIOD_COUNT> periods;
     };
 
     struct GPUSection {
@@ -73,64 +116,7 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
         std::vector<std::pair<std::string, uint32_t>> children;
         uint32_t child_cursor{0};
 
-        uint32_t num_captures{0};
-        uint64_t sum_duration_ns{0};
-        uint64_t sq_sum_duration_ns{0};
-    };
-
-  public:
-    struct ReportEntry {
-        std::string name;
-        // in ms
-        double duration;
-        // in ms
-        double std_deviation;
-        // set if no captures landed in the last report window; value is ms since last_seen.
-        std::optional<double> last_seen_ms_ago;
-        std::vector<ReportEntry> children;
-    };
-
-    struct Report {
-        std::vector<ReportEntry> cpu_report;
-        std::vector<ReportEntry> gpu_report;
-
-        double cpu_total_std_deviation() const {
-            if (cpu_report.empty()) {
-                return 0;
-            }
-            return std::sqrt(std::transform_reduce(
-                cpu_report.begin(), cpu_report.end(), 0.0, std::plus{},
-                [](const auto& v) { return v.std_deviation * v.std_deviation; }));
-        }
-
-        double cpu_total() const {
-            if (cpu_report.empty()) {
-                return 0;
-            }
-            return std::transform_reduce(cpu_report.begin(), cpu_report.end(), 0.0, std::plus{},
-                                         [](const auto& v) { return v.duration; });
-        }
-
-        double gpu_total_std_deviation() const {
-            if (gpu_report.empty()) {
-                return 0;
-            }
-            return std::sqrt(std::transform_reduce(
-                gpu_report.begin(), gpu_report.end(), 0.0, std::plus{},
-                [](const auto& v) { return v.std_deviation * v.std_deviation; }));
-        }
-
-        double gpu_total() const {
-            if (gpu_report.empty()) {
-                return 0;
-            }
-            return std::transform_reduce(gpu_report.begin(), gpu_report.end(), 0.0, std::plus{},
-                                         [](const auto& v) { return v.duration; });
-        }
-
-        operator bool() const {
-            return !cpu_report.empty() || !gpu_report.empty();
-        }
+        std::array<Accumulator, PERIOD_COUNT> periods;
     };
 
   public:
@@ -138,10 +124,10 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
 
     ~Profiler();
 
-    // Clears the per-window accumulators on every section. Children whose section has not been
-    // seen within evict_after_ms are dropped from their parent's children map; the default
-    // keeps the tree forever.
-    void clear(uint32_t evict_after_ms = std::numeric_limits<uint32_t>::max());
+    // Restarts the period. Sections not seen within evict_after_ms are dropped unless they hold
+    // data of the total period; the default keeps the tree forever.
+    void clear(const Period period,
+               const uint32_t evict_after_ms = std::numeric_limits<uint32_t>::max());
 
     void set_query_pool(const QueryPoolHandle<vk::QueryType::eTimestamp>& query_pool);
 
@@ -165,7 +151,10 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
     // Stop a CPU section
     void end();
 
-    Report get_report();
+    // Sections that did not run in the period are reported for keep_stale_ms after they last ran.
+    ProfilerReport
+    get_report(const Period period,
+               const uint32_t keep_stale_ms = std::numeric_limits<uint32_t>::max()) const;
 
     // Convenience method that sets the next query pool, collects the results then resets query pool
     // (for GPU profiling).
@@ -176,22 +165,14 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
     // Note: The profiler is only reset when the GPU results are actually ready, however, that means
     // that the may be already multiple results for the CPU (noticeable when report_intervall_millis
     // == 0).
-    std::optional<Report>
+    std::optional<ProfilerReport>
     set_collect_get_every(const QueryPoolHandle<vk::QueryType::eTimestamp>& query_pool,
                           const uint32_t report_intervall_millis = 0,
                           const uint32_t evict_after_ms = std::numeric_limits<uint32_t>::max());
 
-    // returns the report as string
-    static std::string get_report_str(const Profiler::Report& report);
-
-    // outputs the report as config
-    static void get_cpu_report_as_config(Properties& config, const Profiler::Report& report);
-    static void get_gpu_report_as_config(Properties& config, const Profiler::Report& report);
-
-    // outputs the report as config
-    static void get_report_as_config(Properties& config, const Profiler::Report& report);
-
   private:
+    template <typename SectionType> void reset_stale_periods(SectionType& section) const;
+
     // Resolves or inserts `name` as a child of sections[parent_idx]; new children land at
     // the parent's child_cursor so insertion order tracks execution order.
     template <typename SectionType>
@@ -200,7 +181,6 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
                             const std::string& name,
                             uint32_t& current_idx);
 
-    const ContextHandle context;
     const float timestamp_period;
 
     QueryPoolHandle<vk::QueryType::eTimestamp> query_pool;
@@ -214,10 +194,15 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
     std::vector<CPUSection> cpu_sections;
     std::vector<GPUSection> gpu_sections;
 
-    // Set in clear(); a section is fresh this period iff last_seen >= last_clear_time.
-    chrono_clock::time_point last_clear_time;
+    // A section is fresh in a period iff last_seen >= the period's start.
+    std::array<chrono_clock::time_point, PERIOD_COUNT> period_start;
 
-    std::unordered_map<QueryPoolHandle<vk::QueryType::eTimestamp>, std::vector<uint32_t>>
+    struct PendingSection {
+        uint32_t section;
+        // periods that started later get no result
+        chrono_clock::time_point recorded;
+    };
+    std::unordered_map<QueryPoolHandle<vk::QueryType::eTimestamp>, std::vector<PendingSection>>
         pending_gpu_sections;
 };
 using ProfilerHandle = std::shared_ptr<Profiler>;

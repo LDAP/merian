@@ -61,6 +61,8 @@ class LightCollection {
     // Binds the buffers to a merian::NEE cursor.
     void write_to(ShaderCursor cursor) const;
 
+    void clear_learned_state();
+
     void properties(Properties& props);
 
     uint32_t get_triangle_count() const {
@@ -221,6 +223,8 @@ class LightCollection {
     BufferHandle tree_cdf_state_buffer;
     BufferHandle tree_guide_buffer;
     BufferHandle tree_info_buffer[2];
+    // zeroed in the next update
+    bool tree_info_fresh = false;
     BufferHandle setup_state_buffer;
     BufferHandle sort_state_buffer;
     BufferHandle grid_keys_buffer[2];

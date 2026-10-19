@@ -239,9 +239,8 @@ class GraphConnectionsTest : public GraphTest {
 
     using GraphTest::create_graph;
 
-    static GraphHandle create_graph(const std::string& description) {
-        const GraphHandle graph = create_graph();
-        graph->load_from_json(json::parse(description));
+    static GraphHandle create_graph(const json& description) {
+        const GraphHandle graph = GraphTest::create_graph(description);
         run(graph);
         return graph;
     }
@@ -250,13 +249,13 @@ class GraphConnectionsTest : public GraphTest {
 } // namespace
 
 TEST_F(GraphConnectionsTest, AutoConnectionsAreConnected) {
-    const GraphHandle graph = create_graph(R"({
+    const GraphHandle graph = create_graph(json::parse(R"({
         "version": 4,
         "nodes": {
             "a": {"type": "Feedback Test", "outputs": ["out->f.src"]},
             "f": {"type": "Feedback Test"}
         }
-    })");
+    })"));
 
     EXPECT_TRUE(has_connection(graph, "a", "out->a.prev"));
     EXPECT_TRUE(has_connection(graph, "f", "out->f.prev"));
@@ -266,27 +265,27 @@ TEST_F(GraphConnectionsTest, AutoConnectionsAreConnected) {
 }
 
 TEST_F(GraphConnectionsTest, ChainedAutoConnectionsAreConnected) {
-    const GraphHandle graph = create_graph(R"({
+    const GraphHandle graph = create_graph(json::parse(R"({
         "version": 4,
         "nodes": {
             "a": {"type": "Feedback Test", "outputs": ["out->n.src"]},
             "n": {"type": "Auto Connect Chain Test"}
         }
-    })");
+    })"));
 
     EXPECT_TRUE(has_connection(graph, "a", "out->n.earlier"));
     EXPECT_TRUE(has_connection(graph, "a", "out->n.later"));
 }
 
 TEST_F(GraphConnectionsTest, ChainedAutoConnectionsFollowRewiredInput) {
-    const GraphHandle graph = create_graph(R"({
+    const GraphHandle graph = create_graph(json::parse(R"({
         "version": 4,
         "nodes": {
             "a": {"type": "Feedback Test", "outputs": ["out->n.src"]},
             "c": {"type": "Feedback Test"},
             "n": {"type": "Auto Connect Chain Test"}
         }
-    })");
+    })"));
     ASSERT_TRUE(has_connection(graph, "a", "out->n.later"));
 
     graph->add_connection("c", "n", "out", "src");
@@ -296,54 +295,53 @@ TEST_F(GraphConnectionsTest, ChainedAutoConnectionsFollowRewiredInput) {
 }
 
 TEST_F(GraphConnectionsTest, ExplicitWiringWins) {
-    const GraphHandle graph = create_graph(R"({
+    const GraphHandle graph = create_graph(json::parse(R"({
         "version": 4,
         "nodes": {
             "a": {"type": "Feedback Test", "outputs": ["out->f.src", "out->f.prev"]},
             "f": {"type": "Feedback Test"}
         }
-    })");
+    })"));
 
     EXPECT_TRUE(has_connection(graph, "a", "out->f.prev"));
     EXPECT_FALSE(has_connection(graph, "f", "out->f.prev"));
 }
 
 TEST_F(GraphConnectionsTest, RemovedAutoConnectionStaysRemoved) {
-    const GraphHandle graph = create_graph(R"({
+    const GraphHandle graph = create_graph(json::parse(R"({
         "version": 4,
         "nodes": {"f": {"type": "Feedback Test"}}
-    })");
+    })"));
     ASSERT_TRUE(has_connection(graph, "f", "out->f.prev"));
 
     graph->remove_connection("f", "f", "prev");
     run(graph);
-    graph->request_reconnect();
+    graph->restart_run();
     run(graph);
     EXPECT_FALSE(has_connection(graph, "f", "out->f.prev"));
 
-    const GraphHandle restored = create_graph();
-    restored->load_from_json(graph->store_to_json());
+    const GraphHandle restored = create_graph(graph->to_description());
     run(restored);
     EXPECT_TRUE(has_connection(restored, "f", "out->f.prev"));
 }
 
 TEST_F(GraphConnectionsTest, AutoConnectionWithoutOutputErrors) {
-    const GraphHandle graph = create_graph(R"({
+    const GraphHandle graph = create_graph(json::parse(R"({
         "version": 4,
         "nodes": {"m": {"type": "Missing Feedback Test"}}
-    })");
-    graph->request_reconnect();
+    })"));
+    graph->restart_run();
     run(graph);
 
     EXPECT_FALSE(has_connection(graph, "m", "missing->m.prev"));
-    EXPECT_EQ(graph->get_node_state("m"), NodeState::ERRORED);
+    EXPECT_EQ(graph->node_get_state("m"), NodeState::ERRORED);
 }
 
 TEST_F(GraphConnectionsTest, HistoryFollowsItsInputOnceConnected) {
-    const GraphHandle graph = create_graph(R"({
+    const GraphHandle graph = create_graph(json::parse(R"({
         "version": 4,
         "nodes": {"a": {"type": "Feedback Test"}, "f": {"type": "Feedback Test"}}
-    })");
+    })"));
     EXPECT_FALSE(has_connection(graph, "a", "out->f.hist"));
 
     graph->add_connection("a", "f", "out", "src");
@@ -352,7 +350,7 @@ TEST_F(GraphConnectionsTest, HistoryFollowsItsInputOnceConnected) {
 }
 
 TEST_F(GraphConnectionsTest, HistoryFollowsRewiredInput) {
-    const GraphHandle graph = create_graph(R"({
+    const GraphHandle graph = create_graph(json::parse(R"({
         "version": 4,
         "nodes": {
             "a": {"type": "Feedback Test", "outputs": ["out->f.src"]},
@@ -360,7 +358,7 @@ TEST_F(GraphConnectionsTest, HistoryFollowsRewiredInput) {
             "d": {"type": "Feedback Test"},
             "f": {"type": "Feedback Test"}
         }
-    })");
+    })"));
     ASSERT_TRUE(has_connection(graph, "a", "out->f.hist"));
 
     graph->add_connection("c", "f", "out", "src");
@@ -374,7 +372,7 @@ TEST_F(GraphConnectionsTest, HistoryFollowsRewiredInput) {
 }
 
 TEST_F(GraphConnectionsTest, HistoryFollowsRemovedAndConnectedInput) {
-    const GraphHandle graph = create_graph(R"({
+    const GraphHandle graph = create_graph(json::parse(R"({
         "version": 4,
         "nodes": {
             "a": {"type": "Feedback Test", "outputs": ["out->f.src"]},
@@ -382,7 +380,7 @@ TEST_F(GraphConnectionsTest, HistoryFollowsRemovedAndConnectedInput) {
             "d": {"type": "Feedback Test"},
             "f": {"type": "Feedback Test"}
         }
-    })");
+    })"));
     ASSERT_TRUE(has_connection(graph, "a", "out->f.hist"));
 
     graph->remove_connection("a", "f", "src");
@@ -401,7 +399,7 @@ TEST_F(GraphConnectionsTest, HistoryFollowsRemovedAndConnectedInput) {
 }
 
 TEST_F(GraphConnectionsTest, RejectedHistoryFollowsNewSource) {
-    const GraphHandle graph = create_graph(R"({
+    const GraphHandle graph = create_graph(json::parse(R"({
         "version": 4,
         "nodes": {
             "p": {"type": "Persistent Test", "outputs": ["out->f.src"]},
@@ -409,10 +407,10 @@ TEST_F(GraphConnectionsTest, RejectedHistoryFollowsNewSource) {
             "d": {"type": "Feedback Test"},
             "f": {"type": "Feedback Test"}
         }
-    })");
+    })"));
     EXPECT_TRUE(has_connection(graph, "p", "out->f.src"));
     EXPECT_FALSE(has_connection(graph, "p", "out->f.hist"));
-    EXPECT_EQ(graph->get_node_state("f"), NodeState::OK);
+    EXPECT_EQ(graph->node_get_state("f"), NodeState::OK);
 
     graph->add_connection("c", "f", "out", "src");
     run(graph);
@@ -426,14 +424,14 @@ TEST_F(GraphConnectionsTest, RejectedHistoryFollowsNewSource) {
 }
 
 TEST_F(GraphConnectionsTest, HistoryReconnectsAfterSourceRemoval) {
-    const GraphHandle graph = create_graph(R"({
+    const GraphHandle graph = create_graph(json::parse(R"({
         "version": 4,
         "nodes": {
             "a": {"type": "Feedback Test", "outputs": ["out->f.src"]},
             "c": {"type": "Feedback Test"},
             "f": {"type": "Feedback Test"}
         }
-    })");
+    })"));
     graph->remove_node("a");
     run(graph);
 
@@ -443,7 +441,7 @@ TEST_F(GraphConnectionsTest, HistoryReconnectsAfterSourceRemoval) {
 }
 
 TEST_F(GraphConnectionsTest, DisabledNodesPassThrough) {
-    const GraphHandle graph = create_graph(R"({
+    const GraphHandle graph = create_graph(json::parse(R"({
         "version": 4,
         "nodes": {
             "a": {"type": "Feedback Test", "outputs": ["out->f.src"]},
@@ -451,58 +449,58 @@ TEST_F(GraphConnectionsTest, DisabledNodesPassThrough) {
             "g": {"type": "Feedback Test", "enabled": false, "outputs": ["out->b.src"]},
             "b": {"type": "Feedback Test"}
         }
-    })");
+    })"));
 
     const UIProperties props = draw(graph);
-    EXPECT_EQ(graph->get_node_state("f"), NodeState::BYPASSED);
-    EXPECT_EQ(graph->get_node_state("g"), NodeState::BYPASSED);
-    EXPECT_EQ(graph->get_node_state("b"), NodeState::OK);
+    EXPECT_EQ(graph->node_get_state("f"), NodeState::BYPASSED);
+    EXPECT_EQ(graph->node_get_state("g"), NodeState::BYPASSED);
+    EXPECT_EQ(graph->node_get_state("b"), NodeState::OK);
     EXPECT_TRUE(props.shows_text("Receiving from: out, a (Feedback Test)", {"b", "src"}));
     EXPECT_TRUE(has_connection(graph, "g", "out->b.src"));
 }
 
 TEST_F(GraphConnectionsTest, UnsupportedNodesDoNotPassThrough) {
-    const GraphHandle graph = create_graph(R"({
+    const GraphHandle graph = create_graph(json::parse(R"({
         "version": 4,
         "nodes": {
             "a": {"type": "Feedback Test", "outputs": ["out->u.src"]},
             "u": {"type": "Unsupported Test", "outputs": ["out->r.src"]},
             "r": {"type": "Required Test"}
         }
-    })");
+    })"));
 
-    EXPECT_EQ(graph->get_node_state("u"), NodeState::UNSUPPORTED);
-    EXPECT_EQ(graph->get_node_state("r"), NodeState::FORCE_DISABLED);
+    EXPECT_EQ(graph->node_get_state("u"), NodeState::UNSUPPORTED);
+    EXPECT_EQ(graph->node_get_state("r"), NodeState::FORCE_DISABLED);
 }
 
 TEST_F(GraphConnectionsTest, UnsupportedWritersPassTheirVersionOn) {
-    const GraphHandle graph = create_graph(R"({
+    const GraphHandle graph = create_graph(json::parse(R"({
         "version": 4,
         "nodes": {
             "a": {"type": "Feedback Test", "outputs": ["out->u.canvas"]},
             "u": {"type": "Unsupported Writer Test", "outputs": ["canvas->r.src"]},
             "r": {"type": "Required Test"}
         }
-    })");
+    })"));
 
-    EXPECT_EQ(graph->get_node_state("u"), NodeState::UNSUPPORTED);
-    EXPECT_EQ(graph->get_node_state("r"), NodeState::OK);
+    EXPECT_EQ(graph->node_get_state("u"), NodeState::UNSUPPORTED);
+    EXPECT_EQ(graph->node_get_state("r"), NodeState::OK);
 }
 
 TEST_F(GraphConnectionsTest, InPlaceDeclarationsError) {
     for (const std::string mode : {"delayed", "read only", "passing", "passed onto", "named twice",
                                    "history of it", "auto connection cycle", "same resource twice",
                                    "output named like it", "connector error"}) {
-        const GraphHandle graph = create_graph(fmt::format(R"({{
+        const GraphHandle graph = create_graph(json::parse(fmt::format(R"({{
             "version": 4,
             "nodes": {{
                 "a": {{"type": "Feedback Test", "outputs": ["out->d.canvas", "out->d.src"]}},
                 "d": {{"type": "Declaration Test", "properties": {{"mode": "{}"}}}}
             }}
         }})",
-                                                           mode));
+                                                                       mode)));
         const UIProperties props = draw(graph);
-        EXPECT_EQ(graph->get_node_state("d"), NodeState::ERRORED) << mode;
+        EXPECT_EQ(graph->node_get_state("d"), NodeState::ERRORED) << mode;
         if (mode == std::string{"history of it"}) {
             EXPECT_TRUE(props.shows_text("invalid auto connection")) << mode;
         }
@@ -516,34 +514,33 @@ TEST_F(GraphConnectionsTest, InPlaceDeclarationsError) {
 }
 
 TEST_F(GraphConnectionsTest, WiringOfDisabledNodesIsChecked) {
-    const GraphHandle graph = create_graph(R"({
+    const GraphHandle graph = create_graph(json::parse(R"({
         "version": 4,
         "nodes": {
             "a": {"type": "Feedback Test", "outputs": ["missing->f.hist"]},
             "f": {"type": "Feedback Test", "enabled": false, "outputs": ["out->f.src"]}
         }
-    })");
+    })"));
 
-    EXPECT_EQ(stored_connections(graph->store_to_json()),
-              (std::set<std::string>{"a.out->a.prev", "f.out->f.prev"}));
-    EXPECT_EQ(graph->get_node_state("f"), NodeState::DISABLED);
+    EXPECT_EQ(stored_connections(graph), (std::set<std::string>{"a.out->a.prev", "f.out->f.prev"}));
+    EXPECT_EQ(graph->node_get_state("f"), NodeState::DISABLED);
 }
 
 TEST_F(GraphConnectionsTest, DisabledNodeWithoutSourceIsNotBypassed) {
-    const GraphHandle graph = create_graph(R"({
+    const GraphHandle graph = create_graph(json::parse(R"({
         "version": 4,
         "nodes": {
             "f": {"type": "Feedback Test", "enabled": false, "outputs": ["out->b.src"]},
             "b": {"type": "Feedback Test"}
         }
-    })");
+    })"));
 
-    EXPECT_EQ(graph->get_node_state("f"), NodeState::DISABLED);
-    EXPECT_EQ(graph->get_node_state("b"), NodeState::OK);
+    EXPECT_EQ(graph->node_get_state("f"), NodeState::DISABLED);
+    EXPECT_EQ(graph->node_get_state("b"), NodeState::OK);
 }
 
 TEST_F(GraphConnectionsTest, InvalidResolvedConnectionsKeepWiring) {
-    const GraphHandle graph = create_graph(R"({
+    const GraphHandle graph = create_graph(json::parse(R"({
         "version": 4,
         "nodes": {
             "x": {"type": "Buffer Test", "outputs": ["buf->f.src"]},
@@ -553,54 +550,54 @@ TEST_F(GraphConnectionsTest, InvalidResolvedConnectionsKeepWiring) {
             "r2": {"type": "Required Test"},
             "b": {"type": "Feedback Test"}
         }
-    })");
-    graph->request_reconnect();
+    })"));
+    graph->restart_run();
     run(graph);
 
-    EXPECT_EQ(graph->get_node_state("r1"), NodeState::ERRORED);
-    EXPECT_EQ(graph->get_node_state("r2"), NodeState::ERRORED);
-    EXPECT_EQ(graph->get_node_state("b"), NodeState::OK);
+    EXPECT_EQ(graph->node_get_state("r1"), NodeState::ERRORED);
+    EXPECT_EQ(graph->node_get_state("r2"), NodeState::ERRORED);
+    EXPECT_EQ(graph->node_get_state("b"), NodeState::OK);
     EXPECT_TRUE(has_connection(graph, "f", "out->r1.src"));
     EXPECT_TRUE(has_connection(graph, "f", "out->r2.src"));
     EXPECT_TRUE(has_connection(graph, "f", "out->b.src"));
 }
 
 TEST_F(GraphConnectionsTest, InvalidDirectConnectionIsRemoved) {
-    const GraphHandle graph = create_graph(R"({
+    const GraphHandle graph = create_graph(json::parse(R"({
         "version": 4,
         "nodes": {
             "x": {"type": "Buffer Test", "outputs": ["buf->b.src"]},
             "b": {"type": "Feedback Test"}
         }
-    })");
+    })"));
 
     EXPECT_FALSE(has_connection(graph, "x", "buf->b.src"));
-    EXPECT_EQ(graph->get_node_state("b"), NodeState::OK);
+    EXPECT_EQ(graph->node_get_state("b"), NodeState::OK);
 }
 
 TEST_F(GraphConnectionsTest, DelayedReadThroughBypassOfPersistentOutputErrors) {
-    const GraphHandle graph = create_graph(R"({
+    const GraphHandle graph = create_graph(json::parse(R"({
         "version": 4,
         "nodes": {
             "color": {"type": "Color", "outputs": ["out->f.src"]},
             "f": {"type": "Feedback Test", "enabled": false, "outputs": ["out->r.prev"]},
             "r": {"type": "Missing Feedback Test"}
         }
-    })");
+    })"));
 
-    EXPECT_EQ(graph->get_node_state("r"), NodeState::ERRORED);
+    EXPECT_EQ(graph->node_get_state("r"), NodeState::ERRORED);
     EXPECT_TRUE(has_connection(graph, "f", "out->r.prev"));
 }
 
 TEST_F(GraphConnectionsTest, UndelayedCycleErrors) {
-    const GraphHandle graph = create_graph(R"({
+    const GraphHandle graph = create_graph(json::parse(R"({
         "version": 4,
         "nodes": {
             "x": {"type": "Feedback Test", "outputs": ["out->y.src"]},
             "y": {"type": "Feedback Test", "outputs": ["out->x.src"]}
         }
-    })");
+    })"));
 
-    EXPECT_EQ(graph->get_node_state("x"), NodeState::ERRORED);
-    EXPECT_EQ(graph->get_node_state("y"), NodeState::ERRORED);
+    EXPECT_EQ(graph->node_get_state("x"), NodeState::ERRORED);
+    EXPECT_EQ(graph->node_get_state("y"), NodeState::ERRORED);
 }

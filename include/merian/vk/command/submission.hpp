@@ -5,35 +5,36 @@
 #include "merian/vk/command/queue.hpp"
 #include "merian/vk/sync/semaphore_binary.hpp"
 #include "merian/vk/sync/semaphore_timeline.hpp"
-#include "merian/vk/utils/cpu_queue.hpp"
 
+#include <deque>
 #include <functional>
 #include <memory>
+#include <optional>
 
 namespace merian {
 
 class Submission;
 using SubmissionHandle = std::shared_ptr<Submission>;
 
-// A chain of queue submissions being assembled: commands, wait/signal semaphores and
-// submit-time callbacks. Owns its (caching) command pool.
+// A chain of queue submissions being assembled: commands, wait/signal semaphores, submit-time and
+// host callbacks. Owns its (caching) command pool.
 class Submission {
   public:
-    Submission(const ContextHandle& context,
-               const QueueHandle& queue,
-               const CPUQueueHandle& cpu_queue)
-        : queue(queue), cpu_queue(cpu_queue),
-          pool(std::make_shared<CachingCommandPool>(CommandPool::create(queue))),
+    // IN_ORDER callbacks run in order on the thread that runs the callbacks; ASYNC ones are handed
+    // to an AsyncRunner and run concurrently with it.
+    enum class CallbackMode : uint8_t { IN_ORDER, ASYNC };
+    using AsyncRunner = std::function<void(std::function<void()>&& callback)>;
+
+    Submission(const ContextHandle& context, const QueueHandle& queue)
+        : queue(queue), pool(std::make_shared<CachingCommandPool>(CommandPool::create(queue))),
           cpu_sync_semaphore(TimelineSemaphore::create(context)) {}
 
     Submission(const Submission&) = delete;
     Submission& operator=(const Submission&) = delete;
 
-    // Caller guarantees that the GPU finished all work submitted from this Submission.
-    void reset() {
-        assert(!cmd && "reset() with recording in progress");
-        pool->reset();
-    }
+    // Caller guarantees that the GPU finished all work submitted from this Submission. Runs the
+    // remaining host callbacks.
+    void reset(const AsyncRunner& run_async = {});
 
     const QueueHandle& get_queue() const noexcept {
         return queue;
@@ -91,7 +92,7 @@ class Submission {
         signal_values.push_back(value);
     }
 
-    // Called after every submit of this Submission.
+    // Called after finish() submitted.
     void add_submit_callback(const std::function<void(const QueueHandle& queue,
                                                       Submission& submission)>& callback) noexcept {
         submit_callbacks.push_back(callback);
@@ -105,69 +106,61 @@ class Submission {
 
     // ------------------------------------------------------------------------------------
 
-    // Queues the callback to be called when the commands recorded until this point have finished
-    // executing on the GPU. The execution of the callback may be delayed until after finish().
-    void sync_to_cpu(const std::function<void()>& callback) {
-        add_signal_semaphore(cpu_sync_semaphore, cpu_sync_value);
-        cpu_queue->submit(cpu_sync_semaphore, cpu_sync_value, callback);
-        cpu_sync_value++;
-    }
+    // Runs callback on the host once the commands recorded so far have finished, from
+    // run_finished_callbacks() or reset() on the thread that calls them. A callback must not wait
+    // for the GPU.
+    void sync_to_cpu(std::function<void()> callback,
+                     const CallbackMode mode = CallbackMode::IN_ORDER);
 
-    // Queues the callback to be called when the commands recorded until this point have finished
-    // executing on the GPU; GPU processing continues when the callback returns. Submits the
-    // recording so far.
+    // As sync_to_cpu; the commands recorded afterwards wait until callback returned. Submits the
+    // recording so far. Whoever waits for later work on the queue must run the callbacks meanwhile.
     //
     // Note: This must not be used if a present operation depends on the CPU execution.
-    void sync_to_cpu_and_back(const std::function<void()>& callback) {
-        add_signal_semaphore(cpu_sync_semaphore, cpu_sync_value);
-        submit();
-        cpu_queue->submit(cpu_sync_semaphore, cpu_sync_value, cpu_sync_semaphore,
-                          cpu_sync_value + 1, callback);
-        add_wait_semaphore(cpu_sync_semaphore, vk::PipelineStageFlagBits::eTopOfPipe,
-                           cpu_sync_value + 1);
-        cpu_sync_value += 2;
-    }
+    void sync_to_cpu_and_back(std::function<void()> callback);
+
+    // Runs, in order, the callbacks whose commands have finished, without waiting. ASYNC callbacks
+    // go to run_async, without it they run in order as well.
+    void run_finished_callbacks(const AsyncRunner& run_async = {});
+
+    // Runs the callbacks of the submitted commands, waiting for each.
+    void run_submitted_callbacks(const AsyncRunner& run_async = {});
+
+    // The semaphore value the next pending callback waits for, if a submitted one is pending.
+    std::optional<std::pair<TimelineSemaphoreHandle, uint64_t>> next_callback_wait() const;
+
+    // Whether submitted commands wait for a callback of sync_to_cpu_and_back that has not run.
+    bool waits_for_host() const;
 
     // ------------------------------------------------------------------------------------
 
-    // Submits the recording so far with the accumulated semaphores; recording then continues on
-    // a fresh command buffer.
-    void submit(const vk::Fence& fence = VK_NULL_HANDLE) {
-        get_cmd()->end();
-        queue->submit(cmd, fence, signal_semaphores, wait_semaphores, wait_stages,
-                      vk::TimelineSemaphoreSubmitInfo{wait_values, signal_values});
-        cmd.reset();
+    // Submits the recording so far with the accumulated wait semaphores; recording continues on a
+    // fresh command buffer, which the reference get_cmd() returned then holds. The signal
+    // semaphores wait for finish().
+    void submit();
 
-        for (const auto& callback : submit_callbacks) {
-            callback(queue, *this);
-        }
-
-        wait_semaphores.clear();
-        wait_stages.clear();
-        wait_values.clear();
-        signal_semaphores.clear();
-        signal_values.clear();
-        submit_callbacks.clear();
-    }
-
-    // Runs the pre-submit callbacks and submits the final batch.
-    void finish(const vk::Fence& fence = VK_NULL_HANDLE) {
-        for (const auto& callback : pre_submit_callbacks) {
-            callback(*this);
-        }
-        pre_submit_callbacks.clear();
-        submit(fence);
-    }
+    // Runs the pre-submit callbacks and submits the final batch with the signal semaphores.
+    void finish();
 
   private:
+    void submit_recording(const bool last);
+
+    struct Callback {
+        uint64_t value;
+        std::function<void()> function;
+        CallbackMode mode;
+        bool signal_back;
+    };
+
     const QueueHandle queue;
-    const CPUQueueHandle cpu_queue;
     const std::shared_ptr<CachingCommandPool> pool;
 
     CommandBufferHandle cmd = nullptr;
 
-    TimelineSemaphoreHandle cpu_sync_semaphore;
-    uint64_t cpu_sync_value = 1;
+    const TimelineSemaphoreHandle cpu_sync_semaphore;
+    uint64_t last_cpu_sync_value = 0;
+    bool cpu_sync_signal_pending = false;
+    uint64_t submitted_cpu_sync_value = 0;
+    std::deque<Callback> callbacks;
 
     std::vector<vk::Semaphore> wait_semaphores;
     std::vector<uint64_t> wait_values;

@@ -1,8 +1,55 @@
 #pragma once
 #include <cstdint>
 #include <functional>
+#include <string_view>
 
 namespace merian {
+
+//---- Stable 32-bit hashes, equal to those of merian_shaders.utils.hash ----
+// [Jarzynski and Olano 2020, Hash Functions for GPU Rendering]
+namespace detail {
+constexpr uint32_t XXHASH_PRIME32_2 = 2246822519u;
+constexpr uint32_t XXHASH_PRIME32_3 = 3266489917u;
+constexpr uint32_t XXHASH_PRIME32_4 = 668265263u;
+constexpr uint32_t XXHASH_PRIME32_5 = 374761393u;
+
+constexpr uint32_t rotl32(const uint32_t v, const int r) {
+    return (v << r) | (v >> (32 - r));
+}
+
+constexpr uint32_t xxhash32_avalanche(uint32_t h32) {
+    h32 = XXHASH_PRIME32_2 * (h32 ^ (h32 >> 15));
+    h32 = XXHASH_PRIME32_3 * (h32 ^ (h32 >> 13));
+    return h32 ^ (h32 >> 16);
+}
+} // namespace detail
+
+constexpr uint32_t xxhash32(const uint32_t p) {
+    using namespace detail;
+    return xxhash32_avalanche(XXHASH_PRIME32_4 * rotl32(p + XXHASH_PRIME32_5, 17));
+}
+
+constexpr uint32_t xxhash32(const uint32_t x, const uint32_t y) {
+    using namespace detail;
+    return xxhash32_avalanche(XXHASH_PRIME32_4 *
+                              rotl32(y + XXHASH_PRIME32_5 + x * XXHASH_PRIME32_3, 17));
+}
+
+constexpr uint32_t xxhash32(const uint32_t x, const uint32_t y, const uint32_t z) {
+    using namespace detail;
+    uint32_t h32 = XXHASH_PRIME32_4 * rotl32(z + XXHASH_PRIME32_5 + x * XXHASH_PRIME32_3, 17);
+    h32 += y * XXHASH_PRIME32_3;
+    return xxhash32_avalanche(XXHASH_PRIME32_4 * rotl32(h32, 17));
+}
+
+constexpr uint32_t fnv1a32(const std::string_view bytes) {
+    uint32_t h32 = 2166136261u;
+    for (const char byte : bytes) {
+        h32 = (h32 ^ static_cast<uint8_t>(byte)) * 16777619u;
+    }
+    return h32;
+}
+//--------------
 
 //---- Hash Combination ----
 // http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2014/n3876.pdf
@@ -10,7 +57,8 @@ template <typename T> void hash_combine(std::size_t& seed, const T& val) {
     seed ^= std::hash<T>()(val) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
 }
 // Auxiliary generic functions to create a hash value using a seed
-template <typename T, typename... Types> void hash_combine(std::size_t& seed, const T& val, const Types&... args) {
+template <typename T, typename... Types>
+void hash_combine(std::size_t& seed, const T& val, const Types&... args) {
     hash_combine(seed, val);
     hash_combine(seed, args...);
 }

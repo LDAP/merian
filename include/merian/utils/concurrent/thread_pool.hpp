@@ -12,9 +12,9 @@ namespace merian {
 
 class ThreadPool {
   public:
-    // concurrency sets the number of threads. queue_size controls the size of the task queue.
-    // While the task queue is full, submit blocks.
-    ThreadPool(const uint32_t concurrency = std::thread::hardware_concurrency());
+    // submit blocks while queue_capacity tasks wait.
+    ThreadPool(const uint32_t concurrency = std::thread::hardware_concurrency(),
+               const uint64_t queue_capacity = UINT64_MAX);
 
     ~ThreadPool();
 
@@ -39,7 +39,7 @@ class ThreadPool {
         std::shared_ptr<std::packaged_task<T()>> task =
             std::make_shared<std::packaged_task<T()>>(function);
         std::future<T> future = task->get_future();
-        tasks.push([task] { (*task)(); });
+        tasks.push([task] { (*task)(); }, queue_capacity);
         return future;
     }
 
@@ -47,7 +47,7 @@ class ThreadPool {
         std::shared_ptr<std::packaged_task<T()>> task =
             std::make_shared<std::packaged_task<T()>>(function);
         std::future<T> future = task->get_future();
-        tasks.push([task] { (*task)(); });
+        tasks.push([task] { (*task)(); }, queue_capacity);
         return future;
     }
 
@@ -63,6 +63,7 @@ class ThreadPool {
     void wait_empty();
 
   private:
+    uint64_t queue_capacity;
     std::vector<std::thread> threads;
     ConcurrentQueue<std::optional<std::function<void()>>> tasks;
 

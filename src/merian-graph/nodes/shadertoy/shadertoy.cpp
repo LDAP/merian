@@ -3,15 +3,13 @@
 #include "merian-graph/connectors/image/vk_image_out_managed.hpp"
 #include "merian-graph/graph/errors.hpp"
 #include "merian/io/file_loader.hpp"
-
-#include <atomic>
+#include "merian/utils/hash.hpp"
 
 namespace merian {
 
 namespace {
-std::string next_module_name() {
-    static std::atomic<uint64_t> counter = 0;
-    return fmt::format("merian_shadertoy_generated_{}", counter++);
+std::string module_name(const std::string& source) {
+    return fmt::format("merian_shadertoy_{:016x}", hash_val(source));
 }
 } // namespace
 
@@ -66,9 +64,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 }
 )";
 
-Shadertoy::Shadertoy()
-    : AbstractCompute(sizeof(PushConstant)), module_name(next_module_name()),
-      shader_glsl(default_shader) {}
+Shadertoy::Shadertoy() : AbstractCompute(sizeof(PushConstant)), shader_glsl(default_shader) {}
 
 DeviceSupportInfo Shadertoy::query_device_support(const DeviceSupportQueryInfo& query_info) {
     return DeviceSupportInfo::check(query_info, {}, {}, {}, {}, {"Shader", "ImageQuery"}, {}, {},
@@ -93,8 +89,9 @@ std::string Shadertoy::compose_source(const std::string& body) {
 
 bool Shadertoy::try_compile(const std::string& body) {
     try {
+        const std::string source = compose_source(body);
         const auto composition = SlangComposition::create();
-        composition->add_module_from_string(module_name, compose_source(body), true);
+        composition->add_module_from_string(module_name(source), source, true);
         SlangProgram::create(compile_context, composition).get();
         error.reset();
         return true;
@@ -127,8 +124,9 @@ Shadertoy::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
 }
 
 SlangCompositionHandle Shadertoy::create_composition() {
+    const std::string source = compose_source(current_body());
     const auto composition = SlangComposition::create();
-    composition->add_module_from_string(module_name, compose_source(current_body()), true);
+    composition->add_module_from_string(module_name(source), source, true);
     return composition;
 }
 
@@ -166,7 +164,7 @@ const void* Shadertoy::get_push_constant(const NodeIO& io, const NodeProcessInfo
 
     constant.iTimeDelta = static_cast<float>(info.get_time_delta());
     constant.iTime = static_cast<float>(info.get_elapsed());
-    constant.iFrame = static_cast<int32_t>(info.get_total_iteration());
+    constant.iFrame = static_cast<int32_t>(info.get_iteration());
 
     const auto now = std::chrono::system_clock::now();
     const auto now_d = std::chrono::floor<std::chrono::days>(now);
@@ -205,7 +203,7 @@ AbstractCompute::NodeStatusFlags Shadertoy::properties(Properties& config) {
         break;
     }
     case 1: {
-        if (config.config_text("shader path", shader_path, true)) {
+        if (config.config_path("shader path", shader_path)) {
             needs_reconnect = true;
             resolved_shader_path =
                 context->get_file_loader()->find_file(shader_path).value_or(shader_path);

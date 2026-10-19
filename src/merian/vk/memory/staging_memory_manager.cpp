@@ -46,6 +46,12 @@ BumpMemoryAllocatorHandle reuse_if_released(BumpMemoryAllocatorHandle& spare) {
     return std::move(spare);
 }
 
+void cmd_host_barrier(const CommandBufferHandle& cmd) {
+    cmd->barrier(
+        vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost,
+        vk::MemoryBarrier{vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eHostRead});
+}
+
 } // namespace
 
 void StagingMemoryManager::replace_block(BumpMemoryAllocatorHandle& block,
@@ -78,7 +84,7 @@ MemoryAllocationHandle StagingMemoryManager::suballocate(BumpMemoryAllocatorHand
 
 MemoryAllocationHandle StagingMemoryManager::get_upload_staging_space(
     const vk::DeviceSize size, BufferHandle& upload_buffer, vk::DeviceSize& upload_buffer_offset) {
-
+    const std::scoped_lock lock(blocks_mutex);
     if (size <= block_size) {
         if (upload_block->get_free_size() < size + STAGING_ALIGNMENT) {
             replace_block(upload_block, spare_upload_block, upload_usage,
@@ -101,7 +107,7 @@ MemoryAllocationHandle
 StagingMemoryManager::get_download_staging_space(const vk::DeviceSize size,
                                                  BufferHandle& download_buffer,
                                                  vk::DeviceSize& download_buffer_offset) {
-
+    const std::scoped_lock lock(blocks_mutex);
     if (size <= block_size) {
         if (!download_block || download_block->get_free_size() < size + STAGING_ALIGNMENT) {
             replace_block(download_block, spare_download_block, download_usage,
@@ -195,6 +201,7 @@ StagingMemoryManager::cmd_from_device(const CommandBufferHandle& cmd,
                                       const std::optional<vk::Extent3D> optional_extent) {
     const DeviceImageDownload download = from_device(image, subresource, offset, optional_extent);
     cmd->copy(download.copy.dst, download.copy.src, download.copy.region);
+    cmd_host_barrier(cmd);
     return download.memory;
 }
 
@@ -304,6 +311,7 @@ StagingMemoryManager::cmd_from_device(const CommandBufferHandle& cmd,
                                       const std::optional<vk::DeviceSize> optional_size) {
     const DeviceBufferDownload download = from_device(buffer, offset, optional_size);
     cmd->copy(download.copy.src, download.copy.dst, download.copy.region);
+    cmd_host_barrier(cmd);
     return download.memory;
 }
 

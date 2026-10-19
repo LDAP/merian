@@ -1,8 +1,9 @@
 # Project
 
 merian is a Vulkan C++ rendering framework. It builds `merian-core` (shared library), the
-`merian-graph` node/graph library, and the generic `merian-graph-run` executable. Renderers,
-scenes, and other node sets live in separate repos as plugins (`merian-plugin-*`), not in this tree.
+`merian-graph` node/graph library and the `merian` Python package; `examples/graph_run.py` is the
+generic graph runner. Renderers, scenes, and other node sets live in separate repos as plugins
+(`merian-plugin-*`), not in this tree.
 
 Use the same bash commands to prevent re-approval.
 
@@ -12,13 +13,13 @@ Uses Meson.
 
 Setup: run once if `build` does not exist: `meson setup build`
 Compile: `meson compile -C build`
-Run a graph: `build/merian-graph-run <config.json>`, better with timeout:
-`timeout 15 build/merian-graph-run <config.json>`
+Run a graph: `python examples/graph_run.py <config.json>`
 
 # Tests
 
 Enable tests: `meson configure build -Dtests=true`
-Run one: `build/tests/test-<name>` (e.g. `test-small-vector`)
+Run one: `build/tests/test-<name>` (e.g. `test-small-vector`), the Python ones with
+`meson test -C build python_config python_graph`
 
 If a failure is preexisting, but the fix is quick, then fix instead of just report.
 

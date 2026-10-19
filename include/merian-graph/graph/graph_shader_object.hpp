@@ -18,7 +18,7 @@ struct ShaderObjectAllocateInfo {
     ContextHandle context;
     // Memory for this copy, not bound before on_connected.
     ResourceAllocatorHandle allocator;
-    // Union of the declared ConnectorAccess over all connected ports - incorporate the usage
+    // Union of the declared ConnectorAccess over all connected connectors - incorporate the usage
     // flags into allocations.
     ConnectorAccess combined_access;
     // The producer relies on the contents surviving iterations.

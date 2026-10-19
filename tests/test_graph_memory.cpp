@@ -159,23 +159,22 @@ class GraphMemoryTest : public GraphTest {
     using GraphTest::create_graph;
 
     static GraphHandle create_graph(const json& description) {
-        const GraphHandle graph = create_graph();
-        graph->load_from_json(description);
+        const GraphHandle graph = GraphTest::create_graph(description);
         run(graph);
         return graph;
     }
 
-    static const GraphMemoryReport::Placed* find_placed(const GraphMemoryReport& report,
-                                                        const std::string& output) {
+    static const GraphMemoryReport::Transient* find_transient(const GraphMemoryReport& report,
+                                                              const std::string& output) {
         const auto it =
-            std::ranges::find(report.placed, output, &GraphMemoryReport::Placed::output);
-        return it == report.placed.end() ? nullptr : &*it;
+            std::ranges::find(report.transient, output, &GraphMemoryReport::Transient::output);
+        return it == report.transient.end() ? nullptr : &*it;
     }
 
-    static std::vector<uint32_t> positions(const GraphMemoryReport::Placed& placed) {
+    static std::vector<uint32_t> positions(const GraphMemoryReport::Transient& transient) {
         std::vector<uint32_t> in_use;
-        for (uint32_t position = 0; position < placed.lifetime.get_positions(); position++) {
-            if (placed.lifetime.contains(position)) {
+        for (uint32_t position = 0; position < transient.lifetime.get_positions(); position++) {
+            if (transient.lifetime.contains(position)) {
                 in_use.push_back(position);
             }
         }
@@ -186,12 +185,13 @@ class GraphMemoryTest : public GraphTest {
 } // namespace
 
 TEST_F(GraphMemoryTest, ChainPingPongs) {
-    const GraphMemoryReport report = create_graph(tonemap_chain(true))->get_memory_report();
+    const GraphMemoryReport report = create_graph(tonemap_chain(true))->memory_get_report();
 
     EXPECT_EQ(report.period, 1);
-    std::vector<const GraphMemoryReport::Placed*> outputs;
+    std::vector<const GraphMemoryReport::Transient*> outputs;
     for (uint32_t i = 0; i < 4; i++) {
-        const auto* output = outputs.emplace_back(find_placed(report, fmt::format("t{}.out", i)));
+        const auto* output =
+            outputs.emplace_back(find_transient(report, fmt::format("t{}.out", i)));
         ASSERT_TRUE(output);
         EXPECT_EQ(positions(*output),
                   (i < 3 ? std::vector<uint32_t>{i + 1, i + 2} : std::vector<uint32_t>{i + 1}));
@@ -201,7 +201,7 @@ TEST_F(GraphMemoryTest, ChainPingPongs) {
     EXPECT_EQ(outputs[1]->placement.offset, outputs[3]->placement.offset);
     EXPECT_NE(outputs[0]->placement.offset, outputs[1]->placement.offset);
     // the color source is persistent
-    const auto* color = find_placed(report, "color.out");
+    const auto* color = find_transient(report, "color.out");
     ASSERT_TRUE(color);
     EXPECT_EQ(positions(*color).size(), report.layer_count);
     EXPECT_FALSE(color->placement.aliased);
@@ -214,11 +214,11 @@ TEST_F(GraphMemoryTest, ChainPingPongs) {
 }
 
 TEST_F(GraphMemoryTest, ChainWithoutAliasing) {
-    const GraphMemoryReport report = create_graph(tonemap_chain(false))->get_memory_report();
+    const GraphMemoryReport report = create_graph(tonemap_chain(false))->memory_get_report();
 
     EXPECT_FALSE(report.aliasing);
-    ASSERT_EQ(report.placed.size(), 5);
-    for (const auto& output : report.placed) {
+    ASSERT_EQ(report.transient.size(), 5);
+    for (const auto& output : report.transient) {
         EXPECT_FALSE(output.placement.aliased) << output.output;
     }
 }
@@ -231,16 +231,16 @@ TEST_F(GraphMemoryTest, ScratchAndDisabledOutputs) {
             "b": {"type": "Memory Test"}
         }
     })"))
-                                         ->get_memory_report();
+                                         ->memory_get_report();
 
-    for (const auto& output : report.placed) {
+    for (const auto& output : report.transient) {
         EXPECT_FALSE(output.output.ends_with(".off")) << output.output;
     }
     EXPECT_TRUE(report.exclusive.empty());
 
-    const auto* a_out = find_placed(report, "a.out");
-    const auto* a_tmp = find_placed(report, "a.tmp");
-    const auto* b_tmp = find_placed(report, "b.tmp");
+    const auto* a_out = find_transient(report, "a.out");
+    const auto* a_tmp = find_transient(report, "a.tmp");
+    const auto* b_tmp = find_transient(report, "b.tmp");
     ASSERT_TRUE(a_out && a_tmp && b_tmp);
     EXPECT_FALSE(a_out->scratch);
     EXPECT_TRUE(a_tmp->scratch);
@@ -249,7 +249,7 @@ TEST_F(GraphMemoryTest, ScratchAndDisabledOutputs) {
     EXPECT_EQ(positions(*b_tmp), std::vector<uint32_t>{1});
     EXPECT_EQ(a_tmp->placement.offset, b_tmp->placement.offset);
 
-    const auto* a_state = find_placed(report, "a.state");
+    const auto* a_state = find_transient(report, "a.state");
     ASSERT_TRUE(a_state);
     EXPECT_TRUE(a_state->scratch);
     EXPECT_EQ(positions(*a_state).size(), report.layer_count);
@@ -266,15 +266,15 @@ TEST_F(GraphMemoryTest, DelayedFeedbackSharesWithDownstream) {
             "u": {"type": "Memory Test"}
         }
     })"))
-                                         ->get_memory_report();
+                                         ->memory_get_report();
 
     ASSERT_EQ(report.layer_count, 3);
     ASSERT_EQ(report.period, 2);
-    EXPECT_FALSE(find_placed(report, "f.out"));
-    const auto* f_0 = find_placed(report, "f.out (0)");
-    const auto* f_1 = find_placed(report, "f.out (1)");
-    const auto* t_0 = find_placed(report, "t.out (0)");
-    const auto* t_1 = find_placed(report, "t.out (1)");
+    EXPECT_FALSE(find_transient(report, "f.out"));
+    const auto* f_0 = find_transient(report, "f.out (0)");
+    const auto* f_1 = find_transient(report, "f.out (1)");
+    const auto* t_0 = find_transient(report, "t.out (0)");
+    const auto* t_1 = find_transient(report, "t.out (1)");
     ASSERT_TRUE(f_0 && f_1 && t_0 && t_1);
     EXPECT_EQ(positions(*f_0), (std::vector<uint32_t>{0, 1, 2, 3}));
     EXPECT_EQ(positions(*f_1), (std::vector<uint32_t>{0, 3, 4, 5}));
@@ -292,7 +292,7 @@ TEST_F(GraphMemoryTest, ScratchCannotBeConnected) {
             "b": {"type": "Memory Test"}
         }
     })"));
-    EXPECT_FALSE(graph->store_to_json()["nodes"]["a"].contains("outputs"));
+    EXPECT_FALSE(graph->to_description().to_json()["nodes"]["a"].contains("outputs"));
 }
 
 TEST_F(GraphMemoryTest, DisabledOutputAccessStopsNode) {
@@ -317,8 +317,8 @@ TEST_F(GraphMemoryTest, OnConnectedWritesOnlyPersistentOutputs) {
             "a": {"type": "Memory Test"}
         }
     })"));
-    EXPECT_EQ(graph->get_node_state("transient"), NodeState::ERRORED);
-    EXPECT_EQ(graph->get_node_state("persistent"), NodeState::OK);
+    EXPECT_EQ(graph->node_get_state("transient"), NodeState::ERRORED);
+    EXPECT_EQ(graph->node_get_state("persistent"), NodeState::OK);
     EXPECT_TRUE(draw(graph).shows_text("not persistent", {"transient"}));
 }
 
@@ -332,60 +332,57 @@ TEST_F(GraphMemoryTest, ForceDisabledConsumerIsNotALifetime) {
             "d": {"type": "Two Inputs"}
         }
     })"));
-    const GraphMemoryReport delayed = graph->get_memory_report();
+    const GraphMemoryReport delayed = graph->memory_get_report();
     ASSERT_EQ(delayed.layer_count, 3);
     EXPECT_EQ(delayed.period, 2);
-    EXPECT_TRUE(find_placed(delayed, "a.out (1)"));
+    EXPECT_TRUE(find_transient(delayed, "a.out (1)"));
 
     // d requires an output that b disabled
     graph->add_connection("b", "d", "off", "b");
     graph->run();
     graph->wait();
-    const GraphMemoryReport report = graph->get_memory_report();
+    const GraphMemoryReport report = graph->memory_get_report();
     // the delayed read does not happen
     EXPECT_EQ(report.period, 1);
-    const auto* a_out = find_placed(report, "a.out");
+    const auto* a_out = find_transient(report, "a.out");
     ASSERT_TRUE(a_out);
     EXPECT_EQ(positions(*a_out), std::vector<uint32_t>{0});
-    std::ignore = fmt::format("{}", report);
+    std::ignore = report.to_text();
 }
 
 TEST_F(GraphMemoryTest, ReconnectReusesHeldMemory) {
     const GraphHandle graph = create_graph(tonemap_chain(true));
-    const MemoryAllocationHandle held = graph->get_memory_report().blocks.at(0).memory.lock();
+    const MemoryAllocationHandle held = graph->memory_get_report().blocks.at(0).memory.lock();
     ASSERT_TRUE(held);
 
-    graph->request_reconnect();
+    graph->restart_run();
     graph->run();
     graph->wait();
-    EXPECT_EQ(graph->get_memory_report().blocks.at(0).memory.lock(), held);
+    EXPECT_EQ(graph->memory_get_report().blocks.at(0).memory.lock(), held);
 }
 
 TEST_F(GraphMemoryTest, ShrinkingOutputsShrinksMemory) {
     const GraphHandle graph = create_graph(tonemap_chain(true));
     const auto set_extent = [&](const uint32_t extent) {
-        JSONLoadProperties props(json::parse(
-            fmt::format(R"({{"nodes": {{"color": {{"properties": {{"extent": [{}, {}, 1]}}}}}}}})",
-                        extent, extent)));
-        graph->properties(props);
+        graph->node_set_properties("color", {{"extent", {extent, extent, 1}}});
         graph->run();
         graph->wait();
-        return graph->get_memory_report().blocks.at(0).size;
+        return graph->memory_get_report().blocks.at(0).size;
     };
 
     const vk::DeviceSize small = set_extent(256);
     const vk::DeviceSize large = set_extent(1024);
     EXPECT_GE(large, 8 * small);
     // also while something holds the large block
-    const MemoryAllocationHandle held = graph->get_memory_report().blocks.at(0).memory.lock();
+    const MemoryAllocationHandle held = graph->memory_get_report().blocks.at(0).memory.lock();
     EXPECT_EQ(set_extent(256), small);
-    EXPECT_NE(graph->get_memory_report().blocks.at(0).memory.lock(), held);
+    EXPECT_NE(graph->memory_get_report().blocks.at(0).memory.lock(), held);
 
     // reports and the memory view do not keep it alive past the iterations in flight that used it
     set_extent(1024);
-    const GraphMemoryReport large_report = graph->get_memory_report();
+    const GraphMemoryReport large_report = graph->memory_get_report();
     UIProperties props;
-    graph->properties(props);
+    graph->draw_ui(props);
     set_extent(256);
     graph->run();
     graph->wait();
@@ -394,21 +391,25 @@ TEST_F(GraphMemoryTest, ShrinkingOutputsShrinksMemory) {
 
 TEST_F(GraphMemoryTest, PropertiesShowMemory) {
     const GraphHandle graph = create_graph(tonemap_chain(true));
-    const vk::DeviceSize block_size = graph->get_memory_report().blocks.at(0).size;
+    const vk::DeviceSize block_size = graph->memory_get_report().blocks.at(0).size;
     UIProperties props;
-    graph->properties(props);
-    graph->properties(props);
+    graph->draw_ui(props);
+    graph->draw_ui(props);
     graph->run();
     graph->wait();
-    EXPECT_EQ(graph->get_memory_report().blocks.at(0).size, block_size);
+    EXPECT_EQ(graph->memory_get_report().blocks.at(0).size, block_size);
 
-    const GraphMemoryReport report = graph->get_memory_report();
-    const std::string text = fmt::format("{}", report);
+    const GraphMemoryReport report = graph->memory_get_report();
+    const std::string text = report.to_text();
     EXPECT_NE(text.find("Block 0"), std::string::npos);
     EXPECT_NE(text.find("t3.out"), std::string::npos);
-    EXPECT_TRUE(props.shows_text(report.format_summary(), {"memory"}));
-    EXPECT_TRUE(props.shows_text(report.format_nodes(), {"memory", "nodes"}));
-    EXPECT_TRUE(props.shows_text(report.format_layers(), {"memory", "layers"}));
-    EXPECT_TRUE(props.shows_text(report.format_outputs(), {"memory", "outputs"}));
-    EXPECT_TRUE(props.shows_text(report.format_blocks(), {"memory", "blocks"}));
+    EXPECT_TRUE(props.shows_text(report.to_text(GraphMemoryReport::View::SUMMARY), {"memory"}));
+    EXPECT_TRUE(
+        props.shows_text(report.to_text(GraphMemoryReport::View::NODES), {"memory", "nodes"}));
+    EXPECT_TRUE(
+        props.shows_text(report.to_text(GraphMemoryReport::View::LAYERS), {"memory", "layers"}));
+    EXPECT_TRUE(
+        props.shows_text(report.to_text(GraphMemoryReport::View::OUTPUTS), {"memory", "outputs"}));
+    EXPECT_TRUE(
+        props.shows_text(report.to_text(GraphMemoryReport::View::BLOCKS), {"memory", "blocks"}));
 }

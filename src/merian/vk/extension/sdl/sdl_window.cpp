@@ -1,5 +1,6 @@
 #include "merian/vk/extension/sdl/sdl_window.hpp"
 #include "merian/vk/extension/sdl/sdl_surface.hpp"
+#include "merian/vk/window/surface_swapchain.hpp"
 
 #include <SDL3/SDL.h>
 #include <spdlog/spdlog.h>
@@ -474,9 +475,10 @@ vk::Extent2D SDLWindow::window_extent() {
     return vk::Extent2D{static_cast<uint32_t>(w), static_cast<uint32_t>(h)};
 }
 
-SurfaceHandle SDLWindow::get_surface() {
-    return std::make_shared<SDLSurface>(device,
-                                        std::static_pointer_cast<SDLWindow>(shared_from_this()));
+SwapchainHandle SDLWindow::create_swapchain(const ContextHandle& context) {
+    return std::make_shared<SurfaceSwapchain>(
+        context, std::make_shared<SDLSurface>(
+                     device, std::static_pointer_cast<SDLWindow>(shared_from_this())));
 }
 
 bool SDLWindow::should_close() const {

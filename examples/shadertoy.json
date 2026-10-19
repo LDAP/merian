@@ -5,28 +5,34 @@
             "required": true
         }
     },
-    "graph_properties": {
-        "flush thread pool": true,
-        "fps limiter": false,
-        "iterations in flight": 2,
-        "time source": "Auto"
-    },
+    "include": [
+        "parts/mixins.json"
+    ],
     "nodes": {
-        "blit": {
+        "display": {
             "enabled": true,
-            "outputs": [
-                "canvas->imgui.canvas"
-            ],
             "type": "Swapchain Blit"
         },
-        "imgui": {
+        "output": {
             "enabled": true,
-            "type": "ImGui"
+            "outputs": [
+                "canvas->display.canvas",
+                "controller->shadertoy.controller"
+            ],
+            "properties": {
+                "backend": "auto",
+                "on close": {
+                    "remove node": false,
+                    "send event": true
+                },
+                "present mode": "Immediate"
+            },
+            "type": "Window"
         },
         "shadertoy": {
             "enabled": true,
             "outputs": [
-                "out->blit.src"
+                "out->display.src"
             ],
             "properties": {
                 "height": 720,
@@ -35,25 +41,6 @@
                 "width": 1280
             },
             "type": "Shadertoy"
-        },
-        "window": {
-            "enabled": true,
-            "outputs": [
-                "canvas->blit.canvas",
-                "controller->shadertoy.controller",
-                "window->imgui.window"
-            ],
-            "properties": {
-                "backend": "SDL3 (Video Subsystem)",
-                "blit mode": "FIT",
-                "on_should_close_actions": {
-                    "remove node": false,
-                    "send sigint": true,
-                    "send sigterm": false
-                },
-                "present mode": "Immediate"
-            },
-            "type": "Window"
         }
     },
     "version": 4

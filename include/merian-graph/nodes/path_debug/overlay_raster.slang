@@ -203,19 +203,18 @@ Varyings vertex_main(uint vertex_id: SV_VertexID, uint instance_id: SV_InstanceI
     const uint item = index % PATH_DEBUG_MAX_SEGMENTS;
     const bool kept_slots = path_debug_overlay_kept();
 
+    if (slot >= params.overlay_max_paths) {
+        return o;
+    }
+    const bool drawn = kept_slots ? kept[PATH_DEBUG_KEPT_KEYS + slot] != 0
+                                  : slot < state[PATH_DEBUG_STATE_DRAW_COUNT];
     const uint path_index = kept_slots ? slot : state[PATH_DEBUG_STATE_DRAW_LIST + slot];
-    if ((params.overlay_isolate != PATH_DEBUG_NO_ISOLATE && path_index != params.overlay_isolate) ||
-        slot >= params.overlay_max_paths) {
+    if (!drawn ||
+        (params.overlay_isolate != PATH_DEBUG_NO_ISOLATE && path_index != params.overlay_isolate)) {
         return o;
     }
     if (kept_slots) {
-        if (kept[PATH_DEBUG_KEPT_KEYS + slot] == 0) {
-            return o;
-        }
         return segment(kept, PATH_DEBUG_KEPT_VERTICES, path_index, kind, item, vertex_id, o);
-    }
-    if (slot >= state[PATH_DEBUG_STATE_DRAW_COUNT]) {
-        return o;
     }
     return segment(in_records, path_record_vertex_region_offset(in_records), path_index, kind, item,
                    vertex_id, o);

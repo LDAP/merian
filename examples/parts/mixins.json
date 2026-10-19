@@ -1,0 +1,9 @@
+{
+    "presets": {
+        "mixin": {
+            "folder": "mixins",
+            "multiple": true,
+            "order": 2
+        }
+    }
+}

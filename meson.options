@@ -69,7 +69,15 @@ option(
     'ffmpeg',
     type: 'feature',
     value: 'auto',
-    description: 'Build with FFmpeg video read/write nodes using Vulkan hardware en-/decoding.'
+    description: 'Build the Video Source and Video Sink nodes using Vulkan hardware en-/decoding.'
+)
+
+# Bindings
+option(
+    'python',
+    type: 'feature',
+    value: 'enabled',
+    description: 'Build the merian Python package (needs the Python headers; nanobind from WrapDB).'
 )
 
 # Tests

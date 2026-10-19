@@ -52,8 +52,6 @@ class AbstractCompute : public Node {
     process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) override final;
 
   protected:
-    // Force shader recompilation after the composed source changed. Retires the shared session so
-    // a module recomposed under the same name is reloaded instead of served from the stale cache.
     void invalidate_shader();
 
     ContextHandle context;

@@ -38,7 +38,8 @@ image_load_u8(const std::filesystem::path& path, ImageInfo& info, int desired_ch
 
 bool rgba8_is_opaque(const uint8_t* data, size_t texel_count);
 
-// Load as 32-bit float per channel. Any file format; LDR source values are mapped to [0, 1].
+// Load as 32-bit float per channel. Any file format; LDR source values are linearized with gamma
+// 2.2 to [0, 1].
 // Throws std::runtime_error on failure.
 BlobHandle
 image_load_f32(const std::filesystem::path& path, ImageInfo& info, int desired_channels = 4);

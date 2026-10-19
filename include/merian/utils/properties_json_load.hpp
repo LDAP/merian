@@ -4,8 +4,10 @@
 #include "nlohmann/json.hpp"
 
 #include <filesystem>
+#include <functional>
 #include <optional>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 namespace merian {
@@ -85,12 +87,36 @@ class JSONLoadProperties : public Properties {
     virtual bool serialize_json(const std::string& id, nlohmann::json& json) override;
     virtual bool serialize_string(const std::string& id, std::string& s) override;
 
+    // JSON pointers of the keys no property read.
+    std::vector<std::string> unread_keys() const;
+
+    // Options whose value is none of the choices.
+    const std::vector<std::string>& invalid_values() const;
+
+    // The invalid values and, if any, "unknown <unread keys>".
+    std::vector<std::string> problems() const;
+
+    // Loads again with the keys the first load left unread (they may have been revealed), unless
+    // it returned false. Returns the problems() of both and the error that aborted a load.
+    static std::vector<std::string> load_revealed(const nlohmann::json& json,
+                                                  const std::function<bool(Properties&)>& load);
+
   private:
+    bool read(const std::string& id);
+
+    void collect_unread(const nlohmann::json& object,
+                        const nlohmann::json::json_pointer& pointer,
+                        std::vector<std::string>& unread) const;
+
     std::string object_name;
     std::vector<nlohmann::json> o;
 
-  private:
     std::vector<bool> transparent;
+
+    nlohmann::json::json_pointer current;
+    std::unordered_set<std::string> read_keys;
+    std::unordered_set<std::string> entered_children;
+    std::vector<std::string> invalid;
 };
 
 } // namespace merian

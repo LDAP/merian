@@ -156,7 +156,7 @@ class NodeRegistry {
         NodeHandle node = type_to_type_info.at(node_info.type).factory();
 
         if (node_info.config) {
-            node->load_config(*node_info.config);
+            load_config(node, *node_info.config);
         }
 
         return node;
@@ -168,7 +168,7 @@ class NodeRegistry {
         NodeHandle node = type_to_type_info.at(type).factory();
 
         if (config) {
-            node->load_config(*config);
+            load_config(node, *config);
         }
 
         return node;
@@ -230,6 +230,9 @@ class NodeRegistry {
 
   private:
     NodeRegistry();
+
+    // Throws invalid_argument naming the problems.
+    static void load_config(const NodeHandle& node, const nlohmann::json& config);
 
     void assert_node_name_exists(const std::string& node_name) const {
         if (!node_name_to_node_info.contains(node_name)) {

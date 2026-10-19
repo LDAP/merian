@@ -41,7 +41,7 @@ class Connector : public std::enable_shared_from_this<Connector> {
     // Write the resource into the shader cursor field named after this connector.
     // resource is null if an optional input is not connected or an output is disabled - write a
     // dummy then, or throw node_error if there is none.
-    // access is the declared ConnectorAccess of the port.
+    // access is the declared ConnectorAccess of the connector.
     virtual void bind([[maybe_unused]] ShaderCursor& cursor,
                       [[maybe_unused]] const GraphResourceHandle& resource,
                       [[maybe_unused]] const ResourceAllocatorHandle& allocator,

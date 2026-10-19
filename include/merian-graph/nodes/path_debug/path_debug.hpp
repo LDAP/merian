@@ -15,6 +15,7 @@
 #include "merian/utils/stopwatch.hpp"
 #include "merian/vk/imgui/imgui_context.hpp"
 #include "merian/vk/imgui/imgui_merian_backend.hpp"
+#include "merian/vk/imgui/imgui_merian_window_backend.hpp"
 #include "merian/vk/imgui/imgui_renderer.hpp"
 #include "merian/vk/window/window.hpp"
 
@@ -74,9 +75,8 @@ class PathDebugNode : public Node {
     static constexpr std::array<const char*, 3> FINITE_NAMES = {"any", "finite only",
                                                                 "NaN or infinite only"};
     static constexpr std::array<const char*, 2> METHOD_MODE_NAMES = {"any vertex", "every vertex"};
-    static constexpr std::array<const char*, 5> RANK_NAMES = {
-        "spread over the image", "brightest", "brightest fraction", "resampled by contribution",
-        "most recent"};
+    static constexpr std::array<const char*, 4> RANK_NAMES = {
+        "most recent", "brightest", "brightest fraction", "resampled by contribution"};
     static constexpr std::array<const char*, 3> DEPTH_NAMES = {
         "off (x-ray)", "hide behind geometry", "dash behind geometry"};
     static constexpr std::array<const char*, 4> COLOR_NAMES = {"luminance", "bounces", "random",
@@ -163,7 +163,6 @@ class PathDebugNode : public Node {
 
     struct ReadbackFeedback {
         uint32_t observed_paths;
-        uint32_t matched_paths;
         bool run_check;
     };
 
@@ -183,10 +182,12 @@ class PathDebugNode : public Node {
 
     struct PanelHit {
         uint32_t channel;
+        uint32_t bin;
         bool on_close;
     };
 
     void handle_input(const NodeIO& io);
+    void reproject_pick(const NodeIO& io);
     ReadbackFeedback apply_readback_feedback(const NodeProcessInfo& info,
                                              const PathRecordCapacities& capacities);
     void adapt_keep_prob(const PathRecordCapacities& capacities);
@@ -198,8 +199,8 @@ class PathDebugNode : public Node {
                                 const ReadbackFeedback& fed);
     void update_selection_params();
     void update_capture_params();
-    void update_overlay_params(const ReadbackFeedback& fed, bool frozen);
-    void update_map_params(const ReadbackFeedback& fed);
+    void update_overlay_params(bool frozen, bool ready);
+    void update_map_params(const NodeIO& io, const ReadbackFeedback& fed, bool ready);
     void update_heat_params(bool frozen);
     void update_pixel_stats_params(const NodeIO& io, bool frozen, bool ready);
     void update_backdrop_params(const NodeProcessInfo& info);
@@ -219,10 +220,13 @@ class PathDebugNode : public Node {
     void
     record_overlay_lines(const NodeIO& io, const NodeProcessInfo& info, Submission& submission);
     void record_map_panels(const NodeIO& io, const NodeProcessInfo& info, Submission& submission);
-    void record_labels(const NodeIO& io, const NodeProcessInfo& info, Submission& submission);
+    void record_labels(const NodeIO& io,
+                       const NodeProcessInfo& info,
+                       Submission& submission,
+                       bool onto_canvas);
     void record_export(const NodeIO& io, const NodeProcessInfo& info, Submission& submission);
     void record_readback(const NodeIO& io, const NodeProcessInfo& info, Submission& submission);
-    void record_present(const NodeIO& io, Submission& submission);
+    bool record_present(const NodeIO& io, Submission& submission);
 
     void build_gbuffer_kernels(const ContextHandle& context,
                                const ResourceAllocatorHandle& allocator);
@@ -239,19 +243,21 @@ class PathDebugNode : public Node {
     void set_expression(bool slot_b, const std::string& text);
     bool shared_support(bool needs_camera_wi) const;
     bool overlay_kept() const;
+    bool keeps_top() const;
 
+    bool pick_visible() const;
     uint32_t shown_panel_mask() const;
+    int32_t label_px(uint32_t size) const;
     int32_t panel_top(uint32_t slot) const;
     int32_t panel_left() const;
-    std::optional<PanelHit> panel_at(const int2& pixel) const;
+    std::optional<PanelHit> panel_at(const float2& at) const;
+    std::string map_scope() const;
 
     std::optional<int2> to_image(const float2& window_pos) const;
-    std::optional<int2> cursor_pixel() const;
 
     void draw_window();
     void draw_header();
-    void draw_look_tab();
-    void draw_select_tab();
+    void draw_lines_tab();
     void draw_analyze_tab();
     void draw_convergence_tab();
     void draw_distributions_tab() const;
@@ -259,6 +265,7 @@ class PathDebugNode : public Node {
     void draw_inspector();
     void draw_maps_tab();
     void draw_capture_tab();
+    void draw_pick_hint(Properties& config) const;
     void draw_sampling_fit() const;
     std::string overlay_summary() const;
     void draw_properties_section(void (PathDebugNode::*section)(Properties&));
@@ -296,6 +303,7 @@ class PathDebugNode : public Node {
     std::optional<ComputeKernel> select_kernel;
     std::optional<ComputeKernel> threshold_kernel;
     std::optional<ComputeKernel> collect_kernel;
+    std::optional<ComputeKernel> keep_kernel;
     std::optional<ComputeKernel> map_reduce_kernel;
     std::optional<ComputeKernel> map_view_kernel;
     std::optional<ComputeKernel> heat_decay_kernel;
@@ -328,11 +336,15 @@ class PathDebugNode : public Node {
     BufferHandle matches_buffer;
     BufferHandle kept_buffer;
     TextureHandle reference_texture;
+    TextureHandle panel_texture;
+    ImTextureID panel_texture_id = 0;
     std::vector<BufferHandle> readback_buffers;
 
     ImGuiContextHandle imgui_ctx;
     ImGuiRendererHandle imgui_renderer;
     ImGuiMerianBackendHandle imgui_backend;
+    ImGuiMerianWindowBackendHandle imgui_window_backend;
+    std::weak_ptr<Window> imgui_window;
     Stopwatch frametime;
 
     std::shared_ptr<PathDebugInput> input = std::make_shared<PathDebugInput>();
@@ -341,6 +353,11 @@ class PathDebugNode : public Node {
     vk::Offset3D present_upper{};
     float present_density = 1.f;
     bool presenting = false;
+    // the canvas while presenting, else the output
+    int2 label_area = int2(0);
+    // the display scale the panels and labels are laid out at
+    float label_scale = 1.f;
+    std::optional<float2> probe_at;
 
     std::mutex stats_mutex;
     Readback latest_readback{};
@@ -348,7 +365,6 @@ class PathDebugNode : public Node {
     bool window_drawn = false;
     bool inspector_drawn = false;
     bool convergence_drawn = false;
-    bool mouse_over_ui = false;
     uint32_t frames_since_window = UI_IDLE_FRAMES;
     uint32_t frames_since_inspector = UI_IDLE_FRAMES;
     uint32_t frames_since_convergence = UI_IDLE_FRAMES;
@@ -358,6 +374,9 @@ class PathDebugNode : public Node {
 
     bool picked = false;
     int2 picked_pixel = int2(0, 0);
+    bool picked_offscreen = false;
+    std::optional<int2> picked_in_records;
+    bool reproject = false;
     bool picked_pos_valid = false;
     float3 picked_pos = float3(0.f);
     float picked_radius = 0.f;
@@ -376,11 +395,12 @@ class PathDebugNode : public Node {
     int32_t contribution_filter = static_cast<int32_t>(PATH_DEBUG_FINITE_ANY);
 
     int32_t overlay_source = PATH_DEBUG_SOURCE_A;
-    int32_t overlay_rank = PATH_DEBUG_RANK_ANY;
+    int32_t overlay_rank = PATH_DEBUG_RANK_RECENT;
     int32_t overlay_max_paths = 64;
     float overlay_brightest_fraction = 1e-4f;
+    float resample_history = 60.f;
     int32_t overlay_depth_mode = static_cast<int32_t>(PATH_DEBUG_DEPTH_HIDE);
-    int32_t overlay_color = static_cast<int32_t>(PATH_DEBUG_COLOR_BOUNCES);
+    int32_t overlay_color = static_cast<int32_t>(PATH_DEBUG_COLOR_LUMINANCE);
     int32_t isolate_path = -1;
     uint32_t record_path_capacity = 0;
 
@@ -394,7 +414,7 @@ class PathDebugNode : public Node {
     int32_t map_source = PATH_DEBUG_SOURCE_A;
     int32_t map_res_log2 = 5;
     int32_t map_transform = 0;
-    int32_t map_frame = static_cast<int32_t>(PATH_DEBUG_FRAME_WORLD);
+    int32_t map_frame = static_cast<int32_t>(PATH_DEBUG_FRAME_LOCAL);
     int32_t map_pdf_ref = static_cast<int32_t>(PATH_DEBUG_PDF_REF_BSDF);
     int32_t map_bounce = 0;
     bool map_accumulate = true;
@@ -411,6 +431,8 @@ class PathDebugNode : public Node {
     std::array<bool, MAP_CHANNEL_COUNT> panel_enabled{true,  false, false, false, true,
                                                       false, true,  false, true};
     bool panels_enabled = true;
+    int32_t panel_size = 192;
+    int32_t panel_px = 192;
     int32_t panel_scroll = 0;
     int32_t panel_overflow = 0;
     int32_t analysis_paths = 1 << 16;
@@ -428,14 +450,18 @@ class PathDebugNode : public Node {
     int32_t pixel_stats_view = static_cast<int32_t>(PATH_DEBUG_PIXEL_STAT_OFF);
     bool pixel_stats_dirty = true;
     uint32_t pixel_stats_frames = 0;
+    uint32_t pixel_stats_generation = 0;
     bool kept_dirty = true;
     uint32_t kept_frames = 0;
-    uint64_t resampled_from = 0;
+    uint32_t kept_generation = 0;
+    uint64_t kept_from = 0;
     std::deque<float> mean_history;
     std::deque<float> rel_error_history;
     std::deque<float> variance_history;
 
     bool freeze = false;
+    bool was_frozen = false;
+    bool camera_moved = false;
     bool auto_keep_prob = true;
     float keep_prob = 1.f;
     bool record_picked_pixel_only = false;
@@ -447,8 +473,6 @@ class PathDebugNode : public Node {
 
     bool gbuffer_connected = false;
     SlangCompositionHandle gbuffer_composition;
-
-    std::string imgui_event_pattern = "//ui";
 };
 
 } // namespace merian

@@ -8,9 +8,6 @@
 
 #include <nlohmann/json.hpp>
 
-#include <filesystem>
-#include <fstream>
-
 using namespace merian;
 using json = nlohmann::json;
 
@@ -32,283 +29,47 @@ TEST(GraphLoadStore, CliRoundTrip) {
         }
     })");
 
-    graph->load_from_json(config);
-    EXPECT_EQ(graph->store_to_json().at("cli"), config.at("cli"));
+    graph->from_description(GraphDescription::from_json(config));
+    EXPECT_EQ(graph->to_description().to_json().at("cli"), config.at("cli"));
 
-    graph->load_from_json(json::parse(R"({"version": 4, "nodes": {}})"));
-    EXPECT_FALSE(graph->store_to_json().contains("cli"));
+    graph->from_description(
+        GraphDescription::from_json(json::parse(R"({"version": 4, "nodes": {}})")));
+    EXPECT_FALSE(graph->to_description().to_json().contains("cli"));
 
     // node metadata only lives in the loaded description and must be carried through
     const json with_metadata = json::parse(R"({
         "version": 4,
         "nodes": {"color": {"type": "Color", "metadata": {"pos": [10, 20]}}}
     })");
-    graph->load_from_json(with_metadata);
-    EXPECT_EQ(graph->store_to_json().at("nodes").at("color").at("metadata"),
+    graph->from_description(GraphDescription::from_json(with_metadata));
+    EXPECT_EQ(graph->to_description().to_json().at("nodes").at("color").at("metadata"),
               with_metadata.at("nodes").at("color").at("metadata"));
 }
 
-TEST(GraphLoadStore, V3ArrayBackCompat) {
-    const GraphDescription description = GraphDescription::from_json(json::parse(R"({
-        "version": 3,
-        "nodes": [
-            {"id": "color", "type": "Color", "enabled": false, "outputs": ["out->blit.src"]},
-            {"id": "blit", "type": "Blit"}
-        ]
-    })"));
-    EXPECT_FALSE(description.get_node_enabled("color"));
-    EXPECT_EQ(description.get_node_type("blit"), "Blit");
+TEST(GraphLoadStore, NoVersionIsTheCurrentOne) {
+    const json config = json::parse(R"({
+        "nodes": {
+            "color": {"type": "Color", "enabled": false, "outputs": ["out->a.src", "out->b.src"]},
+            "a": {"type": "Blit"},
+            "b": {"type": "Blit", "outputs": ["out->a.prev"]}
+        }
+    })");
+    const GraphDescription description = GraphDescription::from_json(config);
+    EXPECT_FALSE(description.get_nodes().at("color").enabled);
+    EXPECT_EQ(description.get_nodes().at("a").node_type, "Blit");
 
     const json stored = description.to_json();
     EXPECT_EQ(stored.at("version"), 4);
-    EXPECT_EQ(stored.at("nodes").at("color").at("outputs"), json::parse(R"(["out->blit.src"])"));
-}
-
-TEST(GraphCli, ValueWithSet) {
-    json config = json::parse(R"({
-        "nodes": {
-            "render": {"properties": {"samples per pixel": 2}},
-            "scene":  {"properties": {"file": "", "env": {"Type": "Empty", "Path": ""}}}
-        },
-        "cli": {
-            "--":      {"pointer": "/nodes/scene/properties/file"},
-            "env-map": {"pointer": "/nodes/scene/properties/env/Path",
-                        "set": {"/nodes/scene/properties/env/Type": "LatLong"}},
-            "spp":     {"pointer": "/nodes/render/properties/samples per pixel"}
-        }
-    })");
-
-    EXPECT_TRUE(GraphDescription::apply_cli(
-        config, {"--env-map", "/tmp/x.hdr", "--spp", "8", "/scene.gltf"}));
-
-    EXPECT_EQ(config["nodes"]["scene"]["properties"]["env"]["Path"], "/tmp/x.hdr");
-    EXPECT_EQ(config["nodes"]["scene"]["properties"]["env"]["Type"], "LatLong");
-    EXPECT_EQ(config["nodes"]["render"]["properties"]["samples per pixel"], 8);
-    EXPECT_EQ(config["nodes"]["scene"]["properties"]["file"], "/scene.gltf");
-}
-
-TEST(GraphCli, Variant) {
-    const json base = json::parse(R"({
-        "v": 0,
-        "cli": {"quality": {"type": "variant", "default": "high",
-                            "variants": {"low": {"set": {"/v": 1}}, "high": {"set": {"/v": 8}}}}}
-    })");
-
-    json with_default = base;
-    EXPECT_TRUE(GraphDescription::apply_cli(with_default, {}));
-    EXPECT_EQ(with_default["v"], 8);
-
-    json low = base;
-    EXPECT_TRUE(GraphDescription::apply_cli(low, {"--quality", "low"}));
-    EXPECT_EQ(low["v"], 1);
-
-    json bad = base;
-    EXPECT_FALSE(GraphDescription::apply_cli(bad, {"--quality", "ultra"}));
-    EXPECT_EQ(bad["v"], 0);
-}
-
-TEST(GraphCli, Flag) {
-    const json base = json::parse(R"({
-        "d": false,
-        "cli": {"denoise": {"type": "flag", "set": {"/d": true}, "off": {"set": {"/d": false}}}}
-    })");
-
-    json on = base;
-    EXPECT_TRUE(GraphDescription::apply_cli(on, {"--denoise", "on"}));
-    EXPECT_EQ(on["d"], true);
-
-    json off = base;
-    off["d"] = true;
-    EXPECT_TRUE(GraphDescription::apply_cli(off, {"--denoise", "off"}));
-    EXPECT_EQ(off["d"], false);
-}
-
-TEST(GraphCli, RequiredAndUnknown) {
-    const json config = json::parse(R"({
-        "nodes": {"scene": {"properties": {"file": ""}}},
-        "cli": {"scene": {"pointer": "/nodes/scene/properties/file", "required": true}}
-    })");
-
-    json missing = config;
-    EXPECT_FALSE(GraphDescription::apply_cli(missing, {}));
-
-    json given = config;
-    EXPECT_TRUE(GraphDescription::apply_cli(given, {"--scene", "/s.gltf"}));
-    EXPECT_EQ(given["nodes"]["scene"]["properties"]["file"], "/s.gltf");
-
-    // a value a stored session already materialized satisfies the requirement
-    EXPECT_TRUE(GraphDescription::apply_cli(given, {}));
-
-    // An undeclared --flag is positional; with no "--" override declared, that's an error.
-    json unknown = config;
-    EXPECT_FALSE(GraphDescription::apply_cli(unknown, {"--nope", "x"}));
-}
-
-TEST(GraphCli, OrderLastWins) {
-    json config = json::parse(R"({"v": 0, "cli": {"spp": {"pointer": "/v"}}})");
-    EXPECT_TRUE(GraphDescription::apply_cli(config, {"--spp", "1", "--spp", "2"}));
-    EXPECT_EQ(config["v"], 2);
-}
-
-TEST(GraphCli, MergeDeclaresOverride) {
-    const std::filesystem::path file =
-        std::filesystem::temp_directory_path() / "merian-test-fragment.json";
-    {
-        std::ofstream out(file);
-        out << R"({
-            "nodes": {"render": {"properties": {"samples per pixel": 2}}},
-            "cli": {"spp": {"pointer": "/nodes/render/properties/samples per pixel"}}
-        })";
+    for (const std::string identifier : {"color", "b"}) {
+        EXPECT_EQ(stored.at("nodes").at(identifier).at("outputs"),
+                  config.at("nodes").at(identifier).at("outputs"));
     }
-
-    // overrides declared by a merged fragment are recognized in the same invocation, in any
-    // argument order, and the explicit value wins over the fragment's
-    for (const auto& args : {std::vector<std::string>{"--merge", file.string(), "--spp", "8"},
-                             std::vector<std::string>{"--spp", "8", "--merge", file.string()}}) {
-        json config = json::parse(R"({"nodes": {"scene": {}}})");
-        EXPECT_TRUE(GraphDescription::apply_cli(config, args));
-        EXPECT_EQ(config["nodes"]["render"]["properties"]["samples per pixel"], 8);
-    }
-
-    std::filesystem::remove(file);
+    EXPECT_FALSE(stored.at("nodes").at("a").contains("outputs"));
 }
 
-TEST(GraphCli, DefaultVariantDeclaresOverride) {
-    const std::filesystem::path file =
-        std::filesystem::temp_directory_path() / "merian-test-renderer.json";
-    {
-        std::ofstream out(file);
-        out << R"({
-            "nodes": {"render": {"properties": {"samples per pixel": 2}}},
-            "cli": {"spp": {"pointer": "/nodes/render/properties/samples per pixel"}}
-        })";
-    }
-
-    json config = json::parse(R"({
-        "nodes": {"scene": {}},
-        "cli": {"renderer": {"type": "variant", "default": "pt", "variants": {"pt": {}}}}
-    })");
-    config["cli"]["renderer"]["variants"]["pt"]["merge"] = file.string();
-
-    EXPECT_TRUE(GraphDescription::apply_cli(config, {"--spp", "8"}));
-    EXPECT_EQ(config["nodes"]["render"]["properties"]["samples per pixel"], 8);
-    EXPECT_EQ(config["cli"]["renderer"]["selected"], "pt");
-
-    std::filesystem::remove(file);
-}
-
-TEST(GraphCli, VariantSticky) {
-    const json base = json::parse(R"({
-        "v": 0,
-        "cli": {"quality": {"type": "variant", "default": "high",
-                            "variants": {"low": {"set": {"/v": 1}}, "high": {"set": {"/v": 8}}}}}
-    })");
-
-    json config = base;
-    EXPECT_TRUE(GraphDescription::apply_cli(config, {}));
-    EXPECT_EQ(config["v"], 8);
-    EXPECT_EQ(config["cli"]["quality"]["selected"], "high");
-
-    // a persisted selection is not re-applied
-    config["v"] = 42;
-    EXPECT_TRUE(GraphDescription::apply_cli(config, {}));
-    EXPECT_EQ(config["v"], 42);
-
-    // an explicit selection always re-applies its patch
-    EXPECT_TRUE(GraphDescription::apply_cli(config, {"--quality", "high"}));
-    EXPECT_EQ(config["v"], 8);
-
-    EXPECT_TRUE(GraphDescription::apply_cli(config, {"--quality", "low"}));
-    EXPECT_EQ(config["v"], 1);
-    EXPECT_EQ(config["cli"]["quality"]["selected"], "low");
-}
-
-TEST(GraphCli, VariantCustomFile) {
-    const std::filesystem::path file =
-        std::filesystem::temp_directory_path() / "merian-test-custom-renderer.json";
-    {
-        std::ofstream out(file);
-        out << R"({"nodes": {"render": {"properties": {"samples per pixel": 16}}}})";
-    }
-
-    json config = json::parse(R"({
-        "nodes": {"scene": {}},
-        "cli": {"renderer": {"type": "variant", "default": "pt",
-                             "variants": {"pt": {"set": {"/nodes/scene/properties/x": 1}}}}}
-    })");
-
-    // a path merges the fragment, suppresses the default, and persists as the selection
-    EXPECT_TRUE(GraphDescription::apply_cli(config, {"--renderer", file.string()}));
-    EXPECT_EQ(config["nodes"]["render"]["properties"]["samples per pixel"], 16);
-    EXPECT_EQ(config["cli"]["renderer"]["selected"], file.string());
-    EXPECT_FALSE(config["nodes"]["scene"].contains("properties"));
-
-    json missing = json::parse(R"({
-        "cli": {"renderer": {"type": "variant", "variants": {}}}
-    })");
-    EXPECT_FALSE(GraphDescription::apply_cli(missing, {"--renderer", "does/not/exist.json"}));
-    EXPECT_FALSE(missing["cli"]["renderer"].contains("selected"));
-
-    std::filesystem::remove(file);
-}
-
-TEST(GraphCli, PatchMergeThenSet) {
-    const std::filesystem::path file =
-        std::filesystem::temp_directory_path() / "merian-test-merge-set.json";
-    {
-        std::ofstream out(file);
-        out << R"({"nodes": {"render": {"properties": {"max path length": 12}}}})";
-    }
-
-    // the set targets a node that only exists after the patch's own merge
-    json config = json::parse(R"({
-        "nodes": {"scene": {}},
-        "cli": {"renderer": {"type": "variant", "variants": {"pt": {
-            "set": {"/nodes/render/properties/max path length": 3}}}}}
-    })");
-    config["cli"]["renderer"]["variants"]["pt"]["merge"] = file.string();
-
-    EXPECT_TRUE(GraphDescription::apply_cli(config, {"--renderer", "pt"}));
-    EXPECT_EQ(config["nodes"]["render"]["properties"]["max path length"], 3);
-
-    std::filesystem::remove(file);
-}
-
-TEST(GraphCli, NullRemovesOverride) {
-    const std::filesystem::path file =
-        std::filesystem::temp_directory_path() / "merian-test-null.json";
-    {
-        std::ofstream out(file);
-        out << R"({"cli": {"max-path-length": null}})";
-    }
-
-    json config = json::parse(R"({"v": 5, "cli": {"max-path-length": {"pointer": "/v"}}})");
-    EXPECT_TRUE(GraphDescription::apply_cli(config, {"--merge", file.string()}));
-    EXPECT_FALSE(config["cli"].contains("max-path-length"));
-
-    // the removed override is no longer recognized
-    json again = config;
-    EXPECT_FALSE(GraphDescription::apply_cli(again, {"--max-path-length", "3"}));
-
-    std::filesystem::remove(file);
-}
-
-TEST(GraphCli, MergeFile) {
-    const std::filesystem::path file =
-        std::filesystem::temp_directory_path() / "merian-test-merge.json";
-    {
-        std::ofstream out(file);
-        out << R"({"nodes": {"render": {"properties": {"samples per pixel": 16}}}})";
-    }
-
-    json config = json::parse(R"({
-        "nodes": {"render": {"properties": {"samples per pixel": 2, "max path length": 5}}}
-    })");
-    EXPECT_TRUE(GraphDescription::apply_cli(config, {"--merge", file.string()}));
-    EXPECT_EQ(config["nodes"]["render"]["properties"]["samples per pixel"], 16);
-    EXPECT_EQ(config["nodes"]["render"]["properties"]["max path length"], 5);
-
-    std::filesystem::remove(file);
+TEST(GraphLoadStore, UnsupportedVersion) {
+    EXPECT_THROW(GraphDescription::from_json(json::parse(R"({"version": 3, "nodes": {}})")),
+                 std::runtime_error);
 }
 
 TEST(GraphMerge, ObjectRecurse) {
@@ -355,4 +116,55 @@ TEST(GraphMerge, AppendPrefix) {
     GraphDescription::merge_into(empty,
                                  json::parse(R"({"nodes": {"gbuffer": {"$+$outputs": ["a"]}}})"));
     EXPECT_EQ(empty, json::parse(R"({"nodes": {"gbuffer": {"outputs": ["a"]}}})"));
+}
+
+TEST(GraphDescription, ConnectionReplacesTheInputsSource) {
+    GraphDescription description;
+    description.add_node("Color", "a");
+    description.add_node("Color", "b");
+    description.add_node("Blit", "blit");
+    description.add_connection("a", "blit", "out", "src");
+    description.add_connection("b", "blit", "out", "src");
+    EXPECT_FALSE(description.remove_connection("a", "blit", "src"));
+    EXPECT_FALSE(description.to_json().at("nodes").at("a").contains("outputs"));
+    EXPECT_TRUE(description.remove_node("b"));
+    EXPECT_TRUE(description.get_nodes().at("blit").incoming_connections.empty());
+}
+
+TEST(GraphDescription, NamesWithDashesAndDotsRoundTrip) {
+    GraphDescription description;
+    description.add_node("Color", "a-b");
+    description.add_node("Blit", "c-d");
+    description.add_connection("a-b", "c-d", "out-1.x", "src-2.y");
+    const GraphDescription loaded = GraphDescription::from_json(description.to_json());
+    EXPECT_EQ(loaded.get_nodes().at("c-d").incoming_connections.at("src-2.y"),
+              (std::pair<std::string, std::string>{"a-b", "out-1.x"}));
+    EXPECT_EQ(loaded.to_json(), description.to_json());
+}
+
+TEST(GraphDescription, GeneratedIdentifiersMatchTheGraphs) {
+    GraphDescription description;
+    EXPECT_EQ(description.add_node("Color"), "Color 0");
+    EXPECT_EQ(description.add_node("Color"), "Color 1");
+    EXPECT_EQ(description.add_node("Color", "Color 2"), "Color 2");
+    EXPECT_EQ(description.add_node("Color"), "Color 3");
+
+    const ContextHandle context = Context::create({
+        .context_extensions = {MerianGraphExtension::name},
+        .application_name = "test-graph-load-store",
+    });
+    const auto alloc = context->get_context_extension<ExtensionResources>()->resource_allocator();
+    const GraphHandle graph = context->get_context_extension<MerianGraphExtension>()->create(
+        {.context = context, .resource_allocator = alloc});
+    EXPECT_EQ(graph->add_node("Color"), "Color 0");
+    EXPECT_EQ(graph->add_node("Color"), "Color 1");
+}
+
+TEST(GraphDescription, ConnectionNeedsNodes) {
+    GraphDescription description;
+    description.add_node("Color", "color");
+    EXPECT_THROW(description.add_connection("color", "missing", "out", "src"),
+                 std::invalid_argument);
+    EXPECT_THROW(description.add_connection("missing", "color", "out", "src"),
+                 std::invalid_argument);
 }

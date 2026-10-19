@@ -125,6 +125,6 @@ AnyOut::create()
 
 ## Binding
 
-`io.bind(shader_object)` writes every shader-visible port into the field of its name: input `src`
+`io.bind(shader_object)` writes every shader-visible connector into the field of its name: input `src`
 into `in_src`, output `out` into `out_out`, at the root or inside a `graph_in` / `graph_out` struct
-field. Ports without a field are skipped; unconnected optional inputs with a field receive a dummy.
+field. Connectors without a field are skipped; unconnected optional inputs with a field receive a dummy.

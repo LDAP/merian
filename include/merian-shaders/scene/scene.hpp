@@ -13,6 +13,7 @@
 #include "merian/utils/camera/camera.hpp"
 #include "merian/utils/free_list.hpp"
 #include "merian/utils/small_set.hpp"
+#include "merian/vk/command/submission.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout.hpp"
 #include "merian/vk/memory/memory_suballocator_vma.hpp"
 #include "merian/vk/memory/staging_memory_manager.hpp"
@@ -384,8 +385,8 @@ class Scene : public std::enable_shared_from_this<Scene> {
         vk::BuildAccelerationStructureFlagsKHR blas_build_flags{};
         // a mesh changed (new mesh in group -> not the same group, never true)
         bool blas_dirty = false;
-        uint32_t blas_last_built_frame = 0;
-        uint32_t blas_last_updated_frame = 0;
+        uint32_t blas_last_built_update = 0;
+        uint32_t blas_last_updated_update = 0;
         std::optional<vk::AccelerationStructureBuildSizesInfoKHR> cached_blas_size_info;
         // ----------------
 
@@ -456,11 +457,14 @@ class Scene : public std::enable_shared_from_this<Scene> {
     static SlangCompositionHandle
     query_device_support_composition(const DeviceSupportQueryInfo& query_info);
 
-    // obj_allocator binds the scene's update passes; falls back to a non-caching one.
-    void update(const CommandBufferHandle& cmd,
+    // frame 0 starts a run: restarts the learned light state and bakes all pending micromaps,
+    // submitting in between. seed decorrelates camera jitter and lens samples. obj_allocator binds
+    // the scene's update passes; falls back to a non-caching one.
+    void update(Submission& submission,
                 float time,
                 float time_diff,
                 uint32_t frame,
+                uint32_t seed,
                 const ShaderObjectAllocatorHandle& obj_allocator = nullptr);
 
     // What changed during the most recent update(). Lets consumers (e.g. temporal
@@ -710,11 +714,11 @@ class Scene : public std::enable_shared_from_this<Scene> {
     // uploads the meshes, geometry data, and instance transforms
     void upload_meshes(const CommandBufferHandle& cmd);
 
-    void build_blas(const CommandBufferHandle& cmd,
-                    const ShaderObjectAllocatorHandle& obj_allocator);
+    void build_blas(const CommandBufferHandle& cmd);
 
-    void ensure_micromaps(const CommandBufferHandle& cmd,
-                          const ShaderObjectAllocatorHandle& obj_allocator);
+    void ensure_micromaps(Submission& submission,
+                          const ShaderObjectAllocatorHandle& obj_allocator,
+                          const bool complete);
     void build_tlas(const CommandBufferHandle& cmd);
 
     // Grows one shared buffer: re-suballocates every live region into a new backing buffer and
@@ -796,7 +800,8 @@ class Scene : public std::enable_shared_from_this<Scene> {
     std::vector<std::optional<Node>> scene_graph; // sized to node_ids.size()
     bool pretransform_animated = false;
     float blas_rebuild_fraction = 0.33f;
-    uint32_t current_frame = 0;
+    uint32_t update_count = 0;
+    bool starting_run = true;
 
     std::unique_ptr<Micromaps> micromaps;
     ShaderObjectAllocatorHandle fallback_obj_allocator;

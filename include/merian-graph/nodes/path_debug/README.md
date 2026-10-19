@@ -7,25 +7,27 @@ what arms capture in the renderer — while no debugger consumes the stream, not
 and the recorder hooks compile to nothing.
 
 ```
-merian-graph-run examples/pbrt.json scene.pbrt --merge examples/mixins/debug.json
+python examples/graph_run.py examples/pbrt.json scene.pbrt --mixin debug
 ```
 
-The mixin appends the record connection to whatever renderer is selected, so a `--renderer` of its
-own has to come first:
+Everything below is reachable from the node's UI: its own window, drawn with the panels over the
+window it presents to, otherwise its properties, e.g. in the graph editor
+(`examples/graph_editor.py`). The window groups them into **Select** (the pick, expressions,
+constraints), **Draw** (overlay and backdrop), **Analyze** (maps and panels, BSDF, paths, pixels,
+heat grid) and **Capture** (freeze, subsampling, export); the properties list the same controls
+under `selection`, `overlay`, `backdrop`, `directional maps`, `scene heatmap`, `per-pixel
+statistics`, `capture` and `export`.
 
-```
-merian-graph-run examples/pbrt.json scene.pbrt --renderer pt_mcpg --merge examples/mixins/debug.json
-```
-
-Everything below is reachable from the node's UI. Click the image to pick, escape to clear,
-ctrl+scroll to widen the region; the same values are editable as numbers under `selection`.
+**Alt + click** the image to pick; a plain click and drag stays with the camera. Escape clears the
+pick, ctrl+scroll widens the region, and scrolling over the panels pages them. The same values are
+editable as numbers under `selection`.
 
 ## The four axes
 
 | Axis | Answers | Controls |
 | --- | --- | --- |
 | **selection** | which paths am I looking at | the pick and what it restricts, two path expressions, scatter/method/material constraints |
-| **overlay** | which of them are drawn as lines | `paths from`, `keep` (spread over the image / brightest / brightest fraction / resampled by contribution / most recent), `max paths`, `depth test`, `thickness`, colour, isolate |
+| **overlay** | which of them are drawn as lines | `paths from`, `keep` (see below), `max paths`, `depth test`, `thickness`, colour (luminance by default), `isolate path` |
 | **backdrop** | what the lines are drawn on | the render (default), the filtered paths re-rendered, a reference image, difference, splits |
 | **analysis** | what the panels measure | directional maps, heat grid, per-pixel statistics — each with its own `paths from` |
 
@@ -55,42 +57,71 @@ shows that such a path was traced at all: `NaN or infinite only` is the view tha
 then points at them — the heatmap places them in the scene, and the inspector marks the vertex the
 contribution stopped being finite at.
 
+### When the camera moves
+
+The region is a sphere in the world and stays where it was picked either way. What else happens
+is `reproject`'s choice, off by default since a BSDF seen from elsewhere is a different
+distribution:
+
+| `reproject` | the pick | the overlay |
+| --- | --- | --- |
+| off | stays on its pixel, which now sees another surface | the kept paths start over with what the new view traces |
+| on | follows its surface point; `the pick is offscreen` while it projects outside the view, and moving back brings it back, its statistics accumulating anew | the kept paths stay, drawn from their world positions with the current camera |
+
+So the paths through a region behind the glass of a canopy thin out once the camera backs away:
+from there few traced paths cross it. To keep the ones on screen, turn on `reproject`, or `freeze`
+the capture first; frozen records keep matching the pixel they were
+traced through, and with `reproject` one orbits around them in 3D, dashed where geometry hides
+them under `dash behind geometry`.
+
+### Which paths are drawn
+
+| `keep` | draws |
+| --- | --- |
+| `most recent` | the latest matching paths over frames; a frame matching more than fit keeps a uniform share |
+| `brightest` | the `max paths` brightest matching paths since the last change, those of a picked pixel included |
+| `brightest fraction` | that share of the frame's brightest paths |
+| `resampled by contribution` | `max paths` paths drawn without replacement, proportionally to contribution (A-ES, Efraimidis and Spirakis 2006), from a history that fades over `history` |
+
+All but `brightest fraction` keep at most 64 paths.
+
 ## Use cases
 
 | Goal | How |
 | --- | --- |
-| Debug a reference path tracer | connect the debugger, leave everything default: a representative sample of the frame's paths draws over the render |
-| Top-k contributing paths | overlay `keep: brightest`, `max paths: k` |
-| The last N paths of a pixel | click it, overlay `keep: most recent`, `max paths: N`; the slots keep the latest matching paths over frames and clear on a new pick |
-| The last N paths of a kind | as above, plus `expression A`: `.N` direct NEE, `.*T.+N` NEE after a refraction, `.*S.+N` after a specular event |
-| Representative paths | overlay `keep: resampled by contribution`, `max paths: 1`; each slot holds one path drawn proportionally to its contribution from every path since the last change |
+| Debug a reference path tracer | connect the debugger, leave everything default: the most recent paths, a uniform sample of the frame, draw over the render |
+| Top-k contributing paths | overlay `keep: brightest`, `max paths: k`; with a picked pixel, the k brightest of that pixel |
+| The last N paths of a pixel | alt+click it, overlay `keep: most recent`, `max paths: N`; the slots keep the latest matching paths over frames and clear on a new pick |
+| The last N paths of a kind | as above, plus `expression a`: `.N` direct NEE, `.*T.+N` NEE after a refraction, `.*S.+N` after a specular event |
+| Representative paths | overlay `keep: resampled by contribution`, `max paths: k`; k paths drawn without replacement, proportionally to contribution, from the recent history (`history`, 0 = every path since the last change) |
 | Fireflies | overlay `keep: brightest fraction`, `brightest fraction: 1e-4`; the inspector lists them and dissects one vertex by vertex |
-| NaN or infinite paths | `--debug nonfinite`, or selection `contribution: NaN or infinite only`; the heatmap shows where they come from and the inspector marks the vertex that broke |
+| NaN or infinite paths | `--mixin debug_nonfinite`, or selection `contribution: NaN or infinite only`; the heatmap shows where they come from and the inspector marks the vertex that broke |
 | Paths of a certain length | selection `scatter events: [min, max]` |
-| Paths matching a path expression | selection `expression A`, e.g. `.*<T>.*` (contains a transmission), `.{3,}` (three or more events), `N` (connected to a light by NEE), `.D.N` (NEE from the third vertex, the second one diffuse) |
+| Paths matching a path expression | selection `expression a`, e.g. `.*<T>.*` (contains a transmission), `.{3,}` (three or more events), `N` (connected to a light by NEE), `.D.N` (NEE from the third vertex, the second one diffuse) |
 | Only these paths' contribution | backdrop `selection A`; it accumulates until the selection changes |
-| Compare two classes of transport | `expression A` and `expression B`, backdrop `A \| B` |
-| Paths through a surface point | click the scene, `restrict to: paths through the region` |
-| Everything one pixel does | click a pixel, `restrict to: the picked pixel`, capture `picked pixel only` for full-rate sampling of it |
-| BSDF sampling vs pdf | as above, plus maps `frame: local shading frame`, `bounce: 0`, panels `density` + `BSDF pdf` + `density / pdf` + `z-score` |
+| Compare two classes of transport | `expression a` and `expression b`, backdrop `A \| B` |
+| Paths through a surface point | alt+click the scene, `restrict to: paths through the region` |
+| Orbit around paths | `reproject`, optionally `freeze`, and move the camera |
+| Everything one pixel does | alt+click a pixel, `restrict to: the picked pixel`, capture `picked pixel only` for full-rate sampling of it |
+| BSDF sampling vs pdf | as above, maps `bounce: 0` (the local shading frame is the default), panels `density` + `BSDF pdf` + `density / pdf` + `z-score` |
 | Is the BSDF itself consistent | `check BSDF` in the window's `BSDF` tab: the whole GPU samples the picked surface's BSDF into the `BSDF check` panel — it must match `BSDF pdf`, renderer out of the loop — and validates it there. Clears with the maps (new pick, camera move, reset) |
-| How good is the pdf as a guiding target | panel `BSDF eval`: `f * cos` per bin, the distribution an ideal sampler would follow. `TV vs pdf` is how far the pdf is from it, `albedo` its integral |
+| How good is the pdf as a guiding target | panel `BSDF eval`: `f * cos` per bin, the distribution an ideal sampler would follow. `total variation vs pdf` is how far the pdf is from it, `albedo` its integral |
 | The BSDF from another direction | the `BSDF` tab's direction picker (or maps `incident direction: manual`); the pdf, eval and check references follow it, the comparisons against the records grey out |
 | Where a sampler sends its rays | maps `paths from: all paths`, panel `density` |
 | Where energy comes from in the scene | heat `mode: contribution` |
 | Which pixels are still noisy | per-pixel statistics `overlay: relative error` |
-| What one pixel's estimate is doing | click it; the convergence tab plots its mean and variance over time next to the current values |
-| Is my method unbiased | the Error Plot node, or `scripts/eval.py` for several methods at once |
+| What one pixel's estimate is doing | alt+click it; the `pixels` tab plots its mean and variance over time next to the current values |
+| Is my method unbiased | the Error Plot node, or `examples/compare_methods.py` for several methods at once |
 | Which technique sampled each segment | overlay `color: technique`; next-event connections draw from their vertex to the light |
-| Which paths used a technique | selection `method` (BSDF, guiding, ReSTIR, light …) |
+| Which paths used a technique | selection `sampling method` (BSDF, guiding, ReSTIR, light …) |
 | Follow a path behind or inside geometry | overlay `depth test: off (x-ray)`, or `dash behind geometry` to keep the depth cue |
 
 ## What it looks like
 
 ### Paths over the render
 
-The default view: a representative sample of the frame's recorded paths drawn over the input
-image, coloured by scatter count, green at the first vertex and red where a path terminates.
+The default view: the most recent recorded paths, a uniform sample of the frame, drawn over the
+input image, coloured by luminance, green at the first vertex and red where a path terminates.
 
 ![paths over the render](images/overview.jpg)
 
@@ -160,6 +191,25 @@ panels are, top to bottom, the sampled direction density, the BSDF pdf evaluated
 their ratio, and the Poisson z-score of the counts against the pdf. **chi2/dof ≈ 1 means the
 sampler draws from the density it claims** — here 0.96 over 798 samples of one pixel.
 
+The panels lie over the right edge of the window at a fixed size at the window's display scale,
+whatever the render resolution or how the image is fitted; scroll over them to page, hover a bin
+for its values. The line under `density` names what it binned:
+
+| panel | shows | needs a pick |
+| --- | --- | --- |
+| `density` | sampled directions per steradian at `bounce`, over the paths of the maps' `paths from`. With nothing picked these are every pixel's paths in the world frame: where the renderer sends its rays from the whole image, e.g. towards a window or a light | no |
+| `contribution`, `mean color`, `mean lum` | the radiance that came back along each direction, per steradian or per sample | no |
+| `BSDF pdf` | the material's own pdf at the picked surface, evaluated in closed form per direction for the incident direction; independent of what the renderer drew | yes |
+| `density / pdf`, `z-score` | the density tested against the `pdf reference` | the picked pixel at bounce 0 |
+| `BSDF check`, `BSDF eval` | the BSDF sampled on the GPU, and `f * cos` | yes |
+
+`pdf reference` decides what `density / pdf` and `z-score` compare against. `BSDF pdf` is the
+material's analytic pdf, which tests a BSDF sampler. `recorded pdf` is the pdf every sampler
+stored with each of its own samples (BSDF, guiding, light, 1/W of a resampled sample), tested via
+E[sum 1/pdf] = draws * omega per bin; it is the only reference for samplers without a closed form.
+The local shading frame needs the picked surface; without a visible pick the maps bin in the world
+frame.
+
 ![sampling analysis](images/sampling.jpg)
 
 Panels share one scale where they are comparable, so agreeing distributions render as identical
@@ -199,8 +249,8 @@ the wallpaper are still an order of magnitude noisier than the lit floor.
 
 ### Which technique sampled what
 
-`method: guiding` keeps the paths a guided sampler steered. On veach-ajar they crowd the door gap,
-which is what the guiding distribution is there to find.
+`sampling method: guiding` keeps the paths a guided sampler steered. On veach-ajar they crowd the
+door gap, which is what the guiding distribution is there to find.
 
 ![guided paths](images/guided.jpg)
 
@@ -212,10 +262,10 @@ plots MSE / RMSE / MAE / relative MSE. On logarithmic axes it fits the slope, wh
 diagnostic - an unbiased estimator holds the Monte Carlo rate (-1/2 for RMSE and MAE, -1 for the
 squared metrics) while one converging to a different image flattens onto its bias floor.
 Converging a renderer you trust and snapshotting it turns the plot into a bias test with no file
-in between, and `Convergence csv` writes the series out.
+in between, and `convergence csv` writes the series out.
 
-For comparing several methods at once, `scripts/eval.py` does it headlessly: it renders each
-variant, captures at every power of two, and produces an image grid, convergence plots against
+For comparing several methods at once, `examples/compare_methods.py` does it headlessly: it renders
+each variant, captures at every power of two, and produces an image grid, convergence plots against
 samples and against time, and a report.
 
 ## Reading the numbers
@@ -229,11 +279,12 @@ samples and against time, and a report.
   technique at a time: maps `draws` is `scatter directions` or `light connections`, the latter being
   the only draw of ReSTIR DI.
 - **chi2/dof** — needs `restrict to: the picked pixel` and `bounce: 0`, so every draw shares one
-  support. `BSDF pdf` compares scatter directions against the material; `recorded pdf` tests each
-  sampler against the density it claims per sample (E[sum 1/pdf] = draws * omega per bin), which
-  also works for guided and resampled samplers that have no closed-form pdf. A resampled sample
-  records its contribution weight 1/W, for which the identity holds inside the target's support
-  (Lin et al. 2022, GRIS): with light draws, bins on the edge of the observed support are left out.
+  support. `pdf reference: BSDF pdf` compares scatter directions against the material;
+  `recorded pdf` tests each sampler against the density it claims per sample (E[sum 1/pdf] =
+  draws * omega per bin), which also works for guided and resampled samplers that have no
+  closed-form pdf. A resampled sample records its contribution weight 1/W, for which the identity
+  holds inside the target's support (Lin et al. 2022, GRIS): with light draws, bins on the edge of
+  the observed support are left out.
   A bin the support covers only in part still reads low: the direct light of a surface next to an
   occluder is such a case, so test on a pixel that sees the lights unobstructed.
   A correct sampler gives chi2/dof = 1 with a standard deviation of sqrt(2 / dof), 1 ± 0.14 over
@@ -258,7 +309,7 @@ At 1920x1080 on an RX 7900 XTX: 0.37 ms over the whole image, 0.09 ms for one pi
 with both filter slots re-rendering. Recording adds about 0.5 ms to the path tracer; unconnected it
 costs nothing.
 
-Whole-image map scopes sample the stream (`analysis paths / frame`) instead of walking every
+Whole-image map scopes sample the stream (`analysis paths per frame`) instead of walking every
 recorded vertex, and pause while neither panels, sphere nor the debugger window show them. The
 per-pixel statistics run only while their overlay, the hover probe or the convergence tab reads
 them. The heat grid is a fixed cost per frame in the grid size.

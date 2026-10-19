@@ -1,0 +1,9 @@
+{
+    "presets": {
+        "denoiser": {
+            "folder": "denoisers",
+            "default": "none",
+            "order": 1
+        }
+    }
+}

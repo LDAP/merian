@@ -15,7 +15,7 @@ struct PushConstant {
     float q;
 
     float shutter_time;
-    float aperature;
+    float aperture;
 
     float K;
     float speed_up;

@@ -1,39 +1,15 @@
 {
-    "cli": {
-        "volume": {
-            "default": "off",
-            "type": "variant",
-            "variants": {
-                "off": {},
-                "on": {
-                    "merge": [
-                        "renderers/volume.json",
-                        "renderers/volume_scene.json",
-                        "denoisers/volume_svgf.json"
-                    ],
-                    "set": {
-                        "/nodes/svgf/outputs": [
-                            "out->add.input_0",
-                            "out->svgf.prev_out"
-                        ]
-                    }
-                }
-            }
-        }
-    },
     "nodes": {
         "accumulate": {
             "enabled": true,
             "outputs": [
-                "history->accumulate.prev_history",
                 "history->svgf.history",
-                "out->accumulate.prev_out",
                 "out->svgf.src"
             ],
             "properties": {
-                "IPR factor": 50.0,
+                "ipr factor": 50.0,
                 "adaptivity": 0.95,
-                "adaptivity IPR factor": 1.5,
+                "adaptivity ipr factor": 1.5,
                 "adaptivity percentile lower": 0.05000000074505806,
                 "adaptivity percentile upper": 0.949999988079071,
                 "alpha": 0.95,
@@ -75,8 +51,7 @@
         "svgf": {
             "enabled": true,
             "outputs": [
-                "out->exposure.src",
-                "out->svgf.prev_out"
+                "out->exposure.src"
             ],
             "properties": {
                 "iterations": 5,

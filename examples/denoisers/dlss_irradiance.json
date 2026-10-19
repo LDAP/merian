@@ -1,9 +1,0 @@
-{
-    "nodes": {
-        "render": {
-            "$+$outputs": [
-                "irradiance->dlss.src"
-            ]
-        }
-    }
-}

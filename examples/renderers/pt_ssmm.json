@@ -1,4 +1,7 @@
 {
+    "include": [
+        "pt.json"
+    ],
     "nodes": {
         "gbuffer": {
             "$+$outputs": [

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "merian/vk/window/surface.hpp"
+#include "merian/fwd.hpp"
 #include "merian/vk/window/window_listener.hpp"
 #include <functional>
 #include <memory>
@@ -37,7 +37,7 @@ class InputController;
 using InputControllerHandle = std::shared_ptr<InputController>;
 
 /*
- * Abstract window interface. Implemented by GLFWWindow and SDLWindow.
+ * Abstract window interface.
  *
  * poll_events() drains the platform event queue and dispatches all callbacks
  * (both window-level and input).
@@ -60,7 +60,7 @@ class Window : public std::enable_shared_from_this<Window> {
     // On non-HiDPI displays this equals framebuffer_extent().
     virtual vk::Extent2D window_extent() = 0;
 
-    virtual SurfaceHandle get_surface() = 0;
+    virtual SwapchainHandle create_swapchain(const ContextHandle& context) = 0;
 
     // Returns true if the user has requested to close this window.
     virtual bool should_close() const = 0;

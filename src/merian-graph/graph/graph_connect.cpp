@@ -1,4 +1,6 @@
 #include "merian-graph/graph/graph.hpp"
+#include "merian/utils/hash.hpp"
+#include "merian/utils/string.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -19,7 +21,7 @@ void Graph::connect() {
 }
 
 void Graph::connect_graph() {
-    ProfilerHandle profiler = std::make_shared<Profiler>(context);
+    const ProfilerHandle profiler = std::make_shared<Profiler>(context);
     const ScopedDefaultProfiler scoped_default_profiler{profiler};
     try {
         MERIAN_PROFILE_SCOPE(profiler, "connect");
@@ -28,7 +30,7 @@ void Graph::connect_graph() {
 
         // fresh per build: descriptor caches must not outlive the topology they were made for
         shader_object_allocator = std::make_shared<FrameCachingShaderObjectAllocator>(
-            resource_allocator, ring_fences.size());
+            resource_allocator, static_cast<uint32_t>(in_flight.size()));
 
         if (node_data.empty()) {
             reset_connections();
@@ -38,6 +40,8 @@ void Graph::connect_graph() {
 
         {
             MERIAN_PROFILE_SCOPE(profiler, "notify nodes");
+            // before the nodes compile, so they pick up edited files
+            reload_shaders();
             send_graph_event("connect");
         }
 
@@ -58,8 +62,12 @@ void Graph::connect_graph() {
             MERIAN_PROFILE_SCOPE(profiler, "connect nodes");
             if (!connect_nodes(topology)) {
                 SPDLOG_WARN("connecting nodes failed, connecting again");
-                needs_reconnect = true;
+                request_reconnect();
                 return;
+            }
+            // after the subgraphs made their children
+            for (auto& [node, data] : node_data) {
+                data.seed = xxhash32(settings.seed, fnv1a32(data.identifier));
             }
         }
 
@@ -80,14 +88,11 @@ void Graph::connect_graph() {
 
         {
             MERIAN_PROFILE_SCOPE(profiler, "on_connected");
-            Submission submission(context, queue, cpu_queue);
+            Submission submission(context, queue);
             // last: their initialization must survive the others sharing their memory
             for (const bool read_before_written : {false, true}) {
                 if (read_before_written) {
-                    submission.get_cmd()->barrier(vk::MemoryBarrier2{
-                        vk::PipelineStageFlagBits2::eAllCommands, vk::AccessFlagBits2::eMemoryWrite,
-                        vk::PipelineStageFlagBits2::eAllCommands,
-                        vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite});
+                    submission.get_cmd()->barrier(FULL_MEMORY_BARRIER);
                 }
                 for (const auto& layer : layers)
                     for (const NodeHandle& node : layer.nodes) {
@@ -120,12 +125,18 @@ void Graph::connect_graph() {
                     Node::NodeStatusFlags flags = 0;
                     collect_node_errors(data.errors_queued, [&] {
                         flags = node->on_connected(
-                            io_layout, io, NodeConnectionInfo{ring_fences.size()}, submission);
+                            io_layout, io,
+                            NodeConnectionInfo{.iterations_in_flight =
+                                                   static_cast<uint32_t>(in_flight.size()),
+                                               .identifier = data.identifier},
+                            submission);
                     });
-                    needs_reconnect |= (flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT) != 0u;
+                    if ((flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT) != 0u) {
+                        request_reconnect();
+                    }
                     if ((flags & Node::NodeStatusFlagBits::RESET_IN_FLIGHT_DATA) != 0u) {
-                        for (uint32_t i = 0; i < ring_fences.size(); i++) {
-                            ring_fences.get(i).user_data.in_flight_data.erase(node);
+                        for (InFlightData& slot : in_flight) {
+                            slot.in_flight_data.erase(node);
                         }
                     }
                     if ((flags & Node::NodeStatusFlagBits::REMOVE_NODE) != 0u) {
@@ -134,7 +145,7 @@ void Graph::connect_graph() {
                     if (!data.errors_queued.empty()) {
                         SPDLOG_ERROR("on_connected of {} failed:\n - {}", data.label,
                                      fmt::join(data.errors_queued, "\n - "));
-                        needs_reconnect = true;
+                        request_reconnect();
                     }
                 }
             if (!needs_reconnect) {
@@ -144,22 +155,44 @@ void Graph::connect_graph() {
             }
 
             submission.finish();
+            submission.run_submitted_callbacks(async_runner);
             queue->wait_idle();
+            submission.reset(async_runner);
         }
     } catch (...) {
         // resources may be half allocated
-        needs_reconnect = true;
+        request_reconnect();
         throw;
     }
 
-    {
-        MERIAN_PROFILE_SCOPE(profiler, "register user event listener");
-        for (const auto& [event_pattern, event_listener] : user_event_pattern_listener) {
-            register_event_listener_for_connect(event_pattern, event_listener);
+    std::vector<GraphEvent::Pattern> imgui_patterns;
+    split(settings.imgui_event, ",", [&](const std::string& event_name) {
+        if (!event_name.empty()) {
+            imgui_patterns.push_back({.event_name = event_name});
         }
+    });
+    register_event_listener_for_connect(
+        nullptr, imgui_patterns, [this](const GraphEvent::Info&, const GraphEvent::Data& data) {
+            if (Properties* const* props = std::any_cast<Properties*>(&data)) {
+                draw_ui(**props);
+            }
+        });
+
+    const auto inactive = get_inactive_nodes();
+    if (!inactive.empty()) {
+        std::vector<std::string> lines;
+        for (const auto& [identifier, reason] : inactive) {
+            lines.push_back(fmt::format("{}: {}", identifier, reason));
+        }
+        SPDLOG_WARN("{} node(s) are NOT running:\n - {}", lines.size(), fmt::join(lines, "\n - "));
     }
 
-    std::vector<std::string> dead_nodes;
+    build_report = profiler->get_report(Profiler::Period::INTERVAL);
+    reset_run();
+}
+
+std::vector<std::pair<std::string, std::string>> Graph::get_inactive_nodes() const {
+    std::vector<std::pair<std::string, std::string>> inactive;
     for (const auto& [node, data] : node_data) {
         if (!data.enabled || (data.parent && !node_data.at(data.parent).runs())) {
             continue;
@@ -167,29 +200,25 @@ void Graph::connect_graph() {
         // on_connected errors are only queued
         const std::vector<std::string>& errors =
             data.errors.empty() ? data.errors_queued : data.errors;
+        std::string reason;
         if (!errors.empty()) {
-            dead_nodes.push_back(fmt::format("{}: {}", data.label, fmt::join(errors, "; ")));
+            reason = fmt::format("{}", fmt::join(errors, "; "));
         } else if (data.force_disabled) {
-            dead_nodes.push_back(fmt::format("{}: {}", data.label, data.force_disabled_reason));
+            reason = data.force_disabled_reason;
         } else if (data.unsupported) {
-            dead_nodes.push_back(fmt::format("{}: {}", data.label, data.unsupported_reason));
+            reason = data.unsupported_reason;
+        } else {
+            continue;
         }
+        inactive.emplace_back(data.identifier, fmt::format("({}) {}", data.type_name, reason));
     }
-    if (!dead_nodes.empty()) {
-        std::ranges::sort(dead_nodes);
-        SPDLOG_WARN("{} node(s) are NOT running:\n - {}", dead_nodes.size(),
-                    fmt::join(dead_nodes, "\n - "));
-    }
-
-    run_iteration = 0;
-    last_build_report = profiler->get_report();
-    time_connect_reference = std::chrono::high_resolution_clock::now();
-    duration_elapsed_since_connect = 0ns;
+    std::ranges::sort(inactive);
+    return inactive;
 }
 
 void Graph::reset_connections() {
     layers.clear();
-    memory_view_dirty = true;
+    ui.memory_view_dirty = true;
     for (auto& [node, data] : node_data) {
         data.reset();
     }
@@ -283,11 +312,11 @@ bool writes_in_place(const graph_internal::NodeData& data, const std::string& in
 }
 } // namespace
 
-std::optional<graph_internal::Port> Graph::auto_connection_source(
+std::optional<graph_internal::ConnectorRef> Graph::auto_connection_source(
     const NodeHandle& node,
     const NodeData& data,
     std::string input,
-    const std::function<std::optional<Port>(const std::string&)>& source_of) {
+    const std::function<std::optional<ConnectorRef>(const std::string&)>& source_of) {
     for (std::unordered_set<std::string> followed; followed.insert(input).second;) {
         const auto connector = data.input_connector_for_name.find(input);
         if (connector == data.input_connector_for_name.end()) {
@@ -295,13 +324,13 @@ std::optional<graph_internal::Port> Graph::auto_connection_source(
         }
         const AutoConnect& auto_connect = data.input_descriptors.at(connector->second).auto_connect;
         if (auto_connect.from == AutoConnect::From::OUTPUT) {
-            return Port{node, auto_connect.name};
+            return ConnectorRef{node, auto_connect.name};
         }
         if (auto_connect.from != AutoConnect::From::INPUT) {
             return std::nullopt;
         }
         input = auto_connect.name;
-        if (std::optional<Port> source = source_of(input)) {
+        if (std::optional<ConnectorRef> source = source_of(input)) {
             return source;
         }
     }
@@ -376,7 +405,7 @@ bool Graph::connect_nodes(std::vector<NodeHandle>& topology) {
                 desired == data.desired_incoming_connections.end()) {
                 continue;
             }
-            const Port source = desired->second;
+            const ConnectorRef source = desired->second;
             if (!remove_connection(connection.src, connection.dst, connection.dst_input)) {
                 continue;
             }
@@ -436,12 +465,12 @@ void Graph::materialize_auto_connections() {
                 continue;
             }
             if (!data.desired_incoming_connections.contains(descriptor.name)) {
-                const std::optional<Port> source = auto_connection_source(
+                const std::optional<ConnectorRef> source = auto_connection_source(
                     node, data, descriptor.name, [&](const std::string& followed) {
                         const auto connected = data.desired_incoming_connections.find(followed);
                         return connected == data.desired_incoming_connections.end()
                                    ? std::nullopt
-                                   : std::optional<Port>(connected->second);
+                                   : std::optional<ConnectorRef>(connected->second);
                     });
                 const auto rejected = data.rejected_auto_connections.find(descriptor.name);
                 // once the followed input is connected, to a source other than the rejected
@@ -468,44 +497,53 @@ std::optional<graph_internal::Connection> Graph::wiring(NodeHandle node, std::st
             source != data.subgraph_sources.end()) {
             return Connection{source->second.node, source->second.name, node, input};
         }
-        const auto port = data.public_feeds.find(input);
-        if (port == data.public_feeds.end()) {
+        const auto public_input = data.public_feeds.find(input);
+        if (public_input == data.public_feeds.end()) {
             return std::nullopt;
         }
-        input = port->second;
+        input = public_input->second;
         node = data.parent;
     }
 }
 
-graph_internal::Port Graph::follow(Port port) const {
+graph_internal::ConnectorRef Graph::follow(ConnectorRef output) const {
     for (std::set<std::pair<NodeHandle, std::string>> passed;
-         passed.emplace(port.node, port.name).second;) {
-        const NodeData& data = node_data.at(port.node);
+         passed.emplace(output.node, output.name).second;) {
+        const NodeData& data = node_data.at(output.node);
         std::optional<Connection> received;
-        if (const auto input = data.pass_through_inputs.find(port.name);
+        if (const auto input = data.pass_through_inputs.find(output.name);
             !data.enabled && input != data.pass_through_inputs.end()) {
-            received = wiring(port.node, input->second);
+            received = wiring(output.node, input->second);
         }
         if (!received) {
-            if (const auto child = data.public_outputs.find(port.name);
+            if (const auto child = data.public_outputs.find(output.name);
                 child != data.public_outputs.end()) {
-                port = child->second;
+                output = child->second;
                 continue;
             }
-            if (!data.runs() && writes_in_place(data, port.name)) {
-                received = wiring(port.node, port.name);
+            if (!data.runs() && writes_in_place(data, output.name)) {
+                received = wiring(output.node, output.name);
             }
         }
         if (!received) {
             break;
         }
-        port = {received->src, received->src_output};
+        output = {received->src, received->src_output};
     }
-    return port;
+    return output;
 }
 
-std::optional<graph_internal::Connection>
-Graph::direct_connection(Port consumer, const Connection& wired, const Port& source) const {
+graph_internal::ConnectorRef Graph::carrier(ConnectorRef output) const {
+    for (auto child = node_data.at(output.node).public_outputs.find(output.name);
+         child != node_data.at(output.node).public_outputs.end();
+         child = node_data.at(output.node).public_outputs.find(output.name)) {
+        output = child->second;
+    }
+    return output;
+}
+
+std::optional<graph_internal::Connection> Graph::direct_connection(
+    ConnectorRef consumer, const Connection& wired, const ConnectorRef& source) const {
     // the wiring of a subgraph is no desired connection
     if (node_data.at(wired.dst).parent) {
         return std::nullopt;
@@ -513,20 +551,15 @@ Graph::direct_connection(Port consumer, const Connection& wired, const Port& sou
     // an auto connection to a public input is not what the user wired
     while (consumer.node != wired.dst) {
         const NodeData& data = node_data.at(consumer.node);
-        const std::string& port = data.public_feeds.at(consumer.name);
-        if (std::ranges::find(node_data.at(data.parent).public_inputs.at(port), consumer) ==
-            node_data.at(data.parent).public_inputs.at(port).end()) {
+        const std::string& public_input = data.public_feeds.at(consumer.name);
+        if (std::ranges::find(node_data.at(data.parent).public_inputs.at(public_input), consumer) ==
+            node_data.at(data.parent).public_inputs.at(public_input).end()) {
             return std::nullopt;
         }
-        consumer = {data.parent, port};
+        consumer = {data.parent, public_input};
     }
-    Port port{wired.src, wired.src_output};
-    for (auto child = node_data.at(port.node).public_outputs.find(port.name);
-         child != node_data.at(port.node).public_outputs.end();
-         child = node_data.at(port.node).public_outputs.find(port.name)) {
-        port = child->second;
-    }
-    if (port != source || writes_in_place(node_data.at(source.node), source.name)) {
+    if (carrier({wired.src, wired.src_output}) != source ||
+        writes_in_place(node_data.at(source.node), source.name)) {
         return std::nullopt;
     }
     return wired;
@@ -541,7 +574,7 @@ graph_internal::InputDecision Graph::decide_input(const NodeHandle& node,
     if (!wired) {
         return {.kind = Kind::UNCONNECTED};
     }
-    const Port source = follow({wired->src, wired->src_output});
+    const ConnectorRef source = follow({wired->src, wired->src_output});
     const NodeData& source_data = node_data.at(source.node);
     const auto reject = [&](const Kind kind, const std::string& reason, const bool removable) {
         const std::optional<Connection> direct =
@@ -630,7 +663,8 @@ bool Graph::apply_decision(NodeData& data,
     }
     if (decision.kind != Kind::CONNECTED && !descriptor.optional) {
         if (decision.kind == Kind::UNCONNECTED) {
-            data.errors.emplace_back(make_error_input_not_connected(input, data));
+            data.errors.emplace_back(fmt::format(
+                "the non-optional input {} on {} is not connected.", descriptor.name, data.label));
             SPDLOG_WARN("{}", data.errors.back());
         } else if (decision.kind == Kind::STOPPED) {
             force_disable(data, decision.reason);
@@ -1043,12 +1077,6 @@ bool Graph::validate_in_place_writes(const std::vector<NodeHandle>& nodes) {
         }
     }
     return valid;
-}
-
-std::string Graph::make_error_input_not_connected(const InputConnectorHandle& input,
-                                                  const NodeData& data) {
-    return fmt::format("the non-optional input {} on {} is not connected.",
-                       data.input_descriptors.at(input).name, data.label);
 }
 
 } // namespace merian

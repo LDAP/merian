@@ -1,0 +1,18 @@
+{
+    "nodes": {
+        "display": {
+            "$+$outputs": [
+                "canvas->imgui.canvas"
+            ]
+        },
+        "imgui": {
+            "enabled": true,
+            "type": "ImGui"
+        },
+        "output": {
+            "$+$outputs": [
+                "window->imgui.window"
+            ]
+        }
+    }
+}

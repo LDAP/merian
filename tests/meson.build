@@ -2,56 +2,47 @@ gtest_main_dep = dependency('gtest', main : true, fallback: ['gtest', 'gtest_mai
 
 test_shader_dir_arg = '-DTEST_SHADER_DIR="' + meson.current_source_dir() + '"'
 
-test_free_list = executable(
-    'test-free-list',
-    'test_free_list.cpp',
-    dependencies: [merian_dep, gtest_main_dep],
-)
-test('free_list', test_free_list, timeout: 30)
-
-test_small_vector = executable(
-    'test-small-vector',
-    'test_small_vector.cpp',
-    dependencies: [merian_dep, gtest_main_dep],
-)
-test('small_vector', test_small_vector, timeout: 30)
-
-test_small_set = executable(
-    'test-small-set',
-    'test_small_set.cpp',
-    dependencies: [merian_dep, gtest_main_dep],
-)
-test('small_set', test_small_set, timeout: 30)
-
-test_versioned = executable(
-    'test-versioned',
-    'test_versioned.cpp',
-    dependencies: [merian_dep, gtest_main_dep],
-)
-test('versioned', test_versioned, timeout: 30)
-
-if get_option('glfw').enable_auto_if(glfw.found()).enabled() and host_machine.system() == 'linux'
-    test_extension_glfw = executable(
-        'test-extension-glfw',
-        'test_extension_glfw.cpp',
+test_timeouts = {
+    'free_list': 30,
+    'gbuffer_layout': 120,
+    'geometry_utils': 30,
+    'graph_connections': 120,
+    'graph_data_flow': 300,
+    'graph_edit': 300,
+    'graph_in_place': 300,
+    'graph_load_store': 120,
+    'graph_memory': 120,
+    'graph_run': 120,
+    'graph_subgraphs': 300,
+    'host_nodes': 120,
+    'memory_allocator_tracking': 120,
+    'memory_allocator_transient': 120,
+    'node_properties': 120,
+    'omm_bake': 60,
+    'path_expression': 30,
+    'path_debug_resample': 30,
+    'properties_json_load': 30,
+    'small_set': 30,
+    'small_vector': 30,
+    'svgf': 120,
+    'versioned': 30,
+}
+foreach name, timeout : test_timeouts
+    test(name, executable(
+        'test-' + name.replace('_', '-'),
+        'test_' + name + '.cpp',
         dependencies: [merian_dep, gtest_main_dep],
-    )
-    test('extension_glfw', test_extension_glfw, timeout: 60)
-endif
+    ), timeout: timeout)
+endforeach
 
-test_geometry_utils = executable(
-    'test-geometry-utils',
-    'test_geometry_utils.cpp',
-    dependencies: [merian_dep, gtest_main_dep],
-)
-test('geometry_utils', test_geometry_utils, timeout: 30)
-
-test_omm_bake = executable(
-    'test-omm-bake',
-    'test_omm_bake.cpp',
-    dependencies: [merian_dep, gtest_main_dep],
-)
-test('omm_bake', test_omm_bake, timeout: 60)
+foreach name : ['bsdf', 'material_system', 'scene', 'slang_hot_reload', 'texture_manager']
+    test(name, executable(
+        'test-' + name.replace('_', '-'),
+        'test_' + name + '.cpp',
+        dependencies: [merian_dep, gtest_main_dep],
+        cpp_args: [test_shader_dir_arg],
+    ), timeout: 120)
+endforeach
 
 test_slang_binding = executable(
     'test-slang-binding',
@@ -61,73 +52,14 @@ test_slang_binding = executable(
 )
 test('slang_binding', test_slang_binding, timeout: 120)
 
-test_texture_manager = executable(
-    'test-texture-manager',
-    'test_texture_manager.cpp',
-    dependencies: [merian_dep, gtest_main_dep],
-    cpp_args: [test_shader_dir_arg],
-)
-test('texture_manager', test_texture_manager, timeout: 120)
-
-test_material_system = executable(
-    'test-material-system',
-    'test_material_system.cpp',
-    dependencies: [merian_dep, gtest_main_dep],
-    cpp_args: [test_shader_dir_arg],
-)
-test('material_system', test_material_system, timeout: 120)
-
-test_scene = executable(
-    'test-scene',
-    'test_scene.cpp',
-    dependencies: [merian_dep, gtest_main_dep],
-    cpp_args: [test_shader_dir_arg],
-)
-test('scene', test_scene, timeout: 120)
-
-test_gbuffer_layout = executable(
-    'test-gbuffer-layout',
-    'test_gbuffer_layout.cpp',
-    dependencies: [merian_dep, gtest_main_dep],
-)
-test('gbuffer_layout', test_gbuffer_layout, timeout: 120)
-
-test_graph_load_store = executable(
-    'test-graph-load-store',
-    'test_graph_load_store.cpp',
-    dependencies: [merian_dep, gtest_main_dep],
-)
-test('graph_load_store', test_graph_load_store, timeout: 120)
-
-test_node_properties = executable(
-    'test-node-properties',
-    'test_node_properties.cpp',
-    dependencies: [merian_dep, gtest_main_dep],
-)
-test('node_properties', test_node_properties, timeout: 120)
-
-test_path_expression = executable(
-    'test-path-expression',
-    'test_path_expression.cpp',
-    dependencies: [merian_dep, gtest_main_dep],
-)
-test('path_expression', test_path_expression, timeout: 30)
-
-test_slang_hot_reload = executable(
-    'test-slang-hot-reload',
-    'test_slang_hot_reload.cpp',
-    dependencies: [merian_dep, gtest_main_dep],
-    cpp_args: [test_shader_dir_arg],
-)
-test('slang_hot_reload', test_slang_hot_reload, timeout: 120)
-
-test_bsdf = executable(
-    'test-bsdf',
-    'test_bsdf.cpp',
-    dependencies: [merian_dep, gtest_main_dep],
-    cpp_args: [test_shader_dir_arg],
-)
-test('bsdf', test_bsdf, timeout: 120)
+if get_option('glfw').enable_auto_if(glfw.found()).enabled() and host_machine.system() == 'linux'
+    test_extension_glfw = executable(
+        'test-extension-glfw',
+        'test_extension_glfw.cpp',
+        dependencies: [merian_dep, gtest_main_dep],
+    )
+    test('extension_glfw', test_extension_glfw, timeout: 60)
+endif
 
 if tgltf.found()
     test_model_dir_arg = '-DTEST_MODEL_DIR="' + meson.current_source_dir() + '/../subprojects/tinygltf/models"'
@@ -151,45 +83,15 @@ if pbrt_enabled
     test('pbrt_scene', test_pbrt_scene, timeout: 120)
 endif
 
-test_memory_allocator_transient = executable(
-    'test-memory-allocator-transient',
-    'test_memory_allocator_transient.cpp',
-    dependencies: [merian_dep, gtest_main_dep],
-)
-test('memory_allocator_transient', test_memory_allocator_transient, timeout: 120)
-
-test_graph_memory = executable(
-    'test-graph-memory',
-    'test_graph_memory.cpp',
-    dependencies: [merian_dep, gtest_main_dep],
-)
-test('graph_memory', test_graph_memory, timeout: 120)
-
-test_svgf = executable(
-    'test-svgf',
-    'test_svgf.cpp',
-    dependencies: [merian_dep, gtest_main_dep],
-)
-test('svgf', test_svgf, timeout: 120)
-
-foreach name : ['data_flow', 'edit', 'in_place', 'subgraphs']
-    test('graph_' + name, executable(
-        'test-graph-' + name.replace('_', '-'),
-        'test_graph_' + name + '.cpp',
-        dependencies: [merian_dep, gtest_main_dep],
-    ), timeout: 300)
-endforeach
-
-test_graph_connections = executable(
-    'test-graph-connections',
-    'test_graph_connections.cpp',
-    dependencies: [merian_dep, gtest_main_dep],
-)
-test('graph_connections', test_graph_connections, timeout: 120)
-
-test_memory_allocator_tracking = executable(
-    'test-memory-allocator-tracking',
-    'test_memory_allocator_tracking.cpp',
-    dependencies: [merian_dep, gtest_main_dep],
-)
-test('memory_allocator_tracking', test_memory_allocator_tracking, timeout: 120)
+if python_enabled
+    foreach name, timeout : {'config': 60, 'graph': 120}
+        test(
+            'python_' + name,
+            py,
+            args: [files('python/test_' + name + '.py')],
+            env: {'PYTHONPATH': python_package_dir},
+            depends: [python_core_module, python_graph_module],
+            timeout: timeout,
+        )
+    endforeach
+endif

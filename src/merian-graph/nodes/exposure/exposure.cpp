@@ -79,7 +79,6 @@ AutoExposure::on_connected(const NodeIOLayout& io_layout,
             for (auto* kernel : {&histogram_kernel, &luminance_kernel, &exposure_kernel}) {
                 (*kernel)->reload(std::any_cast<bool>(force), compile_context);
             }
-            return true;
         });
 
     return {};
@@ -145,7 +144,7 @@ AutoExposure::NodeStatusFlags AutoExposure::properties(Properties& config) {
     pc.min_exposure = std::min(pc.min_exposure, pc.max_exposure);
 
     config.st_separate("Auto");
-    config.config_float("K", pc.K, "Reflected-light meter calibration constant", 0.1);
+    config.config_float("k", pc.K, "Reflected-light meter calibration constant", 0.1);
     config.config_float("min log luminance", pc.min_log_histogram);
     config.config_float("max log luminance", pc.max_log_histogram);
     config.config_float("speed up", pc.speed_up);
@@ -154,11 +153,11 @@ AutoExposure::NodeStatusFlags AutoExposure::properties(Properties& config) {
                           Properties::OptionsStyle::COMBO);
 
     config.st_separate("Manual");
-    config.config_float("ISO", pc.iso, "Sensor sensitivity/gain (ISO)");
+    config.config_float("iso", pc.iso, "Sensor sensitivity/gain (ISO)");
     float shutter_time = pc.shutter_time * 1000.0f;
-    config.config_float("shutter time (ms)", shutter_time);
+    config.config_float("shutter time", shutter_time, "In milliseconds.");
     pc.shutter_time = std::max(0.f, shutter_time / 1000);
-    config.config_float("aperature", pc.aperature, "", .01);
+    config.config_float("aperture", pc.aperture, "", .01);
 
     config.st_separate();
     if (config.config_enum("overwrite format", overwrite_format, Properties::OptionsStyle::COMBO,

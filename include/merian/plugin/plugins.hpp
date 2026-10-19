@@ -18,7 +18,8 @@ class Plugins {
     static void add_search_path(const std::filesystem::path& path);
 
     // Directories searched, in order: add_search_path(), $MERIAN_PLUGIN_PATH, the executable
-    // directory and its plugin subdirs, the user data dir.
+    // directory and its plugin subdirs, <libdir>/merian/plugins next to the merian library, the
+    // user data dir.
     static std::vector<std::filesystem::path> search_paths();
 
     // Canonical, deduplicated paths of all discovered plugin libraries, in search order.

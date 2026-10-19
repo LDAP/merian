@@ -9,13 +9,13 @@
 namespace merian {
 
 namespace {
-// (node name, connector name) of "node.connector"; the node name is empty for a public port.
-std::optional<std::pair<std::string, std::string>> split_port(const std::string& port) {
-    const size_t dot = port.find('.');
-    if (dot == std::string::npos || dot + 1 == port.size()) {
+// (node name, connector name) of "node.connector"; the node name is empty for a public connector.
+std::optional<std::pair<std::string, std::string>> split_address(const std::string& address) {
+    const size_t dot = address.find('.');
+    if (dot == std::string::npos || dot + 1 == address.size()) {
         return std::nullopt;
     }
-    return std::make_pair(port.substr(0, dot), port.substr(dot + 1));
+    return std::make_pair(address.substr(0, dot), address.substr(dot + 1));
 }
 
 std::optional<std::string> subgraph_declaration_error(const NodeHandle& node,
@@ -45,33 +45,33 @@ std::optional<std::string> subgraph_declaration_error(const NodeHandle& node,
     std::unordered_set<std::string> public_inputs;
     std::unordered_set<std::string> public_outputs;
     for (const auto& [src, dst] : subgraph.get_connections()) {
-        const auto src_port = split_port(src);
-        const auto dst_port = split_port(dst);
-        if (!src_port || !dst_port ||
-            (!src_port->first.empty() && !names.contains(src_port->first)) ||
-            (!dst_port->first.empty() && !names.contains(dst_port->first))) {
-            return fmt::format("connection {} -> {} names an unknown port", src, dst);
+        const auto src_connector = split_address(src);
+        const auto dst_connector = split_address(dst);
+        if (!src_connector || !dst_connector ||
+            (!src_connector->first.empty() && !names.contains(src_connector->first)) ||
+            (!dst_connector->first.empty() && !names.contains(dst_connector->first))) {
+            return fmt::format("connection {} -> {} names an unknown connector", src, dst);
         }
-        if (src_port->first.empty() && dst_port->first.empty()) {
-            return fmt::format("connection {} -> {} connects two public ports", src, dst);
+        if (src_connector->first.empty() && dst_connector->first.empty()) {
+            return fmt::format("connection {} -> {} connects two public connectors", src, dst);
         }
-        if (src_port->first.empty()) {
-            public_inputs.insert(src_port->second);
+        if (src_connector->first.empty()) {
+            public_inputs.insert(src_connector->second);
         }
-        if (dst_port->first.empty() ? !public_outputs.insert(dst_port->second).second
-                                    : !connected_inputs.insert(dst).second) {
+        if (dst_connector->first.empty() ? !public_outputs.insert(dst_connector->second).second
+                                         : !connected_inputs.insert(dst).second) {
             return fmt::format("{} is connected twice", dst);
         }
     }
 
     std::unordered_set<std::string> passed_on;
     for (const auto& [input, output] : subgraph.get_pass_throughs()) {
-        const auto input_port = split_port(input);
-        const auto output_port = split_port(output);
-        if (!input_port || !output_port || !input_port->first.empty() ||
-            !output_port->first.empty() || !public_inputs.contains(input_port->second) ||
-            !public_outputs.contains(output_port->second) ||
-            !passed_on.insert(output_port->second).second) {
+        const auto input_connector = split_address(input);
+        const auto output_connector = split_address(output);
+        if (!input_connector || !output_connector || !input_connector->first.empty() ||
+            !output_connector->first.empty() || !public_inputs.contains(input_connector->second) ||
+            !public_outputs.contains(output_connector->second) ||
+            !passed_on.insert(output_connector->second).second) {
             return fmt::format("invalid pass-through {} -> {}", input, output);
         }
     }
@@ -238,22 +238,24 @@ void Graph::build_subgraph(
     }
     data.children = std::move(children);
 
-    // 2. public ports and the connections between the children
+    // 2. public connectors and the connections between the children
     for (const auto& [src, dst] : subgraph->get_connections()) {
-        const auto [src_name, src_port] = *split_port(src);
-        const auto [dst_name, dst_port] = *split_port(dst);
+        const auto [src_name, src_connector] = *split_address(src);
+        const auto [dst_name, dst_connector] = *split_address(dst);
         if (src_name.empty()) {
-            data.public_inputs[src_port].push_back({child_for_name.at(dst_name), dst_port});
+            data.public_inputs[src_connector].push_back(
+                {child_for_name.at(dst_name), dst_connector});
         } else if (dst_name.empty()) {
-            data.public_outputs.try_emplace(dst_port, child_for_name.at(src_name), src_port);
+            data.public_outputs.try_emplace(dst_connector, child_for_name.at(src_name),
+                                            src_connector);
         } else {
-            data.subgraph_connections.push_back(
-                {child_for_name.at(src_name), src_port, child_for_name.at(dst_name), dst_port});
+            data.subgraph_connections.push_back({child_for_name.at(src_name), src_connector,
+                                                 child_for_name.at(dst_name), dst_connector});
         }
     }
     for (const auto& [input, output] : subgraph->get_pass_throughs()) {
-        data.public_pass_throughs.try_emplace(split_port(output)->second,
-                                              split_port(input)->second);
+        data.public_pass_throughs.try_emplace(split_address(output)->second,
+                                              split_address(input)->second);
     }
 }
 
@@ -276,20 +278,20 @@ void Graph::connect_subgraph(NodeData& data) {
     };
 
     // 1. the inputs it connects exist, unless the child or its subgraph is unknown
-    const auto receives = [&](const Port& input) {
+    const auto receives = [&](const ConnectorRef& input) {
         const NodeData& child_data = node_data.at(input.node);
         return !child_data.errors.empty() || child_data.unsupported ||
                child_data.input_connector_for_name.contains(input.name) ||
                child_data.public_inputs.contains(input.name);
     };
-    std::vector<Port> connected_inputs;
+    std::vector<ConnectorRef> connected_inputs;
     for (const Connection& connection : data.subgraph_connections) {
         connected_inputs.push_back({connection.dst, connection.dst_input});
     }
-    for (const auto& [port, inputs] : data.public_inputs) {
+    for (const auto& [public_input, inputs] : data.public_inputs) {
         connected_inputs.insert(connected_inputs.end(), inputs.begin(), inputs.end());
     }
-    for (const Port& input : connected_inputs) {
+    for (const ConnectorRef& input : connected_inputs) {
         if (data.errors.empty() && !receives(input)) {
             fail(fmt::format("its subgraph connects input {} of {}, which does not exist",
                              input.name, node_data.at(input.node).identifier));
@@ -325,29 +327,29 @@ void Graph::connect_subgraph(NodeData& data) {
                                           connection.src_output);
     }
     const NodeHandle& parent = node_for_identifier.at(data.identifier);
-    for (const auto& [port, inputs] : data.public_inputs) {
+    for (const auto& [public_input, inputs] : data.public_inputs) {
         // an unwired public input leaves the children's auto connections in place
-        const bool wired = wiring(parent, port).has_value();
-        for (const Port& input : inputs) {
+        const bool wired = wiring(parent, public_input).has_value();
+        for (const ConnectorRef& input : inputs) {
             NodeData& child_data = node_data.at(input.node);
             const auto connector = child_data.input_connector_for_name.find(input.name);
             if (wired || connector == child_data.input_connector_for_name.end() ||
                 !child_data.input_descriptors.at(connector->second).auto_connect) {
-                child_data.public_feeds.try_emplace(input.name, port);
+                child_data.public_feeds.try_emplace(input.name, public_input);
             }
         }
     }
     for (const NodeHandle& child : data.children) {
         NodeData& child_data = node_data.at(child);
         // (node, output), or (null, public input)
-        const auto source_of = [&](const std::string& input) -> std::optional<Port> {
+        const auto source_of = [&](const std::string& input) -> std::optional<ConnectorRef> {
             if (const auto source = child_data.subgraph_sources.find(input);
                 source != child_data.subgraph_sources.end()) {
                 return source->second;
             }
-            if (const auto port = child_data.public_feeds.find(input);
-                port != child_data.public_feeds.end()) {
-                return Port{nullptr, port->second};
+            if (const auto public_input = child_data.public_feeds.find(input);
+                public_input != child_data.public_feeds.end()) {
+                return ConnectorRef{nullptr, public_input->second};
             }
             return std::nullopt;
         };
@@ -356,7 +358,7 @@ void Graph::connect_subgraph(NodeData& data) {
             if (!descriptor.auto_connect || source_of(descriptor.name)) {
                 continue;
             }
-            const std::optional<Port> source =
+            const std::optional<ConnectorRef> source =
                 auto_connection_source(child, child_data, descriptor.name, source_of);
             if (source && source->node) {
                 child_data.subgraph_sources.try_emplace(descriptor.name, *source);

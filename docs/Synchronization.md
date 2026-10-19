@@ -39,6 +39,21 @@ while (true) {
 }
 ```
 
+### Host callbacks
+
+`Submission::sync_to_cpu(callback)` runs `callback` on the host once the commands recorded so far
+have finished; `sync_to_cpu_and_back(callback)` also makes the commands recorded afterwards wait
+until it returned. Callbacks run in order from `run_finished_callbacks()`, which does not wait, or
+`reset()`, on the thread that calls them, and must not wait for the GPU. With
+`Submission::CallbackMode::ASYNC`, a callback is handed to the caller's runner instead and runs
+concurrently.
+
+A graph calls them on its run thread while it waits for an iteration in flight. The in-order
+callbacks of an iteration have run before its slot is recorded again, so they can read per-slot
+readback buffers; async callbacks must own what they read. Async callbacks, such as image writes,
+run on a pool of "max async tasks" threads. The graph hands over every async callback whose commands
+finished before it continues and waits while that many run, so it stalls instead of queueing work.
+
 ### Queue submission
 
 `Queue` wraps a `vk::Queue` with a mutex and provides convenience submit methods:
@@ -59,11 +74,13 @@ queue->submit(cmds, fence, signal_semaphores, wait_semaphores, wait_stages);
 
 ### Swapchain
 
-The `Swapchain` and `SwapchainManager` classes handle presentation:
+The `Swapchain` and `SwapchainManager` classes handle presentation. A window creates its swapchain
+(see [Window](Window.md)): a `SurfaceSwapchain` presents to the window system, a `HostSwapchain`
+into host memory.
 
 ```c++
-// SwapchainManager wraps a Swapchain handle.
-auto swapchain_manager = std::make_shared<merian::SwapchainManager>(swapchain);
+// SwapchainManager wraps a Swapchain handle and replaces it when it needs a recreate.
+auto swapchain_manager = std::make_shared<merian::SwapchainManager>(window->create_swapchain(context));
 
 // Acquire next image. Returns nullopt if minimized or acquire failed.
 // Pass the window to auto-resize on extent change.

@@ -50,9 +50,9 @@ std::vector<InputConnectorDescriptor> SwapchainBlit::describe_inputs() {
 }
 
 Node::NodeStatusFlags SwapchainBlit::properties(Properties& config) {
-    if (current_src_array_size > 0) {
+    if (current_src_array_size > 0 || !config.is_ui()) {
         config.config_uint("source array element", src_array_element, "", 0U,
-                           current_src_array_size - 1);
+                           std::max(current_src_array_size, 1U) - 1);
     }
 
     int int_mode = mode;

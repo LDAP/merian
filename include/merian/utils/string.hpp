@@ -110,21 +110,6 @@ inline uint32_t parse_vk_api_version(const char* version_str) {
     return args;
 }
 
-// Inverse of split_args for a single token.
-[[nodiscard]] inline std::string quote_arg(const std::string& value) {
-    if (!value.empty() && value.find_first_of(" \t\n\v\f\r\"") == std::string::npos) {
-        return value;
-    }
-    std::string quoted = "\"";
-    for (const char c : value) {
-        if (c == '"') {
-            quoted += '"';
-        }
-        quoted += c;
-    }
-    return quoted + '"';
-}
-
 inline void split(const std::string& value,
                   const std::string& delim,
                   const std::function<void(const std::string&)>& function) {

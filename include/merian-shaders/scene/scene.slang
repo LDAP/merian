@@ -52,6 +52,7 @@ struct Scene {
 
     // Global scene parameters
     uint frame;
+    uint seed;
     float time;
     float time_diff;
 
@@ -99,12 +100,12 @@ struct Scene {
         return rq.CommittedStatus() == COMMITTED_NOTHING;
     }
 
-    // Primary camera ray for a pixel. The lens sample depends on (pixel, frame) only, so every
-    // pass that calls this within a frame gets the identical ray.
+    // Primary camera ray for a pixel. The lens sample depends on (pixel, frame, seed) only, so
+    // every pass that calls this within a frame gets the identical ray.
     RayDesc generate_camera_ray(const uint2 pixel, const uint2 frame_dimensions) {
         if (merian_hint_enable_thin_lens && camera.aperture_radius > 0.f) {
             // R2 low-discrepancy sequence over frames, per-pixel rotated to decorrelate pixels.
-            RandomGenerator rng = PCG(xxhash32(pixel));
+            RandomGenerator rng = PCG(xxhash32(uint3(pixel, seed)));
             const float2 random = frac(r2_sequence(frame) + rng.next_float2());
             return camera.generate_ray_thinlens(pixel, frame_dimensions, random);
         }

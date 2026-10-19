@@ -3,21 +3,20 @@
 #include "merian-graph/connectors/image/vk_image_out_managed.hpp"
 
 #include "merian-graph/graph/errors.hpp"
+#include "merian/utils/hash.hpp"
 #include "merian/vk/utils/math.hpp"
 
-#include <atomic>
 #include <regex>
 
 namespace merian {
 
 namespace {
-std::string next_module_name() {
-    static std::atomic<uint64_t> counter = 0;
-    return fmt::format("merian_reduce_generated_{}", counter++);
+std::string module_name(const std::string& source) {
+    return fmt::format("merian_reduce_{:016x}", hash_val(source));
 }
 } // namespace
 
-Reduce::Reduce() : AbstractCompute(), module_name(next_module_name()) {}
+Reduce::Reduce() : AbstractCompute() {}
 
 Reduce::~Reduce() {}
 
@@ -68,8 +67,6 @@ std::vector<OutputConnectorDescriptor> Reduce::describe_outputs(const NodeIOLayo
         throw graph_errors::node_error{"at least one input must be connected."};
     }
 
-    // Retire the shared session before validating so try_compile compiles the new source fresh and
-    // caches it under this instance's module name; create_composition then reuses that compile.
     std::string new_source = generate_source();
     if (new_source != source) {
         source = std::move(new_source);
@@ -131,7 +128,7 @@ void main(int2 ipos: SV_DispatchThreadID) {{
 bool Reduce::try_compile(const std::string& source_candidate) {
     try {
         const auto composition = SlangComposition::create();
-        composition->add_module_from_string(module_name, source_candidate, true);
+        composition->add_module_from_string(module_name(source_candidate), source_candidate, true);
         SlangProgram::create(compile_context, composition).get();
         error.reset();
         return true;
@@ -143,7 +140,7 @@ bool Reduce::try_compile(const std::string& source_candidate) {
 
 SlangCompositionHandle Reduce::create_composition() {
     const auto composition = SlangComposition::create();
-    composition->add_module_from_string(module_name, source, true);
+    composition->add_module_from_string(module_name(source), source, true);
     return composition;
 }
 
@@ -180,7 +177,7 @@ Reduce::NodeStatusFlags Reduce::properties(Properties& props) {
                           "Undefined keeps the format of the first connected input.");
     props.output_text("output extent: {}x{}x{}", extent.width, extent.height, extent.depth);
 
-    if (props.st_begin_child("show_source", "show source")) {
+    if (props.st_begin_child("show source", "show source")) {
         props.output_text(source);
         props.st_end_child();
     }

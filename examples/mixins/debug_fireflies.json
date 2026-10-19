@@ -1,6 +1,9 @@
 {
+    "include": [
+        "debug.json"
+    ],
     "nodes": {
-        "debug": {
+        "display": {
             "properties": {
                 "overlay": {
                     "keep": "brightest fraction",

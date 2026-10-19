@@ -536,11 +536,14 @@ void Micromaps::clear(const CommandBufferHandle& cmd, std::vector<uint32_t>& cha
     }
 }
 
-void Micromaps::update(const CommandBufferHandle& cmd,
+void Micromaps::update(Submission& submission,
                        const std::vector<MeshGeometry>& meshes,
                        const MaterialSystemHandle& material_system,
                        std::vector<uint32_t>& changed,
-                       const ShaderObjectAllocatorHandle& obj_allocator) {
+                       const ShaderObjectAllocatorHandle& obj_allocator,
+                       const bool complete) {
+    // follows the submissions the bake splits off
+    const CommandBufferHandle& cmd = submission.get_cmd();
     const float threshold = material_system->get_alpha_test_threshold();
     if (threshold != alpha_threshold) {
         clear(cmd, changed);
@@ -603,23 +606,30 @@ void Micromaps::update(const CommandBufferHandle& cmd,
     // 2. bake
     std::vector<MicromapBakeJob> jobs;
     std::vector<MicromapBakeBlock> bake_blocks;
+    std::vector<uint32_t> chunk_ends;
     std::vector<uint32_t> ready;
     uint64_t budget = MAX_TEXEL_STEPS_PER_UPDATE;
+    uint32_t chunk_begin = 0;
     for (const MeshGeometry& mesh : meshes) {
         Entry& entry = entries.at(mesh.mesh_id);
         if (entry.ready) {
             continue;
         }
         uint32_t job_index = NO_OFFSET;
-        bool complete = true;
+        bool baked = true;
         for (uint32_t local = 0; local < entry.blocks.size(); local++) {
             Block& block = blocks[entry.blocks[local]];
             if (block.baked) {
                 continue;
             }
-            if (budget == 0 || bake_blocks.size() == max_blocks_per_update) {
-                complete = false;
-                break;
+            if (budget == 0 || bake_blocks.size() - chunk_begin == max_blocks_per_update) {
+                if (!complete) {
+                    baked = false;
+                    break;
+                }
+                chunk_begin = static_cast<uint32_t>(bake_blocks.size());
+                chunk_ends.push_back(chunk_begin);
+                budget = MAX_TEXEL_STEPS_PER_UPDATE;
             }
             if (job_index == NO_OFFSET) {
                 job_index = static_cast<uint32_t>(jobs.size());
@@ -639,7 +649,7 @@ void Micromaps::update(const CommandBufferHandle& cmd,
             block.baked = true;
             budget -= std::min<uint64_t>(budget, block.cost);
         }
-        if (complete) {
+        if (baked) {
             entry.ready = true;
             entry.block_triangle = {};
             ready.push_back(mesh.mesh_id);
@@ -647,6 +657,9 @@ void Micromaps::update(const CommandBufferHandle& cmd,
     }
     if (bake_blocks.empty() && ready.empty() && !grown) {
         return;
+    }
+    if (!bake_blocks.empty()) {
+        chunk_ends.push_back(static_cast<uint32_t>(bake_blocks.size()));
     }
 
     MERIAN_PROFILE_SCOPE_GPU(cmd, "Micromaps::update");
@@ -684,10 +697,19 @@ void Micromaps::update(const CommandBufferHandle& cmd,
         c["blocks"] = block_buffer;
         c["block_count"] = static_cast<uint32_t>(bake_blocks.size());
 
-        cmd->bind(pipe);
-        ep->bind("material_system", material_system->get_shader_object(), cmd, pipe, obj_allocator);
-        ep->bind("params", params, cmd, pipe, obj_allocator);
-        cmd->dispatch(static_cast<uint32_t>(bake_blocks.size()), 1, 1);
+        uint32_t first_block = 0;
+        for (const uint32_t chunk_end : chunk_ends) {
+            if (first_block > 0) {
+                submission.submit();
+            }
+            cmd->bind(pipe);
+            ep->bind("material_system", material_system->get_shader_object(), cmd, pipe,
+                     obj_allocator);
+            ep->bind("params", params, cmd, pipe, obj_allocator);
+            cmd->push_constant(pipe, first_block);
+            cmd->dispatch(chunk_end - first_block, 1, 1);
+            first_block = chunk_end;
+        }
 
         // the baked records and states
         cmd->barrier(vk::MemoryBarrier2{

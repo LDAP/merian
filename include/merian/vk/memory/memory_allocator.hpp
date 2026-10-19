@@ -26,7 +26,7 @@ enum class MemoryMappingType {
     NONE,
     // Memory mapping is possible. Memory can be access randomly.
     // Equals VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT from VMA.
-    // Will allways have VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT and VK_MEMORY_PROPERTY_HOST_CACHED_BIT
+    // Will always have VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, prefers VK_MEMORY_PROPERTY_HOST_CACHED_BIT
     HOST_ACCESS_RANDOM,
     // Memory mapping is possible. Memory can only be access sequentially (memcpy, for-loop).
     // Equals VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT from VMA.

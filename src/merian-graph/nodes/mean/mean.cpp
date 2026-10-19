@@ -71,7 +71,6 @@ MeanToBuffer::on_connected(const NodeIOLayout& io_layout,
             for (auto* kernel : {&image_to_buffer_kernel, &reduce_buffer_kernel}) {
                 (*kernel)->reload(std::any_cast<bool>(force), compile_context);
             }
-            return true;
         });
 
     return {};

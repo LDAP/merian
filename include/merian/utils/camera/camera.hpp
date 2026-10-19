@@ -159,8 +159,8 @@ class Camera {
     // Selects the sub-pixel jitter sequence; None resets the current jitter to 0.
     void set_jitter_sequence(JitterSequence sequence) noexcept;
 
-    // Advances the jitter to the given frame within the selected sequence (no-op for None).
-    void advance_jitter(uint32_t frame_index) noexcept;
+    // Advances the jitter to frame_index of the sequence, phase-shifted by seed (no-op for None).
+    void advance_jitter(uint32_t frame_index, uint32_t seed) noexcept;
 
     JitterSequence get_jitter_sequence() const noexcept;
 

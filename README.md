@@ -3,20 +3,21 @@
 ~ _A Vulkan development framework._ ~
 
 <p align="middle">
-  <img src="images/alk.png" width="400" />
-  <img src="images/caustics.png" width="400" /> 
-  <img src="images/ABeautifulGame.png" width="400" /> 
-  <img src="images/tears.png" width="400" /> 
+  <img src="images/path_debugger.png" width="400" />
+  <img src="images/graph_gui.png" width="400" />
 </p>
 <p align="middle">
-  <img src="images/path_debugger.png" width="800" />
+  <img src="images/alk.png" width="200" />
+  <img src="images/caustics.png" width="200" />
+  <img src="images/ABeautifulGame.png" width="200" />
+  <img src="images/tears.png" width="200" />
 </p>
 
 Merian is split into multiple components:
 
  - [`merian`](https://github.com/LDAP/merian/tree/main/include/merian): Provides core abstractions and utilities (Vulkan context, memory allocation, configuration, IO, ...).
  - [`merian-graph`](https://github.com/LDAP/merian/tree/main/include/merian-graph): Implements an extensible Vulkan processing graph. Already implemented nodes can be found [here](https://github.com/LDAP/merian/tree/main/include/merian-graph/nodes).
- - [`merian-shaders`](https://github.com/LDAP/merian/tree/main/include/merian-shaders): Reusable shader code plus the scene representation, glTF/FBX loaders, material system and texture management.
+ - [`merian-shaders`](https://github.com/LDAP/merian/tree/main/include/merian-shaders): Reusable shader code plus the scene representation, glTF/FBX/PBRT loaders, material system and texture management.
 
 Merian aims for compatibility with Windows, Linux as well as all major GPU vendors.
 
@@ -28,47 +29,62 @@ You need the [Meson](https://github.com/mesonbuild/meson) buildsystem along with
 
 ```bash
 git clone --recursive https://github.com/LDAP/merian
+cd merian
 # optionally clone any plugin you want to use into subprojects:
 # cd subprojects
 # git clone https://github.com/LDAP/merian-plugin-quake
 meson setup build
 # You can enable / disable some feature by appending -Dfeature_name=enabled, for example glslang (GLSL compiler), glfw (windowing), sdl (windowing+audio), performance_profiling, tinygltf, ufbx, pbrt (scene formats) or switch to a debug build with --buildtype=debug/debugoptimized.
-cd build
-meson compile
-meson devenv # needed on Windows to find all the dlls
-# this builds all the shared libraries and a runner for merian graphs:
-./merian-graph-run
+meson compile -C build
+# this builds all the shared libraries and the merian Python package; run a graph (without one, an empty window):
+python examples/graph_run.py
 ```
 
-### Examples: merian-graph-run
+### Examples: graph_run.py
 
-merian ships a generic executable `merian-graph-run` that loads a [`merian-graph`](https://github.com/LDAP/merian/tree/main/include/merian-graph) from a JSON file and runs it (`merian-graph-run [options] [graph.json [args...]]`; without an argument it starts with an empty graph). Options:
+merian ships a generic runner [`graph_run.py`](https://github.com/LDAP/merian/tree/main/examples/graph_run.py) that loads a [`merian-graph`](https://github.com/LDAP/merian/tree/main/include/merian-graph) from a JSON file and runs it (`python examples/graph_run.py [options] [graph.json [args...]]`; without an argument it opens an empty window). It uses the `merian` Python package, whose build needs the Python headers (`-Dpython=disabled` builds merian without it). Options:
 
 - `--loglevel=<trace|debug|info|warn|error>`: log verbosity.
 - `--plugin-path=<dir>`: extra plugin search directory (repeatable).
 - `--validation=<on|off|ifdebug>`: Vulkan validation layers (default: `ifdebug`).
-- `--merge <file.json>`: deep-merge a JSON file into the config (repeatable, last wins).
-- `--<name> <value>`: set an override declared in the graph's `cli` block (see the per-graph options below).
-- `--help`: with a `graph.json`, also lists that graph's `cli` overrides.
+- `--max-iterations=<n>`, `--exit-on-event=<pattern>`, `--time-delta=<ms>`: end the run or fix the time step.
+- `--print-times`, `--print-memory`: profile the run, report the graph's memory.
+- `--merge <file.json>`: merge a JSON fragment into the config (repeatable).
+- `--set <pointer>=<value>`: assign a value at a JSON pointer, e.g. `--set /nodes/render/properties/x=1`.
+- The options a graph declares: a choice from a preset folder (its `"presets"` key) or a value at a JSON pointer (its `"cli"` key); see the per-graph options below.
+- `--help`: with a `graph.json`, also lists that graph's options.
 
 It ships with a set of built-in nodes and can be extended with additional node sets and renderers through its [plugin system](#plugins).
 
-Example graphs for `merian-graph-run` are in the [`examples`](https://github.com/LDAP/merian/tree/main/examples) folder:
+Example graphs for `graph_run.py` are in the [`examples`](https://github.com/LDAP/merian/tree/main/examples) folder. Their windows show the image only: edit a graph while it runs with the [graph editor](https://github.com/LDAP/merian/tree/main/examples/graph_editor.py), or add the ImGui properties window with `--mixin imgui`.
 
-- [`hdr_viewer.json`](https://github.com/LDAP/merian/tree/main/examples/hdr_viewer.json): a tone-mapped HDR image viewer — `merian-graph-run examples/hdr_viewer.json <image.hdr>`.
-- [`shadertoy.json`](https://github.com/LDAP/merian/tree/main/examples/shadertoy.json): runs a Shadertoy-style shader — `merian-graph-run examples/shadertoy.json <shader.glsl>`.
-- [`gltf.json`](https://github.com/LDAP/merian/tree/main/examples/gltf.json) / [`fbx.json`](https://github.com/LDAP/merian/tree/main/examples/fbx.json) / [`pbrt.json`](https://github.com/LDAP/merian/tree/main/examples/pbrt.json): a glTF / FBX / PBRTv4 scene viewer — `merian-graph-run examples/gltf.json <scene.gltf> [options]`. Options:
-    - `<scene>` (required): path to the glTF / FBX scene to load.
-    - `--renderer <pt|pt_mcpg|pt_ssmm|restir_di>`: renderer, merged from [`examples/renderers`](https://github.com/LDAP/merian/tree/main/examples/renderers) (default: `pt`; the selection persists when the graph is stored). Also accepts a path to a custom renderer fragment, e.g. `--renderer my/renderer.json`.
-    - `--denoiser <none|svgf|dlss>`: denoiser, merged from [`examples/denoisers`](https://github.com/LDAP/merian/tree/main/examples/denoisers) (default: `none`, which accumulates). `dlss` needs merian built with the NGX SDK (`-Ddlss`).
-    - `--volume <off|on>`: traces the scene's volume and denoises it with the selected denoiser (path-traced renderers).
+- [`hdr_viewer.json`](https://github.com/LDAP/merian/tree/main/examples/hdr_viewer.json): a tone-mapped HDR image viewer — `python examples/graph_run.py examples/hdr_viewer.json <image.hdr>`.
+- [`shadertoy.json`](https://github.com/LDAP/merian/tree/main/examples/shadertoy.json): runs a Shadertoy-style shader — `python examples/graph_run.py examples/shadertoy.json <shader.glsl>`.
+- [`gltf.json`](https://github.com/LDAP/merian/tree/main/examples/gltf.json) / [`fbx.json`](https://github.com/LDAP/merian/tree/main/examples/fbx.json) / [`pbrt.json`](https://github.com/LDAP/merian/tree/main/examples/pbrt.json): a glTF / FBX / PBRTv4 scene viewer — `python examples/graph_run.py examples/gltf.json <scene.gltf> [options]`. Options:
+    - `<scene>` (required): path to the glTF / FBX / PBRT scene to load.
+    - `--renderer <pt|pt_mcpg|pt_ssmm|restir_di|restir_pt>`: renderer, one of [`examples/renderers`](https://github.com/LDAP/merian/tree/main/examples/renderers) (default: `pt`). Also accepts a path to a custom renderer fragment, e.g. `--renderer my/renderer.json`.
+    - `--denoiser <none|svgf|dlss|none_volume|svgf_volume|dlss_volume>`: denoiser, one of [`examples/denoisers`](https://github.com/LDAP/merian/tree/main/examples/denoisers) (default: `none`, which accumulates). The `_volume` variants also trace the scene's volume and denoise it (path-traced renderers). `dlss` needs merian built with the NGX SDK (`-Ddlss`).
+    - `--mixin <debug|debug_fireflies|imgui|...>`: additions from [`examples/mixins`](https://github.com/LDAP/merian/tree/main/examples/mixins), repeatable; `debug` attaches the path debugger, `imgui` adds the ImGui properties window (any example graph).
     - `--env-map <path>`: lat-long HDR environment map (sets the env type to `LatLong`).
     - `--max-path-length <n>`: maximum path length (path-traced renderers).
     - `--spp <n>`: samples per pixel.
 
+### Examples: Python scripts
+
+Besides `graph_run.py`, the `examples` folder holds scripts on the `merian` Python package; run from a source tree, they find the package of `build`, as `import merian` does in the repository root. Their few Python dependencies are dependency groups of `pyproject.toml`: `pip install --group scripts`, `--group gui` for the editor. The scene scripts take a scene (the graph follows its file type: glTF, FBX, PBRT) or a graph config, followed by that graph's options; `--help` lists both.
+
+- [`scene_viewer.py`](https://github.com/LDAP/merian/tree/main/examples/scene_viewer.py): shows a scene in a window; the options of `graph_run.py` apply too.
+- [`render_image.py`](https://github.com/LDAP/merian/tree/main/examples/render_image.py): renders a scene headless into an image (`--samples`, `--output`).
+- [`render_reference.py`](https://github.com/LDAP/merian/tree/main/examples/render_reference.py): a reference image, accumulated in batches of distinct seeds; resumable.
+- [`compare_methods.py`](https://github.com/LDAP/merian/tree/main/examples/compare_methods.py): compares variants against a reference: an image grid and a convergence plot.
+- [`sweep_parameters.py`](https://github.com/LDAP/merian/tree/main/examples/sweep_parameters.py): renders every combination of values at JSON pointers, error and time per render.
+- [`render_animation.py`](https://github.com/LDAP/merian/tree/main/examples/render_animation.py): renders a video, every frame at its own graph time.
+- [`graph_editor.py`](https://github.com/LDAP/merian/tree/main/examples/graph_editor.py): a graph editor (PySide6): nodes and connections (right-click adds a node), the node's properties, the profiled times with their history, and where the memory goes; a preview, the backdrop and a panel of several views, each showing a window of the graph (its Window nodes present there and take the view's input, raw mouse included; set to SDL or GLFW, a Window node opens its own window instead), an output or a host sink, as an image or buffer values; play, pause and step, open and save configs. The graph runs on its own thread.
+- [`image_grid.py`](https://github.com/LDAP/merian/tree/main/examples/image_grid.py): tiles images into a labelled contact sheet.
+
 ### Plugins
 
-A plugin is a separate repository that builds a `merian-plugin-*` shared library and contributes nodes and/or context extensions, which are discovered automatically at startup by `merian-graph-run` and any merian host. Plugins should never vendor merian but consume it via `dependency('merian')`. To build a plugin alongside merian, clone it into the `subprojects` folder (the directory must be named `merian-plugin-*`); `meson compile` then builds it as part of merian (no `PKG_CONFIG_PATH` needed):
+A plugin is a separate repository that builds a `merian-plugin-*` shared library and contributes nodes and/or context extensions, which are discovered automatically at startup by `graph_run.py` and any merian host. Plugins should never vendor merian but consume it via `dependency('merian')`. To build a plugin alongside merian, clone it into the `subprojects` folder (the directory must be named `merian-plugin-*`); `meson compile` then builds it as part of merian (no `PKG_CONFIG_PATH` needed):
 
 ```sh
 git clone <plugin-repo> subprojects/merian-plugin-<name>
@@ -144,7 +160,7 @@ features.set_feature("rayQuery", true);
 
 merian::ContextHandle context = merian::Context::create({
     .features = features,
-    .context_extensions = {"merian-resources", "merian-glfw"},
+    .context_extensions = {"merian-resources", "GLFW"},
 });
 ```
 

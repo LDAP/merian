@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <type_traits>
+#include <utility>
 
 namespace merian {
 
@@ -151,6 +152,7 @@ RenderPT::NodeStatusFlags RenderPT::on_connected(const NodeIOLayout& io_layout,
                                                  [[maybe_unused]] Submission& submission) {
 
     composition = nullptr;
+    seed = io.get_seed();
     debug_connected = io_layout.is_connected(con_debug);
 
     if (path_records.update_connected(io_layout)) {
@@ -166,7 +168,6 @@ RenderPT::NodeStatusFlags RenderPT::on_connected(const NodeIOLayout& io_layout,
                     composition->reload(compile_context->get_search_path_file_loader());
                 }
             }
-            return true;
         });
 
     gbuffer_composition = io[con_gbuffer]->get_layout()->get_composition();
@@ -176,6 +177,14 @@ RenderPT::NodeStatusFlags RenderPT::on_connected(const NodeIOLayout& io_layout,
     }
 
     return {};
+}
+
+bool RenderPT::update_volume_available(const SceneHandle& scene) {
+    if (!scene || !scene->is_ready()) {
+        return false;
+    }
+    const bool available = volume_spp > 0 && scene->has_exterior_volume();
+    return std::exchange(volume_available, available) != available;
 }
 
 void RenderPT::update_guiding_slot() {
@@ -261,6 +270,12 @@ void RenderPT::ensure_pipeline(const ContextHandle& context,
 }
 
 [[nodiscard]] RenderPT::NodeStatusFlags
+RenderPT::pre_process(const NodeIO& io, [[maybe_unused]] const NodeProcessInfo& info) {
+    return update_volume_available(io[con_scene]) ? NodeStatusFlags{NEEDS_RECONNECT}
+                                                  : NodeStatusFlags{};
+}
+
+[[nodiscard]] RenderPT::NodeStatusFlags
 RenderPT::process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) {
     const auto& cmd = submission.get_cmd();
     const auto& scene = io[con_scene];
@@ -282,9 +297,8 @@ RenderPT::process(const NodeIO& io, const NodeProcessInfo& info, Submission& sub
         io.send_event("bounces_changed");
     }
 
-    if (const bool available = volume_spp > 0 && scene->has_exterior_volume();
-        available != volume_available) {
-        volume_available = available;
+    // the scene changed its volume during this iteration
+    if (update_volume_available(scene)) {
         clear_outputs({con_irradiance, con_debug, con_volume, con_volume_depth, con_volume_mv});
         return NodeStatusFlagBits::NEEDS_RECONNECT;
     }
@@ -547,12 +561,6 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
     const bool shows_guiding = has_guiding() || !config.is_ui();
     const bool shows_cache = has_irradiance_cache() || !config.is_ui();
 
-    constants_changed |= config.config_uint(
-        "seed", seed,
-        "Decorrelates this run from another run of the same configuration. The sample stream "
-        "is a function of the pixel, the frame and the sample index alone, so a reference and "
-        "the images judged against it must not share it.");
-
     if (config.st_begin_child("surface", "Surface", Properties::ChildFlagBits::DEFAULT_OPEN)) {
         constants_changed |=
             config.config_int("samples per pixel", spp, "Number of paths per pixel.", 1, 16);
@@ -675,7 +683,7 @@ RenderPT::NodeStatusFlags RenderPT::properties(Properties& config) {
         config.st_end_child();
     }
 
-    if (config.st_begin_child("instance_mask", "Instance mask")) {
+    if (config.st_begin_child("instance mask", "Instance mask")) {
         for (uint32_t bit = 0; bit < 8; ++bit) {
             constants_changed |= config.config_bool(std::to_string(bit), mask_enabled[bit]);
             if ((bit & 3u) != 3u)

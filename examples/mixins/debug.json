@@ -1,63 +1,27 @@
 {
-    "cli": {
-        "debug": {
-            "default": "plain",
-            "type": "variant",
-            "variants": {
-                "plain": {},
-                "fireflies": {
-                    "merge": "mixins/debug_fireflies.json"
-                },
-                "nonfinite": {
-                    "merge": "mixins/debug_nonfinite.json"
-                },
-                "sampling": {
-                    "merge": "mixins/debug_sampling.json"
-                },
-                "filtered": {
-                    "merge": "mixins/debug_filtered.json"
-                }
-            }
-        }
-    },
     "nodes": {
-        "blit": {
-            "enabled": false
-        },
-        "debug": {
-            "enabled": true,
-            "outputs": [
-                "canvas->imgui.canvas"
-            ],
+        "display": {
             "type": "Path Debugger"
         },
         "gbuffer": {
             "$+$outputs": [
-                "gbuffer->debug.gbuffer"
+                "gbuffer->display.gbuffer"
             ]
         },
         "output": {
-            "outputs": [
-                "canvas->debug.canvas",
-                "controller->debug.controller",
-                "controller->scene.controller",
-                "window->debug.window",
-                "window->imgui.window"
+            "$+$outputs": [
+                "controller->display.controller",
+                "window->display.window"
             ]
         },
         "render": {
             "$+$outputs": [
-                "path_records->debug.records"
+                "path_records->display.records"
             ]
         },
         "scene": {
             "$+$outputs": [
-                "scene->debug.scene"
-            ]
-        },
-        "tonemap": {
-            "outputs": [
-                "out->debug.src"
+                "scene->display.scene"
             ]
         }
     }

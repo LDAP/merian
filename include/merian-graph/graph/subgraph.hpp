@@ -10,18 +10,18 @@ namespace merian {
 class Node;
 using NodeHandle = std::shared_ptr<Node>;
 
-// The children a node is made of, connected among each other and to the public ports of their
+// The children a node is made of, connected among each other and to the public connectors of their
 // parent.
 class Subgraph {
   public:
     // The child's identifier is "<parent>:<name>".
     void add_node(const std::string& name, const NodeHandle& node);
 
-    // Ports are "child.port", or ".port" for a public port of the parent: a public input as
-    // source, a public output as destination.
+    // Connectors are "child.connector", or ".connector" for a public connector of the parent: a
+    // public input as source, a public output as destination.
     void add_connection(const std::string& src, const std::string& dst);
 
-    // While the parent is disabled, its public output (".port") carries what its public input
+    // While the parent is disabled, its public output (".connector") carries what its public input
     // receives.
     void add_pass_through(const std::string& input, const std::string& output);
 

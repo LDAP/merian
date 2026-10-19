@@ -23,25 +23,16 @@ Searches for files across a list of registered search paths. Merian registers th
 
 ### InputController (`utils/input_controller.hpp`)
 
-Abstract keyboard and mouse input interface. `input_controller_glfw.hpp` provides a GLFW-backed implementation.
+Abstract keyboard and mouse input interface, implemented by the windows `GLFWWindow`, `SDLWindow` and `HostWindow`.
 
 ### Profiler (`vk/utils/profiler.hpp`)
 
-CPU and GPU profiling. Enabled at compile time with:
-
-```bash
-meson configure build -Dmerian:performance_profiling=true
-```
-
-Accessible via `GraphRun::get_profiler()` (may be `nullptr` if disabled).
+CPU and GPU profiling, compiled in by default (see [Profiling](Profiling.md)). Accessible via `NodeProcessInfo::get_profiler()` (may be `nullptr` if disabled).
 
 ### ThreadPool (`utils/concurrent/`)
 
-A simple work-stealing thread pool. Merian initializes a default thread pool accessible via `GraphRun::get_thread_pool()`.
-
-### CPUQueue (`vk/utils/cpu_queue.hpp`)
-
-A thread-safe task queue for off-thread CPU work (e.g. file I/O, mesh loading). Accessible via `GraphRun::get_cpu_queue()`.
+A simple thread pool; with a `queue_capacity`, `submit` waits while that many tasks wait. A graph
+runs its async host callbacks this way (see Synchronization).
 
 ### RenderDoc (`utils/renderdoc.hpp`)
 

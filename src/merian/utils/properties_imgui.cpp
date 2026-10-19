@@ -19,7 +19,7 @@ void tooltip(const std::string& tooltip) {
 }
 
 static std::string format_for_sensitivity(const float sensitivity) {
-    return fmt::format("%.{}f", std::max(0, (int)std::ceil(-std::log10(sensitivity))));
+    return fmt::format("%.{}f", std::max(1, static_cast<int>(std::ceil(-std::log10(sensitivity)))));
 }
 
 template <typename T>

@@ -300,6 +300,7 @@ class SlangComposition : public std::enable_shared_from_this<SlangComposition> {
 
     // Last known modification times for path-based modules (for reload detection)
     std::map<std::filesystem::path, std::filesystem::file_time_type> module_mtimes;
+    std::map<std::filesystem::path, std::filesystem::path> resolved_paths;
     const std::filesystem::file_time_type creation_time;
 
     uint64_t edits = 0;

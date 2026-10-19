@@ -5,6 +5,11 @@
 #ifdef __cplusplus
 #include "merian-shaders/debug/path_record.hpp"
 #include "merian-shaders/types.slang.h"
+
+#include <cmath>
+#define PATH_DEBUG_FUNC inline
+#else
+#define PATH_DEBUG_FUNC
 #endif
 
 namespace merian {
@@ -12,12 +17,15 @@ namespace merian {
 static const uint32_t PATH_DEBUG_WG = 256;
 
 static const uint32_t PATH_DEBUG_PANEL_MARGIN = 10;
-static const uint32_t PATH_DEBUG_PANEL_GAP = 24;
+static const uint32_t PATH_DEBUG_PANEL_GAP = 40;
 static const uint32_t PATH_DEBUG_PANEL_CLOSE = 14;
+static const uint32_t PATH_DEBUG_PANEL_ATLAS_COLUMNS = 3;
 
 static const uint32_t PATH_DEBUG_HIST_BINS = 128;
 static const float PATH_DEBUG_HIST_MIN_LOG = -20.f;
 static const float PATH_DEBUG_HIST_MAX_LOG = 20.f;
+static const float PATH_DEBUG_KEY_MIN_LOG = -40.f;
+static const float PATH_DEBUG_KEY_MAX_LOG = 60.f;
 
 static const float PATH_DEBUG_ENV_DISTANCE = 1e6f;
 
@@ -37,25 +45,24 @@ static const uint32_t PATH_DEBUG_KEPT_UINTS = PATH_DEBUG_KEPT_HEAD + 1;
 static const uint32_t PATH_DEBUG_STATE_DRAW_COUNT = 0;
 static const uint32_t PATH_DEBUG_STATE_MATCHED = 1;
 static const uint32_t PATH_DEBUG_STATE_HEAT_MAX = 2;
-static const uint32_t PATH_DEBUG_STATE_BAND_LO = 3;
-static const uint32_t PATH_DEBUG_STATE_BAND_HI = 4;
-static const uint32_t PATH_DEBUG_STATE_BAND_KEEP = 5;
-static const uint32_t PATH_DEBUG_STATE_GRID_CELLS = 6;
-static const uint32_t PATH_DEBUG_STATE_GRID_DROPPED = 7;
+// the lowest luminance or key bin drawn or kept, and the share of it drawn
+static const uint32_t PATH_DEBUG_STATE_BAND = 3;
+static const uint32_t PATH_DEBUG_STATE_BAND_KEEP = 4;
+static const uint32_t PATH_DEBUG_STATE_GRID_CELLS = 5;
+static const uint32_t PATH_DEBUG_STATE_GRID_DROPPED = 6;
 // pick resolved from the records: [0] the click sequence answered (0 = none), [1..3] position of
 // the clicked pixel's primary hit, [4] the pixel footprint there
-static const uint32_t PATH_DEBUG_STATE_PICK = 8;
+static const uint32_t PATH_DEBUG_STATE_PICK = 7;
 static const uint32_t PATH_DEBUG_PICK_UINTS = 5;
 static const uint32_t PATH_DEBUG_STATE_HIST = PATH_DEBUG_STATE_PICK + PATH_DEBUG_PICK_UINTS;
-// per resampled slot: the frame's largest key, then whether a winner claimed the slot
-static const uint32_t PATH_DEBUG_STATE_RESAMPLE_KEY = PATH_DEBUG_STATE_HIST + PATH_DEBUG_HIST_BINS;
-static const uint32_t PATH_DEBUG_STATE_RESAMPLE_CLAIM =
-    PATH_DEBUG_STATE_RESAMPLE_KEY + PATH_DEBUG_KEPT_SLOTS;
-static const uint32_t PATH_DEBUG_STATE_RECENT_COUNT =
-    PATH_DEBUG_STATE_RESAMPLE_CLAIM + PATH_DEBUG_KEPT_SLOTS;
-static const uint32_t PATH_DEBUG_STATE_DRAW_LIST = PATH_DEBUG_STATE_RECENT_COUNT + 1;
+// candidates of the kept top-k: the count above the band, then the count in it
+static const uint32_t PATH_DEBUG_STATE_CANDIDATES = PATH_DEBUG_STATE_HIST + PATH_DEBUG_HIST_BINS;
+static const uint32_t PATH_DEBUG_STATE_RECENT_COUNT = PATH_DEBUG_STATE_CANDIDATES + 2;
 
 static const uint32_t PATH_DEBUG_MAX_DRAW = 4096;
+
+// drawn path indices, or top-k candidates: above the band, then in it from PATH_DEBUG_KEPT_SLOTS
+static const uint32_t PATH_DEBUG_STATE_DRAW_LIST = PATH_DEBUG_STATE_RECENT_COUNT + 1;
 
 static const uint32_t PATH_DEBUG_STATE_UINTS = PATH_DEBUG_STATE_DRAW_LIST + PATH_DEBUG_MAX_DRAW;
 
@@ -110,13 +117,16 @@ static const uint32_t PATH_DEBUG_FINITE_NONFINITE = 2;
 static const uint32_t PATH_DEBUG_METHOD_ANY_VERTEX = 0;
 static const uint32_t PATH_DEBUG_METHOD_EVERY_VERTEX = 1;
 
-static const uint32_t PATH_DEBUG_RANK_ANY = 0;
+static const uint32_t PATH_DEBUG_RANK_RECENT = 0;
 static const uint32_t PATH_DEBUG_RANK_BRIGHTEST = 1;
 static const uint32_t PATH_DEBUG_RANK_FIREFLIES = 2;
 static const uint32_t PATH_DEBUG_RANK_RESAMPLED = 3;
-static const uint32_t PATH_DEBUG_RANK_RECENT = 4;
 
 static const uint32_t PATH_DEBUG_NO_PIXEL = 0xFFFFFFFFu;
+// a pick whose world position projects outside the view
+static const uint32_t PATH_DEBUG_OFFSCREEN = 0xFFFFFFFEu;
+// a record pixel filter that no pixel packs to
+static const uint32_t PATH_DEBUG_RECORD_NO_PIXEL = 0xFFFEFFFEu;
 
 static const uint32_t PATH_DEBUG_STATS_COUNT = 0;
 static const uint32_t PATH_DEBUG_STATS_SAMPLES = 1;
@@ -285,8 +295,11 @@ struct PathDebugParams {
     uint32_t dim_x;
     uint32_t dim_y;
 
+    // the pick in the current view, then in the view the records were traced from
     uint32_t sel_pixel_x;
     uint32_t sel_pixel_y;
+    uint32_t sel_record_x;
+    uint32_t sel_record_y;
     float sel_region_x;
     float sel_region_y;
     float sel_region_z;
@@ -312,7 +325,7 @@ struct PathDebugParams {
     uint32_t overlay_source;
     uint32_t overlay_rank;
     uint32_t overlay_max_paths;
-    uint32_t overlay_sample_max;
+    float overlay_key_decay;
     float overlay_brightest_fraction;
     float overlay_alpha;
     uint32_t overlay_depth_mode;
@@ -326,7 +339,6 @@ struct PathDebugParams {
     float backdrop_split;
     float difference_gain;
     float filtered_exposure;
-    uint32_t reference_ready;
 
     uint32_t map_source;
     uint32_t map_res;
@@ -337,8 +349,6 @@ struct PathDebugParams {
     uint32_t map_draws;
     uint32_t map_batch_end;
     uint32_t map_panel_mask;
-    uint32_t map_panel_size;
-    uint32_t map_panel_scroll;
     uint32_t want_top_list;
     float map_exposure;
     uint32_t stats_stride;
@@ -378,6 +388,18 @@ struct PathDebugParams {
     uint32_t pick_y;
     uint32_t pick_seq;
 };
+
+// strictly inside (0, 1)
+PATH_DEBUG_FUNC float path_debug_unit_interval(const uint32_t hash) {
+    return (float(hash >> 9) + 0.5f) / 8388608.f;
+}
+
+// A-ES (Efraimidis and Spirakis 2006); w / -ln(u) orders as u^(1/w)
+PATH_DEBUG_FUNC float path_debug_resample_key(const float weight, const float u) {
+    // the GPU's log may round -ln(u) to 0 or below near u = 1; 2^-24 is -ln of the largest u
+    const float neg_log = -log(u);
+    return weight / (neg_log > 5.96046448e-8f ? neg_log : 5.96046448e-8f);
+}
 
 } // namespace merian
 

@@ -41,8 +41,8 @@ float2 get_camera_pixel(
     return ((uv.rg + 1.) * resolution - 1) / 2.;
 }
 
-float ev_100(float aperature, float shutter_time, float iso) {
-    return log2(((aperature * aperature) * 100.0f) / (shutter_time * iso));
+float ev_100(float aperture, float shutter_time, float iso) {
+    return log2(((aperture * aperture) * 100.0f) / (shutter_time * iso));
 }
 
 float ev_100_from_average(float avg_luminance, float iso, float K) {

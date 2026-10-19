@@ -1,14 +1,17 @@
 {
+    "include": [
+        "debug.json"
+    ],
     "nodes": {
-        "debug": {
+        "display": {
             "properties": {
                 "selection": {
                     "contribution": "NaN or infinite only",
                     "restrict to": "nothing"
                 },
                 "overlay": {
-                    "keep": "spread over the image",
-                    "max paths": 256,
+                    "keep": "most recent",
+                    "max paths": 64,
                     "color": "bounces",
                     "alpha": 0.9
                 },

@@ -41,12 +41,12 @@ ImGuiNode::process(const NodeIO& io, const NodeProcessInfo& info, Submission& su
     const double dt_ms = info.get_time_delta() * 1000.0;
     const std::string title =
         fmt::format("merian ({:.2f} ms, {:.1f} fps) Frame {}###{}", dt_ms,
-                    dt_ms > 0.0 ? 1000.0 / dt_ms : 0.0, info.get_total_iteration(), imgui_event);
+                    dt_ms > 0.0 ? 1000.0 / dt_ms : 0.0, info.get_iteration(), imgui_event);
     imgui_ctx->with_context([&] {
-        if (ImGui::Begin(title.c_str())) {
-            ImGuiProperties props;
-            io.send_event(imgui_event, static_cast<Properties*>(&props));
-        }
+        // Listeners that open windows of their own draw them while this one is collapsed too
+        ImGui::Begin(title.c_str());
+        ImGuiProperties props;
+        io.send_event(imgui_event, static_cast<Properties*>(&props));
         ImGui::End();
     });
 

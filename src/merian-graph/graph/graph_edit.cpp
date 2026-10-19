@@ -9,7 +9,11 @@ namespace merian {
 const std::string& Graph::add_node(const std::string& node_name,
                                    const std::optional<std::string>& identifier) {
     return add_node(registry.create_node_from_name(node_name),
-                    identifier ? *identifier : unique_identifier(node_name));
+                    identifier ? *identifier
+                               : GraphDescription::unique_identifier(
+                                     node_name, [this](const std::string& candidate) {
+                                         return node_for_identifier.contains(candidate);
+                                     }));
 }
 
 NodeHandle Graph::find_node_for_identifier(const std::string& identifier) const {
@@ -44,7 +48,7 @@ bool Graph::remove_node(const std::string& identifier) {
         if (node_data.contains(node)) {
             wait();
             erase_node(node);
-            needs_reconnect = true;
+            request_reconnect();
         }
     });
     return true;
@@ -76,17 +80,8 @@ const std::string& Graph::add_node(const std::shared_ptr<Node>& node,
     }
 
     insert_node(node, identifier);
-    needs_reconnect = true;
+    request_reconnect();
     return node_data.at(node).identifier;
-}
-
-std::string Graph::unique_identifier(const std::string& base) const {
-    for (uint32_t i = 0;; i++) {
-        std::string identifier = fmt::format("{} {}", base, i);
-        if (!node_for_identifier.contains(identifier)) {
-            return identifier;
-        }
-    }
 }
 
 NodeHandle Graph::node_for(const std::string& identifier) const {
@@ -134,6 +129,7 @@ void Graph::insert_node(const NodeHandle& node,
 }
 
 void Graph::erase_node(const NodeHandle& node) {
+    const NodeHandle removed = node;
     NodeData& data = node_data.at(node);
     for (const NodeHandle& child : data.children) {
         erase_node(child);
@@ -150,14 +146,17 @@ void Graph::erase_node(const NodeHandle& node) {
         std::erase_if(other_data.rejected_auto_connections,
                       [&](const auto& entry) { return entry.second.node == node; });
     }
-    for (uint32_t i = 0; i < ring_fences.size(); i++) {
-        ring_fences.get(i).user_data.in_flight_data.erase(node);
+    for (InFlightData& slot : in_flight) {
+        slot.in_flight_data.erase(node);
     }
+    std::erase_if(event_listeners,
+                  [&](const EventListener& listener) { return listener.node == node; });
     if (const auto it = node_for_identifier.find(data.identifier);
         it != node_for_identifier.end() && it->second == node) {
         node_for_identifier.erase(it);
     }
-    node_data.erase(node);
+    node_data.erase(removed);
+    removed->on_removed();
 }
 
 std::vector<NodeHandle> Graph::top_level_nodes() const {
@@ -182,7 +181,7 @@ void Graph::add_connection(const NodeHandle& src,
         }
     }
     NodeData& dst_data = node_data.at(dst);
-    std::optional<Port> replaced;
+    std::optional<ConnectorRef> replaced;
     if (const auto it = dst_data.desired_incoming_connections.find(dst_input);
         it != dst_data.desired_incoming_connections.end()) {
         replaced = it->second;
@@ -193,7 +192,7 @@ void Graph::add_connection(const NodeHandle& src,
     // inputs auto connected to what this one received move along unless they were rewired
     for (const auto& [input, descriptor] : dst_data.input_descriptors) {
         const auto following = dst_data.desired_incoming_connections.find(descriptor.name);
-        if (replaced && *replaced != Port{src, src_output} &&
+        if (replaced && *replaced != ConnectorRef{src, src_output} &&
             descriptor.auto_connect.from == AutoConnect::From::INPUT &&
             descriptor.auto_connect.name == dst_input &&
             following != dst_data.desired_incoming_connections.end() &&
@@ -201,7 +200,7 @@ void Graph::add_connection(const NodeHandle& src,
             add_connection(src, dst, src_output, descriptor.name);
         }
     }
-    needs_reconnect = true;
+    request_reconnect();
 }
 
 void Graph::add_desired_connection(const NodeHandle& src,
@@ -209,7 +208,7 @@ void Graph::add_desired_connection(const NodeHandle& src,
                                    const std::string& src_output,
                                    const std::string& dst_input) {
     node_data.at(dst).desired_incoming_connections.insert_or_assign(dst_input,
-                                                                    Port{src, src_output});
+                                                                    ConnectorRef{src, src_output});
     SPDLOG_DEBUG("connected {}.{} -> {}.{}", node_data.at(src).identifier, src_output,
                  node_data.at(dst).identifier, dst_input);
 }
@@ -224,7 +223,7 @@ bool Graph::remove_connection(const NodeHandle& src,
                     dst_data.identifier, dst_input);
         return false;
     }
-    const Port removed = it->second;
+    const ConnectorRef removed = it->second;
     dst_data.desired_incoming_connections.erase(it);
 
     // inputs auto connected to what this one received connect again once it is connected
@@ -238,7 +237,7 @@ bool Graph::remove_connection(const NodeHandle& src,
             dst_data.settled_auto_connections.erase(descriptor.name);
         }
     }
-    needs_reconnect = true;
+    request_reconnect();
     return true;
 }
 

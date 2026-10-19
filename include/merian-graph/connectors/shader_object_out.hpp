@@ -19,8 +19,8 @@ class ShaderObjectResource : public GraphResource {
 };
 
 // Node-facing view of a transported GraphShaderObject.
-// Implicitly converts to the shader object view matching the port direction (inputs read,
-// outputs and write-declared ports read-write); use r()/w() explicitly where needed.
+// Implicitly converts to the shader object view matching the connector direction (inputs read,
+// outputs and write-declared connectors read-write); use r()/w() explicitly where needed.
 template <typename T> class ShaderObjectAccess {
   public:
     ShaderObjectAccess(const std::shared_ptr<T>& instance, const ShaderAccess access)

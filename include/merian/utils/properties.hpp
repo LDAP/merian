@@ -6,7 +6,9 @@
 #include "nlohmann/json.hpp"
 
 #include <cfloat>
+#include <filesystem>
 #include <fmt/format.h>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -69,7 +71,7 @@ class Properties {
     virtual void output_text(const std::string& text) = 0;
 
     template <typename... T> void output_text(fmt::format_string<T...> fmt, T&&... args) {
-        output_text(vformat(fmt, fmt::make_format_args(args...)));
+        output_text(fmt::format(fmt, std::forward<T>(args)...));
     }
     virtual void output_plot_line(const std::string& label,
                                   const float* samples,
@@ -373,6 +375,12 @@ class Properties {
                                                      std::string& string,
                                                      const bool needs_submit = false,
                                                      const std::string& desc = "") = 0;
+
+    // A file to read, set once submitted.
+    [[nodiscard]] virtual bool
+    config_path(const std::string& id, std::filesystem::path& path, const std::string& desc = "");
+    [[nodiscard]] bool
+    config_path(const std::string& id, std::string& path, const std::string& desc = "");
 
     // Serialization
 

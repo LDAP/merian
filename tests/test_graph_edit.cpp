@@ -26,7 +26,6 @@ class EventNode : public Node, public TimeProvider {
                 listen, [this](const GraphEvent::Info& info, const GraphEvent::Data&) {
                     received.push_back(
                         fmt::format("{}/{}/{}", info.node_name, info.identifier, info.event_name));
-                    return false;
                 });
         }
         return {{.name = "out", .connector = con_out, .access = ConnectorAccess::compute_write}};
@@ -125,8 +124,7 @@ class GraphEditTest : public GraphTest {
     using GraphTest::create_graph;
 
     static GraphHandle create_graph(const json& description) {
-        const GraphHandle graph = create_graph();
-        graph->load_from_json(description);
+        const GraphHandle graph = GraphTest::create_graph(description);
         run(graph);
         return graph;
     }
@@ -143,20 +141,20 @@ class GraphEditTest : public GraphTest {
 } // namespace
 
 // The Remove button, REMOVE_NODE from Node::properties, and both in one draw.
-TEST_F(GraphEditTest, RemovalWhileDrawingProperties) {
+TEST_F(GraphEditTest, RemovalWhileDrawingTheUi) {
     for (const json& node_props : {json{{"Remove", true}}, json{{"properties", {{"remove", true}}}},
                                    json{{"Remove", true}, {"properties", {{"remove", true}}}}}) {
         SCOPED_TRACE(node_props.dump());
         const GraphHandle graph = create_graph(chain());
 
         JSONLoadProperties props(json{{"nodes", {{"a", node_props}}}});
-        graph->properties(props);
+        graph->draw_ui(props);
 
         EXPECT_FALSE(graph->find_node_for_identifier("a"));
-        EXPECT_TRUE(stored_connections(graph->store_to_json()).empty());
+        EXPECT_TRUE(stored_connections(graph).empty());
         std::ignore = draw(graph);
         run(graph);
-        EXPECT_EQ(graph->get_node_state("b"), NodeState::OK);
+        EXPECT_EQ(graph->node_get_state("b"), NodeState::OK);
     }
 }
 
@@ -164,15 +162,38 @@ TEST_F(GraphEditTest, RemovalWhileRunning) {
     for (const std::string callback : {"on_connected", "pre_process", "process"}) {
         const GraphHandle graph = create_graph(chain());
 
-        set_node_properties(graph, "b", {{"remove in", callback}});
-        graph->request_reconnect();
+        graph->node_set_properties("b", {{"remove in", callback}});
+        graph->restart_run();
         run(graph);
 
         EXPECT_FALSE(graph->find_node_for_identifier("b")) << callback;
-        EXPECT_EQ(stored_connections(graph->store_to_json()), std::set<std::string>{"a.out->c.src"})
-            << callback;
-        EXPECT_EQ(graph->get_node_state("c"), NodeState::OK) << callback;
+        EXPECT_EQ(stored_connections(graph), std::set<std::string>{"a.out->c.src"}) << callback;
+        EXPECT_EQ(graph->node_get_state("c"), NodeState::OK) << callback;
     }
+}
+
+TEST_F(GraphEditTest, RemovalWhileLoading) {
+    json description = chain();
+    description["nodes"]["b"]["properties"] = {{"remove", true}};
+    const GraphHandle graph = create_graph(description);
+
+    EXPECT_FALSE(graph->find_node_for_identifier("b"));
+    EXPECT_EQ(stored_connections(graph), std::set<std::string>{"a.out->c.src"});
+    EXPECT_EQ(graph->node_get_state("c"), NodeState::OK);
+}
+
+TEST_F(GraphEditTest, RemovedNodesReceiveNoEvents) {
+    json description = chain();
+    description["nodes"]["b"]["properties"] = {{"listen", "//ping,/graph/connect"}};
+    const GraphHandle graph = create_graph(description);
+    const auto removed = graph->find_node_for_identifier_and_type<EventNode>("b");
+    removed->received.clear();
+
+    ASSERT_TRUE(graph->remove_node("b"));
+    graph->send_event("ping");
+    run(graph);
+
+    EXPECT_TRUE(removed->received.empty());
 }
 
 TEST_F(GraphEditTest, InvalidEditsThrowOrFail) {
@@ -180,7 +201,7 @@ TEST_F(GraphEditTest, InvalidEditsThrowOrFail) {
 
     EXPECT_THROW(graph->add_connection("x", "b", "out", "src"), std::invalid_argument);
     EXPECT_THROW(graph->remove_connection("x", "b", "src"), std::invalid_argument);
-    EXPECT_THROW(std::ignore = graph->get_node_state("x"), std::invalid_argument);
+    EXPECT_THROW(std::ignore = graph->node_get_state("x"), std::invalid_argument);
     EXPECT_FALSE(graph->remove_node("x"));
     EXPECT_FALSE(graph->remove_connection("b", "c", "src"));
     EXPECT_TRUE(has_connection(graph, "a", "out->c.src"));
@@ -195,7 +216,7 @@ TEST_F(GraphEditTest, FailingInitializeIsUnsupported) {
     graph->add_node("Failing Initialize Test", "f");
     run(graph);
 
-    EXPECT_EQ(graph->get_node_state("f"), NodeState::UNSUPPORTED);
+    EXPECT_EQ(graph->node_get_state("f"), NodeState::UNSUPPORTED);
 }
 
 TEST_F(GraphEditTest, LoadIntoARunningGraph) {
@@ -203,16 +224,18 @@ TEST_F(GraphEditTest, LoadIntoARunningGraph) {
     const std::filesystem::path path =
         std::filesystem::temp_directory_path() / "test-graph-edit-load.json";
     create_graph(json{{"version", 4}, {"nodes", {{"x", {{"type", "Event Test"}}}}}})
-        ->store_to_file(path);
+        ->to_description()
+        .to_file(path);
 
     UILoadProperties props(json{{"path", path.string()}, {"Load", true}});
-    graph->properties(props);
+    graph->draw_ui(props);
     run(graph);
     std::filesystem::remove(path);
 
-    EXPECT_EQ(std::set<std::string>(graph->identifiers().begin(), graph->identifiers().end()),
-              std::set<std::string>{"x"});
-    EXPECT_EQ(graph->get_node_state("x"), NodeState::OK);
+    EXPECT_EQ(
+        std::set<std::string>(graph->get_identifiers().begin(), graph->get_identifiers().end()),
+        std::set<std::string>{"x"});
+    EXPECT_EQ(graph->node_get_state("x"), NodeState::OK);
 }
 
 TEST_F(GraphEditTest, EventsReachChildren) {

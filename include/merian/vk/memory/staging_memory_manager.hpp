@@ -6,6 +6,8 @@
 #include "merian/vk/memory/bump_memory_allocator.hpp"
 #include "merian/vk/utils/math.hpp"
 
+#include <mutex>
+
 namespace merian {
 
 class StagingMemoryManager : public std::enable_shared_from_this<StagingMemoryManager> {
@@ -59,14 +61,13 @@ class StagingMemoryManager : public std::enable_shared_from_this<StagingMemoryMa
 
   public:
     // Request a staging area of size 'size' for uploads. The buffer and offset are returned to
-    // queue the device copy on the command buffer.
-    MemoryAllocationHandle
-    get_upload_staging_space(const vk::DeviceSize size,
-                             BufferHandle& upload_buffer,
-                             vk::DeviceSize& buffer_offset);
+    // queue the device copy on the command buffer. Thread-safe.
+    MemoryAllocationHandle get_upload_staging_space(const vk::DeviceSize size,
+                                                    BufferHandle& upload_buffer,
+                                                    vk::DeviceSize& buffer_offset);
 
     // Request a staging area of size 'size' for downloads. The buffer and offset are returned to
-    // queue the device copy on the command buffer.
+    // queue the device copy on the command buffer. Thread-safe.
     MemoryAllocationHandle get_download_staging_space(const vk::DeviceSize size,
                                                       BufferHandle& download_buffer,
                                                       vk::DeviceSize& buffer_offset);
@@ -187,6 +188,7 @@ class StagingMemoryManager : public std::enable_shared_from_this<StagingMemoryMa
 
     static constexpr vk::DeviceSize STAGING_ALIGNMENT = 16;
 
+    std::mutex blocks_mutex;
     BumpMemoryAllocatorHandle upload_block;
     BumpMemoryAllocatorHandle download_block;
     BumpMemoryAllocatorHandle spare_upload_block;

@@ -20,11 +20,7 @@ struct SwapchainAcquireResult {
     // before presenting it. (The system waits for this before presenting).
     BinarySemaphoreHandle signal_semaphore;
 
-    uint16_t min_images;
-    uint16_t num_images;
-
-    // Swapchain was created or recreated.
-    // You can use cmd_update_image_layouts() to update the image layouts to PresentSrc.
+    // The swapchain was created or recreated, the image views are new.
     bool did_recreate;
 };
 
@@ -46,27 +42,6 @@ class SwapchainManager {
     /*
      * If the framebuffer extent is 0 or the aquire was not successfull, std::nullopt is returned.
      */
-    std::optional<SwapchainAcquireResult> acquire(const vk::Extent2D extent,
-                                                  const uint64_t timeout = UINT64_MAX) {
-        std::optional<std::pair<uint32_t, Swapchain::SyncGroup>> image_index_sync_group;
-
-        try {
-            image_index_sync_group = swapchain->acquire(extent, timeout);
-        } catch (const Swapchain::needs_recreate& e) {
-            return std::nullopt;
-        }
-
-        if (image_index_sync_group) {
-            return make_swapchain_acquire_result(image_index_sync_group->first,
-                                                 image_index_sync_group->second, false);
-        }
-
-        return std::nullopt;
-    }
-
-    /*
-     * If the framebuffer extent is 0 or the aquire was not successfull, std::nullopt is returned.
-     */
     std::optional<SwapchainAcquireResult>
     acquire(const std::function<vk::Extent2D()>& framebuffer_extent,
             const uint64_t timeout = UINT64_MAX,
@@ -79,7 +54,7 @@ class SwapchainManager {
             try {
                 image_index_sync_group = swapchain->acquire(framebuffer_extent(), timeout);
             } catch (const Swapchain::needs_recreate& e) {
-                swapchain = std::make_shared<Swapchain>(swapchain);
+                swapchain = swapchain->recreate();
                 image_views.clear();
                 recreated = true;
             }
@@ -148,8 +123,6 @@ class SwapchainManager {
         aquire_result.index = image_index;
         aquire_result.wait_semaphore = sync_group.read_semaphore;
         aquire_result.signal_semaphore = sync_group.written_semaphore;
-        aquire_result.min_images = swapchain_info->min_images;
-        aquire_result.num_images = swapchain_info->images.size();
         aquire_result.did_recreate = recreated;
 
         return aquire_result;

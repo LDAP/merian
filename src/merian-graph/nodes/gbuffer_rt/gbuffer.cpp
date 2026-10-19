@@ -74,7 +74,6 @@ GBufferRTNode::on_connected(const NodeIOLayout& io_layout,
                     composition->reload(compile_context->get_search_path_file_loader());
                 }
             }
-            return true;
         });
 
     emission_connected = io_layout.is_connected(con_emission);
@@ -161,6 +160,7 @@ GBufferRTNode::process(const NodeIO& io, const NodeProcessInfo& info, Submission
             mask |= (1u << bit);
     }
     globals->get_cursor()["params"]["instance_mask"] = mask;
+    globals->get_cursor()["params"]["seed"] = io.get_seed();
     io[con_gbuffer]->set_instance_mask(mask);
 
     if (scene->is_ready()) {

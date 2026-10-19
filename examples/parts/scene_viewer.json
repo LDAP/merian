@@ -1,0 +1,119 @@
+{
+    "cli": {
+        "--": {
+            "pointer": "/nodes/scene/properties/file",
+            "required": true
+        },
+        "env-map": {
+            "pointer": "/nodes/scene/properties/env/path",
+            "set": {
+                "/nodes/scene/properties/env/type": "LatLong"
+            }
+        }
+    },
+    "include": [
+        "denoisers.json",
+        "renderers.json",
+        "mixins.json"
+    ],
+    "nodes": {
+        "display": {
+            "enabled": true,
+            "type": "Swapchain Blit"
+        },
+        "exposure": {
+            "enabled": true,
+            "outputs": [
+                "out->tonemap.src"
+            ],
+            "properties": {
+                "iso": 856.0,
+                "k": 8.0,
+                "aperture": 1.1200000047683716,
+                "autoexposure": true,
+                "max exposure": 10000.0,
+                "max log luminance": 12.0,
+                "metering": "center-weighted",
+                "min exposure": 1.0,
+                "min log luminance": -15.0,
+                "q": 0.6499999761581421,
+                "shutter time": 768.0,
+                "speed down": 5.099999904632568,
+                "speed up": 3.0999999046325684
+            },
+            "type": "Exposure"
+        },
+        "gbuffer": {
+            "enabled": true,
+            "outputs": [
+                "gbuffer->render.gbuffer"
+            ],
+            "properties": {
+                "0": true,
+                "1": true,
+                "2": true,
+                "3": true,
+                "4": true,
+                "5": true,
+                "6": false,
+                "7": true,
+                "height": 1080,
+                "width": 1920
+            },
+            "type": "GBuffer (Raytraced)"
+        },
+        "output": {
+            "enabled": true,
+            "outputs": [
+                "canvas->display.canvas",
+                "controller->scene.controller"
+            ],
+            "properties": {
+                "acquire timeout": 100000000,
+                "backend": "auto",
+                "mode": "windowed",
+                "on close": {
+                    "remove node": false,
+                    "send event": true
+                },
+                "present mode": "Mailbox",
+                "rebuild on recreate": false,
+                "surface format": "R8G8B8A8Srgb, SrgbNonlinear"
+            },
+            "type": "Window"
+        },
+        "scene": {
+            "enabled": true,
+            "outputs": [
+                "scene->gbuffer.scene",
+                "scene->render.scene"
+            ],
+            "properties": {
+                "env": {
+                    "pitch": 0.0,
+                    "type": "Empty",
+                    "yaw": 0.0
+                },
+                "file": "",
+                "settings": {
+                    "alpha test threshold": 0.5,
+                    "blas rebuild fraction": 0.33000001311302185,
+                    "clamp normals": true,
+                    "pretransform animated": false
+                }
+            }
+        },
+        "tonemap": {
+            "enabled": true,
+            "outputs": [
+                "out->display.src"
+            ],
+            "properties": {
+                "alpha mode": "Perceptual luminance",
+                "clamp output": true,
+                "perceptual exponent": 2.200000047683716
+            },
+            "type": "Tonemap"
+        }
+    }
+}

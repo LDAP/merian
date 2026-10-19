@@ -1,6 +1,9 @@
 {
+    "include": [
+        "debug.json"
+    ],
     "nodes": {
-        "debug": {
+        "display": {
             "properties": {
                 "selection": {
                     "pixel picked": true,
@@ -17,7 +20,7 @@
                     "paths from": "selection A",
                     "frame": "local shading frame",
                     "transform": "hemisphere (equal-area)",
-                    "resolution (log2)": 4,
+                    "log2 resolution": 4,
                     "BSDF pdf": true,
                     "density / pdf": true,
                     "density": true,

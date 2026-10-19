@@ -245,7 +245,7 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
                       "LightCollection::setup_state", cmd);
         ensure_buffer(sort_state_buffer, sort_state_size(), "LightCollection::sort_state", cmd);
 
-        bool info_grew = false;
+        bool info_filled = false;
         for (uint32_t i = 0; i < 2; i++) {
             const vk::DeviceSize info_size =
                 static_cast<uint32_t>(grid_cascades) * sizeof(LightGridInfo);
@@ -253,16 +253,18 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
                 ensure_buffer(grid_info_buffer[i], info_size, "LightCollection::grid_info", cmd);
                 // read as the previous cascades before the first setup
                 cmd->fill(grid_info_buffer[i]);
-                info_grew = true;
+                info_filled = true;
             }
-            if (!tree_info_buffer[i]) {
+            // the setup keeps the previous lattice if it holds the lights
+            if (!tree_info_buffer[i] || tree_info_fresh) {
                 ensure_buffer(tree_info_buffer[i], sizeof(LightTreeInfo),
                               "LightCollection::tree_info", cmd);
                 cmd->fill(tree_info_buffer[i]);
-                info_grew = true;
+                info_filled = true;
             }
         }
-        if (info_grew) {
+        tree_info_fresh = false;
+        if (info_filled) {
             cmd->barrier(vk::MemoryBarrier2{
                 vk::PipelineStageFlagBits2::eTransfer,
                 vk::AccessFlagBits2::eTransferWrite,
@@ -610,6 +612,13 @@ void LightCollection::update(const CommandBufferHandle& cmd,
     });
 }
 
+void LightCollection::clear_learned_state() {
+    grid_reset = true;
+    grid_feedback_fresh = static_cast<bool>(grid_feedback_buffer[0]);
+    tree_info_fresh = true;
+    grid_slot = 0;
+}
+
 void LightCollection::write_to(ShaderCursor cursor) const {
     const bool active = enabled && triangle_count > 0 && triangles_buffer && tree_cdf_buffer;
     const BufferHandle& dummy = allocator->get_dummy_buffer();
@@ -694,7 +703,7 @@ void LightCollection::properties(Properties& props) {
         props.st_separate("Cut upkeep");
         if (props.config_bool("clear learned state",
                               "Drop every cell's cut and what it learned about its lights."))
-            grid_reset = true;
+            clear_learned_state();
         if (props.st_begin_child("prior", "Visibility prior")) {
             props.config_float("triangles", triangle_prior,
                                "Share of a group's emission assumed to reach the cell before "

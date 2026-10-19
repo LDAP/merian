@@ -37,10 +37,6 @@ class Reduce : public AbstractCompute {
     // Undefined: keep the format of the input.
     vk::Format overwrite_format = vk::Format::eUndefined;
 
-    // Unique per instance: several Reduce nodes coexist (e.g. compositing and summing), and the
-    // session caches generated modules by name.
-    const std::string module_name;
-
     std::string source;
     std::optional<std::string> error;
 

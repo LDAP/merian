@@ -1,10 +1,13 @@
 #include <gtest/gtest.h>
 
+#include "submit_wait.hpp"
+
 #include "merian-shaders/scene/pbrt_scene.hpp"
 #include "merian-shaders/shading/materials/material_system.hpp"
 #include "merian-shaders/utils/texture_manager.hpp"
 #include "merian/shader/shader_compile_context.hpp"
 #include "merian/vk/command/queue.hpp"
+#include "merian/vk/command/submission.hpp"
 #include "merian/vk/context.hpp"
 #include "merian/vk/extension/extension_resources.hpp"
 #include "merian/vk/extension/extension_vk_validation_layers.hpp"
@@ -98,9 +101,9 @@ TEST_F(PBRTSceneTest, LoadMiniScene) {
     }
 
     auto scene = std::make_shared<PBRTScene>(compile_context, context, allocator, material_system);
-    queue->submit_wait([&](const CommandBufferHandle& cmd) {
-        scene->load(cmd, path);
-        scene->update(cmd, 0.0f, 0.0f, 0);
+    submit_wait(context, queue, [&](Submission& submission) {
+        scene->load(submission.get_cmd(), path);
+        scene->update(submission, 0.0f, 0.0f, 0, 0);
     });
     std::filesystem::remove(path);
 

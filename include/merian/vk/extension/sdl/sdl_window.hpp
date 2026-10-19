@@ -32,7 +32,7 @@ class SDLWindow : public Window, public InputController {
 
     vk::Extent2D framebuffer_extent() override;
     vk::Extent2D window_extent() override;
-    SurfaceHandle get_surface() override;
+    SwapchainHandle create_swapchain(const ContextHandle& context) override;
 
     bool should_close() const override;
     void poll_events() override;

@@ -1,16 +1,16 @@
 #pragma once
 
+#include "merian-graph/graph/errors.hpp"
 #include "merian/io/file_loader.hpp"
 
 #include <nlohmann/json.hpp>
 
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <map>
 #include <optional>
-#include <set>
 #include <string>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -23,11 +23,6 @@ class GraphDescription {
     // -----------------------------------------------------------------
     // Data Structures
     // -----------------------------------------------------------------
-
-    struct PerOutputInfo {
-        // (dst_node -> set<dst_input>)
-        std::map<std::string, std::set<std::string>> target;
-    };
 
     struct PerNodeInfo {
         std::string node_type;
@@ -44,11 +39,8 @@ class GraphDescription {
         // Optional metadata for GUI editors (positions, colors, descriptions, etc.)
         nlohmann::json metadata{};
 
-        // (output_connector_name -> output_info)
-        std::map<std::string, PerOutputInfo> outgoing_connections{};
-
         // (input connector name -> (src_node, src_output_name))
-        std::unordered_map<std::string, std::pair<std::string, std::string>> incoming_connections{};
+        std::map<std::string, std::pair<std::string, std::string>> incoming_connections{};
     };
 
     // -----------------------------------------------------------------
@@ -82,7 +74,7 @@ class GraphDescription {
      */
     bool remove_node(const std::string& identifier);
 
-    // Throws invalid_argument if a node does not exist; the ports are not checked.
+    // Throws invalid_argument if a node does not exist; the connectors are not checked.
     void add_connection(const std::string& src,
                         const std::string& dst,
                         const std::string& src_output,
@@ -99,39 +91,14 @@ class GraphDescription {
     // Node Properties
     // -----------------------------------------------------------------
 
-    void set_node_config(const std::string& identifier, const nlohmann::json& config) {
-        assert(nodes.contains(identifier));
-        nodes.at(identifier).config = config;
-    }
-
-    const nlohmann::json& get_node_config(const std::string& identifier) const {
-        assert(nodes.contains(identifier));
-        return nodes.at(identifier).config;
-    }
-
     void set_node_enabled(const std::string& identifier, bool enabled) {
         assert(nodes.contains(identifier));
         nodes.at(identifier).enabled = enabled;
     }
 
-    bool get_node_enabled(const std::string& identifier) const {
-        assert(nodes.contains(identifier));
-        return nodes.at(identifier).enabled;
-    }
-
     void set_node_linearization_order(const std::string& identifier, uint32_t order) {
         assert(nodes.contains(identifier));
         nodes.at(identifier).linearization_order = order;
-    }
-
-    uint32_t get_node_linearization_order(const std::string& identifier) const {
-        assert(nodes.contains(identifier));
-        return nodes.at(identifier).linearization_order;
-    }
-
-    const std::string& get_node_type(const std::string& identifier) const {
-        assert(nodes.contains(identifier));
-        return nodes.at(identifier).node_type;
     }
 
     void set_node_metadata(const std::string& identifier, const nlohmann::json& metadata) {
@@ -197,6 +164,7 @@ class GraphDescription {
         return from_json(json);
     }
 
+    // Without a "version", the current one.
     static GraphDescription from_json(const nlohmann::json& json);
 
     void to_file(const std::filesystem::path& path) const {
@@ -208,36 +176,31 @@ class GraphDescription {
 
   public:
     // -----------------------------------------------------------------
-    // CLI overrides (context-free; the reserved name "merge" deep-merges a JSON file)
+    // Config files
     // -----------------------------------------------------------------
 
-    // Resolves the top-level "include": <file|[files]> key, which pulls in other configs
-    // (recursively). The including config wins over the included content.
-    static bool resolve_includes(nlohmann::json& config,
-                                 const std::vector<std::filesystem::path>& search_dirs = {});
+    // res/ and examples/ in the parents of the working directory, then the installed examples.
+    static std::vector<std::filesystem::path> default_search_dirs();
 
-    static bool apply_cli(nlohmann::json& config,
-                          const std::vector<std::string>& args,
-                          const std::vector<std::filesystem::path>& search_dirs = {});
+    // The config at path, or else found in search_dirs. Throws config_error.
+    static std::filesystem::path find_config(const std::filesystem::path& path,
+                                             const std::vector<std::filesystem::path>& search_dirs);
 
-    static std::string cli_help(const nlohmann::json& config,
-                                const std::vector<std::filesystem::path>& search_dirs = {});
-
+    // Deep merge; "$+$key": [..] appends its (deduplicated) elements to the array at key.
     static void merge_into(nlohmann::json& base, const nlohmann::json& overwrite);
 
     // Throws std::invalid_argument if the identifier is empty, reserved (user, graph) or contains
     // reserved characters (., ->, /, :).
     static void validate_identifier(const std::string& identifier, const std::string& context);
 
+    // "<base> <i>" with the first i that is not taken.
+    static std::string unique_identifier(const std::string& base,
+                                         const std::function<bool(const std::string&)>& taken);
+
   private:
-    static void parse_graph_v1(const nlohmann::json& json, GraphDescription& description);
-    static void parse_graph_v2(const nlohmann::json& json, GraphDescription& description);
-    static void parse_graph_v3(const nlohmann::json& json, GraphDescription& description);
     static void parse_graph_v4(const nlohmann::json& json, GraphDescription& description);
 
     void dump_graph_v4(nlohmann::json& json) const;
-
-    std::string generate_unique_identifier(const std::string& node_type);
 
     // Connection parsing helpers
     static std::tuple<std::string, std::string, std::string>
@@ -249,6 +212,7 @@ class GraphDescription {
 
   private:
     static constexpr const char* SCHEMA_VERSION_KEY = "version";
+    static constexpr int SCHEMA_VERSION = 4;
 
     // (identifier -> per_node_info)
     std::map<std::string, PerNodeInfo> nodes;

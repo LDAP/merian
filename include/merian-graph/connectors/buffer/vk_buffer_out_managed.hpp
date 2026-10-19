@@ -9,7 +9,7 @@ class ManagedVkBufferOut;
 using ManagedVkBufferOutHandle = std::shared_ptr<ManagedVkBufferOut>;
 
 // Output a buffer that is allocated and managed by the graph. Usage flags are the create info's
-// usage plus the union of the declared ConnectorAccess of this port and all connected inputs.
+// usage plus the union of the declared ConnectorAccess of this connector and all connected inputs.
 class ManagedVkBufferOut : public VkBufferOut,
                            public AccessibleConnector<const BufferArrayResource&> {
   public:

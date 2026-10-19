@@ -113,7 +113,7 @@ void Graph::plan_memory() {
                     max_delay = std::max(max_delay, input_descriptor.delay);
                     combined_access = combined_access | input_descriptor.access;
                 }
-                const bool always = descriptor.persistent || !alias_transient_resources;
+                const bool always = descriptor.persistent || !settings.alias_transient_resources;
                 // without sharing, only the copies the delayed inputs read
                 const uint32_t copy_count = descriptor.persistent || !output->supports_delay() ? 1
                                             : always ? max_delay + 1
@@ -142,11 +142,8 @@ void Graph::plan_memory() {
                             .persistent = descriptor.persistent,
                             .copy_index = copy_index,
                             .copy_count = copy_count,
-                            .debug_name =
-                                copy_count == 1
-                                    ? fmt::format("{}.{}", data.identifier, descriptor.name)
-                                    : fmt::format("{}.{} ({})", data.identifier, descriptor.name,
-                                                  copy_index),
+                            .debug_name = graph_internal::copy_name(
+                                data.identifier, descriptor.name, copy_index, copy_count),
                         }),
                         .scope = scope,
                         .read_before_written =
@@ -164,10 +161,6 @@ void Graph::plan_memory() {
     transient_blocks = transient_allocator->get_blocks();
 
     // 3. a full barrier and image discards where memory changes hands
-    constexpr vk::MemoryBarrier2 full_barrier{
-        vk::PipelineStageFlagBits2::eAllCommands, vk::AccessFlagBits2::eMemoryWrite,
-        vk::PipelineStageFlagBits2::eAllCommands,
-        vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite};
     for (auto& layer : layers)
         for (const auto& node : layer.nodes) {
             for (const auto& [output, per_output_info] : node_data.at(node).output_connections) {
@@ -185,10 +178,10 @@ void Graph::plan_memory() {
                     for (uint32_t iteration = copy_index; iteration < period;
                          iteration += copies.size()) {
                         Layer::Set& set = layer.sets[iteration];
-                        set.barrier.srcStageMask |= full_barrier.srcStageMask;
-                        set.barrier.srcAccessMask |= full_barrier.srcAccessMask;
-                        set.barrier.dstStageMask |= full_barrier.dstStageMask;
-                        set.barrier.dstAccessMask |= full_barrier.dstAccessMask;
+                        set.barrier.srcStageMask |= FULL_MEMORY_BARRIER.srcStageMask;
+                        set.barrier.srcAccessMask |= FULL_MEMORY_BARRIER.srcAccessMask;
+                        set.barrier.dstStageMask |= FULL_MEMORY_BARRIER.dstStageMask;
+                        set.barrier.dstAccessMask |= FULL_MEMORY_BARRIER.dstAccessMask;
                         set.discards.insert(set.discards.end(), images.begin(), images.end());
                     }
                 }
@@ -204,7 +197,7 @@ void Graph::precompute_resources() {
             for (uint32_t set_index = 0; set_index < period; set_index++) {
                 for (auto& [input, per_input_info] : dst_data.input_connections) {
                     if (!per_input_info.node) {
-                        per_input_info.precomputed_resources.emplace_back(nullptr, -1ul);
+                        per_input_info.precomputed_resources.emplace_back();
                         continue;
                     }
                     const NodeData& src_data = node_data.at(per_input_info.node);
@@ -216,19 +209,17 @@ void Graph::precompute_resources() {
                     const uint32_t copy_index =
                         (set_index + period - dst_data.input_descriptors.at(input).delay) %
                         copies.size();
-                    per_input_info.precomputed_resources.emplace_back(copies[copy_index].resource,
-                                                                      copy_index);
+                    per_input_info.precomputed_resources.push_back(copies[copy_index].resource);
                 }
                 for (auto& [_, per_output_info] : dst_data.output_connections) {
                     if (!per_output_info.resource_data) {
-                        per_output_info.precomputed_resources.emplace_back(nullptr, -1ul);
+                        per_output_info.precomputed_resources.emplace_back();
                         continue;
                     }
                     const std::vector<ResourceData::Copy>& copies =
                         per_output_info.resource_data->copies;
-                    const uint32_t copy_index = set_index % copies.size();
-                    per_output_info.precomputed_resources.emplace_back(copies[copy_index].resource,
-                                                                       copy_index);
+                    per_output_info.precomputed_resources.push_back(
+                        copies[set_index % copies.size()].resource);
                 }
 
                 dst_data.resource_maps.emplace_back(this, &dst_data, dst_node, set_index);

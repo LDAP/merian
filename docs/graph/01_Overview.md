@@ -41,8 +41,8 @@ place.
 ### Subgraphs
 
 A node can be made of other nodes. `describe_subgraph()` is called at the start of every connect and
-returns its children, connected among each other (`"child.port"`) and to the node's public ports
-(`".port"`):
+returns its children, connected among each other (`"child.connector"`) and to the node's public connectors
+(`".connector"`):
 
 ```c++
 // SVGF, shortened
@@ -63,7 +63,7 @@ Subgraph SVGF::describe_subgraph() {
   list) that the node constructs and keeps as members, so they survive reconnects; a variable number
   of children is created in the setter of the setting that shapes them. They run like other nodes as
   `<node>:<child>`; `:` is reserved in identifiers.
-- Connections to a public port reach the children's ports; a public input feeds every child input
+- Connections to a public connector reach the children's connectors; a public input feeds every child input
   connected to it. A child input connected to a public input that nothing wires keeps its own auto
   connection.
 - Only the node is stored. It configures its children through setters and nests the settings of the
@@ -77,7 +77,7 @@ Subgraph SVGF::describe_subgraph() {
   ```
 
 - Whenever the node does not run, its children do not run either; while the user disabled it, its
-  `add_pass_through` ports pass through. The UI shows the children in the node's Subnodes tab.
+  `add_pass_through` connectors pass through. The UI shows the children in the node's Subnodes tab.
 
 ### Memory
 
@@ -99,62 +99,70 @@ the allocator they are given and need no handling of shared memory.
 - Each node receives its own allocator in `initialize` (also `NodeIO::get_allocator()`), which counts
   what it allocated.
 
-`Graph::get_memory_report()` (printed by `merian-graph-run --print-memory`) lists the bytes in use at
+`Graph::memory_get_report()` (printed by `graph_run.py --print-memory`) lists the bytes in use at
 each layer of the period, the blocks with the placement and time of use of every copy and, for each
 node in run order, what it allocated and the copies of its outputs. The graph's Memory tab shows it
 with a plot of the bytes in use; a node's Memory tab shows its part.
 
 ### Example
 
+Nodes are added by the name they are registered with:
+
 ```c++
-    auto graph = std::make_shared<merian::Graph>(merian::GraphCreateInfo{context, alloc});
+const merian::ContextHandle context = merian::Context::create({
+    .context_extensions = {merian::MerianGraphExtension::name},
+});
+const merian::ResourceAllocatorHandle allocator =
+    context->get_context_extension<merian::ExtensionResources>()->resource_allocator();
+const merian::GraphHandle graph =
+    context->get_context_extension<merian::MerianGraphExtension>()->create(
+        {.context = context, .resource_allocator = allocator});
 
-    auto window_node = std::make_shared<merian::GLFWWindowNode>(context);
-    auto image_in    = std::make_shared<merian::HDRImageRead>(alloc->get_staging(), "filename.hdr");
-    auto exp         = std::make_shared<merian::AutoExposure>(context);
-    auto tonemap     = std::make_shared<merian::Tonemap>(context);
-    auto curve       = std::make_shared<merian::VKDTFilmcurv>(context);
+graph->add_node("HDR Image Source", "image");
+graph->add_node("Tonemap", "tonemap");
+graph->add_node("Window", "window");
+graph->add_node("Swapchain Blit", "blit");
+graph->node_set_properties("image", {{"path", "filename.hdr"}});
 
-    graph->add_node(window_node, "window");
-    graph->add_node(image_in,    "image_in");
-    graph->add_node(exp,         "exp");
-    graph->add_node(tonemap,     "tonemap");
-    graph->add_node(curve,       "curve");
+graph->add_connection("image", "tonemap", "out", "src");
+graph->add_connection("tonemap", "blit", "out", "src");
+graph->add_connection("window", "blit", "canvas", "canvas");
 
-    graph->add_connection("image_in", "exp",     "out", "src");
-    graph->add_connection("exp",      "tonemap",  "out", "src");
-    graph->add_connection("tonemap",  "curve",    "out", "src");
-    graph->add_connection("curve",    "window",   "out", "src");
-
-    while (!window_node->get_window()->should_close()) {
-        glfwPollEvents();
-        graph->run();
-    }
-    graph->wait();
+// Closing the window removes its node.
+graph->run({.iterations = std::nullopt}, {},
+           [&] { return graph->find_node_for_identifier("window") == nullptr; });
+graph->wait();
 ```
+
+The same graph as a `GraphDescription` (`add_node(type, identifier, properties)`, `add_connection`)
+loads with `Graph::from_description`; its JSON form is what `examples/graph_run.py` takes.
 
 ### Available nodes
 
-| Class | Purpose |
-|---|---|
-| `GLFWWindowNode` | Swapchain output window |
-| `HDRImageRead` | Load HDR/LDR image from disk |
-| `ImageWrite` | Write image to disk |
-| `AutoExposure` | Auto exposure / histogram |
-| `Tonemap` | Tone mapping operators |
-| `VKDTFilmcurv` | Film curve (from vkdt) |
-| `Bloom` | Bloom post-process |
-| `FXAA` | Fast approximate anti-aliasing |
-| `TAA` | Temporal anti-aliasing |
-| `SVGF` | Spatiotemporal variance-guided filtering |
-| `DLSSNode` | NVIDIA DLSS super resolution and ray reconstruction |
-| `Accumulate` | Temporal accumulation |
-| `DeviceASBuilder` | Acceleration structure builder |
-| `GBufferRTNode` | G-buffer via ray tracing |
-| `ColorImage` | Solid color image source |
-| `AbstractCompute` | Generic compute pass base class |
-| `AbstractABCompare` | A/B image comparison |
-| `Reduce` | Parallel reduction |
-| `MeanToBuffer` | Image mean reduction |
-| `MedianApproxNode` | Approximate median |
-| `Shadertoy` | Shadertoy-style compute node |
+| Class | Registry name | Purpose |
+|---|---|---|
+| `WindowNode` | `Window` | Presents to a window of a `WindowProvider` (see [Window](../Window.md)) |
+| `SwapchainBlit` | `Swapchain Blit` | Blits an image onto a window's swapchain image, in place |
+| `ImGuiNode` | `ImGui` | Draws the ImGui UI onto a window's swapchain image, in place |
+| `HDRImageSource` | `HDR Image Source` | Load an HDR image from disk |
+| `LDRImageSource` | `LDR Image Source` | Load an LDR image from disk |
+| `ImageSink` | `Image Sink` | Write image to disk |
+| `HostImageSink` / `HostBufferSink` | `Host Image Sink` / `Host Buffer Sink` | Copy an image / bytes of a buffer to host memory |
+| `HostImageSource` / `HostBufferSource` | `Host Image Source` / `Host Buffer Source` | Output an image / bytes uploaded by the host |
+| `AutoExposure` | `Exposure` | Auto exposure / histogram |
+| `Tonemap` | `Tonemap` | Tone mapping operators |
+| `VKDTFilmcurv` | `Curves` | Film curve (from vkdt) |
+| `Bloom` | `Bloom` | Bloom post-process |
+| `FXAA` | `FXAA` | Fast approximate anti-aliasing |
+| `TAA` | `TAA` | Temporal anti-aliasing |
+| `SVGF` | `Denoiser (SVGF)` | Spatiotemporal variance-guided filtering |
+| `DLSSNode` | `DLSS` | NVIDIA DLSS super resolution and ray reconstruction |
+| `Accumulate` | `Accumulate` | Temporal accumulation |
+| `GBufferRTNode` | `GBuffer (Raytraced)` | G-buffer via ray tracing |
+| `ColorImage` | `Color` | Solid color image source |
+| `AbstractCompute` | | Generic compute pass base class |
+| `ABSplit` / `ABSideBySide` | `AB Split` / `AB Side By Side` | A/B image comparison |
+| `Reduce` | `Reduce` | Parallel reduction |
+| `MeanToBuffer` | `Mean` | Image mean reduction |
+| `MedianApproxNode` | `Median (Approximation)` | Approximate median |
+| `Shadertoy` | `Shadertoy` | Shadertoy-style compute node |

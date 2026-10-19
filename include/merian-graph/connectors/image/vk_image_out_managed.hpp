@@ -10,7 +10,7 @@ class ManagedVkImageOut;
 using ManagedVkImageOutHandle = std::shared_ptr<ManagedVkImageOut>;
 
 // Output a Vulkan image that is allocated and managed by the graph. Usage flags are the union
-// of the declared ConnectorAccess of this port and all connected inputs.
+// of the declared ConnectorAccess of this connector and all connected inputs.
 class ManagedVkImageOut : public VkImageOut, public AccessibleConnector<const ImageArrayResource&> {
   public:
     ManagedVkImageOut(const vk::ArrayProxy<vk::ImageCreateInfo>& create_info);

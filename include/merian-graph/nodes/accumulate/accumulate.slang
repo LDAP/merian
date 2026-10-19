@@ -142,6 +142,7 @@ struct PushConstant {
     float adaptive_alpha_ipr_factor;
 
     uint iteration;
+    uint seed;
 };
 
 [vk::push_constant]
@@ -199,7 +200,7 @@ void main(uint3 ipos: SV_DispatchThreadID) {
     int2 prev_ipos;
     float max_history = pc.accum_max_hist;
     bool is_static; // the surface did not move on screen (motion vector ~0)
-    RandomGenerator rng = XorShift32(pcg3d16(uint3(ipos.xy, pc.iteration)));
+    RandomGenerator rng = XorShift32(pcg3d16(uint3(ipos.xy, pc.iteration)) ^ pc.seed);
     if (USE_MOTION_VECTORS) {
         const float2 mv = MV_OVERRIDE ? in_mv[ipos.xy] : in_gbuffer.get_motion_vectors(ipos.xy);
         is_static = dot(mv, mv) < 1e-3 * 1e-3;

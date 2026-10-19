@@ -3,17 +3,27 @@
 #include "merian/utils/input_listener.hpp"
 #include "merian/utils/vector_matrix.hpp"
 
+#include <memory>
 #include <optional>
 
 namespace merian {
 
+// Over the panels, clicks and scrolling belong to the panels whatever the modifiers.
 class PathDebugInput : public InputListener {
   public:
     static constexpr int PRIORITY = 5;
+    // the node's own UI: below a graph UI drawn over it, above the picking
+    static constexpr int UI_PRIORITY = 8;
+    // above any UI, which consumes the key events while it has the keyboard
+    static constexpr int OBSERVER_PRIORITY = 1000;
+    static constexpr int PICK_MODIFIER = InputController::ALT;
+    static constexpr int WIDEN_MODIFIER = InputController::CONTROL;
 
-    explicit PathDebugInput(
-        const InputController::ModKey modifier = InputController::ModKey::CONTROL)
-        : modifier(modifier) {}
+    struct Click {
+        float2 pos;
+        // with the pick modifier held
+        bool pick;
+    };
 
     bool on_cursor(InputController& controller, double xpos, double ypos) override;
     bool on_key(InputController& controller,
@@ -25,19 +35,45 @@ class PathDebugInput : public InputListener {
                          InputController::KeyStatus status) override;
     bool on_scroll(InputController& controller, double xoffset, double yoffset) override;
 
+    // Tracks the held modifiers and the cursor; never consumes an event.
+    InputListenerHandle observer() const;
+
+    // In window coordinates; empty without panels.
+    void set_panel_area(const float2& lower, const float2& upper);
+
+    // Empty while a listener above has the cursor.
     std::optional<float2> cursor() const;
-    std::optional<float2> take_click();
-    double take_scroll();
+    // A pick, or a click on the panels.
+    std::optional<Click> take_click();
+    double take_panel_scroll();
+    double take_widen_scroll();
     bool take_clear();
 
   private:
-    const InputController::ModKey modifier;
-    bool cursor_seen = false;
-    float2 cursor_pos{};
-    float2 click_pos{};
-    bool modifier_down = false;
-    double scroll_accum = 0.;
-    bool clicked = false;
+    class Observer : public InputListener {
+      public:
+        bool on_cursor(InputController& controller, double xpos, double ypos) override;
+        bool on_key(InputController& controller,
+                    InputController::Key key,
+                    InputController::KeyStatus action,
+                    int mods) override;
+
+        int held_mods = 0;
+        bool cursor_seen = false;
+        float2 cursor_pos{};
+        // the last cursor event did not reach PRIORITY
+        bool cursor_taken = false;
+    };
+
+    bool over_panels() const;
+
+    std::shared_ptr<Observer> observed = std::make_shared<Observer>();
+
+    std::optional<Click> click;
+    float2 panel_lower{};
+    float2 panel_upper{};
+    double panel_scroll = 0.;
+    double widen_scroll = 0.;
     bool clear_requested = false;
     bool swallow_release = false;
 };

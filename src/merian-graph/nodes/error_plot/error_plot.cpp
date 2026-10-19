@@ -118,7 +118,6 @@ ErrorPlot::NodeStatusFlags ErrorPlot::on_connected(const NodeIOLayout& io_layout
             for (auto* kernel : {&error_to_buffer_kernel, &reduce_buffer_kernel}) {
                 (*kernel)->reload(std::any_cast<bool>(force), compile_context);
             }
-            return true;
         });
 
     readback_buffers.resize(info.iterations_in_flight);
@@ -232,12 +231,13 @@ ErrorPlot::process(const NodeIO& io, const NodeProcessInfo& info, Submission& su
                  io[con_error]->buffer_barrier(vk::AccessFlagBits::eShaderWrite,
                                                vk::AccessFlagBits::eTransferRead));
     cmd->copy(static_cast<const BufferHandle&>(io[con_error]), readback);
-    submission.sync_to_cpu([this, readback, generation = generation, sample = ++submitted]() {
-        const float4 value = *readback->get_memory()->map_as<float4>();
-        readback->get_memory()->unmap();
-        const std::scoped_lock lock(result_mutex);
-        readbacks.push_back({generation, sample, value});
-    });
+    submission.sync_to_cpu(
+        [this, readback, generation = generation, sample = info.get_iteration() + 1]() {
+            const float4 value = *readback->get_memory()->map_as<float4>();
+            readback->get_memory()->unmap();
+            const std::scoped_lock lock(result_mutex);
+            readbacks.push_back({generation, sample, value});
+        });
 
     record_output(io, info, submission);
     return {};
@@ -292,7 +292,6 @@ void ErrorPlot::record_output(const NodeIO& io,
 
 void ErrorPlot::reset_history() {
     history.clear();
-    submitted = 0;
     generation++;
     csv_stream.close();
 }
@@ -442,20 +441,20 @@ void ErrorPlot::draw_overlay(const uint32_t width, const uint32_t height) const 
 }
 
 ErrorPlot::NodeStatusFlags ErrorPlot::properties(Properties& config) {
-    config.config_enum("Metric", metric, Properties::OptionsStyle::COMBO,
+    config.config_enum("metric", metric, Properties::OptionsStyle::COMBO,
                        "Error metric computed against the reference.");
 
-    if (config.config_uint("History", history_size, "Number of samples shown in the plot.")) {
+    if (config.config_uint("history", history_size, "Number of samples shown in the plot.")) {
         history_size = std::max(history_size, 2u);
         while (history.size() > history_size) {
             history.pop_front();
         }
     }
-    if (config.config_bool("Reset history")) {
+    if (config.config_bool("reset history")) {
         reset_history();
     }
     if (metric == ErrorMetric::RelMSE) {
-        config.config_float("Relative floor", relative_epsilon,
+        config.config_float("relative floor", relative_epsilon,
                             "Added to the reference's square before dividing. Pixels that are "
                             "legitimately black would otherwise dominate.",
                             0.001f);
@@ -465,28 +464,28 @@ ErrorPlot::NodeStatusFlags ErrorPlot::properties(Properties& config) {
     config.output_text(reference_is_snapshot ? "snapshot of this session"
                        : reference_owned     ? "loaded from file"
                                              : "the connected input");
-    if (config.config_text("Reference image", reference_path, true,
+    if (config.config_path("reference image", reference_path,
                            "Any format the image loader reads. Empty falls back to the "
                            "connected reference.")) {
         reference_dirty = true;
     }
-    if (config.config_bool("Snapshot the input",
+    if (config.config_bool("snapshot the input",
                            "Freezes the current input as the reference and restarts the plot.")) {
         snapshot_requested = true;
     }
-    if (config.config_text("Convergence csv", csv_path, false,
+    if (config.config_text("convergence csv", csv_path, false,
                            "Appends samples,error once per sample while set.")) {
         csv_stream.close();
     }
 
     config.st_separate("Axes");
-    config.config_bool("Logarithmic x-axis", log_x_axis, "Distribute samples on a log10 x-axis.");
-    config.config_bool("Logarithmic y-axis", log_y_axis, "Plot values on a log10 y-axis.");
+    config.config_bool("logarithmic x-axis", log_x_axis, "Distribute samples on a log10 x-axis.");
+    config.config_bool("logarithmic y-axis", log_y_axis, "Plot values on a log10 y-axis.");
 
-    config.config_bool("Auto scale", auto_scale, "Fit the y-axis range to the data.");
+    config.config_bool("auto scale", auto_scale, "Fit the y-axis range to the data.");
     if (!auto_scale) {
-        config.config_float("Min", scale_min, "Lower y-axis bound.", 0.001f);
-        config.config_float("Max", scale_max, "Upper y-axis bound.", 0.001f);
+        config.config_float("min", scale_min, "Lower y-axis bound.", 0.001f);
+        config.config_float("max", scale_max, "Upper y-axis bound.", 0.001f);
     }
 
     const float4 e = metric_error();

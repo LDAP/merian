@@ -91,6 +91,10 @@ std::vector<std::filesystem::path> Plugins::search_paths() {
     paths.push_back(exe_dir);
     paths.push_back(exe_dir / "plugins");
     paths.push_back(exe_dir.parent_path() / "lib" / "merian" / "plugins");
+    // Windows installs the library to bindir
+    const std::filesystem::path library_dir = FileLoader::library_path().parent_path();
+    paths.push_back(library_dir / "merian" / "plugins");
+    paths.push_back(library_dir.parent_path() / "lib" / "merian" / "plugins");
 
     if (const auto user_dir = user_plugin_dir()) {
         paths.push_back(*user_dir);
@@ -109,7 +113,7 @@ std::vector<std::filesystem::path> Plugins::discover() {
             return;
         }
         for (const auto& entry : std::filesystem::directory_iterator(dir, ec)) {
-            if (!entry.is_regular_file(ec) || !is_plugin_filename(entry.path())) {
+            if (!is_plugin_filename(entry.path()) || !entry.is_regular_file(ec)) {
                 continue;
             }
             std::filesystem::path canonical = std::filesystem::weakly_canonical(entry.path());
@@ -124,11 +128,20 @@ std::vector<std::filesystem::path> Plugins::discover() {
     }
 
     // A plugin cloned into <merian>/subprojects/merian-plugin-* is built as a merian subproject,
-    // landing in <build>/subprojects/<name>/ next to the host binary.
-    const std::filesystem::path exe_dir = FileLoader::binary_path().parent_path();
-    const std::filesystem::path build_subprojects = exe_dir / "subprojects";
-    std::error_code ec;
-    if (std::filesystem::is_directory(build_subprojects, ec)) {
+    // landing in <build>/subprojects/<name>/: next to the host binary, or in the build tree that
+    // holds the merian library.
+    std::vector<std::filesystem::path> build_dirs = {FileLoader::binary_path().parent_path()};
+    if (const auto build_dir =
+            FileLoader::search_parents(FileLoader::library_path().parent_path(), "meson-info");
+        build_dir && *build_dir != std::filesystem::weakly_canonical(build_dirs.front())) {
+        build_dirs.push_back(*build_dir);
+    }
+    for (const auto& build_dir : build_dirs) {
+        std::error_code ec;
+        const std::filesystem::path build_subprojects = build_dir / "subprojects";
+        if (!std::filesystem::is_directory(build_subprojects, ec)) {
+            continue;
+        }
         for (const auto& entry : std::filesystem::directory_iterator(build_subprojects, ec)) {
             if (entry.is_directory(ec) &&
                 entry.path().filename().string().starts_with("merian-plugin-")) {
@@ -205,8 +218,8 @@ void load_plugins(const char* register_symbol,
             if (register_sym == nullptr) {
                 continue;
             }
-            // A plugin reachable through more than one path (e.g. an in-tree and a standalone build)
-            // must only register once.
+            // A plugin reachable through more than one path (e.g. an in-tree and a standalone
+            // build) must only register once.
             if (!loaded_names.insert(name).second) {
                 SPDLOG_WARN("skipping duplicate {} plugin '{}' ({})", kind, name, path.string());
                 continue;

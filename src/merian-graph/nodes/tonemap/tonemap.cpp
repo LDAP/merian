@@ -117,7 +117,7 @@ AbstractCompute::NodeStatusFlags Tonemap::properties(Properties& config) {
             pc.param2 = 11.2;
         }
         config.config_float("exposure bias", pc.param1, "see UNCHARTED 2", .05);
-        config.config_float("W", pc.param2, "see UNCHARTED 2", .1);
+        config.config_float("w", pc.param2, "see UNCHARTED 2", .1);
     }
 
     if (tonemap == TONEMAP_LOTTES) {
@@ -130,9 +130,9 @@ AbstractCompute::NodeStatusFlags Tonemap::properties(Properties& config) {
         }
         config.config_float("contrast", pc.param1, "See Lottes talk", 0.01);
         config.config_float("shoulder", pc.param2, "See Lottes talk", 0.01);
-        config.config_float("hdrMax", pc.param3, "See Lottes talk", 0.1);
-        config.config_float("midIn", pc.param4, "See Lottes talk", 0.001);
-        config.config_float("midOut", pc.param5, "See Lottes talk", 0.001);
+        config.config_float("hdr max", pc.param3, "See Lottes talk", 0.1);
+        config.config_float("mid in", pc.param4, "See Lottes talk", 0.001);
+        config.config_float("mid out", pc.param5, "See Lottes talk", 0.001);
     }
 
     if (tonemap == TONEMAP_ACES_APPROX) {

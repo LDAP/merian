@@ -39,7 +39,7 @@ std::vector<uint32_t> generate_pairing(const float radius, const uint32_t seed) 
     for (uint32_t slot = 0; slot < RESTIR_PT_MAX_NEIGHBORS; slot++) {
         const int period = static_cast<int>(PAIRING_PERIODS[slot]);
         const int count = period * period;
-        std::mt19937 rng(hash_val(seed, slot));
+        std::mt19937 rng(xxhash32(seed, slot));
         std::normal_distribution<float> normal(0.f, sigma);
 
         std::vector<int> order(count);
@@ -241,6 +241,7 @@ RenderRestirPT::on_connected(const NodeIOLayout& io_layout,
                              Submission& submission) {
     composition = nullptr;
     previous_iteration_traced = false;
+    seed = io.get_seed();
     if (path_records.update_connected(io_layout)) {
         return NEEDS_RECONNECT;
     }
@@ -254,7 +255,6 @@ RenderRestirPT::on_connected(const NodeIOLayout& io_layout,
                     composition->reload(compile_context->get_search_path_file_loader());
                 }
             }
-            return true;
         });
 
     gbuffer_composition = io[con_gbuffer]->get_layout()->get_composition();
@@ -555,7 +555,8 @@ RenderRestirPT::process(const NodeIO& io, const NodeProcessInfo& info, Submissio
     for (int32_t round = 0; round < rounds; round++) {
         MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "spatial");
         pc.round = static_cast<uint32_t>(round);
-        pc.pairing_transform = static_cast<uint32_t>(hash_val(iteration, round, seed));
+        pc.pairing_transform =
+            xxhash32(static_cast<uint32_t>(iteration), static_cast<uint32_t>(round), seed);
         run_shifts(SpatialNeighbors, current, 0u);
         const BufferHandle target = next_target();
         run(Spatial, current, target, write == writes ? RestirPTPassResolves : 0u);
@@ -584,9 +585,6 @@ RenderRestirPT::NodeStatusFlags RenderRestirPT::properties(Properties& config) {
 
     constants_changed |=
         config.config_int("samples per pixel", spp, "Paths traced per pixel.", 1, 16);
-    if (config.config_uint("seed", seed, "Base seed of every random number.")) {
-        pairing_dirty = true;
-    }
     constants_changed |=
         config.config_int("max path length", max_path_length,
                           "Maximum number of path segments, including the primary hit.", 2, 16);
@@ -743,7 +741,7 @@ RenderRestirPT::NodeStatusFlags RenderRestirPT::properties(Properties& config) {
         config.st_end_child();
     }
 
-    if (config.st_begin_child("instance_mask", "Instance mask")) {
+    if (config.st_begin_child("instance mask", "Instance mask")) {
         for (uint32_t bit = 0; bit < 8; ++bit) {
             constants_changed |= config.config_bool(std::to_string(bit), mask_enabled[bit]);
             if ((bit & 3u) != 3u)

@@ -6,6 +6,11 @@ Note: topological order includes only connections with delay == 0.
 
 - `Node::initialize`; a node that fails to initialize is unsupported.
 
+### Graph::remove_node, Graph::clear, ~Graph
+
+- Once the iterations in flight finished: `Node::on_removed`, for the children of a subgraph too.
+  Others may still hold the node.
+
 
 ### Graph Build
 
@@ -41,6 +46,9 @@ Note: topological order includes only connections with delay == 0.
 
 ### Graph Run
 
+- While waiting for the slot of the iteration in flight it reuses, the host callbacks of
+  `Submission::sync_to_cpu` whose commands finished run, oldest iteration first. A run ends by
+  running the finished ones; `Graph::wait()` runs all.
 - For each node (in topological order):
     - `Node::pre_process`
     - If at least one node returns `NEEDS_RECONNECT`, a build is executed and the run starts over from the beginning.
@@ -51,3 +59,5 @@ Note: topological order includes only connections with delay == 0.
       profiler is enabled). `process` may change the layout only of images the node writes.
     - For each connector of its nodes, except outputs written in place: `Connector::on_post_process`
     - One barrier with the barriers of the connectors.
+- The last batch signals the iteration semaphore with the total iteration + 1. When recording
+  throws, what was recorded is still submitted and the exception propagates.

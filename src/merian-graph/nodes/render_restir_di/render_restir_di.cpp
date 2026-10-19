@@ -114,7 +114,6 @@ RenderRestirDI::on_connected(const NodeIOLayout& io_layout,
                     composition->reload(compile_context->get_search_path_file_loader());
                 }
             }
-            return true;
         });
 
     gbuffer_composition = io[con_gbuffer]->get_layout()->get_composition();
@@ -199,7 +198,7 @@ RenderRestirDI::process(const NodeIO& io, const NodeProcessInfo& info, Submissio
     RestirPushConstant pc{};
     pc.reservoirs_prev = prev;
     pc.frame = static_cast<uint32_t>(info.get_iteration());
-    pc.seed = seed;
+    pc.seed = io.get_seed();
     pc.temporal_clamp_m = temporal_clamp_m;
     pc.spatial_radius = spatial_radius;
     pc.temporal_normal_reject_cos = temporal_normal_reject_cos;
@@ -263,17 +262,16 @@ RenderRestirDI::NodeStatusFlags RenderRestirDI::properties(Properties& config) {
     config.st_separate("Generate");
     constants_changed |=
         config.config_int("samples per pixel", spp, "BSDF-sampled candidates per pixel.", 0, 32);
-    config.config_uint("seed", seed, "Base seed for the per-pixel RNG.");
 
     config.st_separate("Temporal reuse");
     config.config_bool("enable temporal reuse", temporal_enable);
     float temporal_angle = std::acos(temporal_normal_reject_cos);
-    config.config_angle("normal threshold##temporal", temporal_angle,
+    config.config_angle("temporal normal threshold", temporal_angle,
                         "Reject reprojections with normals farther apart.", 0, 180);
     temporal_normal_reject_cos = std::cos(temporal_angle);
-    config.config_percent("depth threshold##temporal", temporal_depth_reject,
+    config.config_percent("temporal depth threshold", temporal_depth_reject,
                           "Reject reprojections with depths farther apart (relative to the max).");
-    config.config_int("clamp M", temporal_clamp_m,
+    config.config_int("clamp m", temporal_clamp_m,
                       "Clamp the temporal history length. 0 disables.");
     constants_changed |=
         config.config_bool("apply motion", apply_mv,
@@ -287,10 +285,10 @@ RenderRestirDI::NodeStatusFlags RenderRestirDI::properties(Properties& config) {
     constants_changed |=
         config.config_int("iterations", spatial_iterations, "Neighbors resampled per pixel.", 0, 8);
     float spatial_angle = std::acos(spatial_normal_reject_cos);
-    config.config_angle("normal threshold##spatial", spatial_angle,
+    config.config_angle("spatial normal threshold", spatial_angle,
                         "Reject neighbors with normals farther apart.", 0, 180);
     spatial_normal_reject_cos = std::cos(spatial_angle);
-    config.config_percent("depth threshold##spatial", spatial_depth_reject,
+    config.config_percent("spatial depth threshold", spatial_depth_reject,
                           "Reject neighbors with depths farther apart (relative to the max).");
     config.config_int("radius", spatial_radius, "Pixel radius for neighbor sampling.", 0, 100);
 

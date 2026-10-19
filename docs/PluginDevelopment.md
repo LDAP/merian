@@ -1,8 +1,8 @@
 # Plugin Development
 
 A plugin is a shared library named `merian-plugin-<name>` that contributes nodes and/or context
-extensions to a merian host (such as `merian-graph-run`). Plugins are discovered at startup, so a
-new renderer or node set appears without rebuilding or relinking the host.
+extensions to a merian host (such as `examples/graph_run.py`). Plugins are discovered at startup,
+so a new renderer or node set appears without rebuilding or relinking the host.
 
 Plugins **do not vendor merian** — they consume it through `dependency('merian')` and link against
 the installed (or in-tree) merian shared libraries.

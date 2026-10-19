@@ -1,0 +1,35 @@
+{
+    "nodes": {
+        "dlss": {
+            "enabled": true,
+            "outputs": [
+                "out->exposure.src"
+            ],
+            "properties": {
+                "mode": "ray reconstruction"
+            },
+            "type": "DLSS"
+        },
+        "gbuffer": {
+            "$+$outputs": [
+                "gbuffer->dlss.gbuffer"
+            ],
+            "properties": {
+                "primary surface replacement": true,
+                "texture lod bias": -1.0
+            }
+        },
+        "render": {
+            "properties": {
+                "output": {
+                    "demodulate albedo": false
+                }
+            }
+        },
+        "scene": {
+            "$+$outputs": [
+                "scene->dlss.scene"
+            ]
+        }
+    }
+}

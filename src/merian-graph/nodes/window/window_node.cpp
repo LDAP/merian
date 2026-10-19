@@ -4,9 +4,50 @@
 #include "merian/vk/extension/extension_registry.hpp"
 #include "merian/vk/utils/profiler.hpp"
 
-#include <csignal>
+#include <algorithm>
 
 namespace merian {
+
+namespace {
+
+constexpr std::string_view BACKEND_AUTO = "auto";
+
+std::string surface_format_name(const vk::SurfaceFormatKHR& format) {
+    return fmt::format("{}, {}", vk::to_string(format.format), vk::to_string(format.colorSpace));
+}
+
+void select_by_name(const SwapchainHandle& swapchain,
+                    const std::string& surface_format,
+                    const std::string& present_mode) {
+    for (const vk::SurfaceFormatKHR& format : swapchain->get_supported_surface_formats()) {
+        if (surface_format_name(format) == surface_format) {
+            swapchain->set_new_surface_format(format);
+        }
+    }
+    for (const vk::PresentModeKHR mode : swapchain->get_supported_present_modes()) {
+        if (vk::to_string(mode) == present_mode) {
+            swapchain->set_new_present_mode(mode);
+        }
+    }
+}
+
+bool config_name(Properties& config,
+                 const std::string& id,
+                 std::string& name,
+                 const std::vector<std::string>& names) {
+    if (!config.is_ui()) {
+        return config.config_text(id, name);
+    }
+    const auto it = std::ranges::find(names, name);
+    int selected = it == names.end() ? 0 : static_cast<int>(std::distance(names.begin(), it));
+    if (!config.config_options(id, selected, names)) {
+        return false;
+    }
+    name = names[selected];
+    return true;
+}
+
+} // namespace
 
 void WindowNode::initialize(const ContextHandle& context,
                             const ResourceAllocatorHandle& /*allocator*/) {
@@ -18,25 +59,25 @@ void WindowNode::initialize(const ContextHandle& context,
 
 WindowNode::NodeStatusFlags WindowNode::on_connected(const NodeIOLayout& /*io_layout*/,
                                                      const NodeIO& io,
-                                                     const NodeConnectionInfo& /*info*/,
+                                                     const NodeConnectionInfo& info,
                                                      Submission& /*submission*/) {
     const auto& selected = get_selected_provider();
     if (!window || selected != active_provider) {
         const ContextHandle& context = io.get_context();
+        const WindowCreateInfo create_info{.title = fmt::format("merian: {}", info.identifier)};
         window = selected->create_window(context->get_device(), create_info);
         active_provider = selected;
+        if (fullscreen) {
+            window->set_fullscreen(true);
+        }
 
-        const SwapchainHandle swapchain =
-            std::make_shared<merian::Swapchain>(context, window->get_surface());
-        swapchain_manager.emplace(swapchain);
+        swapchain_manager.emplace(window->create_swapchain(context));
+        select_by_name(get_swapchain(), surface_format, present_mode);
     }
     return {};
 }
 
 std::vector<InputConnectorDescriptor> WindowNode::describe_inputs() {
-    if (providers.empty()) {
-        throw graph_errors::node_error{"WindowNode requires at least one WindowProvider"};
-    }
     return {{std::string{DISPLAY_INPUT}, image_in, ConnectorAccess::transfer_src, 0, true}};
 }
 
@@ -46,15 +87,19 @@ std::vector<OutputConnectorDescriptor> WindowNode::describe_outputs(const NodeIO
             {"window", con_window}};
 }
 
-WindowNode::NodeStatusFlags WindowNode::pre_process([[maybe_unused]] const NodeIO& io,
+WindowNode::NodeStatusFlags WindowNode::pre_process(const NodeIO& io,
                                                     [[maybe_unused]] const NodeProcessInfo& info) {
-    if (window) {
-        window->poll_events();
-        if (on_should_close_remove_node && window->should_close()) {
-            return NodeStatusFlagBits::REMOVE_NODE;
-        }
+    if (!window) {
+        return {};
     }
-    return {};
+    window->poll_events();
+    if (!window->should_close()) {
+        return {};
+    }
+    if (on_close_send_event) {
+        io.send_event("close");
+    }
+    return on_close_remove_node ? NodeStatusFlagBits::REMOVE_NODE : NodeStatusFlags{};
 }
 
 [[nodiscard]] WindowNode::NodeStatusFlags
@@ -63,11 +108,11 @@ WindowNode::process(const NodeIO& io, const NodeProcessInfo& info, Submission& s
     NodeStatusFlags flags{};
 
     const int64_t signed_max_img_count = get_swapchain()->get_max_image_count();
-    const int64_t signed_iteration = static_cast<int64_t>(info.get_iteration());
-    throttle = !info.get_iteration_semaphore()->wait(
-        std::max(static_cast<int64_t>(0), signed_iteration - signed_max_img_count + 1), 0);
-    info.get_iteration_semaphore()->wait(
+    const int64_t signed_iteration = static_cast<int64_t>(info.get_total_iteration());
+    const auto presentable = static_cast<uint64_t>(
         std::max(static_cast<int64_t>(0), signed_iteration - signed_max_img_count + 1));
+    throttle = info.get_iteration_semaphore()->get_counter_value() < presentable;
+    info.wait_iteration_semaphore(presentable);
 
     get_swapchain()->set_min_images(info.get_iterations_in_flight());
     std::optional<SwapchainAcquireResult> acquire;
@@ -116,16 +161,18 @@ WindowNode::process(const NodeIO& io, const NodeProcessInfo& info, Submission& s
         }
 
         // Transition to present once every node wrote the canvas.
-        submission.add_pre_submit_callback([image](Submission& submission) {
-            submission.get_cmd()->barrier(image->barrier2(vk::ImageLayout::ePresentSrcKHR));
-        });
+        submission.add_pre_submit_callback(
+            [image,
+             present_layout = get_swapchain()->get_present_layout()](Submission& submission) {
+                submission.get_cmd()->barrier(image->barrier2(present_layout));
+            });
 
         submission.add_wait_semaphore(acquire->wait_semaphore,
                                       vk::PipelineStageFlagBits::eTransfer);
         submission.add_signal_semaphore(acquire->signal_semaphore);
 
-        uint32_t index = acquire->index;
-        SwapchainHandle swapchain = get_swapchain();
+        const uint32_t index = acquire->index;
+        const SwapchainHandle swapchain = get_swapchain();
         submission.add_submit_callback(
             [index, swapchain, &info](const QueueHandle& queue, Submission& /*submission*/) {
                 try {
@@ -138,13 +185,6 @@ WindowNode::process(const NodeIO& io, const NodeProcessInfo& info, Submission& s
 
         if (request_rebuild_on_recreate && acquire->did_recreate)
             flags |= NodeStatusFlagBits::NEEDS_RECONNECT;
-    }
-
-    if (window && window->should_close()) {
-        if (on_should_close_sigint)
-            raise(SIGINT);
-        if (on_should_close_sigterm)
-            raise(SIGTERM);
     }
     return flags;
 }
@@ -161,17 +201,21 @@ WindowNode::NodeStatusFlags WindowNode::properties(Properties& config) {
 
     NodeStatusFlags flags{};
 
-    if (current_src_array_size > 0) {
+    if (current_src_array_size > 0 || !config.is_ui()) {
         config.config_uint("source array element", src_array_element, "", 0u,
-                           current_src_array_size - 1);
+                           std::max(current_src_array_size, 1u) - 1);
     }
 
     if (window) {
-        int fullscreen = static_cast<int>(window->is_fullscreen());
-        const int old_fullscreen = fullscreen;
-        config.config_options("mode", fullscreen, {"windowed", "fullscreen"});
-        if (fullscreen != old_fullscreen) {
-            window->set_fullscreen(fullscreen != 0);
+        fullscreen = window->is_fullscreen();
+    }
+    if (window || !config.is_ui()) {
+        int selected_mode = static_cast<int>(fullscreen);
+        if (config.config_options("mode", selected_mode, {"windowed", "fullscreen"})) {
+            fullscreen = selected_mode != 0;
+            if (window) {
+                window->set_fullscreen(fullscreen);
+            }
         }
     }
 
@@ -180,35 +224,27 @@ WindowNode::NodeStatusFlags WindowNode::properties(Properties& config) {
                           Properties::OptionsStyle::LIST_BOX);
     mode = static_cast<BlitMode>(int_mode);
 
-    if (swapchain_manager) {
-        const SwapchainHandle swapchain = get_swapchain();
-
-        int selected = 0;
-        std::vector<std::string> str_surface_formats;
-        const auto& surface_formats = swapchain->get_supported_surface_formats();
-        for (uint32_t i = 0; i < surface_formats.size(); i++) {
-            const vk::SurfaceFormatKHR& format = surface_formats[i];
-            str_surface_formats.emplace_back(fmt::format("{}, {}", vk::to_string(format.format),
-                                                         vk::to_string(format.colorSpace)));
-            if (format == swapchain->get_new_surface_format()) {
-                selected = static_cast<int>(i);
+    if (swapchain_manager || !config.is_ui()) {
+        std::vector<std::string> surface_formats;
+        std::vector<std::string> present_modes;
+        if (swapchain_manager) {
+            const SwapchainHandle& swapchain = get_swapchain();
+            surface_format = surface_format_name(swapchain->get_new_surface_format());
+            present_mode = vk::to_string(swapchain->get_new_present_mode());
+            for (const vk::SurfaceFormatKHR& format : swapchain->get_supported_surface_formats()) {
+                surface_formats.emplace_back(surface_format_name(format));
+            }
+            for (const vk::PresentModeKHR supported_mode :
+                 swapchain->get_supported_present_modes()) {
+                present_modes.emplace_back(vk::to_string(supported_mode));
             }
         }
-        if (config.config_options("surface format", selected, str_surface_formats)) {
-            swapchain->set_new_surface_format(surface_formats[selected]);
-        }
-
-        std::vector<std::string> str_present_modes;
-        const auto& present_modes = swapchain->get_supported_present_modes();
-        for (uint32_t i = 0; i < present_modes.size(); i++) {
-            const vk::PresentModeKHR& mode = present_modes[i];
-            str_present_modes.emplace_back(fmt::format("{}", vk::to_string(mode)));
-            if (mode == swapchain->get_new_present_mode()) {
-                selected = static_cast<int>(i);
-            }
-        }
-        if (config.config_options("present mode", selected, str_present_modes)) {
-            swapchain->set_new_present_mode(present_modes[selected]);
+        const bool format_changed =
+            config_name(config, "surface format", surface_format, surface_formats);
+        const bool present_mode_changed =
+            config_name(config, "present mode", present_mode, present_modes);
+        if (swapchain_manager && (format_changed || present_mode_changed)) {
+            select_by_name(get_swapchain(), surface_format, present_mode);
         }
     }
 
@@ -217,10 +253,10 @@ WindowNode::NodeStatusFlags WindowNode::properties(Properties& config) {
 
     config.config_uint64("acquire timeout", acquire_timeout_ns, "in nanoseconds");
 
-    if (config.st_begin_child("on_should_close_actions", "On should_close()")) {
-        config.config_bool("send sigint", on_should_close_sigint);
-        config.config_bool("send sigterm", on_should_close_sigterm);
-        config.config_bool("remove node", on_should_close_remove_node);
+    if (config.st_begin_child("on close", "On close")) {
+        config.config_bool("send event", on_close_send_event,
+                           "Sends \"close\" each iteration while the window should close.");
+        config.config_bool("remove node", on_close_remove_node);
         config.st_end_child();
     }
 
@@ -239,17 +275,16 @@ WindowNode::NodeStatusFlags WindowNode::properties(Properties& config) {
     }
 
     const auto& registry = ExtensionRegistry::get_instance();
-    if (providers.size() > 1) {
-        std::vector<std::string> provider_names;
-        provider_names.reserve(providers.size());
-        for (const auto& p : providers) {
-            provider_names.push_back(registry.get_name(p));
-        }
-        if (config.config_options("backend", selected_provider, provider_names,
-                                  Properties::OptionsStyle::LIST_BOX)) {
-            flags |= NodeStatusFlagBits::NEEDS_RECONNECT;
-        }
-    } else if (active_provider) {
+    std::vector<std::string> backends = {std::string{BACKEND_AUTO}};
+    for (const auto& provider : providers) {
+        backends.emplace_back(registry.get_name(provider));
+    }
+    if (config.config_options("backend", selected_backend, backends,
+                              Properties::OptionsStyle::LIST_BOX,
+                              "auto: the window provider of the highest priority")) {
+        flags |= NodeStatusFlagBits::NEEDS_RECONNECT;
+    }
+    if (active_provider) {
         config.output_text("active backend: {}", registry.get_name(active_provider));
     }
 
@@ -257,7 +292,8 @@ WindowNode::NodeStatusFlags WindowNode::properties(Properties& config) {
 }
 
 const std::shared_ptr<WindowProvider>& WindowNode::get_selected_provider() const {
-    return providers[std::min(selected_provider, static_cast<int>(providers.size()) - 1)];
+    const int provider = std::max(selected_backend - 1, 0);
+    return providers[std::min(provider, static_cast<int>(providers.size()) - 1)];
 }
 
 } // namespace merian

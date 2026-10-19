@@ -5,19 +5,20 @@ uint2 path_debug_dim() {
     return uint2(params.dim_x, params.dim_y);
 }
 
+bool path_debug_has_pixel() {
+    return params.sel_pixel_x != PATH_DEBUG_NO_PIXEL;
+}
+
 uint2 path_debug_picked_pixel() {
-    if (params.sel_pixel_x == PATH_DEBUG_NO_PIXEL) {
+    if (!path_debug_has_pixel()) {
         return path_debug_dim() / 2;
     }
     return uint2(params.sel_pixel_x, params.sel_pixel_y);
 }
 
-bool path_debug_has_pixel() {
-    return params.sel_pixel_x != PATH_DEBUG_NO_PIXEL;
-}
-
 bool path_debug_restricts_pixel() {
-    return params.sel_restrict == PATH_DEBUG_RESTRICT_PIXEL && path_debug_has_pixel();
+    return params.sel_restrict == PATH_DEBUG_RESTRICT_PIXEL &&
+           params.sel_record_x != PATH_DEBUG_NO_PIXEL;
 }
 
 bool path_debug_shared_support(const bool needs_camera_wi) {
@@ -258,7 +259,8 @@ bool path_debug_selection_matches(const PathRecordPath p,
             return false;
         }
     }
-    if (path_debug_restricts_pixel() && any(p.pixel != path_debug_picked_pixel())) {
+    if (path_debug_restricts_pixel() &&
+        any(p.pixel != uint2(params.sel_record_x, params.sel_record_y))) {
         return false;
     }
     if (scatter < params.sel_scatters_min || scatter > params.sel_scatters_max) {
@@ -392,31 +394,53 @@ bool path_debug_in_source(const uint path_index, const uint source) {
     return source == PATH_DEBUG_SOURCE_ALL || path_debug_matched(path_index, source);
 }
 
-// weighted reservoir sampling (Efraimidis and Spirakis 2006)
-float path_debug_resample_key(const uint path_index, const uint slot, const float weight) {
-    const uint h = pcg(pcg(pcg(in_records[PATH_RECORD_HDR_FRAME]) ^ path_index) ^ slot);
-    const float u = (float(h >> 8) + 0.5f) / 16777216.f;
-    return weight / -log(u);
+// 4294967040 is the largest float below 2^32
+uint path_debug_share_threshold(const float share) {
+    return share >= 1.f ? 0xFFFFFFFFu : uint(4294967040.f * max(share, 0.f));
 }
 
-bool path_debug_resample_weight_valid(const float luminance) {
-    return luminance > 0.f && !isinf(luminance);
-}
-
-void path_debug_resample_offer(const uint path_index, const float luminance) {
-    if (params.overlay_rank != PATH_DEBUG_RANK_RESAMPLED || params.overlay_keep_update == 0 ||
-        !path_debug_resample_weight_valid(luminance)) {
-        return;
-    }
-    for (uint slot = 0; slot < params.overlay_max_paths; slot++) {
-        InterlockedMax(state[PATH_DEBUG_STATE_RESAMPLE_KEY + slot],
-                       asuint(path_debug_resample_key(path_index, slot, luminance)));
-    }
+// per path and frame, independent of the record order and of the recorder's keep decision
+uint path_debug_path_hash(const PathRecordPath p) {
+    return pcg(pcg(pcg(in_records[PATH_RECORD_HDR_FRAME]) ^ path_record_pack_pixel(p.pixel)) ^
+               p.sample_idx);
 }
 
 bool path_debug_overlay_kept() {
-    return params.overlay_rank == PATH_DEBUG_RANK_RESAMPLED ||
+    return params.overlay_rank == PATH_DEBUG_RANK_BRIGHTEST ||
+           params.overlay_rank == PATH_DEBUG_RANK_RESAMPLED ||
            params.overlay_rank == PATH_DEBUG_RANK_RECENT;
+}
+
+bool path_debug_keeps_top() {
+    return params.overlay_rank == PATH_DEBUG_RANK_BRIGHTEST ||
+           params.overlay_rank == PATH_DEBUG_RANK_RESAMPLED;
+}
+
+// orders the paths of the kept top-k, as a positive float's bits; 0 = never kept
+uint path_debug_top_key(const PathRecordPath p) {
+    const float luminance = p.luminance;
+    if (params.overlay_rank == PATH_DEBUG_RANK_BRIGHTEST) {
+        if (isnan(luminance) || isinf(luminance)) {
+            return asuint(3e38f);
+        }
+        return max(asuint(max(luminance, 0.f)), 1u);
+    }
+    if (!(luminance > 0.f) || isinf(luminance)) {
+        return 0;
+    }
+    const float u = path_debug_unit_interval(path_debug_path_hash(p));
+    const float keep_prob = asfloat(in_records[PATH_RECORD_HDR_KEEP_PROB]);
+    const float key = path_debug_resample_key(luminance / max(keep_prob, 1e-30f), u);
+    return max(asuint(min(key, 3e38f)), 1u);
+}
+
+// a kept key aged by one frame
+uint path_debug_kept_key_now(const uint slot) {
+    const uint key = kept[PATH_DEBUG_KEPT_KEYS + slot];
+    if (key == 0) {
+        return 0;
+    }
+    return max(asuint(asfloat(key) * params.overlay_key_decay), 1u);
 }
 
 void path_debug_keep_path(const uint slot, const PathRecordPath p, const uint key) {
@@ -436,40 +460,26 @@ void path_debug_keep_path(const uint slot, const PathRecordPath p, const uint ke
     kept[PATH_DEBUG_KEPT_KEYS + slot] = key;
 }
 
-void path_debug_resample_commit(const uint path_index, const PathRecordPath p) {
-    if (params.overlay_keep_update == 0 || !path_debug_resample_weight_valid(p.luminance)) {
-        return;
-    }
-    for (uint slot = 0; slot < params.overlay_max_paths; slot++) {
-        const uint key = asuint(path_debug_resample_key(path_index, slot, p.luminance));
-        if (key != state[PATH_DEBUG_STATE_RESAMPLE_KEY + slot] ||
-            key <= kept[PATH_DEBUG_KEPT_KEYS + slot]) {
-            continue;
-        }
-        uint claimed;
-        InterlockedExchange(state[PATH_DEBUG_STATE_RESAMPLE_CLAIM + slot], 1, claimed);
-        if (claimed != 0) {
-            continue;
-        }
-        path_debug_keep_path(slot, p, key);
-    }
-}
-
 void path_debug_recent_commit(const PathRecordPath p) {
     if (params.overlay_keep_update == 0) {
         return;
     }
     const uint matched = state[PATH_DEBUG_STATE_MATCHED];
+    if (matched > params.overlay_max_paths &&
+        path_debug_path_hash(p) >
+            path_debug_share_threshold(float(params.overlay_max_paths) / float(matched))) {
+        return;
+    }
     uint order;
     InterlockedAdd(state[PATH_DEBUG_STATE_RECENT_COUNT], 1, order);
-    if (order >= matched || order + params.overlay_max_paths < matched) {
+    if (order >= params.overlay_max_paths) {
         return;
     }
     path_debug_keep_path((kept[PATH_DEBUG_KEPT_HEAD] + order) % params.overlay_max_paths, p, 1);
 }
 
 uint path_debug_recent_advance() {
-    return min(state[PATH_DEBUG_STATE_RECENT_COUNT], state[PATH_DEBUG_STATE_MATCHED]);
+    return min(state[PATH_DEBUG_STATE_RECENT_COUNT], params.overlay_max_paths);
 }
 
 uint path_debug_log_bin(const float value,
@@ -489,6 +499,11 @@ uint path_debug_lum_bin(const float lum) {
         return PATH_DEBUG_HIST_BINS - 1;
     }
     return path_debug_log_bin(lum, PATH_DEBUG_HIST_MIN_LOG, PATH_DEBUG_HIST_MAX_LOG,
+                              PATH_DEBUG_HIST_BINS);
+}
+
+uint path_debug_key_bin(const uint key) {
+    return path_debug_log_bin(asfloat(key), PATH_DEBUG_KEY_MIN_LOG, PATH_DEBUG_KEY_MAX_LOG,
                               PATH_DEBUG_HIST_BINS);
 }
 

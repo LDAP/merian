@@ -112,8 +112,6 @@ class ErrorPlot : public Node {
     bool reference_is_snapshot = false;
     bool snapshot_requested = false;
     TextureHandle reference_texture;
-    // measurements dispatched since the last reset
-    uint32_t submitted = 0;
     // bumped on reset so readbacks against the previous reference are dropped
     uint32_t generation = 0;
     // floor under the reference's magnitude, below which a black pixel cannot dominate relMSE
@@ -151,7 +149,7 @@ class ErrorPlot : public Node {
 
     struct Readback {
         uint32_t generation;
-        uint32_t sample;
+        uint64_t sample;
         float4 sum; // raw per-channel mean error
     };
     std::mutex result_mutex;

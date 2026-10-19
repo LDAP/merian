@@ -75,7 +75,6 @@ class RenderRestirDI : public Node {
     vk::Extent3D extent = vk::Extent3D{1920, 1080, 1};
 
     int32_t spp = 4;
-    uint32_t seed = 0;
     bool emission_on_primary = true;
     bool demodulate_albedo = false;
 

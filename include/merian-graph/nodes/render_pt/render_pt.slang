@@ -618,7 +618,8 @@ void render_pixel<Reorder : IThreadReorder>(const uint2 pixel,
         return;
     }
     float4 debug = float4(0);
-    RandomGenerator debug_rng = PCG(xxhash32(uint4(pixel, scene.frame, 0xDEB0)));
+    RandomGenerator debug_rng =
+        PCG(xxhash32(uint4(pixel, scene.frame, 0xDEB0)) ^ merian_render_seed);
     if (merian_render_debug_output == DebugOutput::ScatterStatistics) {
         // guided, refused by the shading function, refused a ray by the geometry
         debug = float4(scatter_stats, 1);

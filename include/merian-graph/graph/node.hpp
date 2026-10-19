@@ -173,7 +173,10 @@ class Node : public std::enable_shared_from_this<Node> {
                             const ResourceAllocatorHandle& /*allocator*/);
 
     // This might be called at any time of the graph lifecycle. Must be consistent with dump_config.
-    virtual NodeStatusFlags load_config(const nlohmann::json& json);
+    // Sets problems to the unknown keys, values of the wrong type and invalid values.
+    [[nodiscard]]
+    virtual NodeStatusFlags load_config(const nlohmann::json& json,
+                                        std::vector<std::string>& problems);
 
     // This might be called at any time of the graph lifecycle. Must be consistent with load_config.
     virtual nlohmann::json dump_config();
@@ -280,6 +283,9 @@ class Node : public std::enable_shared_from_this<Node> {
     virtual NodeStatusFlags properties([[maybe_unused]] Properties& props) {
         return {};
     }
+
+    // Also called when the graph is cleared or destroyed.
+    virtual void on_removed() {}
 };
 
 using NodeHandle = std::shared_ptr<Node>;

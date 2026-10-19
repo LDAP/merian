@@ -107,4 +107,8 @@ using ShaderCompileContextHandle = std::shared_ptr<ShaderCompileContext>;
 class MemoryAllocation;
 using MemoryAllocationHandle = std::shared_ptr<MemoryAllocation>;
 
+// Window
+class Swapchain;
+using SwapchainHandle = std::shared_ptr<Swapchain>;
+
 } // namespace merian

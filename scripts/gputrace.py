@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Capture an Nsight GPU trace of merian-graph-run and print per-node GPU times.
+Capture an Nsight GPU trace of examples/graph_run.py and print per-node GPU times.
 
 Drives the ngfx CLI so no Nsight UI is needed, then parses the auto-exported
 tables and prints the median per node. Times are also given in Mcycles
@@ -17,7 +17,7 @@ node that is latency bound from one that is simply under-fed.
 
 Examples:
   scripts/gputrace.py subprojects/merian-plugin-quake/quake.json --frame 300 \\
-      -- --renderer mcpg "-basedir C:/Users/me/.quakespasm -game ad +map ad_tears -nosound"
+      -- --renderer pt_mcpg "-basedir C:/Users/me/.quakespasm -game ad +map ad_tears -nosound"
   scripts/gputrace.py graph.json --sol --stalls
   scripts/gputrace.py graph.json --filter render --filter "*svgf*" --sol
   scripts/gputrace.py graph.json --filter raygen --shaders
@@ -37,7 +37,6 @@ import argparse
 import fnmatch
 import glob
 import json
-import re
 import shutil
 import statistics
 import subprocess
@@ -107,19 +106,20 @@ def quote(token):
     return f'"{token}"' if " " in token else token
 
 
-def runner_name(build):
-    for name in ("merian-graph-run.exe", "merian-graph-run"):
-        if (Path(build).resolve() / name).exists():
-            return name
-    sys.exit(f"no merian-graph-run in {build}; pass --build")
+def runner_script(args):
+    script = Path(args.build).resolve().parent / "examples" / "graph_run.py"
+    if not script.exists():
+        sys.exit(f"no {script}; pass --build")
+    return script
 
 
-def build_command(args, out_dir, graph):
-    exe = Path(args.exe or shutil.which("meson") or sys.exit("meson not on PATH; pass --exe"))
+def build_command(args, out_dir, script, graph):
+    exe = Path(args.exe or sys.executable)
     build = Path(args.build).resolve()
-    runner_exe = build / runner_name(build)
-
-    runner = ["devenv", f"./{runner_exe.name}", graph.as_posix()] + args.graph_args
+    package = build / "src" / "merian-python"
+    if not (package / "merian").is_dir():
+        sys.exit(f"no merian package in {package}; build it first")
+    runner = [script.as_posix(), graph.as_posix()] + args.graph_args
     return [
         str(find_ngfx(args.ngfx)),
         "--activity", "GPU Trace Profiler",
@@ -127,6 +127,8 @@ def build_command(args, out_dir, graph):
         "--exe", exe.as_posix(),
         "--dir", build.as_posix(),
         "--args", " ".join(quote(t) for t in runner),
+        # The examples fall back to their repository's merian.py after this one
+        "--env", f"PYTHONPATH={package.as_posix()};",
         "--output-dir", str(out_dir),
         "--start-after-frames", str(args.frame),
         "--limit-to-frames", str(args.frames),
@@ -135,14 +137,6 @@ def build_command(args, out_dir, graph):
 
 
 def prepare_inputs(args, out_dir):
-    """Copy the config out of the tree (the runner rewrites the config it is given) and
-    materialize the overlays."""
-    graph = Path(args.graph).resolve()
-    if args.copy_config:
-        copy = out_dir / graph.name
-        shutil.copyfile(graph, copy)
-        graph = copy
-
     if args.serialize:
         # With iterations in flight > 1 consecutive iterations overlap and per-node
         # attribution scatters; only safe to drop for frames long enough not to overlap.
@@ -153,27 +147,28 @@ def prepare_inputs(args, out_dir):
     for merge in args.merge:
         overlays += ["--merge", str(Path(merge).resolve())]
     args.graph_args = overlays + args.graph_args
-    return graph
 
 
-def running_pids(names):
-    pids = {}
-    for name in names:
-        # tasklist output is not decodable as the locale codepage
-        out = subprocess.run(["tasklist", "/FI", f"IMAGENAME eq {name}", "/FO", "CSV", "/NH"],
-                             capture_output=True, text=True, encoding="utf-8",
-                             errors="replace", check=False).stdout or ""
-        pids[name] = set(re.findall(r'^"[^"]+","(\d+)"', out, re.MULTILINE))
+def traced_pids(script, graph):
+    listing = subprocess.run(
+        ["powershell", "-NoProfile", "-Command",
+         "[Console]::OutputEncoding = [Text.Encoding]::UTF8; ConvertTo-Json -Compress "
+         "-InputObject @(Get-CimInstance Win32_Process | "
+         "Select-Object ProcessId, Name, CommandLine)"],
+        capture_output=True, text=True, encoding="utf-8", errors="replace", check=False).stdout
+    runner = [script.as_posix().lower(), graph.as_posix().lower()]
+    pids = set()
+    for process in json.loads(listing or "[]"):
+        command_line = (process["CommandLine"] or "").replace("\\", "/").lower()
+        if process["Name"] == "ngfx.exe" or all(part in command_line for part in runner):
+            pids.add(process["ProcessId"])
     return pids
 
 
-def kill_ours(before, names):
-    """Only processes that appeared after we started. A failed session leaves the runner behind
-    pinning the GPU, but killing by image name would take down instances the user is running."""
-    now = running_pids(names)
-    for name in names:
-        for pid in now[name] - before.get(name, set()):
-            subprocess.run(["taskkill", "/F", "/PID", pid], capture_output=True, check=False)
+def kill_ours(before, script, graph):
+    """Only processes that appeared after we started."""
+    for pid in traced_pids(script, graph) - before:
+        subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True, check=False)
 
 
 def read_table(path):
@@ -331,16 +326,16 @@ def capture(args):
         shutil.rmtree(out_dir, ignore_errors=True)
     out_dir.mkdir(parents=True)
 
-    graph = prepare_inputs(args, out_dir)
-    command = build_command(args, out_dir, graph)
+    prepare_inputs(args, out_dir)
+    script, graph = runner_script(args), Path(args.graph).resolve()
+    command = build_command(args, out_dir, script, graph)
     if args.dry_run:
         print(" ".join(quote(c) for c in command))
         return None
 
-    watched = ["ngfx.exe", runner_name(args.build)]
-    pre_existing = running_pids(watched)
+    pre_existing = traced_pids(script, graph)
     for attempt in range(1, args.retries + 2):
-        kill_ours(pre_existing, watched)
+        kill_ours(pre_existing, script, graph)
         if attempt > 1:
             time.sleep(RETRY_BACKOFF_S)
         shutil.rmtree(out_dir / "BASE", ignore_errors=True)
@@ -350,14 +345,14 @@ def capture(args):
                            capture_output=not args.verbose)
         except subprocess.TimeoutExpired:
             print(f"attempt {attempt}: ngfx timed out after {args.timeout}s", file=sys.stderr)
-        kill_ours(pre_existing, watched)
+        kill_ours(pre_existing, script, graph)
         result = collect(out_dir)
         if result:
             result["out_dir"] = str(out_dir)
             result["frame"] = args.frame
             return result
         print(f"attempt {attempt}: no usable tables in {out_dir}", file=sys.stderr)
-    kill_ours(pre_existing, watched)
+    kill_ours(pre_existing, script, graph)
     sys.exit("capture failed; check that the app runs standalone and the GPU is idle")
 
 
@@ -488,9 +483,9 @@ def print_comparison(before, after, patterns, top):
 def main():
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("graph", nargs="?", help="graph config passed to merian-graph-run")
+    parser.add_argument("graph", nargs="?", help="graph config passed to graph_run.py")
     parser.add_argument("graph_args", nargs="*",
-                        help="args forwarded to merian-graph-run; put them after --")
+                        help="args forwarded to graph_run.py; put them after --")
     parser.add_argument("--frame", type=int, default=300,
                         help="start capturing after this many frames (default: 300; quake/AD is "
                              "still warming up at 100 and the per-node spread shows it)")
@@ -500,8 +495,10 @@ def main():
                         help="deep-merge a JSON overlay into the config (repeatable)")
     parser.add_argument("--serialize", action="store_true",
                         help="force iterations in flight = 1; required for scenes under ~5 ms")
-    parser.add_argument("--build", default="build", help="merian build directory")
-    parser.add_argument("--exe", help="launcher to trace (default: meson from PATH)")
+    parser.add_argument("--build", default="build",
+                        help="merian build directory whose binaries run, with its source "
+                             "tree's graph_run.py")
+    parser.add_argument("--exe", help="Python to trace (default: this one)")
     parser.add_argument("--ngfx", help="path to ngfx.exe (default: newest preferred install)")
     parser.add_argument("--out", help="output directory for the trace and tables")
     parser.add_argument("--timeout", type=int, default=300, help="per attempt, in seconds")
@@ -517,8 +514,6 @@ def main():
     parser.add_argument("--stalls", action="store_true",
                         help="resident warps per TPC and why they are not issuing; this is what "
                              "separates a latency-bound node from an under-fed one")
-    parser.add_argument("--no-copy-config", dest="copy_config", action="store_false",
-                        help="run the config in place, letting the runner rewrite it")
     parser.add_argument("--json", metavar="FILE", help="write the parsed stats")
     parser.add_argument("--baseline", metavar="FILE", help="compare this capture against a --json")
     parser.add_argument("--compare", nargs=2, metavar=("BEFORE", "AFTER"),

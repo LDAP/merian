@@ -79,12 +79,12 @@ void MaterialSystem::set_clamp_normals(const bool clamp) {
 
 void MaterialSystem::properties(Properties& props) {
     float alpha = alpha_test_threshold;
-    if (props.config_float("Alpha Test Threshold", alpha, "", 0.01F)) {
+    if (props.config_float("alpha test threshold", alpha, "", 0.01F)) {
         set_alpha_test_threshold(alpha);
     }
 
     bool clamp = clamp_normals;
-    if (props.config_bool("Clamp Normals", clamp,
+    if (props.config_bool("clamp normals", clamp,
                           "Hint the materials to clamp their normals to prevent artifacts when "
                           "using normal maps")) {
         set_clamp_normals(clamp);

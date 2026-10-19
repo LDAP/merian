@@ -185,6 +185,11 @@ glslc_path = glslc.full_path()
 
 slang_min_version = '>=2026.19'
 slang = dependency('slang', version: slang_min_version, fallback: ['slang', 'slang_dep'])
+python = py.dependency(required: get_option('python'))
+# the system nanobind only ships a CMake config, which provides no usable meson dependency
+nanobind = dependency('nanobind', method: 'pkg-config', fallback: ['nanobind', 'nanobind_dep'],
+                      required: get_option('python').disable_auto_if(not python.found()))
+python_enabled = python.found() and nanobind.found()
 slangc = find_program('slangc', version: slang_min_version, version_argument: '-version',
                       required: false)
 if not slangc.found()
@@ -268,13 +273,13 @@ merian_dep = declare_dependency(
     ]
 )
 
-merian_graph_run = executable(
-    'merian-graph-run',
-    'src/merian-graph-run/main.cpp',
-    dependencies: merian_dep,
-    export_dynamic: true,
-    install: true,
-)
+python_package_dir = meson.current_build_dir() / 'src' / 'merian-python'
+subdir('src/merian-python')
+if python_enabled
+    devenv = environment()
+    devenv.prepend('PYTHONPATH', python_package_dir)
+    meson.add_devenv(devenv)
+endif
 
 # Let external plugin projects consume merian without vendoring. Use build/meson-uninstalled for
 # building against the build tree directly.
@@ -301,7 +306,8 @@ foreach name : plugin_names.split('\n')
 endforeach
 
 install_subdir('include', install_dir: get_option('includedir'), strip_directory: true)
-install_subdir('examples', install_dir: join_paths(get_option('datadir'), 'merian'))
+install_subdir('examples', install_dir: join_paths(get_option('datadir'), 'merian'),
+               exclude_directories: ['__pycache__', 'gui/__pycache__', 'lib/__pycache__'])
 install_data('scripts/compile_shader.py',
              install_dir: join_paths(get_option('datadir'), 'merian', 'scripts'))
 

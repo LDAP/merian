@@ -67,7 +67,6 @@ MedianApproxNode::on_connected(const NodeIOLayout& io_layout,
             for (auto* kernel : {&histogram_kernel, &reduce_kernel}) {
                 (*kernel)->reload(std::any_cast<bool>(force), compile_context);
             }
-            return true;
         });
 
     return {};

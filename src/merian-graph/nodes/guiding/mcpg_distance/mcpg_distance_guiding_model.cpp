@@ -112,15 +112,15 @@ bool MCPGDistanceGuidingModel::properties(Properties& props) {
     bool constants_changed = false;
     bool recreate = false;
 
-    constants_changed |= props.config_int("distance MC samples", samples,
+    constants_changed |= props.config_int("distance mc samples", samples,
                                           "Distance chains resampled towards each ray.", 1, 16);
-    recreate |= props.config_float("distance MC grid width", base_width,
+    recreate |= props.config_float("distance mc grid width", base_width,
                                    "Cell width in pixels at the finest level.", 0.5f, 1.f, 64.f);
     recreate |=
-        props.config_float("distance MC max width", max_width,
+        props.config_float("distance mc max width", max_width,
                            "Cell width in pixels the coarsest level stops at.", 1.f, 1.f, 1024.f);
     constants_changed |= props.config_float(
-        "distance MC distribution dimension", distribution_dimension,
+        "distance mc distribution dimension", distribution_dimension,
         "Effective dimensionality the levels are spread over; smaller widens the spread.", 0.1f,
         0.1f, 8.f);
 

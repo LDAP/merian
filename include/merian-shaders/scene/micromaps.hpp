@@ -10,6 +10,7 @@
 #include "merian/shader/slang_entry_point.hpp"
 #include "merian/shader/slang_program.hpp"
 #include "merian/utils/versioned.hpp"
+#include "merian/vk/command/submission.hpp"
 #include "merian/vk/memory/resource_allocations.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
@@ -54,12 +55,14 @@ class Micromaps {
 
     static bool is_opacity_supported(const ContextHandle& context);
 
-    // changed receives the meshes whose opacity micromap appeared or went away.
-    void update(const CommandBufferHandle& cmd,
+    // changed receives the meshes whose opacity micromap appeared or went away. complete bakes
+    // everything pending, submitting after each budget's share, else one budget's share.
+    void update(Submission& submission,
                 const std::vector<MeshGeometry>& meshes,
                 const MaterialSystemHandle& material_system,
                 std::vector<uint32_t>& changed,
-                const ShaderObjectAllocatorHandle& obj_allocator);
+                const ShaderObjectAllocatorHandle& obj_allocator,
+                const bool complete);
 
     bool get_opacity(const uint32_t mesh_id,
                      vk::AccelerationStructureTrianglesOpacityMicromapEXT& omm) const;

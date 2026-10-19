@@ -17,7 +17,7 @@ bool SVGFOptions::properties(Properties& config) {
         kaleidoscope = filter_type == SVGFFilterType::ATROUS;
     }
     changed |= config.config_bool("kaleidoscope", kaleidoscope);
-    changed |= config.config_bool("kaleidoscope: shmem", kaleidoscope_use_shmem,
+    changed |= config.config_bool("kaleidoscope shmem", kaleidoscope_use_shmem,
                                   "use shared memory for kaleidoscope");
     return changed;
 }

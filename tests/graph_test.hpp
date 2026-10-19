@@ -6,12 +6,17 @@
 
 #include "merian-graph/graph/graph.hpp"
 #include "merian-graph/merian_graph_extension.hpp"
+#include "merian-graph/nodes/host_sink/host_sink.hpp"
 #include "merian/utils/properties_json_load.hpp"
 #include "merian/vk/context.hpp"
 #include "merian/vk/extension/extension_resources.hpp"
 #include "merian/vk/extension/extension_vk_validation_layers.hpp"
 
+#include <fmt/format.h>
+
+#include <array>
 #include <cstdlib>
+#include <cstring>
 #include <set>
 #include <string>
 
@@ -54,6 +59,36 @@ class GraphTest : public ::testing::Test {
             {.context = context, .resource_allocator = allocator});
     }
 
+    static merian::GraphHandle create_graph(const merian::GraphDescription& description) {
+        const merian::GraphHandle graph = create_graph();
+        graph->from_description(description);
+        return graph;
+    }
+
+    static merian::GraphHandle create_graph(const nlohmann::json& description) {
+        return create_graph(merian::GraphDescription::from_json(description));
+    }
+
+    static merian::GraphDescription color_to_sink() {
+        merian::GraphDescription description;
+        description.add_node("Color", "color",
+                             {{"color", {0.25, 0.5, 0.75, 1}},
+                              {"format", "R32G32B32A32Sfloat"},
+                              {"extent", {2, 1, 1}}});
+        description.add_node("Host Image Sink", "sink");
+        description.add_connection("color", "sink", "out", "src");
+        return description;
+    }
+
+    static std::array<float, 8> read_texels(const merian::HostSink::Capture& capture) {
+        const merian::MemoryAllocationHandle& memory = capture.copy.memory;
+        std::array<float, 8> texels;
+        memory->invalidate();
+        std::memcpy(texels.data(), memory->map(), sizeof(texels));
+        memory->unmap();
+        return texels;
+    }
+
     // Enough runs for every reconnect a run requests.
     static void run(const merian::GraphHandle& graph, const uint32_t runs = 3) {
         for (uint32_t i = 0; i < runs; i++) {
@@ -64,24 +99,15 @@ class GraphTest : public ::testing::Test {
 
     static UIProperties draw(const merian::GraphHandle& graph) {
         UIProperties props;
-        graph->properties(props);
+        graph->draw_ui(props);
         return props;
     }
 
     static void set_node_enabled(const merian::GraphHandle& graph,
                                  const std::string& identifier,
                                  const bool enabled) {
-        merian::JSONLoadProperties props(
-            nlohmann::json{{"nodes", {{identifier, {{"enabled", enabled}}}}}});
-        graph->properties(props);
-    }
-
-    static void set_node_properties(const merian::GraphHandle& graph,
-                                    const std::string& identifier,
-                                    const nlohmann::json& properties) {
-        merian::JSONLoadProperties props(
-            nlohmann::json{{"nodes", {{identifier, {{"properties", properties}}}}}});
-        graph->properties(props);
+        merian::JSONLoadProperties props(nlohmann::json{{identifier, {{"enabled", enabled}}}});
+        graph->node_properties(identifier, props);
     }
 
     static std::set<std::string> stored_connections(const nlohmann::json& description) {
@@ -97,10 +123,13 @@ class GraphTest : public ::testing::Test {
         return connections;
     }
 
+    static std::set<std::string> stored_connections(const merian::GraphHandle& graph) {
+        return stored_connections(graph->to_description().to_json());
+    }
+
     static bool has_connection(const merian::GraphHandle& graph,
                                const std::string& src,
                                const std::string& connection) {
-        return stored_connections(graph->store_to_json())
-            .contains(fmt::format("{}.{}", src, connection));
+        return stored_connections(graph).contains(fmt::format("{}.{}", src, connection));
     }
 };

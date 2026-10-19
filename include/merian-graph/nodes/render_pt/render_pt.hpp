@@ -55,6 +55,9 @@ class RenderPT : public Node {
                                  const NodeConnectionInfo& info,
                                  Submission& submission) override;
 
+    [[nodiscard]] NodeStatusFlags pre_process(const NodeIO& io,
+                                              const NodeProcessInfo& info) override;
+
     [[nodiscard]] NodeStatusFlags
     process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) override;
 
@@ -82,6 +85,8 @@ class RenderPT : public Node {
                          const ResourceAllocatorHandle& allocator,
                          const SceneHandle& scene);
     void update_render_constants();
+    // Returns whether the volume outputs appear or vanish.
+    bool update_volume_available(const SceneHandle& scene);
     uint32_t recorded_vertices_per_path() const;
     bool use_raygen() const;
     void update_guiding_slot();

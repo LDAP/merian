@@ -1,7 +1,7 @@
 #include "merian/vk/utils/image_export.hpp"
 
 #include "merian/utils/defer.hpp"
-#include "merian/vk/utils/blits.hpp"
+#include "merian/vk/utils/host_copy.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -44,53 +44,21 @@ void image_export(const ResourceAllocatorHandle& allocator,
                                  ": " + error.message()};
     }
     const bool as_float = format == ImageFormat::HDR || format == ImageFormat::PFM;
-    const vk::Extent3D extent_3d{extent.width, extent.height, 1};
-    const CommandBufferHandle& cmd = submission.get_cmd();
-
     const vk::Format capture_format =
         as_float ? vk::Format::eR32G32B32A32Sfloat : vk::Format::eR8G8B8A8Srgb;
-
-    const vk::ImageCreateInfo intermediate_info{
-        {},
-        vk::ImageType::e2D,
-        capture_format,
-        extent_3d,
-        1,
-        1,
-        vk::SampleCountFlagBits::e1,
-        vk::ImageTiling::eOptimal,
-        vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc,
-        vk::SharingMode::eExclusive,
-        {},
-        {},
-        vk::ImageLayout::eUndefined,
-    };
-    const ImageHandle intermediate_image = allocator->create_image(intermediate_info);
-    const BufferHandle staging_buffer = allocator->create_buffer(
-        Image::format_size(capture_format) * extent.width * extent.height,
-        vk::BufferUsageFlagBits::eTransferDst, MemoryMappingType::HOST_ACCESS_RANDOM);
-
-    {
-        MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "blit to intermediate image");
-        cmd->barrier(vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eTransfer,
-                     intermediate_image->barrier(vk::ImageLayout::eTransferDstOptimal, {},
-                                                 vk::AccessFlagBits::eTransferWrite));
-        cmd_blit_stretch(cmd, src, src->get_current_layout(), src->get_extent(), intermediate_image,
-                         vk::ImageLayout::eTransferDstOptimal, intermediate_image->get_extent());
-        cmd->barrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer,
-                     intermediate_image->barrier(vk::ImageLayout::eTransferSrcOptimal,
-                                                 vk::AccessFlagBits::eTransferWrite,
-                                                 vk::AccessFlagBits::eTransferRead));
-    }
-    {
-        MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "copy to buffer");
-        // zero row length / image height: tightly packed
-        cmd->copy(intermediate_image, staging_buffer,
-                  vk::BufferImageCopy{0, 0, 0, first_layer(), {}, extent_3d});
-    }
-    cmd->barrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost,
-                 staging_buffer->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
-                                                vk::AccessFlagBits::eHostRead));
+    const vk::Extent3D capture_extent{extent.width, extent.height, 1};
+    const StagingMemoryManagerHandle staging = allocator->get_staging();
+    const CommandBufferHandle& cmd = submission.get_cmd();
+    const MemoryAllocationHandle memory = [&] {
+        MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "copy to host");
+        if (capture_format == src->get_format() && capture_extent == src->get_extent()) {
+            return cmd_copy_to_host(cmd, staging, src).memory;
+        }
+        return cmd_copy_to_host(
+                   cmd, staging, src,
+                   create_host_conversion_image(allocator, capture_format, capture_extent))
+            .memory;
+    }();
 
     // unique per export, so concurrent writers to one path cannot share it
     static std::atomic_uint32_t export_counter{0};
@@ -98,21 +66,20 @@ void image_export(const ResourceAllocatorHandle& allocator,
         path.parent_path() /
         fmt::format(".interm_{}_{}", export_counter++, path.filename().string());
 
-    submission.sync_to_cpu([staging_buffer, path, tmp_path, format, as_float, extent, opaque_alpha,
-                            metadata = std::move(metadata)]() {
+    auto write = [memory, path, tmp_path, format, as_float, extent, opaque_alpha,
+                  metadata = std::move(metadata)]() {
         const int w = static_cast<int>(extent.width);
         const int h = static_cast<int>(extent.height);
         defer {
-            staging_buffer->get_memory()->unmap();
+            memory->unmap();
         };
 
-        // the thread pool discards exceptions
         try {
+            memory->invalidate();
             if (as_float) {
-                image_save_f32(tmp_path, staging_buffer->get_memory()->map_as<float>(), w, h, 4,
-                               format, metadata);
+                image_save_f32(tmp_path, memory->map_as<float>(), w, h, 4, format, metadata);
             } else {
-                uint8_t* const rgba = staging_buffer->get_memory()->map_as<uint8_t>();
+                uint8_t* const rgba = memory->map_as<uint8_t>();
                 if (opaque_alpha) {
                     for (std::size_t i = 3; i < static_cast<std::size_t>(w) * h * 4; i += 4) {
                         rgba[i] = 255;
@@ -133,7 +100,8 @@ void image_export(const ResourceAllocatorHandle& allocator,
             return;
         }
         SPDLOG_INFO("wrote image to {}", path.string());
-    });
+    };
+    submission.sync_to_cpu(std::move(write), Submission::CallbackMode::ASYNC);
 }
 
 TextureHandle image_load_texture(const ResourceAllocatorHandle& allocator,

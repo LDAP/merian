@@ -475,30 +475,32 @@ inline bool group_runs(const GroupSpec& group, const NodeSpec& node) {
            (!settings.own_required || node.inputs.contains(settings.own_input));
 }
 
-using Port = std::pair<std::string, std::string>;
+using ConnectorRef = std::pair<std::string, std::string>;
 
-// Returns the port each public output carries.
-inline std::map<std::string, Port> add_group(GraphSpec& flat,
-                                             std::set<std::string>& nodes,
-                                             const std::string& identifier,
-                                             const GroupSpec& group,
-                                             const std::map<std::string, Port>& sources,
-                                             const bool runs) {
-    const auto source = [&](const std::string& port) -> std::optional<Port> {
-        const auto it = sources.find(port);
-        return it == sources.end() ? std::nullopt : std::optional<Port>(it->second);
+// Returns the connector each public output carries.
+inline std::map<std::string, ConnectorRef>
+add_group(GraphSpec& flat,
+          std::set<std::string>& nodes,
+          const std::string& identifier,
+          const GroupSpec& group,
+          const std::map<std::string, ConnectorRef>& sources,
+          const bool runs) {
+    const auto source = [&](const std::string& connector) -> std::optional<ConnectorRef> {
+        const auto it = sources.find(connector);
+        return it == sources.end() ? std::nullopt : std::optional<ConnectorRef>(it->second);
     };
     const PatternGroup::Settings& settings = group.settings;
-    std::map<std::string, Port> exports;
-    std::optional<Port> out = source("in0");
-    std::optional<Port> buf = source("bin0");
+    std::map<std::string, ConnectorRef> exports;
+    std::optional<ConnectorRef> out = source("in0");
+    std::optional<ConnectorRef> buf = source("bin0");
     bool writer_found = false;
     for (uint32_t i = 0; i < group.children.size(); i++) {
         const std::string name = fmt::format("{}:{}{}", identifier, settings.prefix, i);
         NodeSpec node = group.children[i];
         node.stopped = !runs;
         node.inputs.clear();
-        const auto connect = [&](const std::string& input, const std::optional<Port>& from) {
+        const auto connect = [&](const std::string& input,
+                                 const std::optional<ConnectorRef>& from) {
             const auto index =
                 static_cast<uint32_t>(std::ranges::find(INPUT_NAMES, input) - INPUT_NAMES.begin());
             if (from) {
@@ -517,48 +519,48 @@ inline std::map<std::string, Port> add_group(GraphSpec& flat,
         if (settings.public_in1 && i == 0 && (source("in2") || !node.shape.defaults)) {
             connect("in1", source("in2"));
         } else if (node.shape.defaults && node.shape.delays[1] > 0) {
-            connect("in1", Port{name, "out"});
+            connect("in1", ConnectorRef{name, "out"});
         }
         if (node.shape.defaults && node.shape.delays[4] > 0) {
             connect("bin1", buf);
         }
         if (node.shape.in_place && !writer_found) {
             writer_found = true;
-            for (const std::string port : {"inp", "binp"}) {
-                connect(port, source(port));
-                exports[port] = {name, port};
+            for (const std::string connector : {"inp", "binp"}) {
+                connect(connector, source(connector));
+                exports[connector] = {name, connector};
             }
         }
         flat[name] = node;
         nodes.insert(name);
-        out = Port{name, "out"};
-        buf = Port{name, "buf"};
+        out = ConnectorRef{name, "out"};
+        buf = ConnectorRef{name, "buf"};
     }
     if (!group.inner.empty()) {
         if (settings.parallel) {
             out = source("in0");
             buf = source("bin0");
         }
-        std::map<std::string, Port> inner_sources;
-        for (const auto& [port, from] : {std::pair{"in0", out},
-                                         {"bin0", buf},
-                                         {"in2", source("in2")},
-                                         {"inp", source("inp")},
-                                         {"binp", source("binp")}}) {
-            if (from && (!is_version(port) || !writer_found)) {
-                inner_sources[port] = *from;
+        std::map<std::string, ConnectorRef> inner_sources;
+        for (const auto& [connector, from] : {std::pair{"in0", out},
+                                              {"bin0", buf},
+                                              {"in2", source("in2")},
+                                              {"inp", source("inp")},
+                                              {"binp", source("binp")}}) {
+            if (from && (!is_version(connector) || !writer_found)) {
+                inner_sources[connector] = *from;
             }
         }
         const std::string inner_identifier =
             fmt::format("{}:{}{}", identifier, settings.prefix, group.children.size());
         nodes.insert(inner_identifier);
-        const std::map<std::string, Port> inner_exports =
+        const std::map<std::string, ConnectorRef> inner_exports =
             add_group(flat, nodes, inner_identifier, group.inner.front(), inner_sources, runs);
         out = inner_exports.at("out");
         buf = inner_exports.at("buf");
-        for (const std::string port : {"inp", "binp"}) {
-            if (!writer_found && inner_exports.contains(port)) {
-                exports[port] = inner_exports.at(port);
+        for (const std::string connector : {"inp", "binp"}) {
+            if (!writer_found && inner_exports.contains(connector)) {
+                exports[connector] = inner_exports.at(connector);
             }
         }
     }
@@ -572,17 +574,17 @@ struct FlatSpec {
     std::set<std::string> nodes;
 };
 
-// Disabled groups become pass-through Pattern nodes, broken ones nodes without ports.
+// Disabled groups become pass-through Pattern nodes, broken ones nodes without connectors.
 inline FlatSpec flatten(const GroupedSpec& grouped) {
     // what the public outputs carry does not depend on the sources
-    std::map<std::string, std::map<std::string, Port>> exports;
+    std::map<std::string, std::map<std::string, ConnectorRef>> exports;
     for (const auto& [identifier, group] : grouped.groups) {
         GraphSpec scratch;
         std::set<std::string> scratch_nodes;
         exports[identifier] = add_group(scratch, scratch_nodes, identifier, group, {}, true);
         if (!describes_subgraph(group)) {
-            for (const std::string port : {"out", "buf", "inp", "binp"}) {
-                exports[identifier][port] = {identifier, port};
+            for (const std::string connector : {"out", "buf", "inp", "binp"}) {
+                exports[identifier][connector] = {identifier, connector};
             }
         } else if (!grouped.nodes.at(identifier).enabled) {
             exports[identifier]["out"] = {identifier, "out"};
@@ -594,7 +596,7 @@ inline FlatSpec flatten(const GroupedSpec& grouped) {
         if (grouped.groups.contains(source.src)) {
             return exports.at(source.src).at(output);
         }
-        return Port{source.src, output};
+        return ConnectorRef{source.src, output};
     };
 
     FlatSpec flat;
@@ -609,9 +611,9 @@ inline FlatSpec flatten(const GroupedSpec& grouped) {
             continue;
         }
         const GroupSpec& group = grouped.groups.at(identifier);
-        std::map<std::string, Port> sources;
-        for (const auto& [port, source] : node.inputs) {
-            sources[port] = flat_source(port, source);
+        std::map<std::string, ConnectorRef> sources;
+        for (const auto& [connector, source] : node.inputs) {
+            sources[connector] = flat_source(connector, source);
         }
         add_group(flat.spec, flat.nodes, identifier, group, sources, group_runs(group, node));
         const bool described = describes_subgraph(group);

@@ -62,6 +62,9 @@ class SlangSession {
 
     ~SlangSession();
 
+    // Whether a source of the loaded modules, includes and imports alike, changed since loading.
+    bool sources_changed() const;
+
   private:
     // The path is the identity for path-based imports of the module.
     Slang::ComPtr<slang::IModule>
@@ -106,6 +109,7 @@ class SlangSession {
                        std::function<bool()> serve_binaries);
     // Writes the binaries of the file modules this session compiled.
     void store_modules();
+    void record_source_files(const std::filesystem::file_time_type loading_since);
     std::optional<std::filesystem::path>
     canonical_file_path(const std::filesystem::path& path) const;
     // The name of the file's module when imported by its canonical spelling, nullopt outside the
@@ -167,6 +171,8 @@ class SlangSession {
     std::unordered_map<std::string, slang::IModule*> source_strings_by_identity;
     std::unordered_set<slang::IModule*> checked_module_names;
     bool module_names_canonical = true;
+    std::unordered_map<std::string, std::filesystem::file_time_type> source_files;
+    std::unordered_set<slang::IModule*> recorded_modules;
     struct BoundModule {
         uint64_t source_hash;
         Slang::ComPtr<slang::IModule> module;

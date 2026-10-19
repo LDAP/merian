@@ -39,33 +39,30 @@ class WindowNode : public Node {
     // The optional input that is blitted to the swapchain.
     static constexpr std::string_view DISPLAY_INPUT = "src";
 
-    const SwapchainHandle& get_swapchain();
-
     const WindowHandle& get_window() const {
         return window;
-    }
-
-    // Configures the response to the window's close button: raise SIGINT and/or SIGTERM (for a host
-    // that shuts down on those) and/or remove the node from the graph.
-    void set_on_should_close(const bool sigint, const bool sigterm, const bool remove_node) {
-        on_should_close_sigint = sigint;
-        on_should_close_sigterm = sigterm;
-        on_should_close_remove_node = remove_node;
     }
 
   private:
     const std::shared_ptr<WindowProvider>& get_selected_provider() const;
 
+    const SwapchainHandle& get_swapchain();
+
     uint32_t src_array_element = 0;
     uint32_t current_src_array_size = 1;
 
     std::vector<std::shared_ptr<WindowProvider>> providers;
-    int selected_provider = 0;
+    // 0 is auto, then the providers
+    int selected_backend = 0;
     std::shared_ptr<WindowProvider> active_provider;
 
-    WindowCreateInfo create_info;
     WindowHandle window;
     std::optional<SwapchainManager> swapchain_manager = std::nullopt;
+
+    // empty names keep the swapchain's choice
+    bool fullscreen = false;
+    std::string surface_format;
+    std::string present_mode;
 
     BlitMode mode = FIT;
 
@@ -79,9 +76,8 @@ class WindowNode : public Node {
     bool request_rebuild_on_recreate = false;
     uint64_t acquire_timeout_ns = 1000L * 1000L * 100L; // .1s
 
-    bool on_should_close_sigint = false;
-    bool on_should_close_sigterm = false;
-    bool on_should_close_remove_node = true;
+    bool on_close_send_event = false;
+    bool on_close_remove_node = true;
 
     bool throttle = false;
 };

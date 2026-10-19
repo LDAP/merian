@@ -19,8 +19,8 @@ constexpr std::array<ImageFormat, 4> IMAGE_EXPORT_FORMATS = {ImageFormat::PNG, I
 // Labels for the format combo, aligned with IMAGE_EXPORT_FORMATS.
 const std::vector<std::string>& image_export_format_names();
 
-// Writes src (must be in a transfer-src compatible layout) to path once the submission
-// completed. Float formats capture linear f32, the rest sRGB u8 with opaque alpha unless
+// Writes src (must be in a transfer-src compatible layout) to path once the submission completed,
+// in an async callback. Float formats capture linear f32, the rest sRGB u8 with opaque alpha unless
 // opaque_alpha is false; extent may differ from the src extent to rescale.
 //
 // Throws std::runtime_error for anything decidable up front (unknown format, unusable

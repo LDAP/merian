@@ -1,0 +1,15 @@
+{
+    "include": [
+        "none.json",
+        "../parts/volume.json",
+        "../parts/volume_scene.json",
+        "../parts/volume_svgf.json"
+    ],
+    "nodes": {
+        "accumulate": {
+            "outputs": [
+                "out->add.input_0"
+            ]
+        }
+    }
+}

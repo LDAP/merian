@@ -4,16 +4,104 @@
 
 #include "spdlog/spdlog.h"
 
+#include <cmath>
 #include <mutex>
+#include <numeric>
 #include <vector>
-
-#define SW_QUERY_COUNT 2
 
 namespace merian {
 
+namespace {
+
+constexpr uint32_t SW_QUERY_COUNT = 2;
+
+constexpr std::size_t index(const Profiler::Period period) {
+    return static_cast<std::size_t>(period);
+}
+
+double total_ms(const std::vector<ProfilerReport::Entry>& entries) {
+    return std::transform_reduce(entries.begin(), entries.end(), 0.0, std::plus{},
+                                 [](const auto& entry) { return entry.duration_ms; });
+}
+
+double total_std_deviation_ms(const std::vector<ProfilerReport::Entry>& entries) {
+    return std::sqrt(std::transform_reduce(
+        entries.begin(), entries.end(), 0.0, std::plus{},
+        [](const auto& entry) { return entry.std_deviation_ms * entry.std_deviation_ms; }));
+}
+
+std::string entries_text(const std::vector<ProfilerReport::Entry>& entries,
+                         const std::size_t indent_depth) {
+    std::string text;
+    for (const auto& entry : entries) {
+        text += fmt::format("{}{}\n", std::string(2 * indent_depth, ' '), entry.to_text());
+        text += entries_text(entry.children, indent_depth + 1);
+    }
+    return text;
+}
+
+nlohmann::json entries_json(const std::vector<ProfilerReport::Entry>& entries) {
+    nlohmann::json json = nlohmann::json::array();
+    for (const auto& entry : entries) {
+        nlohmann::json& item = json.emplace_back(nlohmann::json{
+            {"name", entry.name},
+            {"duration_ms", entry.duration_ms},
+            {"std_deviation_ms", entry.std_deviation_ms},
+            {"children", entries_json(entry.children)},
+        });
+        if (entry.last_seen_ms_ago) {
+            item["last_seen_ms_ago"] = *entry.last_seen_ms_ago;
+        }
+    }
+    return json;
+}
+
+} // namespace
+
+std::string ProfilerReport::Entry::to_text() const {
+    std::string text =
+        fmt::format("{}: {:.04f} (± {:.04f}) ms", name, duration_ms, std_deviation_ms);
+    if (last_seen_ms_ago) {
+        text += fmt::format(" (stale, last {} ago)",
+                            format_duration(static_cast<uint64_t>(*last_seen_ms_ago * 1e6)));
+    }
+    return text;
+}
+
+bool ProfilerReport::empty() const {
+    return cpu.empty() && gpu.empty();
+}
+
+double ProfilerReport::cpu_total_ms() const {
+    return total_ms(cpu);
+}
+
+double ProfilerReport::cpu_total_std_deviation_ms() const {
+    return total_std_deviation_ms(cpu);
+}
+
+double ProfilerReport::gpu_total_ms() const {
+    return total_ms(gpu);
+}
+
+double ProfilerReport::gpu_total_std_deviation_ms() const {
+    return total_std_deviation_ms(gpu);
+}
+
+std::string ProfilerReport::to_text() const {
+    if (empty()) {
+        return "no timestamps captured";
+    }
+    return fmt::format("CPU:\n{}GPU:\n{}", entries_text(cpu, 1), entries_text(gpu, 1));
+}
+
+nlohmann::json ProfilerReport::to_json() const {
+    return {{"cpu", entries_json(cpu)}, {"gpu", entries_json(gpu)}};
+}
+
 Profiler::Profiler(const ContextHandle& context)
-    : timestamp_period(context->get_physical_device()->get_device_limits().timestampPeriod),
-      last_clear_time(chrono_clock::now()) {
+    : timestamp_period(context->get_physical_device()->get_device_limits().timestampPeriod) {
+    period_start.fill(chrono_clock::now());
     cpu_sections.assign(1, {});
     gpu_sections.assign(1, {});
     gpu_sections.reserve(1024);
@@ -24,7 +112,7 @@ Profiler::Profiler(const ContextHandle& context)
 #endif
 }
 
-Profiler::~Profiler() {}
+Profiler::~Profiler() = default;
 
 // Remember to reset the query pool after creation
 void Profiler::set_query_pool(const QueryPoolHandle<vk::QueryType::eTimestamp>& query_pool) {
@@ -68,16 +156,32 @@ void Profiler::enter_child(std::vector<SectionType>& sections,
     sections[current_idx].child_cursor = 0;
 }
 
-void Profiler::clear(const uint32_t evict_after_ms) {
+void Profiler::Accumulator::add(const uint64_t duration_ns) {
+    sum_duration_ns += duration_ns;
+    sq_sum_duration_ns += static_cast<double>(duration_ns) * static_cast<double>(duration_ns);
+    num_captures++;
+}
+
+template <typename SectionType> void Profiler::reset_stale_periods(SectionType& section) const {
+    for (std::size_t period = 0; period < PERIOD_COUNT; period++) {
+        if (section.last_seen < period_start[period]) {
+            section.periods[period] = {};
+        }
+    }
+}
+
+void Profiler::clear(const Period period, const uint32_t evict_after_ms) {
     const auto now = chrono_clock::now();
-    last_clear_time = now;
+    period_start[index(period)] = now;
 
     if (evict_after_ms != std::numeric_limits<uint32_t>::max()) {
         const auto threshold = std::chrono::milliseconds{evict_after_ms};
         const auto prune = [&](auto& sections) {
             for (auto& parent : sections) {
                 std::erase_if(parent.children, [&](const auto& kv) {
-                    return now - sections[kv.second].last_seen > threshold;
+                    const auto last_seen = sections[kv.second].last_seen;
+                    return now - last_seen > threshold &&
+                           last_seen < period_start[index(Period::TOTAL)];
                 });
             }
         };
@@ -92,8 +196,8 @@ void Profiler::clear(const uint32_t evict_after_ms) {
 void Profiler::cmd_start(const CommandBufferHandle& cmd,
                          const std::string& name,
                          const vk::PipelineStageFlagBits pipeline_stage) {
-    assert(query_pool && "num_gpu_timers is 0?");
-    std::vector<uint32_t>& pending = pending_gpu_sections[query_pool];
+    assert(query_pool && "missing set_query_pool?");
+    std::vector<PendingSection>& pending = pending_gpu_sections[query_pool];
 
     const std::size_t parent_idx = current_gpu_section;
     enter_child(gpu_sections, parent_idx, name, current_gpu_section);
@@ -110,21 +214,17 @@ void Profiler::cmd_start(const CommandBufferHandle& cmd,
     }
 
     const auto now = chrono_clock::now();
-    if (sec.last_seen < last_clear_time) {
-        sec.sum_duration_ns = 0;
-        sec.sq_sum_duration_ns = 0;
-        sec.num_captures = 0;
-    }
+    reset_stale_periods(sec);
     sec.last_seen = now;
 
     sec.timestamp_idx = pending.size() * SW_QUERY_COUNT;
     cmd->write_timestamp(query_pool, sec.timestamp_idx, pipeline_stage);
-    pending.emplace_back(current_gpu_section);
+    pending.emplace_back(current_gpu_section, now);
 }
 
 void Profiler::cmd_end(const CommandBufferHandle& cmd,
                        const vk::PipelineStageFlagBits pipeline_stage) {
-    assert(query_pool && "num_gpu_timers is 0?");
+    assert(query_pool && "missing set_query_pool?");
     assert(current_gpu_section != 0 && "missing cmd_start?");
     GPUSection& section = gpu_sections[current_gpu_section];
 
@@ -141,7 +241,7 @@ void Profiler::collect(const bool wait, const bool keep_query_pool) {
         return;
     }
 
-    std::vector<uint32_t>& pending = pending_gpu_sections[query_pool];
+    std::vector<PendingSection>& pending = pending_gpu_sections[query_pool];
 
     if (pending.empty())
         return;
@@ -153,12 +253,14 @@ void Profiler::collect(const bool wait, const bool keep_query_pool) {
              : query_pool->get_query_pool_results_64(0, pending.size() * SW_QUERY_COUNT);
 
     for (uint32_t i = 0; i < pending.size(); i++) {
-        GPUSection& section = gpu_sections[pending[i]];
+        GPUSection& section = gpu_sections[pending[i].section];
         const uint64_t duration_ns =
             (results[SW_QUERY_COUNT * i + 1] - results[SW_QUERY_COUNT * i]) * timestamp_period;
-        section.sum_duration_ns += duration_ns;
-        section.sq_sum_duration_ns += (duration_ns * duration_ns);
-        section.num_captures++;
+        for (std::size_t period = 0; period < PERIOD_COUNT; period++) {
+            if (pending[i].recorded >= period_start[period]) {
+                section.periods[period].add(duration_ns);
+            }
+        }
     }
 
     query_pool->reset(0, pending.size() * SW_QUERY_COUNT);
@@ -176,11 +278,7 @@ void Profiler::start(const std::string& name) {
 
     CPUSection& sec = cpu_sections[current_cpu_section];
     const auto now = chrono_clock::now();
-    if (sec.last_seen < last_clear_time) {
-        sec.sum_duration_ns = 0;
-        sec.sq_sum_duration_ns = 0;
-        sec.num_captures = 0;
-    }
+    reset_stale_periods(sec);
     sec.last_seen = now;
     sec.start = now;
     std::atomic_signal_fence(std::memory_order_seq_cst);
@@ -191,70 +289,61 @@ void Profiler::end() {
     std::atomic_signal_fence(std::memory_order_seq_cst);
 
     CPUSection& section = cpu_sections[current_cpu_section];
-    section.end = chrono_clock::now();
-    uint64_t duration_ns =
-        std::chrono::duration_cast<std::chrono::nanoseconds>(section.end - section.start).count();
-    section.sum_duration_ns += duration_ns;
-    section.sq_sum_duration_ns += (duration_ns * duration_ns);
-    section.num_captures++;
+    const auto now = chrono_clock::now();
+    const uint64_t duration_ns =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(now - section.start).count();
+    for (Accumulator& accumulator : section.periods) {
+        accumulator.add(duration_ns);
+    }
 
     current_cpu_section = section.parent_index;
 }
 
-std::string format_entry_value(const Profiler::ReportEntry& entry) {
-    std::string s = fmt::format("{:.04f} (± {:.04f}) ms", entry.duration, entry.std_deviation);
-    if (entry.last_seen_ms_ago) {
-        s += fmt::format(" (stale, last {} ago)",
-                         format_duration(uint64_t(*entry.last_seen_ms_ago * 1e6)));
-    }
-    return s;
-}
-
-std::string to_string(const std::vector<Profiler::ReportEntry>& entries,
-                      const std::size_t indent_depth = 0) {
-    std::string result = "";
-    for (const auto& entry : entries) {
-        result += fmt::format("{}{}: {}\n", std::string(2 * indent_depth, ' '), entry.name,
-                              format_entry_value(entry));
-        result += to_string(entry.children, indent_depth + 1);
-    }
-    return result;
-}
+namespace {
 
 template <typename SectionType>
-std::vector<Profiler::ReportEntry>
+std::vector<ProfilerReport::Entry>
 make_report(const SectionType& section,
             const std::vector<SectionType>& sections,
+            const std::size_t period,
             const std::chrono::high_resolution_clock::time_point now,
-            const std::chrono::high_resolution_clock::time_point last_clear_time) {
-    std::vector<Profiler::ReportEntry> report;
+            const std::chrono::high_resolution_clock::time_point since,
+            const std::chrono::milliseconds keep_stale) {
+    std::vector<ProfilerReport::Entry> report;
     report.reserve(section.children.size());
     for (const auto& [name, idx] : section.children) {
         const SectionType& sub = sections[idx];
+        if (sub.last_seen < since && now - sub.last_seen > keep_stale) {
+            continue;
+        }
 
+        const auto& accumulator = sub.periods[period];
         double avg_ms = 0.0;
         double std_ms = 0.0;
-        if (sub.num_captures > 0) {
-            const double avg = (double)sub.sum_duration_ns / sub.num_captures;
+        if (accumulator.num_captures > 0) {
+            const double avg =
+                static_cast<double>(accumulator.sum_duration_ns) / accumulator.num_captures;
             const double std_dev =
-                std::sqrt((double)sub.sq_sum_duration_ns / sub.num_captures - avg * avg);
+                std::sqrt(accumulator.sq_sum_duration_ns / accumulator.num_captures - avg * avg);
             avg_ms = avg / 1e6;
             std_ms = std_dev / 1e6;
         }
 
         std::optional<double> last_seen_ms_ago;
-        if (sub.last_seen < last_clear_time) {
+        if (sub.last_seen < since) {
             last_seen_ms_ago =
                 std::chrono::duration<double, std::milli>(now - sub.last_seen).count();
         }
 
         report.emplace_back(name, avg_ms, std_ms, last_seen_ms_ago,
-                            make_report(sub, sections, now, last_clear_time));
+                            make_report(sub, sections, period, now, since, keep_stale));
     }
     return report;
 }
 
-std::optional<Profiler::Report>
+} // namespace
+
+std::optional<ProfilerReport>
 Profiler::set_collect_get_every(const QueryPoolHandle<vk::QueryType::eTimestamp>& query_pool,
                                 const uint32_t report_intervall_millis,
                                 const uint32_t evict_after_ms) {
@@ -262,76 +351,30 @@ Profiler::set_collect_get_every(const QueryPoolHandle<vk::QueryType::eTimestamp>
 
     collect(false, true);
 
-    std::optional<Profiler::Report> report;
+    std::optional<ProfilerReport> report;
 
     if (report_intervall.millis() >= report_intervall_millis) {
-        report = get_report();
-        if (gpu_sections.size() > 1 && report.value().gpu_report.empty()) {
+        report = get_report(Period::INTERVAL, evict_after_ms);
+        if (gpu_sections.size() > 1 && report->gpu.empty()) {
             // there are sections but we got no results yet
             return std::nullopt;
         }
-        clear(evict_after_ms);
+        clear(Period::INTERVAL, evict_after_ms);
         report_intervall.reset();
     }
 
     return report;
 }
 
-std::string Profiler::get_report_str(const Profiler::Report& report) {
-    if (report.cpu_report.empty() && report.gpu_report.empty()) {
-        return "no timestamps captured";
-    }
-
-    std::string result = "";
-    result += "CPU:\n";
-    result += to_string(report.cpu_report, 1);
-    result += "GPU:\n";
-    result += to_string(report.gpu_report, 1);
-    return result;
-}
-
-void to_config(Properties& config,
-               const std::vector<Profiler::ReportEntry>& entries,
-               const uint32_t level = 0) {
-    for (const auto& entry : entries) {
-        const std::string str = fmt::format("{}: {}\n", entry.name, format_entry_value(entry));
-        if (entry.children.empty()) {
-            // Add 3 spaces to fit with the child item symbol.
-            config.output_text(fmt::format("   {}", str.c_str()));
-        } else if (config.st_begin_child(fmt::format("{}-{}", level, entry.name), str)) {
-            to_config(config, entry.children, level + 1);
-            config.st_end_child();
-        }
-    }
-}
-
-void Profiler::get_cpu_report_as_config(Properties& config, const Profiler::Report& report) {
-    to_config(config, report.cpu_report);
-}
-
-void Profiler::get_gpu_report_as_config(Properties& config, const Profiler::Report& report) {
-    to_config(config, report.gpu_report, 1u << 31);
-}
-
-void Profiler::get_report_as_config(Properties& config, const Profiler::Report& report) {
-    if (!report.cpu_report.empty()) {
-        config.st_separate("CPU");
-        get_cpu_report_as_config(config, report);
-    }
-
-    if (!report.gpu_report.empty()) {
-        config.st_separate("GPU");
-        get_gpu_report_as_config(config, report);
-    }
-}
-
-Profiler::Report Profiler::get_report() {
-    Profiler::Report report;
+ProfilerReport Profiler::get_report(const Period period, const uint32_t keep_stale_ms) const {
+    ProfilerReport report;
     const auto now = chrono_clock::now();
-    report.cpu_report =
-        make_report(cpu_sections[current_cpu_section], cpu_sections, now, last_clear_time);
-    report.gpu_report =
-        make_report(gpu_sections[current_gpu_section], gpu_sections, now, last_clear_time);
+    const auto since = period_start[index(period)];
+    const std::chrono::milliseconds keep_stale{keep_stale_ms};
+    report.cpu = make_report(cpu_sections[current_cpu_section], cpu_sections, index(period), now,
+                             since, keep_stale);
+    report.gpu = make_report(gpu_sections[current_gpu_section], gpu_sections, index(period), now,
+                             since, keep_stale);
     return report;
 }
 

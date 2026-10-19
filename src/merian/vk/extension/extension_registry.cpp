@@ -9,6 +9,7 @@
 #include "merian/vk/extension/extension_glslang_compiler.hpp"
 #include "merian/vk/extension/extension_glslangvalidator_compiler.hpp"
 #include "merian/vk/extension/extension_glslc_compiler.hpp"
+#include "merian/vk/extension/extension_host_windows.hpp"
 #include "merian/vk/extension/extension_merian.hpp"
 #include "merian/vk/extension/extension_mitigations.hpp"
 #include "merian/vk/extension/extension_resources.hpp"
@@ -59,6 +60,8 @@ ExtensionRegistry::ExtensionRegistry() {
     register_extension<ExtensionSDLVideo>(ExtensionSDLVideo::name, true,
                                           {ProviderPriority<WindowProvider>{50}});
 #endif
+    register_extension<ExtensionHostWindows>(ExtensionHostWindows::name, false,
+                                             {ProviderPriority<WindowProvider>{100}});
     register_extension<ExtensionCompatibility>(ExtensionCompatibility::name, true);
     register_extension<ExtensionMitigations>(ExtensionMitigations::name, true);
     register_extension<ExtensionVkDebugUtils>(ExtensionVkDebugUtils::name, Context::IS_DEBUG_BUILD);

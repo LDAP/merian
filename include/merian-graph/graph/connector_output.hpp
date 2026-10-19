@@ -13,8 +13,8 @@ using InputConnectorHandle = std::shared_ptr<InputConnector>;
 struct ResourceCreateInfo {
     // The inputs it feeds, also through versions written in place.
     const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs;
-    // The union of the declared accesses of this port and all connected inputs: allocate with its
-    // usage flags.
+    // The union of the declared accesses of this connector and all connected inputs: allocate with
+    // its usage flags.
     ConnectorAccess combined_access;
     // Memory for this copy, not bound before on_connected.
     ResourceAllocatorHandle allocator;

@@ -15,7 +15,6 @@
 #include <algorithm>
 #include <bit>
 #include <cmath>
-#include <limits>
 #include <numbers>
 
 namespace merian {
@@ -24,6 +23,7 @@ namespace {
 constexpr const char* SELECT_MODULE = "merian-graph/nodes/path_debug/select.slang";
 constexpr const char* THRESHOLD_MODULE = "merian-graph/nodes/path_debug/threshold.slang";
 constexpr const char* COLLECT_MODULE = "merian-graph/nodes/path_debug/collect.slang";
+constexpr const char* KEEP_MODULE = "merian-graph/nodes/path_debug/keep.slang";
 constexpr const char* OVERLAY_MODULE = "merian-graph/nodes/path_debug/overlay_raster.slang";
 constexpr const char* COMPOSE_MODULE = "merian-graph/nodes/path_debug/compose.slang";
 constexpr const char* STATS_MODULE = "merian-graph/nodes/path_debug/stats.slang";
@@ -36,10 +36,10 @@ constexpr const char* HEAT_SPLAT_MODULE = "merian-graph/nodes/path_debug/heat_sp
 constexpr const char* FINALIZE_MODULE = "merian-graph/nodes/path_debug/finalize.slang";
 constexpr const char* FILTER_RENDER_MODULE = "merian-graph/nodes/path_debug/filter_render.slang";
 
-constexpr std::array<const char*, 12> STANDALONE_MODULES = {
-    SELECT_MODULE,     THRESHOLD_MODULE,  COLLECT_MODULE,       COMPOSE_MODULE,
-    STATS_MODULE,      MAP_REDUCE_MODULE, MAP_VIEW_MODULE,      HEAT_DECAY_MODULE,
-    HEAT_SPLAT_MODULE, FINALIZE_MODULE,   FILTER_RENDER_MODULE, OVERLAY_MODULE};
+constexpr std::array<const char*, 13> STANDALONE_MODULES = {
+    SELECT_MODULE,   THRESHOLD_MODULE,     COLLECT_MODULE,  KEEP_MODULE,       COMPOSE_MODULE,
+    STATS_MODULE,    MAP_REDUCE_MODULE,    MAP_VIEW_MODULE, HEAT_DECAY_MODULE, HEAT_SPLAT_MODULE,
+    FINALIZE_MODULE, FILTER_RENDER_MODULE, OVERLAY_MODULE};
 
 vk::BufferMemoryBarrier2 compute_to_transfer(const BufferHandle& buffer) {
     return buffer->buffer_barrier2(vk::PipelineStageFlagBits2::eComputeShader |
@@ -77,7 +77,6 @@ PathDebugParams PathDebugNode::default_params() {
     defaults.keep_prob = 1.f;
     defaults.record_pixel = PATH_RECORD_ALL_PIXELS;
     defaults.map_res = 32;
-    defaults.map_panel_size = 192;
     defaults.map_exposure = 1.f;
     defaults.sphere_radius = 0.05f;
     defaults.heat_bounce_max = 30;
@@ -88,6 +87,9 @@ PathDebugParams PathDebugNode::default_params() {
     defaults.grid_slots = 1u << 20;
     defaults.pixel_stats_accumulate = 1;
     defaults.pixel_stats_scale = 1.f;
+    defaults.sel_pixel_x = PATH_DEBUG_NO_PIXEL;
+    defaults.sel_record_x = PATH_DEBUG_NO_PIXEL;
+    defaults.overlay_key_decay = 1.f;
     defaults.cursor_x = PATH_DEBUG_NO_PIXEL;
     defaults.cursor_y = PATH_DEBUG_NO_PIXEL;
     defaults.sel_material = PATH_RECORD_MATERIAL_NONE;
@@ -129,6 +131,7 @@ void PathDebugNode::initialize(const ContextHandle& context,
     select_kernel.emplace(context, allocator, compile_context, SELECT_MODULE, spec_info);
     threshold_kernel.emplace(context, allocator, compile_context, THRESHOLD_MODULE, spec_info);
     collect_kernel.emplace(context, allocator, compile_context, COLLECT_MODULE, spec_info);
+    keep_kernel.emplace(context, allocator, compile_context, KEEP_MODULE, spec_info);
     map_reduce_kernel.emplace(context, allocator, compile_context, MAP_REDUCE_MODULE, spec_info);
     map_view_kernel.emplace(context, allocator, compile_context, MAP_VIEW_MODULE, spec_info);
     heat_decay_kernel.emplace(context, allocator, compile_context, HEAT_DECAY_MODULE, spec_info);
@@ -157,6 +160,9 @@ void PathDebugNode::initialize(const ContextHandle& context,
                                             MemoryMappingType::NONE, "path_debug stats");
     ::ImGuiContext* const prev_imgui_ctx = ImGui::GetCurrentContext();
     imgui_ctx = std::make_shared<ImGuiContext>();
+    // the window's cursor and imgui.ini belong to a graph UI drawn over the canvas
+    imgui_ctx->get_io().ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
+    imgui_ctx->get_io().IniFilename = nullptr;
     imgui_renderer = std::make_shared<ImGuiRenderer>(context, allocator, imgui_ctx);
     imgui_backend = std::make_shared<ImGuiMerianBackend>(imgui_ctx);
     ImGuiContext::set_current(prev_imgui_ctx);
@@ -262,7 +268,7 @@ std::vector<InputConnectorDescriptor> PathDebugNode::describe_inputs() {
         {"window", con_window, {}, 0, true},
         {.name = "canvas",
          .connector = con_canvas,
-         .access = ConnectorAccess::transfer_dst,
+         .access = ConnectorAccess::transfer_dst | ConnectorAccess::color_attachment,
          .optional = true,
          .in_place = true},
     };
@@ -317,6 +323,27 @@ PathDebugNode::describe_outputs(const NodeIOLayout& io_layout) {
                                                vk::BufferUsageFlagBits::eTransferDst |
                                                vk::BufferUsageFlagBits::eTransferSrc,
                                            MemoryMappingType::NONE, "path_debug maps");
+    const uint32_t atlas_rows =
+        (MAP_CHANNEL_COUNT + PATH_DEBUG_PANEL_ATLAS_COLUMNS - 1) / PATH_DEBUG_PANEL_ATLAS_COLUMNS;
+    const ImageHandle atlas = allocator->create_image(
+        vk::ImageCreateInfo{
+            {},
+            vk::ImageType::e2D,
+            vk::Format::eR16G16B16A16Sfloat,
+            {allocated_map_res * PATH_DEBUG_PANEL_ATLAS_COLUMNS, allocated_map_res * atlas_rows, 1},
+            1,
+            1,
+            vk::SampleCountFlagBits::e1,
+            vk::ImageTiling::eOptimal,
+            vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled,
+            vk::SharingMode::eExclusive,
+            {},
+            {},
+            vk::ImageLayout::eUndefined},
+        MemoryMappingType::NONE, "path_debug panels");
+    panel_texture = allocator->create_texture(
+        atlas, atlas->make_view_create_info(),
+        allocator->get_sampler_pool()->nearest_clamp_to_edge(), "path_debug panels");
 
     return {{"out", con_out,
              ConnectorAccess::compute_write | ConnectorAccess::color_attachment |
@@ -341,6 +368,9 @@ PathDebugNode::on_connected(const NodeIOLayout& io_layout,
     maps_dirty = true;
     heat_dirty = true;
 
+    imgui_renderer->unregister_texture(panel_texture_id);
+    panel_texture_id = imgui_renderer->register_texture(panel_texture);
+
     const PathRecordCapacities capacities = path_record_capacities(io[con_records]->get_size());
     record_path_capacity = capacities.path_capacity;
     matches_buffer = allocator->create_buffer(
@@ -353,7 +383,7 @@ PathDebugNode::on_connected(const NodeIOLayout& io_layout,
         "/graph/reload_shaders", [this](const GraphEvent::Info&, const GraphEvent::Data& force) {
             const bool forced = std::any_cast<bool>(force);
             for (auto* kernel :
-                 {&select_kernel, &threshold_kernel, &collect_kernel, &stats_kernel,
+                 {&select_kernel, &threshold_kernel, &collect_kernel, &keep_kernel, &stats_kernel,
                   &map_reduce_kernel, &map_view_kernel, &compose_kernel, &heat_decay_kernel,
                   &heat_splat_kernel, &filter_render_kernel, &finalize_kernel}) {
                 (*kernel)->reload(forced, compile_context);
@@ -370,27 +400,17 @@ PathDebugNode::on_connected(const NodeIOLayout& io_layout,
                 }
             }
             pdf_stale = true;
-            return true;
         });
-    io_layout.register_event_listener("//camera_changed,//geometry_changed,//transform_changed",
+    io_layout.register_event_listener(
+        "//camera_changed",
+        [this](const GraphEvent::Info&, const GraphEvent::Data&) { camera_moved = true; });
+    io_layout.register_event_listener("//geometry_changed,//transform_changed",
                                       [this](const GraphEvent::Info&, const GraphEvent::Data&) {
                                           pixel_stats_dirty = true;
                                           maps_dirty = true;
                                           kept_dirty = true;
-                                          return false;
-                                      });
-    io_layout.register_event_listener("//geometry_changed,//transform_changed",
-                                      [this](const GraphEvent::Info&, const GraphEvent::Data&) {
                                           heat_dirty = true;
-                                          return false;
                                       });
-    io_layout.register_event_listener(
-        imgui_event_pattern, [this](const GraphEvent::Info&, const GraphEvent::Data& data) {
-            if (Properties* const* props = std::any_cast<Properties*>(&data); props != nullptr) {
-                draw_window();
-            }
-            return false;
-        });
 
     readback_buffers.resize(info.iterations_in_flight);
     for (auto& buffer : readback_buffers) {
@@ -423,14 +443,21 @@ PathDebugNode::process(const NodeIO& io, const NodeProcessInfo& info, Submission
         record_overlay_lines(io, info, submission);
         record_map_panels(io, info, submission);
     }
-    record_labels(io, info, submission);
+    // an export takes the labels with it
+    const bool labels_into_out = !io.is_connected(con_canvas) || export_next;
+    if (labels_into_out) {
+        record_labels(io, info, submission, false);
+    }
     record_export(io, info, submission);
     if (ready) {
         record_readback(io, info, submission);
     }
-    record_present(io, submission);
+    if (record_present(io, submission) && !labels_into_out) {
+        record_labels(io, info, submission, true);
+    }
     const std::scoped_lock lock(stats_mutex);
-    return std::exchange(pending_reconnect, false) ? NEEDS_RECONNECT : NodeStatusFlags{};
+    return std::exchange(pending_reconnect, false) ? NodeStatusFlags{NEEDS_RECONNECT}
+                                                   : NodeStatusFlags{};
 }
 
 void PathDebugNode::handle_input(const NodeIO& io) {
@@ -438,6 +465,7 @@ void PathDebugNode::handle_input(const NodeIO& io) {
         const InputControllerHandle& controller = io[con_controller];
         if (controller && controller != registered_controller.lock()) {
             controller->add_listener(input, PathDebugInput::PRIORITY);
+            controller->add_listener(input->observer(), PathDebugInput::OBSERVER_PRIORITY);
             registered_controller = controller;
         }
     }
@@ -445,24 +473,25 @@ void PathDebugNode::handle_input(const NodeIO& io) {
         clear_selection();
     }
 
-    if (const double scroll = input->take_scroll(); scroll != 0.) {
-        const auto cursor = cursor_pixel();
-        if (cursor && panel_at(*cursor)) {
-            panel_scroll = std::max(0, panel_scroll - static_cast<int32_t>(scroll * 60.));
-        } else if (picked_pos_valid) {
-            picked_radius =
-                std::max(1e-6f, picked_radius * std::pow(1.15f, static_cast<float>(scroll)));
-            invalidate_selection();
-        }
+    if (const double scroll = input->take_panel_scroll(); scroll != 0.) {
+        panel_scroll = std::max(0, panel_scroll - static_cast<int32_t>(scroll * 60.));
     }
-    const auto clicked = input->take_click();
-    if (const auto click = clicked ? to_image(*clicked) : std::nullopt) {
-        const auto hit = panel_at(*click);
-        if (hit && hit->on_close) {
-            panel_enabled[hit->channel] = false;
-        } else {
+    if (const double scroll = input->take_widen_scroll(); scroll != 0. && picked_pos_valid) {
+        picked_radius =
+            std::max(1e-6f, picked_radius * std::pow(1.15f, static_cast<float>(scroll)));
+        invalidate_selection();
+    }
+    if (const auto clicked = input->take_click()) {
+        const auto hit = presenting ? panel_at(clicked->pos * present_density) : std::nullopt;
+        if (hit) {
+            if (hit->on_close) {
+                panel_enabled[hit->channel] = false;
+            }
+        } else if (const auto click = clicked->pick ? to_image(clicked->pos) : std::nullopt) {
             picked_pixel = *click;
+            picked_in_records = *click;
             picked = true;
+            picked_offscreen = false;
             picked_pos_valid = false;
             picked_radius = 0.f;
             pending_pick_pixel = *click;
@@ -475,33 +504,59 @@ void PathDebugNode::handle_input(const NodeIO& io) {
     params.cursor_x = PATH_DEBUG_NO_PIXEL;
     params.cursor_y = PATH_DEBUG_NO_PIXEL;
     params.probe_channel = PATH_DEBUG_MAP_NONE;
-    if (const auto cursor = cursor_pixel()) {
-        params.cursor_x = static_cast<uint32_t>(cursor->x);
-        params.cursor_y = static_cast<uint32_t>(cursor->y);
-        if (const auto hit = panel_at(*cursor); hit && !hit->on_close) {
-            uint32_t slot = 0;
-            for (uint32_t channel = 0; channel < hit->channel; channel++) {
-                slot += (shown_panel_mask() >> channel) & 1u;
-            }
-            const uint32_t bx = static_cast<uint32_t>(cursor->x - panel_left()) * params.map_res /
-                                params.map_panel_size;
-            const uint32_t by = static_cast<uint32_t>(cursor->y - panel_top(slot)) *
-                                params.map_res / params.map_panel_size;
+    probe_at.reset();
+    const auto cursor = input->cursor();
+    if (!cursor || !presenting) {
+        return;
+    }
+    probe_at = *cursor * present_density;
+    if (const auto hit = panel_at(*probe_at)) {
+        if (!hit->on_close) {
             params.probe_channel = hit->channel;
-            params.probe_bin = (std::min(by, params.map_res - 1) * params.map_res) +
-                               std::min(bx, params.map_res - 1);
+            params.probe_bin = hit->bin;
         }
+        return;
+    }
+    if (const auto pixel = to_image(*cursor)) {
+        params.cursor_x = static_cast<uint32_t>(pixel->x);
+        params.cursor_y = static_cast<uint32_t>(pixel->y);
+    }
+}
+
+void PathDebugNode::reproject_pick(const NodeIO& io) {
+    const SceneHandle& scene = io[con_scene];
+    if (!reproject || !picked || !picked_pos_valid || !scene || !scene->is_ready()) {
+        picked_offscreen = false;
+        return;
+    }
+    const CameraHandle camera = scene->get_active_camera();
+    const float3 to_pick = picked_pos - camera->get_position();
+    const float3& forward = camera->get_forward();
+    const float3& right = camera->get_right();
+    const float depth = dot(to_pick, forward);
+    const float tan_half_fov = std::tan(camera->get_field_of_view_vertical() * 0.5f);
+    const float2 ndc(dot(to_pick, right) / (depth * tan_half_fov * camera->get_aspect_ratio()),
+                     dot(to_pick, cross(right, forward)) / (depth * tan_half_fov));
+    const float2 at = float2(0.5f + (0.5f * ndc.x), 0.5f - (0.5f * ndc.y)) *
+                      float2(static_cast<float>(extent.width), static_cast<float>(extent.height));
+    picked_offscreen = depth <= camera->get_near_plane() || at.x < 0.f || at.y < 0.f ||
+                       at.x >= static_cast<float>(extent.width) ||
+                       at.y >= static_cast<float>(extent.height);
+    if (!picked_offscreen) {
+        picked_pixel = int2(floor(at));
     }
 }
 
 PathDebugNode::ReadbackFeedback
 PathDebugNode::apply_readback_feedback(const NodeProcessInfo& info,
                                        const PathRecordCapacities& capacities) {
-    if (info.get_iteration() == 0 && auto_keep_prob) {
-        keep_prob = MIN_KEEP_PROB;
-    }
-
     const std::scoped_lock lock(stats_mutex);
+    if (info.get_iteration() == 0) {
+        readback_valid = false;
+        if (auto_keep_prob) {
+            keep_prob = MIN_KEEP_PROB;
+        }
+    }
     const auto tick = [](bool& drawn, uint32_t& frames) {
         frames = std::exchange(drawn, false) ? 0 : std::min(frames + 1, UI_IDLE_FRAMES);
     };
@@ -509,12 +564,11 @@ PathDebugNode::apply_readback_feedback(const NodeProcessInfo& info,
     tick(inspector_drawn, frames_since_inspector);
     tick(convergence_drawn, frames_since_convergence);
 
-    ReadbackFeedback fed{capacities.path_capacity, 0, std::exchange(check_requested, false)};
+    ReadbackFeedback fed{capacities.path_capacity, std::exchange(check_requested, false)};
     if (!readback_valid) {
         return fed;
     }
     fed.observed_paths = std::min(latest_readback.frame.paths, capacities.path_capacity);
-    fed.matched_paths = latest_readback.frame.matched;
     if (latest_readback.stats[PATH_DEBUG_STATS_COUNT] > (1u << 30)) {
         maps_dirty = true;
     }
@@ -570,6 +624,13 @@ void PathDebugNode::record_clears(const NodeIO& io,
     if (info.get_iteration() == 0) {
         cmd->fill(records);
     }
+    // held records stay with the view they were traced from
+    if (camera_moved && !freeze && !was_frozen) {
+        camera_moved = false;
+        pixel_stats_dirty = true;
+        maps_dirty = true;
+        kept_dirty |= !reproject;
+    }
     cmd->fill(state_buffer);
     cmd->fill(matches_buffer);
     if (!map_accumulate) {
@@ -593,6 +654,7 @@ void PathDebugNode::record_clears(const NodeIO& io,
         pixel_stats_dirty = false;
         pixel_stats_frames = 0;
         const std::scoped_lock lock(stats_mutex);
+        pixel_stats_generation++;
         mean_history.clear();
         rel_error_history.clear();
         variance_history.clear();
@@ -602,7 +664,8 @@ void PathDebugNode::record_clears(const NodeIO& io,
         kept_dirty = false;
         kept_frames = 0;
         const std::scoped_lock lock(stats_mutex);
-        resampled_from = 0;
+        kept_generation++;
+        kept_from = 0;
     }
     if (info.get_iteration() == 0) {
         cmd->barrier(transfer_to_compute(records));
@@ -617,16 +680,18 @@ PathDebugNode::FrameActivity PathDebugNode::update_params(const NodeIO& io,
                                                           const NodeProcessInfo& info,
                                                           const bool ready,
                                                           const ReadbackFeedback& fed) {
+    reproject_pick(io);
     picked_pixel.x = std::clamp(picked_pixel.x, 0, static_cast<int32_t>(extent.width) - 1);
     picked_pixel.y = std::clamp(picked_pixel.y, 0, static_cast<int32_t>(extent.height) - 1);
     params.dim_x = extent.width;
     params.dim_y = extent.height;
 
-    const bool frozen = freeze;
+    // the frame after a freeze still sees the held records
+    const bool frozen = std::exchange(was_frozen, freeze) || freeze;
     update_selection_params();
     update_capture_params();
-    update_overlay_params(fed, frozen);
-    update_map_params(fed);
+    update_overlay_params(frozen, ready);
+    update_map_params(io, fed, ready);
     update_heat_params(frozen);
     update_pixel_stats_params(io, frozen, ready);
     update_backdrop_params(info);
@@ -652,8 +717,23 @@ void PathDebugNode::update_selection_params() {
         pending_pick = true;
         pending_pick_seq++;
     }
-    params.sel_pixel_x = picked ? static_cast<uint32_t>(picked_pixel.x) : PATH_DEBUG_NO_PIXEL;
-    params.sel_pixel_y = picked ? static_cast<uint32_t>(picked_pixel.y) : PATH_DEBUG_NO_PIXEL;
+    // held records keep matching the pixel they were traced through
+    const bool held = freeze && readback_valid && latest_readback.frame.paths > 0;
+    if (!picked) {
+        picked_in_records.reset();
+    } else if (!held) {
+        picked_in_records =
+            pick_visible() ? std::optional<int2>(picked_pixel) : std::optional<int2>();
+    }
+    params.sel_pixel_x =
+        pick_visible() ? static_cast<uint32_t>(picked_pixel.x) : PATH_DEBUG_NO_PIXEL;
+    params.sel_pixel_y =
+        pick_visible() ? static_cast<uint32_t>(picked_pixel.y) : PATH_DEBUG_NO_PIXEL;
+    params.sel_record_x = !picked             ? PATH_DEBUG_NO_PIXEL
+                          : picked_in_records ? static_cast<uint32_t>(picked_in_records->x)
+                                              : PATH_DEBUG_OFFSCREEN;
+    params.sel_record_y =
+        picked_in_records ? static_cast<uint32_t>(picked_in_records->y) : PATH_DEBUG_OFFSCREEN;
     params.sel_region_x = picked_pos.x;
     params.sel_region_y = picked_pos.y;
     params.sel_region_z = picked_pos.z;
@@ -692,62 +772,82 @@ void PathDebugNode::update_capture_params() {
     const bool one_pixel = record_picked_pixel_only && picked;
     params.freeze = freeze ? 1 : 0;
     params.keep_prob = one_pixel ? 1.f : keep_prob;
-    params.record_pixel =
-        one_pixel ? ((params.sel_pixel_y << 16) | params.sel_pixel_x) : PATH_RECORD_ALL_PIXELS;
+    params.record_pixel = !one_pixel       ? PATH_RECORD_ALL_PIXELS
+                          : pick_visible() ? (params.sel_pixel_y << 16) | params.sel_pixel_x
+                                           : PATH_DEBUG_RECORD_NO_PIXEL;
 }
 
-void PathDebugNode::update_overlay_params(const ReadbackFeedback& fed, const bool frozen) {
+void PathDebugNode::update_overlay_params(const bool frozen, const bool ready) {
     const bool kept = overlay_kept();
     params.overlay_source = static_cast<uint32_t>(overlay_source);
     params.overlay_rank = static_cast<uint32_t>(overlay_rank);
     params.overlay_max_paths = std::min(static_cast<uint32_t>(std::max(overlay_max_paths, 1)),
                                         kept ? PATH_DEBUG_KEPT_SLOTS : MAX_DRAW);
-    params.overlay_keep_update = kept && (!frozen || kept_frames == 0) ? 1 : 0;
-    kept_frames += params.overlay_keep_update;
-    params.overlay_brightest_fraction = std::clamp(overlay_brightest_fraction, 1e-7f, 1.f);
-    params.overlay_sample_max = std::numeric_limits<uint32_t>::max();
-    if (overlay_rank == static_cast<int32_t>(PATH_DEBUG_RANK_ANY) &&
-        fed.matched_paths > params.overlay_max_paths) {
-        const double keep =
-            static_cast<double>(params.overlay_max_paths) / static_cast<double>(fed.matched_paths);
-        params.overlay_sample_max =
-            static_cast<uint32_t>(std::numeric_limits<uint32_t>::max() * keep);
+    // an isolated path keeps its slot
+    params.overlay_keep_update =
+        kept && ((!frozen && isolate_path < 0) || kept_frames == 0) ? 1 : 0;
+    if (params.overlay_keep_update != 0 && ready) {
+        kept_frames++;
     }
+    params.overlay_brightest_fraction = std::clamp(overlay_brightest_fraction, 1e-7f, 1.f);
+    params.overlay_key_decay =
+        overlay_rank == static_cast<int32_t>(PATH_DEBUG_RANK_RESAMPLED) && resample_history > 0.f
+            ? std::exp(-1.f / resample_history)
+            : 1.f;
     params.overlay_depth_mode = static_cast<uint32_t>(overlay_depth_mode);
     params.overlay_color = static_cast<uint32_t>(overlay_color);
     params.overlay_isolate =
         isolate_path < 0 ? PATH_DEBUG_NO_ISOLATE : static_cast<uint32_t>(isolate_path);
 }
 
-void PathDebugNode::update_map_params(const ReadbackFeedback& fed) {
+void PathDebugNode::update_map_params(const NodeIO& io,
+                                      const ReadbackFeedback& fed,
+                                      const bool ready) {
     params.map_source = static_cast<uint32_t>(map_source);
     params.map_res = allocated_map_res;
     params.map_transform = static_cast<uint32_t>(map_transform);
-    params.map_frame =
-        gbuffer_connected ? static_cast<uint32_t>(map_frame) : PATH_DEBUG_FRAME_WORLD;
+    params.map_frame = gbuffer_connected && pick_visible() ? static_cast<uint32_t>(map_frame)
+                                                           : PATH_DEBUG_FRAME_WORLD;
     params.map_pdf_ref = static_cast<uint32_t>(map_pdf_ref);
     params.map_bounce = map_bounce < 0 ? PATH_DEBUG_ALL_BOUNCES : static_cast<uint32_t>(map_bounce);
     params.map_draws = static_cast<uint32_t>(map_draws);
     params.wi_mode = static_cast<uint32_t>(wi_mode);
     params.wi_theta = wi_theta_deg * std::numbers::pi_v<float> / 180.f;
     params.wi_phi = wi_phi_deg * std::numbers::pi_v<float> / 180.f;
-    params.sphere_channel = (sphere_channel < 0 || !gbuffer_connected)
+    params.sphere_channel = (sphere_channel < 0 || !gbuffer_connected || !pick_visible())
                                 ? PATH_DEBUG_MAP_NONE
                                 : static_cast<uint32_t>(sphere_channel);
 
-    const uint32_t panel_limit = std::min(extent.width, extent.height);
-    params.map_panel_size = std::max(
-        1u, std::min(params.map_panel_size, panel_limit > 2 * PATH_DEBUG_PANEL_MARGIN
-                                                ? panel_limit - (2 * PATH_DEBUG_PANEL_MARGIN)
-                                                : panel_limit));
-    params.map_panel_mask = panels_enabled ? shown_panel_mask() : 0;
-    const auto panel_count = static_cast<uint32_t>(std::popcount(params.map_panel_mask));
-    const auto column =
-        static_cast<int32_t>((panel_count * (params.map_panel_size + PATH_DEBUG_PANEL_GAP)) +
-                             (2 * PATH_DEBUG_PANEL_MARGIN));
-    panel_overflow = std::max(0, column - static_cast<int32_t>(extent.height));
+    const bool canvas_connected = io.is_connected(con_canvas);
+    if (const ImageHandle canvas = canvas_connected ? io[con_canvas].get_image() : ImageHandle()) {
+        label_area = int2(static_cast<int32_t>(canvas->get_extent().width),
+                          static_cast<int32_t>(canvas->get_extent().height));
+        label_scale = io.is_connected(con_window) && io[con_window]
+                          ? io[con_window]->get_display_scale()
+                          : 1.f;
+    } else if (!canvas_connected) {
+        label_area = int2(static_cast<int32_t>(extent.width), static_cast<int32_t>(extent.height));
+        label_scale = 1.f;
+    }
+    const int32_t panel_limit =
+        std::min(label_area.x, label_area.y) - (2 * label_px(PATH_DEBUG_PANEL_MARGIN));
+    panel_px = std::clamp(label_px(static_cast<uint32_t>(std::max(panel_size, 0))), 16,
+                          std::max(panel_limit, 16));
+    params.map_panel_mask = panels_enabled && ready ? shown_panel_mask() : 0;
+    const auto panel_count = static_cast<int32_t>(std::popcount(params.map_panel_mask));
+    const int32_t column = (panel_count * (panel_px + label_px(PATH_DEBUG_PANEL_GAP))) +
+                           label_px(PATH_DEBUG_PANEL_MARGIN);
+    panel_overflow = std::max(0, column - label_area.y);
     panel_scroll = std::clamp(panel_scroll, 0, panel_overflow);
-    params.map_panel_scroll = static_cast<uint32_t>(panel_scroll);
+    if (params.map_panel_mask != 0 && presenting) {
+        input->set_panel_area(
+            float2(static_cast<float>(panel_left()), 0.f) / present_density,
+            float2(static_cast<float>(label_area.x),
+                   static_cast<float>(std::min(column - panel_scroll, label_area.y))) /
+                present_density);
+    } else {
+        input->set_panel_area(float2(0.f), float2(0.f));
+    }
     params.want_top_list = frames_since_inspector < UI_IDLE_FRAMES ? 1 : 0;
 
     const bool pixel_restricted =
@@ -794,7 +894,6 @@ void PathDebugNode::update_pixel_stats_params(const NodeIO& io,
 
 void PathDebugNode::update_backdrop_params(const NodeProcessInfo& info) {
     params.backdrop = static_cast<uint32_t>(backdrop);
-    params.reference_ready = reference_loaded ? 1 : 0;
     if (reference_flip && (backdrop == static_cast<int32_t>(PATH_DEBUG_BACKDROP_REFERENCE) ||
                            backdrop == static_cast<int32_t>(PATH_DEBUG_BACKDROP_SPLIT_REFERENCE))) {
         const auto phase = static_cast<uint64_t>(info.get_elapsed() * reference_flip_hz);
@@ -826,6 +925,9 @@ void PathDebugNode::bind_node_buffers(ShaderCursor cursor, const NodeIO& io) con
             c = buffer;
         }
     }
+    if (auto c = cursor.find("out_panels"); c.is_valid() && panel_texture) {
+        c = panel_texture->get_view();
+    }
     if (auto c = cursor.find("in_reference"); c.is_valid() && reference_texture) {
         c = reference_texture;
     }
@@ -846,9 +948,10 @@ void PathDebugNode::bind_node_buffers(ShaderCursor cursor, const NodeIO& io) con
 }
 
 void PathDebugNode::bind_globals(const NodeIO& io) {
-    for (auto* kernel : {&select_kernel, &threshold_kernel, &collect_kernel, &stats_kernel,
-                         &map_reduce_kernel, &map_view_kernel, &compose_kernel, &heat_decay_kernel,
-                         &heat_splat_kernel, &finalize_kernel, &filter_render_kernel}) {
+    for (auto* kernel :
+         {&select_kernel, &threshold_kernel, &collect_kernel, &keep_kernel, &stats_kernel,
+          &map_reduce_kernel, &map_view_kernel, &compose_kernel, &heat_decay_kernel,
+          &heat_splat_kernel, &finalize_kernel, &filter_render_kernel}) {
         bind_node_buffers((*kernel)->globals_cursor(), io);
     }
 }
@@ -934,6 +1037,12 @@ void PathDebugNode::record_analysis(const NodeIO& io,
         MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "collect");
         const auto collect_pipe = collect_kernel->bind(io, info, submission);
         cmd->dispatch(path_groups, 1, 1);
+    }
+    if (params.overlay_keep_update != 0 && keeps_top()) {
+        MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "keep");
+        cmd->barrier({compute_to_compute(state_buffer), compute_to_compute(kept_buffer)});
+        const auto pipe = keep_kernel->bind(io, info, submission);
+        cmd->dispatch(1, 1, 1);
     }
     if (params.heat_mode != PATH_DEBUG_HEAT_OFF) {
         MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "heat");
@@ -1028,36 +1137,67 @@ void PathDebugNode::record_map_panels(const NodeIO& io,
     }
     const CommandBufferHandle& cmd = submission.get_cmd();
     MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "map panels");
-    cmd->barrier(io[con_out]->barrier2(vk::ImageLayout::eGeneral, vk::AccessFlagBits2::eShaderWrite,
-                                       vk::AccessFlagBits2::eShaderWrite,
-                                       vk::PipelineStageFlagBits2::eComputeShader,
-                                       vk::PipelineStageFlagBits2::eComputeShader));
+    const ImageHandle& atlas = panel_texture->get_image();
+    cmd->barrier(atlas->barrier2(vk::ImageLayout::eGeneral, vk::AccessFlagBits2::eShaderRead,
+                                 vk::AccessFlagBits2::eShaderWrite,
+                                 vk::PipelineStageFlagBits2::eFragmentShader,
+                                 vk::PipelineStageFlagBits2::eComputeShader));
     const auto pipe = map_view_kernel->bind(io, info, submission);
-    cmd->dispatch(vk::Extent3D{params.map_panel_size, params.map_panel_size,
-                               static_cast<uint32_t>(std::popcount(params.map_panel_mask))},
-                  16, 16);
+    cmd->dispatch(vk::Extent3D{params.map_res, params.map_res, MAP_CHANNEL_COUNT}, 16, 16);
+    cmd->barrier(atlas->barrier2(vk::ImageLayout::eGeneral, vk::AccessFlagBits2::eShaderWrite,
+                                 vk::AccessFlagBits2::eShaderRead,
+                                 vk::PipelineStageFlagBits2::eComputeShader,
+                                 vk::PipelineStageFlagBits2::eFragmentShader));
 }
 
 void PathDebugNode::record_labels(const NodeIO& io,
                                   const NodeProcessInfo& info,
-                                  Submission& submission) {
+                                  Submission& submission,
+                                  const bool onto_canvas) {
     const CommandBufferHandle& cmd = submission.get_cmd();
     MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "labels");
-    cmd->barrier(io[con_out]->barrier2(
-        vk::ImageLayout::eColorAttachmentOptimal, vk::AccessFlagBits2::eShaderWrite,
-        vk::AccessFlagBits2::eColorAttachmentRead | vk::AccessFlagBits2::eColorAttachmentWrite,
-        vk::PipelineStageFlagBits2::eComputeShader,
-        vk::PipelineStageFlagBits2::eColorAttachmentOutput));
-    imgui_ctx->get_io().DisplaySize =
-        ImVec2(static_cast<float>(extent.width), static_cast<float>(extent.height));
-    imgui_backend->new_frame(static_cast<float>(frametime.seconds()));
+    const TextureHandle& target =
+        onto_canvas ? io[con_canvas].get_texture() : io[con_out].get_texture(0);
+    const WindowHandle window =
+        onto_canvas && io.is_connected(con_window) ? io[con_window] : WindowHandle();
+    if (!onto_canvas) {
+        label_area = int2(static_cast<int32_t>(extent.width), static_cast<int32_t>(extent.height));
+        cmd->barrier(io[con_out]->barrier2(
+            vk::ImageLayout::eColorAttachmentOptimal, vk::AccessFlagBits2::eShaderWrite,
+            vk::AccessFlagBits2::eColorAttachmentRead | vk::AccessFlagBits2::eColorAttachmentWrite,
+            vk::PipelineStageFlagBits2::eComputeShader,
+            vk::PipelineStageFlagBits2::eColorAttachmentOutput));
+    }
+    if (window && window != imgui_window.lock()) {
+        imgui_window_backend = std::make_shared<ImGuiMerianWindowBackend>(
+            imgui_ctx, window, PathDebugInput::UI_PRIORITY);
+        imgui_window = window;
+    }
+    const auto delta_time = static_cast<float>(frametime.seconds());
     frametime.reset();
-    imgui_ctx->with_context([&] { draw_overlay(); });
-    imgui_renderer->render(cmd, io[con_out].get_texture(0)->get_view());
-    cmd->barrier(io[con_out]->barrier2(
-        vk::ImageLayout::eGeneral, vk::AccessFlagBits2::eColorAttachmentWrite,
-        vk::AccessFlagBits2::eShaderRead, vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-        vk::PipelineStageFlagBits2::eAllCommands));
+    if (window) {
+        imgui_window_backend->new_frame(delta_time);
+    } else {
+        ImGuiIO& imgui_io = imgui_ctx->get_io();
+        imgui_io.DisplaySize =
+            ImVec2(static_cast<float>(label_area.x), static_cast<float>(label_area.y));
+        imgui_io.DisplayFramebufferScale = ImVec2(1.f, 1.f);
+        imgui_ctx->get_style().FontScaleDpi = label_scale;
+        imgui_backend->new_frame(delta_time);
+    }
+    imgui_ctx->with_context([&] {
+        if (window) {
+            draw_window();
+        }
+        draw_overlay();
+    });
+    imgui_renderer->render(cmd, target->get_view());
+    if (!onto_canvas) {
+        cmd->barrier(io[con_out]->barrier2(
+            vk::ImageLayout::eGeneral, vk::AccessFlagBits2::eColorAttachmentWrite,
+            vk::AccessFlagBits2::eShaderRead, vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+            vk::PipelineStageFlagBits2::eAllCommands));
+    }
 }
 
 void PathDebugNode::record_export(const NodeIO& io,
@@ -1107,17 +1247,20 @@ void PathDebugNode::record_readback(const NodeIO& io,
     cmd->barrier(readback->buffer_barrier2(
         vk::PipelineStageFlagBits2::eTransfer, vk::PipelineStageFlagBits2::eHost,
         vk::AccessFlagBits2::eTransferWrite, vk::AccessFlagBits2::eHostRead));
-    submission.sync_to_cpu([this, readback,
-                            resampled = params.overlay_rank == PATH_DEBUG_RANK_RESAMPLED &&
-                                        params.overlay_keep_update != 0]() {
+    const bool kept_top = keeps_top() && params.overlay_keep_update != 0;
+    submission.sync_to_cpu([this, readback, kept_top, recorded_pixel_stats = pixel_stats_generation,
+                            recorded_kept = kept_generation]() {
         const Readback data = *readback->get_memory()->map_as<Readback>();
         readback->get_memory()->unmap();
         const std::scoped_lock lock(stats_mutex);
         latest_readback = data;
-        if (resampled) {
-            resampled_from += data.frame.matched;
-        }
         readback_valid = true;
+        if (kept_top && recorded_kept == kept_generation) {
+            kept_from += data.frame.matched;
+        }
+        if (recorded_pixel_stats != pixel_stats_generation) {
+            return;
+        }
         mean_history.push_back(std::bit_cast<float>(data.probe.picked_mean));
         rel_error_history.push_back(std::bit_cast<float>(data.probe.picked_rel_error));
         variance_history.push_back(std::bit_cast<float>(data.probe.picked_variance));
@@ -1129,14 +1272,15 @@ void PathDebugNode::record_readback(const NodeIO& io,
     });
 }
 
-void PathDebugNode::record_present(const NodeIO& io, Submission& submission) {
-    presenting = false;
+bool PathDebugNode::record_present(const NodeIO& io, Submission& submission) {
     if (!io.is_connected(con_canvas)) {
-        return;
+        presenting = false;
+        return false;
     }
+    // a frame without a canvas image keeps the last mapping, input still refers to it
     const ImageHandle& dst = io[con_canvas].get_image();
     if (!dst) {
-        return;
+        return false;
     }
 
     const CommandBufferHandle& cmd = submission.get_cmd();
@@ -1160,6 +1304,7 @@ void PathDebugNode::record_present(const NodeIO& io, Submission& submission) {
     present_density =
         io.is_connected(con_window) && io[con_window] ? io[con_window]->get_pixel_density() : 1.f;
     presenting = true;
+    return true;
 }
 
 void PathDebugNode::load_reference(const ResourceAllocatorHandle& allocator,
@@ -1193,6 +1338,7 @@ void PathDebugNode::invalidate_selection() {
 
 void PathDebugNode::clear_selection() {
     picked = false;
+    picked_offscreen = false;
     picked_pos_valid = false;
     picked_radius = 0.f;
     pending_pick = false;
@@ -1207,12 +1353,22 @@ void PathDebugNode::set_expression(const bool slot_b, const std::string& text) {
 }
 
 bool PathDebugNode::overlay_kept() const {
-    return overlay_rank == static_cast<int32_t>(PATH_DEBUG_RANK_RESAMPLED) ||
+    return overlay_rank == static_cast<int32_t>(PATH_DEBUG_RANK_BRIGHTEST) ||
+           overlay_rank == static_cast<int32_t>(PATH_DEBUG_RANK_RESAMPLED) ||
            overlay_rank == static_cast<int32_t>(PATH_DEBUG_RANK_RECENT);
 }
 
+bool PathDebugNode::keeps_top() const {
+    return overlay_rank == static_cast<int32_t>(PATH_DEBUG_RANK_BRIGHTEST) ||
+           overlay_rank == static_cast<int32_t>(PATH_DEBUG_RANK_RESAMPLED);
+}
+
+bool PathDebugNode::pick_visible() const {
+    return picked && !picked_offscreen;
+}
+
 bool PathDebugNode::shared_support(const bool needs_camera_wi) const {
-    return picked && restrict_mode == static_cast<int32_t>(PATH_DEBUG_RESTRICT_PIXEL) &&
+    return pick_visible() && restrict_mode == static_cast<int32_t>(PATH_DEBUG_RESTRICT_PIXEL) &&
            map_bounce == 0 &&
            (!needs_camera_wi || wi_mode == static_cast<int32_t>(PATH_DEBUG_WI_CAMERA));
 }
@@ -1222,44 +1378,44 @@ uint32_t PathDebugNode::shown_panel_mask() const {
     for (uint32_t channel = 0; channel < MAP_CHANNEL_COUNT; channel++) {
         mask |= panel_enabled[channel] ? (1u << channel) : 0;
     }
-    return picked ? mask : mask & ~PATH_DEBUG_MAP_SURFACE_MASK;
+    return pick_visible() ? mask : mask & ~PATH_DEBUG_MAP_SURFACE_MASK;
+}
+
+int32_t PathDebugNode::label_px(const uint32_t size) const {
+    return static_cast<int32_t>(std::lround(static_cast<float>(size) * label_scale));
 }
 
 int32_t PathDebugNode::panel_left() const {
-    return static_cast<int32_t>(extent.width - params.map_panel_size - PATH_DEBUG_PANEL_MARGIN);
+    return label_area.x - panel_px - label_px(PATH_DEBUG_PANEL_MARGIN);
 }
 
 int32_t PathDebugNode::panel_top(const uint32_t slot) const {
-    return static_cast<int32_t>(PATH_DEBUG_PANEL_MARGIN +
-                                (slot * (params.map_panel_size + PATH_DEBUG_PANEL_GAP))) -
+    return label_px(PATH_DEBUG_PANEL_MARGIN) +
+           (static_cast<int32_t>(slot) * (panel_px + label_px(PATH_DEBUG_PANEL_GAP))) -
            panel_scroll;
 }
 
-std::optional<PathDebugNode::PanelHit> PathDebugNode::panel_at(const int2& pixel) const {
-    const int32_t left = panel_left();
-    const auto size = static_cast<int32_t>(params.map_panel_size);
-    if (!panels_enabled || pixel.x < left || pixel.x >= left + size) {
+std::optional<PathDebugNode::PanelHit> PathDebugNode::panel_at(const float2& at) const {
+    const auto left = static_cast<float>(panel_left());
+    const auto size = static_cast<float>(panel_px);
+    if (params.map_panel_mask == 0 || at.x < left || at.x >= left + size) {
         return std::nullopt;
     }
-    const uint32_t mask = shown_panel_mask();
     uint32_t slot = 0;
     for (uint32_t channel = 0; channel < MAP_CHANNEL_COUNT; channel++) {
-        if ((mask & (1u << channel)) == 0) {
+        if ((params.map_panel_mask & (1u << channel)) == 0) {
             continue;
         }
-        const int32_t top = panel_top(slot);
-        if (pixel.y >= top && pixel.y < top + size) {
-            const auto close = static_cast<int32_t>(PATH_DEBUG_PANEL_CLOSE);
-            return PanelHit{channel, pixel.y < top + close && pixel.x >= left + size - close};
+        const auto top = static_cast<float>(panel_top(slot++));
+        if (at.y < top || at.y >= top + size) {
+            continue;
         }
-        slot++;
-    }
-    return std::nullopt;
-}
-
-std::optional<int2> PathDebugNode::cursor_pixel() const {
-    if (const auto at = input->cursor(); at && !mouse_over_ui) {
-        return to_image(*at);
+        const auto close = static_cast<float>(label_px(PATH_DEBUG_PANEL_CLOSE));
+        const uint2 bin =
+            min(uint2((at - float2(left, top)) / size * static_cast<float>(params.map_res)),
+                uint2(params.map_res - 1));
+        return PanelHit{channel, (bin.y * params.map_res) + bin.x,
+                        at.y < top + close && at.x >= left + size - close};
     }
     return std::nullopt;
 }

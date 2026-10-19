@@ -581,7 +581,7 @@ void Scene::properties_mesh(Properties& props, const MeshID mesh_id) {
     }
 
     // instance_mask is part of the group split key, so any change forces a regroup.
-    if (props.st_begin_child("instance_mask", "instance mask")) {
+    if (props.st_begin_child("instance mask", "instance mask")) {
         for (uint32_t bit = 0; bit < 8; ++bit) {
             bool on = (mesh.instance_mask & (1u << bit)) != 0u;
             if (props.config_bool(std::to_string(bit), on)) {
@@ -637,14 +637,14 @@ void Scene::properties_mesh_group(Properties& props, const MeshGroupID group_id)
     props.output_text(
         "split flags: {}\nhas animated node: {}\nhas morphed mesh: {}\nhas variable topology: "
         "{}\nall opaque: {}\npretransformed: {}\ninstances: {}\nvertices: {}\ntriangles: "
-        "{}\nblas: {}\nblas build flags: {}\nblas dirty: {}\nblas last built frame: {}\nblas "
-        "last updated frame: {}",
+        "{}\nblas: {}\nblas build flags: {}\nblas dirty: {}\nblas last built update: {}\nblas "
+        "last updated update: {}",
         group.flags, group.has_animated_node, group.has_morphed_mesh,
         group.has_variable_topology_mesh, group.all_opaque, pretransformed, instances,
         group_vertices, group_triangles,
         group.blas ? format_size(group.blas->get_size()) : "<none>",
-        vk::to_string(group.blas_build_flags), group.blas_dirty, group.blas_last_built_frame,
-        group.blas_last_updated_frame);
+        vk::to_string(group.blas_build_flags), group.blas_dirty, group.blas_last_built_update,
+        group.blas_last_updated_update);
 
     if (props.st_begin_child("members", fmt::format("members ({})", group.meshes.size()))) {
         for (const MeshID mesh_id : group.meshes) {
@@ -670,7 +670,7 @@ void Scene::properties_cameras(Properties& props) {
             get_active_camera()->properties(props);
         }
         if (props.is_ui() && aabb.is_valid() &&
-            props.config_bool("Fit AABB", "Rotates and moves the camera to fit the scene AABB.")) {
+            props.config_bool("fit aabb", "Rotates and moves the camera to fit the scene AABB.")) {
             get_active_camera()->look_at_bounding_box(aabb);
         }
     }
@@ -751,7 +751,7 @@ void Scene::properties_explorer(Properties& props) {
         properties_meshes(props);
         props.st_end_child();
     }
-    if (props.st_begin_child("mesh_groups", fmt::format("Mesh Groups ({})", mesh_groups.size()))) {
+    if (props.st_begin_child("mesh groups", fmt::format("Mesh Groups ({})", mesh_groups.size()))) {
         properties_mesh_groups(props);
         props.st_end_child();
     }
@@ -759,11 +759,11 @@ void Scene::properties_explorer(Properties& props) {
         properties_graph(props);
         props.st_end_child();
     }
-    if (props.st_begin_child("material_system", "Material System")) {
+    if (props.st_begin_child("material system", "Material System")) {
         material_system->properties(props);
         props.st_end_child();
     }
-    if (props.st_begin_child("texture_manager", "Texture Manager")) {
+    if (props.st_begin_child("texture manager", "Texture Manager")) {
         get_texture_manager()->properties(props);
         props.st_end_child();
     }
@@ -771,21 +771,21 @@ void Scene::properties_explorer(Properties& props) {
 
 void Scene::properties_settings(Properties& props) {
     bool pretransform = get_pretransform_animated();
-    if (props.config_bool("Pretransform Animated", pretransform)) {
+    if (props.config_bool("pretransform animated", pretransform)) {
         set_pretransform_animated(pretransform);
     }
-    props.config_percent("BLAS Rebuild Fraction", blas_rebuild_fraction);
+    props.config_percent("blas rebuild fraction", blas_rebuild_fraction);
 
     props.st_separate("Micromaps");
     if (micromaps && Micromaps::is_opacity_supported(context)) {
-        props.config_bool("Opacity Micromaps", opacity_micromaps_enabled,
+        props.config_bool("opacity micromaps", opacity_micromaps_enabled,
                           "Settle alpha-tested hits during traversal instead of invoking the alpha "
                           "test");
     } else {
         props.output_text("opacity micromaps: not supported by the device");
     }
     if (micromaps) {
-        props.config_bool("Emission Micromaps", emission_micromaps_enabled,
+        props.config_bool("emission micromaps", emission_micromaps_enabled,
                           "Draw light samples on an emissive triangle only where its emission "
                           "texture emits");
         micromaps->properties(props);
@@ -793,11 +793,11 @@ void Scene::properties_settings(Properties& props) {
 
     props.st_separate("Material System");
     float alpha_threshold = material_system->get_alpha_test_threshold();
-    if (props.config_float("Alpha Test Threshold", alpha_threshold, "", 0.01F)) {
+    if (props.config_float("alpha test threshold", alpha_threshold, "", 0.01F)) {
         material_system->set_alpha_test_threshold(alpha_threshold);
     }
     bool clamp_normals = material_system->get_clamp_normals();
-    if (props.config_bool("Clamp Normals", clamp_normals,
+    if (props.config_bool("clamp normals", clamp_normals,
                           "Hint the materials to clamp their normals to prevent artifacts when "
                           "using normal maps")) {
         material_system->set_clamp_normals(clamp_normals);
@@ -859,17 +859,16 @@ void Scene::process_pending_env_load(const CommandBufferHandle& cmd) {
 
 void Scene::properties_env(Properties& props) {
     static const std::vector<std::string> kinds = {"Empty", "LatLong", "CubeMap", "EqualAreaOct"};
-    const bool selection_changed = props.config_options("Type", env_ui.selection, kinds);
+    const bool selection_changed = props.config_options("type", env_ui.selection, kinds);
 
     bool paths_changed = false;
     if (env_ui.selection == 1 || env_ui.selection == 3) {
-        paths_changed |= props.config_text("Path", env_ui.latlong_path, props.is_ui());
+        paths_changed |= props.config_path("path", env_ui.latlong_path);
     } else if (env_ui.selection == 2) {
         static constexpr std::array<const char*, 6> face_labels = {"rt (+X)", "bk (+Y)", "lf (-X)",
                                                                    "ft (-Y)", "up (+Z)", "dn (-Z)"};
         for (int i = 0; i < 6; ++i) {
-            paths_changed |=
-                props.config_text(face_labels[i], env_ui.cubemap_paths[i], props.is_ui());
+            paths_changed |= props.config_path(face_labels[i], env_ui.cubemap_paths[i]);
         }
     }
 
@@ -913,7 +912,7 @@ void Scene::properties_volume(Properties& props) {
     // the volume can also be set by the scene implementation, so the current type is the state
     int selection = exterior_volume->get_type_name() == "merian::Fog" ? 1 : 0;
 
-    if (props.config_options("Type", selection, kinds)) {
+    if (props.config_options("type", selection, kinds)) {
         if (selection == 1) {
             const auto fog = std::make_shared<FogVolume>();
             // optical depth of about one across the scene, so the fog shows at any scene scale
@@ -1797,8 +1796,9 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
     }
 }
 
-void Scene::ensure_micromaps(const CommandBufferHandle& cmd,
-                             const ShaderObjectAllocatorHandle& obj_allocator) {
+void Scene::ensure_micromaps(Submission& submission,
+                             const ShaderObjectAllocatorHandle& obj_allocator,
+                             const bool complete) {
     if (!micromaps) {
         return;
     }
@@ -1853,7 +1853,7 @@ void Scene::ensure_micromaps(const CommandBufferHandle& cmd,
     }
 
     std::vector<MeshID> changed;
-    micromaps->update(cmd, baked, material_system, changed, obj_allocator);
+    micromaps->update(submission, baked, material_system, changed, obj_allocator, complete);
 
     for (const MeshID mesh_id : changed) {
         if (mesh_id >= mesh_to_group.size() || mesh_to_group[mesh_id] == MESH_GROUP_ID_INVALID) {
@@ -1861,18 +1861,15 @@ void Scene::ensure_micromaps(const CommandBufferHandle& cmd,
         }
         MeshGroup& group = mesh_groups[mesh_to_group[mesh_id]];
         if (group.blas) {
-            cmd->keep_until_pool_reset(std::move(group.blas));
+            submission.get_cmd()->keep_until_pool_reset(std::move(group.blas));
         }
         group.cached_blas_size_info.reset();
         group.blas_dirty = true;
     }
 }
 
-void Scene::build_blas(const CommandBufferHandle& cmd,
-                       const ShaderObjectAllocatorHandle& obj_allocator) {
+void Scene::build_blas(const CommandBufferHandle& cmd) {
     MERIAN_PROFILE_SCOPE_GPU(cmd, "Scene::build_blas");
-
-    ensure_micromaps(cmd, obj_allocator);
 
     blas_geometries.assign(mesh_groups.size(), {});
 
@@ -1953,8 +1950,8 @@ void Scene::build_blas(const CommandBufferHandle& cmd,
         as_builder.queue_build(blas_geometry.geometries, blas_geometry.ranges, group.blas,
                                size_info, group.blas_build_flags);
         group.blas_dirty = false;
-        group.blas_last_built_frame = current_frame;
-        group.blas_last_updated_frame = current_frame;
+        group.blas_last_built_update = update_count;
+        group.blas_last_updated_update = update_count;
         frame_stats.blas_builds++;
         if (static_geometry)
             frame_stats.blas_builds_static++;
@@ -1971,8 +1968,8 @@ void Scene::build_blas(const CommandBufferHandle& cmd,
         if (rebuild_count < eligible_count) {
             std::sort(update_eligible.begin(), update_eligible.end(),
                       [&](MeshGroupID a, MeshGroupID b) {
-                          return mesh_groups[a].blas_last_built_frame <
-                                 mesh_groups[b].blas_last_built_frame;
+                          return mesh_groups[a].blas_last_built_update <
+                                 mesh_groups[b].blas_last_built_update;
                       });
         }
 
@@ -1997,7 +1994,7 @@ void Scene::build_blas(const CommandBufferHandle& cmd,
                 }
                 as_builder.queue_build(blas_geometry.geometries, blas_geometry.ranges, group.blas,
                                        size_info, group.blas_build_flags);
-                group.blas_last_built_frame = current_frame;
+                group.blas_last_built_update = update_count;
                 frame_stats.blas_builds++;
                 frame_stats.blas_builds_dynamic++;
             } else {
@@ -2006,7 +2003,7 @@ void Scene::build_blas(const CommandBufferHandle& cmd,
                 frame_stats.blas_updates++;
             }
             group.blas_dirty = false;
-            group.blas_last_updated_frame = current_frame;
+            group.blas_last_updated_update = update_count;
         }
     }
 
@@ -2104,13 +2101,17 @@ void Scene::build_tlas(const CommandBufferHandle& cmd) {
     as_builder.get_cmds_tlas(cmd, as_scratch_buffer);
 }
 
-void Scene::update(const CommandBufferHandle& cmd,
+void Scene::update(Submission& submission,
                    const float time,
                    const float time_diff,
                    const uint32_t frame,
+                   const uint32_t seed,
                    const ShaderObjectAllocatorHandle& obj_allocator_in) {
+    // follows the submissions the micromap bake splits off
+    const CommandBufferHandle& cmd = submission.get_cmd();
     MERIAN_PROFILE_SCOPE_GPU(cmd, "Scene::update");
-    current_frame = frame;
+    update_count++;
+    starting_run |= frame == 0;
     frame_stats = {};
 
     if (!obj_allocator_in && !fallback_obj_allocator) {
@@ -2187,13 +2188,6 @@ void Scene::update(const CommandBufferHandle& cmd,
         n.prev_global_inverse_transposed = n.global_inverse_transposed;
     }
 
-    // changes at regroup, or updated mesh (buffer address), or if material ids change -> run every
-    // frame.
-    upload_geometry_data(cmd);
-
-    frame_stats.geometry_data_bytes = geometries.size() * sizeof(GeometryData);
-    frame_stats.transform_data_bytes = instance_transforms.size() * sizeof(float4x4) * 4;
-
     cmd->barrier(vk::MemoryBarrier2{
         vk::PipelineStageFlagBits2::eTransfer | vk::PipelineStageFlagBits2::eComputeShader,
         vk::AccessFlagBits2::eTransferWrite | vk::AccessFlagBits2::eShaderWrite,
@@ -2202,8 +2196,20 @@ void Scene::update(const CommandBufferHandle& cmd,
     });
 
     if (as_supported) {
-        // binds the material system object, every write to it must precede this
-        build_blas(cmd, obj_allocator);
+        // binds the material system object, every write to it must precede this; before the
+        // geometry data, which carries the emission micromaps
+        ensure_micromaps(submission, obj_allocator, starting_run);
+    }
+
+    // changes at regroup, or updated mesh (buffer address), or if material ids change -> run every
+    // frame.
+    upload_geometry_data(cmd);
+
+    frame_stats.geometry_data_bytes = geometries.size() * sizeof(GeometryData);
+    frame_stats.transform_data_bytes = instance_transforms.size() * sizeof(float4x4) * 4;
+
+    if (as_supported) {
+        build_blas(cmd);
 
         tlas_dirty |= needs_regroup || transforms_changed;
         if (tlas_dirty || !tlas) {
@@ -2237,6 +2243,12 @@ void Scene::update(const CommandBufferHandle& cmd,
     const auto cam = get_active_camera();
     assert(cam);
 
+    if (starting_run) {
+        prev_active_camera = *cam;
+        lights.clear_learned_state();
+        starting_run = false;
+    }
+
     // the thin lens hint must be settled before the shader object is fetched below
     if (const bool thin_lens = cam->get_aperture_radius() > 0.f; thin_lens != thin_lens_enabled) {
         set_enable_thin_lens(thin_lens);
@@ -2246,6 +2258,7 @@ void Scene::update(const CommandBufferHandle& cmd,
     auto c = shader_object->get_cursor();
 
     c["frame"] = frame;
+    c["seed"] = seed;
     c["prev_geometry_remap_count"] = static_cast<uint32_t>(prev_geometry_remap.size());
     c["time"] = get_time(time);
     c["time_diff"] = time_diff;
@@ -2254,7 +2267,7 @@ void Scene::update(const CommandBufferHandle& cmd,
     // prev_active_camera still holds last frame's pose here (updated below).
     last_update_changes.camera_changed = !(*cam == prev_active_camera);
 
-    cam->advance_jitter(frame);
+    cam->advance_jitter(frame, seed);
 
     prev_active_camera.write_to(c["prev_camera"]);
     cam->write_to(c["camera"]);

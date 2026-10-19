@@ -5,25 +5,32 @@
             "required": true
         }
     },
-    "graph_properties": {
-        "time source": "Auto"
-    },
+    "include": [
+        "parts/mixins.json"
+    ],
     "nodes": {
-        "blit": {
+        "display": {
             "enabled": true,
-            "outputs": [
-                "canvas->imgui.canvas"
-            ],
             "type": "Swapchain Blit"
         },
-        "imgui": {
+        "output": {
             "enabled": true,
-            "type": "ImGui"
+            "outputs": [
+                "canvas->display.canvas"
+            ],
+            "properties": {
+                "on close": {
+                    "remove node": false,
+                    "send event": true
+                },
+                "present mode": "Fifo"
+            },
+            "type": "Window"
         },
         "tonemap": {
             "enabled": true,
             "outputs": [
-                "out->blit.src"
+                "out->display.src"
             ],
             "properties": {
                 "tonemap": "Clamp"
@@ -39,24 +46,7 @@
                 "loop": true,
                 "path": ""
             },
-            "type": "Video Read"
-        },
-        "window": {
-            "enabled": true,
-            "outputs": [
-                "canvas->blit.canvas",
-                "window->imgui.window"
-            ],
-            "properties": {
-                "blit mode": "FIT",
-                "on_should_close_actions": {
-                    "remove node": false,
-                    "send sigint": true,
-                    "send sigterm": false
-                },
-                "present mode": "Fifo"
-            },
-            "type": "Window"
+            "type": "Video Source"
         }
     },
     "version": 4

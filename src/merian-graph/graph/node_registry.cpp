@@ -3,6 +3,7 @@
 #include "merian-graph/plugin/node_plugin.hpp"
 #include "merian/plugin/plugins.hpp"
 
+#include <fmt/ranges.h>
 #include <spdlog/spdlog.h>
 
 #include "merian-graph/nodes/ab_compare/ab_compare.hpp"
@@ -12,33 +13,37 @@
 #include "merian-graph/nodes/dlss/dlss_node.hpp"
 #include "merian-graph/nodes/error_plot/error_plot.hpp"
 #include "merian-graph/nodes/exposure/exposure.hpp"
-#include "merian-graph/nodes/fbx_scene/fbx_scene_node.hpp"
 #include "merian-graph/nodes/fxaa/fxaa.hpp"
 #include "merian-graph/nodes/gbuffer_debug/gbuffer_debug.hpp"
 #include "merian-graph/nodes/gbuffer_rt/gbuffer.hpp"
-#include "merian-graph/nodes/gltf_scene/gltf_scene_node.hpp"
 #include "merian-graph/nodes/guiding/mcpg/mcpg_guiding_node.hpp"
 #include "merian-graph/nodes/guiding/mcpg_distance/mcpg_distance_guiding_node.hpp"
 #include "merian-graph/nodes/guiding/ssmm/ssmm_guiding_node.hpp"
-#include "merian-graph/nodes/image_read/hdr_image.hpp"
-#include "merian-graph/nodes/image_read/ldr_image.hpp"
-#include "merian-graph/nodes/image_write/image_write.hpp"
+#include "merian-graph/nodes/host_sink/host_buffer_sink.hpp"
+#include "merian-graph/nodes/host_sink/host_image_sink.hpp"
+#include "merian-graph/nodes/host_source/host_buffer_source.hpp"
+#include "merian-graph/nodes/host_source/host_image_source.hpp"
+#include "merian-graph/nodes/image_sink/image_sink.hpp"
+#include "merian-graph/nodes/image_source/hdr_image_source.hpp"
+#include "merian-graph/nodes/image_source/ldr_image_source.hpp"
 #include "merian-graph/nodes/imgui/imgui_node.hpp"
 #include "merian-graph/nodes/mean/mean.hpp"
 #include "merian-graph/nodes/median_approx/median.hpp"
 #include "merian-graph/nodes/path_debug/path_debug.hpp"
-#include "merian-graph/nodes/pbrt_scene/pbrt_scene_node.hpp"
 #include "merian-graph/nodes/reduce/reduce.hpp"
 #include "merian-graph/nodes/render_pt/render_pt.hpp"
 #include "merian-graph/nodes/render_restir_di/render_restir_di.hpp"
 #include "merian-graph/nodes/render_restir_pt/render_restir_pt.hpp"
+#include "merian-graph/nodes/scene_file/fbx_scene_node.hpp"
+#include "merian-graph/nodes/scene_file/gltf_scene_node.hpp"
+#include "merian-graph/nodes/scene_file/pbrt_scene_node.hpp"
 #include "merian-graph/nodes/shadertoy/shadertoy.hpp"
 #include "merian-graph/nodes/svgf/svgf.hpp"
 #include "merian-graph/nodes/swapchain_blit/swapchain_blit.hpp"
 #include "merian-graph/nodes/taa/taa.hpp"
 #include "merian-graph/nodes/tonemap/tonemap.hpp"
-#include "merian-graph/nodes/video_read/video_read.hpp"
-#include "merian-graph/nodes/video_write/video_write.hpp"
+#include "merian-graph/nodes/video_sink/video_sink.hpp"
+#include "merian-graph/nodes/video_source/video_source.hpp"
 #include "merian-graph/nodes/vkdt_filmcurv/vkdt_filmcurv.hpp"
 #include "merian-graph/nodes/window/window_node.hpp"
 
@@ -89,9 +94,16 @@ NodeRegistry::NodeRegistry() {
     register_node_type<FBXSceneNode>("FBX Scene", "Loads an FBX scene file.");
     register_node_type<PBRTSceneNode>("PBRT Scene", "Loads a pbrt-v4 scene file.");
     register_node_type<WindowNode>("Window", "Outputs to a window.");
-    register_node_type<HDRImageRead>("HDR Image", "Loads an HDR image.");
-    register_node_type<LDRImageRead>("LDR Image", "Loads a LDR image.");
-    register_node_type<ImageWrite>("Image Write", "Stores a graph output as image file.");
+    register_node_type<HDRImageSource>("HDR Image Source", "Loads an HDR image.");
+    register_node_type<LDRImageSource>("LDR Image Source", "Loads a LDR image.");
+    register_node_type<ImageSink>("Image Sink", "Stores a graph output as image file.");
+    register_node_type<HostImageSink>("Host Image Sink", "Copies images to host memory.");
+    register_node_type<HostBufferSink>("Host Buffer Sink",
+                                       "Copies bytes of a buffer to host memory.");
+    register_node_type<HostImageSource>("Host Image Source",
+                                        "Outputs an image uploaded by the host.");
+    register_node_type<HostBufferSource>("Host Buffer Source",
+                                         "Outputs bytes uploaded by the host.");
     register_node_type<ImGuiNode>("ImGui",
                                   "Renders ImGui draw callbacks onto a window's canvas, in place.");
     register_node_type<MeanToBuffer>(
@@ -134,10 +146,10 @@ NodeRegistry::NodeRegistry() {
                                       "Blits a graph image onto a Window node's canvas, in place.");
     register_node_type<TAA>("TAA", "Temporal Anti-Aliasing.");
     register_node_type<Tonemap>("Tonemap", "Convert a HDR image to LDR using various tonemaps.");
-    register_node_type<VideoRead>("Video Read",
-                                  "Decodes a video file with the Vulkan hardware decoder.");
-    register_node_type<VideoWrite>("Video Write",
-                                   "Encodes a graph output with the Vulkan hardware encoder.");
+    register_node_type<VideoSource>("Video Source",
+                                    "Decodes a video file with the Vulkan hardware decoder.");
+    register_node_type<VideoSink>("Video Sink",
+                                  "Encodes a graph output with the Vulkan hardware encoder.");
     register_node_type<VKDTFilmcurv>("Curves", "Adjust brightness and contrast. Ported from VKDT.");
 
     register_node<Reduce>(
@@ -190,6 +202,15 @@ NodeRegistry::NodeRegistry() {
               "(1.0 - current_value.a)) / max(current_value.a + accumulator.a * (1.0 - "
               "current_value.a), 1e-8), current_value.a + accumulator.a * (1.0 - "
               "current_value.a))"}}));
+}
+
+void NodeRegistry::load_config(const NodeHandle& node, const nlohmann::json& config) {
+    std::vector<std::string> problems;
+    // not in a graph yet
+    std::ignore = node->load_config(config, problems);
+    if (!problems.empty()) {
+        throw std::invalid_argument{fmt::format("{}", fmt::join(problems, "; "))};
+    }
 }
 
 } // namespace merian

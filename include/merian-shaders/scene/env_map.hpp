@@ -43,12 +43,12 @@ class EnvMap {
     // Yaw/pitch UI; subclasses can extend to expose more state.
     virtual void properties(Properties& props) {
         bool changed = false;
-        changed |= props.config_angle("Yaw", yaw_rad);
-        changed |= props.config_angle("Pitch", pitch_rad, "", -90, 90);
+        changed |= props.config_angle("yaw", yaw_rad);
+        changed |= props.config_angle("pitch", pitch_rad, "", -90, 90);
         if (changed) {
             rebuild_transform();
         }
-        if (props.config_float("Intensity", intensity, "", 0.01f, 0.f)) {
+        if (props.config_float("intensity", intensity, "", 0.01f, 0.f)) {
             ++version;
         }
     }

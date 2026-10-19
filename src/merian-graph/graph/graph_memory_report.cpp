@@ -22,7 +22,7 @@ constexpr std::string_view FREE = "·";
 constexpr std::string_view PEAK = "▶";
 constexpr std::array<std::string_view, 8> LEFT_EIGHTHS = {"", "▏", "▎", "▍", "▌", "▋", "▊", "▉"};
 
-constexpr size_t SIZE_WIDTH = 9;
+constexpr size_t SIZE_COLUMN_WIDTH = 9;
 constexpr size_t LAYER_WIDTH = 3;
 constexpr uint32_t GAUGE_WIDTH = 32;
 constexpr uint32_t WHERE_WIDTH = 20;
@@ -69,7 +69,7 @@ std::string repeat(const std::string_view text, const size_t count) {
     return repeated;
 }
 
-std::string size_cell(const vk::DeviceSize size, const size_t width = SIZE_WIDTH) {
+std::string size_cell(const vk::DeviceSize size, const size_t width = SIZE_COLUMN_WIDTH) {
     return size == 0 ? align_right(FREE, width) : align_right(format_size(size), width);
 }
 
@@ -187,7 +187,7 @@ std::string layer_nodes(const GraphMemoryReport& report, const uint32_t position
     return fmt::format("{}", fmt::join(report.layers[position % report.layer_count], ", "));
 }
 
-std::string_view port_name(const std::string& node, const std::string& output) {
+std::string_view connector_name(const std::string& node, const std::string& output) {
     if (output.size() > node.size() && output.starts_with(node) && output[node.size()] == '.') {
         return std::string_view(output).substr(node.size() + 1);
     }
@@ -203,7 +203,7 @@ std::string_view kind(const bool scratch, const bool persistent) {
 
 std::unordered_map<std::string_view, std::string> node_prefixes(const GraphMemoryReport& report) {
     std::unordered_set<std::string_view> nodes;
-    for (const GraphMemoryReport::Placed& entry : report.placed) {
+    for (const GraphMemoryReport::Transient& entry : report.transient) {
         nodes.insert(entry.node);
     }
     std::unordered_map<std::string_view, std::string> prefixes;
@@ -226,7 +226,18 @@ std::unordered_map<std::string_view, std::string> node_prefixes(const GraphMemor
 
 } // namespace
 
-std::string GraphMemoryReport::format_summary() const {
+vk::DeviceSize GraphMemoryReport::total_size() const {
+    vk::DeviceSize size = 0;
+    for (const Block& block : blocks) {
+        size += block.size;
+    }
+    for (const NodeAllocation& node : node_allocations) {
+        size += node.size;
+    }
+    return size;
+}
+
+std::string GraphMemoryReport::summary_text() const {
     vk::DeviceSize block_size = 0;
     vk::DeviceSize output_size = 0;
     for (const Block& block : blocks) {
@@ -276,7 +287,7 @@ std::string GraphMemoryReport::format_summary() const {
     return text;
 }
 
-std::string GraphMemoryReport::format_nodes() const {
+std::string GraphMemoryReport::nodes_text() const {
     enum Column : uint8_t { OWN, TRANSIENT, PERSISTENT, EXCLUSIVE, TOTAL, COLUMN_COUNT };
     constexpr std::array<std::string_view, COLUMN_COUNT> column_names = {
         "own", "transient", "persistent", "exclusive", "total"};
@@ -292,7 +303,7 @@ std::string GraphMemoryReport::format_nodes() const {
         row_for_node.try_emplace(allocation.node, rows.size());
         rows.push_back({allocation.node, {allocation.size}});
     }
-    for (const Placed& entry : placed) {
+    for (const Transient& entry : transient) {
         rows[row_for_node.at(entry.node)].sizes[entry.persistent ? PERSISTENT : TRANSIENT] +=
             entry.placement.size;
     }
@@ -340,7 +351,7 @@ std::string GraphMemoryReport::format_nodes() const {
     return text;
 }
 
-std::string GraphMemoryReport::format_layers() const {
+std::string GraphMemoryReport::layers_text() const {
     const auto peak = std::ranges::max_element(in_use);
     if (peak == in_use.end()) {
         return {};
@@ -352,14 +363,15 @@ std::string GraphMemoryReport::format_layers() const {
     }
 
     constexpr size_t label_width = LAYER_WIDTH + 2;
-    std::string text = fmt::format(
-        "{}  {}  {}  nodes\n", align_left("layer", label_width), align_right("in use", SIZE_WIDTH),
-        align_left(fmt::format("of {}", format_size(block_size)), GAUGE_WIDTH));
+    std::string text =
+        fmt::format("{}  {}  {}  nodes\n", align_left("layer", label_width),
+                    align_right("in use", SIZE_COLUMN_WIDTH),
+                    align_left(fmt::format("of {}", format_size(block_size)), GAUGE_WIDTH));
     for (uint32_t position = 0; position < in_use.size(); position++) {
         const uint32_t layer = position % layer_count;
         if (period > 1 && layer == 0) {
             text += titled_rule(fmt::format("iteration {}", position / layer_count),
-                                label_width + SIZE_WIDTH + GAUGE_WIDTH + 4) +
+                                label_width + SIZE_COLUMN_WIDTH + GAUGE_WIDTH + 4) +
                     "\n";
         }
         const double fraction =
@@ -371,8 +383,8 @@ std::string GraphMemoryReport::format_layers() const {
     return text;
 }
 
-std::string GraphMemoryReport::format_outputs() const {
-    if (placed.empty() && exclusive.empty()) {
+std::string GraphMemoryReport::outputs_text() const {
+    if (transient.empty() && exclusive.empty()) {
         return {};
     }
     const bool several_blocks = blocks.size() > 1;
@@ -380,19 +392,19 @@ std::string GraphMemoryReport::format_outputs() const {
     for (const NodeAllocation& node : node_allocations) {
         name_width = std::max(name_width, text_width(node.node));
     }
-    for (const Placed& entry : placed) {
-        name_width = std::max(name_width, 2 + text_width(port_name(entry.node, entry.output)));
+    for (const Transient& entry : transient) {
+        name_width = std::max(name_width, 2 + text_width(connector_name(entry.node, entry.output)));
     }
     for (const Exclusive& entry : exclusive) {
-        name_width = std::max(name_width, 2 + text_width(port_name(entry.node, entry.output)));
+        name_width = std::max(name_width, 2 + text_width(connector_name(entry.node, entry.output)));
     }
     const auto row = [&](const std::string_view name, const vk::DeviceSize size) {
         return fmt::format("  {} {}  ", align_left(std::string(name), name_width - 2),
                            size_cell(size));
     };
 
-    std::string text =
-        fmt::format("{} {}  ", align_left("output", name_width), align_right("size", SIZE_WIDTH));
+    std::string text = fmt::format("{} {}  ", align_left("output", name_width),
+                                   align_right("size", SIZE_COLUMN_WIDTH));
     if (!blocks.empty()) {
         text += several_blocks ? "block  " + axis("start", "end", WHERE_WIDTH)
                                : " " + axis(blocks.front().size, WHERE_WIDTH);
@@ -401,10 +413,10 @@ std::string GraphMemoryReport::format_outputs() const {
     text += "\n";
 
     for (const NodeAllocation& node : node_allocations) {
-        std::vector<const Placed*> node_placed;
-        for (const Placed& entry : placed) {
+        std::vector<const Transient*> node_transient;
+        for (const Transient& entry : transient) {
             if (entry.node == node.node) {
-                node_placed.push_back(&entry);
+                node_transient.push_back(&entry);
             }
         }
         std::vector<const Exclusive*> node_exclusive;
@@ -413,18 +425,18 @@ std::string GraphMemoryReport::format_outputs() const {
                 node_exclusive.push_back(&entry);
             }
         }
-        if (node_placed.empty() && node_exclusive.empty()) {
+        if (node_transient.empty() && node_exclusive.empty()) {
             continue;
         }
-        std::ranges::sort(node_placed, [](const Placed* a, const Placed* b) {
+        std::ranges::sort(node_transient, [](const Transient* a, const Transient* b) {
             return std::tie(a->placement.block_index, a->output) <
                    std::tie(b->placement.block_index, b->output);
         });
 
         text += node.node + "\n";
-        for (const Placed* entry : node_placed) {
+        for (const Transient* entry : node_transient) {
             const TransientMemoryAllocator::Placement& placement = entry->placement;
-            text += row(port_name(entry->node, entry->output), placement.size);
+            text += row(connector_name(entry->node, entry->output), placement.size);
             if (several_blocks) {
                 text += fmt::format("{:>5}  ", placement.block_index);
             }
@@ -435,7 +447,7 @@ std::string GraphMemoryReport::format_outputs() const {
                                 kind(entry->scratch, entry->persistent));
         }
         for (const Exclusive* entry : node_exclusive) {
-            text += row(port_name(entry->node, entry->output), entry->fallback.size);
+            text += row(connector_name(entry->node, entry->output), entry->fallback.size);
             text += fmt::format("exclusive · {}{}\n", reason_name(entry->fallback.reason),
                                 kind(entry->scratch, false));
         }
@@ -443,7 +455,7 @@ std::string GraphMemoryReport::format_outputs() const {
     return text;
 }
 
-std::string GraphMemoryReport::format_blocks() const {
+std::string GraphMemoryReport::blocks_text() const {
     if (layer_count == 0) {
         return {};
     }
@@ -453,8 +465,8 @@ std::string GraphMemoryReport::format_blocks() const {
     std::string text;
     for (uint32_t block_index = 0; block_index < blocks.size(); block_index++) {
         const Block& block = blocks[block_index];
-        std::vector<const Placed*> entries;
-        for (const Placed& entry : placed) {
+        std::vector<const Transient*> entries;
+        for (const Transient& entry : transient) {
             if (entry.placement.block_index == block_index) {
                 entries.push_back(&entry);
             }
@@ -469,7 +481,7 @@ std::string GraphMemoryReport::format_blocks() const {
                             block_index == 0 ? "" : "\n", block_index, format_size(block.size),
                             block.memory_type_index, format_size(cell_begin(1)));
         text += fmt::format("{}{}  {}  nodes\n", align_left("layer", indent.size() + 1),
-                            axis(block.size, MAP_WIDTH), align_right("in use", SIZE_WIDTH));
+                            axis(block.size, MAP_WIDTH), align_right("in use", SIZE_COLUMN_WIDTH));
 
         // 1. rows, a cell shows the output covering most of it
         std::vector<std::string> rows;
@@ -479,7 +491,7 @@ std::string GraphMemoryReport::format_blocks() const {
             std::vector<vk::DeviceSize> most_covered(MAP_WIDTH, 0);
             vk::DeviceSize alive_size = 0;
             for (uint32_t index = 0; index < entries.size(); index++) {
-                const Placed& entry = *entries[index];
+                const Transient& entry = *entries[index];
                 if (!entry.lifetime.contains(position)) {
                     continue;
                 }
@@ -545,7 +557,7 @@ std::string GraphMemoryReport::format_blocks() const {
         for (uint32_t labeled = MAP_WIDTH; labeled-- > 0;) {
             const std::vector<uint32_t>& at_cell = entries_at_cell[labeled];
             for (uint32_t i = 0; i < at_cell.size(); i++) {
-                const Placed& entry = *entries[at_cell[i]];
+                const Transient& entry = *entries[at_cell[i]];
                 std::string line = indent + " ";
                 for (uint32_t cell = 0; cell < labeled; cell++) {
                     line += entries_at_cell[cell].empty() ? " " : "│";
@@ -558,18 +570,82 @@ std::string GraphMemoryReport::format_blocks() const {
     return text;
 }
 
-std::string format_as(const GraphMemoryReport& report) {
-    std::string text = report.format_summary();
+std::string GraphMemoryReport::to_text(const View view) const {
+    switch (view) {
+    case View::SUMMARY:
+        return summary_text();
+    case View::NODES:
+        return nodes_text();
+    case View::LAYERS:
+        return layers_text();
+    case View::OUTPUTS:
+        return outputs_text();
+    case View::BLOCKS:
+        return blocks_text();
+    }
+    return {};
+}
+
+std::string GraphMemoryReport::to_text() const {
+    std::string text = summary_text();
     const auto section = [&](const std::string_view title, const std::string& body) {
         if (!body.empty()) {
             text += fmt::format("\n{}\n{}", title, body);
         }
     };
-    section("Nodes", report.format_nodes());
-    section("Layers", report.format_layers());
-    section("Outputs", report.format_outputs());
-    section("Blocks", report.format_blocks());
+    section("Nodes", nodes_text());
+    section("Layers", layers_text());
+    section("Outputs", outputs_text());
+    section("Blocks", blocks_text());
     return text;
+}
+
+nlohmann::json GraphMemoryReport::to_json() const {
+    const auto positions = [](const TransientMemoryAllocator::Lifetime& lifetime) {
+        nlohmann::json in_use = nlohmann::json::array();
+        for (uint32_t position = 0; position < lifetime.get_positions(); position++) {
+            if (lifetime.contains(position)) {
+                in_use.push_back(position);
+            }
+        }
+        return in_use;
+    };
+
+    nlohmann::json json = {
+        {"total_size", total_size()}, {"layer_count", layer_count}, {"period", period},
+        {"aliasing", aliasing},       {"layers", layers},           {"in_use", in_use},
+    };
+    nlohmann::json& json_blocks = json["blocks"] = nlohmann::json::array();
+    for (const Block& block : blocks) {
+        json_blocks.push_back({{"memory_type_index", block.memory_type_index},
+                               {"size", block.size},
+                               {"requested_size", block.requested_size}});
+    }
+    nlohmann::json& json_transient = json["transient"] = nlohmann::json::array();
+    for (const Transient& entry : transient) {
+        json_transient.push_back({{"node", entry.node},
+                                  {"output", entry.output},
+                                  {"scratch", entry.scratch},
+                                  {"persistent", entry.persistent},
+                                  {"block", entry.placement.block_index},
+                                  {"offset", entry.placement.offset},
+                                  {"size", entry.placement.size},
+                                  {"aliased", entry.placement.aliased},
+                                  {"in_use", positions(entry.lifetime)}});
+    }
+    nlohmann::json& json_exclusive = json["exclusive"] = nlohmann::json::array();
+    for (const Exclusive& entry : exclusive) {
+        json_exclusive.push_back({{"node", entry.node},
+                                  {"output", entry.output},
+                                  {"scratch", entry.scratch},
+                                  {"size", entry.fallback.size},
+                                  {"reason", reason_name(entry.fallback.reason)}});
+    }
+    nlohmann::json& json_nodes = json["node_allocations"] = nlohmann::json::array();
+    for (const NodeAllocation& allocation : node_allocations) {
+        json_nodes.push_back({{"node", allocation.node}, {"size", allocation.size}});
+    }
+    return json;
 }
 
 } // namespace merian

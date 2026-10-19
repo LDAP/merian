@@ -1,133 +1,79 @@
 #include "merian-graph/graph/graph.hpp"
 
+#include <algorithm>
 #include <spdlog/spdlog.h>
 
 namespace merian {
 
-void Graph::send_event(const std::string& event_name,
-                       const GraphEvent::Data& data,
-                       const bool notify_all) {
-    send_event(GraphEvent::Info{nullptr, "", "user", event_name}, data, notify_all);
+namespace {
+
+bool matches_any(const std::vector<GraphEvent::Pattern>& patterns, const GraphEvent::Info& info) {
+    return std::ranges::any_of(
+        patterns, [&](const GraphEvent::Pattern& pattern) { return pattern.matches(info); });
 }
 
-void Graph::register_event_listener(const std::string& event_pattern,
-                                    const GraphEvent::Listener& event_listener) {
-    user_event_pattern_listener.push_back(std::make_pair(event_pattern, event_listener));
+} // namespace
+
+void Graph::send_event(const std::string& event_name, const GraphEvent::Data& data) {
+    if (event_name.empty() || event_name.find('/') != std::string::npos) {
+        throw std::invalid_argument{fmt::format("invalid event name '{}'", event_name)};
+    }
+    send_event(GraphEvent::Info{"", "user", event_name}, data);
 }
 
-void Graph::register_event_listener_for_connect(const std::string& event_pattern,
+void Graph::register_event_listener_for_connect(const NodeHandle& node,
+                                                const std::vector<GraphEvent::Pattern>& patterns,
                                                 const GraphEvent::Listener& event_listener) {
-    split(event_pattern, ",", [&](const std::string& split_pattern) {
-        std::smatch match;
-        if (!std::regex_match(split_pattern, match, EVENT_REGEX)) {
-            SPDLOG_WARN("invalid event pattern '{}'", split_pattern);
-            return;
-        }
-        const std::string& node_name = match[1];
-        const std::string& node_identifier = match[2];
-        const std::string& event_name = match[3];
-
-        bool registered = false;
-        if (node_name.empty()) {
-            registered = true;
-            if (node_identifier.empty()) {
-                event_listeners["user"][event_name].emplace_back(event_listener);
-                event_listeners["graph"][event_name].emplace_back(event_listener);
-            } else if (node_identifier == "user" || node_identifier == "graph") {
-                event_listeners[node_identifier][event_name].emplace_back(event_listener);
-            } else {
-                registered = false;
-            }
-        }
-        for (const auto& [identifier, node] : node_for_identifier) {
-            if ((node_name.empty() || registry.node_type_name(node) == node_name) &&
-                (node_identifier.empty() || identifier == node_identifier)) {
-                event_listeners[identifier][event_name].emplace_back(event_listener);
-                registered = true;
-            }
-        }
-
-        if (registered) {
-            SPDLOG_DEBUG("registered listener for event pattern '{}'", split_pattern);
-        } else {
-            SPDLOG_WARN("no listener registered for event pattern '{}'. (no node type and node "
-                        "identifier matched)",
-                        split_pattern);
-        }
-    });
+    for (const GraphEvent::Pattern& pattern : patterns) {
+        warn_if_no_sender(pattern);
+    }
+    event_listeners.push_back({node, patterns, event_listener});
 }
 
-void Graph::send_graph_event(const std::string& event_name,
-                             const GraphEvent::Data& data,
-                             const bool notify_all) {
-    send_event(GraphEvent::Info{nullptr, "", "graph", event_name}, data, notify_all);
+void Graph::warn_if_no_sender(const GraphEvent::Pattern& pattern) const {
+    const auto sends = [&](const std::string& node_name, const std::string& identifier) {
+        return pattern.matches({node_name, identifier, pattern.event_name});
+    };
+    if (sends("", "user") || sends("", "graph") ||
+        std::ranges::any_of(node_for_identifier, [&](const auto& entry) {
+            return sends(node_data.at(entry.second).type_name, entry.first);
+        })) {
+        return;
+    }
+    SPDLOG_WARN("no node matches the event pattern '{}/{}/{}'", pattern.node_name,
+                pattern.identifier, pattern.event_name);
 }
 
-void Graph::send_event(const GraphEvent::Info& event_info,
-                       const GraphEvent::Data& data,
-                       const bool notify_all) const {
+void Graph::send_graph_event(const std::string& event_name, const GraphEvent::Data& data) {
+    send_event(GraphEvent::Info{"", "graph", event_name}, data);
+}
+
+void Graph::send_event(const GraphEvent::Info& event_info, const GraphEvent::Data& data) {
     assert(!event_info.event_name.empty() && "event name cannot be empty.");
     assert(!event_info.identifier.empty() && "identifier cannot be empty.");
     assert((event_info.event_name.find('/') == event_info.event_name.npos) &&
            "event name cannot contain '/'.");
 
-    SPDLOG_TRACE("sending event: {}/{}/{}, notify all={}", event_info.node_name,
-                 event_info.identifier, event_info.event_name, notify_all);
+    SPDLOG_TRACE("sending event: {}/{}/{}", event_info.node_name, event_info.identifier,
+                 event_info.event_name);
 
-    recent_events[fmt::format("{}/{}/{}", event_info.node_name, event_info.identifier,
-                              event_info.event_name)] = {total_iteration,
-                                                         std::chrono::steady_clock::now()};
-
-    const auto identifier_it = event_listeners.find(event_info.identifier);
-    if (identifier_it == event_listeners.end()) {
-        return;
+    std::string address =
+        fmt::format("{}/{}/{}", event_info.node_name, event_info.identifier, event_info.event_name);
+    if (!run_stop_event && matches_any(run_stop_patterns, event_info)) {
+        run_stop_event = address;
     }
+    recent_events[std::move(address)] = {run_iteration, std::chrono::steady_clock::now()};
 
-    // exact match
-    const auto event_it = identifier_it->second.find(event_info.event_name);
-    if (event_it != identifier_it->second.end()) {
-        if (notify_all) {
-            for (const auto& listener : event_it->second) {
-                listener(event_info, data);
-            }
-        } else {
-            for (const auto& listener : event_it->second) {
-                if (listener(event_info, data)) {
-                    break;
-                }
+    {
+        // a removal erases listeners, so it waits until all ran
+        const BusyScope busy_scope(*this);
+        for (const EventListener& listener : event_listeners) {
+            if (matches_any(listener.patterns, event_info)) {
+                listener.listener(event_info, data);
             }
         }
     }
-
-    // any
-    const auto event_any_it = identifier_it->second.find("");
-    if (event_any_it != identifier_it->second.end()) {
-        if (notify_all) {
-            for (const auto& listener : event_any_it->second) {
-                listener(event_info, data);
-            }
-        } else {
-            for (const auto& listener : event_any_it->second) {
-                if (listener(event_info, data)) {
-                    break;
-                }
-            }
-        }
-    }
-}
-
-void Graph::set_on_run_starting(
-    const std::function<void(const NodeProcessInfo& info)>& on_run_starting) {
-    this->on_run_starting = on_run_starting;
-}
-
-void Graph::set_on_pre_submit(
-    const std::function<void(const NodeProcessInfo& info)>& on_pre_submit) {
-    this->on_pre_submit = on_pre_submit;
-}
-
-void Graph::set_on_post_submit(const std::function<void()>& on_post_submit) {
-    this->on_post_submit = on_post_submit;
+    apply_deferred_edits();
 }
 
 } // namespace merian

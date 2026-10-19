@@ -123,7 +123,6 @@ Accumulate::on_connected(const NodeIOLayout& io_layout,
             for (auto* kernel : {&percentile_kernel, &accumulate_kernel}) {
                 (*kernel)->reload(std::any_cast<bool>(force), compile_context);
             }
-            return true;
         });
 
     percentile_group_count_x =
@@ -169,7 +168,8 @@ Accumulate::on_connected(const NodeIOLayout& io_layout,
 [[nodiscard]] Accumulate::NodeStatusFlags
 Accumulate::process(const NodeIO& io, const NodeProcessInfo& info, Submission& submission) {
     const CommandBufferHandle& cmd = submission.get_cmd();
-    accumulate_pc.iteration = info.get_total_iteration();
+    accumulate_pc.iteration = static_cast<uint32_t>(info.get_iteration());
+    accumulate_pc.seed = io.get_seed();
 
     if (accumulate_pc.firefly_filter_enable == VK_TRUE ||
         accumulate_pc.adaptive_alpha_reduction > 0.0f) {
@@ -267,7 +267,7 @@ Accumulate::NodeStatusFlags Accumulate::properties(Properties& config) {
 
     config.config_float("firefly filter bias", accumulate_pc.firefly_bias,
                         "Adds this value to the maximum allowed luminance.", 0.1);
-    config.config_float("IPR factor", accumulate_pc.firefly_ipr_factor,
+    config.config_float("ipr factor", accumulate_pc.firefly_ipr_factor,
                         "Inter-percentile range factor. Increase to allow higher outliers.");
     config.st_separate();
     config.config_percent("firefly percentile lower", percentile_pc.firefly_percentile_lower);
@@ -283,7 +283,7 @@ Accumulate::NodeStatusFlags Accumulate::properties(Properties& config) {
     config.config_percent("adaptivity", accumulate_pc.adaptive_alpha_reduction,
                           "(1. - adaptivity) is the smallest factor that alpha is multipied with");
     config.config_float(
-        "adaptivity IPR factor", accumulate_pc.adaptive_alpha_ipr_factor,
+        "adaptivity ipr factor", accumulate_pc.adaptive_alpha_ipr_factor,
         "Inter-percentile range for adaptive reduction. Increase to soften reduction.", 0.1);
     config.st_separate();
     config.config_percent("adaptivity percentile lower",

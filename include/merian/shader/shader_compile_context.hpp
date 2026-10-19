@@ -124,6 +124,9 @@ class ShaderCompileContext : public std::enable_shared_from_this<ShaderCompileCo
         hot_session.reset();
     }
 
+    // Retires the session if a file it compiled from changed since. Returns whether it did.
+    bool retire_stale_session();
+
     // -------------------------------------------------
 
     static ShaderCompileContextHandle create(const ContextHandle& context) {

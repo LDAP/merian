@@ -42,6 +42,7 @@ class Accumulate : public Node {
         float adaptive_alpha_ipr_factor = 1.5;
 
         uint32_t iteration = 0;
+        uint32_t seed = 0;
     };
 
   public:

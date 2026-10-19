@@ -903,9 +903,47 @@ Slang::ComPtr<slang::IComponentType>
 SlangSession::compose(const SlangCompositionHandle& composition) {
     std::unordered_map<std::string, uint64_t> sources;
     check_one_source_per_name(composition, sources);
+    const std::filesystem::file_time_type loading_since =
+        std::filesystem::file_time_type::clock::now();
     const Slang::ComPtr<slang::IComponentType> composed = compose_tree(composition);
     store_modules();
+    record_source_files(loading_since);
     return composed;
+}
+
+void SlangSession::record_source_files(const std::filesystem::file_time_type loading_since) {
+    const std::filesystem::file_time_type now = std::filesystem::file_time_type::clock::now();
+    for (SlangInt i = 0; i < session->getLoadedModuleCount(); i++) {
+        slang::IModule* const module = session->getLoadedModule(i);
+        if (!recorded_modules.insert(module).second) {
+            continue;
+        }
+        for (SlangInt32 j = 0; j < module->getDependencyFileCount(); j++) {
+            // a source string's dependency is its content hash, not a file
+            const std::optional<std::filesystem::path> file =
+                canonical_file_path(module->getDependencyFilePath(j));
+            if (!file) {
+                continue;
+            }
+            std::error_code ec;
+            const std::filesystem::file_time_type mtime =
+                std::filesystem::last_write_time(*file, ec);
+            if (!ec) {
+                // saved while loading, maybe after Slang read it: recorded as changed
+                const bool saved_while_loading = mtime >= loading_since && mtime <= now;
+                source_files.try_emplace(
+                    file->string(),
+                    saved_while_loading ? std::filesystem::file_time_type::min() : mtime);
+            }
+        }
+    }
+}
+
+bool SlangSession::sources_changed() const {
+    return std::ranges::any_of(source_files, [](const auto& source_file) {
+        std::error_code ec;
+        return std::filesystem::last_write_time(source_file.first, ec) != source_file.second;
+    });
 }
 
 void SlangSession::check_one_source_per_name(const SlangCompositionHandle& composition,
@@ -1107,6 +1145,14 @@ SlangSessionHandle ShaderCompileContext::current_session() {
         hot_session_epoch = epoch;
     }
     return hot_session;
+}
+
+bool ShaderCompileContext::retire_stale_session() {
+    if (!hot_session || !hot_session->sources_changed()) {
+        return false;
+    }
+    bump_slang_source_epoch();
+    return true;
 }
 
 static slang::TypeLayoutReflection* find_type_layout(slang::ProgramLayout* layout,

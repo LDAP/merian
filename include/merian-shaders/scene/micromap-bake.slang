@@ -46,6 +46,11 @@ struct MicromapBakeBinding {
     uint block_count;
 }
 
+struct MicromapBakeRange {
+    uint first_block;
+}
+[vk::push_constant] ConstantBuffer<MicromapBakeRange> bake_range;
+
 float lookup_reach(const bool nearest) {
     return nearest ? 0.5f : 1.f;
 }
@@ -296,11 +301,12 @@ void main(uint3 group_id: SV_GroupID,
           uint3 local_id: SV_GroupThreadID,
           ParameterBlock<MaterialSystem> material_system,
           ParameterBlock<MicromapBakeBinding> params) {
-    if (group_id.x >= params.block_count)
+    const uint block_index = bake_range.first_block + group_id.x;
+    if (block_index >= params.block_count)
         return;
     const uint thread = local_id.x;
 
-    const MicromapBakeBlock block = params.blocks[group_id.x];
+    const MicromapBakeBlock block = params.blocks[block_index];
     const MicromapBakeJob job = params.jobs[block.job_index];
 
     float2 uv0;

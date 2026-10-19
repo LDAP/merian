@@ -8,11 +8,8 @@ void NodeEvents::register_listeners(const NodeIOLayout& io_layout) const {
             continue;
         }
         io_layout.register_event_listener(
-            action.pattern,
-            [handler = action.handler](const GraphEvent::Info&, const GraphEvent::Data&) {
-                handler();
-                return false;
-            });
+            action.pattern, [handler = action.handler](const GraphEvent::Info&,
+                                                       const GraphEvent::Data&) { handler(); });
     }
 }
 

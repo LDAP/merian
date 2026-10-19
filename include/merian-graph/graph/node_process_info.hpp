@@ -1,17 +1,15 @@
 #pragma once
 
-#include "merian/shader/glsl_shader_compiler.hpp"
 #include "merian/shader/shader_object_allocator.hpp"
 #include "merian/utils/chrono.hpp"
-#include "merian/utils/concurrent/thread_pool.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/sync/semaphore_timeline.hpp"
-#include "merian/vk/utils/cpu_queue.hpp"
 #include "merian/vk/utils/profiler.hpp"
 
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -27,20 +25,21 @@ class NodeProcessInfo {
     NodeProcessInfo(const NodeProcessInfo&) = delete;
     NodeProcessInfo& operator=(const NodeProcessInfo&) = delete;
 
-    // Number of iterations since connect.
-    // Use get_total_iteration() for iterations since graph initialization.
-    //
-    // Iterations are 0-indexed.
+    // Number of iterations since connect, 0-indexed. Every connect starts the run from scratch:
+    // seed random numbers and clear histories with this one.
     const uint64_t& get_iteration() const noexcept {
         return iteration;
     }
 
-    // Number of iterations since graph initialization.
-    // Use get_iteration() for iterations since connect.
-    //
-    // Iterations are 0-indexed.
+    // Number of iterations since graph initialization, 0-indexed. Information only, e.g. for file
+    // names, and the values of the iteration semaphore.
     const uint64_t& get_total_iteration() const noexcept {
         return total_iteration;
+    }
+
+    // Whether this is the last iteration of a Graph::run() that was given an iteration count.
+    bool is_last_iteration() const noexcept {
+        return last_iteration;
     }
 
     // returns the current in-flight index i, with 0 <= i < get_iterations_in_flight().
@@ -102,9 +101,15 @@ class NodeProcessInfo {
         return allocator;
     }
 
-    // Returns a semaphore that is signaled at the end of a run with the value of the next run.
+    // Reaches T + 1 once total iteration T finished on the GPU.
     const TimelineSemaphoreHandle& get_iteration_semaphore() const noexcept {
         return iteration_semaphore;
+    }
+
+    // Waits until the iteration semaphore reaches value, running the host callbacks that
+    // iterations in flight wait for.
+    void wait_iteration_semaphore(const uint64_t value) const {
+        wait_for_iteration(value);
     }
 
     // Key/value description of this run for a node to embed into what it writes.
@@ -116,6 +121,7 @@ class NodeProcessInfo {
     const ResourceAllocatorHandle allocator;
 
     std::function<std::vector<std::pair<std::string, std::string>>()> metadata;
+    std::function<void(uint64_t value)> wait_for_iteration;
 
     TimelineSemaphoreHandle iteration_semaphore;
     ShaderObjectAllocatorHandle shader_object_allocator;
@@ -123,6 +129,7 @@ class NodeProcessInfo {
 
     uint64_t iteration = 0;
     uint64_t total_iteration = 0;
+    bool last_iteration = false;
     uint32_t in_flight_index = 0;
     uint32_t iterations_in_flight = 0;
     std::chrono::nanoseconds time_delta{};
@@ -133,6 +140,8 @@ class NodeProcessInfo {
 // Context the graph supplies to Node::on_connected.
 struct NodeConnectionInfo {
     uint32_t iterations_in_flight;
+    // in the graph, with the prefixes of the subgraphs it is in (e.g. "group:node")
+    std::string_view identifier;
 };
 
 } // namespace merian

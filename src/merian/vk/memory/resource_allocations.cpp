@@ -162,11 +162,11 @@ Image::Image(const ContextHandle& context,
 Image::Image(const ContextHandle& context, const vk::ImageCreateInfo create_info)
     : context(context), image(context->get_device()->get_device().createImage(create_info)),
       create_info(create_info), current_layout(create_info.initialLayout) {
-    SPDLOG_TRACE("created image ({})", fmt::ptr(VkImage(image)));
+    SPDLOG_TRACE("created image ({})", fmt::ptr(static_cast<VkImage>(image)));
 }
 
 Image::~Image() {
-    SPDLOG_TRACE("destroy image ({})", fmt::ptr(VkImage(image)));
+    SPDLOG_TRACE("destroy image ({})", fmt::ptr(static_cast<VkImage>(image)));
     context->get_device()->get_device().destroyImage(image);
 }
 

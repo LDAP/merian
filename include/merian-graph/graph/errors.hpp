@@ -1,6 +1,8 @@
 #pragma once
 
 #include <stdexcept>
+#include <string>
+#include <vector>
 
 namespace merian {
 
@@ -26,19 +28,10 @@ class node_error : public graph_error {
     node_error(const std::string& what_arg) : graph_error(what_arg) {}
 };
 
-//---------------------
-
-// Generic graph build error
-class build_error : public graph_error {
+// what() lists all messages, one per line.
+class config_error : public graph_error {
   public:
-    build_error(const std::string& what_arg) : graph_error(what_arg) {}
-};
-
-// attempted to build() a graph with a missing connection. Meaning a node input was not connected
-// to an node output.
-class connection_missing : public build_error {
-  public:
-    connection_missing(const std::string& what_arg) : build_error(what_arg) {}
+    config_error(const std::vector<std::string>& messages);
 };
 
 } // namespace graph_errors

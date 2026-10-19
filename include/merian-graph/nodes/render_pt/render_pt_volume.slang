@@ -287,7 +287,8 @@ void render_pixel(const uint2 pixel,
     params.volume_depth[pixel] = depth_weight > 0.f ? depth_sum / depth_weight : linear_z;
 
     if (merian_render_debug_output == DebugOutput::DistanceGuiding) {
-        RandomGenerator debug_rng = PCG(xxhash32(uint4(pixel, scene.frame, 0xDEB0)));
+        RandomGenerator debug_rng =
+            PCG(xxhash32(uint4(pixel, scene.frame, 0xDEB0)) ^ merian_render_seed);
         const RayVertex ray_vertex = {primary_ray.Origin, primary_ray.Direction, max_t, pixel,
                                       uint16_t(0)};
         params.debug[pixel] =

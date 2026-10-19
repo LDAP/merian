@@ -2,6 +2,7 @@
 #include "merian/utils/string.hpp"
 #include "merian/utils/vector.hpp"
 
+#include <array>
 #include <filesystem>
 #include <fmt/ranges.h>
 #include <fstream>
@@ -17,6 +18,8 @@
 #include <direct.h>
 #include <io.h>
 #include <shlobj.h>
+#else
+#include <dlfcn.h>
 #endif
 
 #if defined(__FreeBSD__)
@@ -25,6 +28,21 @@
 #endif
 
 namespace merian {
+
+#if defined(_WIN32)
+namespace {
+
+std::filesystem::path module_path(const HMODULE module) {
+    std::array<wchar_t, 32768> path;
+    const DWORD length = GetModuleFileNameW(module, path.data(), static_cast<DWORD>(path.size()));
+    if (length == path.size()) {
+        return {};
+    }
+    return {path.data(), path.data() + length};
+}
+
+} // namespace
+#endif
 
 bool FileLoader::exists(const std::filesystem::path& path,
                         std::filesystem::file_status file_status) {
@@ -59,9 +77,7 @@ std::filesystem::path FileLoader::binary_path() {
     sysctl(mib_procpath, 4, path.data(), &len_procpath, NULL, 0);
     return std::filesystem::canonical(path.data());
 #elif defined(_WIN32)
-    char* path;
-    _get_pgmptr(&path);
-    return std::filesystem::canonical(path);
+    return std::filesystem::canonical(module_path(nullptr));
 #elif defined(__APPLE__)
     pid_t pid = getpid();
     std::array<char, 1024> path;
@@ -69,6 +85,26 @@ std::filesystem::path FileLoader::binary_path() {
     return std::filesystem::canonical(path.data());
 #else
 #error "binary_path not implemented for this target system"
+#endif
+}
+
+std::filesystem::path FileLoader::library_path() {
+#if defined(_WIN32)
+    HMODULE module = nullptr;
+    if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                               GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                           reinterpret_cast<LPCWSTR>(&FileLoader::library_path), &module) == 0) {
+        return binary_path();
+    }
+    const std::filesystem::path path = module_path(module);
+    return path.empty() ? binary_path() : std::filesystem::weakly_canonical(path);
+#else
+    Dl_info info;
+    if (dladdr(reinterpret_cast<void*>(&FileLoader::library_path), &info) == 0 ||
+        info.dli_fname == nullptr) {
+        return binary_path();
+    }
+    return std::filesystem::weakly_canonical(info.dli_fname);
 #endif
 }
 

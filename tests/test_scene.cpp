@@ -1,11 +1,14 @@
 #include <gtest/gtest.h>
 
+#include "submit_wait.hpp"
+
 #include "merian-shaders/scene/scene.hpp"
 #include "merian-shaders/shading/materials/material_system.hpp"
 #include "merian-shaders/utils/texture_manager.hpp"
 #include "merian/shader/shader_compile_context.hpp"
 #include "merian/shader/shader_object_allocator.hpp"
 #include "merian/vk/command/queue.hpp"
+#include "merian/vk/command/submission.hpp"
 #include "merian/vk/context.hpp"
 #include "merian/vk/extension/extension_resources.hpp"
 #include "merian/vk/extension/extension_vk_validation_layers.hpp"
@@ -158,7 +161,8 @@ TEST_F(SceneTest, MeshGroupingStatic) {
     scene->add_mesh_instance(m1, nid);
 
     // Trigger update which calls create_mesh_groups + upload
-    queue->submit_wait([&](const CommandBufferHandle& cmd) { scene->update(cmd, 0.0f, 0.0f, 0); });
+    submit_wait(context, queue,
+                [&](Submission& submission) { scene->update(submission, 0.0f, 0.0f, 0, 0); });
 
     // Both meshes are static non-instanced → single group with both meshes
     EXPECT_EQ(scene->get_mesh(m0).instances.size(), 1u);
@@ -185,7 +189,8 @@ TEST_F(SceneTest, MeshGroupingInstanced) {
 
     EXPECT_EQ(scene->get_mesh(mid).instances.size(), 2u);
 
-    queue->submit_wait([&](const CommandBufferHandle& cmd) { scene->update(cmd, 0.0f, 0.0f, 0); });
+    submit_wait(context, queue,
+                [&](Submission& submission) { scene->update(submission, 0.0f, 0.0f, 0, 0); });
 }
 
 // ---------------------------------------------------------------------------
@@ -210,7 +215,8 @@ TEST_F(SceneTest, MeshGroupingDynamic) {
     scene->add_mesh_instance(m0, nid0);
     scene->add_mesh_instance(m1, nid1);
 
-    queue->submit_wait([&](const CommandBufferHandle& cmd) { scene->update(cmd, 0.0f, 0.0f, 0); });
+    submit_wait(context, queue,
+                [&](Submission& submission) { scene->update(submission, 0.0f, 0.0f, 0, 0); });
 
     // Each mesh on a different animated node → separate groups
     EXPECT_EQ(scene->get_mesh(m0).instances.size(), 1u);
@@ -253,7 +259,8 @@ TEST_F(SceneTest, RemoveMeshInstanceLeavesMeshAndOtherInstances) {
     EXPECT_EQ(scene->get_mesh(m).instances.size(), 1u);
     EXPECT_EQ(scene->get_mesh(m).instances.count(n1), 1u);
 
-    queue->submit_wait([&](const CommandBufferHandle& cmd) { scene->update(cmd, 0.0f, 0.0f, 0); });
+    submit_wait(context, queue,
+                [&](Submission& submission) { scene->update(submission, 0.0f, 0.0f, 0, 0); });
 }
 
 TEST_F(SceneTest, RemoveMeshClearsSlotAndAllowsReuse) {
@@ -265,7 +272,8 @@ TEST_F(SceneTest, RemoveMeshClearsSlotAndAllowsReuse) {
     MeshID m1 = scene->add_mesh(make_triangle(0));
     scene->add_mesh_instance(m0, n);
     scene->add_mesh_instance(m1, n);
-    queue->submit_wait([&](const CommandBufferHandle& cmd) { scene->update(cmd, 0.0f, 0.0f, 0); });
+    submit_wait(context, queue,
+                [&](Submission& submission) { scene->update(submission, 0.0f, 0.0f, 0, 0); });
 
     // Remove the top mesh — slot should compact away and be reused on next add.
     scene->remove_mesh(m1);
@@ -275,7 +283,8 @@ TEST_F(SceneTest, RemoveMeshClearsSlotAndAllowsReuse) {
     EXPECT_EQ(m_new, m1);
     scene->add_mesh_instance(m_new, n);
 
-    queue->submit_wait([&](const CommandBufferHandle& cmd) { scene->update(cmd, 0.0f, 0.0f, 0); });
+    submit_wait(context, queue,
+                [&](Submission& submission) { scene->update(submission, 0.0f, 0.0f, 0, 0); });
 }
 
 TEST_F(SceneTest, RemoveNodeCascadesAndDetachesInstances) {

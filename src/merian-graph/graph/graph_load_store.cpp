@@ -1,151 +1,115 @@
 #include "merian-graph/graph/graph.hpp"
 #include "merian-graph/graph/graph_description.hpp"
-#include "merian/utils/properties_json_dump.hpp"
 #include "merian/utils/properties_json_load.hpp"
 
+#include <fmt/ranges.h>
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
 namespace merian {
 
-// -----------------------------------------------------------------
-// Public Load/Store Methods
-// -----------------------------------------------------------------
-
-void Graph::load_from_file(const std::filesystem::path& path) {
-    SPDLOG_DEBUG("Loading graph from {}", path.string());
-    GraphDescription description = GraphDescription::from_file(path);
-    from_description(description);
-    set_store_path(path);
-}
-
-void Graph::set_store_path(const std::filesystem::path& path) {
-    store_path = path.string();
-}
-
-void Graph::load_from_json(const nlohmann::json& json) {
-    GraphDescription description = GraphDescription::from_json(json);
-    from_description(description);
-}
-
-void Graph::store_to_file(const std::filesystem::path& path) {
-    GraphDescription description = to_description();
-    description.to_file(path);
-    SPDLOG_INFO("stored graph with {} nodes to {}", node_for_identifier.size(), path.string());
-}
-
-nlohmann::json Graph::store_to_json() {
-    GraphDescription description = to_description();
-    return description.to_json();
-}
-
-std::vector<std::pair<std::string, std::string>> Graph::metadata() {
+std::vector<std::pair<std::string, std::string>> Graph::get_metadata() {
     // tEXt and COM are latin-1, so keep the config ascii-escaped
     return {{"Software", "merian " MERIAN_VERSION},
-            {"merian.graph", store_to_json().dump(-1, ' ', true)}};
+            {"merian.graph", to_description().to_json().dump(-1, ' ', true)}};
 }
 
-// -----------------------------------------------------------------
-// Private Helper Methods
-// -----------------------------------------------------------------
-
-void Graph::from_description(const GraphDescription& description) {
-    // Clear existing graph
-    reset();
+std::vector<std::string> Graph::from_description(const GraphDescription& description) {
+    clear();
+    settings = {};
+    async_tasks.reset();
 
     loaded_description = description;
 
-    // Load graph-level properties using JSONLoadProperties
-    const auto& graph_props = description.get_graph_properties();
-    if (!graph_props.empty()) {
-        JSONLoadProperties load_props(graph_props);
-        graph_properties(load_props);
-    }
-
-    // Load profiler properties using JSONLoadProperties
-    const auto& profiler_props = description.get_profiler_properties();
-    if (!profiler_props.empty()) {
-        JSONLoadProperties load_props(profiler_props);
-        profiler_properties(load_props);
-    }
+    std::vector<std::string> problems;
+    const auto load_settings = [&](const nlohmann::json& properties, const std::string_view name,
+                                   const auto& settings) {
+        if (properties.empty()) {
+            return;
+        }
+        if (const std::vector<std::string> load_problems =
+                JSONLoadProperties::load_revealed(properties,
+                                                  [&](Properties& props) {
+                                                      settings(props);
+                                                      return true;
+                                                  });
+            !load_problems.empty()) {
+            problems.push_back(fmt::format("{}: {}", name, fmt::join(load_problems, "; ")));
+            SPDLOG_WARN("{}", problems.back());
+        }
+    };
+    load_settings(description.get_graph_properties(), "graph properties",
+                  [&](Properties& props) { graph_settings(props); });
+    load_settings(description.get_profiler_properties(), "profiler properties",
+                  [&](Properties& props) { profiler_settings(props); });
 
     // Load nodes
     const auto& nodes = description.get_nodes();
-    for (const auto& [identifier, node_info] : nodes) {
-        const std::string& node_type = node_info.node_type;
-        const nlohmann::json& config = node_info.config;
-        bool enabled = node_info.enabled;
+    {
+        // a node that removes itself leaves once everything is loaded
+        const BusyScope busy_scope(*this);
+        for (const auto& [identifier, node_info] : nodes) {
+            const std::string& node_type = node_info.node_type;
+            const nlohmann::json& config = node_info.config;
+            const bool enabled = node_info.enabled;
 
-        try {
-            // Create node from registry
-            NodeHandle node = NodeRegistry::get_instance().create_node_from_name(node_type);
+            try {
+                const NodeHandle node = registry.create_node_from_name(node_type);
 
-            // Add node to graph (this initializes the node)
-            add_node(node, identifier);
+                add_node(node, identifier);
 
-            // Load node configuration (after initialization)
-            if (!config.empty()) {
-                node->load_config(config);
-            }
-
-            // Set enabled state
-            node_data.at(node).enabled = enabled;
-            node_data.at(node).linearization_order = node_info.linearization_order;
-
-            SPDLOG_DEBUG("Loaded node '{}' of type '{}'", identifier, node_type);
-        } catch (const std::exception& e) {
-            SPDLOG_ERROR("Failed to load node '{}' of type '{}': {}", identifier, node_type,
-                         e.what());
-            throw;
-        }
-    }
-
-    // Load connections
-    for (const auto& [src, node_info] : nodes) {
-        for (const auto& [src_output, output_info] : node_info.outgoing_connections) {
-            for (const auto& [dst, dst_inputs] : output_info.target) {
-                for (const auto& dst_input : dst_inputs) {
-                    try {
-                        add_connection(src, dst, src_output, dst_input);
-                        SPDLOG_DEBUG("Loaded connection {} ({}) -> {} ({})", src, src_output, dst,
-                                     dst_input);
-                    } catch (const std::exception& e) {
-                        SPDLOG_ERROR("Failed to add connection {} ({}) -> {} ({}): {}", src,
-                                     src_output, dst, dst_input, e.what());
-                        throw;
+                if (!config.empty()) {
+                    if (auto problem = load_node_properties(identifier, node, config)) {
+                        SPDLOG_WARN("{}", *problem);
+                        problems.push_back(std::move(*problem));
                     }
+                }
+
+                node_data.at(node).enabled = enabled;
+                node_data.at(node).linearization_order = node_info.linearization_order;
+
+                SPDLOG_DEBUG("Loaded node '{}' of type '{}'", identifier, node_type);
+            } catch (const std::exception& e) {
+                SPDLOG_ERROR("Failed to load node '{}' of type '{}': {}", identifier, node_type,
+                             e.what());
+                throw;
+            }
+        }
+
+        // Load connections
+        for (const auto& [dst, node_info] : nodes) {
+            for (const auto& [dst_input, source] : node_info.incoming_connections) {
+                const auto& [src, src_output] = source;
+                try {
+                    add_connection(src, dst, src_output, dst_input);
+                    SPDLOG_DEBUG("Loaded connection {} ({}) -> {} ({})", src, src_output, dst,
+                                 dst_input);
+                } catch (const std::exception& e) {
+                    SPDLOG_ERROR("Failed to add connection {} ({}) -> {} ({}): {}", src, src_output,
+                                 dst, dst_input, e.what());
+                    throw;
                 }
             }
         }
     }
-
-    // Mark that we need to reconnect the graph
-    needs_reconnect = true;
+    apply_deferred_edits();
+    request_reconnect();
 
     SPDLOG_INFO("Graph loaded successfully with {} nodes", nodes.size());
+    return problems;
 }
 
 GraphDescription Graph::to_description() {
     GraphDescription description;
 
-    // Store graph-level properties using JSONDumpProperties
-    {
-        JSONDumpProperties dump_props;
-        graph_properties(dump_props);
-        description.set_graph_properties(dump_props.get());
-    }
-
-    // Store profiler properties using JSONDumpProperties
-    {
-        JSONDumpProperties dump_props;
-        profiler_properties(dump_props);
-        description.set_profiler_properties(dump_props.get());
-    }
+    nlohmann::json properties = get_properties();
+    description.set_graph_properties(properties["graph_properties"]);
+    description.set_profiler_properties(properties["profiler"]);
 
     // Store top-level nodes: a parent's properties hold its children
     for (const NodeHandle& node : top_level_nodes()) {
         const std::string& identifier = node_data.at(node).identifier;
-        const std::string node_type = NodeRegistry::get_instance().node_type_name(node);
+        const std::string& node_type = node_data.at(node).type_name;
         const nlohmann::json config = node->dump_config();
         const bool enabled = node_data.at(node).enabled;
 

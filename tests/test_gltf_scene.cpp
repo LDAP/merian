@@ -1,11 +1,14 @@
 #include <gtest/gtest.h>
 
+#include "submit_wait.hpp"
+
 #include "merian-shaders/scene/gltf_scene.hpp"
 #include "merian-shaders/shading/materials/material_system.hpp"
 #include "merian-shaders/utils/texture_manager.hpp"
 #include "merian/shader/shader_compile_context.hpp"
 #include "merian/shader/shader_object_allocator.hpp"
 #include "merian/vk/command/queue.hpp"
+#include "merian/vk/command/submission.hpp"
 #include "merian/vk/context.hpp"
 #include "merian/vk/extension/extension_resources.hpp"
 #include "merian/vk/extension/extension_vk_validation_layers.hpp"
@@ -82,9 +85,9 @@ TEST_F(GLTFSceneTest, LoadCubeGLTF) {
     std::filesystem::path cube_path = std::filesystem::path(TEST_MODEL_DIR) / "Cube" / "Cube.gltf";
     ASSERT_TRUE(std::filesystem::exists(cube_path)) << "Test model not found: " << cube_path;
 
-    queue->submit_wait([&](const CommandBufferHandle& cmd) {
-        scene->load(cmd, cube_path);
-        scene->update(cmd, 0.0f, 0.0f, 0);
+    submit_wait(context, queue, [&](Submission& submission) {
+        scene->load(submission.get_cmd(), cube_path);
+        scene->update(submission, 0.0f, 0.0f, 0, 0);
     });
 
     // Cube.gltf has 1 mesh with 1 primitive, 1 material, and 1 node
@@ -108,9 +111,9 @@ TEST_F(GLTFSceneTest, LoadBoxGLB) {
     std::filesystem::path glb_path = std::filesystem::path(TEST_MODEL_DIR) / "box01.glb";
     ASSERT_TRUE(std::filesystem::exists(glb_path)) << "Test model not found: " << glb_path;
 
-    queue->submit_wait([&](const CommandBufferHandle& cmd) {
-        scene->load(cmd, glb_path);
-        scene->update(cmd, 0.0f, 0.0f, 0);
+    submit_wait(context, queue, [&](Submission& submission) {
+        scene->load(submission.get_cmd(), glb_path);
+        scene->update(submission, 0.0f, 0.0f, 0, 0);
     });
 
     const auto& graph = scene->get_scene_graph();
@@ -131,9 +134,9 @@ TEST_F(GLTFSceneTest, SceneGraphHierarchy) {
     std::filesystem::path cube_path = std::filesystem::path(TEST_MODEL_DIR) / "Cube" / "Cube.gltf";
     ASSERT_TRUE(std::filesystem::exists(cube_path));
 
-    queue->submit_wait([&](const CommandBufferHandle& cmd) {
-        scene->load(cmd, cube_path);
-        scene->update(cmd, 0.0f, 0.0f, 0);
+    submit_wait(context, queue, [&](Submission& submission) {
+        scene->load(submission.get_cmd(), cube_path);
+        scene->update(submission, 0.0f, 0.0f, 0, 0);
     });
 
     // All root nodes should have parent == NODE_ID_INVALID

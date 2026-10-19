@@ -1,0 +1,17 @@
+# The Python dependencies of the merian package and the example scripts. The package itself is
+# built by meson (see README). Install a group with `pip install --group <name>`.
+
+[dependency-groups]
+merian = ["numpy"]
+scripts = ["numpy", "Pillow"]
+gui = ["numpy", "PySide6"]
+
+# Format with `ruff format` and sort imports with `ruff check --select I --fix`.
+[tool.ruff]
+line-length = 88
+src = ["src/merian-python", "examples", "examples/gui", "tests/python"]
+extend-exclude = ["subprojects"]
+
+[tool.ruff.lint.isort]
+# merian.io and merian.plugins are submodules of the extension module
+known-first-party = ["merian"]

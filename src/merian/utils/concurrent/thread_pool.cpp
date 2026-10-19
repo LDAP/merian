@@ -5,8 +5,9 @@
 
 namespace merian {
 
-ThreadPool::ThreadPool(const uint32_t concurrency)
-    : wait_idle_barrier((ptrdiff_t)concurrency + 1, []() noexcept {}) {
+ThreadPool::ThreadPool(const uint32_t concurrency, const uint64_t queue_capacity)
+    : queue_capacity(queue_capacity),
+      wait_idle_barrier(static_cast<ptrdiff_t>(concurrency) + 1, []() noexcept {}) {
     assert(concurrency);
 
     for (uint32_t i = threads.size(); i < concurrency; i++) {
@@ -24,7 +25,8 @@ ThreadPool::ThreadPool(const uint32_t concurrency)
 }
 
 ThreadPool::ThreadPool(ThreadPool&& other) noexcept
-    : wait_idle_barrier((ptrdiff_t)other.threads.size() + 1, []() noexcept {}) {
+    : queue_capacity(other.queue_capacity),
+      wait_idle_barrier(static_cast<ptrdiff_t>(other.threads.size()) + 1, []() noexcept {}) {
     tasks = std::move(other.tasks);
 
     for (uint32_t i = threads.size(); i < other.threads.size(); i++) {

@@ -1,52 +1,11 @@
 {
-    "cli": {
-        "volume": {
-            "default": "off",
-            "type": "variant",
-            "variants": {
-                "off": {
-                    "merge": "denoisers/dlss_irradiance.json"
-                },
-                "on": {
-                    "merge": [
-                        "renderers/volume.json",
-                        "renderers/volume_scene.json",
-                        "denoisers/dlss_volume.json"
-                    ]
-                }
-            }
-        }
-    },
+    "include": [
+        "../parts/dlss.json"
+    ],
     "nodes": {
-        "dlss": {
-            "enabled": true,
-            "outputs": [
-                "out->exposure.src"
-            ],
-            "properties": {
-                "mode": "ray reconstruction"
-            },
-            "type": "DLSS"
-        },
-        "gbuffer": {
-            "$+$outputs": [
-                "gbuffer->dlss.gbuffer"
-            ],
-            "properties": {
-                "primary surface replacement": true,
-                "texture lod bias": -1.0
-            }
-        },
         "render": {
-            "properties": {
-                "output": {
-                    "demodulate albedo": false
-                }
-            }
-        },
-        "scene": {
             "$+$outputs": [
-                "scene->dlss.scene"
+                "irradiance->dlss.src"
             ]
         }
     }

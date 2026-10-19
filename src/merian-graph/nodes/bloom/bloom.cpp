@@ -67,7 +67,6 @@ Bloom::NodeStatusFlags Bloom::on_connected(const NodeIOLayout& io_layout,
             for (auto* kernel : {&separate_kernel, &composite_kernel}) {
                 (*kernel)->reload(std::any_cast<bool>(force), compile_context);
             }
-            return true;
         });
 
     return {};

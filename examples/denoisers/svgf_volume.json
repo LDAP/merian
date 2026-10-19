@@ -1,0 +1,15 @@
+{
+    "include": [
+        "svgf.json",
+        "../parts/volume.json",
+        "../parts/volume_scene.json",
+        "../parts/volume_svgf.json"
+    ],
+    "nodes": {
+        "svgf": {
+            "outputs": [
+                "out->add.input_0"
+            ]
+        }
+    }
+}

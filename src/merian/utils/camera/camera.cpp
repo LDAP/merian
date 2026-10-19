@@ -333,17 +333,20 @@ void Camera::set_jitter_sequence(const JitterSequence sequence) noexcept {
     }
 }
 
-void Camera::advance_jitter(const uint32_t frame_index) noexcept {
+void Camera::advance_jitter(const uint32_t frame_index, const uint32_t seed) noexcept {
+    const auto phase = [&](const uint32_t period) {
+        return (frame_index % period + seed % period) % period;
+    };
     switch (jitter_sequence) {
     case JitterSequence::None:
         return;
     case JitterSequence::Halton: {
-        const uint32_t n = (frame_index % jitter_phases) + 1;
+        const uint32_t n = phase(jitter_phases) + 1;
         jitter = float2(radical_inverse(n, 2), radical_inverse(n, 3)) - 0.5f;
         break;
     }
     case JitterSequence::R2: {
-        const auto n = static_cast<float>(frame_index % padovan_at_least(jitter_phases));
+        const auto n = static_cast<float>(phase(padovan_at_least(jitter_phases)));
         jitter = float2(std::fmod(0.5f + (R2_ALPHA_X * n), 1.0f),
                         std::fmod(0.5f + (R2_ALPHA_Y * n), 1.0f)) -
                  0.5f;
@@ -351,7 +354,7 @@ void Camera::advance_jitter(const uint32_t frame_index) noexcept {
     }
     case JitterSequence::BlackmanHarris: {
         // random per frame: independent samples of the filter, robust to clearing at any time.
-        XORShift32 rng(static_cast<uint32_t>(hash_val(frame_index)));
+        XORShift32 rng(xxhash32(frame_index, seed));
         jitter = pixel_offset_blackman_harris(float2(rng.next_float(), rng.next_float()));
         break;
     }
