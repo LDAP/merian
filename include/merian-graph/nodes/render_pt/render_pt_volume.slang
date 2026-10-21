@@ -139,7 +139,7 @@ void render_pixel(const uint2 pixel,
             ScatterMixture(guided_share(guiding, merian_render_volume_guiding_share, 1.f));
 
         // 3. resampled direct light
-        let lights = scene.nee.begin_vertex(scatter_pos, float3(0), float3(0), rng);
+        let lights = scene.nee.begin_vertex(scatter_pos, float3(0), 0.f, float3(0), rng);
         Optional<DirectLightSample> direct = none;
         if (merian_render_volume_nee_mode == NEEMode::Resampled && nee) {
             direct = scene.sample_direct_light(
@@ -193,8 +193,8 @@ void render_pixel(const uint2 pixel,
         segment.direct_scale = guiding_direct_scale(1.f);
         let guiding_record = params.guiding.record_scatter(guiding, segment, guided, rng);
 
-        float3 contribution = scene.resolve_direct_light(lights, float3(0), 0.f, direct, rng,
-                                                         merian_render_instance_mask);
+        float3 contribution =
+            scene.resolve_direct_light(lights, direct, rng, merian_render_instance_mask);
 
         if (scattered && any(f_cos > 0.f)) {
             RayDesc ray;

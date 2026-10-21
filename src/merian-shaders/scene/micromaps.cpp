@@ -150,7 +150,7 @@ uint32_t morton(const uint32_t x, const uint32_t y) {
 // Reuse pre-pass and spatial sort of NVIDIA's Opacity Micro-Map SDK.
 std::vector<uint32_t> build_blocks(const Micromaps::MeshGeometry& mesh,
                                    std::vector<uint32_t>& block_of_triangle) {
-    const uint32_t count = mesh.geometry.primitive_count;
+    const uint32_t count = mesh.primitive_count;
     block_of_triangle.resize(count);
 
     const HostGeometry host(mesh);
@@ -262,9 +262,7 @@ void Micromaps::ensure_pipeline(const SlangCompositionHandle& material_system_co
 }
 
 bool Micromaps::same_geometry(const Entry& entry, const MeshGeometry& mesh) {
-    return entry.mesh_serial == mesh.mesh_serial && entry.vertices == mesh.geometry.vertices &&
-           entry.indices == mesh.geometry.indices &&
-           entry.primitive_count == mesh.geometry.primitive_count &&
+    return entry.mesh_serial == mesh.mesh_serial && entry.primitive_count == mesh.primitive_count &&
            entry.uv_version == mesh.uv_version;
 }
 
@@ -322,9 +320,7 @@ Micromaps::Entry Micromaps::create_entry(const CommandBufferHandle& cmd,
     const TextureManager& textures = *material_system->get_texture_manager();
     Entry entry{};
     entry.mesh_serial = mesh.mesh_serial;
-    entry.vertices = mesh.geometry.vertices;
-    entry.indices = mesh.geometry.indices;
-    entry.primitive_count = mesh.geometry.primitive_count;
+    entry.primitive_count = mesh.primitive_count;
     entry.uv_version = mesh.uv_version;
     entry.alpha_tested = mesh.alpha_tested;
     entry.opacity = mesh.opacity;
@@ -366,7 +362,7 @@ Micromaps::Entry Micromaps::create_entry(const CommandBufferHandle& cmd,
     entry.subdivision_level = std::min(level, max_level);
     level = entry.subdivision_level;
     entry.geometry_usage =
-        vk::MicromapUsageEXT{mesh.geometry.primitive_count, level, MERIAN_OMM_FORMAT_4_STATE};
+        vk::MicromapUsageEXT{mesh.primitive_count, level, MERIAN_OMM_FORMAT_4_STATE};
 
     std::vector<uint32_t> block_of_triangle;
     entry.block_triangle = build_blocks(mesh, block_of_triangle);
@@ -401,11 +397,11 @@ Micromaps::Entry Micromaps::create_entry(const CommandBufferHandle& cmd,
         }
         const uint32_t opacity_words = entry.opacity ? words_per_block(level) : 0;
         const uint32_t emission_words = entry.emission ? emission_record_words(level) : 0;
-        blocks.emplace_back(Block{
-            entry.opacity ? allocate(opacity_pool, opacity_words) : NO_OFFSET,
-            entry.emission ? allocate(emission_pool, emission_words) : NO_OFFSET,
-            opacity_words + emission_words,
-            static_cast<uint32_t>(std::min(cost, static_cast<double>(UINT32_MAX))), 0, false});
+        blocks.emplace_back(
+            Block{entry.opacity ? allocate(opacity_pool, opacity_words) : NO_OFFSET,
+                  entry.emission ? allocate(emission_pool, emission_words) : NO_OFFSET,
+                  opacity_words + emission_words,
+                  cost < UINT32_MAX ? static_cast<uint32_t>(cost) : UINT32_MAX, 0, false});
         return static_cast<uint32_t>(blocks.size() - 1);
     };
     entry.blocks.resize(entry.block_triangle.size());

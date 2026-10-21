@@ -33,7 +33,7 @@ template <typename NodeType> struct NodeReference : GraphReference {
     mutable std::weak_ptr<NodeType> node;
 
     std::shared_ptr<NodeType> get() const {
-        // a removed sink is cancelled, but its capture callbacks may keep it alive
+        // a removed sink is cancelled, but may still be alive
         if (const auto current = node.lock()) {
             if constexpr (std::is_base_of_v<HostSink, NodeType>) {
                 if (!current->is_cancelled()) {
@@ -46,12 +46,14 @@ template <typename NodeType> struct NodeReference : GraphReference {
         std::shared_ptr<NodeType> current;
         if constexpr (std::is_base_of_v<HostSink, NodeType>) {
             current = python_graph().sink(identifier);
-        } else {
+        } else if constexpr (std::is_base_of_v<HostSource, NodeType>) {
             current = std::dynamic_pointer_cast<NodeType>(python_graph().source(identifier));
             if (!current) {
                 throw nb::key_error(
                     fmt::format("'{}' is a host source of another kind", identifier).c_str());
             }
+        } else {
+            current = python_graph().find<NodeType>(identifier, "node of this type");
         }
         node = current;
         return current;
@@ -84,11 +86,28 @@ PyType_Slot graph_reference_slots[] = {
     {Py_tp_clear, reinterpret_cast<void*>(clear_graph_reference<T>)},
     {0, nullptr}};
 
+template <typename NodeType>
+nb::class_<NodeReference<NodeType>>
+bind_node_reference(nb::module_& m, const char* name, const char* doc) {
+    return nb::class_<NodeReference<NodeType>>(
+               m, name, doc, nb::type_slots(graph_reference_slots<NodeReference<NodeType>>))
+        .def_static("_find",
+                    [name](const nb::object& graph, const std::string& identifier) {
+                        NodeReference<NodeType> reference{{graph}, identifier, {}};
+                        reference.node =
+                            reference.python_graph().template find<NodeType>(identifier, name);
+                        return reference;
+                    })
+        .def_ro("identifier", &NodeReference<NodeType>::identifier);
+}
+
 void bind_description(nb::module_& m);
 
 void bind_nodes(nb::module_& m);
 
 void bind_graph(nb::module_& m);
+
+void bind_scene(nb::module_& m);
 
 void bind_window(nb::module_& m);
 

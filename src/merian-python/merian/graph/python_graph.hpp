@@ -23,17 +23,28 @@ namespace nb = nanobind;
 
 inline unsigned long main_thread_ident = 0;
 
-// Calls wait(slice) without the GIL until it returns true, or false once timeout passed; between
-// slices a Python signal handler that raises (Ctrl-C) ends the wait with its exception.
+// wait(slice) without the GIL until true or timeout; Ctrl-C ends it with its exception
 bool wait_interruptibly(const std::function<bool(std::chrono::nanoseconds slice)>& wait,
                         const std::optional<std::chrono::nanoseconds>& timeout = {});
 
-// While run() or a call that releases the GIL runs, only stop() and the host methods of the sink
-// and source nodes are allowed from other threads; capture callbacks, which run on the running
-// thread between iterations, may also edit the graph. Calls that wait for the GPU (load, run, wait,
-// close, connect) need an idle graph.
+struct IterationInfo {
+    uint64_t index_in_run;
+    uint64_t iteration;
+    uint64_t total_iteration;
+    // seconds
+    double time;
+    double time_delta;
+    double elapsed_since_connect;
+};
+
+// While running, other threads may only call stop() and the host sink and source methods.
 class PythonGraph {
   public:
+    // Called with the GIL held; a returned time holds the graph time from that iteration on.
+    using BeforeIteration =
+        std::function<std::optional<std::chrono::nanoseconds>(const IterationInfo&)>;
+    using AfterIteration = std::function<void(const IterationInfo&)>;
+
     PythonGraph(const ContextHandle& context,
                 const std::optional<GraphDescription>& description,
                 const bool strict);
@@ -45,7 +56,10 @@ class PythonGraph {
 
     void load(const GraphDescription& description, const bool strict);
 
-    GraphRunResult run(const GraphRunOptions& options);
+    // An exception of a callback ends the run before the next iteration and is raised from it.
+    GraphRunResult run(const GraphRunOptions& options,
+                       const BeforeIteration& before_iteration = {},
+                       const AfterIteration& after_iteration = {});
 
     void stop();
 
@@ -59,10 +73,6 @@ class PythonGraph {
     // The node's section, recorded into ui, a merian.Properties.
     void node_properties(const std::string& identifier, const nb::object& ui);
 
-    void add_capture_callback(const std::shared_ptr<HostSink>& sink, const nb::callable& callback);
-
-    void remove_capture_callbacks(const std::shared_ptr<HostSink>& sink);
-
     // Cancelled once the graph removes it, which ends the waits of consumer threads.
     std::shared_ptr<HostSink> sink(const std::string& identifier) const;
 
@@ -73,9 +83,23 @@ class PythonGraph {
 
     std::unordered_map<std::string, std::shared_ptr<HostWindow>> windows() const;
 
+    // Raises KeyError if the graph has no node with this identifier that is a T.
+    template <typename T>
+    std::shared_ptr<T> find(const std::string& identifier, const std::string_view kind) const {
+        const auto node =
+            std::dynamic_pointer_cast<T>(editable_handle()->find_node_for_identifier(identifier));
+        if (!node) {
+            throw nb::key_error(fmt::format("no {} '{}'", kind, identifier).c_str());
+        }
+        return node;
+    }
+
     const GraphHandle& idle_handle() const;
 
     const GraphHandle& editable_handle() const;
+
+    // Raises unless the graph may be edited from this thread now.
+    void ensure_editable() const;
 
     template <typename F> auto without_gil(const char* activity, const F& f) const {
         busy = activity;
@@ -86,42 +110,38 @@ class PythonGraph {
         return f();
     }
 
-    int visit_callbacks(visitproc visit, void* arg) const;
-    void clear_callbacks();
-
   private:
-    struct SinkCallbacks {
-        std::shared_ptr<HostSink> sink;
-        std::vector<nb::callable> callbacks;
+    // Marks this thread as the one calling back, which may edit the running graph.
+    class DispatchScope {
+      public:
+        explicit DispatchScope(const PythonGraph& graph)
+            : graph(graph), previous(graph.dispatch_thread.exchange(std::this_thread::get_id())) {}
+        ~DispatchScope() {
+            graph.dispatch_thread = previous;
+        }
+        DispatchScope(const DispatchScope&) = delete;
+        DispatchScope& operator=(const DispatchScope&) = delete;
+
+      private:
+        const PythonGraph& graph;
+        const std::thread::id previous;
     };
 
     void ensure_idle() const;
-
-    void ensure_editable() const;
 
     const GraphHandle& handle() const;
 
     void record(const nb::object& ui, const std::function<void(Properties& props)>& pass);
 
-    template <typename T>
-    std::shared_ptr<T> find(const std::string& identifier, const std::string_view kind) const;
-
     void wait_for_iterations(const char* activity);
-
-    // Needs the GIL.
-    void dispatch_captures();
-
-    bool captures_ready() const;
 
     static void check_problems(const std::vector<std::string>& problems, const bool strict);
 
     GraphHandle graph;
     std::atomic_bool running = false;
     mutable std::atomic<const char*> busy = nullptr;
-    std::atomic<std::thread::id> dispatch_thread;
+    mutable std::atomic<std::thread::id> dispatch_thread;
     std::atomic_bool stop_requested = false;
-    // keeps those of a removed sink until dispatch_captures() delivered its captures
-    std::vector<SinkCallbacks> capture_callbacks;
 };
 
 } // namespace merian::python

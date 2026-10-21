@@ -68,14 +68,15 @@ PythonGraph::~PythonGraph() {
 
 void PythonGraph::load(const GraphDescription& description, const bool strict) {
     wait();
-    capture_callbacks.clear();
     const GraphHandle graph_handle = handle();
     const std::vector<std::string> problems =
         without_gil("loading", [&] { return graph_handle->from_description(description); });
     check_problems(problems, strict);
 }
 
-GraphRunResult PythonGraph::run(const GraphRunOptions& options) {
+GraphRunResult PythonGraph::run(const GraphRunOptions& options,
+                                const BeforeIteration& before_iteration,
+                                const AfterIteration& after_iteration) {
     const GraphHandle graph_handle = idle_handle();
     running = true;
     stop_requested = false;
@@ -98,21 +99,42 @@ GraphRunResult PythonGraph::run(const GraphRunOptions& options) {
         }
         return error.has_value();
     };
+    const auto info_of = [](const GraphIterationInfo& info) {
+        const NodeProcessInfo& process = info.process_info;
+        return IterationInfo{
+            .index_in_run = info.index_in_run,
+            .iteration = process.get_iteration(),
+            .total_iteration = process.get_total_iteration(),
+            .time = process.get_elapsed(),
+            .time_delta = process.get_time_delta(),
+            .elapsed_since_connect = process.get_elapsed_since_connect(),
+        };
+    };
+    const auto before = [&](const GraphIterationInfo& info) {
+        const nb::gil_scoped_acquire acquire;
+        const DispatchScope dispatch(*this);
+        try {
+            return before_iteration(info_of(info));
+        } catch (nb::python_error& e) {
+            error.emplace(std::move(e));
+        }
+        return std::optional<std::chrono::nanoseconds>{};
+    };
+    const auto after = [&](const GraphIterationInfo& info) {
+        const nb::gil_scoped_acquire acquire;
+        const DispatchScope dispatch(*this);
+        try {
+            after_iteration(info_of(info));
+        } catch (nb::python_error& e) {
+            error.emplace(std::move(e));
+        }
+    };
     GraphRunResult result;
     {
         const nb::gil_scoped_release release;
         result = graph_handle->run(
-            options,
-            [&] {
-                if (captures_ready()) {
-                    const nb::gil_scoped_acquire acquire;
-                    try {
-                        dispatch_captures();
-                    } catch (nb::python_error& e) {
-                        error.emplace(std::move(e));
-                    }
-                }
-            },
+            options, before_iteration ? Graph::BeforeIteration(before) : Graph::BeforeIteration{},
+            after_iteration ? Graph::AfterIteration(after) : Graph::AfterIteration{},
             [&] { return error.has_value() || stop_requested || signal_raised(); });
     }
     if (error) {
@@ -130,7 +152,6 @@ void PythonGraph::wait() {
         return;
     }
     wait_for_iterations("waiting");
-    dispatch_captures();
 }
 
 void PythonGraph::close() {
@@ -138,7 +159,6 @@ void PythonGraph::close() {
         return;
     }
     ensure_idle();
-    capture_callbacks.clear();
     wait_for_iterations("closing");
     without_gil("closing", [&] { graph.reset(); });
 }
@@ -151,17 +171,6 @@ void PythonGraph::wait_for_iterations(const char* activity) {
     };
     wait_interruptibly(
         [&](const std::chrono::nanoseconds slice) { return graph_handle->wait(slice); });
-}
-
-void PythonGraph::add_capture_callback(const std::shared_ptr<HostSink>& sink,
-                                       const nb::callable& callback) {
-    ensure_editable();
-    const auto entry = std::ranges::find(capture_callbacks, sink, &SinkCallbacks::sink);
-    if (entry == capture_callbacks.end()) {
-        capture_callbacks.push_back({sink, {callback}});
-    } else {
-        entry->callbacks.push_back(callback);
-    }
 }
 
 void PythonGraph::properties(const nb::object& ui) {
@@ -179,23 +188,6 @@ void PythonGraph::record(const nb::object& ui, const std::function<void(Properti
     PythonProperties properties{ui};
     without_gil("recording properties", [&] { pass(properties); });
     properties.rethrow_error();
-}
-
-void PythonGraph::remove_capture_callbacks(const std::shared_ptr<HostSink>& sink) {
-    ensure_editable();
-    std::erase_if(capture_callbacks,
-                  [&](const SinkCallbacks& entry) { return entry.sink == sink; });
-}
-
-template <typename T>
-std::shared_ptr<T> PythonGraph::find(const std::string& identifier,
-                                     const std::string_view kind) const {
-    const auto node =
-        std::dynamic_pointer_cast<T>(editable_handle()->find_node_for_identifier(identifier));
-    if (!node) {
-        throw nb::key_error(fmt::format("no {} '{}'", kind, identifier).c_str());
-    }
-    return node;
 }
 
 std::shared_ptr<HostSink> PythonGraph::sink(const std::string& identifier) const {
@@ -228,7 +220,7 @@ std::unordered_map<std::string, std::shared_ptr<HostWindow>> PythonGraph::window
 void PythonGraph::ensure_idle() const {
     ensure_editable();
     if (running || dispatch_thread != std::thread::id{}) {
-        throw std::runtime_error("the graph is running or calling capture callbacks");
+        throw std::runtime_error("the graph is running or calling iteration callbacks");
     }
 }
 
@@ -237,8 +229,8 @@ void PythonGraph::ensure_editable() const {
         throw std::runtime_error(fmt::format("the graph is busy {}", activity));
     }
     if (running && dispatch_thread != std::this_thread::get_id()) {
-        throw std::runtime_error("the graph is running, edit it from a capture callback or stop() "
-                                 "it first");
+        throw std::runtime_error("the graph is running, edit it from an iteration callback or "
+                                 "stop() it first");
     }
 }
 
@@ -257,60 +249,6 @@ const GraphHandle& PythonGraph::idle_handle() const {
 const GraphHandle& PythonGraph::editable_handle() const {
     ensure_editable();
     return handle();
-}
-
-int PythonGraph::visit_callbacks(const visitproc visit, void* arg) const {
-    for (const SinkCallbacks& entry : capture_callbacks) {
-        for (const nb::callable& callback : entry.callbacks) {
-            Py_VISIT(callback.ptr());
-        }
-    }
-    return 0;
-}
-
-void PythonGraph::clear_callbacks() {
-    capture_callbacks.clear();
-}
-
-void PythonGraph::dispatch_captures() {
-    dispatch_thread = std::this_thread::get_id();
-    defer {
-        dispatch_thread = std::thread::id{};
-    };
-    while (true) {
-        std::shared_ptr<HostSink> next;
-        uint64_t next_value = 0;
-        for (const SinkCallbacks& entry : capture_callbacks) {
-            const auto value = entry.sink->next_ready_semaphore_value();
-            if (value && (!next || *value < next_value)) {
-                next = entry.sink;
-                next_value = *value;
-            }
-        }
-        if (!next) {
-            std::erase_if(capture_callbacks,
-                          [](const SinkCallbacks& entry) { return entry.sink->is_cancelled(); });
-            return;
-        }
-        std::optional<HostSink::Capture> capture = next->get(std::chrono::nanoseconds{0});
-        // another consumer may have taken it
-        if (!capture) {
-            continue;
-        }
-        // callbacks may add or clear callbacks
-        const std::vector<nb::callable> callbacks =
-            std::ranges::find(capture_callbacks, next, &SinkCallbacks::sink)->callbacks;
-        const nb::object capture_object = nb::cast(std::move(*capture));
-        for (const nb::callable& callback : callbacks) {
-            callback(capture_object);
-        }
-    }
-}
-
-bool PythonGraph::captures_ready() const {
-    return std::ranges::any_of(capture_callbacks, [](const SinkCallbacks& entry) {
-        return entry.sink->next_ready_semaphore_value().has_value();
-    });
 }
 
 void PythonGraph::check_problems(const std::vector<std::string>& problems, const bool strict) {

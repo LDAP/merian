@@ -19,12 +19,6 @@ void main(uint thread_id: SV_GroupThreadID, uint2 wg_id: SV_GroupID) {
 
     const PackedVertexData v_in = job.src[i];
 
-    if (job.prev_dst != nullptr) {
-        PackedPrevVertexData p;
-        p.position = mul(job.prev_transform, float4(v_in.position, 1.0)).xyz;
-        job.prev_dst[i] = p;
-    }
-
     const float3 normal = decode_normal(v_in.encoded_normal);
     const float4 tangent = decode_tangent(v_in.encoded_tangent);
 

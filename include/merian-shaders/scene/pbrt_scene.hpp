@@ -51,9 +51,9 @@ class PBRTScene : public Scene {
         bool has_alpha = false;
     };
 
-    struct MaterialBuild; // OpenPBRMaterial + derived mesh flags, defined in the .cpp
+    struct MaterialBuild;
 
-    void release_textures(const CommandBufferHandle& cmd);
+    void release_textures();
     void build_scene(const CommandBufferHandle& cmd);
     void load_env(const CommandBufferHandle& cmd);
     void load_camera();

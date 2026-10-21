@@ -43,11 +43,12 @@ class PathDebugInput : public InputListener {
 
     // Empty while a listener above has the cursor.
     std::optional<float2> cursor() const;
-    // A pick, or a click on the panels.
     std::optional<Click> take_click();
     double take_panel_scroll();
     double take_widen_scroll();
-    bool take_clear();
+    // Escape pressed, whoever consumed it.
+    bool take_escape();
+    void set_consume_escape(bool consume);
 
   private:
     class Observer : public InputListener {
@@ -63,6 +64,7 @@ class PathDebugInput : public InputListener {
         float2 cursor_pos{};
         // the last cursor event did not reach PRIORITY
         bool cursor_taken = false;
+        bool escape_pressed = false;
     };
 
     bool over_panels() const;
@@ -74,8 +76,8 @@ class PathDebugInput : public InputListener {
     float2 panel_upper{};
     double panel_scroll = 0.;
     double widen_scroll = 0.;
-    bool clear_requested = false;
     bool swallow_release = false;
+    bool consume_escape = false;
 };
 
 } // namespace merian

@@ -14,6 +14,7 @@ import signal
 import sys
 
 import lib  # noqa: F401
+from lib.args import config_first
 
 # isort: split
 import merian
@@ -79,27 +80,10 @@ def _default_description() -> mg.Description:
     return description
 
 
-def _config_first(argv: list[str], parser: argparse.ArgumentParser) -> list[str]:
-    """
-    Returns argv with the config moved to the front: before it, an unknown --option
-    takes the next token as its value.
-    """
-    i = 0
-    while i < len(argv):
-        token = argv[i]
-        if not token.startswith("-"):
-            return [token, *argv[:i], *argv[i + 1 :]]
-        action = parser._option_string_actions.get(token)
-        takes_value = action.nargs != 0 if action else token.startswith("--")
-        i += 2 if takes_value and "=" not in token else 1
-    return argv
-
-
 def main(argv: list[str] | None = None) -> int:
-    # The reports are UTF-8, not the locale encoding of redirected output on Windows
     sys.stdout.reconfigure(encoding="utf-8")
     base = _runner_parser()
-    argv = _config_first(sys.argv[1:] if argv is None else argv, base)
+    argv = config_first(sys.argv[1:] if argv is None else argv, base)
     options, _ = base.parse_known_args(argv)
     if options.loglevel:
         merian.set_log_level(options.loglevel)

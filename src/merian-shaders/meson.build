@@ -11,7 +11,6 @@ merian_shaders_src = [
 
 shaders = [
     'scene/transform_vertex.slang',
-    'scene/transform_prev_vertex.slang',
 ]
 foreach s : shaders
     merian_shaders_src += shader_generator.process(s)

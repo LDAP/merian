@@ -46,13 +46,9 @@ template <typename T> T read_strided(const uint8_t* base, int byte_stride, uint3
     return *reinterpret_cast<const T*>(base + byte_stride * index);
 }
 
-// Mesh referencing buffer data in a tinygltf::Model (owned by GLTFScene).
-//
-// glTF meshes carry strided + arbitrarily-typed source data; they aren't in
-// the canonical PackedVertexData layout. GLTFMesh implements
-// HostVertexSource and HostIndexSource for bulk write into device-local buffers.
+// Mesh over the strided buffer data of a tinygltf::Model owned by GLTFScene.
 class GLTFMesh : public Scene::Mesh,
-                 public Scene::Mesh::HostVertexSource<PackedVertexData>,
+                 public Scene::Mesh::HostVertexSource,
                  public Scene::Mesh::HostIndexSource {
   public:
     const uint8_t* pos_base = nullptr;
@@ -96,16 +92,11 @@ class GLTFMesh : public Scene::Mesh,
     MeshVertexData get_vertices() const override {
         return static_cast<HostVertices>(const_cast<GLTFMesh*>(this));
     }
-    MeshPrevVertexData get_prev_vertices() const override {
-        return std::monostate{};
-    }
     MeshIndexData get_indices() const override {
         if (idx_base == nullptr)
             return std::monostate{};
         return static_cast<HostIndices>(const_cast<GLTFMesh*>(this));
     }
-
-    // ---- HostVertexSource<PackedVertexData> ----
 
     void write(PackedVertexData* dst) const override {
         for (uint32_t v = 0; v < vertex_count; v++) {
@@ -826,21 +817,13 @@ void GLTFScene::compute_aabb() {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Load
-// ---------------------------------------------------------------------------
-
 void GLTFScene::load(const CommandBufferHandle& cmd, const std::filesystem::path& path) {
-    // Drop everything we put into the scene / material system / texture manager on the previous
-    // load so this can be called repeatedly. Defer texture destruction to pool reset so any
-    // in-flight frame keeps its bindings valid.
+    // drop what the previous load added
     for (const auto& slot : texture_slots) {
         if (slot.id_srgb != TextureID(-1)) {
-            cmd->keep_until_pool_reset(get_texture_manager()->get_texture(slot.id_srgb));
             get_texture_manager()->remove_texture(slot.id_srgb);
         }
         if (slot.id_linear != TextureID(-1)) {
-            cmd->keep_until_pool_reset(get_texture_manager()->get_texture(slot.id_linear));
             get_texture_manager()->remove_texture(slot.id_linear);
         }
     }

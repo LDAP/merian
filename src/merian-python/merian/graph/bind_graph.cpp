@@ -17,23 +17,6 @@ namespace {
 
 struct GraphProfiler : GraphReference {};
 
-int traverse_graph(PyObject* self, visitproc visit, void* arg) {
-    Py_VISIT(Py_TYPE(self));
-    if (!nb::inst_ready(self)) {
-        return 0;
-    }
-    return nb::inst_ptr<PythonGraph>(self)->visit_callbacks(visit, arg);
-}
-
-int clear_graph(PyObject* self) {
-    nb::inst_ptr<PythonGraph>(self)->clear_callbacks();
-    return 0;
-}
-
-PyType_Slot graph_slots[] = {{Py_tp_traverse, reinterpret_cast<void*>(traverse_graph)},
-                             {Py_tp_clear, reinterpret_cast<void*>(clear_graph)},
-                             {0, nullptr}};
-
 } // namespace
 
 void bind_graph(nb::module_& m) {
@@ -51,6 +34,21 @@ void bind_graph(nb::module_& m) {
             return fmt::format("RunResult(stop_reason={}, iterations={}, event='{}')",
                                nb::cast<std::string>(nb::str(nb::cast(result.stop_reason))),
                                result.iterations, result.event);
+        });
+
+    nb::class_<IterationInfo>(
+        m, "IterationInfo",
+        "An iteration as the callbacks of Graph.run see it: after_iteration the one that ran, "
+        "before_iteration the one before the next.")
+        .def_ro("index_in_run", &IterationInfo::index_in_run, "Of the iteration in this run.")
+        .def_ro("iteration", &IterationInfo::iteration, "Since connect.")
+        .def_ro("total_iteration", &IterationInfo::total_iteration)
+        .def_ro("time", &IterationInfo::time, "Graph time in seconds.")
+        .def_ro("time_delta", &IterationInfo::time_delta, "Seconds since the iteration before.")
+        .def_ro("elapsed_since_connect", &IterationInfo::elapsed_since_connect, "Seconds.")
+        .def("__repr__", [](const IterationInfo& info) {
+            return fmt::format("IterationInfo(index_in_run={}, iteration={}, time={})",
+                               info.index_in_run, info.iteration, info.time);
         });
 
     nb::enum_<ProfilerReportKind>(m, "ReportKind")
@@ -106,29 +104,52 @@ void bind_graph(nb::module_& m) {
     nb::class_<PythonGraph>(m, "Graph",
                             "While it runs, other threads may only call stop() and the methods "
                             "that HostSink, the sources and HostWindow document as callable from "
-                            "any thread.",
-                            nb::type_slots(graph_slots))
+                            "any thread.")
         .def(nb::init<const ContextHandle&, const std::optional<GraphDescription>&, bool>(),
              "context"_a, "description"_a = nb::none(), "strict"_a = true,
              "strict raises ConfigError for properties of the description no node reads or with "
              "invalid values, else they log a warning.")
         .def("load", &PythonGraph::load, "description"_a, "strict"_a = true,
-             "Replaces all nodes and connections, after delivering the pending captures; capture "
-             "callbacks and capture requests are removed.")
+             "Replaces all nodes and connections after waiting for the iterations in flight; "
+             "capture requests are removed.")
         .def(
             "run",
             [](PythonGraph& graph, const std::optional<uint64_t> iterations,
                const std::string& until_event, const std::optional<Seconds> duration,
-               const std::optional<Seconds> time) {
-                return graph.run({
-                    .iterations = iterations,
-                    .until_event = until_event,
-                    .duration = to_limit(duration),
-                    .time = to_nanoseconds(time),
-                });
+               const std::optional<Seconds> time, const std::optional<nb::callable>& before,
+               const std::optional<nb::callable>& after) {
+                PythonGraph::BeforeIteration before_iteration;
+                if (before) {
+                    before_iteration = [&](const IterationInfo& info) {
+                        const nb::object held = (*before)(info);
+                        if (held.is_none()) {
+                            return std::optional<std::chrono::nanoseconds>{};
+                        }
+                        Seconds seconds;
+                        if (!nb::try_cast(held, seconds)) {
+                            PyErr_SetString(PyExc_TypeError,
+                                            "before_iteration must return None or a time");
+                            throw nb::python_error();
+                        }
+                        return to_nanoseconds(seconds);
+                    };
+                }
+                PythonGraph::AfterIteration after_iteration;
+                if (after) {
+                    after_iteration = [&](const IterationInfo& info) { (*after)(info); };
+                }
+                return graph.run(
+                    {
+                        .iterations = iterations,
+                        .until_event = until_event,
+                        .duration = to_limit(duration),
+                        .time = to_nanoseconds(time),
+                    },
+                    before_iteration, after_iteration);
             },
             nb::arg("iterations").none() = 1, "until_event"_a = "", "duration"_a = nb::none(),
-            "time"_a = nb::none(),
+            "time"_a = nb::none(), "before_iteration"_a = nb::none(),
+            "after_iteration"_a = nb::none(),
             "Runs until `iterations` ran (None: no limit), an event matching `until_event` "
             "(comma-separated 'node type/identifier/event' patterns; the graph sends "
             "'/graph/connect' and '/graph/reload_shaders') was sent, `duration` passed or stop() "
@@ -137,16 +158,22 @@ void bind_graph(nb::module_& m) {
             "are seconds or timedelta. With `iterations` the nodes see the last iteration, which "
             "sinks can write ('end of run'). Returns once the last iteration is submitted, after "
             "running the node callbacks (such as image writes) whose GPU work already finished; "
-            "the rest run in the next run() or in wait().")
+            "the rest run in the next run() or in wait(). before_iteration(info) is called before "
+            "each iteration while the earlier ones may still be in flight, and may edit the graph "
+            "and its scenes for it; returning a time (seconds or timedelta) holds the graph time "
+            "from that iteration on, as `time` does. after_iteration(info) is called after each "
+            "iteration is submitted; sink.get_all() there returns the captures that arrived. An "
+            "exception of a callback "
+            "ends the run before the next iteration and is raised from run().")
         .def("stop", &PythonGraph::stop,
              "Ends a run after the current iteration, no effect between runs; callable from any "
              "thread.")
         .def("wait", &PythonGraph::wait,
              "Waits for all iterations in flight and their node callbacks (written image files "
-             "are complete afterwards) and delivers their captures.")
+             "and captures are complete afterwards).")
         .def("close", &PythonGraph::close,
-             "Drops the captures not yet delivered to callbacks; leaving a with block without an "
-             "exception delivers them first.")
+             "Waits for the iterations in flight and releases the graph; captures not taken are "
+             "dropped.")
         .def(
             "__enter__", [](PythonGraph& graph) -> PythonGraph& { return graph; },
             nb::rv_policy::reference)
@@ -301,6 +328,20 @@ void bind_graph(nb::module_& m) {
             "path"_a, "The file Store writes and Load reads in the graph's ImGui panel.")
         .def("to_description",
              [](const PythonGraph& graph) { return graph.editable_handle()->to_description(); })
+        .def(
+            "find",
+            [](const nb::object& graph, const nb::type_object& type,
+               const std::string& identifier) {
+                if (!nb::hasattr(type, "_find")) {
+                    throw nb::type_error(
+                        fmt::format("{} is not a node reference type", nb::type_name(type).c_str())
+                            .c_str());
+                }
+                return type.attr("_find")(graph, identifier);
+            },
+            "type"_a, "identifier"_a,
+            "The node as a reference of type, e.g. find(SceneNode, 'scene'); KeyError if the "
+            "graph has no node of that type with this identifier.")
         .def(
             "sink",
             [](const nb::object& graph, const std::string& identifier) {

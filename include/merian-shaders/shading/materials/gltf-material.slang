@@ -120,52 +120,52 @@ struct GltfMaterial<let TRANSMISSION : bool = false,
         }
     }
 
-    float get_metallic(const TextureManager tm,
+    float get_metallic(const Textures textures,
                        const float2 uv,
                        const LODSampler2D lod = DefaultLODSampler()) {
         float metallic = metallic_factor;
         if (metallic_roughness_texture != TextureID(-1)) {
-            metallic *= lod.sample(tm.get_sampler2D(metallic_roughness_texture), uv).b;
+            metallic *= textures.sample(lod, metallic_roughness_texture, uv).b;
         }
         return metallic;
     }
 
-    float get_roughness(const TextureManager tm,
+    float get_roughness(const Textures textures,
                         const float2 uv,
                         const LODSampler2D lod = DefaultLODSampler()) {
         float roughness = roughness_factor;
         if (metallic_roughness_texture != TextureID(-1)) {
-            roughness *= lod.sample(tm.get_sampler2D(metallic_roughness_texture), uv).g;
+            roughness *= textures.sample(lod, metallic_roughness_texture, uv).g;
         }
         return roughness;
     }
 
     override float3 get_emission(const ShadingData sd,
-                                 const TextureManager tm,
+                                 const Textures textures,
                                  const LODSampler2D lod) {
         float3 emission = emissive_factor;
         if (emissive_texture != TextureID(-1)) {
-            emission *= lod.sample(tm.get_sampler2D(emissive_texture), sd.uv).rgb;
+            emission *= textures.sample(lod, emissive_texture, sd.uv).rgb;
         }
         return emission;
     }
 
     GltfMaterialSample get_sample(const ShadingData sd,
-                                 const TextureManager tm,
-                                 const LODSampler2D lod,
-                                 out float3 out_emission,
-                                 out OrthonormalFrame out_shading_frame) {
+                                  const Textures textures,
+                                  const LODSampler2D lod,
+                                  out float3 out_emission,
+                                  out OrthonormalFrame out_shading_frame) {
         const LOD0Sampler lod0;
 
         float4 base = base_color_factor;
         if (let tex = header.get_alpha_texture_id()) {
-            base *= lod.sample(tm.get_sampler2D(tex), sd.uv);
+            base *= textures.sample(lod, tex, sd.uv);
         }
 
         float metallic = metallic_factor;
         float roughness = roughness_factor;
         if (metallic_roughness_texture != TextureID(-1)) {
-            const float4 mr = lod0.sample(tm.get_sampler2D(metallic_roughness_texture), sd.uv);
+            const float4 mr = textures.sample(lod0, metallic_roughness_texture, sd.uv);
             roughness *= mr.g;
             metallic *= mr.b;
         }
@@ -173,7 +173,7 @@ struct GltfMaterial<let TRANSMISSION : bool = false,
         // normal map per glTF: xy = (2*sample - 1) * normal_scale; z reconstructed
         OrthonormalFrame shading_frame = sd.frame;
         if (normal_texture != TextureID(-1)) {
-            const float3 raw = lod0.sample(tm.get_sampler2D(normal_texture), sd.uv).rgb;
+            const float3 raw = textures.sample(lod0, normal_texture, sd.uv).rgb;
             const float2 nxy = (raw.xy * 2.0f - 1.0f) * normal_scale;
             const float nz = sqrt(max(0.0f, 1.0f - dot(nxy, nxy)));
             const OrthonormalFrame mapped = sd.frame.apply_normal_map(float3(nxy, nz));
@@ -188,7 +188,7 @@ struct GltfMaterial<let TRANSMISSION : bool = false,
 
         float3 emission = emissive_factor;
         if (emissive_texture != TextureID(-1)) {
-            emission *= lod.sample(tm.get_sampler2D(emissive_texture), sd.uv).rgb;
+            emission *= textures.sample(lod, emissive_texture, sd.uv).rgb;
         }
 
         const float alpha = ggx_roughness_to_alpha(roughness);
@@ -199,7 +199,7 @@ struct GltfMaterial<let TRANSMISSION : bool = false,
             float strength = aniso.strength;
             float2 dir = float2(cos(aniso.rotation), sin(aniso.rotation));
             if (aniso.texture != TextureID(-1)) {
-                const float3 a = lod0.sample(tm.get_sampler2D(aniso.texture), sd.uv).rgb;
+                const float3 a = textures.sample(lod0, aniso.texture, sd.uv).rgb;
                 const float2 d = normalize(a.xy * 2.0f - 1.0f);
                 dir = float2(dir.x * d.x - dir.y * d.y, dir.x * d.y + dir.y * d.x);
                 strength *= a.b;
@@ -231,19 +231,18 @@ struct GltfMaterial<let TRANSMISSION : bool = false,
         if (let iri = iridescence_opt) {
             iridescence_factor = iri.factor;
             if (iri.texture != TextureID(-1)) {
-                iridescence_factor *= lod0.sample(tm.get_sampler2D(iri.texture), sd.uv).r;
+                iridescence_factor *= textures.sample(lod0, iri.texture, sd.uv).r;
             }
             iri_ior = iri.ior;
             // Thickness texture green channel selects between min and max; absent -> max.
             float t = 1.0f;
             if (iri.thickness_texture != TextureID(-1)) {
-                t = lod0.sample(tm.get_sampler2D(iri.thickness_texture), sd.uv).g;
+                t = textures.sample(lod0, iri.thickness_texture, sd.uv).g;
             }
             iri_thickness = lerp(iri.thickness_min, iri.thickness_max, t);
         }
 
-        // Opaque part: iridescent specular reflection over diffuse. Transmissive part: a coupled
-        // rough dielectric whose interface reflectance is iridescent. Mixed by the transmission.
+        // opaque: iridescent specular over diffuse; transmission: rough dielectric with iridescence
         const GltfOpaqueDielectric opaque_dielectric =
             GltfOpaqueDielectric(SpecularBRDF(specular_alpha), LambertDiffuseBRDF(base.rgb),
                                  dielectric_f0, eta, iri_ior, iri_thickness, iridescence_factor);
@@ -263,11 +262,11 @@ struct GltfMaterial<let TRANSMISSION : bool = false,
         if (let coat = clearcoat_opt) {
             coat_weight = coat.weight;
             if (coat.texture != TextureID(-1)) {
-                coat_weight *= lod0.sample(tm.get_sampler2D(coat.texture), sd.uv).r;
+                coat_weight *= textures.sample(lod0, coat.texture, sd.uv).r;
             }
             float coat_rough = coat.roughness;
             if (coat.roughness_texture != TextureID(-1)) {
-                coat_rough *= lod0.sample(tm.get_sampler2D(coat.roughness_texture), sd.uv).g;
+                coat_rough *= textures.sample(lod0, coat.roughness_texture, sd.uv).g;
             }
             coat_alpha = ggx_roughness_to_alpha(coat_rough);
         }
@@ -286,11 +285,11 @@ struct GltfMaterial<let TRANSMISSION : bool = false,
         if (let sh = sheen_opt) {
             sheen_col = sh.color;
             if (sh.color_texture != TextureID(-1)) {
-                sheen_col *= lod.sample(tm.get_sampler2D(sh.color_texture), sd.uv).rgb;
+                sheen_col *= textures.sample(lod, sh.color_texture, sd.uv).rgb;
             }
             sheen_rough = sh.roughness;
             if (sh.roughness_texture != TextureID(-1)) {
-                sheen_rough *= lod0.sample(tm.get_sampler2D(sh.roughness_texture), sd.uv).a;
+                sheen_rough *= textures.sample(lod0, sh.roughness_texture, sd.uv).a;
             }
         }
         const float sheen_alpha = ggx_roughness_to_alpha(sheen_rough);

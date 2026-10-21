@@ -1,5 +1,8 @@
+import base64
 import faulthandler
+import json
 import math
+import struct
 import tempfile
 import threading
 import time
@@ -28,6 +31,89 @@ AttributeBegin
     Shape "sphere" "float radius" 0.25
 AttributeEnd
 """
+
+
+def _gltf_scene() -> str:
+    """A floor, an emissive ceiling quad and a clearcoated back wall."""
+    quads = [
+        [(-1, 0, -1), (-1, 0, 1), (1, 0, 1), (1, 0, -1)],
+        [(-0.5, 2, -0.5), (0.5, 2, -0.5), (0.5, 2, 0.5), (-0.5, 2, 0.5)],
+        [(-1, 0, -1), (1, 0, -1), (1, 2, -1), (-1, 2, -1)],
+    ]
+    blob = b"".join(struct.pack("<3f", *p) for quad in quads for p in quad)
+    blob += struct.pack("<6H", 0, 1, 2, 0, 2, 3)
+    blob += struct.pack("<8f", 0, 0, 0, 1, 1, 1, 1, 0)
+    accessors = [
+        {
+            "bufferView": i,
+            "componentType": 5126,
+            "count": 4,
+            "type": "VEC3",
+            "min": np.min(quad, axis=0).tolist(),
+            "max": np.max(quad, axis=0).tolist(),
+        }
+        for i, quad in enumerate(quads)
+    ]
+    accessors.append(
+        {"bufferView": 3, "componentType": 5123, "count": 6, "type": "SCALAR"}
+    )
+    accessors.append(
+        {"bufferView": 4, "componentType": 5126, "count": 4, "type": "VEC2"}
+    )
+    views = [{"buffer": 0, "byteOffset": 48 * i, "byteLength": 48} for i in range(3)]
+    views.append({"buffer": 0, "byteOffset": 144, "byteLength": 12})
+    views.append({"buffer": 0, "byteOffset": 156, "byteLength": 32})
+    data = base64.b64encode(blob).decode()
+    return json.dumps(
+        {
+            "asset": {"version": "2.0"},
+            "extensionsUsed": ["KHR_materials_clearcoat"],
+            "scene": 0,
+            "scenes": [{"nodes": [0, 1, 2, 3]}],
+            "nodes": [
+                {"mesh": 0},
+                {"mesh": 1},
+                {"mesh": 2},
+                {"camera": 0, "translation": [0, 1, 5]},
+            ],
+            "cameras": [
+                {"type": "perspective", "perspective": {"yfov": 0.7, "znear": 0.01}}
+            ],
+            "meshes": [
+                {
+                    "primitives": [
+                        {
+                            "attributes": {"POSITION": i}
+                            | ({"TEXCOORD_0": 4} if i == 0 else {}),
+                            "indices": 3,
+                            "material": i,
+                        }
+                    ]
+                }
+                for i in range(3)
+            ],
+            "materials": [
+                {"pbrMetallicRoughness": {"metallicFactor": 0}},
+                {
+                    "emissiveFactor": [1, 1, 1],
+                    "doubleSided": True,
+                    "pbrMetallicRoughness": {"metallicFactor": 0},
+                },
+                {
+                    "pbrMetallicRoughness": {"metallicFactor": 0},
+                    "extensions": {"KHR_materials_clearcoat": {"clearcoatFactor": 1}},
+                },
+            ],
+            "buffers": [
+                {
+                    "byteLength": len(blob),
+                    "uri": f"data:application/octet-stream;base64,{data}",
+                }
+            ],
+            "bufferViews": views,
+            "accessors": accessors,
+        }
+    )
 
 
 class _PathRecorder(merian.Properties):
@@ -285,32 +371,31 @@ class GraphTest(unittest.TestCase):
                 done.set()
                 thread.join()
 
-    def test_capture_callbacks_in_iteration_order(self):
+    def test_captures_from_the_after_iteration_callback(self):
         description = mg.Description()
         description.add_node("Color", "color", {"extent": [4, 2, 1]})
         description.add_image_sink("color.out", "a")
         description.add_image_sink("color.out", "b")
         with mg.Graph(self.context, description) as graph:
-            delivered: list[tuple[str, int]] = []
+            delivered: dict[str, list[int]] = {"a": [], "b": []}
 
-            def on_a(capture):
-                delivered.append(("a", capture.run_iteration))
+            def take():
+                for name, iterations in delivered.items():
+                    captures = graph.sink(name).get_all()
+                    iterations += [capture.run_iteration for capture in captures]
+
+            def after(info: mg.IterationInfo) -> None:
+                take()
                 graph.nodes["color"].set_properties(
-                    {"color": [capture.run_iteration, 0, 0, 1]}
+                    {"color": [info.index_in_run, 0, 0, 1]}
                 )
 
-            graph.sink("a").on_capture(on_a)
-            graph.sink("b").on_capture(
-                lambda capture: delivered.append(("b", capture.run_iteration))
-            )
             graph.sink("a").capture_every(1)
             graph.sink("b").capture_every(2)
-            graph.run(iterations=6)
+            graph.run(iterations=6, after_iteration=after)
             graph.wait()
-            iterations = [iteration for _, iteration in delivered]
-            self.assertEqual(iterations, sorted(iterations))
-            self.assertEqual([name for name, _ in delivered].count("a"), 6)
-            self.assertEqual([name for name, _ in delivered].count("b"), 3)
+            take()
+            self.assertEqual(delivered, {"a": [0, 1, 2, 3, 4, 5], "b": [0, 2, 4]})
 
     def test_other_threads_while_running(self):
         with self.color_graph() as graph:
@@ -325,12 +410,9 @@ class GraphTest(unittest.TestCase):
                     errors.append(error)
                 graph.stop()
 
-            sink = graph.sink("sink")
-            sink.on_capture(lambda _: running.set())
-            sink.capture()
             thread = threading.Thread(target=other)
             thread.start()
-            result = graph.run(iterations=None)
+            result = graph.run(iterations=None, after_iteration=lambda _: running.set())
             thread.join(timeout=5)
             self.assertEqual(result.stop_reason, mg.StopReason.REQUESTED)
             self.assertEqual(len(errors), 1)
@@ -380,22 +462,21 @@ class GraphTest(unittest.TestCase):
             capture = sink.get(timedelta(0))
             self.assertEqual(capture.run_iteration, 0)
 
-    def test_restart_run_from_a_capture_callback(self):
+    def test_restart_run_from_an_iteration_callback(self):
         with self.color_graph() as graph:
+            sink = graph.sink("sink")
             iterations: list[int] = []
 
-            def on_capture(capture):
-                iterations.append(capture.run_iteration)
-                if len(iterations) == 3:
+            def after(info: mg.IterationInfo) -> None:
+                iterations.extend(capture.run_iteration for capture in sink.get_all())
+                if info.index_in_run == 2:
                     graph.restart_run()
 
-            sink = graph.sink("sink")
-            sink.on_capture(on_capture)
             sink.capture_every(1)
-            graph.run(iterations=8)
+            graph.run(iterations=5, after_iteration=after)
             graph.wait()
-            self.assertEqual(iterations[:3], [0, 1, 2])
-            self.assertEqual(iterations.count(0), 2)
+            iterations.extend(capture.run_iteration for capture in sink.get_all())
+            self.assertEqual(iterations, [0, 1, 2, 0, 1])
 
     def test_reports(self):
         with self.color_graph() as graph:
@@ -424,13 +505,14 @@ class GraphTest(unittest.TestCase):
         description.add_image_sink("color.out", "sink")
         self.assertEqual(description.connections, [("color", "sink", "out", "src")])
 
-    def path_traced(self) -> mg.Description:
+    def path_traced(self, gltf: bool = False) -> mg.Description:
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
-        scene_file = Path(directory.name) / "scene.pbrt"
-        scene_file.write_text(_PBRT_SCENE)
+        scene_file = Path(directory.name) / ("scene.gltf" if gltf else "scene.pbrt")
+        scene_file.write_text(_gltf_scene() if gltf else _PBRT_SCENE)
         description = mg.Description()
-        description.add_node("PBRT Scene", "scene", {"file": str(scene_file)})
+        scene_type = "GLTF Scene" if gltf else "PBRT Scene"
+        description.add_node(scene_type, "scene", {"file": str(scene_file)})
         description.add_node("GBuffer (Raytraced)", "gbuffer")
         description.add_node("Render (Path-traced)", "render")
         description.add_node("Accumulate", "accumulate")
@@ -470,6 +552,206 @@ class GraphTest(unittest.TestCase):
             first = self.render_bits(graph)
             graph.restart_run()
             np.testing.assert_array_equal(first, self.render_bits(graph))
+
+    def test_find_scene_node_and_edit_its_scene(self):
+        with mg.Graph(self.context, self.path_traced()) as graph:
+            graph.connect()
+            with self.assertRaises(KeyError):
+                graph.find(mg.SceneNode, "render")
+            with self.assertRaisesRegex(KeyError, "SceneNode"):
+                graph.find(mg.SceneNode, "missing")
+            with self.assertRaises(TypeError):
+                graph.find(int, "scene")
+            scene = graph.find(mg.SceneNode, "scene")
+            self.assertEqual(scene.identifier, "scene")
+
+            camera = scene.camera
+            self.assertIsInstance(camera.position, tuple)
+            np.testing.assert_allclose(camera.position, (0, 1, 5), atol=1e-6)
+            camera.look_at((0, 1, 4), (0, 1, 0), (0, 1, 0))
+            np.testing.assert_allclose(
+                scene.cameras[scene.active_camera].position, (0, 1, 4)
+            )
+            with self.assertRaises(IndexError):
+                scene.active_camera = len(scene.cameras)
+
+            plane = next(mesh for mesh in scene.meshes if mesh.instances)
+            parent = scene.add_node(animated=True)
+            moving = scene.add_node(parent=parent, animated=True)
+            scene.add_mesh_instance(plane.mesh_id, moving)
+            fixed = scene.add_node(animated=False)
+            with self.assertRaises(ValueError):
+                scene.set_transform(fixed, np.eye(4, dtype=np.float32))
+            for call in (
+                lambda: scene.set_transform(10**6, np.eye(4, dtype=np.float32)),
+                lambda: scene.add_mesh_instance(10**6, fixed),
+                lambda: scene.add_mesh_instance(plane.mesh_id, 10**6),
+                lambda: scene.remove_mesh_instance(plane.mesh_id, fixed),
+                lambda: scene.add_node(parent=10**6),
+            ):
+                with self.assertRaises(KeyError):
+                    call()
+
+            positions = np.array(
+                [[-1, 0.5, 0], [1, 0.5, 0], [0, 1.5, 0]], dtype=np.float32
+            )
+            triangles = np.array([[0, 1, 2]], dtype=np.uint32)
+            with self.assertRaises(KeyError):
+                scene.add_mesh(positions, triangles, 2**15)
+            uvs = np.array([[0, 0], [1, 0], [0.5, 1]], dtype=np.float32)
+            with self.assertRaises(ValueError):
+                scene.add_mesh(positions, triangles, plane.material_id, uvs=uvs[:2])
+            with self.assertRaises(ValueError):
+                scene.add_mesh(positions, triangles[:0], plane.material_id)
+            with self.assertRaises(ValueError):
+                scene.add_mesh(positions[:0], triangles[:0], plane.material_id)
+            triangle = scene.add_mesh(
+                positions, triangles, plane.material_id, uvs=uvs, morphed=True
+            )
+            scene.add_mesh_instance(triangle, scene.add_node(animated=False))
+            with self.assertRaises(ValueError):
+                scene.set_vertices(plane.mesh_id, positions)
+
+            for frame in range(3):
+                transform = np.eye(4, dtype=np.float32)
+                transform[1, 3] = 0.1 * frame
+                scene.set_transform(parent, transform)
+                scene.set_vertices(triangle, positions * (1 + 0.1 * frame))
+                graph.run(iterations=1)
+            graph.wait()
+            self.assertEqual(graph.inactive_nodes, {})
+            self.assertAlmostEqual(scene.transform(moving)[1, 3], 0.2, places=6)
+
+            scene.remove_node(parent)
+            scene.remove_mesh(triangle)
+            self.assertNotIn(triangle, [mesh.mesh_id for mesh in scene.meshes])
+            graph.run(iterations=1)
+            graph.wait()
+            self.assertEqual(graph.inactive_nodes, {})
+
+    def test_replacing_large_meshes(self):
+        with mg.Graph(self.context, self.path_traced()) as graph:
+            graph.connect()
+            scene = graph.find(mg.SceneNode, "scene")
+            material = next(mesh for mesh in scene.meshes if mesh.instances).material_id
+            node = scene.add_node(animated=False)
+            triangles = np.array([[0, 1, 2]], dtype=np.uint32)
+            mesh = None
+            for vertex_count in (2_000_000, 2_000_000, 2_400_000, 2_800_000):
+                positions = np.zeros((vertex_count, 3), dtype=np.float32)
+                positions[:3] = [[-1, 0.5, 0], [1, 0.5, 0], [0, 1.5, 0]]
+                if mesh is not None:
+                    scene.remove_mesh(mesh)
+                mesh = scene.add_mesh(positions, triangles, material)
+                scene.add_mesh_instance(mesh, node)
+                graph.run(iterations=1)
+            graph.wait()
+            self.assertEqual(graph.inactive_nodes, {})
+
+    def test_scene_textures_and_materials(self):
+        with mg.Graph(self.context, self.path_traced(gltf=True)) as graph:
+            graph.connect()
+            scene = graph.find(mg.SceneNode, "scene")
+            plane, _, coated = sorted(scene.meshes, key=lambda mesh: mesh.mesh_id)
+
+            def mean() -> float:
+                return float(self.render_bits(graph).view(np.float32)[..., :3].mean())
+
+            dark = mean()
+            checker = np.zeros((4, 8, 4), dtype=np.uint8)
+            checker[::2, ::2] = 255
+            texture = scene.add_texture(checker)
+            material = scene.add_material(base_color_texture=texture)
+            scene.set_mesh_material(plane.mesh_id, material)
+            meshes = {mesh.mesh_id: mesh for mesh in scene.meshes}
+            self.assertEqual(meshes[plane.mesh_id].material_id, material)
+            checkered = mean()
+            self.assertLess(checkered, dark)
+            scene.set_texture(texture, np.full((2, 2, 4), 255, dtype=np.uint8))
+            white = mean()
+            self.assertGreater(white, checkered)
+
+            glow = scene.add_texture(
+                np.full((1, 1, 4), 255, dtype=np.uint8), srgb=False, mipmaps=False
+            )
+            scene.set_material(
+                material,
+                base_color_texture=texture,
+                emission=(2, 2, 2),
+                emission_texture=glow,
+            )
+            bright = mean()
+            self.assertGreater(bright, white)
+            scene.remove_texture(glow)
+            self.assertNotEqual(mean(), bright)
+            scene.set_material(material, base_color_texture=texture, roughness=0.3)
+            self.assertLess(mean(), bright)
+            self.assertEqual(graph.inactive_nodes, {})
+
+            for call in (
+                lambda: scene.set_texture(glow, checker),
+                lambda: scene.remove_texture(glow),
+                lambda: scene.add_material(emission_texture=glow),
+                lambda: scene.set_material(2**15),
+                lambda: scene.set_mesh_material(10**6, material),
+                lambda: scene.set_mesh_material(plane.mesh_id, 2**15),
+            ):
+                with self.assertRaises(KeyError):
+                    call()
+            with self.assertRaises(ValueError):
+                scene.add_texture(np.zeros((0, 4, 4), dtype=np.uint8))
+            with self.assertRaises(ValueError):
+                scene.set_material(coated.material_id)
+            with self.assertRaises(TypeError):
+                scene.add_texture(np.zeros((2, 2, 3), dtype=np.uint8))
+            with self.assertRaises(TypeError):
+                scene.add_texture(np.ones((2, 2, 4), dtype=np.float32))
+
+    def test_iteration_callbacks_edit_each_iteration(self):
+        with mg.Graph(self.context, self.path_traced()) as graph:
+            graph.connect()
+            scene = graph.find(mg.SceneNode, "scene")
+            sink = graph.sink("sink")
+            sink.capture_every(1)
+            times = []
+            seen = []
+
+            def before(info: mg.IterationInfo) -> float:
+                scene.camera.look_at(
+                    (0, 1, 5 + info.index_in_run), (0, 1, 0), (0, 1, 0)
+                )
+                return 10.0 * (info.index_in_run + 1)
+
+            def after(info: mg.IterationInfo) -> None:
+                times.extend(capture.time for capture in sink.get_all())
+                seen.append((info.index_in_run, info.time, scene.camera.position[2]))
+
+            result = graph.run(
+                iterations=4, before_iteration=before, after_iteration=after
+            )
+            graph.wait()
+            self.assertEqual(result.iterations, 4)
+            self.assertEqual([index for index, _, _ in seen], [0, 1, 2, 3])
+            self.assertEqual([at for _, at, _ in seen], [10.0, 20.0, 30.0, 40.0])
+            np.testing.assert_allclose([z for _, _, z in seen], [5, 6, 7, 8], atol=1e-5)
+            times.extend(capture.time for capture in sink.get_all())
+            self.assertEqual(times, [10.0, 20.0, 30.0, 40.0])
+
+            # the clock continues from the time held last
+            graph.run(iterations=1)
+            self.assertGreaterEqual(graph.time, 40.0)
+
+            def failing(info: mg.IterationInfo) -> None:
+                if info.index_in_run == 1:
+                    raise ValueError("stop here")
+
+            with self.assertRaisesRegex(ValueError, "stop here"):
+                graph.run(iterations=5, before_iteration=failing)
+            with self.assertRaises(RuntimeError):
+                graph.run(iterations=1, before_iteration=lambda _: graph.wait())
+            with self.assertRaises(TypeError):
+                graph.run(iterations=1, before_iteration=lambda _: "later")
+            graph.wait()
 
     def test_graph_seed_changes_the_image(self):
         with mg.Graph(self.context, self.path_traced()) as graph:

@@ -17,20 +17,22 @@ import merian_shaders.utils.sampling;
 // Workaround for https://github.com/shader-slang/slang/pull/10769; scene.cpp injects replacements.
 __exported import scene_as_workaround;
 __exported import scene_env_map_workaround;
+__exported import scene_prev_env_map_workaround;
 __exported import scene_volume_workaround;
 
 namespace merian {
 
 // Once https://github.com/shader-slang/slang/pull/10769 lands these can replace the workaround
 // imports above. extern struct SceneAccelerationStructure : AccelerationStructure =
-// NullAccelerationStructure; extern struct SceneEnvMap : IEnvMap = EmptyEnv;
+// NullAccelerationStructure; extern struct SceneEnvMap : IEnvMap = EmptyEnv; extern struct
+// ScenePrevEnvMap : IEnvMap = EmptyEnv;
 
-// Enables thin lens depth of field in generate_camera_ray. Set via Scene from the active camera.
+// set by Scene from the active camera
 extern static const bool merian_hint_enable_thin_lens = false;
 
-// See scene.hpp for details.
 struct Scene {
     SceneAccelerationStructure as;
+    SceneAccelerationStructure prev_as;
 
     StructuredBuffer<GeometryData, ScalarDataLayout> geometries;
 
@@ -45,51 +47,49 @@ struct Scene {
 
     ParameterBlock<MaterialSystem> material_system;
     SceneEnvMap env_map;
+    ScenePrevEnvMap prev_env_map;
     NEE nee;
+    // The previous frame's, looked up by this frame's GeometryIDs.
+    NEE prev_nee;
 
     Camera camera;
     Camera prev_camera;
 
-    // Global scene parameters
     uint frame;
     uint seed;
     float time;
     float time_diff;
+    float prev_time;
 
-    // The medium filling the scene outside of any surface. Vacuum unless the scene sets one, in
-    // which case the type itself removes the medium from every renderer that reads it.
+    // the medium outside any surface; a vacuum type unless the scene sets one
     SceneHomogeneousVolume exterior_volume;
-
-    // -----------------------------------------
 
     PathMedium<SceneHomogeneousVolume> make_path_medium() {
         return PathMedium<SceneHomogeneousVolume>(exterior_volume);
     }
 
-    /* Traces the ray agains the scenes acceleration structure.
-     *
-     * Returns the hit information.
-     */
     Hit trace_ray(const RayDesc ray,
                   const uint ray_flags = RAY_FLAG_NONE,
-                  const uint instances_mask = 0xff) {
+                  const uint instances_mask = 0xff,
+                  const bool prev_frame = false) {
         SceneAccelerationStructure::RayQueryImpl rq;
-        as.trace_ray(rq, ray, ray_flags, instances_mask);
-        _proceed_ray(rq);
+        if (prev_frame)
+            prev_as.trace_ray(rq, ray, ray_flags, instances_mask);
+        else
+            as.trace_ray(rq, ray, ray_flags, instances_mask);
+        _proceed_ray(rq, prev_frame);
 
         if (rq.CommittedStatus() == COMMITTED_TRIANGLE_HIT) {
-            return Hit(rq.CommittedInstanceID(), rq.CommittedInstanceIndex(),
-                       rq.CommittedPrimitiveIndex(), rq.CommittedGeometryIndex(),
-                       rq.CommittedRayBarycentrics());
+            const Hit hit = Hit(rq.CommittedInstanceID(), rq.CommittedInstanceIndex(),
+                                rq.CommittedPrimitiveIndex(), rq.CommittedGeometryIndex(),
+                                rq.CommittedRayBarycentrics());
+            return prev_frame ? from_prev_frame(hit) : hit;
         }
 
         return Hit();
     }
 
-    /* Traces the ray agains the scenes acceleration structure.
-     *
-     * Returns if visible, i.e. if nothing was hit.
-     */
+    // true if nothing was hit
     bool trace_visibility_ray(const RayDesc ray,
                               const uint ray_flags = RAY_FLAG_NONE,
                               const uint instances_mask = 0xff) {
@@ -112,69 +112,60 @@ struct Scene {
         return camera.generate_ray_pinhole(pixel, frame_dimensions);
     }
 
-    // -----------------------------------------
-
-    // Loads the geometry data from memory.
     GeometryData get_geometry_data(const GeometryID geometry_id) {
         return geometries[geometry_id];
     }
 
-    // Hits recorded in earlier frames may reference geometry that no longer exists (the id is at
-    // best stale, at worst out of bounds). Check before dereferencing such hits.
-    bool is_valid_geometry_id(const GeometryID geometry_id) {
-        uint count;
-        uint stride;
-        geometries.GetDimensions(count, stride);
-        return geometry_id < count;
-    }
-
-    bool from_prev_frame(inout Hit hit) {
+    // the hit must be at most one frame old
+    Hit from_prev_frame(const Hit hit) {
         if (prev_geometry_remap_count == 0 || !hit.is_valid())
-            return true;
-        const GeometryID geometry_id = hit.get_geometry_id();
-        if (geometry_id >= prev_geometry_remap_count)
-            return false;
-        const GeometryRemap remap = prev_geometry_remap[geometry_id];
-        if (remap.geometry_id == GEOMETRY_ID_GONE)
-            return false;
-        hit.instance_id = remap.geometry_id;
-        hit.geometry_index = 0;
-        hit.instance_index = remap.instance_index;
-        return true;
+            return hit;
+        const GeometryRemap remap = prev_geometry_remap[hit.get_geometry_id()];
+        Hit mapped = hit;
+        mapped.instance_id = remap.geometry_id;
+        mapped.geometry_index = 0;
+        mapped.instance_index = remap.instance_index;
+        return mapped;
     }
 
-    // Loads the geometry data from memory.
+    // A miss or a sky portal: the hit sees the environment.
+    bool is_distant(const Hit hit) {
+        return !hit.is_valid() ||
+               (get_geometry_data(hit.get_geometry_id()).flags & GeometryDataFlags::UseEnvMap) != 0;
+    }
+
+    // misses exist in both frames
+    bool exists(const Hit hit, const bool prev_frame) {
+        if (!hit.is_valid())
+            return true;
+        const GeometryDataFlags absent =
+            prev_frame ? GeometryDataFlags::New : GeometryDataFlags::Retired;
+        return (get_geometry_data(hit.get_geometry_id()).flags & absent) == 0;
+    }
+
+    float get_time(const bool prev_frame) {
+        return prev_frame ? prev_time : time;
+    }
+
     GeometryData get_geometry_data(const uint instance_id, const uint geometry_index) {
         return get_geometry_data(instance_id + geometry_index);
     }
 
-    // Loads the instance transform for a TLAS instance from memory.
-    float4x4 get_instance_transform(const uint instance_index) {
-        return instance_transforms[instance_index];
+    float4x4 get_instance_transform(const uint instance_index, const bool prev_frame = false) {
+        return prev_frame ? prev_instance_transforms[instance_index]
+                          : instance_transforms[instance_index];
     }
 
-    // Loads the inverse transposed instance transform for a TLAS instance from memory (for
-    // transforming directions / normals).
-    float4x4 get_inverse_transposed_instance_transform(const uint instance_index) {
-        return inverse_transposed_instance_transforms[instance_index];
+    float4x4 get_inverse_transposed_instance_transform(const uint instance_index,
+                                                       const bool prev_frame = false) {
+        return prev_frame ? prev_inverse_transposed_instance_transforms[instance_index]
+                          : inverse_transposed_instance_transforms[instance_index];
     }
 
-    // Loads the previous frame instance transform for a TLAS instance from memory.
-    float4x4 get_prev_instance_transform(const uint instance_index) {
-        return prev_instance_transforms[instance_index];
-    }
-
-    // Loads the previous frame inverse transposed instance transform for a TLAS instance.
-    float4x4 get_prev_inverse_transposed_instance_transform(const uint instance_index) {
-        return prev_inverse_transposed_instance_transforms[instance_index];
-    }
-
-    // Conventience method for get_geometry_data(...).material_id;.
     MaterialID get_material_id(const GeometryID geometry_id) {
         return get_geometry_data(geometry_id).material_id;
     }
 
-    // Convenience method for get_geometry_data(...).material_id;
     MaterialID get_material_id(const Hit hit) {
         return get_material_id(hit.get_geometry_id());
     }
@@ -188,126 +179,51 @@ struct Scene {
         return merian::get_packed_vertex_data(geometry_data, vertex_index);
     }
 
-    vector<PackedVertexData, 3> get_packed_vertex_data(const GeometryData geometry_data,
-                                                       const uint primitive_id,
-                                                       const float3 barycentrics) {
-        const uint3 indices = get_vertex_indices(geometry_data, primitive_id);
-        return {get_packed_vertex_data(geometry_data, indices.x),
-                get_packed_vertex_data(geometry_data, indices.y),
-                get_packed_vertex_data(geometry_data, indices.z)};
+    VertexBufferAddress get_vertices(const GeometryData geometry_data, const bool prev_frame) {
+        return prev_frame ? geometry_data.prev_vertices : geometry_data.vertices;
     }
 
-    VertexData get_interpolated_vertex_data(const GeometryData geometry_data,
-                                            const uint primitive_id,
-                                            const float3 barycentrics) {
-        const uint3 indices = get_vertex_indices(geometry_data, primitive_id);
-
-        VertexData v = barycentrics.x * get_packed_vertex_data(geometry_data, indices.x).unpack();
-        v += barycentrics.y * get_packed_vertex_data(geometry_data, indices.y).unpack();
-        v += barycentrics.z * get_packed_vertex_data(geometry_data, indices.z).unpack();
-
-        v.normal = normalize(v.normal);
-        v.tangent.xyz = normalize(v.tangent.xyz);
-
-        return v;
-    }
-
-    // Convenience method to load the vertex uvs.
     float2 get_interpolated_uv(const GeometryData geometry_data,
                                const uint primitive_id,
-                               const float3 barycentrics) {
+                               const float3 barycentrics,
+                               const bool prev_frame = false) {
         const uint3 indices = get_vertex_indices(geometry_data, primitive_id);
+        const VertexBufferAddress vertices = get_vertices(geometry_data, prev_frame);
 
-        return barycentrics.x * float2(geometry_data.vertices[indices.x].uv) +
-               barycentrics.y * float2(geometry_data.vertices[indices.y].uv) +
-               barycentrics.z * float2(geometry_data.vertices[indices.z].uv);
+        return barycentrics.x * float2(vertices[indices.x].uv) +
+               barycentrics.y * float2(vertices[indices.y].uv) +
+               barycentrics.z * float2(vertices[indices.z].uv);
     }
 
-    // Previous-frame object-space position for a vertex.
-    // For non-morphed meshes this equals the current position.
-    float3 get_prev_object_position(const GeometryData geometry_data, const uint vertex_index) {
-        if ((geometry_data.flags & GeometryDataFlags::HasPrevVertices) == 0)
-            return geometry_data.vertices[vertex_index].position;
-        return geometry_data.prev_vertices[vertex_index].position;
-    }
-
-    float3 get_interpolated_prev_object_position(const GeometryData geometry_data,
-                                                 const uint primitive_id,
-                                                 const float3 barycentrics) {
-        const uint3 indices = get_vertex_indices(geometry_data, primitive_id);
-        return barycentrics.x * get_prev_object_position(geometry_data, indices.x) +
-               barycentrics.y * get_prev_object_position(geometry_data, indices.y) +
-               barycentrics.z * get_prev_object_position(geometry_data, indices.z);
-    }
-
-    // -----------------------------------------
-
-    // Transform object-space position to world space.
-    float3
-    to_world_position(const GeometryData gd, const uint instance_index, const float3 object_pos) {
+    float3 to_world_position(const GeometryData gd,
+                             const uint instance_index,
+                             const float3 object_pos,
+                             const bool prev_frame = false) {
         if (gd.flags & GeometryDataFlags::Pretransformed)
             return object_pos;
-        return mul(get_instance_transform(instance_index), float4(object_pos, 1.0)).xyz;
+        return mul(get_instance_transform(instance_index, prev_frame), float4(object_pos, 1.0)).xyz;
     }
 
-    // Transform an object-space normal to world space (covariant: uses inverse-transpose).
-    float3
-    to_world_normal(const GeometryData gd, const uint instance_index, const float3 object_normal) {
+    float3 to_world_normal(const GeometryData gd,
+                           const uint instance_index,
+                           const float3 object_normal,
+                           const bool prev_frame = false) {
         if (gd.flags & GeometryDataFlags::Pretransformed)
             return object_normal;
-        return normalize(mul(get_inverse_transposed_instance_transform(instance_index),
+        return normalize(mul(get_inverse_transposed_instance_transform(instance_index, prev_frame),
                              float4(object_normal, 0.0))
                              .xyz);
     }
 
-    // Transform an object-space vector (edge, tangent, ...) to world space (uses regular M).
-    float3
-    to_world_vector(const GeometryData gd, const uint instance_index, const float3 object_vec) {
+    float3 to_world_vector(const GeometryData gd,
+                           const uint instance_index,
+                           const float3 object_vec,
+                           const bool prev_frame = false) {
         if (gd.flags & GeometryDataFlags::Pretransformed)
             return object_vec;
-        return mul((float3x3)get_instance_transform(instance_index), object_vec);
+        return mul((float3x3)get_instance_transform(instance_index, prev_frame), object_vec);
     }
 
-    // Transform object-space position to previous frame world space.
-    float3 to_prev_world_position(const GeometryData gd,
-                                  const uint instance_index,
-                                  const float3 object_pos) {
-        if (gd.flags & GeometryDataFlags::Pretransformed)
-            return object_pos;
-        if ((gd.flags & GeometryDataFlags::IsAnimated) == 0)
-            return mul(get_instance_transform(instance_index), float4(object_pos, 1.0)).xyz;
-        return mul(get_prev_instance_transform(instance_index), float4(object_pos, 1.0)).xyz;
-    }
-
-    // Transform an object-space normal to previous-frame world space.
-    float3 to_prev_world_normal(const GeometryData gd,
-                                const uint instance_index,
-                                const float3 object_normal) {
-        if (gd.flags & GeometryDataFlags::Pretransformed)
-            return object_normal;
-        if ((gd.flags & GeometryDataFlags::IsAnimated) == 0)
-            return normalize(mul(get_inverse_transposed_instance_transform(instance_index),
-                                 float4(object_normal, 0.0))
-                                 .xyz);
-        return normalize(mul(get_prev_inverse_transposed_instance_transform(instance_index),
-                             float4(object_normal, 0.0))
-                             .xyz);
-    }
-
-    // Transform an object-space vector (edge, tangent, ...) to previous-frame world space.
-    float3 to_prev_world_vector(const GeometryData gd,
-                                const uint instance_index,
-                                const float3 object_vec) {
-        if (gd.flags & GeometryDataFlags::Pretransformed)
-            return object_vec;
-        if ((gd.flags & GeometryDataFlags::IsAnimated) == 0)
-            return mul((float3x3)get_instance_transform(instance_index), object_vec);
-        return mul((float3x3)get_prev_instance_transform(instance_index), object_vec);
-    }
-
-    // -----------------------------------------
-
-    // none on miss
     Optional<GeometryData> get_geometry_data(const Hit hit) {
         if (!hit.is_valid())
             return none;
@@ -315,28 +231,42 @@ struct Scene {
     }
 
     // Hit must be a valid triangle hit.
-    TriangleHit get_triangle_hit(const Hit hit) {
-        return get_triangle_hit(hit, get_geometry_data(hit.instance_id, hit.geometry_index));
+    TriangleHit get_triangle_hit(const Hit hit, const bool prev_frame = false) {
+        return get_triangle_hit(hit, get_geometry_data(hit.instance_id, hit.geometry_index),
+                                prev_frame);
     }
 
-    TriangleHit get_triangle_hit(const Hit hit, const GeometryData gd) {
+    TriangleHit
+    get_triangle_hit(const Hit hit, const GeometryData gd, const bool prev_frame = false) {
         const uint3 indices = get_vertex_indices(gd, hit.primitive_id);
+        const VertexBufferAddress vertices = get_vertices(gd, prev_frame);
         TriangleHit tri;
         tri.gd = gd;
-        tri.v0 = get_packed_vertex_data(gd, indices.x);
-        tri.v1 = get_packed_vertex_data(gd, indices.y);
-        tri.v2 = get_packed_vertex_data(gd, indices.z);
+        tri.v0 = vertices[indices.x];
+        tri.v1 = vertices[indices.y];
+        tri.v2 = vertices[indices.z];
         return tri;
     }
 
-    // Normal curvatures across and along the plane of incidence of wi, positive where the surface
-    // bulges towards wi.
+    // tri of the other frame, reused where its vertices did not change
+    TriangleHit get_triangle_hit(const Hit hit, const TriangleHit tri, const bool prev_frame) {
+        if (has_static_vertices(tri.gd))
+            return tri;
+        return get_triangle_hit(hit, tri.gd, prev_frame);
+    }
+
+    static bool has_static_vertices(const GeometryData gd) {
+        return (uint64_t)gd.prev_vertices == (uint64_t)gd.vertices;
+    }
+
+    // normal curvatures across and along wi's plane of incidence, positive bulging towards wi
     float2 get_curvatures(const Hit hit, const TriangleHit tri, const float3 wi) {
         if (tri.gd.flags & GeometryDataFlags::FlatShading) {
             return float2(0.f);
         }
         const uint instance = hit.instance_index;
-        const float3 n0 = to_world_normal(tri.gd, instance, decode_normal(tri.v0.encoded_normal));
+        const float3 n0 =
+            to_world_normal(tri.gd, instance, decode_normal(tri.v0.encoded_normal));
         const float3 dn1 =
             to_world_normal(tri.gd, instance, decode_normal(tri.v1.encoded_normal)) - n0;
         const float3 dn2 =
@@ -366,14 +296,15 @@ struct Scene {
         return side * float2(dot(b2, mul(symmetric, b2)), dot(t2, mul(symmetric, t2)));
     }
 
-    Surface get_surface(const Hit hit, const TriangleHit tri) {
+    Surface get_surface(const Hit hit, const TriangleHit tri, const bool prev_frame = false) {
         const float3 bary = hit.get_barycentrics3();
+        const uint instance = hit.instance_index;
 
-        const float3 pos = to_world_position(tri.gd, hit.instance_index, tri.get_position(hit));
+        const float3 pos = to_world_position(tri.gd, instance, tri.get_position(hit), prev_frame);
         const float3 edge01 =
-            to_world_vector(tri.gd, hit.instance_index, tri.get_triangle_edge01());
+            to_world_vector(tri.gd, instance, tri.get_triangle_edge01(), prev_frame);
         const float3 edge02 =
-            to_world_vector(tri.gd, hit.instance_index, tri.get_triangle_edge02());
+            to_world_vector(tri.gd, instance, tri.get_triangle_edge02(), prev_frame);
 
         float3 face_normal = normalize(cross(edge01, edge02));
         if (tri.gd.flags & GeometryDataFlags::FlipFacing)
@@ -386,7 +317,7 @@ struct Scene {
             const float3 n_obj = normalize(bary.x * decode_normal(tri.v0.encoded_normal) +
                                            bary.y * decode_normal(tri.v1.encoded_normal) +
                                            bary.z * decode_normal(tri.v2.encoded_normal));
-            vertex_normal = to_world_normal(tri.gd, hit.instance_index, n_obj);
+            vertex_normal = to_world_normal(tri.gd, instance, n_obj, prev_frame);
         }
 
         // per-vertex tangent or Lengyel UV-derived fallback
@@ -398,7 +329,7 @@ struct Scene {
             const float4 t1 = decode_tangent(tri.v1.encoded_tangent);
             const float4 t2 = decode_tangent(tri.v2.encoded_tangent);
             const float4 t = bary.x * t0 + bary.y * t1 + bary.z * t2;
-            tangent = to_world_vector(tri.gd, hit.instance_index, normalize(t.xyz));
+            tangent = to_world_vector(tri.gd, instance, normalize(t.xyz), prev_frame);
             handedness = sign(t.w);
             tangent_valid = true;
         } else {
@@ -424,54 +355,35 @@ struct Scene {
         s.uv = tri.get_uv(hit);
         s.face_normal = face_normal;
         s.spawn_offset = triangle_spawn_offset(pos, edge01, edge02);
+        s.area = 0.5f * length(cross(edge01, edge02));
         s.frame = tangent_valid ? OrthonormalFrame(vertex_normal, tangent, handedness)
                                 : OrthonormalFrame(vertex_normal);
         return s;
     }
 
-    // prefer get_prev_world_position(const Hit hit, const TriangleHit tri) which reuses the
-    // triangle data if possible
-    float3 get_prev_world_position(const Hit hit, const GeometryData gd) {
-        const float3 prev_obj =
-            get_interpolated_prev_object_position(gd, hit.primitive_id, hit.get_barycentrics3());
-        return to_prev_world_position(gd, hit.instance_index, prev_obj);
+    // a triangle inactive (x = NaN) in that frame stays where it is in the other
+    float3 get_world_position(const Hit hit, const GeometryData gd, const bool prev_frame) {
+        const float3 pos = _get_world_position(hit, gd, prev_frame);
+        if (isnan(pos.x))
+            return _get_world_position(hit, gd, !prev_frame);
+        return pos;
     }
 
-    // reuses the vertex positions of the triangle if possible
-    float3 get_prev_world_position(const Hit hit, const TriangleHit tri) {
-        float3 prev_obj;
-        if ((tri.gd.flags & GeometryDataFlags::HasPrevVertices) == 0) {
-            prev_obj = tri.get_position(hit);
-        } else {
-            prev_obj = get_interpolated_prev_object_position(tri.gd, hit.primitive_id,
-                                                             hit.get_barycentrics3());
-        }
-        return to_prev_world_position(tri.gd, hit.instance_index, prev_obj);
-    }
-
-    // The surface where it was in the previous frame. Only positions are kept for the previous
-    // frame, so the shading attributes are the current ones.
-    Surface get_prev_surface(const Hit hit, const TriangleHit tri) {
-        float3 p0 = tri.v0.position;
-        float3 p1 = tri.v1.position;
-        float3 p2 = tri.v2.position;
-        if (tri.gd.flags & GeometryDataFlags::HasPrevVertices) {
-            const uint3 indices = get_vertex_indices(tri.gd, hit.primitive_id);
-            p0 = tri.gd.prev_vertices[indices.x].position;
-            p1 = tri.gd.prev_vertices[indices.y].position;
-            p2 = tri.gd.prev_vertices[indices.z].position;
-        }
-        p0 = to_prev_world_position(tri.gd, hit.instance_index, p0);
-        p1 = to_prev_world_position(tri.gd, hit.instance_index, p1);
-        p2 = to_prev_world_position(tri.gd, hit.instance_index, p2);
-
-        Surface s = get_surface(hit, tri);
+    float3 _get_world_position(const Hit hit, const GeometryData gd, const bool prev_frame) {
         const float3 bary = hit.get_barycentrics3();
-        s.pos = bary.x * p0 + bary.y * p1 + bary.z * p2;
-        const float3 face_normal = normalize(cross(p1 - p0, p2 - p0));
-        s.face_normal = (tri.gd.flags & GeometryDataFlags::FlipFacing) ? -face_normal : face_normal;
-        s.spawn_offset = triangle_spawn_offset(s.pos, p1 - p0, p2 - p0);
-        return s;
+        const uint3 indices = get_vertex_indices(gd, hit.primitive_id);
+        const VertexBufferAddress vertices = get_vertices(gd, prev_frame);
+        const float3 object_pos = bary.x * vertices[indices.x].position +
+                                  bary.y * vertices[indices.y].position +
+                                  bary.z * vertices[indices.z].position;
+        return to_world_position(gd, hit.instance_index, object_pos, prev_frame);
+    }
+
+    // tri of the other frame, reused where its vertices did not change
+    float3 get_world_position(const Hit hit, const TriangleHit tri, const bool prev_frame) {
+        if (has_static_vertices(tri.gd))
+            return to_world_position(tri.gd, hit.instance_index, tri.get_position(hit), prev_frame);
+        return get_world_position(hit, tri.gd, prev_frame);
     }
 
     // Pixel-space delta of the surface point between the previous and the current projection.
@@ -499,15 +411,16 @@ struct Scene {
         return get_shading_point(ray, hit, tri, get_surface(hit, tri), ctx, lod, with_material);
     }
 
-    // For callers that already hold the triangle and its surface.
+    // tri and surface of the frame of prev_frame
     ShadingPoint get_shading_point(const RayDesc ray,
                                    const Hit hit,
                                    const TriangleHit tri,
                                    const Surface surface,
                                    const RenderContext ctx = RenderContext(),
                                    const LODSampler2D lod = DefaultLODSampler(),
-                                   const bool with_material = true) {
-        const float3 prev_pos = get_prev_world_position(hit, tri);
+                                   const bool with_material = true,
+                                   const bool prev_frame = false) {
+        const float3 prev_pos = prev_frame ? surface.pos : get_world_position(hit, tri, true);
 
         OrthonormalFrame frame = surface.frame;
         float3 face_normal = surface.face_normal;
@@ -520,8 +433,9 @@ struct Scene {
             }
         }
 
-        const ShadingData sd = ShadingData(-ray.Direction, surface.pos, surface.uv, time, frame,
-                                           face_normal, ctx.bounce, front_facing);
+        const ShadingData sd =
+            ShadingData(-ray.Direction, surface.pos, surface.uv, get_time(prev_frame),
+                        frame, face_normal, ctx.bounce, front_facing);
 
         ShadingPoint sp;
         sp.pos = surface.pos;
@@ -530,11 +444,12 @@ struct Scene {
         sp.has_surface_material = with_material;
         sp.material_id = surface.material_id;
         sp.spawn_offset = surface.spawn_offset;
+        sp.area = surface.area;
         if (with_material) {
             sp.surface_material = material_system.get_material_sample(
-                surface.material_id, sd, sp.emission, sp.shading_frame, lod);
+                surface.material_id, sd, sp.emission, sp.shading_frame, lod, prev_frame);
         } else {
-            sp.emission = material_system.get_emission(surface.material_id, sd, lod);
+            sp.emission = material_system.get_emission(surface.material_id, sd, lod, prev_frame);
             sp.shading_frame = frame;
         }
         return sp;
@@ -544,28 +459,21 @@ struct Scene {
                                    const Hit hit,
                                    const RenderContext ctx = RenderContext(),
                                    const LODSampler2D lod = DefaultLODSampler(),
-                                   const bool with_material = true) {
-        if (let gd = get_geometry_data(hit)) {
-            if ((gd.flags & GeometryDataFlags::UseEnvMap) == 0) {
-                return get_shading_point(ray, hit, gd, ctx, lod, with_material);
-            }
-        }
-        return _make_environment_map_shading_point(ray, ctx, lod);
+                                   const bool with_material = true,
+                                   const bool prev_frame = false) {
+        if (is_distant(hit))
+            return _make_environment_map_shading_point(ray, ctx, lod, prev_frame);
+        const TriangleHit tri = get_triangle_hit(hit, prev_frame);
+        return get_shading_point(ray, hit, tri, get_surface(hit, tri, prev_frame), ctx, lod,
+                                 with_material, prev_frame);
     }
 
-    ShadingPoint trace_and_get_shading_point(const RayDesc ray,
-                                             const uint instance_mask = 0xff,
-                                             const RenderContext ctx = RenderContext(),
-                                             const LODSampler2D lod = DefaultLODSampler(),
-                                             const bool with_material = true) {
-        return get_shading_point(ray, trace_ray(ray, RAY_FLAG_NONE, instance_mask), ctx, lod,
-                                 with_material);
-    }
-
-    // -----------------------------------------
-
+    // record: the light cut learns from the draws.
     Optional<DirectLightSample> sample_direct_light<T : IDirectLightTarget>(
-        const DirectLightVertex vertex, const T target, inout RandomGenerator rng) {
+        const DirectLightVertex vertex,
+        const T target,
+        inout RandomGenerator rng,
+        const bool record = true) {
         DirectLightReservoir reservoir = DirectLightReservoir();
         const uint draws = nee.draw_count();
         const LightCellWeights weights = nee.grid.weigh_cell(vertex, draws, rng);
@@ -579,23 +487,26 @@ struct Scene {
                         float scatter_pdf;
                         const float3 unshadowed = target.unshadowed(ls, rng, scatter_pdf);
                         delivers = yuv_luminance(unshadowed) > 0.f;
-                        reservoir.add_light(ls, unshadowed, light_pdf, scatter_pdf, entry, rng);
+                        reservoir.add_light(ls, c.pos, unshadowed, light_pdf, scatter_pdf, entry,
+                                            rng);
                     }
                 }
             }
             // only the winner is traced; a draw the receiver cannot see delivers nothing
-            if (!delivers)
+            if (record && !delivers)
                 nee.record_failed_draw(entry);
         }
         if (!reservoir.needs_shadow_ray()) {
             return none;
         }
+        const float weight = reservoir.weight();
         DirectLightSample s;
-        s.value = reservoir.resolve();
-        s.light_pos = reservoir.light_pos;
-        s.light_index = reservoir.light_index;
+        s.value = reservoir.value * weight;
+        s.light = reservoir.light;
+        s.light_point = reservoir.light_point;
         s.light_entry = reservoir.light_entry;
-        s.radiance = reservoir.light_radiance;
+        s.light_pdf = reservoir.light_pdf;
+        s.scatter_pdf = reservoir.scatter_pdf;
         s.realized_pdf = reservoir.realized_pdf();
         return s;
     }
@@ -637,46 +548,56 @@ struct Scene {
         return ray;
     }
 
-    uint light_ray_flags(const bool distant) {
+    bool has_sky_portals(const bool prev_frame) {
+        return prev_frame ? prev_nee.has_sky_portals : nee.has_sky_portals;
+    }
+
+    uint light_ray_flags(const bool distant, const bool prev_frame) {
         // a sky portal in front of the environment must not end the search
-        return distant && nee.has_sky_portals ? RAY_FLAG_NONE
-                                              : RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH;
+        return distant && has_sky_portals(prev_frame) ? RAY_FLAG_NONE
+                                                      : RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH;
     }
 
-    bool reaches_light(const Hit hit, const bool distant) {
-        if (let gd = get_geometry_data(hit))
-            return distant && nee.has_sky_portals && (gd.flags & GeometryDataFlags::UseEnvMap) != 0;
-        return true;
+    bool reaches_light(const Hit hit, const bool distant, const bool prev_frame) {
+        if (!hit.is_valid())
+            return true;
+        return distant && has_sky_portals(prev_frame) && is_distant(hit);
     }
 
-    // Shadow ray towards a point on a light. One ray query for every case: each query object
-    // costs its own traversal stack.
     bool trace_light_visibility(const float3 pos,
                                 const float3 face_normal,
                                 const float spawn_offset,
                                 const float3 light_pos,
                                 const bool distant,
-                                const uint instances_mask = 0xff) {
+                                const uint instances_mask = 0xff,
+                                const bool prev_frame = false) {
         const RayDesc ray = make_light_ray(pos, face_normal, spawn_offset, light_pos, distant);
-        return reaches_light(trace_ray(ray, light_ray_flags(distant), instances_mask), distant);
+        return reaches_light(
+            trace_ray(ray, light_ray_flags(distant, prev_frame), instances_mask, prev_frame),
+            distant, prev_frame);
+    }
+
+    // the light cut learns from the outcome
+    bool trace_direct_light(const DirectLightVertex vertex,
+                            const DirectLightSample s,
+                            inout RandomGenerator rng,
+                            const uint instances_mask = 0xff) {
+        const float radiance = yuv_luminance(s.light.Li);
+        const bool visible =
+            trace_light_visibility(vertex.pos, vertex.face_normal, vertex.spawn_offset, s.light.pos,
+                                   s.light.index == LIGHT_ENV_INDEX, instances_mask);
+        nee.record_contribution(vertex, s.light.index, s.light.wo, visible ? radiance : 0.f,
+                                s.light.dist, rng, s.light_entry);
+        return visible;
     }
 
     float3 resolve_direct_light(const DirectLightVertex vertex,
-                                const float3 face_normal,
-                                const float spawn_offset,
                                 const Optional<DirectLightSample> direct,
                                 inout RandomGenerator rng,
                                 const uint instances_mask = 0xff) {
-        if (!direct.hasValue)
-            return float3(0);
-        const DirectLightSample s = direct.value;
-        const bool visible =
-            trace_light_visibility(vertex.pos, face_normal, spawn_offset, s.light_pos,
-                                   s.light_index == LIGHT_ENV_INDEX, instances_mask);
-        nee.record_contribution(vertex, s.light_index, normalize(s.light_pos - vertex.pos),
-                                visible ? s.radiance : 0.f, distance(s.light_pos, vertex.pos), rng,
-                                s.light_entry);
-        return visible ? s.value : float3(0);
+        if (let s = direct)
+            return trace_direct_light(vertex, s, rng, instances_mask) ? s.value : float3(0);
+        return float3(0);
     }
 
     static float3
@@ -696,7 +617,7 @@ struct Scene {
         const float3 normal = get_receiver_normal(
             ray.Direction, ng,
             bsdf_is_transmissive(sp.surface_material.get_bsdf().get_lobe_types()));
-        let vertex = nee.begin_vertex(sp.pos, ng, normal, rng);
+        let vertex = nee.begin_vertex(sp.pos, ng, sp.spawn_offset, normal, rng);
 
         switch (nee.debug_view) {
         case LightDebugView::LightDebugCell:
@@ -794,18 +715,17 @@ struct Scene {
         }
     }
 
-    // LIGHT_ENV_INDEX for the environment, LIGHT_INVALID_INDEX for a non-emitter
-    uint get_light_index(const Hit hit) {
-        if (!hit.is_valid())
+    // LIGHT_ENV_INDEX, LIGHT_INVALID_INDEX for a non-emitter; with prev_frame in prev_nee
+    uint get_light_index(const Hit hit, const bool prev_frame = false) {
+        if (is_distant(hit))
             return LIGHT_ENV_INDEX;
-        const GeometryDataFlags flags = get_geometry_data(hit.get_geometry_id()).flags;
-        if ((flags & GeometryDataFlags::UseEnvMap) != 0)
-            return LIGHT_ENV_INDEX;
-        if ((flags & GeometryDataFlags::Emissive) == 0)
+        if (!prev_frame &&
+            (get_geometry_data(hit.get_geometry_id()).flags & GeometryDataFlags::Emissive) == 0)
             return LIGHT_INVALID_INDEX;
-        if (let index = nee.get_triangle_index(hit.get_geometry_id(), hit.primitive_id))
-            return index;
-        return LIGHT_INVALID_INDEX;
+        const Optional<uint> index =
+            prev_frame ? prev_nee.get_triangle_index(hit.get_geometry_id(), hit.primitive_id)
+                       : nee.get_triangle_index(hit.get_geometry_id(), hit.primitive_id);
+        return index.hasValue ? index.value : LIGHT_INVALID_INDEX;
     }
 
     Hit get_emitter_hit(const uint index, const float3 pos) {
@@ -819,41 +739,59 @@ struct Scene {
         return Hit(tri.geometry_id, lg.instance_index, tri.primitive_id, 0, bary);
     }
 
-    // -----------------------------------------
+    float3 eval_env_map(const ShadingData sd,
+                        const LODSampler2D lod = DefaultLODSampler(),
+                        const bool prev_frame = false) {
+        const Textures textures = material_system.texture_manager.get_textures(prev_frame);
+        if (prev_frame)
+            return prev_env_map.eval(sd, textures, lod);
+        return env_map.eval(sd, textures, lod);
+    }
+
+    // at the time of the frame of `prev_frame`
+    float3 eval_env_map(const float3 dir, const float3 origin, const bool prev_frame) {
+        return eval_env_map(make_env_shading_data(dir, origin, get_time(prev_frame)),
+                            DefaultLODSampler(), prev_frame);
+    }
 
     ShadingPoint _make_environment_map_shading_point(const RayDesc ray,
                                                      const RenderContext ctx,
-                                                     const LODSampler2D lod) {
+                                                     const LODSampler2D lod,
+                                                     const bool prev_frame = false) {
         const float3 pos = ray.Origin + ray.Direction * ENV_MAP_DISTANCE;
         const ShadingData sd =
-            ShadingData(-ray.Direction, pos, float2(0), time, OrthonormalFrame(-ray.Direction),
-                        -ray.Direction, ctx.bounce, true);
+            ShadingData(-ray.Direction, pos, float2(0), get_time(prev_frame),
+                        OrthonormalFrame(-ray.Direction), -ray.Direction, ctx.bounce, true);
 
         ShadingPoint sp;
         sp.pos = pos;
         sp.prev_pos = pos;
         sp.enc_face_normal = encode_normal(-ray.Direction);
-        sp.emission = env_map.eval(sd, material_system.texture_manager, lod);
+        sp.emission = eval_env_map(sd, lod, prev_frame);
         sp.shading_frame = OrthonormalFrame(-ray.Direction);
         sp.has_surface_material = false;
         sp.material_id = uint(-1);
         sp.spawn_offset = 0.f;
+        sp.area = 0.f;
         return sp;
     }
 
-    void _proceed_ray(inout SceneAccelerationStructure::RayQueryImpl rq) {
+    void _proceed_ray(inout SceneAccelerationStructure::RayQueryImpl rq,
+                      const bool prev_frame = false) {
         while (rq.Proceed()) {
 
             if (rq.CandidateType() == CANDIDATE_NON_OPAQUE_TRIANGLE) {
-                const GeometryData geometry_data =
-                    get_geometry_data(rq.CandidateInstanceID(), rq.CandidateGeometryIndex());
-
-                float2 bary = rq.CandidateRayBarycentrics();
-                float3 bary3 = float3(1.0 - bary.x - bary.y, bary.x, bary.y);
-
+                Hit candidate = Hit(rq.CandidateInstanceID(), rq.CandidateInstanceIndex(),
+                                    rq.CandidatePrimitiveIndex(), rq.CandidateGeometryIndex(),
+                                    rq.CandidateRayBarycentrics());
+                if (prev_frame)
+                    candidate = from_prev_frame(candidate);
+                const GeometryData geometry_data = get_geometry_data(candidate.get_geometry_id());
                 if (material_system.alpha_test(
                         geometry_data.material_id,
-                        get_interpolated_uv(geometry_data, rq.CandidatePrimitiveIndex(), bary3))) {
+                        get_interpolated_uv(geometry_data, candidate.primitive_id,
+                                            candidate.get_barycentrics3(), prev_frame),
+                        DefaultLODSampler(), prev_frame)) {
                     continue;
                 }
 

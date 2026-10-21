@@ -68,7 +68,6 @@ class Graph : public std::enable_shared_from_this<Graph> {
         QueryPoolHandle<vk::QueryType::eTimestamp> profiler_query_pool;
         // reached by the iteration semaphore once the slot's last iteration finished
         uint64_t iteration_value = 0;
-        // For each node: optional in-flight data.
         std::unordered_map<NodeHandle, std::any> in_flight_data{};
     };
 
@@ -76,15 +75,15 @@ class Graph : public std::enable_shared_from_this<Graph> {
     Graph(const GraphCreateInfo& create_info);
 
   public:
+    using BeforeIteration =
+        std::function<std::optional<std::chrono::nanoseconds>(const GraphIterationInfo&)>;
+    using AfterIteration = std::function<void(const GraphIterationInfo&)>;
+
     ~Graph();
 
     // --- add / remove nodes and connections ---
 
-    // Adds a node of the registered type, unsupported if it fails to initialize.
-    //
-    // Throws invalid_argument if a node with this identifier already exists or it is invalid.
-    //
-    // Returns the node identifier.
+    // unsupported if it fails to initialize; throws invalid_argument for a taken or bad identifier
     const std::string& add_node(const std::string& node_name,
                                 const std::optional<std::string>& identifier = std::nullopt);
 
@@ -124,16 +123,13 @@ class Graph : public std::enable_shared_from_this<Graph> {
 
     // --- connect / run graph ---
 
-    // Attempts to connect the graph with the current set of connections.
-    //
-    // Connections that cannot work are removed. In this case connect returns with
-    // needs_reconnect still being true. For this reason connect should be called in a loop.
+    // Removes connections that cannot work; call in a loop while needs_reconnect.
     void connect();
 
-    // Connects if necessary. stop_requested is polled after each after_iteration and while waiting
-    // for the GPU, during which the host callbacks of finished iterations run.
+    // A time returned by before_iteration holds the graph time from that iteration on.
     GraphRunResult run(const GraphRunOptions& options = {},
-                       const std::function<void()>& after_iteration = {},
+                       const BeforeIteration& before_iteration = {},
+                       const AfterIteration& after_iteration = {},
                        const std::function<bool()>& stop_requested = {});
 
     // Also runs the host callbacks and waits for the async ones. False on timeout.
@@ -141,8 +137,7 @@ class Graph : public std::enable_shared_from_this<Graph> {
 
     void clear();
 
-    // Reconnects before the next iteration: run iteration 0, node histories cleared, the time since
-    // connect and the RUN report restarted.
+    // The next iteration reconnects and restarts the run at iteration 0.
     void restart_run();
 
     // Recompiles the shaders whose files changed, includes and imports alike, all if force. Every

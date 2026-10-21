@@ -23,6 +23,8 @@ class EnvMap {
 
     virtual void write_to(ShaderCursor cursor) const = 0;
 
+    virtual std::shared_ptr<EnvMap> clone() const = 0;
+
     // False if eval is identically zero; NEE then never samples the environment.
     virtual bool is_emissive() const {
         return true;
@@ -125,6 +127,10 @@ class EmptyEnvMap : public EnvMap {
     }
 
     void write_to([[maybe_unused]] ShaderCursor cursor) const override {}
+
+    EnvMapHandle clone() const override {
+        return std::make_shared<EmptyEnvMap>(*this);
+    }
 };
 
 class LatLongEnvMap : public EnvMap {
@@ -148,6 +154,10 @@ class LatLongEnvMap : public EnvMap {
         cursor["env_map"] = texture;
         cursor["to_local"] = to_local;
         cursor["intensity"] = intensity;
+    }
+
+    EnvMapHandle clone() const override {
+        return std::make_shared<LatLongEnvMap>(*this);
     }
 
     const TextureHandle& get_texture() const {
@@ -185,6 +195,10 @@ class EqualAreaOctEnvMap : public EnvMap {
         cursor["env_map"] = texture;
         cursor["to_local"] = to_local;
         cursor["intensity"] = intensity;
+    }
+
+    EnvMapHandle clone() const override {
+        return std::make_shared<EqualAreaOctEnvMap>(*this);
     }
 
     const TextureHandle& get_texture() const {
@@ -226,6 +240,10 @@ class CubeMapEnvMap : public EnvMap {
         cursor["dn"] = faces[5];
         cursor["to_local"] = to_local;
         cursor["intensity"] = intensity;
+    }
+
+    EnvMapHandle clone() const override {
+        return std::make_shared<CubeMapEnvMap>(*this);
     }
 
     const std::array<TextureHandle, 6>& get_faces() const {

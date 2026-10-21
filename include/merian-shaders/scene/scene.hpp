@@ -20,6 +20,7 @@
 #include "merian/vk/pipeline/pipeline.hpp"
 #include "merian/vk/raytrace/as_builder.hpp"
 
+#include <initializer_list>
 #include <optional>
 #include <unordered_map>
 #include <variant>
@@ -39,18 +40,15 @@ class Scene : public std::enable_shared_from_this<Scene> {
     static constexpr NodeID NODE_ID_INVALID = UINT32_MAX;
     static constexpr CameraID CAMERA_ID_INVALID = UINT32_MAX;
 
-    // --- Mesh flags ---
-
     enum class MeshFlags : uint32_t {
         None = 0,
-        // default: not; means: vertices can move over time, get_prev_vertices must be valid.
+        // vertices can change between frames
         IsMorphed = 0x1,
-        // Topology (vertex count, primitive count) can change between frames.
+        // Topology can change or vertices move incoherently between frames: rebuild, never refit.
         HasVariableTopology = 0x2,
         // default: treat all as non-opaque (allow alpha mask)
         IsOpaque = 0x4,
-        // Set when the mesh's front winding is clockwise (default is counter-clockwise).
-        // Maps to VK_GEOMETRY_INSTANCE_TRIANGLE_FLIP_FACING_BIT_KHR.
+        // front winding is clockwise; maps to VK_GEOMETRY_INSTANCE_TRIANGLE_FLIP_FACING_BIT_KHR
         FlipFacing = 0x8,
         // default: cull backfaces
         TwoSided = 0x10,
@@ -132,7 +130,7 @@ class Scene : public std::enable_shared_from_this<Scene> {
 
         float4x4 local_transform = identity();
 
-        // --- Managed by Scene ---
+        // managed by Scene
 
         // Empty when invalidated; children must be invalidated too.
         std::optional<float4x4> global_transform;
@@ -142,7 +140,6 @@ class Scene : public std::enable_shared_from_this<Scene> {
         std::optional<float4x4> prev_global_inverse_transposed;
 
         bool transform_dirty = true;
-        bool transform_dirty_last_frame = false;
 
         SmallSet<MeshID, 1> meshes;
 
@@ -156,20 +153,15 @@ class Scene : public std::enable_shared_from_this<Scene> {
             node.local_transform, node.global_transform.value_or(float4x4(0)));
     }
 
-    // --- Mesh ---
-
     class Mesh {
       public:
-        // ----- Bulk CPU vertex data -----
-        template <typename T> struct HostVertexSource {
+        struct HostVertexSource {
             virtual ~HostVertexSource() = default;
-            virtual void write(T* dst) const = 0;
+            virtual void write(PackedVertexData* dst) const = 0;
         };
 
-        using HostVertices = HostVertexSource<PackedVertexData>*;
-        using HostPrevVertices = HostVertexSource<PackedPrevVertexData>*;
+        using HostVertices = HostVertexSource*;
 
-        // ----- Bulk CPU index data -----
         struct HostIndexSource {
             virtual ~HostIndexSource() = default;
             virtual void write(void* dst) const = 0;
@@ -189,7 +181,6 @@ class Scene : public std::enable_shared_from_this<Scene> {
             vk::DeviceSize offset = 0;
         };
 
-        // ----- GPU Local Data (Procedural/Static GPU data) -----
         // Non-owning: references a BufferHandle owned by the Mesh subclass.
         struct DeviceLocal {
             const BufferHandle& data;
@@ -197,13 +188,6 @@ class Scene : public std::enable_shared_from_this<Scene> {
 
         using MeshVertexData =
             std::variant<HostVertices, HostPacked<PackedVertexData>, DeviceStaged, DeviceLocal>;
-
-        // can be std::monostate for static meshes.
-        using MeshPrevVertexData = std::variant<std::monostate,
-                                                HostPrevVertices,
-                                                HostPacked<PackedPrevVertexData>,
-                                                DeviceStaged,
-                                                DeviceLocal>;
 
         // monostate means no index buffer (only valid when index_type == eNoneKHR).
         using MeshIndexData =
@@ -226,7 +210,6 @@ class Scene : public std::enable_shared_from_this<Scene> {
         virtual uint32_t get_primitive_count() const = 0;
 
         virtual MeshVertexData get_vertices() const = 0;
-        virtual MeshPrevVertexData get_prev_vertices() const = 0;
         virtual MeshIndexData get_indices() const = 0;
 
         bool is_morphed() const {
@@ -272,7 +255,7 @@ class Scene : public std::enable_shared_from_this<Scene> {
                            mesh.vertices_dirty, mesh.indices_dirty);
     }
 
-    // A suballocation inside one of Scene's shared vertex / prev-vertex / index buffers.
+    // A suballocation inside one of Scene's shared vertex / index buffers.
     struct MeshBufferRegion {
         MemoryAllocationHandle suballoc;
         vk::DeviceSize size = 0;
@@ -297,14 +280,16 @@ class Scene : public std::enable_shared_from_this<Scene> {
         }
     };
 
-    // Scene-owned per-mesh record.
     class MeshInfo {
       public:
         MeshHandle mesh;
 
         MeshBufferRegion vertex_buffer;
+        // last frame's vertex_buffer while the vertices change, else empty
         MeshBufferRegion prev_vertex_buffer;
         MeshBufferRegion index_buffer;
+        // of the uploaded buffers
+        uint32_t primitive_count = 0;
         uint32_t uv_version = 0;
 
         SmallSet<NodeID, 1> instances;
@@ -324,7 +309,6 @@ class Scene : public std::enable_shared_from_this<Scene> {
     class SimpleMesh : public Mesh {
       public:
         std::vector<PackedVertexData> vertices;
-        std::vector<PackedPrevVertexData> prev_vertices;
         std::vector<uint3> indices;
 
         uint32_t get_vertex_count() const override {
@@ -336,12 +320,6 @@ class Scene : public std::enable_shared_from_this<Scene> {
 
         MeshVertexData get_vertices() const override {
             return HostPacked<PackedVertexData>{vertices.data()};
-        }
-        MeshPrevVertexData get_prev_vertices() const override {
-            if (!is_morphed())
-                return std::monostate{};
-            assert(prev_vertices.size() == vertices.size());
-            return HostPacked<PackedPrevVertexData>{prev_vertices.data()};
         }
         MeshIndexData get_indices() const override {
             assert(index_type == vk::IndexType::eUint32);
@@ -371,24 +349,20 @@ class Scene : public std::enable_shared_from_this<Scene> {
         // only the TLAS-instance-level flags shared by all meshes (GROUP_SPLIT_MASK)
         MeshFlags flags;
         uint8_t instance_mask = 0xFF;
-        // true if any instance node has is_animated set
         bool has_animated_node = false;
-        // true if any mesh in the group is morphed
         bool has_morphed_mesh = false;
-        // true if any mesh in the group has HasVariableTopology
         bool has_variable_topology_mesh = false;
-        // true if all meshes in the group are opaque
         bool all_opaque = true;
 
-        // ----------------
         AccelerationStructureHandle blas;
+        // the previous frame's BLAS while the group changes
+        AccelerationStructureHandle spare_blas;
         vk::BuildAccelerationStructureFlagsKHR blas_build_flags{};
-        // a mesh changed (new mesh in group -> not the same group, never true)
+        // a mesh of the group changed
         bool blas_dirty = false;
         uint32_t blas_last_built_update = 0;
         uint32_t blas_last_updated_update = 0;
         std::optional<vk::AccelerationStructureBuildSizesInfoKHR> cached_blas_size_info;
-        // ----------------
 
         const SmallSet<NodeID, 1>& get_instances(const std::vector<MeshInfo>& mesh_infos) const {
             assert(!mesh_infos.empty());
@@ -413,7 +387,7 @@ class Scene : public std::enable_shared_from_this<Scene> {
     // https://github.com/NVIDIAGameWorks/Falcor/blob/master/Source/Falcor/Scene/Scene.h
     //
     // We differentiate between meshes with IsMorphed (vertices that change) and nodes with
-    // IsAnimated (transforms that change). A mesh is "dynamic" if either applies to any of
+    // is_animated (transforms that change). A mesh is "dynamic" if either applies to any of
     // its instances; otherwise it is "static".
     //
     // BLASs (one per group, split by GROUP_SPLIT_MASK = FrontCCW | TwoSided)
@@ -457,9 +431,7 @@ class Scene : public std::enable_shared_from_this<Scene> {
     static SlangCompositionHandle
     query_device_support_composition(const DeviceSupportQueryInfo& query_info);
 
-    // frame 0 starts a run: restarts the learned light state and bakes all pending micromaps,
-    // submitting in between. seed decorrelates camera jitter and lens samples. obj_allocator binds
-    // the scene's update passes; falls back to a non-caching one.
+    // frame 0 starts a run: restarts the learned light state and bakes all pending micromaps
     void update(Submission& submission,
                 float time,
                 float time_diff,
@@ -467,19 +439,17 @@ class Scene : public std::enable_shared_from_this<Scene> {
                 uint32_t seed,
                 const ShaderObjectAllocatorHandle& obj_allocator = nullptr);
 
-    // What changed during the most recent update(). Lets consumers (e.g. temporal
-    // accumulation) react to scene edits without diffing the scene themselves.
-    struct UpdateChanges {
-        bool geometry_changed = false;  // a mesh or instance was added or removed
-        bool transform_changed = false; // a node transform changed
-        bool camera_changed = false;    // the active camera moved or a different one became active
+    enum SceneUpdateTypeBits : uint32_t {
+        // a mesh or instance was added or removed
+        SceneUpdateGeometry = 1u << 0,
+        SceneUpdateTransform = 1u << 1,
+        // the active camera moved or a different one became active
+        SceneUpdateCamera = 1u << 2,
     };
 
-    const UpdateChanges& get_last_update_changes() const {
-        return last_update_changes;
+    uint32_t get_last_updates() const {
+        return last_updates;
     }
-
-    // ------------------------------
 
     const SlangCompositionHandle& get_composition() const {
         return composition;
@@ -518,13 +488,16 @@ class Scene : public std::enable_shared_from_this<Scene> {
 
     CameraHandle get_active_camera() const;
 
-    // Must be true before binding the shader object. Subclasses override.
+    uint32_t get_active_camera_index() const {
+        return active_camera;
+    }
+
+    // Must be true before binding the shader object.
     virtual bool is_ready() const {
         return false;
     }
 
-    // The active camera's native render resolution, matching its aspect ratio. nullopt if there
-    // is no active camera or it has no resolution opinion.
+    // nullopt if there is no active camera or it has no resolution opinion
     std::optional<vk::Extent3D> get_resolution() const;
 
     void set_active_camera(uint32_t index);
@@ -624,22 +597,10 @@ class Scene : public std::enable_shared_from_this<Scene> {
         return time;
     }
 
-    // ------------------------------
-
     void properties(Properties& props);
 
-    //
     const AABB& get_aabb() const {
         return aabb;
-    }
-
-  protected:
-    virtual void
-    on_update(const CommandBufferHandle& cmd, float time, float time_diff, uint32_t frame) {
-        (void)cmd;
-        (void)time;
-        (void)time_diff;
-        (void)frame;
     }
 
     MeshID add_mesh(MeshHandle mesh);
@@ -660,6 +621,15 @@ class Scene : public std::enable_shared_from_this<Scene> {
 
     CameraID add_camera(CameraHandle camera);
 
+  protected:
+    virtual void
+    on_update(const CommandBufferHandle& cmd, float time, float time_diff, uint32_t frame) {
+        (void)cmd;
+        (void)time;
+        (void)time_diff;
+        (void)frame;
+    }
+
     const ContextHandle& get_context() const {
         return context;
     }
@@ -673,45 +643,33 @@ class Scene : public std::enable_shared_from_this<Scene> {
         return aabb;
     }
 
-    void defer_buffer_release(BufferHandle buffer) {
-        if (buffer)
-            pending_buffer_releases.push_back(std::move(buffer));
-    }
+    // Releases the object once the frames that may still read it have completed.
+    void retire(ConstObjectHandle object);
 
   private:
     ShaderObjectHandle build_shader_object() const;
+    void drain_retired(const CommandBufferHandle& cmd);
 
-    // invalidates the global transform of this node and its children and marks the node as dirty.
     void invalidate_node(Node& node);
 
-    // Groups meshes into BLASes according to the logic above.
-    // All meshes in a group share the same instances (transforms); one group = one BLAS.
+    // one group = one BLAS; all meshes of a group share the same instances
     void compute_mesh_groups();
-
-    // Whether this mesh in this group needs a prev_vertex_buffer for motion vectors.
-    bool needs_prev_vertices(const MeshGroup& group, const MeshInfo& info) const;
 
     void ensure_transform_pipelines();
 
-    // Upload accumulated TransformVertexJob / TransformPrevVertexJob arrays to their
-    // device buffers. Called before the transfer→compute barrier.
     void stage_transform_jobs(const CommandBufferHandle& cmd);
 
-    // Bind + push descriptor + dispatch the two batched transform shaders. No transfers,
-    // no internal barrier; the two dispatches touch disjoint per-mesh buffers.
     void dispatch_batched_transforms(const CommandBufferHandle& cmd);
 
-    // this only changes if the mesh groups changed or if a transform changes (TODO: selectively
-    // upload transforms)
     void upload_geometry_data(const CommandBufferHandle& cmd);
-    void upload_prev_geometry_remap(const CommandBufferHandle& cmd,
-                                    const std::vector<uint32_t>& instance_indices);
 
-    // this only changes if the mesh groups changed or if a transform changes (TODO: selectively
-    // upload transforms)
+    // vanished geometries map to appended Retired entries, unseen ones are marked New
+    void compute_prev_geometry_remap();
+
+    void upload_prev_geometry_remap(const CommandBufferHandle& cmd);
+
     void upload_transforms(const CommandBufferHandle& cmd);
 
-    // uploads the meshes, geometry data, and instance transforms
     void upload_meshes(const CommandBufferHandle& cmd);
 
     void build_blas(const CommandBufferHandle& cmd);
@@ -721,17 +679,15 @@ class Scene : public std::enable_shared_from_this<Scene> {
                           const bool complete);
     void build_tlas(const CommandBufferHandle& cmd);
 
-    // Grows one shared buffer: re-suballocates every live region into a new backing buffer and
-    // copies the existing data over in a single vkCmdCopyBuffer.
+    // re-suballocates every live region into a new backing buffer and copies it over
     void reallocate_shared_buffer(const CommandBufferHandle& cmd,
                                   VMAMemorySubAllocatorHandle& slot,
                                   vk::DeviceSize& capacity_slot,
-                                  MeshBufferRegion MeshInfo::* region_field,
+                                  std::initializer_list<MeshBufferRegion MeshInfo::*> region_fields,
                                   vk::DeviceSize new_capacity,
                                   vk::BufferUsageFlags usage,
                                   const std::string& debug_name);
 
-    // Detail panes that double as drill-down targets from explorer lists.
     void properties_node(Properties& props, NodeID node_id);
     void properties_mesh(Properties& props, MeshID mesh_id);
     void properties_mesh_group(Properties& props, MeshGroupID group_id);
@@ -751,6 +707,9 @@ class Scene : public std::enable_shared_from_this<Scene> {
     void properties_lights(Properties& props);
 
     void process_pending_env_load(const CommandBufferHandle& cmd);
+
+    // selects the ScenePrevEnvMap type of prev_env_map
+    void compose_prev_env();
 
   private:
     // --- Context ---
@@ -777,6 +736,9 @@ class Scene : public std::enable_shared_from_this<Scene> {
 
     MaterialSystemHandle material_system;
     EnvMapHandle env_map;
+    // as written by the last update
+    EnvMapHandle prev_env_map;
+    std::string prev_env_type_name;
     LightCollection lights;
     std::vector<LightCollection::EmissiveGeometry> emissive_geometries;
 
@@ -808,7 +770,7 @@ class Scene : public std::enable_shared_from_this<Scene> {
     bool opacity_micromaps_enabled = true;
     bool emission_micromaps_enabled = true;
 
-    UpdateChanges last_update_changes;
+    uint32_t last_updates = 0;
 
     struct FrameStats {
         uint32_t meshes_uploaded_device_local = 0;
@@ -821,8 +783,6 @@ class Scene : public std::enable_shared_from_this<Scene> {
 
         uint32_t gpu_vertex_transforms = 0;
         uint32_t gpu_vertex_transform_vertices = 0;
-        uint32_t gpu_prev_vertex_transforms = 0;
-        uint32_t gpu_prev_vertex_transform_vertices = 0;
         vk::DeviceSize gpu_transform_buffer_bytes = 0;
 
         uint32_t blas_builds = 0;
@@ -834,7 +794,7 @@ class Scene : public std::enable_shared_from_this<Scene> {
         uint32_t tlas_instance_count = 0;
 
         uint32_t buffers_allocated = 0;
-        uint32_t buffers_released = 0;
+        uint32_t objects_retired = 0;
 
         vk::DeviceSize geometry_data_bytes = 0;
         vk::DeviceSize transform_data_bytes = 0;
@@ -853,16 +813,10 @@ class Scene : public std::enable_shared_from_this<Scene> {
     bool store_cameras = false;
     AABB aabb; // can be invalid if information is not available.
 
-    // Buffers dropped by remove_mesh; drained at the top of update() via
-    // cmd->keep_until_pool_reset so in-flight cmds keep them alive.
-    std::vector<BufferHandle> pending_buffer_releases;
-    std::vector<AccelerationStructureHandle> pending_blas_releases;
-
-    // --- Cached and precomputed ---
+    std::vector<ConstObjectHandle> retired;
 
     bool needs_regroup = false;      // a mesh was instanced
     bool transforms_changed = false; // a node was updated
-    bool transforms_changed_last_frame = false;
     bool tlas_dirty = false;
 
     inline static const MeshGroupID MESH_GROUP_ID_INVALID = MeshGroupID(-1);
@@ -870,19 +824,28 @@ class Scene : public std::enable_shared_from_this<Scene> {
     // MeshID -> GroupID; MESH_GROUP_ID_INVALID for meshes with no instances.
     std::vector<MeshGroupID> mesh_to_group;
 
-    // --- GPU data ---
-
     // Shared scene buffers: one backing buffer per kind, suballocated per-mesh.
     VMAMemorySubAllocatorHandle shared_vb_suballoc;
-    VMAMemorySubAllocatorHandle shared_prev_vb_suballoc;
     VMAMemorySubAllocatorHandle shared_ib_suballoc;
     vk::DeviceSize shared_vb_capacity = 0;
-    vk::DeviceSize shared_prev_vb_capacity = 0;
     vk::DeviceSize shared_ib_capacity = 0;
 
-    std::vector<GeometryData> geometries;
-    std::vector<uint64_t> geometry_keys;
-    std::vector<uint64_t> prev_geometry_keys;
+    // live geometries first, then the Retired ones only previous-frame hits reach
+    struct FrameGeometry {
+        AccelerationStructureHandle tlas;
+        std::vector<GeometryData> geometries;
+        // of the live geometries
+        std::vector<uint64_t> geometry_keys;
+        // GeometryID -> instance index
+        std::vector<uint32_t> instance_indices;
+        std::vector<float4x4> instance_transforms;
+        std::vector<float4x4> inverse_transposed_instance_transforms;
+        std::vector<float4x4> prev_instance_transforms;
+        std::vector<float4x4> prev_inverse_transposed_instance_transforms;
+    };
+    FrameGeometry geometry;
+    FrameGeometry prev_geometry;
+
     std::vector<GeometryRemap> prev_geometry_remap;
     std::unordered_map<uint64_t, GeometryID> geometry_of_key;
     uint32_t next_serial = 0;
@@ -892,11 +855,6 @@ class Scene : public std::enable_shared_from_this<Scene> {
         std::vector<vk::AccelerationStructureTrianglesOpacityMicromapEXT> micromaps;
     };
     std::vector<BLASGeometry> blas_geometries;
-
-    std::vector<float4x4> instance_transforms;
-    std::vector<float4x4> inverse_transposed_instance_transforms;
-    std::vector<float4x4> prev_instance_transforms;
-    std::vector<float4x4> prev_inverse_transposed_instance_transforms;
 
     // Indexed with GeometryID (InstanceID + GeometryIndex)
     BufferHandle geometries_buffer;
@@ -909,22 +867,21 @@ class Scene : public std::enable_shared_from_this<Scene> {
     std::vector<vk::AccelerationStructureInstanceKHR> tlas_instances;
     BufferHandle tlas_instances_buffer;
     BufferHandle as_scratch_buffer;
-    AccelerationStructureHandle tlas;
 
-    // Batched GPU transform pipelines (lazily initialized) and reusable device buffers.
     DescriptorSetLayoutHandle transform_descriptor_layout;
     PipelineHandle transform_vertex_pipeline;
-    PipelineHandle transform_prev_vertex_pipeline;
     BufferHandle transform_vertex_job_buf;
-    BufferHandle transform_prev_vertex_job_buf;
     std::vector<TransformVertexJob> vertex_jobs;
-    std::vector<TransformPrevVertexJob> prev_vertex_jobs;
     uint32_t max_vertex_count_in_jobs = 0;
-    uint32_t max_prev_vertex_count_in_jobs = 0;
 
     Camera prev_active_camera;
+    std::optional<float> prev_time;
 };
 
 using SceneHandle = std::shared_ptr<Scene>;
+
+// area-weighted, (0, 1, 0) where the adjacent triangles have no area
+std::vector<float3> compute_vertex_normals(const std::vector<float3>& positions,
+                                           const std::vector<uint3>& triangles);
 
 } // namespace merian

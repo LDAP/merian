@@ -46,7 +46,8 @@ class HostNodes : public GraphTest {
                 taken.push_back(capture.run_iteration);
             }
         };
-        std::ignore = graph->run({.iterations = iterations}, take);
+        std::ignore =
+            graph->run({.iterations = iterations}, {}, [&](const GraphIterationInfo&) { take(); });
         graph->wait();
         take();
         return taken;

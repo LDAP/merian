@@ -95,6 +95,7 @@ struct Surface {
     float3 face_normal; // in worldspace
     OrthonormalFrame frame;
     float spawn_offset;
+    float area; // of the triangle, in worldspace
 
     // per-pixel screen-space derivative of linear_z along r_x, r_y
     half2
@@ -108,26 +109,26 @@ struct Surface {
 
 struct ShadingPoint {
     float3 pos;      // in worldspace
-    float3 prev_pos; // in worldspace, mcpg only — see Scene::get_prev_world_position
+    float3 prev_pos; // in worldspace, of the previous frame
     uint enc_face_normal;
     float3 emission;
     // view-facing where the ray left the scene
     OrthonormalFrame shading_frame;
-    // false where the ray left the scene; surface_material is then unset and must not be read.
-    // Optional<MaterialSample> does not compile as efficiently.
-    // see https://github.com/shader-slang/slang/issues/12338
+    // false where the ray left the scene; surface_material is then unset
     bool has_surface_material;
     MaterialSample surface_material;
     // scene material id; uint(-1) where the ray left the scene
     uint material_id;
     float spawn_offset;
+    // of the triangle, in worldspace; 0 where the ray left the scene
+    float area;
 
     // in worldspace
     float3 get_face_normal() {
         return decode_normal(enc_face_normal);
     }
 
-    // the (representative) shading normal in world space. I.e. to guide a denoiser.
+    // representative shading normal, in worldspace
     property float3 shading_normal {
         get {
             return shading_frame.get_normal();
@@ -140,16 +141,6 @@ struct ShadingPoint {
     bool geometric_side_agrees(const float3 wi, const float3 wo, const bool transmission) {
         const float3 ng = get_face_normal();
         return ((dot(wi, ng) < 0.f) != (dot(wo, ng) < 0.f)) == transmission;
-    }
-
-    // Whether the geometry agrees with the shading frame about the side wo is on. Normal mapping
-    // lifts directions above the shading horizon that the geometry still hides; a light sampled
-    // there would be lit through the surface.
-    bool geometric_side_matches_shading(const float3 wo) {
-        const float3 ns = shading_frame.get_normal();
-        const float3 ng = get_face_normal();
-        const float3 ng_shading_side = dot(ng, ns) < 0.f ? -ng : ng;
-        return (dot(wo, ns) < 0.f) == (dot(wo, ng_shading_side) < 0.f);
     }
 
     // Continuation ray for a scatter event; none where the geometric sides disagree.

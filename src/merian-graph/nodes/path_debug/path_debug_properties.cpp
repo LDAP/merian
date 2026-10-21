@@ -69,7 +69,9 @@ void PathDebugNode::properties_selection(Properties& config) {
     }
     bool changed = false;
     draw_pick_hint(config);
-    if (config.config_bool("pixel picked", picked, "Unset or press escape to clear the pick.")) {
+    if (config.config_bool(
+            "pixel picked", picked,
+            "Unset, or press escape in the Path Debugger window, to clear the pick.")) {
         if (picked) {
             picked_in_records = picked_pixel;
             changed = true;

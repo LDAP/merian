@@ -211,12 +211,10 @@ void bind_nodes(nb::module_& m) {
     using SinkReference = NodeReference<HostSink>;
     nb::class_<SinkReference>(
         m, "HostSink",
-        "Captures of a Host Image or Buffer Sink in the iterations asked for. They go to the "
-        "on_capture callbacks if any, else they wait for get() and get_all(). capture(), "
-        "capture_at(), capture_every(), get() and get_all() are callable from any thread, except "
-        "while the graph runs on another thread after it removed or reloaded the sink, which is "
-        "looked up again by identifier; on_capture() and remove_callbacks() only between runs or "
-        "from a capture callback.",
+        "Captures of a Host Image or Buffer Sink in the iterations asked for, which wait for "
+        "get() and get_all(), e.g. from an after_iteration callback of Graph.run. All methods "
+        "are callable from any thread, except while the graph runs on another thread after it "
+        "removed or reloaded the sink, which is looked up again by identifier.",
         nb::type_slots(graph_reference_slots<SinkReference>))
         .def(
             "capture",
@@ -235,8 +233,7 @@ void bind_nodes(nb::module_& m) {
             },
             "every"_a = 1,
             "Captures every n-th run iteration (see Graph.run_iteration), 0 stops. Skips an "
-            "iteration while more captures wait than iterations are in flight, which on_capture "
-            "callbacks never cause.")
+            "iteration while more captures wait than iterations are in flight.")
         .def(
             "get",
             [](const SinkReference& sink, const std::optional<Seconds> timeout) {
@@ -258,23 +255,6 @@ void bind_nodes(nb::module_& m) {
         .def(
             "get_all", [](const SinkReference& sink) { return sink.get()->get_all(); },
             "The captures whose data arrived, oldest first, without waiting.")
-        .def(
-            "on_capture",
-            [](const SinkReference& sink, const nb::callable& callback) {
-                sink.python_graph().add_capture_callback(sink.get(), callback);
-            },
-            "callback"_a,
-            "Calls callback(capture) for every capture once its data arrived, in iteration order "
-            "across sinks: on the running thread between iterations of run(), at least one "
-            "iteration later, and in wait(). The GPU works on the next iterations meanwhile, but "
-            "no further ahead than the iterations in flight. Callbacks may edit the graph; a busy "
-            "second Python thread delays each by the GIL switch interval.")
-        .def(
-            "remove_callbacks",
-            [](const SinkReference& sink) {
-                sink.python_graph().remove_capture_callbacks(sink.get());
-            },
-            "Captures wait for get() and get_all() again.")
         .def("__repr__", [](const SinkReference& sink) {
             return fmt::format("HostSink('{}')", sink.identifier);
         });

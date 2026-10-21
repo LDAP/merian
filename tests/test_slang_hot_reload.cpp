@@ -668,9 +668,8 @@ TEST_F(SlangHotReloadTest, TextureArrayResizeRebuildsFullPipeline) {
     pipeline.get();
     EXPECT_EQ(rebuild_count, 2u) << "pipeline rebuilt after TM resize";
 
-    // Dispatch with the auto-rebuilt pipeline
     auto output_buffer = allocator->create_buffer(
-        4 * sizeof(uint32_t),
+        8 * sizeof(uint32_t),
         vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
         MemoryMappingType::HOST_ACCESS_RANDOM, "test_output");
 
@@ -681,6 +680,7 @@ TEST_F(SlangHotReloadTest, TextureArrayResizeRebuildsFullPipeline) {
     params->get_cursor()["texture_id"] = static_cast<uint32_t>(tex_id);
 
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
+        tm->update(cmd);
         cmd->bind(pipeline.get());
         entry_point.get()->bind("params", params, cmd, pipeline.get(), obj_allocator);
         cmd->dispatch(1, 1, 1);

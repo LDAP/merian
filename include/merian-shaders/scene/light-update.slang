@@ -108,11 +108,11 @@ main(uint3 group_id : SV_GroupID,
                 continue;
             luminance_sum += yuv_luminance(material.get_emission(
                 ShadingData(n, pos, uv, scene.time, front, n, uint16_t(1), true),
-                scene.material_system.texture_manager, DefaultLODSampler()));
+                scene.material_system.texture_manager.get_textures(), DefaultLODSampler()));
             if (two_sided) {
                 luminance_sum += yuv_luminance(material.get_emission(
                     ShadingData(-n, pos, uv, scene.time, back, -n, uint16_t(1), false),
-                    scene.material_system.texture_manager, DefaultLODSampler()));
+                    scene.material_system.texture_manager.get_textures(), DefaultLODSampler()));
             }
         }
     }

@@ -21,64 +21,54 @@ struct MaterialBufferEntry {
 struct MaterialSystem {
     uint material_count;
     StructuredBuffer<MaterialBufferEntry> materials;
+    StructuredBuffer<MaterialBufferEntry> prev_materials;
 
     ParameterBlock<TextureManager> texture_manager;
 
-    // --------------------------------------
-
-    // return true if transparent / should be discarded
+    // true where the texel is discarded
     bool alpha_test(const MaterialID material_id,
                     const float2 uv,
-                    const LODSampler2D lod_sampler = DefaultLODSampler()) {
-        const MaterialHeader header = materials[material_id].header;
-        if (let texture_id = header.get_alpha_texture_id()) {
-            const float alpha = lod_sampler.sample(texture_manager.get_sampler2D(texture_id), uv).a;
-            return alpha < merian_alpha_test_threshold;
-        }
-
-        return false;
-    }
-
-    uint2 get_alpha_texture_dimensions(const MaterialID material_id) {
-        const MaterialHeader header = materials[material_id].header;
-        if (let texture_id = header.get_alpha_texture_id()) {
-            return texture_dimensions(texture_manager.get_sampler2D(texture_id), 0);
-        }
-        return uint2(0);
+                    const LODSampler2D lod_sampler = DefaultLODSampler(),
+                    const bool prev_frame = false) {
+        return get_alpha(material_id, uv, lod_sampler, prev_frame) < merian_alpha_test_threshold;
     }
 
     // Sampled alpha (or 1.0 if the material has no alpha texture).
     float get_alpha(const MaterialID material_id,
                     const float2 uv,
-                    const LODSampler2D lod_sampler = DefaultLODSampler()) {
-        const MaterialHeader header = materials[material_id].header;
+                    const LODSampler2D lod_sampler = DefaultLODSampler(),
+                    const bool prev_frame = false) {
+        const MaterialHeader header =
+            prev_frame ? prev_materials[material_id].header : materials[material_id].header;
         if (let texture_id = header.get_alpha_texture_id()) {
-            return lod_sampler.sample(texture_manager.get_sampler2D(texture_id), uv).a;
+            return texture_manager.get_textures(prev_frame).sample(lod_sampler, texture_id, uv).a;
         }
         return 1.f;
     }
 
-    MaterialModel get_material(const MaterialID material_id) {
-        const uint material_model_type_id = materials[material_id].header.material_model_type_id;
-        // the material_model_type_id must be registerd on CPU side as type conformance. The CPU
-        // side MaterialSystem ensures that.
-        return createDynamicObject<MaterialModel>(material_model_type_id, materials[material_id]);
+    MaterialModel get_material(const MaterialID material_id, const bool prev_frame = false) {
+        const MaterialBufferEntry entry =
+            prev_frame ? prev_materials[material_id] : materials[material_id];
+        return createDynamicObject<MaterialModel>(entry.header.material_model_type_id, entry);
     }
 
     float3 get_emission(const MaterialID material_id,
                         const ShadingData sd,
-                        const LODSampler2D lod_sampler = DefaultLODSampler()) {
-        return get_material(material_id).get_emission(sd, texture_manager, lod_sampler);
+                        const LODSampler2D lod_sampler = DefaultLODSampler(),
+                        const bool prev_frame = false) {
+        return get_material(material_id, prev_frame)
+            .get_emission(sd, texture_manager.get_textures(prev_frame), lod_sampler);
     }
 
     MaterialSample get_material_sample(const MaterialID material_id,
                                        const ShadingData sd,
                                        out float3 out_emission,
                                        out OrthonormalFrame out_shading_frame,
-                                       const LODSampler2D lod_sampler = DefaultLODSampler()) {
-        const MaterialModel material_model = get_material(material_id);
-        return material_model.get_sample(sd, texture_manager, lod_sampler, out_emission,
-                                         out_shading_frame);
+                                       const LODSampler2D lod_sampler = DefaultLODSampler(),
+                                       const bool prev_frame = false) {
+        const MaterialModel material_model = get_material(material_id, prev_frame);
+        return material_model.get_sample(sd, texture_manager.get_textures(prev_frame), lod_sampler,
+                                         out_emission, out_shading_frame);
     }
 }
 

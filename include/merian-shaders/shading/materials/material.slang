@@ -19,31 +19,23 @@ enum MaterialFlags : uint8_t {
 // composition (MaterialSystem::set_clamp_normals()).
 extern static const bool merian_hint_clamp_normals = true;
 
-// This represents the definition of the material (before being evaluated at a shading point), e.g.
-// Disney, glTF.
-//
-// The get_sample() method evaluates the material maps (gloss, normal, ...) to create an instance of
-// this material for the shading point.
-//
-// Materials must ALWAYS have MaterialHeader as first member variable. The CPU side material system
-// checks for this requirement.
+// MaterialHeader must be the first member.
 interface MaterialModel {
     associatedtype MaterialSampleImpl : MaterialSample;
 
-    MaterialSampleImpl get_sample(const ShadingData sd, const TextureManager texture_manager,
+    MaterialSampleImpl get_sample(const ShadingData sd, const Textures textures,
                                   const LODSampler2D lod_sampler, out float3 out_emission,
                                   out OrthonormalFrame out_shading_frame);
 
-    float3 get_emission(const ShadingData sd, const TextureManager texture_manager,
+    float3 get_emission(const ShadingData sd, const Textures textures,
                         const LODSampler2D lod_sampler) {
         float3 emission;
         OrthonormalFrame shading_frame;
-        get_sample(sd, texture_manager, lod_sampler, emission, shading_frame);
+        get_sample(sd, textures, lod_sampler, emission, shading_frame);
         return emission;
     }
 }
 
-// This represents how the evaluated material at a point on a surface or in a volume scatters.
 interface MaterialSample {
 
     associatedtype BSDFImpl : BSDF;

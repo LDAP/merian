@@ -355,9 +355,9 @@ class PathDebugNode : public Node {
     bool presenting = false;
     // the canvas while presenting, else the output
     int2 label_area = int2(0);
-    // the display scale the panels and labels are laid out at
     float label_scale = 1.f;
     std::optional<float2> probe_at;
+    bool escape_clears = false;
 
     std::mutex stats_mutex;
     Readback latest_readback{};

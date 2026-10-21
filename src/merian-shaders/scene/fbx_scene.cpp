@@ -464,16 +464,10 @@ void FBXScene::compute_aabb() {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Load
-// ---------------------------------------------------------------------------
-
 void FBXScene::load(const CommandBufferHandle& cmd, const std::filesystem::path& path) {
-    // Defer texture destruction to pool reset so any in-flight frame keeps its bindings valid.
     for (const TextureSlot& slot : texture_slots) {
         for (const TextureID id : {slot.id_srgb, slot.id_linear}) {
             if (id != TextureID(-1)) {
-                cmd->keep_until_pool_reset(get_texture_manager()->get_texture(id));
                 get_texture_manager()->remove_texture(id);
             }
         }

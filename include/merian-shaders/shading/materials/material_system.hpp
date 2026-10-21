@@ -6,6 +6,7 @@
 #include "merian/shader/slang_composition.hpp"
 #include "merian/shader/slang_program.hpp"
 
+#include <optional>
 #include <span>
 #include <string>
 #include <unordered_map>
@@ -74,18 +75,20 @@ class MaterialSystem : public std::enable_shared_from_this<MaterialSystem> {
     MaterialModelID register_material_type(const std::string& slang_type_name,
                                            const std::string& slang_module_path);
 
+    std::optional<MaterialModelID> find_material_type(const std::string& slang_type_name) const;
+
+    MaterialModelID get_material_type(const MaterialID id) const {
+        assert(id < materials.size());
+        return materials[id].header.material_model_type_id;
+    }
+
     // Add a material instance. Returns MaterialID.
     MaterialID add_material(MaterialModelID type_id, const Material& material);
 
-    // Re-pack the payload at slot `id`. Cheap: only widens the dirty range so
-    // the next upload() copies that single entry. The new material's payload
-    // size must not exceed the current max_payload_size (asserted) — pick a
-    // material model whose payload is stable across updates.
+    // The new payload size must not exceed max_payload_size.
     void update_material(MaterialID id, const Material& material);
 
-    // Drop all materials. Caller is responsible for re-adding (e.g. after a
-    // map change). The GPU buffer handle is kept; it gets overwritten on the
-    // next upload().
+    // Drops all materials; the GPU buffer is kept.
     void clear();
 
     uint32_t get_material_count() const {
@@ -158,7 +161,7 @@ class MaterialSystem : public std::enable_shared_from_this<MaterialSystem> {
   private:
     void update_composition_constants();
     ShaderObjectHandle build_shader_object() const;
-    void repack_host_buffer();
+    void repack_host_buffers(uint32_t prev_entry_size);
     uint32_t get_entry_size() const;
 
     ShaderCompileContextHandle compile_context;
@@ -178,11 +181,12 @@ class MaterialSystem : public std::enable_shared_from_this<MaterialSystem> {
 
     // Packed host-side buffer matching GPU MaterialBufferEntry layout
     std::vector<uint8_t> host_buffer;
+    // host_buffer as uploaded by the last update
+    std::vector<uint8_t> prev_host_buffer;
     BufferHandle material_buffer;
+    BufferHandle prev_material_buffer;
     uint32_t max_payload_size = 0;
     bool any_interior_volume = false;
-    uint32_t dirty_begin = UINT32_MAX;
-    uint32_t dirty_end = 0;
     float alpha_test_threshold = 0.5F;
     bool clamp_normals = true;
     SlangCompositionHandle composition;

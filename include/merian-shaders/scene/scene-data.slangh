@@ -13,15 +13,10 @@ namespace merian {
 enum GeometryDataFlags : uint16_t {
     // Data already in world space; skip the instance transform multiply.
     Pretransformed = 0x1,
-    // prev_vertices buffer is valid.
-    HasPrevVertices = 0x2,
-    // Instance transform changed since last frame; read prev_instance_transform.
-    IsAnimated = 0x4,
     // Set when -cross(edge01, edge02) is the front-facing (outward) normal.
     FlipFacing = 0x8,
 
-    // Index buffer element type. None (no bit set) means sequential indices:
-    // triangle i has vertices 3i, 3i+1, 3i+2 — no memory read.
+    // None: sequential indices, triangle i has vertices 3i, 3i+1, 3i+2
     IndexTypeUint8 = 0x10,
     IndexTypeUint16 = 0x20,
     IndexTypeUint32 = 0x40,
@@ -44,9 +39,13 @@ enum GeometryDataFlags : uint16_t {
 
     // Its triangles are lights of the light collection.
     Emissive = 0x1000,
-};
 
-// See scene.hpp for details.
+    // Not in the previous frame.
+    New = 0x2000,
+
+    // only in the previous frame, addressable under a current GeometryID for one frame
+    Retired = 0x4000,
+};
 
 // InstanceID + GeometryIndex
 typedef uint32_t GeometryID;
@@ -106,49 +105,30 @@ struct PackedVertexData {
 #endif
 };
 
-struct PackedPrevVertexData {
-    float3 position;
-};
-
 #ifdef __cplusplus
 using VertexBufferAddress = vk::DeviceAddress;
 using IndexBufferAddress = vk::DeviceAddress;
-using PrevVertexBufferAddress = vk::DeviceAddress;
 #else
 typealias VertexBufferAddress = PackedVertexData*;
-// Raw byte pointer; element type encoded in GeometryDataFlags IndexType bits.
-// 0 (null) when IndexType == None.
+// element type in the IndexType bits of GeometryDataFlags; null for IndexType None
 typealias IndexBufferAddress = uint8_t*;
-typealias PrevVertexBufferAddress = PackedPrevVertexData*;
 #endif
 
 struct GeometryData {
     VertexBufferAddress vertices;
+    // the previous frame's vertices; equals vertices where they did not change
+    VertexBufferAddress prev_vertices;
     IndexBufferAddress indices;
-    // 0 / nullptr if static: prev position equals current position.
-    PrevVertexBufferAddress prev_vertices;
 
     MaterialID material_id;
     GeometryDataFlags flags;
-    // to validate hits recorded in earlier frames against despawned/resized geometry
-    uint32_t primitive_count;
 };
 
 struct TransformVertexJob {
     VertexBufferAddress src;
-    VertexBufferAddress dst;          // may equal src for in-place
-    PrevVertexBufferAddress prev_dst; // 0 if no prev
+    VertexBufferAddress dst;
     float4x4 transform;
     float4x4 inverse_transposed;
-    float4x4 prev_transform;          // unused if prev_dst == 0
-    uint32_t vertex_count;
-    uint32_t _pad[3];
-};
-
-struct TransformPrevVertexJob {
-    PrevVertexBufferAddress src;
-    PrevVertexBufferAddress dst;      // may equal src for in-place
-    float4x4 prev_transform;
     uint32_t vertex_count;
     uint32_t _pad[3];
 };
@@ -190,12 +170,6 @@ void get_triangle_uv(const GeometryData geometry_data,
     uv1 = float2(geometry_data.vertices[indices.y].uv);
     uv2 = float2(geometry_data.vertices[indices.z].uv);
 }
-#endif
-
-#ifdef __cplusplus
-static constexpr GeometryID GEOMETRY_ID_GONE = 0xFFFFFFFFu;
-#else
-static const GeometryID GEOMETRY_ID_GONE = 0xFFFFFFFFu;
 #endif
 
 #ifdef __cplusplus

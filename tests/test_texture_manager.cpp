@@ -12,6 +12,7 @@
 #include "merian/vk/extension/extension_vk_validation_layers.hpp"
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 
+#include <array>
 #include <bit>
 #include <cstring>
 
@@ -127,7 +128,7 @@ TEST_F(TextureManagerTest, SampleTextureOnGPU) {
     auto pipeline = ComputePipeline::create(pipe_layout, vulkan_ep);
 
     auto output_buffer = allocator->create_buffer(
-        4 * sizeof(uint32_t),
+        8 * sizeof(uint32_t),
         vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
         MemoryMappingType::HOST_ACCESS_RANDOM, "test_output");
 
@@ -138,23 +139,42 @@ TEST_F(TextureManagerTest, SampleTextureOnGPU) {
     cursor["output"] = output_buffer;
     cursor["texture_id"] = static_cast<uint32_t>(tex_id);
 
-    queue->submit_wait([&](const CommandBufferHandle& cmd) {
-        cmd->bind(pipeline);
-        entry_point.get()->bind("params", params, cmd, pipeline, obj_allocator);
-        cmd->dispatch(1, 1, 1);
-    });
+    // one frame: current and previous color at tex_id
+    const auto render = [&] {
+        queue->submit_wait([&](const CommandBufferHandle& cmd) {
+            tm->update(cmd);
+            cmd->bind(pipeline);
+            entry_point.get()->bind("params", params, cmd, pipeline, obj_allocator);
+            cmd->dispatch(1, 1, 1);
+        });
+        std::array<float4, 2> colors;
+        const auto* mapped = output_buffer->get_memory()->map_as<uint32_t>();
+        for (uint32_t i = 0; i < 8; i++) {
+            colors[i / 4][i % 4] = bits_float(mapped[i]);
+        }
+        output_buffer->get_memory()->unmap();
+        return colors;
+    };
+    const auto expect_near = [](const float4& actual, const float4& expected) {
+        for (uint32_t i = 0; i < 4; i++) {
+            EXPECT_NEAR(actual[i], expected[i], 1e-3f);
+        }
+    };
 
-    auto* mapped = output_buffer->get_memory()->map_as<uint32_t>();
-    float r = bits_float(mapped[0]);
-    float g = bits_float(mapped[1]);
-    float b = bits_float(mapped[2]);
-    float a = bits_float(mapped[3]);
-    output_buffer->get_memory()->unmap();
+    const float4 red{1, 0, 0, 1};
+    const float4 green{0, 1, 0, 1};
+    expect_near(render()[0], red);
 
-    EXPECT_NEAR(r, 1.0f, 1e-3f);
-    EXPECT_NEAR(g, 0.0f, 1e-3f);
-    EXPECT_NEAR(b, 0.0f, 1e-3f);
-    EXPECT_NEAR(a, 1.0f, 1e-3f);
+    const uint32_t green_pixel = 0xFF00FF00;
+    tm->set_texture_from_rgba8(tex_id, &green_pixel, 1, 1, vk::SamplerAddressMode::eRepeat,
+                               vk::Filter::eNearest, vk::Filter::eNearest, false);
+    const auto [changed, changed_prev] = render();
+    expect_near(changed, green);
+    expect_near(changed_prev, red);
+
+    const auto [kept, kept_prev] = render();
+    expect_near(kept, green);
+    expect_near(kept_prev, green);
 }
 
 TEST_F(TextureManagerTest, ResizePropagatesVersion) {

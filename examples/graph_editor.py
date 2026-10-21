@@ -13,6 +13,10 @@ for the backdrop, select what it shows. Delete removes the selected nodes and
 connections. Hollow inputs are optional; grey connectors and dashed connections were
 connected but are not described by their node now. Positions are stored in the saved
 config.
+
+Space plays and pauses, . steps. A graph's view sends the keys to the graph; there,
+Shift+Alt+Space plays and pauses, Shift+Alt+. steps and Shift+Alt+Esc gives the mouse
+back.
 """
 
 import argparse
@@ -81,12 +85,29 @@ _VIEW_SINK = "gui view"
 
 _CLOCK_INTERVAL = timedelta(milliseconds=33)
 _CONNECTED = "/graph/connect"
-# Below any refresh period, which Qt can misreport
 _FRAME_INTERVAL = timedelta(milliseconds=4)
 _MEMORY_INTERVAL = timedelta(seconds=1)
 _PROPERTIES_INTERVAL = timedelta(milliseconds=100)
 _REPORT_INTERVAL = timedelta(milliseconds=100)
 _RUN_SLICE = timedelta(milliseconds=15)
+
+_PLAYBACK_KEYS = (QtCore.Qt.Key.Key_Space, QtCore.Qt.Key.Key_Period)
+_VIEW_MODIFIERS = (
+    QtCore.Qt.KeyboardModifier.ShiftModifier | QtCore.Qt.KeyboardModifier.AltModifier
+)
+_RELEASE_MOUSE = QtCore.QKeyCombination(_VIEW_MODIFIERS, QtCore.Qt.Key.Key_Escape)
+_VIEW_SHORTCUTS = {_RELEASE_MOUSE.toCombined()} | {
+    QtCore.QKeyCombination(_VIEW_MODIFIERS, key).toCombined() for key in _PLAYBACK_KEYS
+}
+_PLAYBACK_KEY_USERS = (
+    QtWidgets.QAbstractButton,
+    QtWidgets.QAbstractItemView,
+    QtWidgets.QComboBox,
+)
+_STOP_TIP = (
+    "Stop: completes the iterations in flight and reconnects, which restarts the run at "
+    "iteration 0"
+)
 
 _BACKDROP_SHADE = QtGui.QColor(THEME["canvas"])
 _BACKDROP_SHADE.setAlpha(120)
@@ -264,8 +285,8 @@ class _GraphWorker(QtCore.QObject):
 
     nodes_changed = QtCore.Signal(object)
     node_added = QtCore.Signal(str, object)
-    # sequence, identifier, items
-    properties_recorded = QtCore.Signal(int, str, object)
+    # sequence, identifier or None for the graph, items
+    properties_recorded = QtCore.Signal(int, object, object)
     # iteration, time
     clocked = QtCore.Signal(object, float)
     reported = QtCore.Signal(object)
@@ -361,16 +382,18 @@ class _GraphWorker(QtCore.QObject):
                 view_sink.sink.capture()
                 view_sink.requested = True
                 view_sink.requested_time = now
-        if self.paused_time is not None:
-            # A step and the first iteration after a pause run at the time paused at
+        if not self.playing:
+            limits = {"iterations": 1}
+        elif self.paused_time is not None:
             limits = {"iterations": 1, "time": self.paused_time}
-            if self.playing:
-                self.paused_time = None
+            self.paused_time = None
         else:
             limits = {"iterations": None, "duration": _RUN_SLICE}
         self.steps = max(self.steps - 1, 0)
         try:
             result = self.graph.run(**limits, until_event=_CONNECTED)
+            if not self.playing:
+                self.paused_time = self.graph.time
             if result.stop_reason == mg.StopReason.EVENT:
                 self.publish_state()
         except Exception:
@@ -417,10 +440,7 @@ class _GraphWorker(QtCore.QObject):
 
     def connect_graph(self) -> None:
         self.graph.connect()
-        self.profiler_interval = self.graph.get_properties()["profiler"][
-            "report interval"
-        ]
-        self.profiler_interval_changed.emit(self.profiler_interval)
+        self.show_profiler_interval()
         self.publish_state()
 
     def publish_state(self) -> None:
@@ -643,8 +663,9 @@ class _GraphWorker(QtCore.QObject):
         self.message.emit(f"saved {path}")
 
     def request_properties(
-        self, sequence: int, identifier: str, recorder: Recorder
+        self, sequence: int, identifier: str | None, recorder: Recorder
     ) -> None:
+        """Records the properties of a node, of the graph for identifier None."""
         if self.properties_request:
             _, pending_identifier, pending = self.properties_request
             if pending_identifier == identifier:
@@ -654,21 +675,34 @@ class _GraphWorker(QtCore.QObject):
         self.properties_request = (sequence, identifier, recorder)
 
     def record_properties(
-        self, sequence: int, identifier: str, recorder: Recorder
+        self, sequence: int, identifier: str | None, recorder: Recorder
     ) -> None:
         nodes = self.graph.nodes
-        if identifier not in nodes:
+        if identifier is None:
+            record = self.graph.properties
+        elif identifier in nodes:
+            record = nodes[identifier].properties
+        else:
             return
+        changed = bool(recorder.changes)
         try:
-            nodes[identifier].properties(recorder)
+            record(recorder)
         finally:
             self.properties_recorded.emit(sequence, identifier, recorder.items)
             if self.graph.needs_reconnect:
                 self.connect_graph()
+            elif identifier is None and changed:
+                self.show_profiler_interval()
+            if identifier is None and changed and not self.playing:
+                source = self.graph.get_properties()["graph_properties"]["time source"]
+                if source == "Time":
+                    self.paused_time = None
 
-
-# Graph View
-############
+    def show_profiler_interval(self) -> None:
+        interval = self.graph.get_properties()["profiler"]["report interval"]
+        if interval != self.profiler_interval:
+            self.profiler_interval = interval
+            self.profiler_interval_changed.emit(interval)
 
 
 @functools.cache
@@ -1215,23 +1249,32 @@ class _GraphView(QtWidgets.QGraphicsView):
         self.scale(factor, factor)
 
 
-# Main Window
-#############
+def _pointer(path: list[str]) -> str:
+    return "".join("/" + name.replace("~", "~0").replace("/", "~1") for name in path)
+
+
+def _key_names(key: tuple) -> list[str] | None:
+    if any(occurrence for _, _, occurrence in key):
+        return None
+    return [name for _, name, _ in key]
 
 
 def _property_pointer(key: tuple) -> str | None:
-    if any(occurrence for _, _, occurrence in key):
+    names = _key_names(key)
+    if names is None:
         return None
-    names = [name for _, name, _ in key]
     if len(names) == 2 and names[1] in ("enabled", "linearization order"):
-        path = names
-    elif len(names) > 3 and names[1:3] == ["sections", "properties"]:
-        path = [names[0], "properties", *names[3:]]
-    else:
-        return None
-    return "/nodes/" + "/".join(
-        name.replace("~", "~0").replace("/", "~1") for name in path
-    )
+        return _pointer(["nodes", *names])
+    if len(names) > 3 and names[1:3] == ["sections", "properties"]:
+        return _pointer(["nodes", names[0], "properties", *names[3:]])
+    return None
+
+
+def _graph_property_pointer(key: tuple) -> str | None:
+    names = _key_names(key)
+    if names and len(names) == 2 and names[0] == "graph_properties":
+        return _pointer(names)
+    return None
 
 
 def _add_action(
@@ -1251,6 +1294,15 @@ def _add_action(
     if tip:
         action.setToolTip(tip)
     return action
+
+
+def _keys(action: QtGui.QAction) -> str:
+    """The shortcuts of an action: in the editor, then in a graph's view."""
+    editor, view = (
+        shortcut.toString(QtGui.QKeySequence.SequenceFormat.NativeText)
+        for shortcut in action.shortcuts()
+    )
+    return f"{editor}, in a graph's view {view}"
 
 
 def _polygon(*points: tuple[float, float]) -> QtGui.QPolygonF:
@@ -1327,7 +1379,7 @@ class _Window(QtWidgets.QMainWindow):
         self.playing = True
         self.fitted = False
         self.sequence = 0
-        self.change_sequence = 0
+        self.change_sequences: dict[str | None, int] = {}
         self.properties_scheduled = False
 
         self.graph_view = _GraphView()
@@ -1351,7 +1403,11 @@ class _Window(QtWidgets.QMainWindow):
             lambda properties: self.set_view_properties(_BACKDROP, properties)
         )
         self.graph_view.input.message.connect(self.show_message)
+        self.graph_view.input.shortcuts = _VIEW_SHORTCUTS
         self.properties = QtProperties(self.schedule_properties, _property_pointer)
+        self.graph_properties = QtProperties(
+            self.schedule_properties, _graph_property_pointer
+        )
         self.profiler = ProfilerView()
         self.profiler.enabled_changed.connect(
             functools.partial(worker.post, worker.set_profiling)
@@ -1377,6 +1433,7 @@ class _Window(QtWidgets.QMainWindow):
         self.tabs = QtWidgets.QTabWidget()
         for page, name in (
             (self.properties.widget, "Node"),
+            (self.graph_properties.widget, "Graph"),
             (self.profiler, "Times"),
             (self.memory, "Memory"),
         ):
@@ -1465,6 +1522,50 @@ class _Window(QtWidgets.QMainWindow):
             "redder",
             checkable=True,
         )
+        view_menu.addSeparator()
+        _add_action(
+            view_menu,
+            "&Release Mouse",
+            self.release_mouse,
+            QtGui.QKeySequence(_RELEASE_MOUSE),
+            "Give the mouse back from a graph's view that takes raw input, which a click "
+            "into the view captures again",
+        )
+
+        playback_menu = self.menuBar().addMenu("&Playback")
+        playback_menu.setToolTipsVisible(True)
+        self.play_action = _add_action(playback_menu, "&Pause", self.toggle_playing)
+        self.play_action.setAutoRepeat(False)
+        self.step_action = _add_action(
+            playback_menu, "&Step", lambda: self.worker.post(self.worker.step)
+        )
+        for action, key in zip((self.play_action, self.step_action), _PLAYBACK_KEYS):
+            action.setShortcuts(
+                [
+                    QtGui.QKeySequence(key),
+                    QtGui.QKeySequence(QtCore.QKeyCombination(_VIEW_MODIFIERS, key)),
+                ]
+            )
+        self.step_action.setToolTip(
+            f"Step: runs one iteration ({_keys(self.step_action)})"
+        )
+        _add_action(
+            playback_menu,
+            "S&top",
+            lambda: self.worker.post(self.worker.stop),
+            tip=_STOP_TIP,
+        )
+
+    def event(self, event: QtCore.QEvent) -> bool:
+        if (
+            event.type() == QtCore.QEvent.Type.ShortcutOverride
+            and event.key() in _PLAYBACK_KEYS
+            and event.modifiers() == QtCore.Qt.KeyboardModifier.NoModifier
+            and isinstance(QtWidgets.QApplication.focusWidget(), _PLAYBACK_KEY_USERS)
+        ):
+            event.accept()
+            return True
+        return super().event(event)
 
     def swap(self) -> None:
         split_sizes, side_sizes = self.split.sizes(), self.side.sizes()
@@ -1492,22 +1593,11 @@ class _Window(QtWidgets.QMainWindow):
             layout.addWidget(tool)
             return tool
 
-        self.play_button = button(
-            "play",
-            "",
-            lambda: self.worker.post(self.worker.set_playing, not self.playing),
-        )
+        self.play_button = button("play", "", self.play_action.trigger)
         self.step_button = button(
-            "step",
-            "Step: runs one iteration",
-            lambda: self.worker.post(self.worker.step),
+            "step", self.step_action.toolTip(), self.step_action.trigger
         )
-        button(
-            "stop",
-            "Stop: completes the iterations in flight and reconnects, which restarts the "
-            "run at iteration 0",
-            lambda: self.worker.post(self.worker.stop),
-        )
+        button("stop", _STOP_TIP, lambda: self.worker.post(self.worker.stop))
         button(
             "reconnect",
             "Reconnect the graph",
@@ -1565,10 +1655,21 @@ class _Window(QtWidgets.QMainWindow):
     def show_playing(self, playing: bool) -> None:
         self.playing = playing
         self.play_button.setIcon(_painted_icon("pause" if playing else "play"))
-        self.play_button.setToolTip(
-            "Pause: holds the graph time" if playing else "Play"
-        )
+        self.play_action.setText("&Pause" if playing else "&Play")
+        tip = "Pause: holds the graph time" if playing else "Play"
+        tip = f"{tip} ({_keys(self.play_action)})"
+        self.play_action.setToolTip(tip)
+        self.play_button.setToolTip(tip)
+        self.step_action.setEnabled(not playing)
         self.step_button.setEnabled(not playing)
+
+    def toggle_playing(self) -> None:
+        self.worker.post(self.worker.set_playing, not self.playing)
+
+    def release_mouse(self) -> None:
+        for view in self.windows:
+            if self.view_of(view).input.release_mouse():
+                self.show_message("released the mouse, a click into the view takes it")
 
     def show_clock(self, iteration: int, graph_time: float) -> None:
         self.iteration_label.setText(str(iteration))
@@ -1811,6 +1912,7 @@ class _Window(QtWidgets.QMainWindow):
             functools.partial(self.worker.post, self.worker.set_capture_interval, view)
         )
         output_view.input.message.connect(self.show_message)
+        output_view.input.shortcuts = _VIEW_SHORTCUTS
 
     def set_view_properties(self, view: str, properties: dict) -> None:
         if window := self.windows.get(view):
@@ -1886,20 +1988,31 @@ class _Window(QtWidgets.QMainWindow):
             QtCore.QTimer.singleShot(0, self.request_properties)
 
     def request_properties(self) -> None:
+        """Records the shown panel, and the other one if it has changes."""
         self.properties_scheduled = False
-        shown = self.tabs.currentWidget() is self.properties.widget
-        if not self.selected or not shown or QtWidgets.QApplication.activeModalWidget():
+        if QtWidgets.QApplication.activeModalWidget():
             return
-        self.sequence += 1
-        recorder = self.properties.recorder()
-        if recorder.changes:
-            self.change_sequence = self.sequence
-        sequence, identifier = self.sequence, self.selected
-        self.worker.post(self.worker.request_properties, sequence, identifier, recorder)
+        panels = [(None, self.graph_properties)]
+        if self.selected:
+            panels.append((self.selected, self.properties))
+        for identifier, panel in panels:
+            if panel.changes or self.tabs.currentWidget() is panel.widget:
+                self.sequence += 1
+                recorder = panel.recorder()
+                if recorder.changes:
+                    self.change_sequences[identifier] = self.sequence
+                self.worker.post(
+                    self.worker.request_properties, self.sequence, identifier, recorder
+                )
 
-    def show_recording(self, sequence: int, identifier: str, items: list) -> None:
-        if identifier == self.selected:
-            self.properties.show(items, consumed=sequence >= self.change_sequence)
+    def show_recording(
+        self, sequence: int, identifier: str | None, items: list
+    ) -> None:
+        consumed = sequence >= self.change_sequences.get(identifier, 0)
+        if identifier is None:
+            self.graph_properties.show(items, consumed)
+        elif identifier == self.selected:
+            self.properties.show(items, consumed)
 
     def open_config(self) -> None:
         directory = str(self.path.parent) if self.path else str(scene.EXAMPLES)

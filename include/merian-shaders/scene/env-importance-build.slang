@@ -33,8 +33,7 @@ build(uint thread_id : SV_GroupIndex,
             const float3 dir = equal_area_square_to_sphere((float2(texel) + offset) * inv_size);
             // the environment is looked up along -wi, and emitters may only light later bounces
             const ShadingData sd = make_env_shading_data(dir, float3(0), scene.time);
-            sum += yuv_luminance(
-                scene.env_map.eval(sd, scene.material_system.texture_manager, DefaultLODSampler()));
+            sum += yuv_luminance(scene.eval_env_map(sd, DefaultLODSampler()));
         }
         value = 0.25f * sum;
         value = isfinite(value) ? max(value, 0.f) : 0.f;

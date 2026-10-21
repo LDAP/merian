@@ -54,10 +54,10 @@ MERIAN_MICROMAP_FUNC uint32_t emission_grid_index_of(const float2 bary, const ui
     const float scaled_u = bary.x * float(n);
     const float scaled_v = bary.y * float(n);
     const uint32_t v = uint32_t(
-        scaled_v <= 0.f ? 0.f : (scaled_v >= float(n - 1) ? float(n - 1) : floor(scaled_v)));
+        !(scaled_v > 0.f) ? 0.f : (scaled_v >= float(n - 1) ? float(n - 1) : floor(scaled_v)));
     const uint32_t row_end = n - 1 - v;
     const uint32_t u = uint32_t(
-        scaled_u <= 0.f ? 0.f : (scaled_u >= float(row_end) ? float(row_end) : floor(scaled_u)));
+        !(scaled_u > 0.f) ? 0.f : (scaled_u >= float(row_end) ? float(row_end) : floor(scaled_u)));
     const bool inverted = u < row_end && scaled_u - float(u) + scaled_v - float(v) > 1.f;
     return emission_grid_index(u, v, inverted, level);
 }
@@ -74,14 +74,10 @@ MERIAN_MICROMAP_FUNC uint32_t emission_grid_index_of_micro_triangle(const MicroT
 MERIAN_MICROMAP_FUNC MicroTriangle emission_grid_to_bary(const uint32_t index,
                                                          const uint32_t level) {
     const uint32_t n = 1u << level;
-    const uint32_t remaining = n * n - index;
-    uint32_t rows_left = uint32_t(ceil(sqrt(float(remaining))));
-    while (rows_left * rows_left < remaining)
-        rows_left++;
-    while (rows_left > 1 && (rows_left - 1) * (rows_left - 1) >= remaining)
-        rows_left--;
-    const uint32_t v = n - rows_left;
-    const uint32_t within = index - (n * n - rows_left * rows_left);
+    uint32_t v = 0;
+    while (v + 1 < n && emission_grid_index(0, v + 1, false, level) <= index)
+        v++;
+    const uint32_t within = index - emission_grid_index(0, v, false, level);
     const uint32_t u = within >> 1;
 
     const float scale = 1.f / float(n);

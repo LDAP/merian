@@ -3,7 +3,7 @@ import merian_shaders.shading.bsdfs.brdf_lambert_diffuse;
 
 namespace merian {
 
-// DiffuseMaterial: uses the alpha_texture in MaterialHeader as the base_color_texture.
+// uses the alpha_texture of MaterialHeader as base color
 struct DiffuseMaterial : MaterialModel {
     typealias MaterialSampleImpl = DiffuseMaterialSample;
 
@@ -11,13 +11,13 @@ struct DiffuseMaterial : MaterialModel {
     float4 base_color_factor;
 
     override float3 get_emission(const ShadingData sd,
-                                 const TextureManager tm,
+                                 const Textures textures,
                                  const LODSampler2D lod) {
         return float3(0);
     }
 
     DiffuseMaterialSample get_sample(const ShadingData sd,
-                                     const TextureManager tm,
+                                     const Textures textures,
                                      const LODSampler2D lod,
                                      out float3 out_emission,
                                      out OrthonormalFrame out_shading_frame) {
@@ -25,7 +25,7 @@ struct DiffuseMaterial : MaterialModel {
         out_shading_frame = sd.frame.apply_normal_map(float3(0, 0, 1));
         float3 albedo = base_color_factor.rgb;
         if (let tex_id = header.get_alpha_texture_id()) {
-            float4 tex_color = lod.sample(tm.get_sampler2D(tex_id), sd.uv);
+            float4 tex_color = textures.sample(lod, tex_id, sd.uv);
             albedo *= tex_color.rgb;
         }
         DiffuseMaterialSample s;

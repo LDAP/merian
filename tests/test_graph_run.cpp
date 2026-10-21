@@ -16,6 +16,7 @@
 #include <random>
 #include <thread>
 #include <utility>
+#include <vector>
 
 using namespace merian;
 using namespace std::chrono_literals;
@@ -280,19 +281,21 @@ TEST_F(GraphRun, Iterations) {
 
 TEST_F(GraphRun, Requested) {
     uint64_t calls = 0;
-    const GraphRunResult result =
-        graph->run({.iterations = 10}, [&] { calls++; }, [&] { return calls == 2; });
+    const GraphRunResult result = graph->run(
+        {.iterations = 10}, {}, [&](const GraphIterationInfo&) { calls++; },
+        [&] { return calls == 2; });
     EXPECT_EQ(result.stop_reason, GraphRunStopReason::REQUESTED);
     EXPECT_EQ(result.iterations, 2);
 }
 
 TEST_F(GraphRun, EventSentBetweenIterations) {
     uint64_t calls = 0;
-    const GraphRunResult result = graph->run({.iterations = 10, .until_event = "/user/done"}, [&] {
-        if (++calls == 3) {
-            graph->send_event("done");
-        }
-    });
+    const GraphRunResult result = graph->run({.iterations = 10, .until_event = "/user/done"}, {},
+                                             [&](const GraphIterationInfo&) {
+                                                 if (++calls == 3) {
+                                                     graph->send_event("done");
+                                                 }
+                                             });
     EXPECT_EQ(result.stop_reason, GraphRunStopReason::EVENT);
     EXPECT_EQ(result.iterations, 3);
     EXPECT_EQ(result.event, "/user/done");
@@ -305,13 +308,31 @@ TEST_F(GraphRun, EventBeforeRunIsIgnored) {
 }
 
 TEST_F(GraphRun, PatternParts) {
-    const auto send_done = [] { graph->send_event("done"); };
+    const auto send_done = [](const GraphIterationInfo&) { graph->send_event("done"); };
+    EXPECT_EQ(graph->run({.iterations = 2, .until_event = "Color//done,//other"}, {}, send_done)
+                  .stop_reason,
+              GraphRunStopReason::ITERATIONS);
     EXPECT_EQ(
-        graph->run({.iterations = 2, .until_event = "Color//done,//other"}, send_done).stop_reason,
-        GraphRunStopReason::ITERATIONS);
-    EXPECT_EQ(
-        graph->run({.iterations = 2, .until_event = "//other,,//done"}, send_done).stop_reason,
+        graph->run({.iterations = 2, .until_event = "//other,,//done"}, {}, send_done).stop_reason,
         GraphRunStopReason::EVENT);
+}
+
+TEST_F(GraphRun, IterationCallbacks) {
+    std::vector<uint64_t> before;
+    std::vector<uint64_t> after;
+    const GraphRunResult result = graph->run(
+        {.iterations = 3},
+        [&](const GraphIterationInfo& info) -> std::optional<std::chrono::nanoseconds> {
+            before.push_back(info.index_in_run);
+            return 10s * (info.index_in_run + 1);
+        },
+        [&](const GraphIterationInfo& info) {
+            after.push_back(info.index_in_run);
+            EXPECT_EQ(info.process_info.get_elapsed_duration(), 10s * (info.index_in_run + 1));
+        });
+    EXPECT_EQ(result.iterations, 3);
+    EXPECT_EQ(before, (std::vector<uint64_t>{0, 1, 2}));
+    EXPECT_EQ(after, (std::vector<uint64_t>{0, 1, 2}));
 }
 
 TEST_F(GraphRun, Duration) {
@@ -538,7 +559,8 @@ TEST_F(GraphRun, StopWhileWaitingForTheGpu) {
 
     uint32_t polls = 0;
     const auto start = std::chrono::steady_clock::now();
-    const GraphRunResult result = gated->run({.iterations = 10}, {}, [&] { return ++polls == 3; });
+    const GraphRunResult result =
+        gated->run({.iterations = 10}, {}, {}, [&] { return ++polls == 3; });
     EXPECT_EQ(result.stop_reason, GraphRunStopReason::REQUESTED);
     // the iterations in flight were recorded, the next one waits for the first
     EXPECT_EQ(result.iterations, 2);

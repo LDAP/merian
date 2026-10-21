@@ -24,11 +24,11 @@ struct EnvSample {
 }
 
 interface IEnvMap {
-    float3 eval(const ShadingData sd, const TextureManager tm, const LODSampler2D lod);
+    float3 eval(const ShadingData sd, const Textures textures, const LODSampler2D lod);
 }
 
 struct EmptyEnv : IEnvMap {
-    float3 eval(const ShadingData sd, const TextureManager tm, const LODSampler2D lod) {
+    float3 eval(const ShadingData sd, const Textures textures, const LODSampler2D lod) {
         return float3(0);
     }
 }
@@ -42,7 +42,7 @@ struct LatLongMap : IEnvMap {
         return intensity * lod.sample(env_map, uv).rgb;
     }
 
-    float3 eval(const ShadingData sd, const TextureManager tm, const LODSampler2D lod) {
+    float3 eval(const ShadingData sd, const Textures textures, const LODSampler2D lod) {
         return eval(world_to_latlong_map(mul((float3x3)to_local, -sd.wi)), lod);
     }
 }
@@ -54,7 +54,7 @@ struct EqualAreaOctMap : IEnvMap {
     float4x4 to_local;
     float intensity;
 
-    float3 eval(const ShadingData sd, const TextureManager tm, const LODSampler2D lod) {
+    float3 eval(const ShadingData sd, const Textures textures, const LODSampler2D lod) {
         return intensity *
                lod.sample(env_map, equal_area_sphere_to_square(mul((float3x3)to_local, -sd.wi)))
                    .rgb;
@@ -71,7 +71,7 @@ struct CubeMap : IEnvMap {
     float4x4 to_local;
     float intensity;
 
-    float3 eval(const ShadingData sd, const TextureManager tm, const LODSampler2D lod) {
+    float3 eval(const ShadingData sd, const Textures textures, const LODSampler2D lod) {
         const float3 d = mul((float3x3)to_local, -sd.wi);
 
         float3 c;

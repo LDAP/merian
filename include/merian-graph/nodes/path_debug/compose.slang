@@ -14,7 +14,7 @@ using merian;
 
 ParameterBlock<GBuffer> gbuffer;
 Sampler2D<float4> in_reference;
-Texture2D<float4> in_backdrop;
+Sampler2D<float4> in_backdrop;
 
 float3 filtered_tonemapped(const float3 radiance) {
     return params.filtered_exposure > 0.f ? 1.f - exp(-radiance * params.filtered_exposure)
@@ -47,7 +47,8 @@ float3 backdrop_color(const uint2 pixel,
     case PATH_DEBUG_BACKDROP_SPLIT_REFERENCE:
         return left_of_split(pixel) ? render : sample_reference(pixel);
     case PATH_DEBUG_BACKDROP_INPUT:
-        return in_backdrop[pixel].rgb;
+        return in_backdrop.SampleLevel((float2(pixel) + 0.5f) / float2(path_debug_dim()), 0.f)
+            .rgb;
     default:
         return render;
     }
@@ -98,7 +99,8 @@ void main(uint3 gid: SV_DispatchThreadID) {
         out_filtered_b[pixel] = float4(filtered_b, lum_b * lum_b);
     }
 
-    const float4 src = in_src[pixel];
+    const float4 src =
+        in_src.SampleLevel((float2(pixel) + 0.5f) / float2(path_debug_dim()), 0.f);
 
     float3 color = backdrop_color(pixel, src.rgb, filtered_a, filtered_b);
 

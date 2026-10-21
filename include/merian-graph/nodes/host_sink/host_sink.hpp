@@ -47,8 +47,6 @@ class HostSink : public Node {
     // The ready captures, oldest first, without waiting.
     std::vector<Capture> get_all();
 
-    std::optional<uint64_t> next_ready_semaphore_value() const;
-
     // Drops outstanding requests; get returns nullopt once no capture waits.
     void cancel();
 

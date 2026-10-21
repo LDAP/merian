@@ -278,7 +278,9 @@ std::vector<OutputConnectorDescriptor>
 PathDebugNode::describe_outputs(const NodeIOLayout& io_layout) {
     grid_slots_log2 = std::clamp(grid_slots_log2, 8, 26);
     const vk::ImageCreateInfo src_info = io_layout[con_src]->get_create_info_or_throw();
-    extent = src_info.extent;
+    // the pixels the records are traced in; src may be shown at another resolution
+    extent = io_layout.is_connected(con_gbuffer) ? io_layout[con_gbuffer]->get_create_info().extent
+                                                 : src_info.extent;
 
     const vk::ImageCreateInfo out_info{
         {},
@@ -469,10 +471,9 @@ void PathDebugNode::handle_input(const NodeIO& io) {
             registered_controller = controller;
         }
     }
-    if (input->take_clear()) {
+    if (input->take_escape() && escape_clears) {
         clear_selection();
     }
-
     if (const double scroll = input->take_panel_scroll(); scroll != 0.) {
         panel_scroll = std::max(0, panel_scroll - static_cast<int32_t>(scroll * 60.));
     }
@@ -505,22 +506,24 @@ void PathDebugNode::handle_input(const NodeIO& io) {
     params.cursor_y = PATH_DEBUG_NO_PIXEL;
     params.probe_channel = PATH_DEBUG_MAP_NONE;
     probe_at.reset();
-    const auto cursor = input->cursor();
-    if (!cursor || !presenting) {
-        return;
-    }
-    probe_at = *cursor * present_density;
-    if (const auto hit = panel_at(*probe_at)) {
-        if (!hit->on_close) {
-            params.probe_channel = hit->channel;
-            params.probe_bin = hit->bin;
+    if (const auto cursor = input->cursor(); cursor && presenting) {
+        probe_at = *cursor * present_density;
+        if (const auto hit = panel_at(*probe_at)) {
+            if (!hit->on_close) {
+                params.probe_channel = hit->channel;
+                params.probe_bin = hit->bin;
+            }
+        } else if (const auto pixel = to_image(*cursor)) {
+            params.cursor_x = static_cast<uint32_t>(pixel->x);
+            params.cursor_y = static_cast<uint32_t>(pixel->y);
         }
-        return;
     }
-    if (const auto pixel = to_image(*cursor)) {
-        params.cursor_x = static_cast<uint32_t>(pixel->x);
-        params.cursor_y = static_cast<uint32_t>(pixel->y);
+
+    const bool over_image = params.cursor_x != PATH_DEBUG_NO_PIXEL;
+    if (!window_drawn) {
+        escape_clears = over_image;
     }
+    input->set_consume_escape(!window_drawn && over_image);
 }
 
 void PathDebugNode::reproject_pick(const NodeIO& io) {

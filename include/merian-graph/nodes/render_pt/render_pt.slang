@@ -79,10 +79,12 @@ struct ScatterTarget<B : ShadingFunction, G : GuidingDistribution<float3>, V : H
     float3 shading_normal;
     float3 geo_normal;
     bool transmissive;
+    bool wi_below;
 
     bool receives(const float3 wo) {
-        const bool below = dot(wo, geo_normal) < 0.f;
-        return (dot(wo, shading_normal) < 0.f) == below && (!below || transmissive);
+        const bool transmission = wi_local.z * dot(wo, shading_normal) < 0.f;
+        return (wi_below != (dot(wo, geo_normal) < 0.f)) == transmission &&
+               (!transmission || transmissive);
     }
 
     float3 unshadowed(const LightSample ls, inout RandomGenerator rng, out float scatter_pdf) {
@@ -108,8 +110,9 @@ make_scatter_target<B : ShadingFunction, G : GuidingDistribution<float3>, V : Ho
     const float3 shading_normal,
     const float3 geo_normal,
     const bool transmissive) {
-    ScatterTarget<B, G, V> target = {bsdf,     guiding,        mixture,    medium,      frame,
-                                     wi_local, shading_normal, geo_normal, transmissive};
+    const bool wi_below = dot(frame.to_world(wi_local), geo_normal) < 0.f;
+    ScatterTarget<B, G, V> target = {bsdf,     guiding,        mixture,    medium,       frame,
+                                     wi_local, shading_normal, geo_normal, transmissive, wi_below};
     return target;
 }
 
@@ -164,7 +167,7 @@ void record_connection(inout PathRecorder rec,
                        const uint bounce,
                        const uint material) {
     if (let d = direct) {
-        rec.connection(params.path_records, from, d.light_pos, d.realized_pdf, throughput * d.value,
+        rec.connection(params.path_records, from, d.light.pos, d.realized_pdf, throughput * d.value,
                        contrib, bounce, PATH_RECORD_METHOD_LIGHT, material);
     } else if (attempted) {
         rec.connection(params.path_records, from, from, 0.f, float3(0.f), float3(0.f), bounce,
@@ -217,7 +220,7 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
         const bool roulette = merian_render_russian_roulette && !pass_through &&
                               bounce > merian_render_roulette_depth;
         let lights = scene.nee.begin_vertex(
-            sp.pos, ng,
+            sp.pos, ng, spawn_offset,
             Scene::get_receiver_normal(ray.Direction, ng,
                                        bsdf_is_transmissive(bsdf.get_lobe_types())),
             rng);
@@ -235,9 +238,7 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
         float3 light_dir = float3(0, 0, 1);
         if (light_scatter) {
             if (let lp = scene.nee.sample_point(lights, rng, sampled_entry)) {
-                // aimed from the offset origin: from sp.pos it misses the triangle near its edges
-                const float3 origin = offset_ray_origin(sp.pos, ng, spawn_offset, lp.pos - sp.pos);
-                light_dir = normalize(lp.pos - origin);
+                light_dir = normalize(lp.pos - lights.origin(lp.pos));
                 sampled_light = lp.index;
             }
         }
@@ -275,12 +276,11 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
         }
 
         const float3 direct_light =
-            throughput * scene.resolve_direct_light(lights, ng, spawn_offset, direct, rng,
-                                                    merian_render_instance_mask);
+            throughput *
+            scene.resolve_direct_light(lights, direct, rng, merian_render_instance_mask);
         radiance += direct_light;
 
-        // 3. scatter direction, from a light or from the mixture. The light technique's density
-        // joins the mixture once the hit says which light the ray reached.
+        // 3. scatter direction
         bool scattered = false;
         bool guided = false;
         BSDFLobe scatter_lobe = BSDFLobe::None;

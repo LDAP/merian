@@ -128,32 +128,18 @@ class ASBuilder {
                      const vk::BuildAccelerationStructureFlagsKHR build_flags,
                      const uint32_t geometry_count);
 
-    // Enqueues a BLAS to be updated with the next get_cmds().
-    //
-    // The geometry_count and build_flags members must have the same value which was specified when
-    // `as` was last built. The caller must pass the current `size_info` — its updateScratchSize is
-    // used to size the scratch buffer, and its accelerationStructureSize is asserted to fit into
-    // `as`. Note: You should call queue_build after many updates or major deformation.
-    //
-    // You must wait until after calling get_cmds() to free the geometry and range_info (pointers
-    // need to remain valid)!
+    // Enqueues refitting BLAS `src` into `as` (may be `src`) under queue_build's requirements.
     void queue_update(const std::vector<vk::AccelerationStructureGeometryKHR>& geometry,
                       const std::vector<vk::AccelerationStructureBuildRangeInfoKHR>& range_info,
+                      const AccelerationStructureHandle& src,
                       const AccelerationStructureHandle& as,
                       const vk::AccelerationStructureBuildSizesInfoKHR& size_info,
                       const vk::BuildAccelerationStructureFlagsKHR build_flags);
 
-    // Enqueues a BLAS to be updated with the next get_cmds().
-    //
-    // The geometry_count and build_flags members must have the same value which was specified when
-    // `as` was last built. The caller must pass the current `size_info` — its updateScratchSize is
-    // used to size the scratch buffer, and its accelerationStructureSize is asserted to fit into
-    // `as`. Note: You should call queue_build after many updates or major deformation.
-    //
-    // You must wait until after calling get_cmds() to free the geometry and range_info (pointers
-    // need to remain valid)!
+    // Enqueues refitting BLAS `src` into `as` (may be `src`) under queue_build's requirements.
     void queue_update(const vk::AccelerationStructureGeometryKHR* geometry,
                       const vk::AccelerationStructureBuildRangeInfoKHR* range_info,
+                      const AccelerationStructureHandle& src,
                       const AccelerationStructureHandle& as,
                       const vk::AccelerationStructureBuildSizesInfoKHR& size_info,
                       const vk::BuildAccelerationStructureFlagsKHR build_flags,

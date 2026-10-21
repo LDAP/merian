@@ -32,6 +32,9 @@ class SceneFileNode : public Node {
 
     NodeStatusFlags properties(Properties& config) override;
 
+    // Null until the node is initialized.
+    const SceneHandle& get_scene() const;
+
   protected:
     explicit SceneFileNode(std::string file_description);
 

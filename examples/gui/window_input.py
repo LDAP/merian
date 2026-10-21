@@ -1,4 +1,6 @@
 import enum
+import functools
+import operator
 from collections.abc import Callable
 
 from PySide6 import QtCore, QtGui, QtWidgets
@@ -98,6 +100,7 @@ _MODIFIERS = {
     _Qt.KeyboardModifier.AltModifier: mg.ModKey.ALT,
     _Qt.KeyboardModifier.MetaModifier: mg.ModKey.SUPER,
 }
+_MODIFIER_MASK = functools.reduce(operator.or_, _MODIFIERS)
 
 _BUTTONS = {
     _Qt.MouseButton.LeftButton: mg.MouseButton.MOUSE1,
@@ -194,10 +197,11 @@ class _WarpedCursor:
 class WindowInput(QtCore.QObject):
     """
     Sends the input of a widget to a window: keys while the widget has the focus, the
-    mouse over area(), the part of mouse_source that shows the window.
+    mouse over area(), the part of mouse_source that shows the window, but the key
+    combinations in shortcuts (QKeyCombination.toCombined()), which trigger shortcuts.
+    While the window asks for raw input it does not get, a click captures the mouse.
     """
 
-    # Once, what raw input is missing
     message = QtCore.Signal(str)
 
     def __init__(
@@ -211,11 +215,12 @@ class WindowInput(QtCore.QObject):
         self.mouse_source = mouse_source or widget
         self.area = area
         self.window: mg.HostWindow | None = None
+        self.shortcuts: set[int] = set()
         self.raw = False
+        self.released = False
         self.pressed_keys: dict[int, tuple[mg.Key, int]] = {}
         self.pressed_buttons: set[mg.MouseButton] = set()
         self.position = (0.0, 0.0)
-        # Position of the last mouse event
         self.cursor = QtCore.QPointF()
         self.raw_start = QtCore.QPoint()
         self.motion = _RawMotion.ABSOLUTE
@@ -231,6 +236,7 @@ class WindowInput(QtCore.QObject):
     def set_window(self, window: mg.HostWindow | None) -> None:
         self.release_all()
         self.set_raw(False)
+        self.released = False
         self.window = window
         self.widget.setFocusPolicy(
             _Qt.FocusPolicy.StrongFocus if window else self.focus_policy
@@ -242,12 +248,31 @@ class WindowInput(QtCore.QObject):
         """Follows the cursor and raw input the window asks for."""
         if self.window is None:
             return
-        raw = self.window.mouse_grabbed and self.widget.hasFocus()
+        grabbed = self.window.mouse_grabbed
+        self.released &= grabbed
+        raw = grabbed and self.widget.hasFocus() and not self.released
         self.set_raw(raw)
-        if not raw:
+        if grabbed and not raw:
+            self.mouse_source.setCursor(_Qt.CursorShape.ArrowCursor)
+        elif not raw:
             self.mouse_source.setCursor(
                 _CURSORS.get(self.window.cursor, _Qt.CursorShape.ArrowCursor)
             )
+
+    def release_mouse(self) -> bool:
+        """Gives up raw input until the next click; returns whether it had it."""
+        if not self.raw:
+            return False
+        self.released = True
+        self.update()
+        return True
+
+    def held_back(self) -> bool:
+        """
+        Whether the window asks for raw input it does not get; it takes cursor positions
+        for motion then, so the mouse is not sent.
+        """
+        return self.window.mouse_grabbed and not self.raw
 
     def set_raw(self, raw: bool) -> None:
         if raw == self.raw:
@@ -261,6 +286,9 @@ class WindowInput(QtCore.QObject):
             self.mouse_source.setCursor(_Qt.CursorShape.BlankCursor)
             self.mouse_source.grabMouse()
             self.raw_start = QtGui.QCursor.pos()
+            self.cursor = QtCore.QPointF(
+                self.mouse_source.mapFromGlobal(self.raw_start)
+            )
             self.raw_cursor = _WarpedCursor(self.cursor)
             if self.motion == _RawMotion.RELATIVE:
                 wayland_pointer().start(
@@ -270,6 +298,8 @@ class WindowInput(QtCore.QObject):
                 self.recenter()
             return
         self.raw = False
+        if self.window is not None and self.window.mouse_grabbed:
+            self.release_buttons()
         if self.motion == _RawMotion.RELATIVE:
             wayland_pointer().stop()
         if QtWidgets.QWidget.mouseGrabber() is self.mouse_source:
@@ -296,6 +326,11 @@ class WindowInput(QtCore.QObject):
         kind = event.type()
         Type = QtCore.QEvent.Type
         if watched is self.widget:
+            if kind == Type.ShortcutOverride:
+                modifiers = event.modifiers() & _MODIFIER_MASK
+                if event.key() | modifiers.value not in self.shortcuts:
+                    event.accept()
+                return True
             if kind in (Type.KeyPress, Type.KeyRelease):
                 self.send_key(event)
                 return True
@@ -312,21 +347,18 @@ class WindowInput(QtCore.QObject):
             ):
                 self.widget.setFocus(_Qt.FocusReason.MouseFocusReason)
                 self.cursor = event.position()
-                if button := _BUTTONS.get(event.button()):
-                    if kind == Type.MouseButtonRelease:
-                        self.pressed_buttons.discard(button)
-                        status = mg.KeyStatus.RELEASE
-                    else:
-                        self.pressed_buttons.add(button)
-                        status = mg.KeyStatus.PRESS
-                    self.window.send_mouse_button(
-                        button, status, _mods_of(event.modifiers())
-                    )
+                if not self.held_back():
+                    self.send_button(event)
+                elif kind != Type.MouseButtonRelease:
+                    self.released = False
+                    self.update()
                 return True
             if kind == Type.MouseMove:
                 self.send_motion(event.position())
                 return True
             if kind == Type.Wheel:
+                if self.held_back():
+                    return True
                 steps = event.angleDelta()
                 self.window.send_scroll(steps.x() / 120, steps.y() / 120)
                 return True
@@ -334,14 +366,31 @@ class WindowInput(QtCore.QObject):
                 return True
         return False
 
+    def send_button(self, event: QtGui.QMouseEvent) -> None:
+        """Sends a release only for a sent press."""
+        button = _BUTTONS.get(event.button())
+        if button is None:
+            return
+        if event.type() != QtCore.QEvent.Type.MouseButtonRelease:
+            self.pressed_buttons.add(button)
+            status = mg.KeyStatus.PRESS
+        elif button in self.pressed_buttons:
+            self.pressed_buttons.discard(button)
+            status = mg.KeyStatus.RELEASE
+        else:
+            return
+        self.window.send_mouse_button(button, status, _mods_of(event.modifiers()))
+
     def send_key(self, event: QtGui.QKeyEvent) -> None:
-        """A release sends the key of its press, as the mods may change the symbol."""
+        """
+        A release sends the key of its press, as the mods may change the symbol, and only
+        for a sent press.
+        """
         code = event.nativeScanCode() or event.key()
         mods = _mods_of(event.modifiers())
         if event.type() == QtCore.QEvent.Type.KeyRelease:
-            # Held keys repeat as release and press pairs
-            if not event.isAutoRepeat():
-                key, _ = self.pressed_keys.pop(code, (_key_of(event), mods))
+            if not event.isAutoRepeat() and code in self.pressed_keys:
+                key, _ = self.pressed_keys.pop(code)
                 self.window.send_key(key, mg.KeyStatus.RELEASE, mods)
             return
         key, _ = self.pressed_keys.setdefault(code, (_key_of(event), mods))
@@ -355,13 +404,19 @@ class WindowInput(QtCore.QObject):
         if self.window is not None:
             for key, mods in self.pressed_keys.values():
                 self.window.send_key(key, mg.KeyStatus.RELEASE, mods)
+        self.pressed_keys.clear()
+        self.release_buttons()
+
+    def release_buttons(self) -> None:
+        if self.window is not None:
             for button in self.pressed_buttons:
                 self.window.send_mouse_button(button, mg.KeyStatus.RELEASE, 0)
-        self.pressed_keys.clear()
         self.pressed_buttons.clear()
 
     def send_motion(self, position: QtCore.QPointF) -> None:
         self.cursor = position
+        if self.held_back():
+            return
         if not self.raw:
             self.position = self.pixel(position)
             self.window.send_cursor(*self.position)

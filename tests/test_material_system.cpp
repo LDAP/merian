@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "merian-shaders/shading/materials/gltf_material.hpp"
 #include "merian-shaders/shading/materials/material_system.hpp"
 #include "merian-shaders/utils/texture_manager.hpp"
 #include "merian/shader/shader_compile_context.hpp"
@@ -211,6 +212,64 @@ TEST_F(MaterialSystemTest, SampleMaterialOnGPU) {
     EXPECT_NEAR(r, inv_pi * 1.0f, 1e-5f);
     EXPECT_NEAR(g, inv_pi * 0.0f, 1e-5f);
     EXPECT_NEAR(b, inv_pi * 0.0f, 1e-5f);
+}
+
+TEST_F(MaterialSystemTest, PrevMaterialsSurviveRepack) {
+    auto tm = std::make_shared<TextureManager>(compile_context, context, allocator, 16);
+    auto ms = std::make_shared<MaterialSystem>(compile_context, context, allocator, tm);
+
+    const auto diffuse = ms->register_material_type(
+        "merian::DiffuseMaterial", "merian-shaders/shading/materials/diffuse-material.slang");
+    const MaterialID mat_id =
+        ms->add_material(diffuse, DiffuseMaterial(float4(1, 0, 0, 1), TextureID(-1)));
+    queue->submit_wait([&](const CommandBufferHandle& cmd) { ms->update(cmd); });
+
+    // a larger payload repacks every entry at a new stride
+    ms->update_material(mat_id, DiffuseMaterial(float4(0, 1, 0, 1), TextureID(-1)));
+    const GltfMaterial gltf;
+    ms->add_material(
+        ms->register_material_type(gltf.variant_type_name(), GLTF_MATERIAL_SLANG_MODULE_PATH),
+        gltf);
+    ASSERT_GT(gltf.get_payload_size(), DiffuseMaterial().get_payload_size());
+
+    auto composition = SlangComposition::create();
+    composition->add_composition(ms->get_composition());
+    composition->add_module_from_path("material_system/read_prev_material.slang", true);
+    auto program = SlangProgram::create(compile_context, composition);
+    auto entry_point = SlangProgramEntryPoint::create(program, "main");
+    auto pipeline = ComputePipeline::create(entry_point.get()->get_pipeline_layout(context),
+                                            entry_point.get()->specialize());
+
+    auto output_buffer = allocator->create_buffer(
+        8 * sizeof(uint32_t),
+        vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
+        MemoryMappingType::HOST_ACCESS_RANDOM, "test_output");
+    auto params =
+        entry_point.get()->create_shader_object_for_parameter(context, "params", allocator);
+    auto cursor = params->get_cursor();
+    cursor["output"] = output_buffer;
+    cursor["material_id"] = static_cast<uint32_t>(mat_id);
+
+    queue->submit_wait([&](const CommandBufferHandle& cmd) {
+        ms->update(cmd);
+        cursor["ms"] = ms;
+        cmd->bind(pipeline);
+        entry_point.get()->bind("params", params, cmd, pipeline, obj_allocator);
+        cmd->dispatch(1, 1, 1);
+    });
+
+    auto* mapped = output_buffer->get_memory()->map_as<uint32_t>();
+    const float current[4] = {bits_float(mapped[0]), bits_float(mapped[1]), bits_float(mapped[2]),
+                              bits_float(mapped[3])};
+    const float prev[4] = {bits_float(mapped[4]), bits_float(mapped[5]), bits_float(mapped[6]),
+                           bits_float(mapped[7])};
+    output_buffer->get_memory()->unmap();
+
+    EXPECT_FLOAT_EQ(current[0], 0.f);
+    EXPECT_FLOAT_EQ(current[1], 1.f);
+    EXPECT_FLOAT_EQ(prev[0], 1.f);
+    EXPECT_FLOAT_EQ(prev[1], 0.f);
+    EXPECT_FLOAT_EQ(prev[3], 1.f);
 }
 
 TEST_F(MaterialSystemTest, PayloadResizePropagatesVersion) {

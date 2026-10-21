@@ -59,15 +59,13 @@ void generate(ParameterBlock<Scene> scene, ParameterBlock<RestirBinding> params)
 
             if (!distant && merian_restir_apply_motion &&
                 scene.time_diff > 0) {
-                if (let gd = scene.get_geometry_data(hit)) {
-                    const float3 mv =
-                        (x.pos - scene.get_prev_world_position(hit, gd)) / scene.time_diff;
-                    // newly spawned geometry has no valid previous position - a bogus velocity
-                    // advances the sample to infinity in the temporal pass (degenerate rays hang
-                    // the traversal hardware)
-                    if (all(isfinite(mv)) && dot(mv, mv) < RESTIR_MAX_SAMPLE_SPEED_2) {
-                        x.mv = mv;
-                    }
+                const float3 mv =
+                    (x.pos - scene.get_world_position(
+                                 hit, scene.get_geometry_data(hit.get_geometry_id()), true)) /
+                    scene.time_diff;
+                // bogus velocities (inactive triangles, teleports) make rays that hang traversal
+                if (all(isfinite(mv)) && dot(mv, mv) < RESTIR_MAX_SAMPLE_SPEED_2) {
+                    x.mv = mv;
                 }
             }
 
@@ -116,7 +114,9 @@ void temporal(ParameterBlock<Scene> scene, ParameterBlock<RestirBinding> params)
         }
         if (pc.temporal_clamp_m > 0)
             prev.confidence = min(prev.confidence, float(pc.temporal_clamp_m));
-        prev_surface = restir_surface(scene, params.prev_gbuffer, uint2(prev_pixel), dim, true);
+        prev_surface =
+            restir_surface(scene, scene.from_prev_frame(params.prev_gbuffer.get_hit(prev_pixel)),
+                           uint2(prev_pixel), dim);
     }
 
     // [Lin et al. 2022, eq. 36]

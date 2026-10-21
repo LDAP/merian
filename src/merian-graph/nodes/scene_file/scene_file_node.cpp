@@ -22,6 +22,10 @@ void SceneFileNode::initialize(const ContextHandle& context,
     scene = create_scene(compile_context, context, allocator, material_system);
 }
 
+const SceneHandle& SceneFileNode::get_scene() const {
+    return scene;
+}
+
 std::vector<InputConnectorDescriptor> SceneFileNode::describe_inputs() {
     return {{"controller", con_controller, {}, 0, true}};
 }
@@ -57,12 +61,12 @@ SceneFileNode::process(const NodeIO& io, const NodeProcessInfo& info, Submission
                   static_cast<uint32_t>(info.get_iteration()), io.get_seed(),
                   info.get_shader_object_allocator());
 
-    const Scene::UpdateChanges& changes = scene->get_last_update_changes();
-    if (changes.geometry_changed)
+    const uint32_t changes = scene->get_last_updates();
+    if ((changes & Scene::SceneUpdateGeometry) != 0)
         io.send_event("geometry_changed");
-    if (changes.transform_changed)
+    if ((changes & Scene::SceneUpdateTransform) != 0)
         io.send_event("transform_changed");
-    if (changes.camera_changed)
+    if ((changes & Scene::SceneUpdateCamera) != 0)
         io.send_event("camera_changed");
 
     return {};

@@ -11,7 +11,6 @@
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 #include "merian/vk/utils/math.hpp"
 
-#include "transform_prev_vertex.slang.spv.h"
 #include "transform_vertex.slang.spv.h"
 
 #include <spdlog/spdlog.h>
@@ -53,6 +52,8 @@ Scene::Scene(const ShaderCompileContextHandle& compile_context,
                        "namespace merian { public typealias SceneAccelerationStructure = "
                        "NullAccelerationStructure; }");
     set_env(std::make_shared<EmptyEnvMap>());
+    prev_env_map = env_map->clone();
+    compose_prev_env();
 
     if (as_supported) {
         micromaps = std::make_unique<Micromaps>(compile_context, context, allocator);
@@ -72,14 +73,11 @@ Scene::Scene(const ShaderCompileContextHandle& compile_context,
 DeviceSupportInfo Scene::query_device_support(const DeviceSupportQueryInfo& query_info) {
     const SpirvReflect transform(merian_transform_vertex_slang_spv(),
                                  merian_transform_vertex_slang_spv_size());
-    const SpirvReflect transform_prev(merian_transform_prev_vertex_slang_spv(),
-                                      merian_transform_prev_vertex_slang_spv_size());
     return DeviceSupportInfo::check(query_info, {},
                                     {"accelerationStructure", "micromap",
                                      "storageBuffer16BitAccess", "storageBuffer8BitAccess",
                                      "uniformAndStorageBuffer8BitAccess"}) &
-           transform.query_device_support(query_info) &
-           transform_prev.query_device_support(query_info);
+           transform.query_device_support(query_info);
 }
 
 SlangCompositionHandle
@@ -104,6 +102,11 @@ Scene::query_device_support_composition(const DeviceSupportQueryInfo& query_info
         "module scene_env_map_workaround;\n"
         "import merian_shaders.scene.environment_map;\n"
         "namespace merian { public typealias SceneEnvMap = merian::EmptyEnv; }");
+    composition->add_module_from_string(
+        "scene_prev_env_map_workaround",
+        "module scene_prev_env_map_workaround;\n"
+        "import merian_shaders.scene.environment_map;\n"
+        "namespace merian { public typealias ScenePrevEnvMap = merian::EmptyEnv; }");
     composition->add_module_from_string(
         "scene_volume_workaround",
         "module scene_volume_workaround;\n"
@@ -133,6 +136,20 @@ void Scene::set_env(EnvMapHandle env) {
                     "import {};\n"
                     "namespace merian {{ public typealias SceneEnvMap = {}; }}",
                     env_map->get_slang_module().get_import_spelling(), env_map->get_type_name()));
+}
+
+void Scene::compose_prev_env() {
+    if (prev_env_map->get_type_name() == prev_env_type_name) {
+        return;
+    }
+    prev_env_type_name = prev_env_map->get_type_name();
+    composition->add_module(prev_env_map->get_slang_module());
+    composition->add_module_from_string(
+        "scene_prev_env_map_workaround",
+        fmt::format("module scene_prev_env_map_workaround;\n"
+                    "import {};\n"
+                    "namespace merian {{ public typealias ScenePrevEnvMap = {}; }}",
+                    prev_env_map->get_slang_module().get_import_spelling(), prev_env_type_name));
 }
 
 void Scene::set_enable_thin_lens(const bool enable) {
@@ -189,10 +206,8 @@ ShaderObjectHandle Scene::build_shader_object() const {
             ? prev_inverse_transposed_instance_transforms_buffer
             : allocator->get_dummy_buffer();
 
-    if (as_supported && tlas) {
-        c["as"]["as"] = tlas;
-    }
     lights.write_to(c["nee"]);
+    lights.write_prev_to(c["prev_nee"]);
     return object;
 }
 
@@ -302,17 +317,19 @@ void Scene::remove_mesh(const MeshID mesh_id) {
     if (mesh_id < mesh_to_group.size() && mesh_to_group[mesh_id] != MESH_GROUP_ID_INVALID) {
         MeshGroup& group = mesh_groups[mesh_to_group[mesh_id]];
         group.cached_blas_size_info.reset();
-        if (group.blas)
-            pending_blas_releases.push_back(std::move(group.blas));
+        retire(std::move(group.blas));
+        retire(std::move(group.spare_blas));
     }
 
-    for (const NodeID node_id : mesh_infos[mesh_id].instances) {
+    MeshInfo& info = mesh_infos[mesh_id];
+    for (const NodeID node_id : info.instances) {
         scene_graph[node_id]->meshes.erase(mesh_id);
     }
 
-    // Dropping the MeshInfo also drops its MeshBufferRegion suballocation handles, returning the
-    // shared-buffer regions to the suballocator's free list.
-    mesh_infos[mesh_id] = MeshInfo{};
+    retire(std::move(info.vertex_buffer.suballoc));
+    retire(std::move(info.prev_vertex_buffer.suballoc));
+    retire(std::move(info.index_buffer.suballoc));
+    info = MeshInfo{};
 
     mesh_ids.release(mesh_id);
     mesh_infos.resize(mesh_ids.size());
@@ -352,6 +369,12 @@ Scene::CameraID Scene::add_camera(CameraHandle camera) {
     const CameraID id = cameras.size();
     cameras.push_back(std::move(camera));
     return id;
+}
+
+void Scene::retire(ConstObjectHandle object) {
+    if (object) {
+        retired.push_back(std::move(object));
+    }
 }
 
 void Scene::clear_geometry() {
@@ -419,7 +442,7 @@ constexpr uint32_t TRANSFORM_LOCAL_SIZE_X = 256;
 } // namespace
 
 void Scene::ensure_transform_pipelines() {
-    if (transform_vertex_pipeline && transform_prev_vertex_pipeline)
+    if (transform_vertex_pipeline)
         return;
 
     transform_descriptor_layout =
@@ -430,9 +453,6 @@ void Scene::ensure_transform_pipelines() {
     auto vertex_module = EntryPoint::create(context, merian_transform_vertex_slang_spv(),
                                             merian_transform_vertex_slang_spv_size(), "main",
                                             vk::ShaderStageFlagBits::eCompute);
-    auto prev_module = EntryPoint::create(context, merian_transform_prev_vertex_slang_spv(),
-                                          merian_transform_prev_vertex_slang_spv_size(), "main",
-                                          vk::ShaderStageFlagBits::eCompute);
 
     const auto layout = PipelineLayoutBuilder(context)
                             .add_descriptor_set_layout(transform_descriptor_layout)
@@ -443,7 +463,6 @@ void Scene::ensure_transform_pipelines() {
     const SpecializationInfoHandle spec = spec_builder.build();
 
     transform_vertex_pipeline = ComputePipeline::create(layout, vertex_module, spec);
-    transform_prev_vertex_pipeline = ComputePipeline::create(layout, prev_module, spec);
 }
 
 void Scene::stage_transform_jobs(const CommandBufferHandle& cmd) {
@@ -452,54 +471,27 @@ void Scene::stage_transform_jobs(const CommandBufferHandle& cmd) {
     const auto job_buf_usage =
         vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst;
 
-    const auto ensure_job_buf = [&](BufferHandle& buf, vk::DeviceSize size, const char* name) {
-        if (!buf || buf->get_size() < size) {
-            if (buf)
-                cmd->keep_until_pool_reset(std::move(buf));
-            buf = allocator->create_buffer(size, job_buf_usage, MemoryMappingType::NONE, name);
-            frame_stats.buffers_allocated++;
-        }
-    };
-
-    if (!vertex_jobs.empty()) {
-        const vk::DeviceSize size = vertex_jobs.size() * sizeof(TransformVertexJob);
-        ensure_job_buf(transform_vertex_job_buf, size, "Scene::transform_vertex_jobs");
-        staging->cmd_to_device(cmd, transform_vertex_job_buf, vertex_jobs.data(), 0, size);
-        frame_stats.gpu_transform_buffer_bytes += size;
+    const vk::DeviceSize size = vertex_jobs.size() * sizeof(TransformVertexJob);
+    if (!transform_vertex_job_buf || transform_vertex_job_buf->get_size() < size) {
+        retire(std::move(transform_vertex_job_buf));
+        transform_vertex_job_buf = allocator->create_buffer(
+            size, job_buf_usage, MemoryMappingType::NONE, "Scene::transform_vertex_jobs");
+        frame_stats.buffers_allocated++;
     }
-    if (!prev_vertex_jobs.empty()) {
-        const vk::DeviceSize size = prev_vertex_jobs.size() * sizeof(TransformPrevVertexJob);
-        ensure_job_buf(transform_prev_vertex_job_buf, size, "Scene::transform_prev_vertex_jobs");
-        staging->cmd_to_device(cmd, transform_prev_vertex_job_buf, prev_vertex_jobs.data(), 0,
-                               size);
-        frame_stats.gpu_transform_buffer_bytes += size;
-    }
+    staging->cmd_to_device(cmd, transform_vertex_job_buf, vertex_jobs.data(), 0, size);
+    frame_stats.gpu_transform_buffer_bytes += size;
 }
 
 void Scene::dispatch_batched_transforms(const CommandBufferHandle& cmd) {
     ensure_transform_pipelines();
+    MERIAN_PROFILE_SCOPE_GPU(cmd, "Scene::transform_vertices");
 
-    if (!vertex_jobs.empty()) {
-        MERIAN_PROFILE_SCOPE_GPU(cmd, "Scene::transform_vertices");
-
-        const uint32_t wgx =
-            (max_vertex_count_in_jobs + TRANSFORM_LOCAL_SIZE_X - 1) / TRANSFORM_LOCAL_SIZE_X;
-        cmd->bind(transform_vertex_pipeline);
-        cmd->push_descriptor_set(transform_vertex_pipeline,
-                                 transform_vertex_job_buf->get_descriptor_info());
-        cmd->dispatch(wgx, static_cast<uint32_t>(vertex_jobs.size()), 1);
-    }
-
-    if (!prev_vertex_jobs.empty()) {
-        MERIAN_PROFILE_SCOPE_GPU(cmd, "Scene::transform_prev_vertices");
-
-        const uint32_t wgx =
-            (max_prev_vertex_count_in_jobs + TRANSFORM_LOCAL_SIZE_X - 1) / TRANSFORM_LOCAL_SIZE_X;
-        cmd->bind(transform_prev_vertex_pipeline);
-        cmd->push_descriptor_set(transform_prev_vertex_pipeline,
-                                 transform_prev_vertex_job_buf->get_descriptor_info());
-        cmd->dispatch(wgx, static_cast<uint32_t>(prev_vertex_jobs.size()), 1);
-    }
+    const uint32_t wgx =
+        (max_vertex_count_in_jobs + TRANSFORM_LOCAL_SIZE_X - 1) / TRANSFORM_LOCAL_SIZE_X;
+    cmd->bind(transform_vertex_pipeline);
+    cmd->push_descriptor_set(transform_vertex_pipeline,
+                             transform_vertex_job_buf->get_descriptor_info());
+    cmd->dispatch(wgx, static_cast<uint32_t>(vertex_jobs.size()), 1);
 }
 
 void Scene::set_pretransform_animated(bool value) {
@@ -517,15 +509,6 @@ void Scene::set_pretransform_animated(bool value) {
     }
 
     needs_regroup = true;
-}
-
-bool Scene::needs_prev_vertices(const MeshGroup& group, const MeshInfo& info) const {
-    const Mesh& mesh = *info.mesh;
-    if (mesh.is_morphed() || mesh.has_variable_topology())
-        return true;
-    if (!group.is_pretransformed(mesh_infos, pretransform_animated))
-        return false;
-    return scene_graph[*info.instances.begin()]->is_animated;
 }
 
 void Scene::properties_node(Properties& props, const NodeID node_id) {
@@ -964,12 +947,12 @@ void Scene::properties_statistics(Properties& props) {
         "textures:    {}\n"
         "tlas:        {} instances\n"
         "flags:       needs_regroup={}, transforms_changed={}, pretransform_animated={}\n"
-        "pending buffer releases: {}",
+        "retired:     {}",
         node_ids.count(), mesh_ids.count(), dynamic_meshes, morphed_meshes,
         animated_instance_meshes, variable_topology_meshes, total_instances, animated_instances,
         mesh_groups.size(), total_vertices, total_triangles, material_system->get_material_count(),
         get_texture_manager()->get_texture_count(), tlas_instances.size(), needs_regroup,
-        transforms_changed, pretransform_animated, pending_buffer_releases.size());
+        transforms_changed, pretransform_animated, retired.size());
 
     if (aabb.is_valid()) {
         props.output_text("aabb: min={}, max={}, size={}", aabb.get_min(), aabb.get_max(),
@@ -984,23 +967,21 @@ void Scene::properties_statistics(Properties& props) {
         "host_unpacked: {})\n"
         "upload:          {} ({} vertices, {} primitives)\n"
         "vertex xfm:      {} jobs ({} vertices)\n"
-        "prev vertex xfm: {} jobs ({} vertices)\n"
         "xfm job buffers: {}\n"
         "blas:            {} ops (builds_static: {}, builds_dynamic: {}, updates: {})\n"
         "tlas:            {} ({} instances)\n"
-        "buffers:         allocated: {}, released: {}\n"
+        "buffers:         allocated: {}, retired objects: {}\n"
         "gpu data:        geometry {}, transforms {}, tlas instances {}",
         frame_stats.meshes_uploaded(), frame_stats.meshes_uploaded_device_local,
         frame_stats.meshes_uploaded_device_staged, frame_stats.meshes_uploaded_host_packed,
         frame_stats.meshes_uploaded_host_unpacked, format_size(frame_stats.upload_bytes),
         frame_stats.vertices_uploaded, frame_stats.indices_uploaded,
         frame_stats.gpu_vertex_transforms, frame_stats.gpu_vertex_transform_vertices,
-        frame_stats.gpu_prev_vertex_transforms, frame_stats.gpu_prev_vertex_transform_vertices,
         format_size(frame_stats.gpu_transform_buffer_bytes),
         frame_stats.blas_builds + frame_stats.blas_updates, frame_stats.blas_builds_static,
         frame_stats.blas_builds_dynamic, frame_stats.blas_updates,
         frame_stats.tlas_rebuilt ? "rebuilt" : "unchanged", frame_stats.tlas_instance_count,
-        frame_stats.buffers_allocated, frame_stats.buffers_released,
+        frame_stats.buffers_allocated, frame_stats.objects_retired,
         format_size(frame_stats.geometry_data_bytes), format_size(frame_stats.transform_data_bytes),
         format_size(frame_stats.tlas_instance_data_bytes));
 
@@ -1028,7 +1009,6 @@ void Scene::properties_statistics(Properties& props) {
                           fmt_size(s.unusedRangeSizeMax));
     };
     block_text("shared_vb", shared_vb_suballoc, shared_vb_capacity);
-    block_text("shared_prev_vb", shared_prev_vb_suballoc, shared_prev_vb_capacity);
     block_text("shared_ib", shared_ib_suballoc, shared_ib_capacity);
     props.output_text("{:<14} {} staged this frame",
                       "upload_staging:", format_size(frame_stats.upload_bytes));
@@ -1157,116 +1137,79 @@ void Scene::compute_mesh_groups() {
         }
 
         // Checking the first mesh suffices — if it changed group, the BLAS can't be reused.
-        // blas_dirty is computed later by upload_meshes (this method doesn't run every frame).
         MeshGroupID maybe_prev_group = prev_mesh_to_group[*group.meshes.begin()];
         if (maybe_prev_group != MESH_GROUP_ID_INVALID) {
             MeshGroup& prev_group = prev_mesh_groups[maybe_prev_group];
             if (prev_group.meshes == group.meshes &&
                 prev_group.blas_build_flags == group.blas_build_flags) {
-                group.blas = prev_group.blas;
+                group.blas = std::move(prev_group.blas);
+                group.spare_blas = std::move(prev_group.spare_blas);
                 group.cached_blas_size_info = prev_group.cached_blas_size_info;
             }
         }
     }
 
     for (auto& prev_group : prev_mesh_groups) {
-        if (prev_group.blas)
-            pending_blas_releases.push_back(std::move(prev_group.blas));
+        retire(std::move(prev_group.blas));
+        retire(std::move(prev_group.spare_blas));
     }
 }
 
 void Scene::upload_transforms(const CommandBufferHandle& cmd) {
     MERIAN_PROFILE_SCOPE_GPU(cmd, "Scene::upload_transforms");
-    instance_transforms.clear();
-    inverse_transposed_instance_transforms.clear();
-    prev_instance_transforms.clear();
-    prev_inverse_transposed_instance_transforms.clear();
+    if (geometry.instance_transforms.empty()) {
+        return;
+    }
 
-    const float4x4 identity_transform = identity();
+    const vk::DeviceSize transforms_size = geometry.instance_transforms.size() * sizeof(float4x4);
+    if (!instance_transforms_buffer || instance_transforms_buffer->get_size() < transforms_size) {
+        retire(std::move(instance_transforms_buffer));
+        retire(std::move(inverse_transposed_instance_transforms_buffer));
+        retire(std::move(prev_instance_transforms_buffer));
+        retire(std::move(prev_inverse_transposed_instance_transforms_buffer));
 
-    for (MeshGroupID group_id = 0; group_id < mesh_groups.size(); group_id++) {
-        MeshGroup& group = mesh_groups[group_id];
-        assert(!group.meshes.empty());
+        const auto transform_usage =
+            vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst;
+        instance_transforms_buffer =
+            allocator->create_buffer(transforms_size, transform_usage, MemoryMappingType::NONE,
+                                     "Scene::instance_transforms");
+        inverse_transposed_instance_transforms_buffer =
+            allocator->create_buffer(transforms_size, transform_usage, MemoryMappingType::NONE,
+                                     "Scene::inv_transposed_instance_transforms");
+        prev_instance_transforms_buffer =
+            allocator->create_buffer(transforms_size, transform_usage, MemoryMappingType::NONE,
+                                     "Scene::prev_instance_transforms");
+        prev_inverse_transposed_instance_transforms_buffer =
+            allocator->create_buffer(transforms_size, transform_usage, MemoryMappingType::NONE,
+                                     "Scene::prev_inv_transposed_instance_transforms");
 
-        const bool pretransform = group.is_pretransformed(mesh_infos, pretransform_animated);
-
-        for (const NodeID node_id : group.get_instances(mesh_infos)) {
-            Node& node = *scene_graph[node_id];
-            const float4x4& global_transform = get_global_transform(node);
-            const float4x4& global_inverse_transposed_transform =
-                get_global_inverse_transposed_transform(node);
-
-            if (pretransform) {
-                instance_transforms.emplace_back(identity_transform);
-                inverse_transposed_instance_transforms.emplace_back(identity_transform);
-                prev_instance_transforms.emplace_back(identity_transform);
-                prev_inverse_transposed_instance_transforms.emplace_back(identity_transform);
-            } else {
-                instance_transforms.emplace_back(global_transform);
-                inverse_transposed_instance_transforms.emplace_back(
-                    global_inverse_transposed_transform);
-
-                prev_instance_transforms.emplace_back(
-                    node.prev_global_transform.value_or(global_transform));
-                prev_inverse_transposed_instance_transforms.emplace_back(
-                    node.prev_global_inverse_transposed.value_or(
-                        global_inverse_transposed_transform));
-            }
-        }
+        auto c = shader_object->get_cursor();
+        c["instance_transforms"] = instance_transforms_buffer;
+        c["inverse_transposed_instance_transforms"] = inverse_transposed_instance_transforms_buffer;
+        c["prev_instance_transforms"] = prev_instance_transforms_buffer;
+        c["prev_inverse_transposed_instance_transforms"] =
+            prev_inverse_transposed_instance_transforms_buffer;
     }
 
     const auto staging = allocator->get_staging();
-    auto c = shader_object->get_cursor();
-
-    if (!instance_transforms.empty()) {
-        const vk::DeviceSize transforms_size = instance_transforms.size() * sizeof(float4x4);
-
-        if (!instance_transforms_buffer ||
-            instance_transforms_buffer->get_size() < transforms_size) {
-
-            cmd->keep_until_pool_reset(instance_transforms_buffer);
-            cmd->keep_until_pool_reset(inverse_transposed_instance_transforms_buffer);
-            cmd->keep_until_pool_reset(prev_instance_transforms_buffer);
-            cmd->keep_until_pool_reset(prev_inverse_transposed_instance_transforms_buffer);
-
-            const auto transform_usage =
-                vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst;
-            instance_transforms_buffer =
-                allocator->create_buffer(transforms_size, transform_usage, MemoryMappingType::NONE,
-                                         "Scene::instance_transforms");
-            inverse_transposed_instance_transforms_buffer =
-                allocator->create_buffer(transforms_size, transform_usage, MemoryMappingType::NONE,
-                                         "Scene::inv_transposed_instance_transforms");
-            prev_instance_transforms_buffer =
-                allocator->create_buffer(transforms_size, transform_usage, MemoryMappingType::NONE,
-                                         "Scene::prev_instance_transforms");
-            prev_inverse_transposed_instance_transforms_buffer =
-                allocator->create_buffer(transforms_size, transform_usage, MemoryMappingType::NONE,
-                                         "Scene::prev_inv_transposed_instance_transforms");
-
-            c["instance_transforms"] = instance_transforms_buffer;
-            c["inverse_transposed_instance_transforms"] =
-                inverse_transposed_instance_transforms_buffer;
-            c["prev_instance_transforms"] = prev_instance_transforms_buffer;
-            c["prev_inverse_transposed_instance_transforms"] =
-                prev_inverse_transposed_instance_transforms_buffer;
-        }
-
-        staging->cmd_to_device(cmd, instance_transforms_buffer, instance_transforms);
-        staging->cmd_to_device(cmd, inverse_transposed_instance_transforms_buffer,
-                               inverse_transposed_instance_transforms);
-        staging->cmd_to_device(cmd, prev_instance_transforms_buffer, prev_instance_transforms);
-        staging->cmd_to_device(cmd, prev_inverse_transposed_instance_transforms_buffer,
-                               prev_inverse_transposed_instance_transforms);
-    }
+    staging->cmd_to_device(cmd, instance_transforms_buffer, geometry.instance_transforms);
+    staging->cmd_to_device(cmd, inverse_transposed_instance_transforms_buffer,
+                           geometry.inverse_transposed_instance_transforms);
+    staging->cmd_to_device(cmd, prev_instance_transforms_buffer, geometry.prev_instance_transforms);
+    staging->cmd_to_device(cmd, prev_inverse_transposed_instance_transforms_buffer,
+                           geometry.prev_inverse_transposed_instance_transforms);
 }
 
 void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
     MERIAN_PROFILE_SCOPE_GPU(cmd, "Scene::upload_geometry_data");
-    geometries.clear();
-    geometry_keys.clear();
+    geometry.geometries.clear();
+    geometry.geometry_keys.clear();
+    geometry.instance_indices.clear();
+    geometry.instance_transforms.clear();
+    geometry.inverse_transposed_instance_transforms.clear();
+    geometry.prev_instance_transforms.clear();
+    geometry.prev_inverse_transposed_instance_transforms.clear();
     emissive_geometries.clear();
-    std::vector<uint32_t> instance_indices;
     bool has_sky_portals = false;
 
     const float4x4 identity_transform = identity();
@@ -1281,14 +1224,37 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
 
         for (const NodeID node_id : group.get_instances(mesh_infos)) {
             Node& node = *scene_graph[node_id];
-            const bool transform_is_identity = get_global_transform(node) == identity_transform;
+            const float4x4& global_transform = get_global_transform(node);
+            const float4x4& global_inverse_transposed =
+                get_global_inverse_transposed_transform(node);
+            if (pretransform) {
+                geometry.instance_transforms.emplace_back(identity_transform);
+                geometry.inverse_transposed_instance_transforms.emplace_back(identity_transform);
+                geometry.prev_instance_transforms.emplace_back(identity_transform);
+                geometry.prev_inverse_transposed_instance_transforms.emplace_back(
+                    identity_transform);
+            } else {
+                geometry.instance_transforms.emplace_back(global_transform);
+                geometry.inverse_transposed_instance_transforms.emplace_back(
+                    global_inverse_transposed);
+                geometry.prev_instance_transforms.emplace_back(
+                    starting_run ? global_transform
+                                 : node.prev_global_transform.value_or(global_transform));
+                geometry.prev_inverse_transposed_instance_transforms.emplace_back(
+                    starting_run
+                        ? global_inverse_transposed
+                        : node.prev_global_inverse_transposed.value_or(global_inverse_transposed));
+            }
+
+            // an animated node passing through identity still has a previous transform
+            const bool transform_is_identity =
+                !node.is_animated && global_transform == identity_transform;
 
             for (const MeshID mesh_id : group.meshes) {
                 MeshInfo& info = mesh_infos[mesh_id];
                 Mesh& mesh = *info.mesh;
                 assert(info.vertex_buffer && (!mesh.has_indices() || info.index_buffer));
 
-                const bool needs_prev = needs_prev_vertices(group, info);
                 const uint64_t geometry_key =
                     (static_cast<uint64_t>(info.serial) << 32) | node.serial;
 
@@ -1298,7 +1264,7 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
                 if (is_light) {
                     LightCollection::EmissiveGeometry& emissive =
                         emissive_geometries.emplace_back(LightCollection::EmissiveGeometry{
-                            static_cast<GeometryID>(geometries.size()), instance_index,
+                            static_cast<GeometryID>(geometry.geometries.size()), instance_index,
                             mesh.get_primitive_count()});
                     if (micromaps) {
                         if (const auto emission = micromaps->get_emission(
@@ -1312,26 +1278,18 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
 
                 GeometryData gd;
                 gd.material_id = mesh.material_id;
-                gd.primitive_count = mesh.get_primitive_count();
                 gd.vertices = info.vertex_buffer.get_device_address();
-                gd.indices = info.index_buffer ? info.index_buffer.get_device_address()
-                                               : vk::DeviceAddress{0};
-                assert(!needs_prev || info.prev_vertex_buffer);
                 gd.prev_vertices = info.prev_vertex_buffer
                                        ? info.prev_vertex_buffer.get_device_address()
-                                       : vk::DeviceAddress{0};
+                                       : gd.vertices;
+                gd.indices = info.index_buffer ? info.index_buffer.get_device_address()
+                                               : vk::DeviceAddress{0};
                 gd.flags = index_type_flag(mesh.index_type);
                 if (pretransform || transform_is_identity) {
                     gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::Pretransformed);
                 }
-                if (needs_prev) {
-                    gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::HasPrevVertices);
-                }
                 if (mesh.is_flip_facing()) {
                     gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::FlipFacing);
-                }
-                if (scene_graph[node_id]->is_animated) {
-                    gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::IsAnimated);
                 }
                 if (mesh.flags & MeshFlags::HasTangents) {
                     gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::HasTangents);
@@ -1352,72 +1310,139 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
                     gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::Emissive);
                 }
 
-                geometries.emplace_back(gd);
-                geometry_keys.push_back(geometry_key);
-                instance_indices.push_back(instance_index);
+                geometry.geometries.emplace_back(gd);
+                geometry.geometry_keys.push_back(geometry_key);
+                geometry.instance_indices.push_back(instance_index);
             }
             instance_index++;
         }
     }
 
-    lights.set_geometries(emissive_geometries, static_cast<uint32_t>(geometries.size()));
     lights.set_has_sky_portals(has_sky_portals);
+    compute_prev_geometry_remap();
+    upload_prev_geometry_remap(cmd);
+    upload_transforms(cmd);
 
-    const auto staging = allocator->get_staging();
-    auto c = shader_object->get_cursor();
-
+    const std::vector<GeometryData>& geometries = geometry.geometries;
     if (!geometries.empty()) {
         const vk::DeviceSize geometries_size = geometries.size() * sizeof(GeometryData);
         if (!geometries_buffer || geometries_buffer->get_size() < geometries_size) {
-            cmd->keep_until_pool_reset(geometries_buffer);
+            retire(std::move(geometries_buffer));
 
             geometries_buffer = allocator->create_buffer(
-                geometries.size() * sizeof(GeometryData),
+                geometries_size,
                 vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
                 MemoryMappingType::NONE, "Scene::geometries");
 
-            c["geometries"] = geometries_buffer;
+            shader_object->get_cursor()["geometries"] = geometries_buffer;
         }
-        staging->cmd_to_device(cmd, geometries_buffer, geometries);
+        allocator->get_staging()->cmd_to_device(cmd, geometries_buffer, geometries);
     }
 
-    upload_prev_geometry_remap(cmd, instance_indices);
+    lights.set_geometries(emissive_geometries, static_cast<uint32_t>(geometries.size()),
+                          prev_geometry_remap);
+
+    for (const NodeID node_id : node_ids) {
+        Node& node = *scene_graph[node_id];
+        node.prev_global_transform = node.global_transform;
+        node.prev_global_inverse_transposed = node.global_inverse_transposed;
+    }
 }
 
-void Scene::upload_prev_geometry_remap(const CommandBufferHandle& cmd,
-                                       const std::vector<uint32_t>& instance_indices) {
-    prev_geometry_remap.clear();
-    if (geometry_keys != prev_geometry_keys) {
-        // keys are unique, so a key that moved lands where the key changed
-        const auto unchanged = [&](const GeometryID geometry_id) {
-            return geometry_id < geometry_keys.size() && geometry_id < prev_geometry_keys.size() &&
-                   geometry_keys[geometry_id] == prev_geometry_keys[geometry_id];
-        };
-        geometry_of_key.clear();
-        for (GeometryID geometry_id = 0; geometry_id < geometry_keys.size(); geometry_id++)
-            if (!unchanged(geometry_id))
-                geometry_of_key.try_emplace(geometry_keys[geometry_id], geometry_id);
+namespace {
 
-        prev_geometry_remap.reserve(prev_geometry_keys.size());
-        for (GeometryID prev_id = 0; prev_id < prev_geometry_keys.size(); prev_id++) {
-            if (unchanged(prev_id)) {
-                prev_geometry_remap.push_back({prev_id, instance_indices[prev_id]});
-                continue;
-            }
-            const auto it = geometry_of_key.find(prev_geometry_keys[prev_id]);
-            if (it == geometry_of_key.end())
-                prev_geometry_remap.push_back({GEOMETRY_ID_GONE, 0});
-            else
-                prev_geometry_remap.push_back({it->second, instance_indices[it->second]});
+bool continues(const GeometryData& geometry_data, const GeometryData& prev_geometry_data) {
+    constexpr uint32_t frame_flags =
+        GeometryDataFlags::Emissive | GeometryDataFlags::New | GeometryDataFlags::Retired;
+    return geometry_data.material_id == prev_geometry_data.material_id &&
+           (geometry_data.flags & ~frame_flags) == (prev_geometry_data.flags & ~frame_flags);
+}
+
+} // namespace
+
+void Scene::compute_prev_geometry_remap() {
+    prev_geometry_remap.clear();
+    if (starting_run)
+        return;
+
+    const std::vector<uint64_t>& keys = geometry.geometry_keys;
+    const std::vector<uint64_t>& prev_keys = prev_geometry.geometry_keys;
+    const auto same_key = [&](const GeometryID geometry_id) {
+        return geometry_id < keys.size() && geometry_id < prev_keys.size() &&
+               keys[geometry_id] == prev_keys[geometry_id];
+    };
+    const auto continues_at = [&](const GeometryID geometry_id, const GeometryID prev_id) {
+        return continues(geometry.geometries[geometry_id], prev_geometry.geometries[prev_id]);
+    };
+
+    bool unchanged = keys.size() == prev_keys.size();
+    for (GeometryID geometry_id = 0; unchanged && geometry_id < keys.size(); geometry_id++)
+        unchanged = same_key(geometry_id) && continues_at(geometry_id, geometry_id);
+    if (unchanged)
+        return;
+
+    // keys are unique, so a key that moved lands where the key changed
+    geometry_of_key.clear();
+    for (GeometryID geometry_id = 0; geometry_id < keys.size(); geometry_id++)
+        if (!same_key(geometry_id))
+            geometry_of_key.try_emplace(keys[geometry_id], geometry_id);
+
+    const auto live_count = static_cast<GeometryID>(keys.size());
+    std::vector<bool> existed(live_count, false);
+    // previous instance index -> the instance index its Retired geometries share
+    std::vector<uint32_t> retired_instances(prev_geometry.instance_transforms.size(), ~0u);
+    prev_geometry_remap.reserve(prev_keys.size());
+    for (GeometryID prev_id = 0; prev_id < prev_keys.size(); prev_id++) {
+        GeometryID geometry_id = prev_id;
+        if (!same_key(prev_id)) {
+            const auto it = geometry_of_key.find(prev_keys[prev_id]);
+            geometry_id = it != geometry_of_key.end() ? it->second : live_count;
         }
-        prev_geometry_keys = geometry_keys;
+        if (geometry_id < live_count && continues_at(geometry_id, prev_id)) {
+            prev_geometry_remap.push_back({geometry_id, geometry.instance_indices[geometry_id]});
+            existed[geometry_id] = true;
+            continue;
+        }
+
+        // last frame's geometry under last frame's transforms
+        const uint32_t prev_instance = prev_geometry.instance_indices[prev_id];
+        uint32_t& instance = retired_instances[prev_instance];
+        if (instance == ~0u) {
+            instance = static_cast<uint32_t>(geometry.instance_transforms.size());
+            const float4x4& transform = prev_geometry.instance_transforms[prev_instance];
+            const float4x4& inverse_transposed =
+                prev_geometry.inverse_transposed_instance_transforms[prev_instance];
+            geometry.instance_transforms.push_back(transform);
+            geometry.inverse_transposed_instance_transforms.push_back(inverse_transposed);
+            geometry.prev_instance_transforms.push_back(transform);
+            geometry.prev_inverse_transposed_instance_transforms.push_back(inverse_transposed);
+        }
+        GeometryData retired_geometry = prev_geometry.geometries[prev_id];
+        retired_geometry.prev_vertices = retired_geometry.vertices;
+        retired_geometry.flags = GeometryDataFlags(
+            (retired_geometry.flags & ~GeometryDataFlags::New) | GeometryDataFlags::Retired);
+        prev_geometry_remap.push_back(
+            {static_cast<GeometryID>(geometry.geometries.size()), instance});
+        geometry.geometries.push_back(retired_geometry);
+        geometry.instance_indices.push_back(instance);
     }
 
+    for (GeometryID geometry_id = 0; geometry_id < live_count; geometry_id++) {
+        if (existed[geometry_id])
+            continue;
+        // the previous vertices of its mesh belong to another identity
+        GeometryData& new_geometry = geometry.geometries[geometry_id];
+        new_geometry.prev_vertices = new_geometry.vertices;
+        new_geometry.flags = GeometryDataFlags(new_geometry.flags | GeometryDataFlags::New);
+    }
+}
+
+void Scene::upload_prev_geometry_remap(const CommandBufferHandle& cmd) {
     if (prev_geometry_remap.empty())
         return;
     const vk::DeviceSize remap_size = prev_geometry_remap.size() * sizeof(GeometryRemap);
     if (!prev_geometry_remap_buffer || prev_geometry_remap_buffer->get_size() < remap_size) {
-        cmd->keep_until_pool_reset(prev_geometry_remap_buffer);
+        retire(std::move(prev_geometry_remap_buffer));
         prev_geometry_remap_buffer = allocator->create_buffer(
             remap_size * 3 / 2,
             vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
@@ -1451,13 +1476,14 @@ constexpr vk::DeviceSize size_with_headroom(const vk::DeviceSize required) {
 
 } // namespace
 
-void Scene::reallocate_shared_buffer(const CommandBufferHandle& cmd,
-                                     VMAMemorySubAllocatorHandle& slot,
-                                     vk::DeviceSize& capacity_slot,
-                                     MeshBufferRegion MeshInfo::* region_field,
-                                     const vk::DeviceSize new_capacity,
-                                     const vk::BufferUsageFlags usage,
-                                     const std::string& debug_name) {
+void Scene::reallocate_shared_buffer(
+    const CommandBufferHandle& cmd,
+    VMAMemorySubAllocatorHandle& slot,
+    vk::DeviceSize& capacity_slot,
+    const std::initializer_list<MeshBufferRegion MeshInfo::*> region_fields,
+    const vk::DeviceSize new_capacity,
+    const vk::BufferUsageFlags usage,
+    const std::string& debug_name) {
     const vk::DeviceSize old_capacity = capacity_slot;
     const BufferHandle new_buffer = allocator->create_buffer(
         vk::BufferCreateInfo{{}, new_capacity, usage}, MemoryMappingType::NONE, debug_name);
@@ -1466,18 +1492,21 @@ void Scene::reallocate_shared_buffer(const CommandBufferHandle& cmd,
 
     const BufferHandle old_buffer = slot ? slot->get_base_buffer() : nullptr;
     std::vector<vk::BufferCopy> regions;
-    regions.reserve(mesh_ids.count());
+    regions.reserve(mesh_ids.count() * region_fields.size());
 
     for (const MeshID id : mesh_ids) {
-        MeshBufferRegion& region = mesh_infos[id].*region_field;
-        if (!region)
-            continue;
+        for (MeshBufferRegion MeshInfo::* const region_field : region_fields) {
+            MeshBufferRegion& region = mesh_infos[id].*region_field;
+            if (!region)
+                continue;
 
-        const vk::DeviceSize old_offset = region.get_offset();
-        const auto va = new_alloc->allocate({region.size, region.alignment, ~0u});
-        regions.push_back({old_offset, va.offset, region.size});
-        region.suballoc = std::make_shared<VMAMemorySubAllocation>(
-            context, new_alloc, va.allocation, va.offset, region.size);
+            const vk::DeviceSize old_offset = region.get_offset();
+            const auto va = new_alloc->allocate({region.size, region.alignment, ~0u});
+            regions.push_back({old_offset, va.offset, region.size});
+            retire(std::move(region.suballoc));
+            region.suballoc = std::make_shared<VMAMemorySubAllocation>(
+                context, new_alloc, va.allocation, va.offset, region.size);
+        }
     }
 
     if (old_buffer && !regions.empty()) {
@@ -1496,49 +1525,62 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
     MERIAN_PROFILE_SCOPE_GPU(cmd, "Scene::upload_meshes");
 
     vertex_jobs.clear();
-    prev_vertex_jobs.clear();
     vertex_jobs.reserve(mesh_ids.count());
-    prev_vertex_jobs.reserve(mesh_ids.count());
     max_vertex_count_in_jobs = 0;
-    max_prev_vertex_count_in_jobs = 0;
+
+    const auto drop_prev_vertices = [&](MeshInfo& info) {
+        retire(std::move(info.prev_vertex_buffer.suballoc));
+        info.prev_vertex_buffer = MeshBufferRegion{};
+    };
 
     vk::DeviceSize total_vb = 0;
-    vk::DeviceSize total_prev_vb = 0;
     vk::DeviceSize total_ib = 0;
+    // allocated by this update, while the regions it retires still occupy the buffers
+    vk::DeviceSize allocated_vb = 0;
+    vk::DeviceSize allocated_ib = 0;
     {
         MERIAN_PROFILE_SCOPE("size_prepass");
         for (const MeshID id : mesh_ids) {
-            const MeshInfo& info = mesh_infos[id];
-            if (info.instances.empty())
+            MeshInfo& info = mesh_infos[id];
+            if (info.instances.empty()) {
+                drop_prev_vertices(info);
                 continue;
+            }
             const Mesh& mesh = *info.mesh;
-            const uint32_t vc = mesh.get_vertex_count();
-            const uint32_t pc = mesh.get_primitive_count();
-            total_vb += vc * sizeof(PackedVertexData);
-            total_ib += pc * std::size_t(3) * size_for_index_type(mesh.index_type);
-            if (mesh.is_morphed() || mesh.has_variable_topology() || info.is_dynamic())
-                total_prev_vb += vc * sizeof(PackedPrevVertexData);
+            const vk::DeviceSize vb_size = mesh.get_vertex_count() * sizeof(PackedVertexData);
+            const vk::DeviceSize ib_size =
+                mesh.get_primitive_count() * std::size_t(3) * size_for_index_type(mesh.index_type);
+            // last frame's vertex and index regions stay allocated next to the new ones
+            const bool two_vertex_regions =
+                info.prev_vertex_buffer || mesh.vertices_dirty || info.is_dynamic();
+            total_vb += two_vertex_regions ? 2 * vb_size : vb_size;
+            total_ib += mesh.indices_dirty ? 2 * ib_size : ib_size;
+            if ((mesh.vertices_dirty || info.is_dynamic()) &&
+                info.prev_vertex_buffer.size != vb_size)
+                allocated_vb += vb_size;
+            if (mesh.indices_dirty)
+                allocated_ib += ib_size;
         }
     }
 
-    if (total_vb > shared_vb_capacity) {
-        MERIAN_PROFILE_SCOPE_GPU(cmd, "realloc_vb");
-        reallocate_shared_buffer(cmd, shared_vb_suballoc, shared_vb_capacity,
-                                 &MeshInfo::vertex_buffer, size_with_headroom(total_vb),
-                                 SHARED_VB_USAGE, "Scene::shared_vb");
-    }
-    if (total_prev_vb > shared_prev_vb_capacity) {
-        MERIAN_PROFILE_SCOPE_GPU(cmd, "realloc_prev_vb");
-        reallocate_shared_buffer(cmd, shared_prev_vb_suballoc, shared_prev_vb_capacity,
-                                 &MeshInfo::prev_vertex_buffer, size_with_headroom(total_prev_vb),
-                                 SHARED_VB_USAGE, "Scene::shared_prev_vb");
-    }
-    if (total_ib > shared_ib_capacity) {
-        MERIAN_PROFILE_SCOPE_GPU(cmd, "realloc_ib");
-        reallocate_shared_buffer(cmd, shared_ib_suballoc, shared_ib_capacity,
-                                 &MeshInfo::index_buffer, size_with_headroom(total_ib),
-                                 SHARED_IB_USAGE, "Scene::shared_ib");
-    }
+    const auto ensure_capacity =
+        [&](VMAMemorySubAllocatorHandle& slot, vk::DeviceSize& capacity,
+            const std::initializer_list<MeshBufferRegion MeshInfo::*> region_fields,
+            const vk::DeviceSize total, const vk::DeviceSize allocated,
+            const vk::BufferUsageFlags usage, const std::string& debug_name) {
+            const vk::DeviceSize used = slot ? capacity - slot->get_free_size() : 0;
+            if (total <= capacity && used + allocated <= capacity)
+                return;
+            MERIAN_PROFILE_SCOPE_GPU(cmd, "reallocate_shared_buffer");
+            reallocate_shared_buffer(cmd, slot, capacity, region_fields,
+                                     size_with_headroom(std::max(total, used + allocated)), usage,
+                                     debug_name);
+        };
+    ensure_capacity(shared_vb_suballoc, shared_vb_capacity,
+                    {&MeshInfo::vertex_buffer, &MeshInfo::prev_vertex_buffer}, total_vb,
+                    allocated_vb, SHARED_VB_USAGE, "Scene::shared_vb");
+    ensure_capacity(shared_ib_suballoc, shared_ib_capacity, {&MeshInfo::index_buffer}, total_ib,
+                    allocated_ib, SHARED_IB_USAGE, "Scene::shared_ib");
 
     // No-op if region already matches; reused regions stay where they are.
     const auto ensure_region = [&](MeshBufferRegion& region,
@@ -1546,7 +1588,7 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                                    const vk::DeviceSize size, const vk::DeviceSize alignment) {
         if (region && region.size == size && region.alignment == alignment)
             return;
-        region.suballoc.reset();
+        retire(std::move(region.suballoc));
         const auto va = slot->allocate({size, alignment, ~0u});
         region.suballoc =
             std::make_shared<VMAMemorySubAllocation>(context, slot, va.allocation, va.offset, size);
@@ -1554,7 +1596,7 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
         region.alignment = alignment;
     };
 
-    static_assert(alignof(PackedVertexData) <= 16 && alignof(PackedPrevVertexData) <= 16,
+    static_assert(alignof(PackedVertexData) <= 16,
                   "StagingMemoryManager aligns every upload to 16");
     struct StagedRange {
         vk::DeviceAddress addr;
@@ -1591,55 +1633,45 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                 if (mesh.indices_dirty || (mesh.vertices_dirty && !mesh.is_morphed()))
                     info.uv_version++;
 
-                const bool needs_prev = needs_prev_vertices(group, info);
-                const bool has_prev = static_cast<bool>(info.prev_vertex_buffer);
-                if (needs_prev != has_prev)
-                    mesh.vertices_dirty = true;
-
-                // prev vertices hold the last motion until the frame after the node stopped
                 if (check_node_transform) {
-                    const Node& node = *scene_graph[*info.instances.begin()];
-                    mesh.vertices_dirty |= node.transform_dirty || node.transform_dirty_last_frame;
+                    mesh.vertices_dirty |= scene_graph[*info.instances.begin()]->transform_dirty;
                 }
+                // vertices that are not uploaded are also last frame's
+                if (!mesh.vertices_dirty)
+                    drop_prev_vertices(info);
                 if (!mesh.is_dirty())
                     continue;
-
-                if (mesh.indices_dirty || (mesh.has_variable_topology() && mesh.vertices_dirty))
-                    info.serial = next_serial++;
-
-                group.blas_dirty = true;
-                if (mesh.has_variable_topology())
-                    group.cached_blas_size_info.reset();
 
                 const uint32_t vertex_count = mesh.get_vertex_count();
                 const uint32_t primitive_count = mesh.get_primitive_count();
                 const vk::DeviceSize vb_size = vertex_count * sizeof(PackedVertexData);
-                const vk::DeviceSize prev_vb_size = vertex_count * sizeof(PackedPrevVertexData);
                 const vk::DeviceSize ib_size =
                     primitive_count * std::size_t(3) * size_for_index_type(mesh.index_type);
+
+                // a topology change is a new identity
+                const bool topology_changed = mesh.indices_dirty ||
+                                              vb_size != info.vertex_buffer.size ||
+                                              primitive_count != info.primitive_count;
+                if (topology_changed)
+                    info.serial = next_serial++;
+                info.primitive_count = primitive_count;
+
+                group.blas_dirty = true;
+                if (topology_changed)
+                    group.cached_blas_size_info.reset();
 
                 frame_stats.vertices_uploaded += vertex_count;
                 frame_stats.indices_uploaded += primitive_count;
                 frame_stats.upload_bytes += vb_size + ib_size;
 
-                const NodeID node_id = *info.instances.begin();
-                const float4x4& M = get_global_transform(node_id);
-                const float4x4& M_it = get_global_inverse_transposed_transform(node_id);
-                const bool pretransform_mesh = pretransform_group && M != identity();
-                const bool pretransform_prev =
-                    needs_prev && !mesh.is_morphed() && !mesh.has_variable_topology();
-
-                ensure_region(info.vertex_buffer, shared_vb_suballoc, vb_size,
-                              alignof(PackedVertexData));
-
-                if (needs_prev) {
-                    ensure_region(info.prev_vertex_buffer, shared_prev_vb_suballoc, prev_vb_size,
-                                  alignof(PackedPrevVertexData));
-                } else if (info.prev_vertex_buffer) {
-                    info.prev_vertex_buffer = MeshBufferRegion{};
-                }
-
                 if (mesh.vertices_dirty) {
+                    // last frame's vertices become the previous ones, the region before is reused
+                    std::swap(info.vertex_buffer, info.prev_vertex_buffer);
+                    ensure_region(info.vertex_buffer, shared_vb_suballoc, vb_size,
+                                  alignof(PackedVertexData));
+                    if (topology_changed || starting_run)
+                        drop_prev_vertices(info);
+
                     vk::DeviceAddress vertex_src_addr = 0;
                     std::visit(
                         [&](auto&& src) {
@@ -1667,61 +1699,16 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                         },
                         mesh.get_vertices());
 
-                    if (needs_prev && !pretransform_prev) {
-                        vk::DeviceAddress prev_src_addr = 0;
-                        std::visit(
-                            [&](auto&& src) {
-                                using T = std::decay_t<decltype(src)>;
-                                if constexpr (std::is_same_v<T, std::monostate>) {
-                                    assert(false);
-                                } else if constexpr (std::is_same_v<T, Mesh::DeviceLocal>) {
-                                    prev_src_addr = src.data->get_device_address();
-                                } else if constexpr (std::is_same_v<T, Mesh::DeviceStaged>) {
-                                    prev_src_addr = src.data->get_device_address() + src.offset;
-                                } else if constexpr (std::is_same_v<T, Mesh::HostPacked<
-                                                                           PackedPrevVertexData>>) {
-                                    prev_src_addr = stage(prev_vb_size, [&](void* dst) {
-                                                        std::memcpy(dst, src.data, prev_vb_size);
-                                                    }).addr;
-                                } else {
-                                    static_assert(std::is_same_v<T, Mesh::HostPrevVertices>);
-                                    prev_src_addr =
-                                        stage(prev_vb_size, [&](void* dst) {
-                                            src->write(static_cast<PackedPrevVertexData*>(dst));
-                                        }).addr;
-                                }
-                            },
-                            mesh.get_prev_vertices());
-
-                        const float4x4 prev_M =
-                            pretransform_mesh
-                                ? scene_graph[node_id]->prev_global_transform.value_or(M)
-                                : float4x4(identity());
-                        prev_vertex_jobs.push_back(TransformPrevVertexJob{
-                            .src = prev_src_addr,
-                            .dst = info.prev_vertex_buffer.get_device_address(),
-                            .prev_transform = prev_M,
-                            .vertex_count = vertex_count,
-                            ._pad = {},
-                        });
-                        max_prev_vertex_count_in_jobs =
-                            std::max(max_prev_vertex_count_in_jobs, vertex_count);
-                        frame_stats.gpu_prev_vertex_transforms++;
-                        frame_stats.gpu_prev_vertex_transform_vertices += vertex_count;
-                        frame_stats.upload_bytes += prev_vb_size;
-                    }
-
-                    const float4x4 prev_M =
-                        pretransform_prev ? scene_graph[node_id]->prev_global_transform.value_or(M)
-                                          : float4x4(identity());
+                    const NodeID node_id = *info.instances.begin();
+                    const float4x4& M = get_global_transform(node_id);
+                    const bool pretransform_mesh = pretransform_group && M != identity();
                     vertex_jobs.push_back(TransformVertexJob{
                         .src = vertex_src_addr,
                         .dst = info.vertex_buffer.get_device_address(),
-                        .prev_dst =
-                            pretransform_prev ? info.prev_vertex_buffer.get_device_address() : 0,
                         .transform = pretransform_mesh ? M : float4x4(identity()),
-                        .inverse_transposed = pretransform_mesh ? M_it : float4x4(identity()),
-                        .prev_transform = prev_M,
+                        .inverse_transposed = pretransform_mesh
+                                                  ? get_global_inverse_transposed_transform(node_id)
+                                                  : float4x4(identity()),
                         .vertex_count = vertex_count,
                         ._pad = {},
                     });
@@ -1732,6 +1719,11 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                     mesh.vertices_dirty = false;
                 }
 
+                if (mesh.indices_dirty) {
+                    // never overwritten in place: retired geometry may read the old indices
+                    retire(std::move(info.index_buffer.suballoc));
+                    info.index_buffer = MeshBufferRegion{};
+                }
                 if (mesh.indices_dirty && mesh.has_indices()) {
                     ensure_region(info.index_buffer, shared_ib_suballoc, ib_size,
                                   size_for_index_type(mesh.index_type));
@@ -1767,14 +1759,8 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                             }
                         },
                         mesh.get_indices());
-
-                    mesh.indices_dirty = false;
-                } else if (mesh.indices_dirty) {
-                    // No index buffer for IndexType::None; drop any prior allocation.
-                    if (info.index_buffer)
-                        info.index_buffer = MeshBufferRegion{};
-                    mesh.indices_dirty = false;
                 }
+                mesh.indices_dirty = false;
             }
         }
     }
@@ -1834,7 +1820,7 @@ void Scene::ensure_micromaps(Submission& submission,
         geometry.opacity = opacity && alpha_tested;
         geometry.emission = emissive;
         geometry.geometry.material_id = mesh.material_id;
-        geometry.geometry.primitive_count = mesh.get_primitive_count();
+        geometry.primitive_count = mesh.get_primitive_count();
         geometry.geometry.vertices = info.vertex_buffer.get_device_address();
         geometry.geometry.indices =
             info.index_buffer ? info.index_buffer.get_device_address() : vk::DeviceAddress{0};
@@ -1860,9 +1846,8 @@ void Scene::ensure_micromaps(Submission& submission,
             continue;
         }
         MeshGroup& group = mesh_groups[mesh_to_group[mesh_id]];
-        if (group.blas) {
-            submission.get_cmd()->keep_until_pool_reset(std::move(group.blas));
-        }
+        retire(std::move(group.blas));
+        retire(std::move(group.spare_blas));
         group.cached_blas_size_info.reset();
         group.blas_dirty = true;
     }
@@ -1879,9 +1864,12 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
     for (MeshGroupID group_id = 0; group_id < mesh_groups.size(); group_id++) {
         MeshGroup& group = mesh_groups[group_id];
         if (group.blas && !group.blas_dirty) {
+            // the previous frame's BLAS is the current one again once a frame passed unchanged
+            retire(std::move(group.spare_blas));
             continue;
         }
         tlas_dirty = true;
+        std::swap(group.blas, group.spare_blas);
 
         auto& blas_geometry = blas_geometries[group_id];
         blas_geometry.micromaps.reserve(group.meshes.size());
@@ -1920,7 +1908,7 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
         }
 
         const bool can_update =
-            group.blas &&
+            group.spare_blas &&
             (group.blas_build_flags & vk::BuildAccelerationStructureFlagBitsKHR::eAllowUpdate);
 
         if (can_update) {
@@ -1939,9 +1927,7 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
         const auto& size_info = *group.cached_blas_size_info;
 
         if (!group.blas || group.blas->get_size() < size_info.accelerationStructureSize) {
-            if (group.blas) {
-                cmd->keep_until_pool_reset(std::move(group.blas));
-            }
+            retire(std::move(group.blas));
             group.blas = allocator->create_acceleration_structure(
                 vk::AccelerationStructureTypeKHR::eBottomLevel, size_info,
                 fmt::format("Scene::blas[{}]", group_id));
@@ -1984,22 +1970,25 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
             }
             const auto& size_info = *group.cached_blas_size_info;
 
-            const bool outgrown = group.blas->get_size() < size_info.accelerationStructureSize;
-            if (i < rebuild_count || outgrown) {
-                if (outgrown) {
-                    cmd->keep_until_pool_reset(std::move(group.blas));
-                    group.blas = allocator->create_acceleration_structure(
-                        vk::AccelerationStructureTypeKHR::eBottomLevel, size_info,
-                        fmt::format("Scene::blas[{}]", group_id));
-                }
+            const bool outgrown =
+                !group.blas || group.blas->get_size() < size_info.accelerationStructureSize;
+            if (outgrown) {
+                retire(std::move(group.blas));
+                group.blas = allocator->create_acceleration_structure(
+                    vk::AccelerationStructureTypeKHR::eBottomLevel, size_info,
+                    fmt::format("Scene::blas[{}]", group_id));
+            }
+            if (i < rebuild_count ||
+                group.spare_blas->get_size() < size_info.accelerationStructureSize) {
                 as_builder.queue_build(blas_geometry.geometries, blas_geometry.ranges, group.blas,
                                        size_info, group.blas_build_flags);
                 group.blas_last_built_update = update_count;
                 frame_stats.blas_builds++;
                 frame_stats.blas_builds_dynamic++;
             } else {
-                as_builder.queue_update(blas_geometry.geometries, blas_geometry.ranges, group.blas,
-                                        size_info, group.blas_build_flags);
+                as_builder.queue_update(blas_geometry.geometries, blas_geometry.ranges,
+                                        group.spare_blas, group.blas, size_info,
+                                        group.blas_build_flags);
                 frame_stats.blas_updates++;
             }
             group.blas_dirty = false;
@@ -2070,7 +2059,7 @@ void Scene::build_tlas(const CommandBufferHandle& cmd) {
     const vk::DeviceSize tlas_instances_size = std::max((std::size_t)1, tlas_instances.size()) *
                                                sizeof(vk::AccelerationStructureInstanceKHR);
     if (!tlas_instances_buffer || tlas_instances_buffer->get_size() < tlas_instances_size) {
-        cmd->keep_until_pool_reset(std::move(tlas_instances_buffer));
+        retire(std::move(tlas_instances_buffer));
         tlas_instances_buffer = allocator->create_buffer(
             tlas_instances_size,
             vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR |
@@ -2090,11 +2079,11 @@ void Scene::build_tlas(const CommandBufferHandle& cmd) {
     const auto size_info =
         as_builder.get_size_info(tlas_instances.size(), tlas_instances_buffer,
                                  vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace);
+    AccelerationStructureHandle& tlas = geometry.tlas;
     if (!tlas || tlas->get_size() < size_info.accelerationStructureSize) {
-        // cannot reuse and needs to be allcated
+        retire(std::move(tlas));
         tlas = allocator->create_acceleration_structure(vk::AccelerationStructureTypeKHR::eTopLevel,
                                                         size_info);
-        shader_object->get_cursor()["as"]["as"] = tlas;
     }
 
     as_builder.queue_build(tlas_instances.size(), tlas_instances_buffer, tlas, size_info);
@@ -2113,6 +2102,13 @@ void Scene::update(Submission& submission,
     update_count++;
     starting_run |= frame == 0;
     frame_stats = {};
+    last_updates = 0;
+
+    // the previous frame may still read what this update overwrites
+    cmd->barrier(vk::MemoryBarrier2{vk::PipelineStageFlagBits2::eAllCommands,
+                                    {},
+                                    vk::PipelineStageFlagBits2::eAllCommands,
+                                    {}});
 
     if (!obj_allocator_in && !fallback_obj_allocator) {
         fallback_obj_allocator = std::make_shared<SimpleShaderObjectAllocator>(allocator);
@@ -2128,8 +2124,15 @@ void Scene::update(Submission& submission,
     process_pending_env_load(cmd);
 
     if (!is_ready()) {
+        // retired objects stay alive for the next ready update, which reads them as previous
+        get_texture_manager()->upload(cmd);
         return;
     }
+
+    if (starting_run) {
+        prev_env_map = env_map->clone();
+    }
+    compose_prev_env();
 
     // rebuild once here so the per-frame uploads below write into the current object
     shader_object.get();
@@ -2137,37 +2140,22 @@ void Scene::update(Submission& submission,
     assert(!cameras.empty() &&
            "the scene implementation must ensure that there is at least one camera");
 
-    frame_stats.buffers_released = static_cast<uint32_t>(pending_buffer_releases.size());
-    for (auto& buffer : pending_buffer_releases) {
-        cmd->keep_until_pool_reset(std::move(buffer));
-    }
-    pending_buffer_releases.clear();
-
-    for (auto& blas : pending_blas_releases) {
-        cmd->keep_until_pool_reset(std::move(blas));
-    }
-    pending_blas_releases.clear();
-
     {
         MERIAN_PROFILE_SCOPE_GPU(cmd, "material_system::update");
         material_system->update(cmd);
     }
+
+    std::swap(geometry, prev_geometry);
 
     // Must run before upload_meshes, which clears the dirty flags.
     if (needs_regroup) {
         compute_mesh_groups();
     }
 
-    // transforms_changed_last_frame: account for prev_transforms
-    if (needs_regroup || transforms_changed || transforms_changed_last_frame) {
-        upload_transforms(cmd);
-    }
-    transforms_changed_last_frame = transforms_changed;
-
     // Must precede upload_geometry_data so device addresses are available.
     upload_meshes(cmd);
 
-    if (!vertex_jobs.empty() || !prev_vertex_jobs.empty()) {
+    if (!vertex_jobs.empty()) {
         stage_transform_jobs(cmd);
 
         cmd->barrier(vk::MemoryBarrier2{
@@ -2180,39 +2168,35 @@ void Scene::update(Submission& submission,
         dispatch_batched_transforms(cmd);
     }
 
-    // Advance prev transforms after upload_meshes (prev-vertex jobs read them).
-    for (const NodeID& nid : node_ids) {
-        assert(scene_graph[nid]);
-        Node& n = *scene_graph[nid];
-        n.prev_global_transform = n.global_transform;
-        n.prev_global_inverse_transposed = n.global_inverse_transposed;
-    }
-
     cmd->barrier(vk::MemoryBarrier2{
-        vk::PipelineStageFlagBits2::eTransfer | vk::PipelineStageFlagBits2::eComputeShader,
+        vk::PipelineStageFlagBits2::eAllCommands,
         vk::AccessFlagBits2::eTransferWrite | vk::AccessFlagBits2::eShaderWrite,
         vk::PipelineStageFlagBits2::eAllCommands,
         vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eAccelerationStructureReadKHR,
     });
 
     if (as_supported) {
-        // binds the material system object, every write to it must precede this; before the
-        // geometry data, which carries the emission micromaps
+        // binds the material system: after its writes, before the geometry data's micromaps
         ensure_micromaps(submission, obj_allocator, starting_run);
     }
 
-    // changes at regroup, or updated mesh (buffer address), or if material ids change -> run every
-    // frame.
     upload_geometry_data(cmd);
 
-    frame_stats.geometry_data_bytes = geometries.size() * sizeof(GeometryData);
-    frame_stats.transform_data_bytes = instance_transforms.size() * sizeof(float4x4) * 4;
+    frame_stats.geometry_data_bytes = geometry.geometries.size() * sizeof(GeometryData);
+    frame_stats.transform_data_bytes = geometry.instance_transforms.size() * sizeof(float4x4) * 4;
 
     if (as_supported) {
         build_blas(cmd);
 
         tlas_dirty |= needs_regroup || transforms_changed;
-        if (tlas_dirty || !tlas) {
+        if (!tlas_dirty && prev_geometry.tlas) {
+            retire(std::move(geometry.tlas));
+            geometry.tlas = prev_geometry.tlas;
+        } else {
+            // the previous frame reads its TLAS, build into the one from two frames ago
+            if (geometry.tlas == prev_geometry.tlas) {
+                geometry.tlas.reset();
+            }
             build_tlas(cmd);
             tlas_dirty = false;
             frame_stats.tlas_rebuilt = true;
@@ -2232,20 +2216,23 @@ void Scene::update(Submission& submission,
 
     for (const NodeID& nid : node_ids) {
         Node& node = *scene_graph[nid];
-        node.transform_dirty_last_frame = node.transform_dirty;
         node.transform_dirty = false;
     }
-    last_update_changes.geometry_changed = needs_regroup;
-    last_update_changes.transform_changed = transforms_changed;
+    if (needs_regroup)
+        last_updates |= SceneUpdateGeometry;
+    if (transforms_changed)
+        last_updates |= SceneUpdateTransform;
     needs_regroup = false;
     transforms_changed = false;
 
     const auto cam = get_active_camera();
     assert(cam);
 
+    const bool run_start = starting_run;
     if (starting_run) {
         prev_active_camera = *cam;
-        lights.clear_learned_state();
+        prev_time.reset();
+        lights.start_run();
         starting_run = false;
     }
 
@@ -2257,15 +2244,23 @@ void Scene::update(Submission& submission,
 
     auto c = shader_object->get_cursor();
 
+    if (as_supported) {
+        c["as"]["as"] = geometry.tlas;
+        c["prev_as"]["as"] = prev_geometry.tlas && !run_start ? prev_geometry.tlas : geometry.tlas;
+    }
     c["frame"] = frame;
     c["seed"] = seed;
     c["prev_geometry_remap_count"] = static_cast<uint32_t>(prev_geometry_remap.size());
-    c["time"] = get_time(time);
+    const float scene_time = get_time(time);
+    c["time"] = scene_time;
     c["time_diff"] = time_diff;
+    c["prev_time"] = prev_time.value_or(scene_time);
+    prev_time = scene_time;
     exterior_volume->write_to(c["exterior_volume"]);
 
     // prev_active_camera still holds last frame's pose here (updated below).
-    last_update_changes.camera_changed = !(*cam == prev_active_camera);
+    if (!(*cam == prev_active_camera))
+        last_updates |= SceneUpdateCamera;
 
     cam->advance_jitter(frame, seed);
 
@@ -2274,15 +2269,43 @@ void Scene::update(Submission& submission,
     prev_active_camera = *cam;
 
     env_map->write_to(c["env_map"]);
+    prev_env_map->write_to(c["prev_env_map"]);
+    prev_env_map = env_map->clone();
 
-    // Binds the scene object, so every write to it must precede this (descriptor sets are not
-    // update-after-bind).
+    // binds the scene object: every write to it must precede this
     lights.set_env_emissive(env_map->is_emissive());
     lights.set_env_state(env_map->get_version(), env_map->is_static());
     lights.set_camera(cam->get_position());
     lights.prepare(cmd);
     lights.write_to(c["nee"]);
+    lights.write_prev_to(c["prev_nee"]);
     lights.update(cmd, composition, shader_object.get(), obj_allocator);
+
+    drain_retired(cmd);
+}
+
+void Scene::drain_retired(const CommandBufferHandle& cmd) {
+    frame_stats.objects_retired = static_cast<uint32_t>(retired.size());
+    for (ConstObjectHandle& object : retired) {
+        cmd->keep_until_pool_reset(std::move(object));
+    }
+    retired.clear();
+}
+
+std::vector<float3> compute_vertex_normals(const std::vector<float3>& positions,
+                                           const std::vector<uint3>& triangles) {
+    std::vector<float3> normals(positions.size(), float3(0));
+    for (const uint3& tri : triangles) {
+        const float3 face =
+            cross(positions[tri.y] - positions[tri.x], positions[tri.z] - positions[tri.x]);
+        normals[tri.x] += face;
+        normals[tri.y] += face;
+        normals[tri.z] += face;
+    }
+    for (float3& n : normals) {
+        n = length(n) > 1e-20f ? normalize(n) : float3(0, 1, 0);
+    }
+    return normals;
 }
 
 } // namespace merian

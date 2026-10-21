@@ -59,7 +59,7 @@ class PBRTSceneTest : public ::testing::Test {
                  "accelerationStructure", "storageBuffer16BitAccess",
                  "uniformAndStorageBuffer16BitAccess", "storageBuffer8BitAccess",
                  "uniformAndStorageBuffer8BitAccess", "shaderSampledImageArrayNonUniformIndexing",
-                 "rayTracingPipeline", "rayQuery"}),
+                 "rayTracingPipeline", "rayQuery", "timelineSemaphore"}),
             .context_extensions = {ExtensionVkValidationLayers::name, ExtensionResources::name},
             .application_name = "test-pbrt-scene",
         };

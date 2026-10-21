@@ -51,18 +51,16 @@ bool PathDebugInput::Observer::on_key([[maybe_unused]] InputController& controll
     } else {
         held_mods = mods;
     }
+    escape_pressed |=
+        key == InputController::Key::ESCAPE && action == InputController::KeyStatus::PRESS;
     return false;
 }
 
 bool PathDebugInput::on_key([[maybe_unused]] InputController& controller,
                             const InputController::Key key,
-                            const InputController::KeyStatus action,
+                            [[maybe_unused]] const InputController::KeyStatus action,
                             [[maybe_unused]] const int mods) {
-    if (key == InputController::Key::ESCAPE && action == InputController::KeyStatus::PRESS) {
-        clear_requested = true;
-        return true;
-    }
-    return false;
+    return key == InputController::Key::ESCAPE && consume_escape;
 }
 
 bool PathDebugInput::on_mouse_button([[maybe_unused]] InputController& controller,
@@ -132,8 +130,12 @@ double PathDebugInput::take_widen_scroll() {
     return std::exchange(widen_scroll, 0.);
 }
 
-bool PathDebugInput::take_clear() {
-    return std::exchange(clear_requested, false);
+bool PathDebugInput::take_escape() {
+    return std::exchange(observed->escape_pressed, false);
+}
+
+void PathDebugInput::set_consume_escape(const bool consume) {
+    consume_escape = consume;
 }
 
 } // namespace merian

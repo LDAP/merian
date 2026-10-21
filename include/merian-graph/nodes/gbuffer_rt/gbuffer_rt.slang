@@ -168,111 +168,108 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<WGBuffer> gbuffer) {
     const RayDesc ray = scene.generate_camera_ray(pixel, dim);
     const Hit hit = scene.trace_ray(ray, RAY_FLAG_NONE, params.instance_mask);
 
-    if (let gd = scene.get_geometry_data(hit)) {
-        if ((gd.flags & GeometryDataFlags::UseEnvMap) == 0) {
-            const TriangleHit tri = scene.get_triangle_hit(hit, gd);
-            const Surface surface = scene.get_surface(hit, tri);
-            const float3 prev_pos = scene.get_prev_world_position(hit, tri);
+    if (!scene.is_distant(hit)) {
+        const GeometryData gd = scene.get_geometry_data(hit.get_geometry_id());
+        const TriangleHit tri = scene.get_triangle_hit(hit, gd);
+        const Surface surface = scene.get_surface(hit, tri);
+        const float3 prev_pos = scene.get_world_position(hit, tri, true);
 
-            const float linear_z = length(surface.pos - ray.Origin);
-            const float3 r_x = scene.camera.get_pinhole_direction(pixel + uint2(1, 0), dim);
-            const float3 r_y = scene.camera.get_pinhole_direction(pixel + uint2(0, 1), dim);
-            const half2 grad_z = surface.compute_grad_z(ray, r_x, r_y, linear_z);
-            const float delta_z = length(prev_pos - scene.prev_camera.position) - linear_z;
-            const float2 mv = scene.compute_motion_vector(prev_pos, surface.pos, pixel, dim);
+        const float linear_z = length(surface.pos - ray.Origin);
+        const float3 r_x = scene.camera.get_pinhole_direction(pixel + uint2(1, 0), dim);
+        const float3 r_y = scene.camera.get_pinhole_direction(pixel + uint2(0, 1), dim);
+        const half2 grad_z = surface.compute_grad_z(ray, r_x, r_y, linear_z);
+        const float delta_z = length(prev_pos - scene.prev_camera.position) - linear_z;
+        const float2 mv = scene.compute_motion_vector(prev_pos, surface.pos, pixel, dim);
 
-            // Screen-space UV gradients for anisotropic mip selection.
-            const float3 edge01_w =
-                scene.to_world_vector(gd, hit.instance_index, tri.get_triangle_edge01());
-            const float3 edge02_w =
-                scene.to_world_vector(gd, hit.instance_index, tri.get_triangle_edge02());
-            RayDifferential rd = RayDifferential::from_pinhole_camera(ray.Direction, r_x, r_y);
-            rd.propagate(ray.Direction, linear_z, surface.face_normal);
-            float2 ddx, ddy;
-            rd.compute_uv_gradients(edge01_w, edge02_w, surface.face_normal, tri.v0.uv, tri.v1.uv,
-                                    tri.v2.uv, ddx, ddy);
-            ddx *= merian_gbuffer_texture_lod_scale;
-            ddy *= merian_gbuffer_texture_lod_scale;
+        // Screen-space UV gradients for anisotropic mip selection.
+        const float3 edge01_w =
+            scene.to_world_vector(gd, hit.instance_index, tri.get_triangle_edge01());
+        const float3 edge02_w =
+            scene.to_world_vector(gd, hit.instance_index, tri.get_triangle_edge02());
+        RayDifferential rd = RayDifferential::from_pinhole_camera(ray.Direction, r_x, r_y);
+        rd.propagate(ray.Direction, linear_z, surface.face_normal);
+        float2 ddx, ddy;
+        rd.compute_uv_gradients(edge01_w, edge02_w, surface.face_normal, tri.v0.uv, tri.v1.uv,
+                                tri.v2.uv, ddx, ddy);
+        ddx *= merian_gbuffer_texture_lod_scale;
+        ddy *= merian_gbuffer_texture_lod_scale;
 
-            OrthonormalFrame frame = surface.frame;
-            float3 face_normal = surface.face_normal;
-            bool front_facing = true;
-            if (gd.flags & GeometryDataFlags::TwoSided) {
-                front_facing = dot(-ray.Direction, surface.face_normal) >= 0.f;
-                if (!front_facing) {
-                    frame.flip_normal();
-                    face_normal = -face_normal;
-                }
+        OrthonormalFrame frame = surface.frame;
+        float3 face_normal = surface.face_normal;
+        bool front_facing = true;
+        if (gd.flags & GeometryDataFlags::TwoSided) {
+            front_facing = dot(-ray.Direction, surface.face_normal) >= 0.f;
+            if (!front_facing) {
+                frame.flip_normal();
+                face_normal = -face_normal;
             }
-
-            const ShadingData sd = ShadingData(-ray.Direction, surface.pos, surface.uv, scene.time,
-                                               frame, face_normal, uint16_t(0), front_facing);
-            float3 mat_emission;
-            OrthonormalFrame mat_shading_frame;
-            let mat = scene.material_system.get_material_sample(
-                surface.material_id, sd, mat_emission, mat_shading_frame, GradLODSampler(ddx, ddy));
-
-            let bsdf = mat.get_bsdf();
-            const Albedo albedo = bsdf.get_albedo(mat_shading_frame.to_local(-ray.Direction));
-            GBufferSample sample = make_sample(scene.camera, surface.pos,
-                                               mat_shading_frame.get_normal(), linear_z, grad_z,
-                                               delta_z, mv, hit);
-            sample.albedo = albedo.reflection;
-            sample.diffuse_albedo = albedo.diffuse;
-            sample.specular_albedo = albedo.specular;
-            sample.roughness = sqrt(bsdf.specular_alpha);
-            if (merian_gbuffer_write_specular_hit_distance || merian_gbuffer_specular_psr) {
-                const SpecularChain chain = specular_chain(
-                    scene, params.instance_mask, ray, hit,
-                    scene.get_shading_point(ray, hit, RenderContext(), GradLODSampler(ddx, ddy)),
-                    pixel);
-                sample.specular_hit_distance = chain.travelled;
-
-                if (merian_gbuffer_specular_psr && chain.travelled > 0.f) {
-                    const float virtual_z = chain.image.distance();
-                    const float3 virtual_pos = ray.Origin + virtual_z * ray.Direction;
-                    const float2 virtual_mv = scene.compute_motion_vector(
-                        virtual_pos + chain.image.displacement(chain.sp.prev_pos - chain.sp.pos,
-                                                               chain.ray.Direction),
-                        virtual_pos, pixel, dim);
-                    if (chain.sp.has_surface_material) {
-                        let chain_bsdf = chain.sp.surface_material.get_bsdf();
-                        const OrthonormalFrame chain_frame = chain.sp.shading_frame;
-                        const Albedo chain_albedo =
-                            chain_bsdf.get_albedo(chain_frame.to_local(-chain.ray.Direction));
-                        sample = make_sample(scene.camera, virtual_pos, chain_frame.get_normal(),
-                                             virtual_z, grad_z, delta_z, virtual_mv, hit);
-                        sample.albedo = chain_albedo.reflection;
-                        sample.diffuse_albedo = chain_albedo.diffuse;
-                        sample.specular_albedo = chain_albedo.specular;
-                        sample.roughness = sqrt(chain_bsdf.specular_alpha);
-                    } else {
-                        sample = make_sample(scene.camera, virtual_pos, chain.sp.shading_normal,
-                                             virtual_z, grad_z, delta_z, virtual_mv, hit);
-                        sample.albedo = chain.sp.emission;
-                        sample.diffuse_albedo = float3(0.5f);
-                        sample.specular_albedo = float3(0.f);
-                        sample.roughness = 0.f;
-                    }
-                    sample.diffuse_albedo =
-                        chain.passed.diffuse + chain.carried * sample.diffuse_albedo;
-                    sample.specular_albedo =
-                        chain.passed.specular + chain.carried * sample.specular_albedo;
-                    sample.albedo = chain.passed.reflection + chain.carried * sample.albedo;
-                    sample.roughness = lerp(sqrt(bsdf.specular_alpha), sample.roughness,
-                                            yuv_luminance(chain.carried));
-                    // the distance starts at the surface the guides describe
-                    sample.specular_hit_distance = 0.f;
-                }
-            }
-            gbuffer.store(pixel, sample);
-            // The emission output bypasses the renderer, so it carries the attenuation of the
-            // primary segment itself. The albedo stays a pure material property.
-            if (merian_gbuffer_write_emission)
-                emission[pixel] =
-                    float4(mat_emission * scene.exterior_volume.transmittance(linear_z), 0);
-            return;
         }
+
+        const ShadingData sd = ShadingData(-ray.Direction, surface.pos, surface.uv, scene.time,
+                                           frame, face_normal, uint16_t(0), front_facing);
+        float3 mat_emission;
+        OrthonormalFrame mat_shading_frame;
+        let mat = scene.material_system.get_material_sample(
+            surface.material_id, sd, mat_emission, mat_shading_frame, GradLODSampler(ddx, ddy));
+
+        let bsdf = mat.get_bsdf();
+        const Albedo albedo = bsdf.get_albedo(mat_shading_frame.to_local(-ray.Direction));
+        GBufferSample sample =
+            make_sample(scene.camera, surface.pos, mat_shading_frame.get_normal(), linear_z, grad_z,
+                        delta_z, mv, hit);
+        sample.albedo = albedo.reflection;
+        sample.diffuse_albedo = albedo.diffuse;
+        sample.specular_albedo = albedo.specular;
+        sample.roughness = sqrt(bsdf.specular_alpha);
+        if (merian_gbuffer_write_specular_hit_distance || merian_gbuffer_specular_psr) {
+            const SpecularChain chain = specular_chain(
+                scene, params.instance_mask, ray, hit,
+                scene.get_shading_point(ray, hit, RenderContext(), GradLODSampler(ddx, ddy)),
+                pixel);
+            sample.specular_hit_distance = chain.travelled;
+
+            if (merian_gbuffer_specular_psr && chain.travelled > 0.f) {
+                const float virtual_z = chain.image.distance();
+                const float3 virtual_pos = ray.Origin + virtual_z * ray.Direction;
+                const float2 virtual_mv = scene.compute_motion_vector(
+                    virtual_pos + chain.image.displacement(chain.sp.prev_pos - chain.sp.pos,
+                                                           chain.ray.Direction),
+                    virtual_pos, pixel, dim);
+                if (chain.sp.has_surface_material) {
+                    let chain_bsdf = chain.sp.surface_material.get_bsdf();
+                    const OrthonormalFrame chain_frame = chain.sp.shading_frame;
+                    const Albedo chain_albedo =
+                        chain_bsdf.get_albedo(chain_frame.to_local(-chain.ray.Direction));
+                    sample = make_sample(scene.camera, virtual_pos, chain_frame.get_normal(),
+                                         virtual_z, grad_z, delta_z, virtual_mv, hit);
+                    sample.albedo = chain_albedo.reflection;
+                    sample.diffuse_albedo = chain_albedo.diffuse;
+                    sample.specular_albedo = chain_albedo.specular;
+                    sample.roughness = sqrt(chain_bsdf.specular_alpha);
+                } else {
+                    sample = make_sample(scene.camera, virtual_pos, chain.sp.shading_normal,
+                                         virtual_z, grad_z, delta_z, virtual_mv, hit);
+                    sample.albedo = chain.sp.emission;
+                    sample.diffuse_albedo = float3(0.5f);
+                    sample.specular_albedo = float3(0.f);
+                    sample.roughness = 0.f;
+                }
+                sample.diffuse_albedo =
+                    chain.passed.diffuse + chain.carried * sample.diffuse_albedo;
+                sample.specular_albedo =
+                    chain.passed.specular + chain.carried * sample.specular_albedo;
+                sample.albedo = chain.passed.reflection + chain.carried * sample.albedo;
+                sample.roughness =
+                    lerp(sqrt(bsdf.specular_alpha), sample.roughness, yuv_luminance(chain.carried));
+                sample.specular_hit_distance = 0.f;
+            }
+        }
+        gbuffer.store(pixel, sample);
+        // the emission bypasses the renderer, so it carries the primary segment's attenuation
+        if (merian_gbuffer_write_emission)
+            emission[pixel] =
+                float4(mat_emission * scene.exterior_volume.transmittance(linear_z), 0);
+        return;
     }
 
     const ShadingPoint sp =

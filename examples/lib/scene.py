@@ -8,6 +8,8 @@ import numpy as np
 import merian
 import merian.graph as mg
 
+from .args import config_first
+
 EXAMPLES = Path(__file__).resolve().parents[1]
 
 ACCUMULATED = "accumulate.out"
@@ -46,7 +48,7 @@ def parse(
     Parses the options of a parser with a positional "scene" and of the scene's graph.
     Returns them and the composed config, None without a scene.
     """
-    argv = sys.argv[1:] if argv is None else argv
+    argv = config_first(sys.argv[1:] if argv is None else argv, parser)
     known, _ = mg.config.parse_known(parser, argv)
     if known.scene is None:
         parser.add_argument(
@@ -122,7 +124,8 @@ def render_ms(entries: list[merian.ProfilerReport.Entry]) -> float:
 
 
 def metrics(reference: np.ndarray, image: np.ndarray) -> dict[str, float]:
-    difference = np.nan_to_num(image - reference, nan=0.0, posinf=0.0, neginf=0.0)
+    difference = image - reference
+    difference = np.where(np.isfinite(difference), difference, np.inf)
     epsilon = max((0.05 * float(np.mean(reference))) ** 2, 1e-12)
     squared = difference * difference
     return {

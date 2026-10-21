@@ -7,12 +7,19 @@
 
 namespace merian {
 
+class NodeProcessInfo;
+
+struct GraphIterationInfo {
+    // before an iteration still of the previous one
+    const NodeProcessInfo& process_info;
+    uint64_t index_in_run;
+};
+
 // The first limit reached ends the run.
 struct GraphRunOptions {
     // nullopt: no iteration limit; else the nodes see the last one (is_last_iteration)
     std::optional<uint64_t> iterations = 1;
-    // Comma-separated "node type/identifier/event" patterns, empty parts match any. Ends the run
-    // after the iteration in which a matching event was sent.
+    // comma-separated "node type/identifier/event" patterns, empty parts match any
     std::string until_event{};
     std::optional<std::chrono::nanoseconds> duration{};
     // The graph time of every iteration of the run, over any time source, which continues from it

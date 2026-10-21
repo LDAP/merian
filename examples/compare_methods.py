@@ -97,7 +97,7 @@ def _signature(*parts) -> str:
 
 
 def _fit_slope(points):
-    pts = [(n, v) for n, v in points if n > 0 and v > 0]
+    pts = [(n, v) for n, v in points if n > 0 and 0 < v < float("inf")]
     if len(pts) < 3:
         return float("nan")
     xs, ys = np.log10(np.array(pts, dtype=np.float64)).T

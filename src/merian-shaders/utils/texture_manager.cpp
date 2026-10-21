@@ -16,8 +16,9 @@ TextureManager::TextureManager(const ShaderCompileContextHandle& compile_context
     : compile_context(compile_context), context(context), allocator(allocator) {
     textures.resize(initial_capacity);
     serials.resize(initial_capacity);
+    bound.resize(initial_capacity);
+    prev_bound.resize(initial_capacity);
 
-    // Build composition once — subsequent changes modify in-place.
     composition = SlangComposition::create();
     composition->add_module_from_path("merian-shaders/utils/texture-manager.slang");
     update_composition_constants();
@@ -32,34 +33,72 @@ SlangCompositionHandle TextureManager::query_device_support_composition() {
     composition->add_module_from_path("merian-shaders/utils/texture-manager.slang");
     composition->add_module_from_string(
         "texture_manager_constants",
-        "namespace merian { export static const int merian_texture_manager_texture_count = 1; }");
+        "namespace merian { export static const int merian_texture_manager_slot_count = 2; }");
     return composition;
 }
 
 void TextureManager::update_composition_constants() {
     composition->add_module_from_string("texture_manager_constants",
                                         fmt::format("namespace merian {{ export static const int "
-                                                    "merian_texture_manager_texture_count = {}; }}",
-                                                    static_cast<uint32_t>(textures.size())));
+                                                    "merian_texture_manager_slot_count = {}; }}",
+                                                    2 * static_cast<uint32_t>(textures.size())));
 }
 
 ShaderObjectHandle TextureManager::build_shader_object() const {
     SPDLOG_DEBUG("recreate shader object");
-    object_composition_version = composition->version();
     const ShaderObjectHandle object =
         layout_program->create_shader_object_for_type(context, "merian::TextureManager", allocator);
-
-    // declare eShaderReadOnlyOptimal up front: staged uploads are eUndefined until update()
-    const auto& dummy = allocator->get_dummy_texture();
-    auto cursor = object->get_cursor();
-    for (uint32_t i = 0; i < textures.size(); i++) {
-        cursor["textures"][i].write(textures[i] ? textures[i] : dummy,
-                                    vk::ImageLayout::eShaderReadOnlyOptimal);
+    const auto capacity = static_cast<uint32_t>(textures.size());
+    for (uint32_t id = 0; id < capacity; id++) {
+        write(object, id, bound[id]);
+        write(object, capacity + id, prev_bound[id]);
     }
     return object;
 }
 
+void TextureManager::write(const ShaderObjectHandle& object,
+                           const uint32_t slot,
+                           const TextureHandle& texture) const {
+    // staged uploads reach eShaderReadOnlyOptimal by the update that binds them
+    object->get_cursor()["textures"][slot].write(texture ? texture : allocator->get_dummy_texture(),
+                                                 vk::ImageLayout::eShaderReadOnlyOptimal);
+}
+
 void TextureManager::update(const CommandBufferHandle& cmd) {
+    upload(cmd);
+    const ShaderObjectHandle& object = shader_object.get();
+    const auto capacity = static_cast<uint32_t>(textures.size());
+
+    // 1. the previous frame's slots take what this frame's held
+    const auto retire = [&](const std::vector<TextureID>& changed_ids) {
+        for (const TextureID id : changed_ids) {
+            if (prev_bound[id] != bound[id]) {
+                // read by the frame in flight
+                if (prev_bound[id]) {
+                    cmd->keep_until_pool_reset(prev_bound[id]);
+                }
+                prev_bound[id] = bound[id];
+                write(object, capacity + id, prev_bound[id]);
+            }
+        }
+    };
+    retire(last_changed);
+    retire(changed);
+
+    // 2. this frame's slots
+    for (const TextureID id : changed) {
+        if (bound[id] != textures[id]) {
+            bound[id] = textures[id];
+            write(object, id, bound[id]);
+        }
+    }
+
+    std::swap(last_changed, changed);
+    changed.clear();
+    update_serial = last_serial;
+}
+
+void TextureManager::upload(const CommandBufferHandle& cmd) {
     if (pending_uploads.empty()) {
         return;
     }
@@ -82,7 +121,6 @@ void TextureManager::update(const CommandBufferHandle& cmd) {
     cmd_generate_mipmaps(cmd, mip_images);
 
     // 3. Transition every pending image to ShaderReadOnlyOptimal (batched).
-    // Descriptors were written upfront with this layout already.
     std::vector<vk::ImageMemoryBarrier2> to_shader_read;
     to_shader_read.reserve(pending_uploads.size());
     for (const auto& copy : pending_uploads) {
@@ -97,9 +135,15 @@ void TextureManager::resize(const uint32_t capacity) {
     if (capacity == textures.size()) {
         return;
     }
+    assert(capacity >= ids.size() && "resize below a texture in use");
 
+    const auto beyond = [&](const TextureID id) { return id >= capacity; };
+    std::erase_if(changed, beyond);
+    std::erase_if(last_changed, beyond);
     textures.resize(capacity);
     serials.resize(capacity);
+    bound.resize(capacity);
+    prev_bound.resize(capacity);
     update_composition_constants();
 }
 
@@ -111,7 +155,10 @@ TextureID TextureManager::allocate_id() {
     return id;
 }
 
-void TextureManager::renew_serial(const TextureID id) {
+void TextureManager::mark_changed(const TextureID id) {
+    if (serials[id] <= update_serial) {
+        changed.push_back(id);
+    }
     serials[id] = ++last_serial;
 }
 
@@ -125,12 +172,7 @@ void TextureManager::set_texture(const TextureID id, const TextureHandle& textur
     assert(id < textures.size());
     ids.acquire(id);
     textures[id] = texture;
-    renew_serial(id);
-    // poke the live slot only when current; otherwise the next reproject covers it
-    if (object_is_current()) {
-        shader_object.peek()->get_cursor()["textures"][id] =
-            texture ? texture : allocator->get_dummy_texture();
-    }
+    mark_changed(id);
 }
 
 TextureID TextureManager::add_texture_from_rgba8(const CommandBufferHandle& cmd,
@@ -187,18 +229,8 @@ void TextureManager::set_texture_from_rgba8(const TextureID id,
                                             const vk::Filter min_filter,
                                             const bool srgb,
                                             const bool generate_mipmaps) {
-    assert(id < textures.size());
-    const TextureHandle texture = stage_rgba8(data, width, height, address_mode, mag_filter,
-                                              min_filter, srgb, generate_mipmaps);
-    ids.acquire(id);
-    textures[id] = texture;
-    renew_serial(id);
-    // image reaches eShaderReadOnlyOptimal at the next update(); declare it now to write
-    // immediately
-    if (object_is_current()) {
-        shader_object.peek()->get_cursor()["textures"][id].write(
-            texture, vk::ImageLayout::eShaderReadOnlyOptimal);
-    }
+    set_texture(id, stage_rgba8(data, width, height, address_mode, mag_filter, min_filter, srgb,
+                                generate_mipmaps));
 }
 
 void TextureManager::remove_texture(const TextureID id) {
@@ -207,10 +239,7 @@ void TextureManager::remove_texture(const TextureID id) {
     assert(was_used && "Removing already-removed texture");
 
     textures[id].reset();
-    renew_serial(id);
-    if (object_is_current()) {
-        shader_object.peek()->get_cursor()["textures"][id] = allocator->get_dummy_texture();
-    }
+    mark_changed(id);
 }
 
 TextureHandle TextureManager::stage_rgba8(const uint32_t* data,

@@ -144,24 +144,29 @@ struct RestirSurface {
     bool valid;
 };
 
+// hit in this frame's ids
 RestirSurface restir_surface(const ParameterBlock<Scene> scene,
-                             const GBuffer gbuffer,
+                             const Hit hit,
                              const uint2 pixel,
-                             const uint2 dim,
-                             const bool prev_frame = false) {
+                             const uint2 dim) {
     RestirSurface s;
     s.wi = float3(0, 0, 1);
-    Hit hit = gbuffer.get_hit(pixel);
-    // the previous frame's gbuffer can reference despawned or resized geometry
-    s.valid = hit.is_valid() && (!prev_frame || scene.from_prev_frame(hit)) &&
-              scene.is_valid_geometry_id(hit.get_geometry_id()) &&
-              hit.primitive_id < scene.get_geometry_data(hit.get_geometry_id()).primitive_count;
+    s.valid = hit.is_valid() && scene.exists(hit, false);
     if (!s.valid)
         return s;
     const RayDesc ray = scene.generate_camera_ray(pixel, dim);
     s.sp = scene.get_shading_point(ray, hit);
     s.wi = -ray.Direction;
+    // fails for NaN triangles as well
+    s.valid = s.sp.area > 0.f;
     return s;
+}
+
+RestirSurface restir_surface(const ParameterBlock<Scene> scene,
+                             const GBuffer gbuffer,
+                             const uint2 pixel,
+                             const uint2 dim) {
+    return restir_surface(scene, gbuffer.get_hit(pixel), pixel, dim);
 }
 
 float restir_target_pdf(const RestirSample y,
@@ -223,9 +228,8 @@ bool restir_trace_visibility(const ParameterBlock<Scene> scene,
 bool restir_is_distant(const ParameterBlock<Scene> scene, const Hit hit) {
     if (!hit.is_valid())
         return true;
-    if (let gd = scene.get_geometry_data(hit))
-        return (gd.flags & GeometryDataFlags::UseEnvMap) != 0;
-    return false;
+    return (scene.get_geometry_data(hit.get_geometry_id()).flags & GeometryDataFlags::UseEnvMap) !=
+           0;
 }
 
 void restir_boiling_filter(inout RestirReservoir reservoir, const float strength) {

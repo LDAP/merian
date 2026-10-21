@@ -72,4 +72,5 @@ NB_MODULE(_graph, m) {
     python::bind_nodes(m);
     python::bind_window(m);
     python::bind_graph(m);
+    python::bind_scene(m);
 }

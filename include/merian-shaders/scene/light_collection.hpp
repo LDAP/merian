@@ -18,15 +18,14 @@
 #include <cmath>
 #include <limits>
 #include <numbers>
+#include <optional>
 #include <vector>
 
 namespace merian {
 
 class Properties;
 
-// The emissive triangles of a Scene and the cuts through them merian::NEE (nee.slang) draws from.
-// Records are rebuilt on the GPU every update from the scene's geometry and materials, so
-// animation, morphing and material edits need no bookkeeping.
+// The emissive triangles of a Scene and the light cuts NEE draws from.
 class LightCollection {
   public:
     struct EmissiveGeometry {
@@ -42,15 +41,15 @@ class LightCollection {
                     const ContextHandle& context,
                     const ResourceAllocatorHandle& allocator);
 
-    // Emissive geometries of the frame in GeometryID order; geometry_count sizes the lookup table.
-    void set_geometries(const std::vector<EmissiveGeometry>& geometries, uint32_t geometry_count);
+    // prev_remap maps the previous frame's GeometryIDs to this frame's, empty where kept
+    void set_geometries(const std::vector<EmissiveGeometry>& geometries,
+                        uint32_t geometry_count,
+                        const std::vector<GeometryRemap>& prev_remap);
 
-    // Allocates and uploads the tables; call before write_to so the cursor sees this frame's
-    // buffers.
+    // call before write_to
     void prepare(const CommandBufferHandle& cmd);
 
-    // Records the update passes. The scene object must already hold this frame's geometry,
-    // transforms and materials and must not be written afterwards (it is bound here).
+    // Records the update passes and binds the scene object, which must not be written afterwards.
     void update_constants(const SlangCompositionHandle& scene_composition);
 
     void update(const CommandBufferHandle& cmd,
@@ -58,10 +57,13 @@ class LightCollection {
                 const ShaderObjectHandle& scene_object,
                 const ShaderObjectAllocatorHandle& obj_allocator);
 
-    // Binds the buffers to a merian::NEE cursor.
     void write_to(ShaderCursor cursor) const;
 
-    void clear_learned_state();
+    // looked up by this frame's GeometryIDs; this frame's densities where unknown
+    void write_prev_to(ShaderCursor cursor) const;
+
+    // Forgets what the cuts learned and the previous frame.
+    void start_run();
 
     void properties(Properties& props);
 
@@ -77,12 +79,14 @@ class LightCollection {
         return enabled;
     }
 
+    bool densities_vary() const {
+        return enabled && triangle_count > 0 && (feedback || uses_grid());
+    }
+
     void set_enabled(const bool value) {
         enabled = value;
     }
 
-    // The importance map is a function of the environment alone, so a static one is built once
-    // and kept until it changes.
     void set_env_state(const uint64_t version, const bool is_static) {
         if (version != env_version || !is_static) {
             env_importance_built = false;
@@ -90,7 +94,6 @@ class LightCollection {
         env_version = version;
     }
 
-    // Whether the scene's environment map emits; false routes all samples to the triangles.
     void set_env_emissive(const bool value) {
         env_emissive = value;
     }
@@ -100,12 +103,47 @@ class LightCollection {
         camera_position = position;
     }
 
-    // Whether UseEnvMap geometry exists (rays to the environment must not stop at it).
+    // UseEnvMap geometry exists
     void set_has_sky_portals(const bool value) {
         has_sky_portals = value;
     }
 
   private:
+    struct Binding {
+        BufferHandle triangles;
+        BufferHandle regions;
+        BufferHandle geometries;
+        BufferHandle geometry_offsets;
+        uint32_t triangle_count = 0;
+        uint32_t geometry_count = 0;
+        uint32_t geometry_offset_count = 0;
+        BufferHandle cdf;
+        BufferHandle guide;
+        BufferHandle order;
+        BufferHandle rank;
+        uint32_t env_texels = 0;
+        BufferHandle starts;
+        BufferHandle cascades;
+        BufferHandle index;
+        BufferHandle blocks;
+        bool in_use = false;
+        float jitter = 0.f;
+        float even_share = 0.f;
+        BufferHandle contribution;
+        BufferHandle estimate;
+        BufferHandle slot_bounds;
+        BufferHandle probability;
+        BufferHandle feedback;
+        uint32_t light_count = 0;
+        bool has_sky_portals = false;
+        uint32_t debug_view = 0;
+        BufferHandle env_cdf;
+        uint32_t env_size = 0;
+    };
+
+    void prepare_buffers(const CommandBufferHandle& cmd);
+    Binding make_binding() const;
+    static void write(ShaderCursor cursor, const Binding& binding);
     void ensure_pipelines(const SlangCompositionHandle& scene_composition);
     uint32_t env_importance_size() const {
         return 1u << static_cast<uint32_t>(env_importance_log2);
@@ -114,7 +152,7 @@ class LightCollection {
         return source == LightSource::LightSourceGrid;
     }
     bool lists_env() const {
-        return triangle_count > 0 && env_emissive && env_cdf_buffer;
+        return triangle_count > 0 && env_emissive && env_cdf_buffer[env_cdf_slot];
     }
     // threads per block of the scans; matches CDF_GROUP_SIZE
     static constexpr uint32_t CDF_GROUP_SIZE = 1024;
@@ -166,7 +204,7 @@ class LightCollection {
                        vk::DeviceSize size,
                        const std::string& name,
                        const CommandBufferHandle& cmd);
-    static void retire_buffer(BufferHandle& buffer, const CommandBufferHandle& cmd);
+    static void retire(BufferHandle& buffer, const CommandBufferHandle& cmd);
 
     ShaderCompileContextHandle compile_context;
     ContextHandle context;
@@ -184,6 +222,7 @@ class LightCollection {
     float grid_coverage = 1.f;
     float grid_jitter = 1.f;
     bool debug_jitter = true;
+    bool feedback = true;
     int32_t debug_view = LightDebugView::LightDebugDrawOutcome;
     bool constants_dirty = true;
     float grid_even_share = 0.3f;
@@ -206,11 +245,19 @@ class LightCollection {
 
     std::vector<LightGeometry> light_geometries;
     std::vector<uint32_t> geometry_light_offsets;
+    // per GeometryID of this frame the previous frame's first triangle
+    std::vector<uint32_t> prev_light_offsets;
+    bool prev_offsets_dirty = false;
     uint32_t triangle_count = 0;
     bool tables_dirty = false;
 
-    BufferHandle env_importance_built_buffer;
-    BufferHandle env_cdf_buffer;
+    // each buffer written only in its own frame
+    std::optional<Binding> binding;
+    std::optional<Binding> prev_binding;
+    BufferHandle prev_offsets_buffer;
+
+    BufferHandle env_cdf_buffer[2];
+    uint32_t env_cdf_slot = 0;
     BufferHandle env_cdf_state_buffer;
     BufferHandle env_cones_buffer;
     // side length of the environment the cones were computed for
@@ -218,10 +265,11 @@ class LightCollection {
     // sorted into slot 0
     BufferHandle tree_keys_buffer[2];
     BufferHandle tree_values_buffer[2];
-    BufferHandle tree_rank_buffer;
-    BufferHandle tree_cdf_buffer;
+    BufferHandle tree_order_buffer[2];
+    BufferHandle tree_rank_buffer[2];
+    BufferHandle tree_cdf_buffer[2];
     BufferHandle tree_cdf_state_buffer;
-    BufferHandle tree_guide_buffer;
+    BufferHandle tree_guide_buffer[2];
     BufferHandle tree_info_buffer[2];
     // zeroed in the next update
     bool tree_info_fresh = false;
@@ -232,19 +280,19 @@ class LightCollection {
     BufferHandle grid_feedback_buffer[2];
     // zeroed in the next update
     bool grid_feedback_fresh = false;
-    BufferHandle grid_starts_buffer;
-    BufferHandle grid_estimate_buffer;
-    BufferHandle grid_slot_bounds_buffer;
-    BufferHandle grid_probability_buffer;
+    BufferHandle grid_starts_buffer[2];
+    BufferHandle grid_estimate_buffer[2];
+    BufferHandle grid_slot_bounds_buffer[2];
+    BufferHandle grid_probability_buffer[2];
     BufferHandle grid_info_buffer[2];
     BufferHandle grid_index_buffer[2];
     BufferHandle grid_blocks_buffer;
     BufferHandle grid_free_buffer;
     BufferHandle grid_offsets_buffer;
     uint32_t grid_slot = 0;
-    BufferHandle triangles_buffer;
+    BufferHandle triangles_buffer[2];
     BufferHandle proxies_buffer;
-    BufferHandle regions_buffer;
+    BufferHandle regions_buffer[2];
     BufferHandle light_geometries_buffer;
     BufferHandle geometry_light_offsets_buffer;
 

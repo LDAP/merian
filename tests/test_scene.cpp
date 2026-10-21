@@ -25,18 +25,9 @@ using NodeID = Scene::NodeID;
 #define TEST_SHADER_DIR "."
 #endif
 
-// Concrete Scene subclass that exposes the protected add_* methods for testing.
 class TestScene : public Scene {
   public:
     using Scene::Scene;
-
-    using Scene::add_camera;
-    using Scene::add_mesh;
-    using Scene::add_mesh_instance;
-    using Scene::add_node;
-    using Scene::remove_mesh;
-    using Scene::remove_mesh_instance;
-    using Scene::remove_node;
 };
 
 class SceneTest : public ::testing::Test {
@@ -52,6 +43,7 @@ class SceneTest : public ::testing::Test {
     static void SetUpTestSuite() {
         spdlog::set_level(spdlog::level::debug);
         ContextCreateInfo info{
+            .features = VulkanFeatures({"timelineSemaphore"}),
             .context_extensions = {ExtensionVkValidationLayers::name, ExtensionResources::name},
             .application_name = "test-scene",
         };
@@ -90,9 +82,6 @@ class SceneTest : public ::testing::Test {
         v2.position = float3(0, 1, 0);
         m->vertices = {v0, v1, v2};
         m->indices = {uint3(0, 1, 2)};
-        if (flags & MeshFlags::IsMorphed) {
-            m->prev_vertices = {{v0.position}, {v1.position}, {v2.position}};
-        }
         return m;
     }
 };

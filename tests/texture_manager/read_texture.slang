@@ -9,11 +9,14 @@ struct Params {
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void main(ParameterBlock<Params> params) {
-    Sampler2D<float4> tex = params.tm.textures[params.texture_id];
     // Sample at center (0.5, 0.5) — for a 1x1 texture this gives the exact texel
-    float4 color = tex.SampleLevel(float2(0.5, 0.5), 0);
-    params.output[0] = asuint(color.r);
-    params.output[1] = asuint(color.g);
-    params.output[2] = asuint(color.b);
-    params.output[3] = asuint(color.a);
+    const float4 color =
+        params.tm.get_textures().get_sampler2D(params.texture_id).SampleLevel(float2(0.5, 0.5), 0);
+    const float4 prev_color = params.tm.get_textures(true)
+                                  .get_sampler2D(params.texture_id)
+                                  .SampleLevel(float2(0.5, 0.5), 0);
+    for (uint i = 0; i < 4; i++) {
+        params.output[i] = asuint(color[i]);
+        params.output[4 + i] = asuint(prev_color[i]);
+    }
 }

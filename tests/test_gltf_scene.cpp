@@ -36,10 +36,10 @@ class GLTFSceneTest : public ::testing::Test {
     static void SetUpTestSuite() {
         spdlog::set_level(spdlog::level::debug);
         ContextCreateInfo info{
-            .features =
-                VulkanFeatures({"scalarBlockLayout", "shaderInt64", "shaderFloat16",
-                                "accelerationStructure", "storageBuffer16BitAccess",
-                                "storageBuffer8BitAccess", "uniformAndStorageBuffer8BitAccess"}),
+            .features = VulkanFeatures({"scalarBlockLayout", "shaderInt64", "shaderFloat16",
+                                        "accelerationStructure", "storageBuffer16BitAccess",
+                                        "storageBuffer8BitAccess",
+                                        "uniformAndStorageBuffer8BitAccess", "timelineSemaphore"}),
             .context_extensions = {ExtensionVkValidationLayers::name, ExtensionResources::name},
             .application_name = "test-gltf-scene",
         };

@@ -2,6 +2,7 @@ import merian_shaders.scene.camera;
 import merian_shaders.debug.path_record;
 import merian_shaders.utils.hash;
 import merian_shaders.colors.colormaps;
+import merian_shaders.colors.colorspaces;
 import merian_shaders.colors.debug;
 import merian_shaders.gbuffer;
 
@@ -70,7 +71,7 @@ float3 method_color(const uint meta) {
     const uint method = min((meta >> PATH_RECORD_METHOD_SHIFT) & PATH_RECORD_METHOD_MASK,
                             PATH_RECORD_METHOD_COUNT - 1);
     const uint rgb = PATH_DEBUG_METHOD_COLORS[method];
-    return float3((rgb >> 16) & 0xFFu, (rgb >> 8) & 0xFFu, rgb & 0xFFu) / 255.f;
+    return srgb_to_rgb(float3((rgb >> 16) & 0xFFu, (rgb >> 8) & 0xFFu, rgb & 0xFFu) / 255.f);
 }
 
 Varyings segment(PathRecordStream records,

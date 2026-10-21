@@ -9,8 +9,8 @@ Besides the graph, a config may declare:
   repeatable.
 - "cli": {"spp": {"pointer": "/nodes/render/properties/samples per pixel"}} names a JSON
   pointer that --spp sets; "set" assigns further pointers then, "required" demands a
-  value and "help" describes it. "--" takes the positional arguments; null removes an
-  entry.
+  value, "type": "string" keeps it from being read as JSON and "help" describes it. "--"
+  takes the positional arguments; null removes an entry.
 
 Presets apply by their order, the choices of one in command-line order, then --merge
 configs, aliases and --set assignments.
@@ -254,6 +254,11 @@ def apply_args(
         value = getattr(namespace, f"cli {name}")
         if value is not None:
             _apply_alias(config, spec, value)
+    for assignment in namespace.set:
+        pointer, separator, value = assignment.partition("=")
+        if not separator:
+            raise _graph.ConfigError(f"--set expects POINTER=VALUE, got '{assignment}'")
+        config.set_text(pointer, value)
     for name, spec in aliases.items():
         if spec.get("required") and config.get(spec["pointer"]) in (None, ""):
             raise _graph.ConfigError(
@@ -261,11 +266,6 @@ def apply_args(
                 if name == POSITIONAL
                 else f"--{name} is required"
             )
-    for assignment in namespace.set:
-        pointer, separator, value = assignment.partition("=")
-        if not separator:
-            raise _graph.ConfigError(f"--set expects POINTER=VALUE, got '{assignment}'")
-        config.set_text(pointer, value)
     return namespace
 
 
@@ -335,7 +335,10 @@ def _add_fragment_arguments(
 
 
 def _apply_alias(config: Config, spec: dict, text: str) -> None:
-    config.set_text(spec["pointer"], text)
+    if spec.get("type") == "string":
+        config.set(spec["pointer"], text)
+    else:
+        config.set_text(spec["pointer"], text)
     for pointer, value in spec.get("set", {}).items():
         config.set(pointer, value)
 

@@ -164,7 +164,8 @@ static const float3 CAST_FAIL = float3(1, 1, 0);
             const MaterialModel m = scene.material_system.get_material(gd.material_id);
             if (let g = m as GltfMaterial) {
                 color = float4(
-                    float3(g.get_metallic(scene.material_system.texture_manager, tri.get_uv(hit))),
+                    float3(g.get_metallic(scene.material_system.texture_manager.get_textures(),
+                                          tri.get_uv(hit))),
                     1);
             } else {
                 color = float4(CAST_FAIL, 1);
@@ -182,7 +183,8 @@ static const float3 CAST_FAIL = float3(1, 1, 0);
             const MaterialModel m = scene.material_system.get_material(gd.material_id);
             if (let g = m as GltfMaterial) {
                 color = float4(
-                    float3(g.get_roughness(scene.material_system.texture_manager, tri.get_uv(hit))),
+                    float3(g.get_roughness(scene.material_system.texture_manager.get_textures(),
+                                           tri.get_uv(hit))),
                     1);
             } else {
                 color = float4(CAST_FAIL, 1);

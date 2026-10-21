@@ -3,6 +3,7 @@
 #include "merian/utils/string.hpp"
 #include "merian/vk/context.hpp"
 #include "merian/vk/memory/resource_allocations.hpp"
+#include "merian/vk/object.hpp"
 
 #include <memory>
 #include <vulkan/vulkan.hpp>
@@ -175,21 +176,13 @@ inline std::string format_as(const MemoryAllocationInfo& alloc_info) {
                        (alloc_info.name != nullptr) ? alloc_info.name : "<unknown>");
 }
 
-/* MemoryAllocation represents a memory allocation or sub-allocation from the
- * generic merian::MemoryAllocator interface. Ideally use `merian::NullMememoryAllocationHandle` for
- * setting to 'NULL'.
- *
- * Base class for memory handles, individual allocators will derive from it and fill the handles
- * with their own data.
- */
-class MemoryAllocation : public std::enable_shared_from_this<MemoryAllocation> {
+// Base class for the handles of allocations and sub-allocations of a MemoryAllocator.
+class MemoryAllocation : public std::enable_shared_from_this<MemoryAllocation>, public Object {
   public:
     MemoryAllocation(const ContextHandle& context);
 
     // unmaps and frees the memory when called
     virtual ~MemoryAllocation();
-
-    // ------------------------------------------------------------------------------------
 
     // Convenience function to allow mapping straight to a typed pointer.
     template <class T> T* map_as() {

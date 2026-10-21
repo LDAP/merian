@@ -52,23 +52,6 @@ std::optional<float3> param_rgb(const ParsedParameter& param, const std::filesys
     return pbrt::spectrum_param_rgb(param, base);
 }
 
-std::vector<float3> compute_vertex_normals(const std::vector<float3>& positions,
-                                           const std::vector<uint3>& triangles) {
-    std::vector<float3> normals(positions.size(), float3(0));
-    for (const uint3& tri : triangles) {
-        // unnormalized cross = area weighting
-        const float3 face =
-            cross(positions[tri.y] - positions[tri.x], positions[tri.z] - positions[tri.x]);
-        normals[tri.x] += face;
-        normals[tri.y] += face;
-        normals[tri.z] += face;
-    }
-    for (float3& n : normals) {
-        n = length(n) > 1e-20f ? normalize(n) : float3(0, 1, 0);
-    }
-    return normals;
-}
-
 void pack_vertices(Scene::SimpleMesh& sm,
                    const std::vector<float3>& positions,
                    const std::vector<float3>& normals,
@@ -1017,15 +1000,9 @@ void PBRTScene::load_camera() {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Load
-// ---------------------------------------------------------------------------
-
-void PBRTScene::release_textures(const CommandBufferHandle& cmd) {
-    // Defer texture destruction to pool reset so any in-flight frame keeps its bindings valid.
+void PBRTScene::release_textures() {
     const auto release = [&](const TextureID id) {
         if (id != TextureID(-1)) {
-            cmd->keep_until_pool_reset(get_texture_manager()->get_texture(id));
             get_texture_manager()->remove_texture(id);
         }
     };
@@ -1054,7 +1031,7 @@ void PBRTScene::release_textures(const CommandBufferHandle& cmd) {
 }
 
 void PBRTScene::load(const CommandBufferHandle& cmd, const std::filesystem::path& path) {
-    release_textures(cmd);
+    release_textures();
     material_cache.clear();
     shape_meshes.clear();
     shape_aabbs.clear();

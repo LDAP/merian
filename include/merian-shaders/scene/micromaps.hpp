@@ -33,6 +33,7 @@ class Micromaps {
         uint32_t mesh_id;
         uint32_t mesh_serial;
         GeometryData geometry;
+        uint32_t primitive_count;
         uint32_t uv_version;
         bool alpha_tested;
         bool opacity;
@@ -107,8 +108,6 @@ class Micromaps {
 
     struct Entry {
         uint32_t mesh_serial;
-        vk::DeviceAddress vertices;
-        vk::DeviceAddress indices;
         uint32_t primitive_count;
         uint32_t uv_version;
         bool alpha_tested;

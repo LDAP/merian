@@ -19,6 +19,7 @@ extern static const bool merian_scene_has_env_light = false;
 extern static const int merian_nee_draws = 1;
 extern static const int merian_nee_source = 0;
 extern static const int merian_nee_slot_weighing = 0;
+extern static const bool merian_nee_feedback = true;
 
 struct LightSample {
     float3 wo;  // from the receiver towards the light
@@ -57,9 +58,15 @@ struct DirectLightVertex {
     uint cell;
     float3 pos;
     float3 normal;
+    float3 face_normal;
+    float spawn_offset;
 
     bool has_cell() {
         return cell != LIGHT_INVALID_INDEX;
+    }
+
+    float3 origin(const float3 to) {
+        return offset_ray_origin(pos, face_normal, spawn_offset, to - pos);
     }
 }
 
@@ -111,15 +118,18 @@ struct LightGrid {
         return int3(floor((pos - info.origin) * info.inv_cell_size + offset));
     }
 
-    uint lookup(const float3 pos, const float3 face_normal, inout RandomGenerator rng) {
+    // record: the cell counts as visited, so it keeps a cut of its own
+    uint lookup(const float3 pos,
+                const float3 face_normal,
+                inout RandomGenerator rng,
+                const bool record = true) {
         if (!in_use)
             return LIGHT_INVALID_INDEX;
         if (merian_nee_source == int(LightSource::LightSourceScene))
             return LIGHT_GRID_FALLBACK_BLOCK;
         const LightGridInfo base = cascades[0];
 
-        // the cascade is picked from the unjittered position, so the jitter cannot walk the
-        // lookup across cascades and change the cell size under it
+        // the cascade comes from the unjittered position, so the jitter cannot change the cell size
         const float cell_size = 1.f / base.inv_cell_size;
         const float3 to_center =
             abs(pos - (base.origin + 0.5f * float(base.dimension) * cell_size));
@@ -130,15 +140,14 @@ struct LightGrid {
         uint cascade = min(uint(max(ceil(log2(max(distance / reach, 1e-6f))), 0.f)), outermost);
         const float3 offset = jitter * (rng.next_float3() - 0.5f);
 
-        // the cascade the distance implies always contains pos unless the snapping pushed it out,
-        // which the next one up covers
+        // snapping can push pos out of its cascade; the next one up covers it
         int3 coord = cell_coord(cascade, pos, offset);
         if ((any(coord < 0) || any(coord >= int(base.dimension))) && cascade < outermost)
             coord = cell_coord(++cascade, pos, offset);
         const uint cell = light_cell_index(cascade, uint3(clamp(coord, 0, int(base.dimension) - 1)),
                                            light_orientation(face_normal), base.dimension);
         const uint entry = index[cell];
-        if ((entry & LIGHT_GRID_VISITED) == 0)
+        if (record && (entry & LIGHT_GRID_VISITED) == 0)
             index[cell] = entry | LIGHT_GRID_VISITED;
         return light_cell_block(entry);
     }
@@ -344,22 +353,23 @@ struct NEE {
         return has_cuts() ? has_emissive_triangles() || lists_env() : has_env();
     }
 
-    // Deterministic per point, face normal and random numbers, so a vertex begun again finds the
-    // same densities.
-    // normal faces the receiving side; either is 0 where unknown
+    // deterministic per point, face normal and random numbers; normal faces the receiver
     DirectLightVertex begin_vertex(const float3 pos,
                                    const float3 face_normal,
+                                   const float spawn_offset,
                                    const float3 normal,
-                                   inout RandomGenerator rng) {
+                                   inout RandomGenerator rng,
+                                   const bool record = true) {
         DirectLightVertex vertex;
         vertex.pos = pos;
         vertex.normal = normal;
-        vertex.cell = grid.lookup(pos, face_normal, rng);
+        vertex.face_normal = face_normal;
+        vertex.spawn_offset = spawn_offset;
+        vertex.cell = grid.lookup(pos, face_normal, rng, record);
         return vertex;
     }
 
-    // Of the light `index` where the ray from origin along dir meets it, summed over every
-    // candidate drawn at the vertex.
+    // density of light `index` where the ray meets it, summed over every candidate
     float pdf(const DirectLightVertex vertex,
               const uint index,
               const float3 origin,
@@ -393,17 +403,19 @@ struct NEE {
         return point_pdf > 0.f ? pdf_lights(vertex, index, dir, point_pdf, none, entry) : 0.f;
     }
 
-    // The same for a known point on the light, which need not be where the light is now.
-    float pdf(const DirectLightVertex vertex,
-              const uint index,
-              const float3 dir,
-              const float dist2,
-              const float3 light_normal) {
+    // for a known point on the light; for the environment light_normal faces the receiver
+    float pdf_point(const DirectLightVertex vertex,
+                    const uint index,
+                    const float3 light_pos,
+                    const float3 light_normal) {
         if (index == LIGHT_INVALID_INDEX)
             return 0.f;
         if (index == LIGHT_ENV_INDEX)
-            return pdf_env(vertex, dir);
-        const float point_pdf = pdf_triangle(index, vertex.pos, dir, dist2, light_normal);
+            return pdf_env(vertex, -light_normal);
+        const float3 to_light = light_pos - vertex.origin(light_pos);
+        const float dist2 = dot(to_light, to_light);
+        const float3 dir = to_light * rsqrt(dist2);
+        const float point_pdf = pdf_triangle(index, light_pos, dir, dist2, light_normal);
         return point_pdf > 0.f ? pdf_lights(vertex, index, dir, point_pdf) : 0.f;
     }
 
@@ -414,6 +426,10 @@ struct NEE {
 
     float3 get_normal(const uint index) {
         return normalize(table.triangles[index].get_scaled_normal());
+    }
+
+    float get_area(const uint index) {
+        return 0.5f * length(table.triangles[index].get_scaled_normal());
     }
 
     // A single draw without radiance; its density is mixture_pdf.
@@ -453,7 +469,7 @@ struct NEE {
             return none;
         const EmissiveTriangle tri = table.triangles[index];
         const float3 scaled_n = tri.get_scaled_normal();
-        if (length(scaled_n) <= 0.f)
+        if (!(length(scaled_n) > 0.f))
             return none;
         const float3 bary = merian::sample_triangle(rng);
         const float3 light_pos =
@@ -500,7 +516,7 @@ struct NEE {
         if (geometry_id >= table.geometry_offset_count)
             return none;
         const uint offset = table.geometry_offsets[geometry_id];
-        if (offset == LIGHT_INVALID_INDEX)
+        if (offset == LIGHT_INVALID_INDEX || offset + primitive_id >= table.triangle_count)
             return none;
         return offset + primitive_id;
     }
@@ -544,7 +560,7 @@ struct NEE {
     }
 
     void record_failed_draw(const uint entry) {
-        if (entry != LIGHT_INVALID_INDEX)
+        if (merian_nee_feedback && entry != LIGHT_INVALID_INDEX)
             grid.count_sample(entry, 0.f, float2(0));
     }
 
@@ -555,7 +571,7 @@ struct NEE {
                              const float dist,
                              inout RandomGenerator rng,
                              uint entry = LIGHT_INVALID_INDEX) {
-        if (!vertex.has_cell() || index == LIGHT_INVALID_INDEX)
+        if (!merian_nee_feedback || !vertex.has_cell() || index == LIGHT_INVALID_INDEX)
             return;
         if (entry == LIGHT_INVALID_INDEX) {
             const uint position = tree_position(index, dir);
@@ -637,25 +653,25 @@ struct NEE {
     }
 
     Optional<LightCandidate> draw_triangle(const uint index,
-                                           const float3 pos,
+                                           const DirectLightVertex vertex,
                                            const float cut_pdf,
                                            inout RandomGenerator rng) {
         const EmissiveTriangle tri = table.triangles[index];
         const float3 uniform = merian::sample_triangle(rng);
         const float u_region = rng.next_float();
         const float3 scaled_n = tri.get_scaled_normal();
-        if (!tri.is_two_sided() && dot(scaled_n, pos - tri.p0) <= 0.f)
+        if (!tri.is_two_sided() && dot(scaled_n, vertex.pos - tri.p0) <= 0.f)
             return none;
         const EmissiveRegion region = table.regions[index];
         const float3 bary = region.to_triangle(uniform, u_region);
 
         const float area2 = length(scaled_n);
-        if (area2 <= 0.f)
+        if (!(area2 > 0.f))
             return none;
         float3 n = scaled_n / area2;
 
         const float3 light_pos = tri.get_position(bary);
-        const float3 to_light = light_pos - pos;
+        const float3 to_light = light_pos - vertex.origin(light_pos);
         const float dist2 = dot(to_light, to_light);
         if (dist2 <= 0.f)
             return none;
@@ -716,8 +732,8 @@ struct NEE {
         }
         if (index == LIGHT_INVALID_INDEX)
             return none;
-        return draw_triangle(index, vertex.pos,
-                             grid.slot_share(vertex, entry, weights) * share_in_slot, rng);
+        return draw_triangle(index, vertex, grid.slot_share(vertex, entry, weights) * share_in_slot,
+                             rng);
     }
 
     Optional<LightSample> light_sample<Env : IEnvMap>(const DirectLightVertex vertex,
@@ -731,8 +747,9 @@ struct NEE {
         ls.pdf = c.pdf;
         ls.index = c.index;
         if (c.index == LIGHT_ENV_INDEX) {
-            ls.Li = env_map.eval(make_env_shading_data(c.wo, vertex.pos, time),
-                                 material_system.texture_manager, DefaultLODSampler());
+            ls.Li =
+                env_map.eval(make_env_shading_data(c.wo, vertex.pos, time),
+                             material_system.texture_manager.get_textures(), DefaultLODSampler());
             ls.pos = c.pos;
             return ls;
         }
@@ -764,7 +781,7 @@ struct NEE {
         const float area2 = length(scaled_n);
         dist = 0.f;
         cos_l = 0.f;
-        if (area2 <= 0.f)
+        if (!(area2 > 0.f))
             return false;
         const float3 n = scaled_n / area2;
         const float ndotd = dot(n, dir);
@@ -787,14 +804,14 @@ struct NEE {
     }
 
     float pdf_triangle(const uint index,
-                       const float3 origin,
+                       const float3 light_pos,
                        const float3 dir,
                        const float dist2,
                        const float3 n) {
         const EmissiveTriangle tri = table.triangles[index];
         const float ndotd = dot(n, dir);
         const float cos_l = tri.is_two_sided() ? abs(ndotd) : -ndotd;
-        if (!(cos_l > 0.f) || !region_contains_point(index, origin + sqrt(dist2) * dir))
+        if (!(cos_l > 0.f) || !region_contains_point(index, light_pos))
             return 0.f;
         return pdf_triangle_area(index, dist2, cos_l);
     }
@@ -843,59 +860,62 @@ struct NEE {
     }
 }
 
-// Resampling weight p_hat / (M p_light + p_scatter), p_hat the luminance of the unshadowed
-// contribution (Bitterli et al. 2020).
+// weight p_hat / (M p_light + p_scatter), p_hat the unshadowed luminance (Bitterli et al. 2020)
 struct DirectLightReservoir {
     float weight_sum;
     float3 value;
-    // the winner's p_light / (p_light + p_scatter)
-    float light_share;
-    float3 light_pos;
-    uint light_index;
+    LightSample light;
+    // not offset
+    float3 light_point;
     uint light_entry;
-    float light_radiance;
+    float light_pdf;
+    float scatter_pdf;
 
     __init() {
         weight_sum = 0.f;
         value = float3(0);
-        light_share = 0.f;
-        light_index = LIGHT_INVALID_INDEX;
+        light.index = LIGHT_INVALID_INDEX;
         light_entry = LIGHT_INVALID_INDEX;
-        light_radiance = 0.f;
+        light_pdf = 0.f;
+        scatter_pdf = 0.f;
     }
 
     [mutating] void add_light(const LightSample ls,
+                              const float3 point,
                               const float3 candidate_value,
-                              const float light_pdf,
-                              const float scatter_pdf,
+                              const float candidate_light_pdf,
+                              const float candidate_scatter_pdf,
                               const uint entry,
                               inout RandomGenerator rng) {
-        const float weight = yuv_luminance(candidate_value) / (light_pdf + scatter_pdf);
-        if (!(weight > 0.f))
+        const float weight =
+            yuv_luminance(candidate_value) / (candidate_light_pdf + candidate_scatter_pdf);
+        if (!(weight > 0.f) || !isfinite(weight))
             return;
         weight_sum += weight;
         if (rng.next_float() * weight_sum < weight) {
             value = candidate_value;
-            light_share = light_pdf / (light_pdf + scatter_pdf);
-            light_pos = ls.pos;
-            light_index = ls.index;
+            light = ls;
+            light_point = point;
             light_entry = entry;
-            light_radiance = yuv_luminance(ls.Li);
+            light_pdf = candidate_light_pdf;
+            scatter_pdf = candidate_scatter_pdf;
         }
     }
 
     bool needs_shadow_ray() {
-        return light_index != LIGHT_INVALID_INDEX;
+        return light.index != LIGHT_INVALID_INDEX;
     }
 
-    float3 resolve() {
+    float weight() {
         const float target = yuv_luminance(value);
-        return target > 0.f ? value * (weight_sum / target) : float3(0);
+        return target > 0.f ? weight_sum / target : 0.f;
     }
 
-    // 1/W for the target value * light_share (Lin et al. 2022)
+    // 1/W for the target value * p_light / (p_light + p_scatter) (Lin et al. 2022)
     float realized_pdf() {
-        return weight_sum > 0.f ? yuv_luminance(value) * light_share / weight_sum : 0.f;
+        return weight_sum > 0.f
+                   ? yuv_luminance(value) * (light_pdf / (light_pdf + scatter_pdf)) / weight_sum
+                   : 0.f;
     }
 }
 
@@ -909,11 +929,14 @@ interface IDirectLightTarget {
 struct DirectLightSample {
     // unshadowed, already divided by the resampling density
     float3 value;
-    float3 light_pos;
-    uint light_index;
+    LightSample light;
+    // the point itself; for the environment at ENV_MAP_DISTANCE along wo
+    float3 light_point;
     uint light_entry;
+    // summed over the draws
+    float light_pdf;
+    float scatter_pdf;
     float realized_pdf;
-    float radiance;
 }
 
 } // namespace merian

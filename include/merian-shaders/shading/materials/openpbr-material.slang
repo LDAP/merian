@@ -88,40 +88,39 @@ struct OpenPBRMaterial<let TRANSMISSION : bool = false,
         get { return volume; }
     }
 
-    // The EDF emits into the hemisphere around the normal, so back faces are dark. Two-sided
-    // emission would require thin-walled mode, which is not modelled.
+    // the EDF emits into the hemisphere around the normal, so back faces are dark
     override float3 get_emission(const ShadingData sd,
-                                 const TextureManager tm,
+                                 const Textures textures,
                                  const LODSampler2D lod) {
         if (!sd.front_facing) {
             return float3(0);
         }
         float3 emission_out = emission;
         if (emission_texture != TextureID(-1)) {
-            emission_out *= lod.sample(tm.get_sampler2D(emission_texture), sd.uv).rgb;
+            emission_out *= textures.sample(lod, emission_texture, sd.uv).rgb;
         }
         return emission_out;
     }
 
     OpenPBRMaterialSample get_sample(const ShadingData sd,
-                                    const TextureManager tm,
-                                    const LODSampler2D lod,
-                                    out float3 out_emission,
-                                    out OrthonormalFrame out_shading_frame) {
+                                     const Textures textures,
+                                     const LODSampler2D lod,
+                                     out float3 out_emission,
+                                     out OrthonormalFrame out_shading_frame) {
         const LOD0Sampler lod0;
 
         float3 base = base_color;
         if (let tex = header.get_alpha_texture_id()) {
-            base *= lod.sample(tm.get_sampler2D(tex), sd.uv).rgb;
+            base *= textures.sample(lod, tex, sd.uv).rgb;
         }
 
         float metal = metalness;
         if (metalness_texture != TextureID(-1)) {
-            metal *= lod0.sample(tm.get_sampler2D(metalness_texture), sd.uv).r;
+            metal *= textures.sample(lod0, metalness_texture, sd.uv).r;
         }
         float2 alpha = specular_alpha;
         if (roughness_texture != TextureID(-1)) {
-            const float texel = lod0.sample(tm.get_sampler2D(roughness_texture), sd.uv).r;
+            const float texel = textures.sample(lod0, roughness_texture, sd.uv).r;
             // The texel scales the lobe width, so it enters in alpha space.
             if (ROUGHNESS_ENCODING == RoughnessEncoding::AlphaSquared) {
                 alpha *= sqrt(texel);
@@ -134,7 +133,7 @@ struct OpenPBRMaterial<let TRANSMISSION : bool = false,
 
         OrthonormalFrame shading_frame = sd.frame;
         if (normal_texture != TextureID(-1)) {
-            const float3 raw = lod0.sample(tm.get_sampler2D(normal_texture), sd.uv).rgb;
+            const float3 raw = textures.sample(lod0, normal_texture, sd.uv).rgb;
             const float2 nxy = (raw.xy * 2.0f - 1.0f) * normal_scale;
             const float nz = sqrt(max(0.0f, 1.0f - dot(nxy, nxy)));
             const OrthonormalFrame mapped = sd.frame.apply_normal_map(float3(nxy, nz));
@@ -202,7 +201,7 @@ struct OpenPBRMaterial<let TRANSMISSION : bool = false,
         OpenPBRMaterialSample s;
         s.brdf = OpenPBRBSDF(with_coat, SheenBRDF(sheen_col, sheen_alpha), sw);
         out_shading_frame = shading_frame;
-        out_emission = get_emission(sd, tm, lod);
+        out_emission = get_emission(sd, textures, lod);
         s.eta = eta;
         s.absorption = absorb;
         return s;

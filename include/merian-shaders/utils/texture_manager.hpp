@@ -22,8 +22,11 @@ class TextureManager : public std::enable_shared_from_this<TextureManager> {
 
     static SlangCompositionHandle query_device_support_composition();
 
-    // Records pending uploads queued by the cmd-less add_/set_ overloads.
+    // the textures of the last update become the previous frame's
     void update(const CommandBufferHandle& cmd);
+
+    // records the staged uploads without changing the bindings
+    void upload(const CommandBufferHandle& cmd);
 
     void resize(const uint32_t capacity);
 
@@ -40,7 +43,7 @@ class TextureManager : public std::enable_shared_from_this<TextureManager> {
                            bool srgb = true,
                            bool generate_mipmaps = false);
 
-    // Stages the upload; the actual GPU copy is recorded by the next update().
+    // staged; copied by the next update() or upload()
     TextureID
     add_texture_from_rgba8(const uint32_t* data,
                            uint32_t width,
@@ -66,7 +69,7 @@ class TextureManager : public std::enable_shared_from_this<TextureManager> {
                            bool srgb = true,
                            bool generate_mipmaps = false);
 
-    // Stages the upload; the actual GPU copy is recorded by the next update().
+    // staged; copied by the next update() or upload()
     void
     set_texture_from_rgba8(TextureID id,
                            const uint32_t* data,
@@ -79,6 +82,10 @@ class TextureManager : public std::enable_shared_from_this<TextureManager> {
                            bool generate_mipmaps = false);
 
     void remove_texture(TextureID id);
+
+    bool has_texture(const TextureID id) const {
+        return ids.is_used(id);
+    }
 
     const TextureHandle& get_texture(TextureID id) const {
         assert(id < textures.size());
@@ -121,15 +128,11 @@ class TextureManager : public std::enable_shared_from_this<TextureManager> {
   private:
     void update_composition_constants();
     ShaderObjectHandle build_shader_object() const;
-    bool object_is_current() const {
-        return shader_object.peek() && object_composition_version == composition->version();
-    }
+    void write(const ShaderObjectHandle& object, uint32_t slot, const TextureHandle& texture) const;
 
-    // Pulls the next slot from free_list or grows the table.
     TextureID allocate_id();
-    void renew_serial(TextureID id);
-    // Builds image + view + sampler and queues the staging copy. Returns the
-    // texture; the upload becomes visible to shaders after the next update().
+    void mark_changed(TextureID id);
+    // the upload becomes visible to shaders after the next update()
     TextureHandle stage_rgba8(const uint32_t* data,
                               uint32_t width,
                               uint32_t height,
@@ -145,11 +148,19 @@ class TextureManager : public std::enable_shared_from_this<TextureManager> {
     std::vector<TextureHandle> textures;
     std::vector<uint64_t> serials;
     uint64_t last_serial = 0;
+    // last_serial at the last update
+    uint64_t update_serial = 0;
     FreeList<TextureID> ids;
     SlangCompositionHandle composition;
     Versioned<SlangProgram> layout_program;
     Versioned<ShaderObject> shader_object;
-    mutable uint64_t object_composition_version = 0;
+
+    // as bound for this and for the previous frame
+    std::vector<TextureHandle> bound;
+    std::vector<TextureHandle> prev_bound;
+    // ids changed since the last update and at the last update
+    std::vector<TextureID> changed;
+    std::vector<TextureID> last_changed;
 
     std::vector<StagingMemoryManager::DeviceImageCopy> pending_uploads;
 };

@@ -19,8 +19,9 @@ under `selection`, `overlay`, `backdrop`, `directional maps`, `scene heatmap`, `
 statistics`, `capture` and `export`.
 
 **Alt + click** the image to pick; a plain click and drag stays with the camera. Escape clears the
-pick, ctrl+scroll widens the region, and scrolling over the panels pages them. The same values are
-editable as numbers under `selection`.
+pick while the Path Debugger window is focused, or, without that window, while the cursor is over
+the image; otherwise it reaches the application. Ctrl+scroll widens the region, and scrolling over
+the panels pages them. The same values are editable as numbers under `selection`.
 
 ## The four axes
 

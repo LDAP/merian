@@ -8,7 +8,8 @@
             "pointer": "/nodes/scene/properties/env/path",
             "set": {
                 "/nodes/scene/properties/env/type": "LatLong"
-            }
+            },
+            "type": "string"
         }
     },
     "include": [

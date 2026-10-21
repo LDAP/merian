@@ -94,15 +94,18 @@ void ASBuilder::queue_build(const vk::AccelerationStructureGeometryKHR* geometry
 void ASBuilder::queue_update(
     const std::vector<vk::AccelerationStructureGeometryKHR>& geometry,
     const std::vector<vk::AccelerationStructureBuildRangeInfoKHR>& range_info,
+    const AccelerationStructureHandle& src,
     const AccelerationStructureHandle& as,
     const vk::AccelerationStructureBuildSizesInfoKHR& size_info,
     const vk::BuildAccelerationStructureFlagsKHR build_flags) {
     assert(geometry.size() == range_info.size());
-    queue_update(geometry.data(), range_info.data(), as, size_info, build_flags, geometry.size());
+    queue_update(geometry.data(), range_info.data(), src, as, size_info, build_flags,
+                 geometry.size());
 }
 
 void ASBuilder::queue_update(const vk::AccelerationStructureGeometryKHR* geometry,
                              const vk::AccelerationStructureBuildRangeInfoKHR* range_info,
+                             const AccelerationStructureHandle& src,
                              const AccelerationStructureHandle& as,
                              const vk::AccelerationStructureBuildSizesInfoKHR& size_info,
                              const vk::BuildAccelerationStructureFlagsKHR build_flags,
@@ -110,7 +113,7 @@ void ASBuilder::queue_update(const vk::AccelerationStructureGeometryKHR* geometr
     assert(as->get_size() >= size_info.accelerationStructureSize);
 
     pending_blas_build_infos.push_back({vk::AccelerationStructureTypeKHR::eBottomLevel, build_flags,
-                                        vk::BuildAccelerationStructureModeKHR::eUpdate, *as, *as,
+                                        vk::BuildAccelerationStructureModeKHR::eUpdate, *src, *as,
                                         geometry_count, geometry});
     pending_blas_range_infos.push_back(range_info);
     pending_blas_total_scratch +=

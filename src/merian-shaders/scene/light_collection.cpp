@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <array>
 #include <spdlog/spdlog.h>
+#include <utility>
 
 namespace merian {
 
@@ -28,7 +29,8 @@ LightCollection::LightCollection(const ShaderCompileContextHandle& compile_conte
       min_subgroup_size(smallest_subgroup_size(context)) {}
 
 void LightCollection::set_geometries(const std::vector<EmissiveGeometry>& geometries,
-                                     const uint32_t geometry_count) {
+                                     const uint32_t geometry_count,
+                                     const std::vector<GeometryRemap>& prev_remap) {
     std::vector<LightGeometry> new_geometries;
     new_geometries.reserve(geometries.size());
     std::vector<uint32_t> new_offsets(geometry_count, LIGHT_INVALID_INDEX);
@@ -42,6 +44,24 @@ void LightCollection::set_geometries(const std::vector<EmissiveGeometry>& geomet
                                   g.emission_level, 0});
         new_offsets[g.geometry_id] = first_triangle;
         first_triangle += g.primitive_count;
+    }
+
+    std::vector<uint32_t> new_prev_offsets(geometry_count, LIGHT_INVALID_INDEX);
+    if (prev_remap.empty()) {
+        std::copy_n(geometry_light_offsets.begin(),
+                    std::min<size_t>(geometry_light_offsets.size(), geometry_count),
+                    new_prev_offsets.begin());
+    } else {
+        assert(prev_remap.size() <= geometry_light_offsets.size());
+        for (GeometryID prev_id = 0; prev_id < prev_remap.size(); prev_id++) {
+            const GeometryID geometry_id = prev_remap[prev_id].geometry_id;
+            assert(geometry_id < geometry_count);
+            new_prev_offsets[geometry_id] = geometry_light_offsets[prev_id];
+        }
+    }
+    if (new_prev_offsets != prev_light_offsets) {
+        prev_light_offsets = std::move(new_prev_offsets);
+        prev_offsets_dirty = true;
     }
 
     if (new_geometries != light_geometries || new_offsets != geometry_light_offsets) {
@@ -68,7 +88,7 @@ void LightCollection::ensure_buffer(BufferHandle& buffer,
                                       MemoryMappingType::NONE, name);
 }
 
-void LightCollection::retire_buffer(BufferHandle& buffer, const CommandBufferHandle& cmd) {
+void LightCollection::retire(BufferHandle& buffer, const CommandBufferHandle& cmd) {
     if (buffer)
         cmd->keep_until_pool_reset(std::move(buffer));
     buffer.reset();
@@ -196,22 +216,27 @@ void LightCollection::ensure_pipelines(const SlangCompositionHandle& scene_compo
 }
 
 void LightCollection::prepare(const CommandBufferHandle& cmd) {
+    prepare_buffers(cmd);
+    prev_binding = std::exchange(binding, make_binding());
+}
+
+void LightCollection::prepare_buffers(const CommandBufferHandle& cmd) {
     if (!enabled)
         return;
     grid_cascades = std::clamp(grid_cascades, 1, static_cast<int32_t>(LIGHT_GRID_MAX_CASCADES));
     grid_cells_kept = std::clamp(grid_cells_kept, 64, 65536);
 
     if (env_emissive) {
-        if (env_importance_resized && env_cdf_buffer) {
-            cmd->keep_until_pool_reset(std::move(env_cdf_buffer));
+        if (env_importance_resized || !env_importance_built) {
+            env_cdf_slot ^= 1u;
+            env_importance_built = false;
+            if (env_importance_resized)
+                retire(env_cdf_buffer[env_cdf_slot], cmd);
         }
         env_importance_resized = false;
         const uint32_t texels = env_importance_size() * env_importance_size();
-        ensure_buffer(env_cdf_buffer, texels * sizeof(float2), "LightCollection::env_cdf", cmd);
-        if (env_cdf_buffer != env_importance_built_buffer) {
-            env_importance_built = false;
-            env_importance_built_buffer = env_cdf_buffer;
-        }
+        ensure_buffer(env_cdf_buffer[env_cdf_slot], texels * sizeof(float2),
+                      "LightCollection::env_cdf", cmd);
         ensure_buffer(env_cdf_state_buffer, cdf_state_size(texels),
                       "LightCollection::env_cdf_state", cmd);
         if (lists_env()) {
@@ -233,14 +258,20 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
             ensure_buffer(tree_values_buffer[i], triangle_count * sizeof(uint32_t),
                           "LightCollection::tree_values", cmd);
         }
-        ensure_buffer(tree_rank_buffer, triangle_count * sizeof(uint32_t),
+        ensure_buffer(tree_order_buffer[grid_slot], triangle_count * sizeof(uint32_t),
+                      "LightCollection::tree_order", cmd);
+        ensure_buffer(tree_rank_buffer[grid_slot], triangle_count * sizeof(uint32_t),
                       "LightCollection::tree_rank", cmd);
-        ensure_buffer(tree_cdf_buffer, triangle_count * sizeof(float2), "LightCollection::tree_cdf",
-                      cmd);
+        ensure_buffer(tree_cdf_buffer[grid_slot], triangle_count * sizeof(float2),
+                      "LightCollection::tree_cdf", cmd);
         ensure_buffer(tree_cdf_state_buffer, cdf_state_size(triangle_count),
                       "LightCollection::tree_cdf_state", cmd);
-        ensure_buffer(tree_guide_buffer, guide_size(triangle_count), "LightCollection::tree_guide",
-                      cmd);
+        ensure_buffer(tree_guide_buffer[grid_slot], guide_size(triangle_count),
+                      "LightCollection::tree_guide", cmd);
+        ensure_buffer(triangles_buffer[grid_slot], triangle_count * sizeof(EmissiveTriangle),
+                      "LightCollection::triangles", cmd);
+        ensure_buffer(regions_buffer[grid_slot], triangle_count * sizeof(EmissiveRegion),
+                      "LightCollection::regions", cmd);
         ensure_buffer(setup_state_buffer, LIGHT_GRID_SETUP_STATE * sizeof(uint32_t),
                       "LightCollection::setup_state", cmd);
         ensure_buffer(sort_state_buffer, sort_state_size(), "LightCollection::sort_state", cmd);
@@ -308,18 +339,18 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
             grid_reset |= reallocated;
             grid_feedback_fresh |= reallocated;
         }
-        ensure_buffer(grid_starts_buffer, slot_count * sizeof(uint32_t),
+        ensure_buffer(grid_starts_buffer[grid_slot], slot_count * sizeof(uint32_t),
                       "LightCollection::grid_starts", cmd);
-        ensure_buffer(grid_estimate_buffer, slot_count * sizeof(float),
+        ensure_buffer(grid_estimate_buffer[grid_slot], slot_count * sizeof(float),
                       "LightCollection::grid_estimate", cmd);
         if (slot_weighing == LightSlotWeighing::LightSlotWeighingShadingPoint) {
-            ensure_buffer(grid_slot_bounds_buffer, slot_count * sizeof(LightBound),
+            ensure_buffer(grid_slot_bounds_buffer[grid_slot], slot_count * sizeof(LightBound),
                           "LightCollection::grid_slot_bounds", cmd);
-            retire_buffer(grid_probability_buffer, cmd);
+            retire(grid_probability_buffer[grid_slot], cmd);
         } else {
-            ensure_buffer(grid_probability_buffer, slot_count * sizeof(float),
+            ensure_buffer(grid_probability_buffer[grid_slot], slot_count * sizeof(float),
                           "LightCollection::grid_probability", cmd);
-            retire_buffer(grid_slot_bounds_buffer, cmd);
+            retire(grid_slot_bounds_buffer[grid_slot], cmd);
         }
     }
 
@@ -329,12 +360,8 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
         const vk::DeviceSize offsets_size = geometry_light_offsets.size() * sizeof(uint32_t);
         ensure_buffer(light_geometries_buffer, geometries_size, "LightCollection::geometries", cmd);
         ensure_buffer(geometry_light_offsets_buffer, offsets_size, "LightCollection::offsets", cmd);
-        ensure_buffer(triangles_buffer, triangle_count * sizeof(EmissiveTriangle),
-                      "LightCollection::triangles", cmd);
         ensure_buffer(proxies_buffer, triangle_count * sizeof(EmissiveLightProxy),
                       "LightCollection::proxies", cmd);
-        ensure_buffer(regions_buffer, triangle_count * sizeof(EmissiveRegion),
-                      "LightCollection::regions", cmd);
         staging->cmd_to_device(cmd, light_geometries_buffer, light_geometries.data(), 0,
                                geometries_size);
         staging->cmd_to_device(cmd, geometry_light_offsets_buffer, geometry_light_offsets.data(), 0,
@@ -345,7 +372,21 @@ void LightCollection::prepare(const CommandBufferHandle& cmd) {
             vk::PipelineStageFlagBits2::eComputeShader,
             vk::AccessFlagBits2::eShaderRead,
         });
-        tables_dirty = false;
+    }
+    tables_dirty = false;
+
+    if (prev_offsets_dirty && !prev_light_offsets.empty()) {
+        const vk::DeviceSize size = prev_light_offsets.size() * sizeof(uint32_t);
+        ensure_buffer(prev_offsets_buffer, size, "LightCollection::prev_offsets", cmd);
+        allocator->get_staging()->cmd_to_device(cmd, prev_offsets_buffer, prev_light_offsets.data(),
+                                                0, size);
+        cmd->barrier(vk::MemoryBarrier2{
+            vk::PipelineStageFlagBits2::eTransfer,
+            vk::AccessFlagBits2::eTransferWrite,
+            vk::PipelineStageFlagBits2::eAllCommands,
+            vk::AccessFlagBits2::eShaderRead,
+        });
+        prev_offsets_dirty = false;
     }
 }
 
@@ -360,10 +401,12 @@ void LightCollection::update_constants(const SlangCompositionHandle& scene_compo
                     "export static const int merian_nee_draws = {};\n"
                     "export static const int merian_nee_source = {};\n"
                     "export static const int merian_nee_slot_weighing = {};\n"
+                    "export static const bool merian_nee_feedback = {};\n"
                     "}}",
                     std::clamp(draws, 1, static_cast<int32_t>(LIGHT_GRID_MAX_DRAWS)), source,
-                    slot_weighing));
+                    slot_weighing, feedback));
     constants_dirty = false;
+    binding.reset();
 }
 
 void LightCollection::update(const CommandBufferHandle& cmd,
@@ -439,8 +482,8 @@ void LightCollection::update(const CommandBufferHandle& cmd,
         auto c = params->get_cursor();
         c["proxies"] = proxies_buffer;
         c["tree_keys"] = tree_keys_buffer[0];
-        c["tree_cdf"] = tree_cdf_buffer;
-        c["env_cdf"] = env_listed ? env_cdf_buffer : dummy;
+        c["tree_cdf"] = tree_cdf_buffer[grid_slot];
+        c["env_cdf"] = env_listed ? env_cdf_buffer[env_cdf_slot] : dummy;
         c["env_size"] = env_listed ? env_size : 0u;
         c["env_cones"] = env_listed ? env_cones_buffer : dummy;
         c["tree_info"] = tree_info_buffer[grid_slot];
@@ -451,10 +494,10 @@ void LightCollection::update(const CommandBufferHandle& cmd,
         c["grid_contribution_prev"] = or_dummy(grid_contribution_buffer[grid_slot ^ 1]);
         c["grid_feedback"] = or_dummy(grid_feedback_buffer[grid_slot]);
         c["grid_feedback_prev"] = or_dummy(grid_feedback_buffer[grid_slot ^ 1]);
-        c["grid_starts"] = or_dummy(grid_starts_buffer);
-        c["grid_estimate"] = or_dummy(grid_estimate_buffer);
-        c["grid_probability"] = or_dummy(grid_probability_buffer);
-        c["grid_slot_bounds"] = or_dummy(grid_slot_bounds_buffer);
+        c["grid_starts"] = or_dummy(grid_starts_buffer[grid_slot]);
+        c["grid_estimate"] = or_dummy(grid_estimate_buffer[grid_slot]);
+        c["grid_probability"] = or_dummy(grid_probability_buffer[grid_slot]);
+        c["grid_slot_bounds"] = or_dummy(grid_slot_bounds_buffer[grid_slot]);
         c["grid_info"] = grid_info_buffer[grid_slot];
         c["grid_info_prev"] = grid_info_buffer[grid_slot ^ 1];
         c["grid_index"] = or_dummy(grid_index_buffer[grid_slot]);
@@ -488,7 +531,7 @@ void LightCollection::update(const CommandBufferHandle& cmd,
         if (env_emissive && !env_importance_built) {
             const auto params = env_build_params.get();
             auto c = params->get_cursor();
-            c["cdf"] = env_cdf_buffer;
+            c["cdf"] = env_cdf_buffer[env_cdf_slot];
             c["state"] = env_cdf_state_buffer;
             c["size"] = env_size;
             run(env_build_entry_point, env_build_pipeline, params,
@@ -498,9 +541,9 @@ void LightCollection::update(const CommandBufferHandle& cmd,
         if (triangle_count > 0) {
             const auto params = update_params.get();
             auto c = params->get_cursor();
-            c["triangles"] = triangles_buffer;
+            c["triangles"] = triangles_buffer[grid_slot];
             c["proxies"] = proxies_buffer;
-            c["regions"] = regions_buffer;
+            c["regions"] = regions_buffer[grid_slot];
             c["light_geometries"] = light_geometries_buffer;
             c["light_geometry_count"] = static_cast<uint32_t>(light_geometries.size());
             c["triangle_count"] = triangle_count;
@@ -541,8 +584,9 @@ void LightCollection::update(const CommandBufferHandle& cmd,
             c["keys_in"] = tree_keys_buffer[in];
             c["values_in"] = tree_values_buffer[in];
             c["keys_out"] = tree_keys_buffer[in ^ 1];
-            c["values_out"] = tree_values_buffer[in ^ 1];
-            c["rank"] = tree_rank_buffer;
+            c["values_out"] = pass == LIGHT_SORT_PASSES ? tree_order_buffer[grid_slot]
+                                                        : tree_values_buffer[in ^ 1];
+            c["rank"] = tree_rank_buffer[grid_slot];
             c["state"] = sort_state_buffer;
             c["count"] = triangle_count;
             c["tile_count"] = tiles;
@@ -560,8 +604,8 @@ void LightCollection::update(const CommandBufferHandle& cmd,
         const auto params = cdf_params.get();
         auto c = params->get_cursor();
         c["proxies"] = proxies_buffer;
-        c["order"] = tree_values_buffer[0];
-        c["cdf"] = tree_cdf_buffer;
+        c["order"] = tree_order_buffer[grid_slot];
+        c["cdf"] = tree_cdf_buffer[grid_slot];
         c["state"] = tree_cdf_state_buffer;
         c["count"] = triangle_count;
         run(cdf_entry_point, cdf_pipeline, params, cdf_block_count(triangle_count));
@@ -572,8 +616,8 @@ void LightCollection::update(const CommandBufferHandle& cmd,
         MERIAN_PROFILE_SCOPE_GPU(cmd, "guide");
         const auto params = guide_params.get();
         auto c = params->get_cursor();
-        c["cdf"] = tree_cdf_buffer;
-        c["guide"] = tree_guide_buffer;
+        c["cdf"] = tree_cdf_buffer[grid_slot];
+        c["guide"] = tree_guide_buffer[grid_slot];
         c["count"] = triangle_count;
         c["buckets"] = triangle_count;
         run(guide_entry_point, guide_pipeline, params, cdf_block_count(triangle_count + 1));
@@ -612,58 +656,120 @@ void LightCollection::update(const CommandBufferHandle& cmd,
     });
 }
 
-void LightCollection::clear_learned_state() {
+void LightCollection::start_run() {
+    binding.reset();
     grid_reset = true;
     grid_feedback_fresh = static_cast<bool>(grid_feedback_buffer[0]);
     tree_info_fresh = true;
     grid_slot = 0;
 }
 
-void LightCollection::write_to(ShaderCursor cursor) const {
-    const bool active = enabled && triangle_count > 0 && triangles_buffer && tree_cdf_buffer;
+LightCollection::Binding LightCollection::make_binding() const {
+    const bool active =
+        enabled && triangle_count > 0 && triangles_buffer[grid_slot] && tree_cdf_buffer[grid_slot];
     const BufferHandle& dummy = allocator->get_dummy_buffer();
-    auto table = cursor["table"];
-    table["triangles"] = active ? triangles_buffer : dummy;
-    table["regions"] = active ? regions_buffer : dummy;
-    table["geometries"] = active ? light_geometries_buffer : dummy;
-    table["geometry_offsets"] = active ? geometry_light_offsets_buffer : dummy;
-    table["triangle_count"] = active ? triangle_count : 0u;
-    table["geometry_count"] = active ? static_cast<uint32_t>(light_geometries.size()) : 0u;
-    table["geometry_offset_count"] =
-        active ? static_cast<uint32_t>(geometry_light_offsets.size()) : 0u;
-
+    const auto or_dummy = [&](const BufferHandle& buffer) -> const BufferHandle& {
+        return active && buffer ? buffer : dummy;
+    };
     const bool env_listed = enabled && lists_env();
     const uint32_t env_texels = env_listed ? env_importance_size() * env_importance_size() : 0u;
+    const bool env_active = enabled && env_emissive && env_cdf_buffer[env_cdf_slot];
+
+    Binding frame_binding;
+    frame_binding.triangles = or_dummy(triangles_buffer[grid_slot]);
+    frame_binding.regions = or_dummy(regions_buffer[grid_slot]);
+    frame_binding.geometries = or_dummy(light_geometries_buffer);
+    frame_binding.geometry_offsets = or_dummy(geometry_light_offsets_buffer);
+    frame_binding.triangle_count = active ? triangle_count : 0u;
+    frame_binding.geometry_count = active ? static_cast<uint32_t>(light_geometries.size()) : 0u;
+    frame_binding.geometry_offset_count =
+        active ? static_cast<uint32_t>(geometry_light_offsets.size()) : 0u;
+    frame_binding.cdf = or_dummy(tree_cdf_buffer[grid_slot]);
+    frame_binding.guide = or_dummy(tree_guide_buffer[grid_slot]);
+    frame_binding.order = or_dummy(tree_order_buffer[grid_slot]);
+    frame_binding.rank = or_dummy(tree_rank_buffer[grid_slot]);
+    frame_binding.env_texels = env_texels;
+    frame_binding.starts = or_dummy(grid_starts_buffer[grid_slot]);
+    frame_binding.cascades = or_dummy(grid_info_buffer[grid_slot]);
+    frame_binding.index = or_dummy(grid_index_buffer[grid_slot]);
+    frame_binding.blocks = or_dummy(grid_blocks_buffer);
+    frame_binding.in_use = active;
+    frame_binding.jitter = debug_jitter ? grid_jitter : 0.f;
+    frame_binding.even_share = grid_even_share;
+    frame_binding.contribution = or_dummy(grid_contribution_buffer[grid_slot]);
+    frame_binding.estimate = or_dummy(grid_estimate_buffer[grid_slot]);
+    frame_binding.slot_bounds = or_dummy(grid_slot_bounds_buffer[grid_slot]);
+    frame_binding.probability = or_dummy(grid_probability_buffer[grid_slot]);
+    frame_binding.feedback = or_dummy(grid_feedback_buffer[grid_slot]);
+    frame_binding.light_count = triangle_count + env_texels;
+    frame_binding.has_sky_portals = has_sky_portals;
+    frame_binding.debug_view = static_cast<uint32_t>(debug_view);
+    frame_binding.env_cdf = env_active ? env_cdf_buffer[env_cdf_slot] : dummy;
+    frame_binding.env_size = env_active ? env_importance_size() : 0u;
+    return frame_binding;
+}
+
+void LightCollection::write(ShaderCursor cursor, const Binding& binding) {
+    auto table = cursor["table"];
+    table["triangles"] = binding.triangles;
+    table["regions"] = binding.regions;
+    table["geometries"] = binding.geometries;
+    table["geometry_offsets"] = binding.geometry_offsets;
+    table["triangle_count"] = binding.triangle_count;
+    table["geometry_count"] = binding.geometry_count;
+    table["geometry_offset_count"] = binding.geometry_offset_count;
+
     auto tree = cursor["tree"];
-    tree["cdf"] = active ? tree_cdf_buffer : dummy;
-    tree["guide"] = active ? tree_guide_buffer : dummy;
-    tree["order"] = active ? tree_values_buffer[0] : dummy;
-    tree["rank"] = active ? tree_rank_buffer : dummy;
-    tree["env_texels"] = env_texels;
+    tree["cdf"] = binding.cdf;
+    tree["guide"] = binding.guide;
+    tree["order"] = binding.order;
+    tree["rank"] = binding.rank;
+    tree["env_texels"] = binding.env_texels;
 
     auto grid = cursor["grid"];
-    grid["starts"] = active ? grid_starts_buffer : dummy;
-    grid["cascades"] = active ? grid_info_buffer[grid_slot] : dummy;
-    grid["index"] = active ? grid_index_buffer[grid_slot] : dummy;
-    grid["blocks"] = active ? grid_blocks_buffer : dummy;
-    grid["in_use"] = active;
-    grid["jitter"] = debug_jitter ? grid_jitter : 0.f;
-    grid["even_share"] = grid_even_share;
-    grid["contribution"] = active ? grid_contribution_buffer[grid_slot] : dummy;
-    grid["estimate"] = active ? grid_estimate_buffer : dummy;
-    grid["slot_bounds"] = active && grid_slot_bounds_buffer ? grid_slot_bounds_buffer : dummy;
-    grid["probability"] = active && grid_probability_buffer ? grid_probability_buffer : dummy;
-    grid["feedback"] = active ? grid_feedback_buffer[grid_slot] : dummy;
-    grid["light_count"] = triangle_count + env_texels;
+    grid["starts"] = binding.starts;
+    grid["cascades"] = binding.cascades;
+    grid["index"] = binding.index;
+    grid["blocks"] = binding.blocks;
+    grid["in_use"] = binding.in_use;
+    grid["jitter"] = binding.jitter;
+    grid["even_share"] = binding.even_share;
+    grid["contribution"] = binding.contribution;
+    grid["estimate"] = binding.estimate;
+    grid["slot_bounds"] = binding.slot_bounds;
+    grid["probability"] = binding.probability;
+    grid["feedback"] = binding.feedback;
+    grid["light_count"] = binding.light_count;
 
-    cursor["has_sky_portals"] = has_sky_portals;
-    cursor["debug_view"] = static_cast<uint32_t>(debug_view);
+    cursor["has_sky_portals"] = binding.has_sky_portals;
+    cursor["debug_view"] = binding.debug_view;
 
-    const bool env_active = enabled && env_emissive && env_cdf_buffer;
-    auto env = cursor["env"];
-    auto importance = env["importance"];
-    importance["cdf"] = env_active ? env_cdf_buffer : dummy;
-    importance["size"] = env_active ? env_importance_size() : 0u;
+    auto importance = cursor["env"]["importance"];
+    importance["cdf"] = binding.env_cdf;
+    importance["size"] = binding.env_size;
+}
+
+void LightCollection::write_to(ShaderCursor cursor) const {
+    if (binding)
+        write(cursor, *binding);
+    else
+        write(cursor, make_binding());
+}
+
+void LightCollection::write_prev_to(ShaderCursor cursor) const {
+    if (!prev_binding || !binding) {
+        write_to(cursor);
+        return;
+    }
+    write(cursor, *prev_binding);
+    const bool remapped =
+        prev_binding->in_use && prev_offsets_buffer && !prev_light_offsets.empty();
+    auto table = cursor["table"];
+    table["geometries"] = allocator->get_dummy_buffer();
+    table["geometry_count"] = 0u;
+    table["geometry_offsets"] = remapped ? prev_offsets_buffer : allocator->get_dummy_buffer();
+    table["geometry_offset_count"] =
+        remapped ? static_cast<uint32_t>(prev_light_offsets.size()) : 0u;
 }
 
 void LightCollection::properties(Properties& props) {
@@ -703,7 +809,7 @@ void LightCollection::properties(Properties& props) {
         props.st_separate("Cut upkeep");
         if (props.config_bool("clear learned state",
                               "Drop every cell's cut and what it learned about its lights."))
-            clear_learned_state();
+            start_run();
         if (props.st_begin_child("prior", "Visibility prior")) {
             props.config_float("triangles", triangle_prior,
                                "Share of a group's emission assumed to reach the cell before "
@@ -790,6 +896,9 @@ void LightCollection::properties(Properties& props) {
                 LIGHT_DEBUG_DRAWS, LIGHT_DEBUG_COVERAGE_RAYS));
         props.config_bool("jitter the lookup", debug_jitter,
                           "Off shows the cells the lookup sees without its random shift.");
+        constants_dirty |= props.config_bool(
+            "record feedback", feedback,
+            "Off: renderers record nothing about their draws, so the cuts do not learn from them.");
         props.st_end_child();
     }
 

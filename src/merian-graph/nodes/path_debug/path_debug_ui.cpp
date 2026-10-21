@@ -296,10 +296,14 @@ void PathDebugNode::draw_window() {
     ImGui::SetNextWindowSize(
         ImVec2(std::min(43.f * font, ImGui::GetIO().DisplaySize.x - position.x), 0.f),
         ImGuiCond_FirstUseEver);
+    escape_clears = false;
     if (!ImGui::Begin("Path Debugger")) {
         ImGui::End();
         return;
     }
+    // Escape cancelling a text edit keeps the pick
+    escape_clears = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
+                    !ImGui::GetIO().WantTextInput;
     ImGui::PushItemWidth(-10.f * font);
 
     const std::scoped_lock lock(stats_mutex);

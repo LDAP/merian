@@ -81,14 +81,6 @@ std::vector<HostSink::Capture> HostSink::get_all() {
     return ready;
 }
 
-std::optional<uint64_t> HostSink::next_ready_semaphore_value() const {
-    const std::scoped_lock lock(mutex);
-    if (captures.empty() || !captures.front().ready()) {
-        return std::nullopt;
-    }
-    return captures.front().semaphore_value;
-}
-
 void HostSink::cancel() {
     {
         const std::scoped_lock lock(mutex);

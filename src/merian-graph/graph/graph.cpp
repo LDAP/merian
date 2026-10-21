@@ -343,7 +343,8 @@ void Graph::finish_iteration(InFlightData& in_flight_data) {
 }
 
 GraphRunResult Graph::run(const GraphRunOptions& options,
-                          const std::function<void()>& after_iteration,
+                          const BeforeIteration& before_iteration,
+                          const AfterIteration& after_iteration,
                           const std::function<bool()>& stop_requested) {
     run_stop_patterns = GraphEvent::Pattern::parse(options.until_event);
     for (const GraphEvent::Pattern& pattern : run_stop_patterns) {
@@ -364,17 +365,26 @@ GraphRunResult Graph::run(const GraphRunOptions& options,
     GraphRunResult result{
         .stop_reason = GraphRunStopReason::ITERATIONS, .iterations = 0, .event = {}};
     while (!options.iterations || result.iterations < *options.iterations) {
+        if (before_iteration) {
+            if (const auto time = before_iteration({run_info, result.iterations})) {
+                held_time = time;
+            }
+            if (stop_requested && stop_requested()) {
+                result.stop_reason = GraphRunStopReason::REQUESTED;
+                break;
+            }
+        }
         run_info.last_iteration =
             options.iterations && result.iterations + 1 == *options.iterations;
         if (!run_unless_stopped(stop_requested)) {
             result.stop_reason = GraphRunStopReason::REQUESTED;
             break;
         }
-        result.iterations++;
 
         if (after_iteration) {
-            after_iteration();
+            after_iteration({run_info, result.iterations});
         }
+        result.iterations++;
         if (stop_requested && stop_requested()) {
             result.stop_reason = GraphRunStopReason::REQUESTED;
             break;

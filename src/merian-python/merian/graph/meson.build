@@ -4,6 +4,7 @@ python_graph_module = py.extension_module(
         'bind_description.cpp',
         'bind_graph.cpp',
         'bind_nodes.cpp',
+        'bind_scene.cpp',
         'bind_window.cpp',
         'module.cpp',
         'python_graph.cpp',

@@ -97,7 +97,8 @@ bool emitting(const MaterialSystem material_system,
               const TextureID texture_id,
               const float2 uv,
               const ExplicitLODSampler lod) {
-    return any(lod.sample(material_system.texture_manager.get_sampler2D(texture_id), uv).rgb > 0.f);
+    return any(material_system.texture_manager.get_textures().sample(lod, texture_id, uv).rgb >
+               0.f);
 }
 
 uint scan(const MaterialSystem material_system,
