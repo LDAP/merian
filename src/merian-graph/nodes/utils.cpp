@@ -1,4 +1,4 @@
-#include "merian-graph/nodes/frame_rate.hpp"
+#include "merian-graph/nodes/utils.hpp"
 
 #include <algorithm>
 

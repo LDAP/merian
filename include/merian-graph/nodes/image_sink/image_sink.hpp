@@ -3,7 +3,7 @@
 #include "merian-graph/connectors/image/vk_image_in.hpp"
 #include "merian-graph/graph/node.hpp"
 #include "merian-graph/graph/time_provider.hpp"
-#include "merian-graph/nodes/frame_rate.hpp"
+#include "merian-graph/nodes/utils.hpp"
 #include "merian/utils/chrono.hpp"
 #include "merian/utils/enums.hpp"
 #include "merian/utils/stopwatch.hpp"

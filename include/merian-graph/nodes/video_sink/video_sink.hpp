@@ -5,7 +5,7 @@
 #include "merian-graph/graph/node_events.hpp"
 #include "merian-graph/graph/time_provider.hpp"
 #include "merian-graph/nodes/compute_node/compute_kernel.hpp"
-#include "merian-graph/nodes/frame_rate.hpp"
+#include "merian-graph/nodes/utils.hpp"
 #include "merian/io/video/video_device_provider.hpp"
 #include "merian/utils/enums.hpp"
 

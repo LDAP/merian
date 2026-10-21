@@ -1,4 +1,4 @@
-merian_graph_src += files('frame_rate.cpp')
+merian_graph_src += files('utils.cpp')
 
 # keep this list sorted
 
