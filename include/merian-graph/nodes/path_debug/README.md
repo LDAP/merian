@@ -96,7 +96,7 @@ All but `brightest fraction` keep at most 64 paths.
 | The last N paths of a kind | as above, plus `expression a`: `.N` direct NEE, `.*T.+N` NEE after a refraction, `.*S.+N` after a specular event |
 | Representative paths | overlay `keep: resampled by contribution`, `max paths: k`; k paths drawn without replacement, proportionally to contribution, from the recent history (`history`, 0 = every path since the last change) |
 | Fireflies | overlay `keep: brightest fraction`, `brightest fraction: 1e-4`; the inspector lists them and dissects one vertex by vertex |
-| NaN or infinite paths | `--mixin debug_nonfinite`, or selection `contribution: NaN or infinite only`; the heatmap shows where they come from and the inspector marks the vertex that broke |
+| NaN or infinite paths | selection `contribution: NaN or infinite only`; the heatmap shows where they come from and the inspector marks the vertex that broke |
 | Paths of a certain length | selection `scatter events: [min, max]` |
 | Paths matching a path expression | selection `expression a`, e.g. `.*<T>.*` (contains a transmission), `.{3,}` (three or more events), `N` (connected to a light by NEE), `.D.N` (NEE from the third vertex, the second one diffuse) |
 | Only these paths' contribution | backdrop `selection A`; it accumulates until the selection changes |

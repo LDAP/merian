@@ -64,7 +64,7 @@ Example graphs for `graph_run.py` are in the [`examples`](https://github.com/LDA
     - `<scene>` (required): path to the glTF / FBX / PBRT scene to load.
     - `--renderer <pt|pt_mcpg|pt_ssmm|restir_di|restir_pt>`: renderer, one of [`examples/renderers`](https://github.com/LDAP/merian/tree/main/examples/renderers) (default: `pt`). Also accepts a path to a custom renderer fragment, e.g. `--renderer my/renderer.json`.
     - `--denoiser <none|svgf|dlss|none_volume|svgf_volume|dlss_volume>`: denoiser, one of [`examples/denoisers`](https://github.com/LDAP/merian/tree/main/examples/denoisers) (default: `none`, which accumulates). The `_volume` variants also trace the scene's volume and denoise it (path-traced renderers). `dlss` needs merian built with the NGX SDK (`-Ddlss`).
-    - `--mixin <debug|debug_fireflies|imgui|...>`: additions from [`examples/mixins`](https://github.com/LDAP/merian/tree/main/examples/mixins), repeatable; `debug` attaches the path debugger, `imgui` adds the ImGui properties window (any example graph).
+    - `--mixin <debug|imgui|...>`: additions from [`examples/mixins`](https://github.com/LDAP/merian/tree/main/examples/mixins), repeatable; `debug` attaches the path debugger, `imgui` adds the ImGui properties window (any example graph).
     - `--env-map <path>`: lat-long HDR environment map (sets the env type to `LatLong`).
     - `--max-path-length <n>`: maximum path length (path-traced renderers).
     - `--spp <n>`: samples per pixel.
