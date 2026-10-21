@@ -354,11 +354,10 @@ PathDebugNode::describe_outputs(const NodeIOLayout& io_layout) {
             {"filtered_b", con_filtered_b, ConnectorAccess::compute_write}};
 }
 
-PathDebugNode::NodeStatusFlags
-PathDebugNode::on_connected(const NodeIOLayout& io_layout,
-                            [[maybe_unused]] const NodeIO& io,
-                            const NodeConnectionInfo& info,
-                            [[maybe_unused]] Submission& submission) {
+PathDebugNode::NodeStatusFlags PathDebugNode::on_connected(const NodeIOLayout& io_layout,
+                                                           [[maybe_unused]] const NodeIO& io,
+                                                           const NodeConnectionInfo& info,
+                                                           Submission& submission) {
     gbuffer_connected = io_layout.is_connected(con_gbuffer);
     gbuffer_composition =
         (gbuffer_connected ? io[con_gbuffer]->get_layout() : GBufferLayout::complete())
@@ -370,6 +369,8 @@ PathDebugNode::on_connected(const NodeIOLayout& io_layout,
     maps_dirty = true;
     heat_dirty = true;
 
+    submission.get_cmd()->barrier(
+        panel_texture->get_image()->barrier2(vk::ImageLayout::eGeneral, true));
     imgui_renderer->unregister_texture(panel_texture_id);
     panel_texture_id = imgui_renderer->register_texture(panel_texture);
 
