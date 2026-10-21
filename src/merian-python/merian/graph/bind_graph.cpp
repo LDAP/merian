@@ -36,19 +36,17 @@ void bind_graph(nb::module_& m) {
                                result.iterations, result.event);
         });
 
-    nb::class_<IterationInfo>(
-        m, "IterationInfo",
-        "An iteration as the callbacks of Graph.run see it: after_iteration the one that ran, "
-        "before_iteration the one before the next.")
-        .def_ro("index_in_run", &IterationInfo::index_in_run, "Of the iteration in this run.")
+    nb::class_<IterationInfo>(m, "IterationInfo",
+                              "The iteration both callbacks of Graph.run describe.")
+        .def_ro("run_index", &IterationInfo::run_index, "Of the iteration in this run.")
         .def_ro("iteration", &IterationInfo::iteration, "Since connect.")
         .def_ro("total_iteration", &IterationInfo::total_iteration)
         .def_ro("time", &IterationInfo::time, "Graph time in seconds.")
         .def_ro("time_delta", &IterationInfo::time_delta, "Seconds since the iteration before.")
         .def_ro("elapsed_since_connect", &IterationInfo::elapsed_since_connect, "Seconds.")
         .def("__repr__", [](const IterationInfo& info) {
-            return fmt::format("IterationInfo(index_in_run={}, iteration={}, time={})",
-                               info.index_in_run, info.iteration, info.time);
+            return fmt::format("IterationInfo(run_index={}, iteration={}, time={})", info.run_index,
+                               info.iteration, info.time);
         });
 
     nb::enum_<ProfilerReportKind>(m, "ReportKind")
@@ -158,16 +156,17 @@ void bind_graph(nb::module_& m) {
             "are seconds or timedelta. With `iterations` the nodes see the last iteration, which "
             "sinks can write ('end of run'). Returns once the last iteration is submitted, after "
             "running the node callbacks (such as image writes) whose GPU work already finished; "
-            "the rest run in the next run() or in wait(). before_iteration(info) is called before "
-            "each iteration while the earlier ones may still be in flight, and may edit the graph "
-            "and its scenes for it; returning a time (seconds or timedelta) holds the graph time "
-            "from that iteration on, as `time` does. after_iteration(info) is called after each "
-            "iteration is submitted; sink.get_all() there returns the captures that arrived. An "
-            "exception of a callback "
-            "ends the run before the next iteration and is raised from run().")
+            "the rest run in the next run() or in wait(). before_iteration(info) is called once "
+            "per iteration after connect and clock, while the earlier ones may still be in "
+            "flight, and may edit the graph and its scenes for it (a removed node only after it); "
+            "returning a time (seconds or "
+            "timedelta) holds the graph time from that iteration on, as `time` does. "
+            "after_iteration(info) is called after each iteration is submitted; sink.get_all() "
+            "there returns the captures that arrived. An exception of a callback ends the run "
+            "after the current iteration and is raised from run().")
         .def("stop", &PythonGraph::stop,
-             "Ends a run after the current iteration, no effect between runs; callable from any "
-             "thread.")
+             "Ends a run after the current iteration, a run waiting for the GPU before its next "
+             "one; no effect between runs; callable from any thread.")
         .def("wait", &PythonGraph::wait,
              "Waits for all iterations in flight and their node callbacks (written image files "
              "and captures are complete afterwards).")

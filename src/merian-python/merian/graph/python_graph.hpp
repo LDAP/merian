@@ -28,7 +28,7 @@ bool wait_interruptibly(const std::function<bool(std::chrono::nanoseconds slice)
                         const std::optional<std::chrono::nanoseconds>& timeout = {});
 
 struct IterationInfo {
-    uint64_t index_in_run;
+    uint64_t run_index;
     uint64_t iteration;
     uint64_t total_iteration;
     // seconds

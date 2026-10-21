@@ -76,9 +76,9 @@ void Graph::graph_settings(Properties& props) {
         }
     }
     if (settings.time_source == TIME_SOURCE_TIME) {
-        float time_s = to_seconds(duration_elapsed);
+        float time_s = to_seconds(run_info.elapsed);
         if (props.config_float("time", time_s, "The graph time in seconds.", 0.1)) {
-            settings.time_overwrite_delta_ms += (time_s - to_seconds(duration_elapsed)) * 1000.;
+            settings.time_overwrite_delta_ms += (time_s - to_seconds(run_info.elapsed)) * 1000.;
         }
         float offset_s = 0;
         if (props.config_float("offset", offset_s, "Seconds added to the graph time.", 0.01)) {

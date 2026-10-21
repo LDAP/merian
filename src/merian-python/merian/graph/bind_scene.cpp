@@ -267,7 +267,9 @@ void bind_scene(nb::module_& m) {
     bind_node_reference<SceneFileNode>(
         m, "SceneNode",
         "A scene file node (PBRT, glTF, FBX), Graph.find(SceneNode, identifier); the Quake node is "
-        "none. Its scene exists once the graph connected. Edits apply in the next iteration and, "
+        "none. Its scene exists once the graph connected. Edits apply in the iteration that "
+        "follows "
+        "them, from before_iteration in the one it prepares, and, "
         "like graph edits, are allowed between runs or from the iteration callbacks of Graph.run. "
         "Loading a file discards the edits and invalidates the ids.")
         .def_prop_ro(

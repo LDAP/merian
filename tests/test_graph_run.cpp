@@ -15,6 +15,7 @@
 #include <limits>
 #include <random>
 #include <thread>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -282,7 +283,7 @@ TEST_F(GraphRun, Iterations) {
 TEST_F(GraphRun, Requested) {
     uint64_t calls = 0;
     const GraphRunResult result = graph->run(
-        {.iterations = 10}, {}, [&](const GraphIterationInfo&) { calls++; },
+        {.iterations = 10}, {}, [&](const NodeProcessInfo&) { calls++; },
         [&] { return calls == 2; });
     EXPECT_EQ(result.stop_reason, GraphRunStopReason::REQUESTED);
     EXPECT_EQ(result.iterations, 2);
@@ -291,7 +292,7 @@ TEST_F(GraphRun, Requested) {
 TEST_F(GraphRun, EventSentBetweenIterations) {
     uint64_t calls = 0;
     const GraphRunResult result = graph->run({.iterations = 10, .until_event = "/user/done"}, {},
-                                             [&](const GraphIterationInfo&) {
+                                             [&](const NodeProcessInfo&) {
                                                  if (++calls == 3) {
                                                      graph->send_event("done");
                                                  }
@@ -308,7 +309,7 @@ TEST_F(GraphRun, EventBeforeRunIsIgnored) {
 }
 
 TEST_F(GraphRun, PatternParts) {
-    const auto send_done = [](const GraphIterationInfo&) { graph->send_event("done"); };
+    const auto send_done = [](const NodeProcessInfo&) { graph->send_event("done"); };
     EXPECT_EQ(graph->run({.iterations = 2, .until_event = "Color//done,//other"}, {}, send_done)
                   .stop_reason,
               GraphRunStopReason::ITERATIONS);
@@ -318,21 +319,72 @@ TEST_F(GraphRun, PatternParts) {
 }
 
 TEST_F(GraphRun, IterationCallbacks) {
-    std::vector<uint64_t> before;
-    std::vector<uint64_t> after;
+    const GraphHandle color = create_graph(color_to_sink());
+    const auto sink = color->find_node_for_identifier_and_type<HostImageSink>("sink");
+
+    using Seen = std::tuple<uint64_t, uint64_t, uint64_t, std::chrono::nanoseconds>;
+    const auto seen = [](const NodeProcessInfo& info) {
+        return Seen{info.get_total_iteration(), info.get_iteration(), info.get_run_index(),
+                    info.get_elapsed_duration()};
+    };
+    std::vector<Seen> before;
+    std::vector<Seen> after;
+    const auto record_after = [&](const NodeProcessInfo& info) { after.push_back(seen(info)); };
+    EXPECT_EQ(color
+                  ->run(
+                      {.iterations = 3},
+                      [&](const NodeProcessInfo& info) {
+                          before.push_back(seen(info));
+                          return std::optional<std::chrono::nanoseconds>{};
+                      },
+                      record_after)
+                  .iterations,
+              3);
+    EXPECT_EQ(before, after);
+    ASSERT_EQ(after.size(), 3);
+    for (uint64_t i = 0; i < after.size(); i++) {
+        EXPECT_EQ(std::get<0>(after[i]), i);
+        EXPECT_EQ(std::get<1>(after[i]), i);
+        EXPECT_EQ(std::get<2>(after[i]), i);
+    }
+
+    // a returned time is the time of that iteration
+    after.clear();
+    sink->capture(2);
+    EXPECT_EQ(color
+                  ->run(
+                      {.iterations = 2},
+                      [&](const NodeProcessInfo& info) {
+                          return std::optional<std::chrono::nanoseconds>{
+                              10s * (info.get_run_index() + 1)};
+                      },
+                      record_after)
+                  .iterations,
+              2);
+    color->wait();
+    ASSERT_EQ(after.size(), 2);
+    const std::vector<HostSink::Capture> captures = sink->get_all();
+    ASSERT_EQ(captures.size(), 2);
+    for (uint64_t i = 0; i < after.size(); i++) {
+        EXPECT_EQ(std::get<0>(after[i]), i + 3);
+        EXPECT_EQ(std::get<3>(after[i]), 10s * (i + 1));
+        EXPECT_EQ(captures[i].time, 10. * static_cast<double>(i + 1));
+    }
+}
+
+TEST_F(GraphRun, StopFromBeforeIterationRunsThatIteration) {
+    bool stop = false;
+    uint64_t after = 0;
     const GraphRunResult result = graph->run(
-        {.iterations = 3},
-        [&](const GraphIterationInfo& info) -> std::optional<std::chrono::nanoseconds> {
-            before.push_back(info.index_in_run);
-            return 10s * (info.index_in_run + 1);
+        {.iterations = 10},
+        [&](const NodeProcessInfo& info) -> std::optional<std::chrono::nanoseconds> {
+            stop = info.get_run_index() == 1;
+            return std::nullopt;
         },
-        [&](const GraphIterationInfo& info) {
-            after.push_back(info.index_in_run);
-            EXPECT_EQ(info.process_info.get_elapsed_duration(), 10s * (info.index_in_run + 1));
-        });
-    EXPECT_EQ(result.iterations, 3);
-    EXPECT_EQ(before, (std::vector<uint64_t>{0, 1, 2}));
-    EXPECT_EQ(after, (std::vector<uint64_t>{0, 1, 2}));
+        [&](const NodeProcessInfo&) { after++; }, [&] { return stop; });
+    EXPECT_EQ(result.stop_reason, GraphRunStopReason::REQUESTED);
+    EXPECT_EQ(result.iterations, 2);
+    EXPECT_EQ(after, 2);
 }
 
 TEST_F(GraphRun, Duration) {

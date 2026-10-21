@@ -76,8 +76,8 @@ class Graph : public std::enable_shared_from_this<Graph> {
 
   public:
     using BeforeIteration =
-        std::function<std::optional<std::chrono::nanoseconds>(const GraphIterationInfo&)>;
-    using AfterIteration = std::function<void(const GraphIterationInfo&)>;
+        std::function<std::optional<std::chrono::nanoseconds>(const NodeProcessInfo&)>;
+    using AfterIteration = std::function<void(const NodeProcessInfo&)>;
 
     ~Graph();
 
@@ -254,8 +254,19 @@ class Graph : public std::enable_shared_from_this<Graph> {
     void request_reconnect();
 
     void connect_graph();
-    bool run_unless_stopped(const std::function<bool()>& stop_requested);
-    bool run_once(const std::function<bool()>& stop_requested);
+    // false if stopped while waiting for the in-flight slot
+    bool iterate(const uint64_t run_index,
+                 const bool is_last,
+                 const BeforeIteration& before_iteration,
+                 const std::function<bool()>& stop_requested);
+    void process_iteration(const uint64_t run_index,
+                           const bool is_last,
+                           const BeforeIteration& before_iteration);
+    // Waits for the next in-flight slot and limits the fps; false if stop_requested returned true.
+    bool acquire_slot(const std::function<bool()>& stop_requested);
+    void
+    update_run_info(const ProfilerHandle& profiler, const uint64_t run_index, const bool is_last);
+    void pre_process_nodes(InFlightData& in_flight_data, const ProfilerHandle& profiler);
     // Runs the finished host callbacks while waiting; false if stop_requested returned true.
     bool wait_for_iteration(const uint64_t value, const std::function<bool()>& stop_requested);
     // Oldest iteration first; returns the wait of the first pending callback.
@@ -327,7 +338,8 @@ class Graph : public std::enable_shared_from_this<Graph> {
 
     // --- Graph run sub-tasks ---
 
-    void advance_time();
+    // time_delta is relative to previous_elapsed
+    void advance_time(const std::chrono::nanoseconds previous_elapsed);
 
     // The time source continues from the held time.
     void release_time();
@@ -527,8 +539,6 @@ class Graph : public std::enable_shared_from_this<Graph> {
     uint64_t run_iteration = 0;
     std::chrono::high_resolution_clock::time_point time_reference;
     std::chrono::high_resolution_clock::time_point time_connect_reference;
-    std::chrono::nanoseconds duration_elapsed_since_connect{};
-    std::chrono::nanoseconds duration_elapsed{};
     static constexpr const char* TIME_SOURCE_AUTO = "Auto";
     static constexpr const char* TIME_SOURCE_SYSTEM = "System";
     static constexpr const char* TIME_SOURCE_TIME = "Time";
@@ -552,8 +562,6 @@ class Graph : public std::enable_shared_from_this<Graph> {
     Settings settings;
     // the time of the last run that set one, until a run without
     std::optional<std::chrono::nanoseconds> held_time;
-    // to the previous iteration, also across connects
-    std::chrono::nanoseconds time_delta{};
     std::chrono::nanoseconds cpu_time{};
 
     // Reused by the next connect. (on plan_memory)

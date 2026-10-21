@@ -37,6 +37,11 @@ class NodeProcessInfo {
         return total_iteration;
     }
 
+    // Number of iterations since the start of this Graph::run(), 0-indexed.
+    const uint64_t& get_run_index() const noexcept {
+        return run_index;
+    }
+
     // Whether this is the last iteration of a Graph::run() that was given an iteration count.
     bool is_last_iteration() const noexcept {
         return last_iteration;
@@ -129,6 +134,7 @@ class NodeProcessInfo {
 
     uint64_t iteration = 0;
     uint64_t total_iteration = 0;
+    uint64_t run_index = 0;
     bool last_iteration = false;
     uint32_t in_flight_index = 0;
     uint32_t iterations_in_flight = 0;

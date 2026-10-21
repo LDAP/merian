@@ -99,10 +99,9 @@ GraphRunResult PythonGraph::run(const GraphRunOptions& options,
         }
         return error.has_value();
     };
-    const auto info_of = [](const GraphIterationInfo& info) {
-        const NodeProcessInfo& process = info.process_info;
+    const auto info_of = [](const NodeProcessInfo& process) {
         return IterationInfo{
-            .index_in_run = info.index_in_run,
+            .run_index = process.get_run_index(),
             .iteration = process.get_iteration(),
             .total_iteration = process.get_total_iteration(),
             .time = process.get_elapsed(),
@@ -110,7 +109,7 @@ GraphRunResult PythonGraph::run(const GraphRunOptions& options,
             .elapsed_since_connect = process.get_elapsed_since_connect(),
         };
     };
-    const auto before = [&](const GraphIterationInfo& info) {
+    const auto before = [&](const NodeProcessInfo& info) {
         const nb::gil_scoped_acquire acquire;
         const DispatchScope dispatch(*this);
         try {
@@ -120,7 +119,10 @@ GraphRunResult PythonGraph::run(const GraphRunOptions& options,
         }
         return std::optional<std::chrono::nanoseconds>{};
     };
-    const auto after = [&](const GraphIterationInfo& info) {
+    const auto after = [&](const NodeProcessInfo& info) {
+        if (error) {
+            return;
+        }
         const nb::gil_scoped_acquire acquire;
         const DispatchScope dispatch(*this);
         try {

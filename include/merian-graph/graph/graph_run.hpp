@@ -7,14 +7,6 @@
 
 namespace merian {
 
-class NodeProcessInfo;
-
-struct GraphIterationInfo {
-    // before an iteration still of the previous one
-    const NodeProcessInfo& process_info;
-    uint64_t index_in_run;
-};
-
 // The first limit reached ends the run.
 struct GraphRunOptions {
     // nullopt: no iteration limit; else the nodes see the last one (is_last_iteration)

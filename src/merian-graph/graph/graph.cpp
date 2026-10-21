@@ -59,108 +59,60 @@ Graph::~Graph() {
     }
 }
 
-bool Graph::run_unless_stopped(const std::function<bool()>& stop_requested) {
+bool Graph::iterate(const uint64_t run_index,
+                    const bool is_last,
+                    const BeforeIteration& before_iteration,
+                    const std::function<bool()>& stop_requested) {
     bool ran = false;
     {
         const BusyScope busy_scope(*this);
-        ran = run_once(stop_requested);
+        // the slot is the only point to cancel the iteration
+        ran = acquire_slot(stop_requested);
+        if (ran) {
+            process_iteration(run_index, is_last, before_iteration);
+        }
         run_finished_callbacks();
     }
     apply_deferred_edits();
     return ran;
 }
 
-bool Graph::run_once(const std::function<bool()>& stop_requested) {
-    // PREPARE RUN: wait for the slot, release resources, reset cmd pool
-    if (settings.iterations_in_flight != in_flight.size()) {
-        wait();
-        resize_in_flight(settings.iterations_in_flight);
-        request_reconnect();
-    }
-
-    Stopwatch sw_gpu_wait;
-    const uint32_t next_index = (in_flight_index + 1) % in_flight.size();
-    if (!wait_for_iteration(in_flight[next_index].iteration_value, stop_requested)) {
-        return false;
-    }
-    in_flight_index = next_index;
+void Graph::process_iteration(const uint64_t run_index,
+                              const bool is_last,
+                              const BeforeIteration& before_iteration) {
     InFlightData& in_flight_data = in_flight[in_flight_index];
-    gpu_wait_time = gpu_wait_time * 0.9 + sw_gpu_wait.duration() * 0.1;
-
-    // FPS LIMITER
-    cpu_sleep_time = std::chrono::duration<double>::zero();
-    if (settings.limit_fps != 0) {
-        cpu_sleep_time = std::max(std::chrono::duration<double>::zero(),
-                                  1s / static_cast<double>(settings.limit_fps) -
-                                      std::chrono::duration<double>(cpu_time));
-    }
-    if (cpu_sleep_time > 0s) {
-        std::this_thread::sleep_for(cpu_sleep_time);
-    }
-
     in_flight_data.submission->reset(async_runner);
 
     const ProfilerHandle& profiler = prepare_profiler_for_run(in_flight_data);
     const ScopedDefaultProfiler scoped_default_profiler{profiler};
     const auto run_start = std::chrono::high_resolution_clock::now();
 
-    // CONNECT and PREPROCESS
-    // the time source may be a node, so the topology has to exist before the clock advances
-    while (needs_reconnect) {
-        connect_graph();
-    }
-    advance_time();
-
+    // 1. connect, clock, host callback, pre-process
+    const std::chrono::nanoseconds previous_elapsed = run_info.elapsed;
+    bool first_pass = true;
     do {
-        // While connection nodes can signalize that they need to reconnect
         while (needs_reconnect) {
             connect_graph();
         }
-
-        shader_object_allocator->set_iteration(in_flight_index);
-
-        run_info.shader_object_allocator = shader_object_allocator;
-        run_info.profiler = profiler;
-        run_info.iteration = run_iteration;
-        run_info.total_iteration = total_iteration;
-        run_info.in_flight_index = in_flight_index;
-        run_info.iterations_in_flight = static_cast<uint32_t>(in_flight.size());
-        run_info.time_delta = time_delta;
-        run_info.elapsed = duration_elapsed;
-        run_info.elapsed_since_connect = duration_elapsed_since_connect;
-
-        // While preprocessing nodes can signalize that they need to reconnect as well
-        {
-            MERIAN_PROFILE_SCOPE(profiler, "Preprocess nodes");
-            for (auto& layer : layers)
-                for (auto& node : layer.nodes) {
-                    NodeData& data = node_data.at(node);
-                    MERIAN_PROFILE_SCOPE(profiler, data.label);
-                    const uint32_t set_idx = data.set_index(run_iteration);
-                    Node::NodeStatusFlags flags = 0;
-                    collect_node_errors(data.errors_queued, [&] {
-                        flags = node->pre_process(data.resource_maps[set_idx], run_info);
-                    });
-                    if (!data.errors_queued.empty()) {
-                        SPDLOG_ERROR("preprocessing {} failed:\n - {}", data.label,
-                                     fmt::join(data.errors_queued, "\n   - "));
-                        request_reconnect();
-                    }
-                    if ((flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT) != 0u) {
-                        SPDLOG_DEBUG("node {} requested reconnect in pre_process", data.identifier);
-                        request_reconnect();
-                    }
-                    if ((flags & Node::NodeStatusFlagBits::RESET_IN_FLIGHT_DATA) != 0u) {
-                        in_flight_data.in_flight_data[node].reset();
-                    }
-                    if ((flags & Node::NodeStatusFlagBits::REMOVE_NODE) != 0u) {
-                        remove_node(data.identifier);
-                    }
-                }
+        // the time source may be a node
+        if (first_pass) {
+            advance_time(previous_elapsed);
         }
+        update_run_info(profiler, run_index, is_last);
+        if (std::exchange(first_pass, false) && before_iteration) {
+            if (const auto time = before_iteration(run_info)) {
+                held_time = time;
+                advance_time(previous_elapsed);
+            }
+            // its edits connect before the nodes pre-process
+            if (needs_reconnect) {
+                continue;
+            }
+        }
+        pre_process_nodes(in_flight_data, profiler);
     } while (needs_reconnect);
 
-    // RUN
+    // 2. record and submit
     Submission& submission = *in_flight_data.submission;
     try {
         record_iteration(submission, profiler);
@@ -181,7 +133,79 @@ bool Graph::run_once(const std::function<bool()>& stop_requested) {
     }
 
     cpu_time = std::chrono::high_resolution_clock::now() - run_start;
+}
+
+bool Graph::acquire_slot(const std::function<bool()>& stop_requested) {
+    if (settings.iterations_in_flight != in_flight.size()) {
+        wait();
+        resize_in_flight(settings.iterations_in_flight);
+        request_reconnect();
+    }
+
+    Stopwatch sw_gpu_wait;
+    const uint32_t next_index = (in_flight_index + 1) % in_flight.size();
+    if (!wait_for_iteration(in_flight[next_index].iteration_value, stop_requested)) {
+        return false;
+    }
+    in_flight_index = next_index;
+    gpu_wait_time = gpu_wait_time * 0.9 + sw_gpu_wait.duration() * 0.1;
+
+    // fps limiter
+    cpu_sleep_time = std::chrono::duration<double>::zero();
+    if (settings.limit_fps != 0) {
+        cpu_sleep_time = std::max(std::chrono::duration<double>::zero(),
+                                  1s / static_cast<double>(settings.limit_fps) -
+                                      std::chrono::duration<double>(cpu_time));
+    }
+    if (cpu_sleep_time > 0s) {
+        std::this_thread::sleep_for(cpu_sleep_time);
+    }
     return true;
+}
+
+void Graph::update_run_info(const ProfilerHandle& profiler,
+                            const uint64_t run_index,
+                            const bool is_last) {
+    shader_object_allocator->set_iteration(in_flight_index);
+
+    run_info.shader_object_allocator = shader_object_allocator;
+    run_info.profiler = profiler;
+    run_info.iteration = run_iteration;
+    run_info.total_iteration = total_iteration;
+    run_info.run_index = run_index;
+    run_info.last_iteration = is_last;
+    run_info.in_flight_index = in_flight_index;
+    run_info.iterations_in_flight = static_cast<uint32_t>(in_flight.size());
+}
+
+void Graph::pre_process_nodes(InFlightData& in_flight_data, const ProfilerHandle& profiler) {
+    MERIAN_PROFILE_SCOPE(profiler, "Preprocess nodes");
+    for (auto& layer : layers) {
+        for (auto& node : layer.nodes) {
+            NodeData& data = node_data.at(node);
+            MERIAN_PROFILE_SCOPE(profiler, data.label);
+            const uint32_t set_idx = data.set_index(run_iteration);
+            Node::NodeStatusFlags flags = 0;
+            collect_node_errors(data.errors_queued, [&] {
+                flags = node->pre_process(data.resource_maps[set_idx], run_info);
+            });
+            if (!data.errors_queued.empty()) {
+                SPDLOG_ERROR("preprocessing {} failed:\n - {}", data.label,
+                             fmt::join(data.errors_queued, "\n   - "));
+                request_reconnect();
+            }
+            if ((flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT) != 0u) {
+                SPDLOG_DEBUG("node {} requested reconnect in pre_process", data.identifier);
+                request_reconnect();
+            }
+            if ((flags & Node::NodeStatusFlagBits::RESET_IN_FLIGHT_DATA) != 0u) {
+                in_flight_data.in_flight_data[node].reset();
+            }
+            if ((flags & Node::NodeStatusFlagBits::REMOVE_NODE) != 0u) {
+                remove_node(data.identifier);
+            }
+        }
+    }
 }
 
 void Graph::record_iteration(Submission& submission, const ProfilerHandle& profiler) {
@@ -358,33 +382,22 @@ GraphRunResult Graph::run(const GraphRunOptions& options,
     }
     defer {
         run_stop_patterns.clear();
-        run_info.last_iteration = false;
     };
 
     const auto start = std::chrono::steady_clock::now();
     GraphRunResult result{
         .stop_reason = GraphRunStopReason::ITERATIONS, .iterations = 0, .event = {}};
     while (!options.iterations || result.iterations < *options.iterations) {
-        if (before_iteration) {
-            if (const auto time = before_iteration({run_info, result.iterations})) {
-                held_time = time;
-            }
-            if (stop_requested && stop_requested()) {
-                result.stop_reason = GraphRunStopReason::REQUESTED;
-                break;
-            }
-        }
-        run_info.last_iteration =
-            options.iterations && result.iterations + 1 == *options.iterations;
-        if (!run_unless_stopped(stop_requested)) {
+        const bool is_last = options.iterations && result.iterations + 1 == *options.iterations;
+        if (!iterate(result.iterations, is_last, before_iteration, stop_requested)) {
             result.stop_reason = GraphRunStopReason::REQUESTED;
             break;
         }
+        result.iterations++;
 
         if (after_iteration) {
-            after_iteration({run_info, result.iterations});
+            after_iteration(run_info);
         }
-        result.iterations++;
         if (stop_requested && stop_requested()) {
             result.stop_reason = GraphRunStopReason::REQUESTED;
             break;
@@ -547,7 +560,7 @@ void Graph::restart_run() {
 void Graph::reset_run() {
     run_iteration = 0;
     time_connect_reference = std::chrono::high_resolution_clock::now();
-    duration_elapsed_since_connect = 0ns;
+    run_info.elapsed_since_connect = 0ns;
     run_profiler->clear(Profiler::Period::TOTAL);
 }
 
@@ -564,17 +577,17 @@ void Graph::release_time() {
 }
 
 void Graph::jump_time(const std::chrono::nanoseconds time) {
-    duration_elapsed_since_connect =
-        std::max(duration_elapsed_since_connect + (time - duration_elapsed), 0ns);
-    duration_elapsed = time;
+    run_info.elapsed_since_connect =
+        std::max(run_info.elapsed_since_connect + (time - run_info.elapsed), 0ns);
+    run_info.elapsed = time;
     // keep the references current so falling back to the system clock does not jump
     const auto now = std::chrono::high_resolution_clock::now();
-    time_reference = now - duration_elapsed;
-    time_connect_reference = now - duration_elapsed_since_connect;
+    time_reference = now - run_info.elapsed;
+    time_connect_reference = now - run_info.elapsed_since_connect;
 }
 
 std::chrono::nanoseconds Graph::get_time() const {
-    return duration_elapsed;
+    return run_info.elapsed;
 }
 
 std::vector<NodeHandle> Graph::time_providers() const {
@@ -594,15 +607,14 @@ std::vector<NodeHandle> Graph::time_providers() const {
     return providers;
 }
 
-void Graph::advance_time() {
-    const std::chrono::nanoseconds last_elapsed = duration_elapsed;
+void Graph::advance_time(const std::chrono::nanoseconds previous_elapsed) {
     std::optional<std::chrono::nanoseconds> elapsed;
 
     if (held_time) {
         elapsed = *held_time;
     } else if (settings.time_source == TIME_SOURCE_TIME ||
                settings.time_source == TIME_SOURCE_DELTA) {
-        elapsed = duration_elapsed +
+        elapsed = previous_elapsed +
                   std::chrono::duration_cast<std::chrono::nanoseconds>(
                       std::chrono::duration<double>(settings.time_overwrite_delta_ms / 1000.));
         if (settings.time_source == TIME_SOURCE_TIME) {
@@ -632,17 +644,17 @@ void Graph::advance_time() {
         jump_time(std::max(*elapsed, 0ns));
     } else {
         const auto now = std::chrono::high_resolution_clock::now();
-        duration_elapsed = now - time_reference;
-        duration_elapsed_since_connect = now - time_connect_reference;
+        run_info.elapsed = now - time_reference;
+        run_info.elapsed_since_connect = now - time_connect_reference;
     }
     // the time since connect is 0 in the first iteration after it, whatever the source jumped
     if (run_iteration == 0) {
-        duration_elapsed_since_connect = 0ns;
+        run_info.elapsed_since_connect = 0ns;
         time_connect_reference = std::chrono::high_resolution_clock::now();
     }
 
     // a seek or a loop moves the source's time backwards; nodes integrate over the delta
-    time_delta = std::max(duration_elapsed - last_elapsed, 0ns);
+    run_info.time_delta = std::max(run_info.elapsed - previous_elapsed, 0ns);
 }
 
 uint64_t Graph::get_total_iteration() const {

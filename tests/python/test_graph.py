@@ -387,7 +387,7 @@ class GraphTest(unittest.TestCase):
             def after(info: mg.IterationInfo) -> None:
                 take()
                 graph.nodes["color"].set_properties(
-                    {"color": [info.index_in_run, 0, 0, 1]}
+                    {"color": [info.run_index, 0, 0, 1]}
                 )
 
             graph.sink("a").capture_every(1)
@@ -469,7 +469,7 @@ class GraphTest(unittest.TestCase):
 
             def after(info: mg.IterationInfo) -> None:
                 iterations.extend(capture.run_iteration for capture in sink.get_all())
-                if info.index_in_run == 2:
+                if info.run_index == 2:
                     graph.restart_run()
 
             sink.capture_every(1)
@@ -715,16 +715,20 @@ class GraphTest(unittest.TestCase):
             sink.capture_every(1)
             times = []
             seen = []
+            described = []
+
+            def counters(info: mg.IterationInfo) -> tuple[int, int, int]:
+                return (info.run_index, info.iteration, info.total_iteration)
 
             def before(info: mg.IterationInfo) -> float:
-                scene.camera.look_at(
-                    (0, 1, 5 + info.index_in_run), (0, 1, 0), (0, 1, 0)
-                )
-                return 10.0 * (info.index_in_run + 1)
+                described.append(counters(info))
+                scene.camera.look_at((0, 1, 5 + info.run_index), (0, 1, 0), (0, 1, 0))
+                return 10.0 * (info.run_index + 1)
 
             def after(info: mg.IterationInfo) -> None:
+                self.assertEqual(counters(info), described[-1])
                 times.extend(capture.time for capture in sink.get_all())
-                seen.append((info.index_in_run, info.time, scene.camera.position[2]))
+                seen.append((info.run_index, info.time, scene.camera.position[2]))
 
             result = graph.run(
                 iterations=4, before_iteration=before, after_iteration=after
@@ -742,11 +746,20 @@ class GraphTest(unittest.TestCase):
             self.assertGreaterEqual(graph.time, 40.0)
 
             def failing(info: mg.IterationInfo) -> None:
-                if info.index_in_run == 1:
+                if info.run_index == 1:
                     raise ValueError("stop here")
 
+            # the iteration being prepared still runs, after_iteration is not called for it
+            afters = []
+            start = graph.run_iteration
             with self.assertRaisesRegex(ValueError, "stop here"):
-                graph.run(iterations=5, before_iteration=failing)
+                graph.run(
+                    iterations=5,
+                    before_iteration=failing,
+                    after_iteration=lambda info: afters.append(info.run_index),
+                )
+            self.assertEqual(graph.run_iteration, start + 2)
+            self.assertEqual(afters, [0])
             with self.assertRaises(RuntimeError):
                 graph.run(iterations=1, before_iteration=lambda _: graph.wait())
             with self.assertRaises(TypeError):

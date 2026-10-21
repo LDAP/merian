@@ -109,9 +109,9 @@ void Graph::draw_controls(Properties& props) {
 
 void Graph::draw_state(Properties& props) {
     props.output_text("Run iteration: {}", run_iteration);
-    props.output_text("Run Elapsed: {:%H:%M:%S}s", duration_elapsed_since_connect);
-    props.output_text("Total Elapsed: {:%H:%M:%S}s", duration_elapsed);
-    props.output_text("Time delta: {:04f}ms", to_milliseconds(time_delta));
+    props.output_text("Run Elapsed: {:%H:%M:%S}s", run_info.elapsed_since_connect);
+    props.output_text("Total Elapsed: {:%H:%M:%S}s", run_info.elapsed);
+    props.output_text("Time delta: {:04f}ms", to_milliseconds(run_info.time_delta));
     props.output_text("GPU wait: {:04f}ms", to_milliseconds(gpu_wait_time));
     props.output_text("Iterations in flight {:02}/{:02}",
                       total_iteration - iteration_semaphore->get_counter_value(), in_flight.size());
