@@ -178,6 +178,14 @@ void write(uint3 tid: SV_DispatchThreadID, ParameterBlock<WGBuffer> gbuffer) {
     gbuffer.store(tid.xy, make_sample());
 }
 
+float error<let N : int>(const vector<float, N> value, const vector<float, N> expected) {
+    return any(isnan(value)) ? GBUFFER_UNREQUESTED : distance(value, expected);
+}
+
+float error(const float value, const float expected) {
+    return isnan(value) ? GBUFFER_UNREQUESTED : abs(value - expected);
+}
+
 // the error of each field in GBufferField order, then of the derived accessors
 [shader("compute")]
 [numthreads(1, 1, 1)]
@@ -188,20 +196,19 @@ void read(uint3 tid: SV_DispatchThreadID, ParameterBlock<GBuffer> gbuffer) {
     const bool ids = hit.instance_id == 7 && hit.instance_index == 3 && hit.primitive_id == 11 &&
                      hit.geometry_index == 2;
 
-    results[0] = distance(gbuffer.get_normal(p), expected.normal);
-    results[1] = abs(gbuffer.get_linear_z(p) - expected.linear_z);
-    results[2] = distance(float2(gbuffer.get_grad_z(p)), float2(expected.grad_z));
-    results[3] = abs(gbuffer.get_delta_z(p) - expected.delta_z);
-    results[4] = distance(gbuffer.get_motion_vectors(p), expected.motion_vectors);
+    results[0] = error(gbuffer.get_normal(p), expected.normal);
+    results[1] = error(gbuffer.get_linear_z(p), expected.linear_z);
+    results[2] = error(float2(gbuffer.get_grad_z(p)), float2(expected.grad_z));
+    results[3] = error(gbuffer.get_delta_z(p), expected.delta_z);
+    results[4] = error(gbuffer.get_motion_vectors(p), expected.motion_vectors);
     results[5] = ids ? distance(hit.barycentrics, expected.hit.barycentrics) : 1;
-    results[6] = distance(gbuffer.get_albedo(p), expected.albedo);
-    results[7] = distance(gbuffer.get_diffuse_albedo(p), expected.diffuse_albedo);
-    results[8] = distance(gbuffer.get_specular_albedo(p), expected.specular_albedo);
-    results[9] = abs(gbuffer.get_roughness(p) - expected.roughness);
-    results[10] =
-        abs(gbuffer.get_specular_hit_distance(p) - expected.specular_hit_distance);
-    results[11] = abs(gbuffer.get_view_depth(p) - expected.view_depth);
-    results[12] = abs(gbuffer.get_projected_depth(p) - expected.projected_depth);
+    results[6] = error(gbuffer.get_albedo(p), expected.albedo);
+    results[7] = error(gbuffer.get_diffuse_albedo(p), expected.diffuse_albedo);
+    results[8] = error(gbuffer.get_specular_albedo(p), expected.specular_albedo);
+    results[9] = error(gbuffer.get_roughness(p), expected.roughness);
+    results[10] = error(gbuffer.get_specular_hit_distance(p), expected.specular_hit_distance);
+    results[11] = error(gbuffer.get_view_depth(p), expected.view_depth);
+    results[12] = error(gbuffer.get_projected_depth(p), expected.projected_depth);
 
     results[13] = abs(gbuffer.get_surface(p).linear_z - expected.linear_z);
     results[14] = distance(gbuffer.get_motion_vectors_dilated(int2(p), 1), expected.motion_vectors);
