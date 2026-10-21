@@ -17,12 +17,11 @@ extern static const bool merian_restir_pt_russian_roulette = true;
 extern static const uint merian_restir_pt_roulette_depth = 2u;
 extern static const uint merian_restir_pt_shift_mapping = RestirPTShiftHybrid;
 extern static const bool merian_restir_pt_emission_on_primary = true;
-// integrate over the pixel area and the lens: both samples become part of the path
-// [Zhang et al. 2024]
+// integrate over the pixel area and the lens [Zhang et al. 2024]
 extern static const bool merian_restir_pt_area = false;
-// follow a dynamic scene: a history path's suffix is re-traced in the current scene, and a path
-// moved into the previous frame is evaluated on that frame's geometry [Lin et al. 2026, 6]
-extern static const bool merian_restir_pt_dynamic_scene = false;
+// the light cut learns from training paths, not from the paths the reservoirs reuse
+extern static const bool merian_restir_pt_independent_feedback = true;
+extern static const bool merian_restir_pt_retrace_suffix = true;
 extern static const uint merian_restir_pt_instance_mask = 0xFFu;
 // c of [Lin et al. 2026, eq. 5], relative to the primary footprint, with a relative jitter
 extern static const float merian_restir_pt_min_footprint = 2e-4f;
@@ -41,16 +40,23 @@ uint restir_pt_rc_vertex(const uint flags) {
     return (flags >> RESTIR_PT_RC_VERTEX_SHIFT) & RESTIR_PT_VERTEX_MASK;
 }
 
+static const uint RESTIR_PT_LOBE_MASK = 0x3;
+static const uint RESTIR_PT_LOBE_TRANSMISSION = 0x4;
+
 uint restir_pt_lobe_bits(const RestirPTLobe lobe, const bool transmission) {
-    return uint(lobe) | (transmission ? 4u : 0u);
+    return uint(lobe) | (transmission ? RESTIR_PT_LOBE_TRANSMISSION : 0u);
+}
+
+uint restir_pt_lobes(const uint prev_bits, const uint rc_bits) {
+    return prev_bits | (rc_bits << (RESTIR_PT_LOBE_RC_SHIFT - RESTIR_PT_LOBE_PREV_SHIFT));
 }
 
 RestirPTLobe restir_pt_lobe(const uint flags, const uint shift) {
-    return RestirPTLobe((flags >> shift) & 3u);
+    return RestirPTLobe((flags >> shift) & RESTIR_PT_LOBE_MASK);
 }
 
 bool restir_pt_transmission(const uint flags, const uint shift) {
-    return ((flags >> shift) & 4u) != 0;
+    return ((flags >> shift) & RESTIR_PT_LOBE_TRANSMISSION) != 0;
 }
 
 uint restir_pt_pack_unorm(const float2 v) {
@@ -62,28 +68,58 @@ float2 restir_pt_unpack_unorm(const uint packed) {
     return float2(packed & 0xFFFFu, packed >> 16) / 65535.f;
 }
 
+uint restir_pt_geometry_id(const Hit hit) {
+    return hit.is_valid() ? hit.get_geometry_id() : uint(-1);
+}
+
 void restir_pt_set_hit(inout RestirPTReservoir r, const Hit hit) {
-    r.hit_instance_id = hit.instance_id;
+    r.hit_geometry_id = restir_pt_geometry_id(hit);
     r.hit_primitive_id = hit.primitive_id;
-    r.hit_indices = (hit.geometry_index & 0xFFFFu) | (hit.instance_index << 16);
-    r.hit_barycentrics = restir_pt_pack_unorm(hit.barycentrics);
+    r.hit_instance_index = hit.instance_index;
+    r.hit_barycentrics = hit.barycentrics;
 }
 
 Hit restir_pt_get_hit(const RestirPTReservoir r) {
-    return Hit(r.hit_instance_id, r.hit_indices >> 16, r.hit_primitive_id, r.hit_indices & 0xFFFFu,
-               restir_pt_unpack_unorm(r.hit_barycentrics));
+    return Hit(r.hit_geometry_id, r.hit_instance_index, r.hit_primitive_id, 0, r.hit_barycentrics);
 }
 
-void restir_pt_from_prev_frame(const ParameterBlock<Scene> scene, inout RestirPTReservoir r) {
+void restir_pt_set_light(inout RestirPTReservoir r, const Hit hit, const float3 env_dir) {
+    r.light_geometry_id = restir_pt_geometry_id(hit);
+    r.light_primitive_id = hit.primitive_id;
+    r.light_instance_index = hit.instance_index;
+    r.light_coords = hit.is_valid() ? hit.barycentrics : octahedral_project(env_dir);
+}
+
+Hit restir_pt_get_light(const RestirPTReservoir r) {
+    return Hit(r.light_geometry_id, r.light_instance_index, r.light_primitive_id, 0,
+               r.light_coords);
+}
+
+RestirPTReservoir restir_pt_from_prev_frame(const ParameterBlock<Scene> scene,
+                                            RestirPTReservoir r) {
     if (scene.prev_geometry_remap_count == 0)
-        return;
-    Hit hit = restir_pt_get_hit(r);
-    if (!scene.from_prev_frame(hit)) {
-        r.W = 0.f;
-        hit = Hit();
-    }
-    r.hit_instance_id = hit.instance_id;
-    r.hit_indices = (hit.geometry_index & 0xFFFFu) | (hit.instance_index << 16);
+        return r;
+    const Hit hit = scene.from_prev_frame(restir_pt_get_hit(r));
+    r.hit_geometry_id = restir_pt_geometry_id(hit);
+    r.hit_instance_index = hit.instance_index;
+    const Hit light = scene.from_prev_frame(restir_pt_get_light(r));
+    r.light_geometry_id = restir_pt_geometry_id(light);
+    r.light_instance_index = light.instance_index;
+    return r;
+}
+
+// false where the hit has no surface in the frame of `prev_frame`
+bool restir_pt_hit_surface(const ParameterBlock<Scene> scene,
+                           const Hit hit,
+                           const bool prev_frame,
+                           out TriangleHit tri,
+                           out Surface surface) {
+    if (!hit.is_valid() || !scene.exists(hit, prev_frame))
+        return false;
+    tri = scene.get_triangle_hit(hit, prev_frame);
+    surface = scene.get_surface(hit, tri, prev_frame);
+    // fails for NaN triangles as well
+    return surface.area > 0.f;
 }
 
 RestirPTReservoir restir_pt_empty_reservoir() {
@@ -94,6 +130,7 @@ RestirPTReservoir restir_pt_empty_reservoir() {
     r.seed = 0;
     r.flags = 0;
     restir_pt_set_hit(r, Hit());
+    restir_pt_set_light(r, Hit(), float3(0, 0, 1));
     r.rc_wo = float3(0, 0, 1);
     r.rc_radiance = float3(0);
     r.rc_geometry = 1.f;
@@ -154,11 +191,9 @@ struct RestirPTThresholds {
     }
 }
 
-// The primary vertex of a domain.
 struct RestirPTPrimary {
     Hit hit;
     RayDesc ray;
-    bool valid;
 }
 
 // Area the pixel's cone covers at the primary vertex, scaled by 4 pi [Lin et al. 2026, eq. 5].
@@ -167,17 +202,7 @@ float restir_pt_primary_footprint(const RayDesc ray, const ShadingPoint sp) {
     return MERIAN_FOUR_PI * dot(d, d) / max(abs(dot(sp.get_face_normal(), ray.Direction)), 1e-6f);
 }
 
-// A GBuffer from the previous frame can reference despawned or resized geometry.
-bool restir_pt_hit_exists(const ParameterBlock<Scene> scene, const Hit hit) {
-    if (!hit.is_valid())
-        return true;
-    if (!scene.is_valid_geometry_id(hit.get_geometry_id()))
-        return false;
-    return hit.primitive_id < scene.get_geometry_data(hit.get_geometry_id()).primitive_count;
-}
-
-// Ray through an arbitrary point of the image plane, in pixel units, without the jitter, and
-// through `lens` on the aperture where the camera has one.
+// `image_pos` in pixels, without the jitter; through `lens` where the camera has an aperture
 RayDesc restir_pt_film_ray(const Camera camera,
                            const float2 image_pos,
                            const uint2 dim,
@@ -213,23 +238,18 @@ RestirPTPrimary restir_pt_primary(const ParameterBlock<Scene> scene,
     if (merian_restir_pt_area) {
         const RestirPTRandom random = {seed};
         v.ray = restir_pt_film_ray(camera, image_pos, dim, random.lens());
-        v.hit = scene.trace_ray(v.ray, RAY_FLAG_NONE, gbuffer.get_instance_mask());
+        v.hit = scene.trace_ray(v.ray, RAY_FLAG_NONE, gbuffer.get_instance_mask(), prev_frame);
     } else {
         const uint2 pixel = uint2(image_pos);
         v.ray = camera.generate_ray_pinhole(pixel, dim);
         v.hit = gbuffer.get_hit(pixel);
-        if (prev_frame && !scene.from_prev_frame(v.hit)) {
-            v.valid = false;
-            return v;
-        }
+        if (prev_frame)
+            v.hit = scene.from_prev_frame(v.hit);
     }
-    v.valid = restir_pt_hit_exists(scene, v.hit);
     return v;
 }
 
-// Where the ray from the lens point of `lens` towards `x` crosses the image, in pixels, and
-// G / cos^3 of that segment, the density of a film sample per area at `x`. `x` is a direction
-// where `distant`. None behind the camera or beside the image.
+// where the ray from `lens` to `x` crosses the image, and the film density per area at `x`
 struct RestirPTProjection {
     float2 image_pos;
     float density;
@@ -279,25 +299,34 @@ restir_pt_splat(const ParameterBlock<Scene> scene,
                 const uint dst_mask,
                 const uint2 dim,
                 const uint seed) {
+    if (!scene.exists(primary.hit, to_prev))
+        return none;
     const RestirPTRandom random = {seed};
     const float2 lens = random.lens();
     const Camera src_camera = to_prev ? scene.camera : scene.prev_camera;
     const Camera dst_camera = to_prev ? scene.prev_camera : scene.camera;
-    const bool distant = restir_pt_hit_is_distant(scene, primary.hit);
+    const bool distant = scene.is_distant(primary.hit);
     float3 src_x = primary.ray.Direction;
     float3 dst_x = src_x;
     float3 src_n = float3(0);
     float3 dst_n = float3(0);
     float dst_offset = 0.f;
+    // the vertex keeps its barycentrics, so its triangle's area change is part of the Jacobian
+    float area_ratio = 1.f;
     if (!distant) {
         const TriangleHit tri = scene.get_triangle_hit(primary.hit);
         const Surface now = scene.get_surface(primary.hit, tri);
-        const Surface prev = scene.get_prev_surface(primary.hit, tri);
+        const Surface prev =
+            scene.get_surface(primary.hit, scene.get_triangle_hit(primary.hit, tri, true), true);
         src_x = to_prev ? now.pos : prev.pos;
         src_n = to_prev ? now.face_normal : prev.face_normal;
         dst_x = to_prev ? prev.pos : now.pos;
         dst_n = to_prev ? prev.face_normal : now.face_normal;
         dst_offset = to_prev ? prev.spawn_offset : now.spawn_offset;
+        // fails for NaN triangles as well
+        if (!(now.area > 0.f) || !(prev.area > 0.f))
+            return none;
+        area_ratio = to_prev ? prev.area / now.area : now.area / prev.area;
     }
     const Optional<RestirPTProjection> src =
         restir_pt_project(src_camera, src_x, src_n, distant, dim, lens);
@@ -310,12 +339,15 @@ restir_pt_splat(const ParameterBlock<Scene> scene,
     const RayDesc ray = restir_pt_film_ray(dst_camera, dst.value.image_pos, dim, lens);
     const float3 target = distant ? ray.Origin + ray.Direction * ENV_MAP_DISTANCE
                                   : offset_ray_origin(dst_x, dst_n, dst_offset, -ray.Direction);
-    if (!scene.trace_light_visibility(ray.Origin, ray.Direction, 0.f, target, distant, dst_mask))
+    if (!scene.trace_light_visibility(ray.Origin, ray.Direction, 0.f, target, distant, dst_mask,
+                                      to_prev))
         return none;
 
     RestirPTSplat s;
     s.image_pos = dst.value.image_pos;
-    s.jacobian = dst.value.density / src.value.density;
+    s.jacobian = dst.value.density / src.value.density * area_ratio;
+    if (!isfinite(s.jacobian))
+        return none;
     return s;
 }
 
@@ -326,56 +358,63 @@ RestirPTLobe restir_pt_sample_lobe(const BSDFLobe lobe) {
     return (uint(lobe) & glossy) != 0 ? RestirPTLobeGlossy : RestirPTLobeDiffuse;
 }
 
-// Whether a direction drawn from `lobe` of `bsdf` is rough enough to reconnect from
-// [Lin et al. 2026, 4.2].
-bool restir_pt_is_rough<B : BSDF>(const B bsdf, const RestirPTLobe lobe, const float threshold) {
-    if (lobe == RestirPTLobeDelta)
-        return false;
-    return lobe == RestirPTLobeDiffuse || sqrt(bsdf.specular_alpha) > threshold;
+// Whether `bsdf` is rough enough to reconnect from [Lin et al. 2026, 4.2].
+bool restir_pt_is_rough<B : BSDF>(const B bsdf, const float threshold) {
+    return sqrt(bsdf.effective_alpha) > threshold;
 }
 
-bool restir_pt_samples_lights<B : BSDF>(const ParameterBlock<Scene> scene, const B bsdf) {
-    return scene.nee.has_lights() && bsdf.effective_alpha >= NEE_MIN_ALPHA;
+bool restir_pt_bsdf_samples_lights<B : BSDF>(const B bsdf) {
+    return bsdf.effective_alpha >= NEE_MIN_ALPHA;
 }
 
-// Drawn and evaluated from the path's light stream, so another domain evaluates the same density.
-struct RestirPTLightSample {
-    float3 wo;
-    float dist;
-    float3 Le;
-    // solid angle density of the mixture
-    float pdf;
-    // the point itself
-    float3 pos;
-    // offset towards the receiver, for the shadow ray to end in front of the light
-    float3 shadow_pos;
-    uint index;
+bool restir_pt_has_lights(const ParameterBlock<Scene> scene, const bool prev_frame) {
+    return prev_frame ? scene.prev_nee.has_lights() : scene.nee.has_lights();
 }
 
-Optional<RestirPTLightSample>
-restir_pt_sample_light(const ParameterBlock<Scene> scene,
-                       const float3 pos,
-                       const float3 face_normal,
-                       inout RandomGenerator rng) {
-    const DirectLightVertex vertex = scene.nee.begin_vertex(pos, face_normal, float3(0), rng);
-    if (let ls = scene.sample_direct_light(vertex, rng)) {
-        RestirPTLightSample s;
-        s.wo = ls.wo;
-        s.dist = ls.dist;
-        s.pdf = ls.pdf;
-        s.Le = ls.Li;
-        s.pos = ls.index == LIGHT_ENV_INDEX ? ls.pos : pos + ls.wo * ls.dist;
-        s.shadow_pos = ls.pos;
-        s.index = ls.index;
-        return s;
-    }
-    return none;
+DirectLightVertex restir_pt_begin_light_vertex(const ParameterBlock<Scene> scene,
+                                               const bool prev_frame,
+                                               const float3 pos,
+                                               const float3 face_normal,
+                                               const float spawn_offset,
+                                               inout RandomGenerator light_rng) {
+    return prev_frame ? scene.prev_nee.begin_vertex(pos, face_normal, spawn_offset, float3(0),
+                                                    light_rng, false)
+                      : scene.nee.begin_vertex(pos, face_normal, spawn_offset, float3(0), light_rng,
+                                               !merian_restir_pt_independent_feedback);
 }
 
-// The vertex a segment leaves from, as far as the reconnection criteria and MIS care.
+float restir_pt_light_point_pdf(const ParameterBlock<Scene> scene,
+                                const bool prev_frame,
+                                const DirectLightVertex vertex,
+                                const uint index,
+                                const float3 light_pos,
+                                const float3 light_normal) {
+    return prev_frame ? scene.prev_nee.pdf_point(vertex, index, light_pos, light_normal)
+                      : scene.nee.pdf_point(vertex, index, light_pos, light_normal);
+}
+
+float restir_pt_light_hit_pdf(const ParameterBlock<Scene> scene,
+                              const bool prev_frame,
+                              const DirectLightVertex vertex,
+                              const uint index,
+                              const float2 barycentrics,
+                              const float3 origin,
+                              const float3 dir) {
+    return prev_frame ? scene.prev_nee.pdf(vertex, index, origin, dir, barycentrics, false)
+                      : scene.nee.pdf(vertex, index, origin, dir, barycentrics, false);
+}
+
+bool restir_pt_samples_lights<B : BSDF>(const ParameterBlock<Scene> scene,
+                                        const B bsdf,
+                                        const bool prev_frame) {
+    return restir_pt_has_lights(scene, prev_frame) && restir_pt_bsdf_samples_lights(bsdf);
+}
+
 struct RestirPTFrom {
     float3 pos;
     float3 face_normal;
+    float spawn_offset;
+    float3 origin;
     uint vertex;
     // |cos| between its face normal and the direction drawn there
     float cos;
@@ -393,11 +432,12 @@ struct RestirPTFrom {
     }
 }
 
-// The segment into x_i. Footprints are areas at the far end of the segment
-// [Lin et al. 2026, eq. 5].
+// footprints are areas at the far end of the segment [Lin et al. 2026, eq. 5]
 struct RestirPTSegment {
     // |cos| at x_i over the squared length; 1 for the environment
     float geometry;
+    // geometry times the area of x_i's triangle
+    float rc_geometry;
     // the squared length over |cos| at x_{i-1}: the area x_i's own lobe covers at x_{i-1}
     float inverse_geometry;
     // the area x_{i-1}'s lobe covers at x_i
@@ -410,20 +450,20 @@ struct RestirPTSegment {
         from_rough = from.rough;
         if (distant) {
             geometry = 1.f;
+            rc_geometry = 1.f;
             inverse_geometry = MERIAN_FLT_MAX;
             footprint = MERIAN_FLT_MAX;
             return;
         }
-        const float3 d = sp.pos - from.pos;
+        const float3 d = sp.pos - from.origin;
         const float dist2 = dot(d, d);
         geometry = abs(dot(sp.get_face_normal(), d * rsqrt(dist2))) / dist2;
+        rc_geometry = geometry * sp.area;
         inverse_geometry = dist2 / max(from.cos, 1e-6f);
         footprint = 1.f / (geometry * from.pdf);
     }
 
-    // x_i is a reconnection vertex when the lobe before it is rough and both lobes around the
-    // segment are wide compared to the pixel [Lin et al. 2026, eq. 5]. `pdf` is the density of
-    // the direction leaving x_i.
+    // [Lin et al. 2026, eq. 5]; `pdf` is the density of the direction leaving x_i
     bool reconnects(const float pdf, const float limit) {
         return from_rough && min(footprint, inverse_geometry / pdf) >= limit;
     }
@@ -434,41 +474,17 @@ struct RestirPTSegment {
     }
 }
 
-bool restir_pt_hit_is_distant(const ParameterBlock<Scene> scene, const Hit hit) {
-    if (!hit.is_valid())
-        return true;
-    return (scene.get_geometry_data(hit.get_geometry_id()).flags & GeometryDataFlags::UseEnvMap) !=
-           0;
+ShadingPoint
+restir_pt_shading_point(const ParameterBlock<Scene> scene,
+                        const RayDesc ray,
+                        const Hit hit,
+                        const uint vertex,
+                        const bool with_material,
+                        const bool prev_frame) {
+    return scene.get_shading_point(ray, hit, RenderContext(uint16_t(vertex)), DefaultLODSampler(),
+                                   with_material, prev_frame);
 }
 
-bool restir_pt_on_prev_geometry(const bool prev_frame) {
-    return merian_restir_pt_dynamic_scene && prev_frame;
-}
-
-Surface restir_pt_hit_surface(const ParameterBlock<Scene> scene,
-                              const Hit hit,
-                              const TriangleHit tri,
-                              const bool prev_frame) {
-    return restir_pt_on_prev_geometry(prev_frame) ? scene.get_prev_surface(hit, tri)
-                                                  : scene.get_surface(hit, tri);
-}
-
-ShadingPoint restir_pt_shading_point(const ParameterBlock<Scene> scene,
-                                     const RayDesc ray,
-                                     const Hit hit,
-                                     const uint vertex,
-                                     const bool with_material,
-                                     const bool prev_frame) {
-    const RenderContext ctx = RenderContext(uint16_t(vertex));
-    if (restir_pt_on_prev_geometry(prev_frame) && !restir_pt_hit_is_distant(scene, hit)) {
-        const TriangleHit tri = scene.get_triangle_hit(hit);
-        return scene.get_shading_point(ray, hit, tri, scene.get_prev_surface(hit, tri), ctx,
-                                       DefaultLODSampler(), with_material);
-    }
-    return scene.get_shading_point(ray, hit, ctx, DefaultLODSampler(), with_material);
-}
-
-// One scatter direction and the ray that follows it.
 struct RestirPTScatter {
     float3 wo;
     // f cos, the sample weight for a delta lobe
@@ -523,78 +539,184 @@ RestirPTFrom restir_pt_from<B : BSDF>(const ParameterBlock<Scene> scene,
                                       const ShadingPoint sp,
                                       const uint vertex,
                                       const RestirPTScatter scatter,
-                                      const float min_roughness) {
+                                      const float min_roughness,
+                                      const bool prev_frame) {
     RestirPTFrom from;
     from.pos = sp.pos;
     from.face_normal = sp.get_face_normal();
+    from.spawn_offset = sp.spawn_offset;
+    from.origin = scatter.ray.Origin;
     from.vertex = vertex;
     from.cos = abs(dot(from.face_normal, scatter.wo));
     from.pdf = scatter.footprint_pdf();
     from.lobes = restir_pt_lobe_bits(scatter.lobe, scatter.transmission);
-    from.rough = restir_pt_is_rough(bsdf, scatter.lobe, min_roughness);
-    from.samples_lights = restir_pt_samples_lights(scene, bsdf) && !scatter.is_delta();
+    from.rough = !scatter.is_delta() && restir_pt_is_rough(bsdf, min_roughness);
+    from.samples_lights = restir_pt_samples_lights(scene, bsdf, prev_frame) && !scatter.is_delta();
     return from;
 }
 
-// Density of the light techniques for the light a scatter from `from` reached, for the MIS
-// weight of that emitter; 0 where no light was sampled there.
+// summed over the draws; 0 where no light was sampled there
 float restir_pt_emitter_light_pdf(const ParameterBlock<Scene> scene,
                                   const RestirPTRandom random,
                                   const RestirPTFrom from,
                                   const float3 dir,
-                                  const Hit hit) {
+                                  const Hit hit,
+                                  const bool prev_frame) {
     if (!from.samples_lights)
         return 0.f;
     RandomGenerator light_rng = random.light(from.vertex);
-    return scene.nee.mixture_pdf(
-        scene.nee.pdf(scene.nee.begin_vertex(from.pos, from.face_normal, float3(0), light_rng),
-                      scene.get_light_index(hit), from.pos, dir));
+    const DirectLightVertex vertex = restir_pt_begin_light_vertex(
+        scene, prev_frame, from.pos, from.face_normal, from.spawn_offset, light_rng);
+    return restir_pt_light_hit_pdf(scene, prev_frame, vertex,
+                                   scene.get_light_index(hit, prev_frame), hit.barycentrics,
+                                   from.origin, dir);
 }
 
-// Next event estimation at a vertex: the light sample drawn from the path's own stream, with
-// the BSDF towards it and the MIS weight against the scatter technique.
-struct RestirPTDirect {
-    RestirPTLightSample ls;
-    float3 f;
-    float p_scatter;
-    float mis;
+struct RestirPTLightTarget<B : BSDF> : IDirectLightTarget {
+    B bsdf;
+    OrthonormalFrame frame;
+    float3 wi;
+    float3 wi_local;
+    float3 face_normal;
 
-    // f Le w / p_light
-    float3 contribution() {
-        return f * ls.Le * (mis / ls.pdf);
+    bool receives(const float3 wo) {
+        const bool transmission = wi_local.z * frame.to_local(wo).z < 0.f;
+        return ((dot(wi, face_normal) < 0.f) != (dot(wo, face_normal) < 0.f)) == transmission;
+    }
+
+    float3 unshadowed(const LightSample ls, inout RandomGenerator rng, out float scatter_pdf) {
+        return bsdf.eval_pdf(wi_local, frame.to_local(ls.wo), rng, scatter_pdf) * ls.Li;
     }
 }
 
-Optional<RestirPTDirect>
-restir_pt_direct<B : BSDF>(const ParameterBlock<Scene> scene,
-                           const B bsdf,
-                           const ShadingPoint sp,
-                           const float3 wi,
-                           const RestirPTRandom random,
-                           const uint vertex,
-                           inout RandomGenerator rng) {
+// generalized balance heuristic [Bitterli et al. 2020]; `record`: the light cut learns from it
+Optional<DirectLightSample> restir_pt_direct<B : BSDF>(const ParameterBlock<Scene> scene,
+                                                       const B bsdf,
+                                                       const ShadingPoint sp,
+                                                       const float3 wi,
+                                                       const RestirPTRandom random,
+                                                       const uint vertex,
+                                                       const bool record,
+                                                       out bool visible) {
     RandomGenerator light_rng = random.light(vertex);
-    if (let ls = restir_pt_sample_light(scene, sp.pos, sp.get_face_normal(), light_rng)) {
-        // a light the geometry hides is not reachable from this surface
-        if (!sp.geometric_side_matches_shading(ls.wo))
-            return none;
-        const OrthonormalFrame frame = sp.shading_frame;
-        const float3 wi_local = frame.to_local(wi);
-        const float3 wo_local = frame.to_local(ls.wo);
-        RestirPTDirect d;
-        d.ls = ls;
-        d.f = bsdf.eval_pdf(wi_local, wo_local, rng, d.p_scatter);
-        d.mis = ls.pdf / (ls.pdf + d.p_scatter);
-        if (any(d.f > 0.f) && scene.trace_light_visibility(
-                                  sp.pos, sp.get_face_normal(), sp.spawn_offset, ls.shadow_pos,
-                                  ls.index == LIGHT_ENV_INDEX, merian_restir_pt_instance_mask))
-            return d;
-    }
-    return none;
+    const DirectLightVertex light_vertex = scene.nee.begin_vertex(
+        sp.pos, sp.get_face_normal(), sp.spawn_offset, float3(0), light_rng, record);
+    const RestirPTLightTarget<B> target = {bsdf, sp.shading_frame, wi,
+                                           sp.shading_frame.to_local(wi), sp.get_face_normal()};
+    let s = scene.sample_direct_light(light_vertex, target, light_rng, record);
+    if (!s.hasValue)
+        visible = false;
+    else if (record)
+        visible = scene.trace_direct_light(light_vertex, s.value, light_rng,
+                                           merian_restir_pt_instance_mask);
+    else
+        visible = scene.trace_light_visibility(light_vertex.pos, light_vertex.face_normal,
+                                               light_vertex.spawn_offset, s.value.light.pos,
+                                               s.value.light.index == LIGHT_ENV_INDEX,
+                                               merian_restir_pt_instance_mask);
+    return s;
 }
 
-// The reconnection vertex the candidates after it share. Where it lies and how the path leaves it
-// is recorded in memory once, the rest changes along the path.
+void restir_pt_train(const ParameterBlock<Scene> scene,
+                     const RestirPTPrimary primary,
+                     const uint seed,
+                     inout RandomGenerator rng) {
+    const RestirPTRandom random = {seed};
+    const uint max_length = uint(merian_restir_pt_max_path_length);
+    ShadingPoint sp = scene.get_shading_point(primary.ray, primary.hit);
+    float3 wi = -primary.ray.Direction;
+    float3 throughput = float3(1);
+    for (uint i = 1; i < max_length && sp.has_surface_material && any(throughput > 0.f); i++) {
+        let bsdf = sp.surface_material.get_bsdf();
+        if (restir_pt_samples_lights(scene, bsdf, false)) {
+            bool visible;
+            restir_pt_direct(scene, bsdf, sp, wi, random, i, true, visible);
+        }
+        if (i + 1 == max_length)
+            return;
+        if (merian_restir_pt_russian_roulette && i > merian_restir_pt_roulette_depth) {
+            const float survive = russian_roulette_survival(throughput);
+            if (!(rng.next_float() < survive))
+                return;
+            throughput /= survive;
+        }
+        const Optional<RestirPTScatter> sampled = restir_pt_scatter(bsdf, sp, wi, random, i, rng);
+        if (!sampled.hasValue)
+            return;
+        throughput *= sampled.value.f / sampled.value.pdf;
+        const Hit hit =
+            scene.trace_ray(sampled.value.ray, RAY_FLAG_NONE, merian_restir_pt_instance_mask);
+        sp = scene.get_shading_point(sampled.value.ray, hit, RenderContext(uint16_t(i)),
+                                     DefaultLODSampler(), true);
+        wi = -sampled.value.ray.Direction;
+    }
+}
+
+// BSDF, emission, geometry term times triangle area and MIS weight of the kept light sample
+float3 restir_pt_kept_light<B : BSDF>(const ParameterBlock<Scene> scene,
+                                      const B bsdf,
+                                      const ShadingPoint sp,
+                                      const float3 wi,
+                                      const RestirPTReservoir r,
+                                      const RestirPTRandom random,
+                                      const uint vertex,
+                                      const bool prev_frame,
+                                      inout RandomGenerator rng) {
+    const bool distant = (r.flags & RESTIR_PT_LIGHT_ENV) != 0;
+    const float3 ng = sp.get_face_normal();
+    RandomGenerator light_rng = random.light(vertex);
+    const DirectLightVertex light_vertex =
+        restir_pt_begin_light_vertex(scene, prev_frame, sp.pos, ng, sp.spawn_offset, light_rng);
+    float3 dir = octahedral_unproject(r.light_coords);
+    float geometry = 1.f;
+    float3 light_normal = -dir;
+    float3 target = sp.pos + dir * ENV_MAP_DISTANCE;
+    float3 light_pos = target;
+    uint index = LIGHT_ENV_INDEX;
+    float3 Le;
+    if (distant) {
+        Le = scene.eval_env_map(dir, sp.pos, prev_frame);
+    } else {
+        const Hit hit = restir_pt_get_light(r);
+        TriangleHit tri;
+        Surface surface;
+        if (!restir_pt_hit_surface(scene, hit, prev_frame, tri, surface))
+            return float3(0);
+        light_pos = surface.pos;
+        const float3 d = light_pos - light_vertex.origin(light_pos);
+        const float dist2 = dot(d, d);
+        dir = d * rsqrt(dist2);
+        light_normal = surface.face_normal;
+        geometry = abs(dot(light_normal, dir)) / dist2 * surface.area;
+        RayDesc ray;
+        ray.Origin = sp.pos;
+        ray.Direction = dir;
+        ray.TMin = 0.f;
+        ray.TMax = SCENE_RAY_TMAX;
+        Le = scene
+                 .get_shading_point(ray, hit, tri, surface, RenderContext(uint16_t(vertex)),
+                                    DefaultLODSampler(), false, prev_frame)
+                 .emission;
+        index = scene.get_light_index(hit, prev_frame);
+        target = offset_ray_origin(surface.pos, surface.face_normal, surface.spawn_offset, -dir);
+    }
+
+    const OrthonormalFrame frame = sp.shading_frame;
+    const float3 wi_local = frame.to_local(wi);
+    const float3 wo_local = frame.to_local(dir);
+    if (!any(Le > 0.f) || !sp.geometric_side_agrees(wi, dir, wi_local.z * wo_local.z < 0.f))
+        return float3(0);
+    float p_scatter;
+    const float3 f = bsdf.eval_pdf(wi_local, wo_local, rng, p_scatter);
+    const float p_light =
+        restir_pt_light_point_pdf(scene, prev_frame, light_vertex, index, light_pos, light_normal);
+    if (!any(f > 0.f) || !(p_light > 0.f) ||
+        !scene.trace_light_visibility(sp.pos, ng, sp.spawn_offset, target, distant,
+                                      merian_restir_pt_instance_mask, prev_frame))
+        return float3(0);
+    return f * Le * (geometry * p_light / (p_light + p_scatter));
+}
+
 struct RestirPTRunningRc {
     uint k;
     // p_{k-1} p_k: turns both segments around x_k from primary sample space to solid angle
@@ -632,20 +754,22 @@ struct RestirPTCandidates {
         *selected = r;
     }
 
-    // A candidate that reconnects at the running vertex.
     void write_running(const uint n,
                        const uint k,
                        const bool nee,
                        const bool env,
                        const float3 integrand,
                        const float3 radiance,
-                       const float light_pdf) {
+                       const float light_pdf,
+                       const Hit light = Hit(),
+                       const float3 light_dir = float3(0, 0, 1)) {
         RestirPTReservoir r = *running;
         r.seed = seed;
         r.integrand = integrand;
         r.flags = restir_pt_flags(n, k, nee, env, 0) | r.flags;
         r.rc_radiance = radiance;
         r.light_pdf = light_pdf;
+        restir_pt_set_light(r, light, light_dir);
         write(r);
     }
 }
@@ -743,27 +867,27 @@ float3 restir_pt_trace_candidates(const ParameterBlock<Scene> scene,
     RestirPTFrom from;
 
     for (uint i = 1;; i++) {
-        const bool distant = i > 1 && restir_pt_hit_is_distant(scene, hit);
+        const bool distant = i > 1 && scene.is_distant(hit);
         RestirPTSegment segment;
         if (i > 1)
             segment = RestirPTSegment(from, sp, distant);
 
         // 1. emission, reached by the scatter technique from x_{i-1}
         if (i == 1) {
-            if (merian_restir_pt_emission_on_primary && merian_restir_pt_area) {
-                if (any(sp.emission > 0.f) && candidates.select(sp.emission, rng)) {
+            if (merian_restir_pt_emission_on_primary) {
+                if (!merian_restir_pt_area) {
+                    primary_emission = sp.emission;
+                } else if (any(sp.emission > 0.f) && candidates.select(sp.emission, rng)) {
                     candidates.write(restir_pt_candidate(
                         seed, sp.emission,
                         restir_pt_flags(1, 0, false, !sp.has_surface_material, 0), Hit(), wi,
                         sp.emission, 1.f, 0.f));
                 }
-            } else if (merian_restir_pt_emission_on_primary) {
-                primary_emission = sp.emission;
-            }
-            if (merian_restir_pt_emission_on_primary)
                 rec.emission(sp.emission);
+            }
         } else if (any(sp.emission > 0.f)) {
-            const float light_pdf = restir_pt_emitter_light_pdf(scene, random, from, -wi, hit);
+            const float light_pdf =
+                restir_pt_emitter_light_pdf(scene, random, from, -wi, hit, false);
             const float mis = from.pdf / (from.pdf + light_pdf);
             const float3 contribution = throughput * sp.emission * mis;
             rec.emission(contribution);
@@ -776,7 +900,7 @@ float3 restir_pt_trace_candidates(const ParameterBlock<Scene> scene,
                     candidates.write(restir_pt_candidate(
                         seed, contribution * roulette * from.measure(),
                         restir_pt_flags(i, i, false, distant, from.lobes), distant ? Hit() : hit,
-                        -wi, sp.emission, segment.geometry, 0.f));
+                        -wi, sp.emission, segment.rc_geometry, 0.f));
                 } else {
                     candidates.write(
                         restir_pt_candidate(seed, contribution * roulette,
@@ -786,8 +910,7 @@ float3 restir_pt_trace_candidates(const ParameterBlock<Scene> scene,
             }
         }
 
-        if (i >= max_length || !sp.has_surface_material ||
-            all(throughput <= 0.f)) {
+        if (i >= max_length || !sp.has_surface_material || all(throughput <= 0.f)) {
             rec.terminal(records, sp.pos);
             break;
         }
@@ -796,60 +919,67 @@ float3 restir_pt_trace_candidates(const ParameterBlock<Scene> scene,
         let bsdf = sp.surface_material.get_bsdf();
         const float3 wi_local = frame.to_local(wi);
         const float3 ng = sp.get_face_normal();
-        const bool samples_lights = restir_pt_samples_lights(scene, bsdf);
+        const bool samples_lights = restir_pt_samples_lights(scene, bsdf, false);
         const uint material = path_record_pack_material(sp.material_id);
         RestirPTLightRecord light_record = RestirPTLightRecord();
 
         // 2. next event estimation towards x_{i+1}
         if (samples_lights) {
             light_record.drawn = true;
-            if (let direct = restir_pt_direct(scene, bsdf, sp, wi, random, i, rng)) {
-                const RestirPTLightSample ls = direct.ls;
-                const float3 contribution = throughput * direct.contribution();
-                const bool env = ls.index == LIGHT_ENV_INDEX;
-                light_record.pos = ls.pos;
-                light_record.pdf = ls.pdf;
-                light_record.throughput = throughput * direct.f * (direct.mis / ls.pdf);
+            bool visible;
+            let resampled = restir_pt_direct(scene, bsdf, sp, wi, random, i,
+                                             !merian_restir_pt_independent_feedback, visible);
+            if (resampled.hasValue) {
+                light_record.pos = resampled.value.light_point;
+                light_record.pdf = resampled.value.realized_pdf;
+            }
+            if (visible) {
+                const DirectLightSample direct = resampled.value;
+                const float3 contribution = throughput * direct.value;
+                const bool env = direct.light.index == LIGHT_ENV_INDEX;
+                light_record.throughput =
+                    select(direct.light.Li > 0.f, contribution / direct.light.Li, float3(0));
                 light_record.contribution = contribution;
                 if (candidates.select(contribution, rng)) {
+                    // per area of the light's triangle
+                    float light_geometry = 1.f;
+                    if (!env) {
+                        const float3 n = scene.nee.get_normal(direct.light.index);
+                        light_geometry = abs(dot(n, direct.light.wo)) /
+                                         (direct.light.dist * direct.light.dist) *
+                                         scene.nee.get_area(direct.light.index);
+                    }
+                    const uint light_lobe = restir_pt_lobe_bits(
+                        RestirPTLobeDiffuse, dot(wi, ng) * dot(direct.light.wo, ng) < 0.f);
                     if (rc.k != 0) {
-                        candidates.write_running(i + 1, rc.k, true, env,
-                                                 contribution * roulette * rc.measure,
-                                                 rc.throughput * direct.contribution(), 0.f);
+                        // the integrand is measured on the light
+                        const float light_density = direct.realized_pdf * light_geometry;
+                        candidates.write_running(
+                            i + 1, rc.k, true, env,
+                            contribution * roulette * rc.measure * light_density,
+                            rc.throughput * direct.value * light_density, 0.f,
+                            env ? Hit()
+                                : scene.get_emitter_hit(direct.light.index, direct.light_point),
+                            direct.light.wo);
                     } else if (i > 1 &&
-                               (hybrid ? segment.reconnects(direct.p_scatter, limit) : i == 2)) {
+                               (hybrid ? segment.reconnects(direct.scatter_pdf, limit) : i == 2)) {
                         // x_i reconnects, with the light sample leaving it
-                        const uint lobes =
-                            from.lobes | (restir_pt_lobe_bits(RestirPTLobeDiffuse,
-                                                              dot(wi, ng) * dot(ls.wo, ng) < 0.f)
-                                          << (RESTIR_PT_LOBE_RC_SHIFT - RESTIR_PT_LOBE_PREV_SHIFT));
+                        const uint lobes = restir_pt_lobes(from.lobes, light_lobe);
                         candidates.write(restir_pt_candidate(
-                            seed, contribution * roulette * from.measure() * ls.pdf,
-                            restir_pt_flags(i + 1, i, true, env, lobes), hit, ls.wo, ls.Le,
-                            segment.geometry, ls.pdf));
+                            seed, contribution * roulette * from.measure() * direct.realized_pdf,
+                            restir_pt_flags(i + 1, i, true, env, lobes) |
+                                RESTIR_PT_RC_SAMPLES_LIGHTS,
+                            hit, direct.light.wo, direct.light.Li, segment.rc_geometry,
+                            direct.light_pdf));
                     } else {
                         // the light vertex itself reconnects
-                        float geometry = 1.f;
-                        if (!env) {
-                            const float3 n = scene.nee.get_normal(ls.index);
-                            geometry = abs(dot(n, ls.wo)) / (ls.dist * ls.dist);
-                        }
                         candidates.write(restir_pt_candidate(
-                            seed, contribution * roulette * ls.pdf,
-                            restir_pt_flags(
-                                i + 1, i + 1, true, env,
-                                restir_pt_lobe_bits(RestirPTLobeDiffuse,
-                                                    dot(wi, ng) * dot(ls.wo, ng) < 0.f)),
-                            env ? Hit() : scene.get_emitter_hit(ls.index, ls.pos), ls.wo,
-                            ls.Le, geometry, 0.f));
+                            seed, contribution * roulette * direct.realized_pdf,
+                            restir_pt_flags(i + 1, i + 1, true, env, light_lobe),
+                            env ? Hit()
+                                : scene.get_emitter_hit(direct.light.index, direct.light_point),
+                            direct.light.wo, direct.light.Li, light_geometry, 0.f));
                     }
-                }
-            } else if (merian_path_record) {
-                // a blocked light sample is still a draw of the light techniques
-                RandomGenerator light_rng = random.light(i);
-                if (let ls = restir_pt_sample_light(scene, sp.pos, ng, light_rng)) {
-                    light_record.pos = ls.pos;
-                    light_record.pdf = ls.pdf;
                 }
             }
         }
@@ -882,16 +1012,19 @@ float3 restir_pt_trace_candidates(const ParameterBlock<Scene> scene,
                    (hybrid ? segment.reconnects(scatter.footprint_pdf(), limit) : i == 2)) {
             rc.k = i;
             rc.measure = from.measure() * scatter.pdf;
+            const bool rc_samples_lights =
+                restir_pt_bsdf_samples_lights(bsdf) && !scatter.is_delta();
             *candidates.running = restir_pt_candidate(
                 seed, float3(0),
-                (from.lobes | (restir_pt_lobe_bits(scatter.lobe, scatter.transmission)
-                               << (RESTIR_PT_LOBE_RC_SHIFT - RESTIR_PT_LOBE_PREV_SHIFT)))
-                    << RESTIR_PT_LOBE_PREV_SHIFT,
-                hit, scatter.wo, float3(0), segment.geometry, 0.f);
+                (restir_pt_lobes(from.lobes,
+                                 restir_pt_lobe_bits(scatter.lobe, scatter.transmission))
+                 << RESTIR_PT_LOBE_PREV_SHIFT) |
+                    (rc_samples_lights ? RESTIR_PT_RC_SAMPLES_LIGHTS : 0u),
+                hit, scatter.wo, float3(0), segment.rc_geometry, 0.f);
         }
 
         throughput *= scatter.f / scatter.pdf;
-        from = restir_pt_from(scene, bsdf, sp, i, scatter, thresholds.roughness);
+        from = restir_pt_from(scene, bsdf, sp, i, scatter, thresholds.roughness, false);
         rec.vertex(records, sp.pos, scatter.wo, scatter.pdf, throughput, i - 1,
                    restir_pt_record_lobe(scatter.lobe, scatter.transmission),
                    PATH_RECORD_METHOD_BSDF, material);

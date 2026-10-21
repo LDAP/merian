@@ -1,6 +1,5 @@
 #include "merian-graph/nodes/render_restir_pt/render_restir_pt.hpp"
 
-#include "merian-graph/nodes/render_restir_pt/render_restir_pt.slangh"
 #include "merian/shader/shader_compile_context.hpp"
 #include "merian/utils/hash.hpp"
 #include "merian/vk/pipeline/pipeline_compute.hpp"
@@ -9,11 +8,13 @@
 #include "merian/vk/utils/profiler.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <fmt/format.h>
 #include <numbers>
 #include <numeric>
 #include <random>
+#include <vector>
 
 namespace merian {
 
@@ -95,6 +96,24 @@ vk::BufferCreateInfo buffer_create_info(const vk::DeviceSize size) {
             vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndirectBuffer};
 }
 
+bool is_shift(const uint32_t pass) {
+    return pass == RenderRestirPT::ShiftSpatial || pass == RenderRestirPT::ShiftTemporal ||
+           pass == RenderRestirPT::ShiftTemporalToPrev || pass == RenderRestirPT::ShiftCoverage;
+}
+
+uint32_t shift_kind(const uint32_t pass) {
+    switch (pass) {
+    case RenderRestirPT::ShiftTemporal:
+        return RestirPTShiftTemporal;
+    case RenderRestirPT::ShiftTemporalToPrev:
+        return RestirPTShiftTemporalToPrev;
+    case RenderRestirPT::ShiftCoverage:
+        return RestirPTShiftCoverage;
+    default:
+        return RestirPTShiftSpatial;
+    }
+}
+
 } // namespace
 
 RenderRestirPT::RenderRestirPT() = default;
@@ -152,7 +171,8 @@ void RenderRestirPT::update_render_constants() {
                     "export static const bool merian_restir_pt_disocclusion_motion = {};\n"
                     "export static const bool merian_restir_pt_duplication_cap = {};\n"
                     "export static const bool merian_restir_pt_decoupled_shading = {};\n"
-                    "export static const bool merian_restir_pt_dynamic_scene = {};\n"
+                    "export static const bool merian_restir_pt_independent_feedback = {};\n"
+                    "export static const bool merian_restir_pt_retrace_suffix = {};\n"
                     "export static const uint merian_restir_pt_temporal_mode = {}u;\n"
                     "export static const bool merian_restir_pt_specular_motion = {};\n"
                     "export static const float merian_restir_pt_specular_motion_roughness = {:f};\n"
@@ -162,11 +182,12 @@ void RenderRestirPT::update_render_constants() {
                     spp, max_path_length, b(russian_roulette), roulette_depth, shift_mapping,
                     b(emission_on_primary), b(area), mask, min_footprint / 100.f, footprint_jitter,
                     min_roughness, roughness_jitter, neighbor_selection, neighbor_count,
-                    cgns_candidates, b(early_stopping), b(geometry_rejection), reject_normal,
-                    reject_depth, b(demodulate_albedo), b(stochastic_backprojection),
+                    cgns_candidates, b(early_stopping),
+                    b(geometry_rejection && neighbor_selection != RestirPTNeighborsCGNS),
+                    reject_normal, reject_depth, b(demodulate_albedo), b(stochastic_backprojection),
                     b(disocclusion_motion), b(duplication_cap), b(decoupled_shading),
-                    b(dynamic_scene), temporal_mode, b(specular_motion), specular_motion_roughness,
-                    debug_view, record_mode));
+                    b(independent_feedback), b(retrace_suffix), temporal_mode, b(specular_motion),
+                    specular_motion_roughness, debug_view, record_mode));
     path_records.add_constants(composition);
 }
 
@@ -282,10 +303,11 @@ RenderRestirPT::on_connected(const NodeIOLayout& io_layout,
     temporal_domains =
         allocator->create_buffer(buffer_create_info(pixels * 4 * sizeof(uint32_t)),
                                  MemoryMappingType::NONE, "ReSTIR PT temporal domains");
-    splat_samples = allocator->create_buffer(buffer_create_info(slots * 2 * sizeof(uint32_t)),
+    splat_samples = allocator->create_buffer(buffer_create_info(pixels * 2 * sizeof(uint32_t)),
                                              MemoryMappingType::NONE, "ReSTIR PT splat samples");
     queue = allocator->create_buffer(
-        buffer_create_info(sizeof(RestirPTQueueHeader) + slots * 2 * sizeof(uint32_t)),
+        buffer_create_info(RESTIR_PT_QUEUES * sizeof(RestirPTQueueHeader) +
+                           pixels * RESTIR_PT_MAX_SHIFTS * sizeof(uint32_t)),
         MemoryMappingType::NONE, "ReSTIR PT shift queue");
     pairing = allocator->create_buffer(
         buffer_create_info((RESTIR_PT_PAIRING_EXTENT * RESTIR_PT_PAIRING_EXTENT + 1) *
@@ -310,6 +332,10 @@ RenderRestirPT::on_connected(const NodeIOLayout& io_layout,
 void RenderRestirPT::upload_pairing(const ResourceAllocatorHandle& allocator,
                                     Submission& submission) {
     const std::vector<uint32_t> tables = generate_pairing(spatial_radius, seed);
+    submission.get_cmd()->barrier(vk::PipelineStageFlagBits::eComputeShader,
+                                  vk::PipelineStageFlagBits::eTransfer,
+                                  pairing->buffer_barrier(vk::AccessFlagBits::eShaderRead,
+                                                          vk::AccessFlagBits::eTransferWrite));
     allocator->get_staging()->cmd_to_device(submission.get_cmd(), pairing, tables);
     submission.get_cmd()->barrier(vk::PipelineStageFlagBits::eTransfer,
                                   vk::PipelineStageFlagBits::eComputeShader,
@@ -336,7 +362,8 @@ void RenderRestirPT::ensure_pipeline(const ContextHandle& context,
         const bool raygen = use_raygen() && p == Initial;
         const char* name = raygen         ? "initial_rt"
                            : p == Initial ? "initial"
-                           : p == Shift   ? "shift"
+                           : is_shift(p)  ? "shift"
+                           : p == Train   ? "train"
                                           : "resample";
         entry_points[p] = SlangProgramEntryPoint::create(program, name);
 
@@ -358,12 +385,15 @@ void RenderRestirPT::ensure_pipeline(const ContextHandle& context,
         } else {
             pipelines[p] = Versioned<Pipeline>([this, context, p] {
                 const auto ep = entry_points[p].get();
-                if (p == Initial || p == Shift) {
+                if (p == Initial || p == Train) {
                     return ComputePipeline::create(ep->get_pipeline_layout(context),
                                                    ep->specialize());
                 }
                 SpecializationInfoBuilder spec;
-                spec.add_entry_id(0, p);
+                if (is_shift(p))
+                    spec.add_entry_id(1, shift_kind(p));
+                else
+                    spec.add_entry_id(0, p);
                 return ComputePipeline::create(ep->get_pipeline_layout(context),
                                                ep->specialize(spec.build()));
             });
@@ -480,10 +510,14 @@ RenderRestirPT::process(const NodeIO& io, const NodeProcessInfo& info, Submissio
         ep->bind("scene", scene->get_shader_object(), cmd, pipe, obj_allocator);
         ep->bind("params", obj, cmd, pipe, obj_allocator);
         cmd->push_constant(pipe, pc);
-        if (p == Shift) {
-            cmd->dispatch_indirect(queue);
-        } else if (p == Duplication) {
-            cmd->dispatch(extent, 16, 16);
+        if (is_shift(p)) {
+            const uint32_t queue_index =
+                p == ShiftTemporalToPrev ? RESTIR_PT_INTO_NEIGHBOR : RESTIR_PT_INTO_PIXEL;
+            cmd->dispatch_indirect(queue, queue_index * sizeof(RestirPTQueueHeader));
+        } else if (p == Train) {
+            const uint32_t pixels = extent.width * extent.height;
+            const uint32_t threads = (pixels + RESTIR_PT_TRAIN_STRIDE - 1) / RESTIR_PT_TRAIN_STRIDE;
+            cmd->dispatch((threads + RESTIR_PT_TRAIN_GROUP - 1) / RESTIR_PT_TRAIN_GROUP, 1, 1);
         } else if (use_raygen() && p == Initial) {
             cmd->trace_rays(initial_sbt.get(), extent);
         } else {
@@ -491,29 +525,38 @@ RenderRestirPT::process(const NodeIO& io, const NodeProcessInfo& info, Submissio
         }
     };
 
-    // neighbor selection queues the shifts, one indirect dispatch runs them
-    const auto run_shifts = [&](const Pass neighbor_pass, const BufferHandle& in,
-                                const uint32_t flags) {
-        const RestirPTQueueHeader empty{0, 1, 1, 0};
+    const auto before_transfer = [&](const BufferHandle& buffer) {
         cmd->barrier(stages | vk::PipelineStageFlagBits::eDrawIndirect,
                      vk::PipelineStageFlagBits::eTransfer,
-                     queue->buffer_barrier(vk::AccessFlagBits::eShaderRead |
-                                               vk::AccessFlagBits::eShaderWrite |
-                                               vk::AccessFlagBits::eIndirectCommandRead,
-                                           vk::AccessFlagBits::eTransferWrite));
-        cmd->update(queue, 0, sizeof(empty), &empty);
+                     buffer->buffer_barrier(vk::AccessFlagBits::eShaderRead |
+                                                vk::AccessFlagBits::eShaderWrite |
+                                                vk::AccessFlagBits::eIndirectCommandRead,
+                                            vk::AccessFlagBits::eTransferWrite));
+    };
+
+    const auto run_shifts = [&](const Pass neighbor_pass, const BufferHandle& in,
+                                const std::initializer_list<Pass> shift_passes) {
+        std::array<RestirPTQueueHeader, RESTIR_PT_QUEUES> empty;
+        empty.fill({0, 1, 1, 0});
+        before_transfer(queue);
+        cmd->update(queue, 0, sizeof(empty), empty.data());
         cmd->barrier(vk::PipelineStageFlagBits::eTransfer,
                      vk::PipelineStageFlagBits::eComputeShader,
                      queue->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
                                            vk::AccessFlagBits::eShaderRead |
                                                vk::AccessFlagBits::eShaderWrite));
-        run(neighbor_pass, in, nullptr, flags);
+        run(neighbor_pass, in, nullptr, 0u);
         sync(vk::PipelineStageFlagBits::eDrawIndirect);
         MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "shift");
-        run(Shift, in, nullptr, flags);
+        for (const Pass shift_pass : shift_passes)
+            run(shift_pass, in, nullptr, 0u);
         sync();
     };
 
+    if (independent_feedback && scene->get_light_collection().densities_vary()) {
+        MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "light training");
+        run(Train, nullptr, nullptr, 0u);
+    }
     BufferHandle current = next_target();
     {
         MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "initial candidates");
@@ -529,23 +572,26 @@ RenderRestirPT::process(const NodeIO& io, const NodeProcessInfo& info, Submissio
                      temporal_mode == RestirPTTemporalSubpixelCoverage);
         if (subpixel_backprojection) {
             if (temporal_mode == RestirPTTemporalSubpixelCoverage) {
-                run_shifts(CoverageNeighbors, current, RestirPTPassCoverageShifts);
+                run_shifts(CoverageNeighbors, current, {ShiftCoverage});
             }
             run(SubpixelBackprojection, current, nullptr, 0u);
             sync();
         }
         if (temporal_mode == RestirPTTemporalSplatting ||
             temporal_mode == RestirPTTemporalSplattingFallback) {
+            before_transfer(splat_counts);
+            before_transfer(neighbors);
             cmd->fill(splat_counts);
+            cmd->fill(neighbors, RESTIR_PT_NO_NEIGHBOR);
             cmd->barrier(vk::PipelineStageFlagBits::eTransfer,
                          vk::PipelineStageFlagBits::eComputeShader,
-                         splat_counts->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
-                                                      vk::AccessFlagBits::eShaderRead |
-                                                          vk::AccessFlagBits::eShaderWrite));
+                         vk::MemoryBarrier{vk::AccessFlagBits::eTransferWrite,
+                                           vk::AccessFlagBits::eShaderRead |
+                                               vk::AccessFlagBits::eShaderWrite});
             run(Splat, current, nullptr, 0u);
             sync();
         }
-        run_shifts(TemporalNeighbors, current, RestirPTPassTemporalShifts);
+        run_shifts(TemporalNeighbors, current, {ShiftTemporal, ShiftTemporalToPrev});
         const BufferHandle target = next_target();
         run(Temporal, current, target, write == writes ? RestirPTPassResolves : 0u);
         current = target;
@@ -557,7 +603,7 @@ RenderRestirPT::process(const NodeIO& io, const NodeProcessInfo& info, Submissio
         pc.round = static_cast<uint32_t>(round);
         pc.pairing_transform =
             xxhash32(static_cast<uint32_t>(iteration), static_cast<uint32_t>(round), seed);
-        run_shifts(SpatialNeighbors, current, 0u);
+        run_shifts(SpatialNeighbors, current, {ShiftSpatial});
         const BufferHandle target = next_target();
         run(Spatial, current, target, write == writes ? RestirPTPassResolves : 0u);
         current = target;
@@ -570,7 +616,7 @@ RenderRestirPT::process(const NodeIO& io, const NodeProcessInfo& info, Submissio
         sync();
     }
 
-    {
+    if (duplication_cap || debug_view == RestirPTDebugDuplication) {
         MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "duplication");
         run(Duplication, current, nullptr,
             previous_reservoirs ? RestirPTPassPreviousReservoirs : 0u);
@@ -610,7 +656,7 @@ RenderRestirPT::NodeStatusFlags RenderRestirPT::properties(Properties& config) {
         constants_changed |= config.config_options(
             "mapping", shift_mapping, {"reconnection", "hybrid"}, Properties::OptionsStyle::COMBO,
             "'reconnection' reconnects at the second vertex. 'hybrid' replays the random numbers "
-            "up to the first vertex whose lobe before it is rough and whose segment is long "
+            "up to the first vertex whose BSDF before it is rough and whose segment is long "
             "compared to the pixel footprint, and reconnects there (Lin et al. 2026, 4).");
         if (shift_mapping == RestirPTShiftHybrid) {
             constants_changed |= config.config_float(
@@ -625,7 +671,7 @@ RenderRestirPT::NodeStatusFlags RenderRestirPT::properties(Properties& config) {
                 0.01f, 0.f, 1.f);
             constants_changed |= config.config_float(
                 "min roughness", min_roughness,
-                "Linear roughness the lobe before a vertex needs for the vertex to be reconnected.",
+                "Linear roughness the BSDF before a vertex needs for the vertex to be reconnected.",
                 0.01f, 0.f, 1.f);
             constants_changed |= config.config_float(
                 "roughness jitter", roughness_jitter,
@@ -646,11 +692,10 @@ RenderRestirPT::NodeStatusFlags RenderRestirPT::properties(Properties& config) {
             "reservoir of the pixel the motion vector points at. 'subpixel backprojection' (area "
             "reservoirs) moves the pixel's footprint back by its motion and resamples the previous "
             "samples in it (Zhang et al. 2024, 4.3): 'samples as-is' those that fall inside, "
-            "'guaranteed coverage' also those of the overlapped pixels by one-pixel shifts, at "
-            "about twice the cost; the latter diverges where geometry moves rigidly, since the "
-            "previous frame is traced in the current scene. 'splatting' pushes every reservoir "
-            "onto the pixel its primary vertex projects to (Liu et al. 2025); its fallback "
-            "backprojects where nothing landed, except with area reservoirs.");
+            "'guaranteed coverage' also those of the overlapped pixels by one-pixel shifts (Zhang "
+            "et al. 2024, 4.3.2), at about twice the cost. 'splatting' pushes every reservoir onto "
+            "the pixel its primary vertex projects to (Liu et al. 2025); its fallback backprojects "
+            "where nothing landed, except with area reservoirs.");
         config.config_float("history cap", history_cap,
                             "Samples a temporal reservoir may stand for. Longer histories "
                             "converge faster but correlate neighbouring pixels.",
@@ -672,11 +717,6 @@ RenderRestirPT::NodeStatusFlags RenderRestirPT::properties(Properties& config) {
             "disocclusion motion vectors", disocclusion_motion,
             "Where the backprojected pixel lies behind an occluder, follow the occluder's motion "
             "instead (Zeng et al. 2021).");
-        constants_changed |= config.config_bool(
-            "dynamic scene update", dynamic_scene,
-            "Re-trace what arrives at a history path's reconnection vertex in the current scene, "
-            "and evaluate a path moved into the previous frame on that frame's geometry, so "
-            "lights and geometry that moved are seen where they are in each frame.");
         constants_changed |= config.config_bool(
             "duplication cap", duplication_cap,
             "Lower the history cap where the previous frame's path repeats around the pixel (Lin "
@@ -705,10 +745,12 @@ RenderRestirPT::NodeStatusFlags RenderRestirPT::properties(Properties& config) {
                                 0.1f, 1.f, 100.f)) {
             pairing_dirty = true;
         }
-        constants_changed |= config.config_bool(
-            "geometry rejection", geometry_rejection,
-            "Drop neighbors whose normal or depth diverges too far from the pixel's.");
-        if (geometry_rejection) {
+        const bool show_rejection = neighbor_selection != RestirPTNeighborsCGNS || !config.is_ui();
+        if (show_rejection)
+            constants_changed |= config.config_bool(
+                "geometry rejection", geometry_rejection,
+                "Drop neighbors whose normal or depth diverges too far from the pixel's.");
+        if (show_rejection && geometry_rejection) {
             float angle = std::acos(reject_normal);
             constants_changed |= config.config_angle(
                 "max normal angle", angle, "Reject neighbors with normals farther apart.", 0, 180);
@@ -738,6 +780,19 @@ RenderRestirPT::NodeStatusFlags RenderRestirPT::properties(Properties& config) {
             }
             config.st_end_child();
         }
+        config.st_end_child();
+    }
+
+    if (config.st_begin_child("biasing", "Biasing")) {
+        constants_changed |= config.config_bool(
+            "independent light feedback", independent_feedback,
+            "Train the light cut with separate paths from a tenth of the pixels instead of with "
+            "the light samples of the paths the reservoirs reuse.");
+        constants_changed |= config.config_bool(
+            "re-trace suffixes", retrace_suffix,
+            "Re-trace the part of a temporal path after its reconnection vertex in the frame it "
+            "is evaluated in, instead of keeping what arrived there when it was sampled. Biased "
+            "when off unless the scene, its lights and their sampling stay fixed.");
         config.st_end_child();
     }
 

@@ -60,11 +60,7 @@ int2 restir_pt_unpack_pixel(const uint packed) {
     return int2(packed & 0xFFFFu, packed >> 16);
 }
 
-static const uint RESTIR_PT_NO_NEIGHBOR = ~0u;
-
-// Every pixel of a periodic tile holds the offset to its partner, which holds the opposite one.
-// A per-round translation, flip and transpose of the tile keeps the pairs reciprocal while it
-// moves them around [Lin et al. 2026, 5.1].
+// reciprocal pairs from a transformed periodic tile [Lin et al. 2026, 5.1]
 int2 restir_pt_reciprocal_neighbor(const RestirPTUintAddress pairing,
                                    const uint transform,
                                    const uint2 pixel,

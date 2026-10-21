@@ -14,16 +14,23 @@ Formulas in the shaders cite the references below by author and equation number.
 A pixel traces `samples per pixel` paths and resamples their light-carrying subpaths into one
 reservoir. Every vertex draws its scatter direction and its light sample from random streams of
 its own, seeded by the path, so a replay in another domain reproduces them whatever the rest of the
-path consumed. Light samples are one-sample mixtures of the scene's pool and cell techniques, taken
-from the unjittered cell, so their density is a function of the point alone.
+path consumed. A light sample is resampled from the light cut's `draws` by its unshadowed
+contribution and weighed against the scatter technique with the generalized balance heuristic
+(Bitterli et al. 2020); the cell lookup jitters with the vertex's light stream, so the density of
+the draws is a function of the point and the path's seed. Light samples are taken only on the side
+of the surface the scatter technique reaches. The light cut learns from the light samples of
+training paths, traced from a tenth of the pixels and never reused, and the next frame draws from
+what it learned.
 
 The integrand is measured in primary sample space everywhere but around the reconnection vertex
-x_k, where both segments are measured in solid angle; the Jacobian of a shift is the ratio of the
-geometry terms into x_k.
+x_k, where both segments are measured in solid angle, and at a light sample drawn behind x_k, which
+is measured on the light; the Jacobian of a shift is the ratio of the geometry terms into x_k. A
+path keeps that light sample, so no other frame has to draw it again from a light cut that changed
+since.
 
 `shift/mapping`:
 
-- `hybrid` replays the random numbers up to the first vertex whose previous lobe is rough
+- `hybrid` replays the random numbers up to the first vertex whose previous BSDF is rough
   (`min roughness`) and whose segment is long on both sides compared to the pixel footprint
   (`min footprint`, Lin et al. 2026, eq. 5), and reconnects there. Both thresholds are jittered per
   path. Paths through specular chains are replayed whole.
@@ -42,8 +49,9 @@ the same point of the destination pixel. Its primary rays see the instances of t
   one shift.
 - `disk`: low-discrepancy offsets on a disk of `radius` pixels.
 - `CGNS`: `cgns/candidates` pixels from the disk, scored by the compatibility of their primary hits
-  and kept in proportion to the score (Junkins et al. 2026). The selection is not reciprocal, so
-  every neighbor costs two shifts, as with `disk`.
+  and kept in proportion to the score (Junkins et al. 2026). The score already weighs normal and
+  distance, so `geometry rejection` does not apply. The selection is not reciprocal, so every
+  neighbor costs two shifts, as with `disk`.
 
 The canonical path and its neighbors are resampled with the confidence-weighted defensive pairwise
 MIS weights (Lin et al. 2022, eq. 38; Hedstrom et al. 2026, eq. 11).
@@ -56,19 +64,21 @@ previous frame, reservoir splatting projects the previous primary hits forward.
 - `backprojection` takes the reservoir of the pixel the motion vector points at and resamples it
   with the confidence-weighted balance heuristic.
 - `subpixel backprojection, samples as-is` (area reservoirs) moves the pixel's footprint back by its
-  motion and resamples the previous samples that fall into it, relabeled to it, with the confidence
-  of the up to four pixels it overlaps (Zhang et al. 2024, 4.3.1, the fast option).
+  motion and resamples the previous samples that fall into it, relabeled to it (Zhang et al. 2024,
+  4.3.1, the fast option). A path is weighed against the confidence of the previous pixel it falls
+  in, the only one that can have sampled it, and none where the footprint leaves the image.
 - `subpixel backprojection, guaranteed coverage` also moves the samples of those pixels that fall
   outside the footprint into it by one-pixel shifts, with MIS over the overlapped pixels (Zhang et
-  al. 2024, 4.3.2, the robust option). It shifts every previous reservoir into its eight neighbors
-  and costs about twice the time of the other modes. It diverges where geometry moves rigidly, such
-  as a first-person weapon: the previous frame is traced in the current scene, and the samples it
-  keeps carry integrands of that mismatch into the next frame.
+  al. 2024, 4.3.2, the robust option). Where the footprint leaves the image no sample moves in, so
+  paths there are not weighed against the history. It shifts every previous reservoir into its own
+  pixel and its eight neighbors, re-tracing their suffixes in the previous frame like the pixel's
+  path moved there, and costs about twice the time of the other modes.
 - `splatting` pushes every previous reservoir onto the pixel its primary vertex projects to (Liu et
-  al. 2025), and resamples all that landed pairwise. With area reservoirs a reservoir lands on the
+  al. 2025), and resamples those that landed pairwise. A pixel keeps a random subset of up to five
+  of them, the same whatever order they arrive in. With area reservoirs a reservoir lands on the
   point of the film its vertex projects to, weighed by the Jacobian between the film areas of both
-  frames, and every current path splats back to find the previous pixel its MIS weight is taken
-  against.
+  frames and by the inverse of its chance to be kept, and every current path splats back to find
+  the previous pixel its MIS weight is taken against.
 - `splatting, backprojection fallback` backprojects where nothing landed. With area reservoirs it
   splats only: which of the two a pixel took would depend on where other samples landed.
 
@@ -77,10 +87,20 @@ frame's path repeats around the pixel (Lin et al. 2026, 6). `specular motion vec
 the specular share of a smooth surface by the virtual image it reflects, `disocclusion motion
 vectors` follow the occluder out of a disocclusion (Zeng et al. 2021).
 
-`dynamic scene update` re-traces a history path's suffix in the current scene, and evaluates a path
-moved into the previous frame on that frame's vertex positions and transforms. Rays of the previous
-frame are traced in the current scene, so the reuse stays biased where the visibility of an emitter
-changes between frames, such as around animated flames.
+A path moved into the previous frame is evaluated on that frame's vertex positions, transforms,
+materials, time, acceleration structures and light sampling, so the target of a history path in its
+own domain is the one it stored. Texture slots that are reused and meshes that switch materials
+between frames are not tracked.
+
+## Biasing
+
+The settings that remove a bias at a cost:
+
+- `independent light feedback`: the light cut learns from training paths of their own instead of
+  the light samples of the paths the reservoirs reuse.
+- `re-trace suffixes`: the suffix of a temporal path is re-traced every frame in the frame it is
+  evaluated in, instead of keeping what arrived at its reconnection vertex when it was sampled.
+  Turning it off is biased unless the scene, its lights and their sampling stay fixed.
 
 ## Path debugger
 
@@ -90,11 +110,13 @@ pixel shades, replayed in its own domain.
 
 ## Not supported
 
-The depth-of-field reconnection shift, a previous-frame acceleration structure, reservoir
-compression, per-lobe BSDF evaluation, analytic lights and denoiser guide buffers.
+The depth-of-field reconnection shift, reservoir compression, per-lobe BSDF evaluation, analytic
+lights and denoiser guide buffers.
 
 ## References
 
+- **Bitterli et al. 2020.** Spatiotemporal Reservoir Resampling for Real-Time Ray Tracing with
+  Dynamic Direct Lighting. *TOG* 39(4). doi:10.1145/3386569.3392481
 - **Chao 1982.** A General Purpose Unequal Probability Sampling Plan. *Biometrika* 69(3).
   doi:10.1093/biomet/69.3.653
 - **Efraimidis 2015.** Weighted Random Sampling over Data Streams. LNCS 9295.

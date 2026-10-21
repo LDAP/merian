@@ -14,11 +14,12 @@ import merian_shaders.utils.sampling;
 import merian_shaders.colors.colorspaces;
 #endif
 
-// C-style enums on both sides, so the shaders name the cases the way the host does
 #ifdef __cplusplus
 #define RESTIR_PT_UNSCOPED
+#define RESTIR_PT_CONST static constexpr uint32_t
 #else
 #define RESTIR_PT_UNSCOPED [UnscopedEnum]
+#define RESTIR_PT_CONST static const uint
 #endif
 
 namespace merian {
@@ -29,19 +30,14 @@ RESTIR_PT_UNSCOPED enum RestirPTPass : uint32_t {
     RestirPTPassTemporalNeighbors = 1,
     // selects every pixel's spatial neighbors and queues the shifts they need
     RestirPTPassSpatialNeighbors = 2,
-    // moves one reservoir into another domain
     RestirPTPassShift = 3,
     RestirPTPassTemporal = 4,
     RestirPTPassSpatial = 5,
     // counts how often each pixel's path repeats around it
     RestirPTPassDuplication = 6,
-    // pushes every previous reservoir onto the pixel its primary vertex projects to
     RestirPTPassSplat = 7,
-    // resamples the previous samples in each pixel's backprojected footprint
     RestirPTPassSubpixelBackprojection = 8,
-    // queues the one-pixel shifts of every previous reservoir into its eight neighbors
     RestirPTPassCoverageNeighbors = 9,
-    // replays every pixel's final path into the path record stream
     RestirPTPassRecord = 10,
     RestirPTPassCount = 11,
 };
@@ -56,19 +52,21 @@ RESTIR_PT_UNSCOPED enum RestirPTRecord : uint32_t {
 RESTIR_PT_UNSCOPED enum RestirPTPassFlags : uint32_t {
     // this dispatch writes the image
     RestirPTPassResolves = 0x1,
-    // the shifts of this dispatch belong to the temporal pair
-    RestirPTPassTemporalShifts = 0x2,
-    // the shifts of this dispatch move previous reservoirs into their neighbors
-    RestirPTPassCoverageShifts = 0x4,
-    // the previous reservoirs were written
-    RestirPTPassPreviousReservoirs = 0x8,
+    RestirPTPassPreviousReservoirs = 0x2,
+};
+
+RESTIR_PT_UNSCOPED enum RestirPTShiftKind : uint32_t {
+    RestirPTShiftSpatial = 0,
+    RestirPTShiftTemporal = 1,
+    RestirPTShiftTemporalToPrev = 2,
+    // a previous reservoir into a neighbor, within the previous frame
+    RestirPTShiftCoverage = 3,
 };
 
 RESTIR_PT_UNSCOPED enum RestirPTShiftMapping : uint32_t {
     // reconnect at the second vertex
     RestirPTShiftReconnection = 0,
-    // replay the random numbers up to the first vertex that is far and rough enough to reconnect
-    // at [Lin et al. 2022, 7.3; Lin et al. 2026, 4]
+    // replay up to the first far and rough vertex, reconnect there [Lin et al. 2022, 7.3; 2026, 4]
     RestirPTShiftHybrid = 1,
 };
 
@@ -104,36 +102,31 @@ RESTIR_PT_UNSCOPED enum RestirPTDebugView : uint32_t {
     RestirPTDebugReconnectionVertex = 2,
     // confidence of the final reservoir over the history cap
     RestirPTDebugConfidence = 3,
-    // share of the neighbors accepted, share of their shifts that succeeded, and whether a
-    // neighbor's path won, for the last resampling pass
+    // share of accepted neighbors, of successful shifts, and whether a neighbor's path won
     RestirPTDebugReuseSuccess = 4,
 };
 
-#ifdef __cplusplus
-static constexpr uint32_t RESTIR_PT_MAX_NEIGHBORS = 5;
+RESTIR_PT_CONST RESTIR_PT_MAX_NEIGHBORS = 5;
+RESTIR_PT_CONST RESTIR_PT_MAX_SHIFTS = 2 * RESTIR_PT_MAX_NEIGHBORS;
+// one per shift direction
+RESTIR_PT_CONST RESTIR_PT_QUEUES = 2;
+RESTIR_PT_CONST RESTIR_PT_INTO_PIXEL = 0;
+RESTIR_PT_CONST RESTIR_PT_INTO_NEIGHBOR = 1;
+RESTIR_PT_CONST RESTIR_PT_NO_NEIGHBOR = ~0u;
+// one pixel in this many traces a training path per frame
+RESTIR_PT_CONST RESTIR_PT_TRAIN_STRIDE = 10;
+RESTIR_PT_CONST RESTIR_PT_TRAIN_GROUP = 64;
 // window the duplication map counts in, 17x17
-static constexpr uint32_t RESTIR_PT_DUPLICATION_RADIUS = 8;
-static constexpr uint32_t RESTIR_PT_PAIRING_EXTENT = 256;
-#else
-static const uint RESTIR_PT_MAX_NEIGHBORS = 5;
-static const uint RESTIR_PT_DUPLICATION_RADIUS = 8;
-static const uint RESTIR_PT_PAIRING_EXTENT = 256;
-#endif
+RESTIR_PT_CONST RESTIR_PT_DUPLICATION_RADIUS = 8;
+RESTIR_PT_CONST RESTIR_PT_PAIRING_EXTENT = 256;
 
-// The lobe a direction was drawn from, as far as the shift criteria care.
 RESTIR_PT_UNSCOPED enum RestirPTLobe : uint32_t {
     RestirPTLobeDiffuse = 0,
     RestirPTLobeGlossy = 1,
     RestirPTLobeDelta = 2,
 };
 
-// One resampled path per pixel, a GRIS reservoir [Lin et al. 2022].
-//
-// The integrand is measured in primary sample space everywhere except around the reconnection
-// vertex x_k, where both of its segments are measured in solid angle. The shift keeps x_k and
-// everything after it, so its Jacobian is left with the geometry term into x_k alone.
-//
-// Every float3 shares 16 bytes with a scalar: pointers take std430, the host packs scalars.
+// GRIS reservoir [Lin et al. 2022]; each float3 shares 16 bytes with a scalar (std430)
 struct RestirPTReservoir {
     float3 integrand;
     // confidence: how many samples the reservoir stands for [Lin et al. 2022, 6.2]
@@ -142,53 +135,44 @@ struct RestirPTReservoir {
     float3 rc_wo;
     // resampling weight sum while resampling, unbiased contribution weight afterwards
     float W;
-    // Radiance arriving at x_k along rc_wo, with the MIS weights of everything behind it. Just the
-    // emission where the light vertex is x_k or follows it: those weights depend on the domain.
+    // radiance at x_k along rc_wo; only emission where the light vertex is x_k or follows it
     float3 rc_radiance;
-    // geometry term of the segment into x_k in this reservoir's domain
+    // geometry term of the segment into x_k times x_k's triangle area
     float rc_geometry;
-    // seeds every random number of the path, so another domain can replay it
     uint seed;
     // RestirPTFlags and the vertex indices
     uint flags;
     // density of the light technique for the light vertex seen from x_k, where it follows x_k
     float light_pdf;
-    // where the primary ray passes the pixel, unorm16x2; the pixel's center without area
-    // reservoirs
+    // where the primary ray passes the pixel, unorm16x2
     uint film;
     // x_k; invalid where it is the environment
-    uint hit_instance_id;
+    float2 hit_barycentrics;
+    uint hit_geometry_id;
     uint hit_primitive_id;
-    // geometry index in the low half, instance index in the high half
-    uint hit_indices;
-    uint hit_barycentrics;
+    uint hit_instance_index;
+    // the light sample drawn behind x_k, as hit_*; octahedral direction for the environment
+    uint light_geometry_id;
+    float2 light_coords;
+    uint light_primitive_id;
+    uint light_instance_index;
+    uint2 padding;
 };
 
 // flags of RestirPTReservoir
-#ifdef __cplusplus
-static constexpr uint32_t RESTIR_PT_LIGHT_VERTEX_SHIFT = 0;
-static constexpr uint32_t RESTIR_PT_RC_VERTEX_SHIFT = 5;
-static constexpr uint32_t RESTIR_PT_VERTEX_MASK = 0x1F;
-static constexpr uint32_t RESTIR_PT_LIGHT_NEE = 1u << 10;
-static constexpr uint32_t RESTIR_PT_LIGHT_ENV = 1u << 11;
-static constexpr uint32_t RESTIR_PT_LOBE_PREV_SHIFT = 12;
-static constexpr uint32_t RESTIR_PT_LOBE_RC_SHIFT = 15;
-#else
-static const uint RESTIR_PT_LIGHT_VERTEX_SHIFT = 0;
-static const uint RESTIR_PT_RC_VERTEX_SHIFT = 5;
-static const uint RESTIR_PT_VERTEX_MASK = 0x1F;
-static const uint RESTIR_PT_LIGHT_NEE = 1u << 10;
-static const uint RESTIR_PT_LIGHT_ENV = 1u << 11;
+RESTIR_PT_CONST RESTIR_PT_LIGHT_VERTEX_SHIFT = 0;
+RESTIR_PT_CONST RESTIR_PT_RC_VERTEX_SHIFT = 5;
+RESTIR_PT_CONST RESTIR_PT_VERTEX_MASK = 0x1F;
+RESTIR_PT_CONST RESTIR_PT_LIGHT_NEE = 1u << 10;
+RESTIR_PT_CONST RESTIR_PT_LIGHT_ENV = 1u << 11;
 // two bits of RestirPTLobe and one for transmission, for x_{k-1} and x_k
-static const uint RESTIR_PT_LOBE_PREV_SHIFT = 12;
-static const uint RESTIR_PT_LOBE_RC_SHIFT = 15;
-#endif
+RESTIR_PT_CONST RESTIR_PT_LOBE_PREV_SHIFT = 12;
+RESTIR_PT_CONST RESTIR_PT_LOBE_RC_SHIFT = 15;
+RESTIR_PT_CONST RESTIR_PT_RC_SAMPLES_LIGHTS = 1u << 18;
 
-// A reservoir moved into another domain. The rest of the reservoir carries over unchanged, but
-// for the geometry term into x_k, which the Jacobian is the ratio of.
 struct RestirPTShift {
     float3 integrand;
-    // |T'| in the measure the integrand is kept in, zero where the shift failed
+    // |T'|, zero where the shift failed
     float jacobian;
 };
 
@@ -200,17 +184,14 @@ struct RestirPTQueueHeader {
     uint count;
 };
 
-// What arrives at a history path's reconnection vertex now, re-traced in the current scene.
 struct RestirPTSuffix {
-    float3 rc_wo;
-    float light_pdf;
     float3 rc_radiance;
-    float unused;
+    float light_pdf;
 };
 
 #ifdef __cplusplus
-static_assert(sizeof(RestirPTReservoir) == 80, "RestirPTReservoir must match std430");
-static_assert(sizeof(RestirPTSuffix) == 32, "RestirPTSuffix must match std430");
+static_assert(sizeof(RestirPTReservoir) == 112, "RestirPTReservoir must match std430");
+static_assert(sizeof(RestirPTSuffix) == 16, "RestirPTSuffix must match std430");
 static_assert(sizeof(RestirPTShift) == 16, "RestirPTShift must match std430");
 using RestirPTReservoirAddress = vk::DeviceAddress;
 using RestirPTShiftAddress = vk::DeviceAddress;
@@ -229,19 +210,16 @@ struct RestirPTPushConstant {
     RestirPTReservoirAddress reservoirs_in;
     RestirPTReservoirAddress reservoirs_out;
     RestirPTReservoirAddress reservoirs_prev;
-    // the suffix of each history reservoir a pixel resamples, re-traced in the current scene
+    // the suffix of each history reservoir a pixel resamples
     RestirPTSuffixAddress history;
 
-    // two results per neighbor slot, RESTIR_PT_MAX_NEIGHBORS slots per pixel
+    // RESTIR_PT_MAX_SHIFTS per pixel: two per neighbor slot, or one per coverage target
     RestirPTShiftAddress shifts;
-    // each pixel's neighbors, packed as x | y << 16, ~0 where rejected
+    // neighbors as x | y << 16, ~0 where rejected; splat keys before the temporal neighbor pass
     RestirPTUintAddress neighbors;
-    // how many previous reservoirs landed on a pixel
     RestirPTUintAddress splat_counts;
     // confidence of each pixel and the neighbors it accepted together
     RestirPTFloatAddress confidence_sums;
-    // RestirPTQueueHeader, then one item per shift: pixel index << 4 | slot << 1 | direction
-    RestirPTUintAddress queue;
     // reciprocal pairing deltas, RESTIR_PT_PAIRING_EXTENT^2 per neighbor, then the periods
     RestirPTUintAddress pairing;
     // how often a pixel's path repeats in the window around it, and how long it has survived
@@ -249,11 +227,9 @@ struct RestirPTPushConstant {
     RestirPTUintAddress prev_duplication;
     // the reservoir of each pixel's footprint backprojected into the previous frame
     RestirPTReservoirAddress backprojected;
-    // four words per pixel: the previous frame's domain its path is moved into, the top-left
-    // corner of the backprojected footprint or where the primary vertex splats with its Jacobian
-    // and the confidence there
+    // per pixel: previous domain, footprint corner or splat point with Jacobian, confidence
     RestirPTUintAddress temporal_domains;
-    // two words per neighbor slot: film position and Jacobian of a splatted reservoir
+    // two words per pixel: where its previous reservoir splats on the film, and the Jacobian
     RestirPTUintAddress splat_samples;
 
     uint32_t frame;

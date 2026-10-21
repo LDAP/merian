@@ -20,11 +20,22 @@ float3 restir_pt_record_light_pos(const ParameterBlock<Scene> scene,
         const Hit hit = restir_pt_get_hit(r);
         return scene.get_surface(hit, scene.get_triangle_hit(hit)).pos;
     }
-    const RestirPTRandom random = {r.seed};
-    RandomGenerator light_rng = random.light(vertex);
-    if (let ls = restir_pt_sample_light(scene, sp.pos, sp.get_face_normal(), light_rng))
-        return ls.pos;
-    return sp.pos + r.rc_wo;
+    if (k + 1 < n) {
+        if ((r.flags & RESTIR_PT_LIGHT_ENV) != 0)
+            return sp.pos + octahedral_unproject(r.light_coords) * ENV_MAP_DISTANCE;
+        const Hit light = restir_pt_get_light(r);
+        return light.is_valid() ? scene.get_surface(light, scene.get_triangle_hit(light)).pos
+                                : sp.pos;
+    }
+    RayDesc ray;
+    ray.Origin = sp.pos;
+    ray.Direction = r.rc_wo;
+    ray.TMin = SCENE_RAY_TMIN;
+    ray.TMax = SCENE_RAY_TMAX;
+    const Hit hit = scene.trace_ray(ray, RAY_FLAG_NONE, merian_restir_pt_instance_mask);
+    if (scene.is_distant(hit))
+        return sp.pos + r.rc_wo * ENV_MAP_DISTANCE;
+    return scene.get_surface(hit, scene.get_triangle_hit(hit)).pos;
 }
 
 void restir_pt_record_shaded(const ParameterBlock<Scene> scene,

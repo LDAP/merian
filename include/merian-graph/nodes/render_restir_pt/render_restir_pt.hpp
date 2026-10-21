@@ -5,6 +5,7 @@
 #include "merian-graph/connectors/image/vk_image_out_managed.hpp"
 #include "merian-graph/connectors/ptr_in.hpp"
 #include "merian-graph/graph/node.hpp"
+#include "merian-graph/nodes/render_restir_pt/render_restir_pt.slangh"
 #include "merian-graph/objects/gbuffer_object.hpp"
 #include "merian-graph/objects/path_record_sink.hpp"
 #include "merian-shaders/gbuffer.hpp"
@@ -21,26 +22,27 @@
 
 namespace merian {
 
-// ReSTIR path tracing after Lin et al. (2022) with the algorithms of ReSTIR PT Enhanced
-// (Lin et al. 2026): the hybrid shift with footprint-based reconnection, reciprocal neighbor
-// pairs, and a history cap that follows sample duplication. Compatibility-guided neighbor
-// selection (Junkins et al. 2026) replaces the pairs where selected.
+// ReSTIR PT [Lin et al. 2022, 2026], compatibility-guided neighbors [Junkins et al. 2026]
 class RenderRestirPT : public Node {
 
   public:
     enum Pass {
-        Initial = 0,
-        TemporalNeighbors = 1,
-        SpatialNeighbors = 2,
-        Shift = 3,
-        Temporal = 4,
-        Spatial = 5,
-        Duplication = 6,
-        Splat = 7,
-        SubpixelBackprojection = 8,
-        CoverageNeighbors = 9,
-        Record = 10,
-        PassCount = 11
+        Initial = RestirPTPassInitial,
+        TemporalNeighbors = RestirPTPassTemporalNeighbors,
+        SpatialNeighbors = RestirPTPassSpatialNeighbors,
+        ShiftSpatial = RestirPTPassShift,
+        Temporal = RestirPTPassTemporal,
+        Spatial = RestirPTPassSpatial,
+        Duplication = RestirPTPassDuplication,
+        Splat = RestirPTPassSplat,
+        SubpixelBackprojection = RestirPTPassSubpixelBackprojection,
+        CoverageNeighbors = RestirPTPassCoverageNeighbors,
+        Record = RestirPTPassRecord,
+        Train = RestirPTPassCount,
+        ShiftTemporal,
+        ShiftTemporalToPrev,
+        ShiftCoverage,
+        PassCount
     };
     enum class TraceShader : int32_t { Auto, RayGeneration, Compute };
 
@@ -104,7 +106,7 @@ class RenderRestirPT : public Node {
     std::array<bool, 8> mask_enabled{true, true, true, true, true, true, true, true};
 
     // shift
-    int32_t shift_mapping = 1;
+    int32_t shift_mapping = RestirPTShiftHybrid;
     // c of the footprint criterion, in percent of the primary footprint
     float min_footprint = 0.02f;
     float footprint_jitter = 0.2f;
@@ -113,21 +115,19 @@ class RenderRestirPT : public Node {
 
     // temporal reuse
     bool temporal_enable = true;
-    // the previous reservoirs and gbuffer were written
     bool previous_iteration_traced = false;
     float history_cap = 20.f;
     bool stochastic_backprojection = false;
     bool disocclusion_motion = false;
     bool specular_motion = false;
     float specular_motion_roughness = 0.1f;
-    bool dynamic_scene = false;
-    int32_t temporal_mode = 0;
+    int32_t temporal_mode = RestirPTTemporalBackprojection;
     bool duplication_cap = false;
     float duplication_exponent = 0.1f;
 
     // spatial reuse
     int32_t spatial_rounds = 1;
-    int32_t neighbor_selection = 0;
+    int32_t neighbor_selection = RestirPTNeighborsReciprocal;
     int32_t neighbor_count = 3;
     float spatial_radius = 30.f;
     bool geometry_rejection = true;
@@ -142,10 +142,14 @@ class RenderRestirPT : public Node {
     bool early_stopping = true;
     float early_stop_cutoff = 0.5f;
 
-    int32_t debug_view = 0;
+    // debiasing
+    bool independent_feedback = true;
+    bool retrace_suffix = true;
+
+    int32_t debug_view = RestirPTDebugNone;
 
     PathRecordSink path_records;
-    int32_t record_mode = 0;
+    int32_t record_mode = RestirPTRecordCandidates;
 
     SlangCompositionHandle gbuffer_composition;
     SlangCompositionHandle composition;
