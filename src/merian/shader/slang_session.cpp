@@ -1103,7 +1103,8 @@ SlangSession::compile(const Slang::ComPtr<slang::IComponentType>& linked_program
 }
 
 std::optional<std::filesystem::path>
-SlangSession::spirv_cache_path(const Slang::ComPtr<slang::IComponentType>& program) {
+SlangSession::spirv_cache_path(const Slang::ComPtr<slang::IComponentType>& program,
+                               const std::optional<uint32_t> entry_point_index) {
     if (!cache_enabled()) {
         return std::nullopt;
     }
@@ -1121,21 +1122,12 @@ SlangSession::spirv_cache_path(const Slang::ComPtr<slang::IComponentType>& progr
         entry_point_hashes += to_hex(hash->getBufferPointer(), hash->getBufferSize());
     }
     // the concatenated entry point hashes exceed MAX_PATH on Windows
-    return cache_dir("spirv") / fmt::format("{:016x}-{}.spv", hash_val(entry_point_hashes), count);
-}
-
-std::optional<std::filesystem::path>
-SlangSession::spirv_cache_path(const Slang::ComPtr<slang::IComponentType>& program,
-                               const uint32_t entry_point_index) {
-    if (!cache_enabled()) {
-        return std::nullopt;
+    const uint64_t key = hash_val(entry_point_hashes);
+    if (entry_point_index) {
+        return cache_dir("spirv") /
+               fmt::format("{:016x}-{}-{}.spv", key, count, *entry_point_index);
     }
-    Slang::ComPtr<slang::IBlob> hash;
-    program->getEntryPointHash(static_cast<SlangInt>(entry_point_index), 0, hash.writeRef());
-    if (hash == nullptr || hash->getBufferSize() == 0) {
-        return std::nullopt;
-    }
-    return cache_dir("spirv") / (to_hex(hash->getBufferPointer(), hash->getBufferSize()) + ".spv");
+    return cache_dir("spirv") / fmt::format("{:016x}-{}.spv", key, count);
 }
 
 SlangSessionHandle ShaderCompileContext::current_session() {

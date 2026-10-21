@@ -118,12 +118,11 @@ class SlangSession {
     // Slang names a module after the first import that reaches it, and mangled names contain the
     // module name: a binary cannot load against a dependency compiled under another name.
     bool modules_canonically_named();
-    // Slang's own backend cache key (getEntryPointHash) as a filename, or nullopt to skip.
-    static std::optional<std::filesystem::path>
-    spirv_cache_path(const Slang::ComPtr<slang::IComponentType>& program);
+    // Slang's own backend cache keys (getEntryPointHash) of all entry points as a filename, or
+    // nullopt to skip.
     static std::optional<std::filesystem::path>
     spirv_cache_path(const Slang::ComPtr<slang::IComponentType>& program,
-                     uint32_t entry_point_index);
+                     std::optional<uint32_t> entry_point_index = std::nullopt);
 
     const Slang::ComPtr<slang::IModule>& ensure_module(SlangComposition::SlangModule& module);
     static void check_one_source_per_name(const SlangCompositionHandle& composition,

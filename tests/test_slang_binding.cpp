@@ -16,6 +16,7 @@
 #include <bit>
 #include <cstring>
 #include <filesystem>
+#include <string_view>
 
 using namespace merian;
 
@@ -1125,4 +1126,29 @@ TEST_F(SlangBindingTest, SecondEntryPointParameterBlock) {
     });
 
     EXPECT_EQ(readback(output_buffer, 1).data[0], float_bits(7.5f));
+}
+
+// mainB's ParameterBlock lands in another register space next to mainA
+TEST_F(SlangBindingTest, EntryPointBinaryDependsOnTheOtherEntryPoints) {
+    SlangComposition::SlangModule module =
+        SlangComposition::SlangModule::from_path("slang_binding/multi_entry_point.slang", false);
+    const SlangCompositionHandle both = SlangComposition::create();
+    both->add_module(module);
+    both->add_entry_point("mainA", module.get_name());
+    both->add_entry_point("mainB", module.get_name());
+    const SlangCompositionHandle only_b = SlangComposition::create();
+    only_b->add_module(module);
+    only_b->add_entry_point("mainB", module.get_name());
+
+    const SlangProgramHandle program_both = SlangProgram::create(compile_context, both).get();
+    const SlangProgramHandle program_b = SlangProgram::create(compile_context, only_b).get();
+    const Slang::ComPtr<slang::IBlob> binary_both =
+        program_both->get_binary(program_both->get_entry_point_index("mainB"));
+    const Slang::ComPtr<slang::IBlob> binary_b =
+        program_b->get_binary(program_b->get_entry_point_index("mainB"));
+    const std::string_view spirv_both(static_cast<const char*>(binary_both->getBufferPointer()),
+                                      binary_both->getBufferSize());
+    const std::string_view spirv_b(static_cast<const char*>(binary_b->getBufferPointer()),
+                                   binary_b->getBufferSize());
+    EXPECT_NE(spirv_both, spirv_b);
 }
