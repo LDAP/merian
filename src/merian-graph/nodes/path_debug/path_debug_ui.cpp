@@ -386,7 +386,8 @@ void PathDebugNode::draw_lines_tab() {
     if (overlay_color == static_cast<int32_t>(PATH_DEBUG_COLOR_TECHNIQUE)) {
         for (const uint32_t method :
              {PATH_RECORD_METHOD_BSDF, PATH_RECORD_METHOD_GUIDING, PATH_RECORD_METHOD_LIGHT,
-              PATH_RECORD_METHOD_RESTIR, PATH_RECORD_METHOD_UNKNOWN}) {
+              PATH_RECORD_METHOD_REPLAYED_BSDF, PATH_RECORD_METHOD_REPLAYED_LIGHT,
+              PATH_RECORD_METHOD_RECONNECTION, PATH_RECORD_METHOD_UNKNOWN}) {
             const uint32_t rgb = PATH_DEBUG_METHOD_COLORS[method];
             ImGui::TextColored(
                 ImVec4(static_cast<float>((rgb >> 16) & 0xFFu) / 255.f,

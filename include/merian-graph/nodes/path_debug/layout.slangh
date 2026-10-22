@@ -274,7 +274,7 @@ static const uint32_t PATH_DEBUG_COLOR_TECHNIQUE = 3;
 
 // 0xRRGGBB per PATH_RECORD_METHOD_*
 static const uint32_t PATH_DEBUG_METHOD_COLORS[PATH_RECORD_METHOD_COUNT] = {
-    0x9a9a9a, 0x9a9a9a, 0x9a9a9a, 0x5ec8f0, 0xc080ff, 0xff9a3c, 0xffd83c};
+    0x9a9a9a, 0x9a9a9a, 0x9a9a9a, 0x5ec8f0, 0xc080ff, 0xffd83c, 0x2e6be6, 0xff9a3c, 0xff3c3c};
 
 static const uint32_t PATH_DEBUG_BACKDROP_RENDER = 0;
 static const uint32_t PATH_DEBUG_BACKDROP_FILTERED_A = 1;

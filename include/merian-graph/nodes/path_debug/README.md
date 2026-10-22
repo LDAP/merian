@@ -114,7 +114,7 @@ All but `brightest fraction` keep at most 64 paths.
 | What one pixel's estimate is doing | alt+click it; the `pixels` tab plots its mean and variance over time next to the current values |
 | Is my method unbiased | the Error Plot node, or `examples/compare_methods.py` for several methods at once |
 | Which technique sampled each segment | overlay `color: technique`; next-event connections draw from their vertex to the light |
-| Which paths used a technique | selection `sampling method` (BSDF, guiding, ReSTIR, light …) |
+| Which paths used a technique | selection `sampling method` (BSDF, guiding, light, replayed BSDF/light, reconnection …) |
 | Follow a path behind or inside geometry | overlay `depth test: off (x-ray)`, or `dash behind geometry` to keep the depth cue |
 
 ## What it looks like
@@ -251,7 +251,10 @@ the wallpaper are still an order of magnitude noisier than the lit floor.
 ### Which technique sampled what
 
 `sampling method: guiding` keeps the paths a guided sampler steered. On veach-ajar they crowd the
-door gap, which is what the guiding distribution is there to find.
+door gap, which is what the guiding distribution is there to find. A path a shift moved into the
+pixel marks its segments `replayed BSDF`, `replayed light` and `reconnection`, so
+`sampling method: reconnection` keeps the paths that reconnect somewhere and leaves those replayed
+whole.
 
 ![guided paths](images/guided.jpg)
 

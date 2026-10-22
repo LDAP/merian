@@ -149,7 +149,7 @@ class RenderRestirPT : public Node {
     int32_t debug_view = RestirPTDebugNone;
 
     PathRecordSink path_records;
-    int32_t record_mode = RestirPTRecordCandidates;
+    int32_t record_mode = RestirPTRecordShaded;
 
     SlangCompositionHandle gbuffer_composition;
     SlangCompositionHandle composition;

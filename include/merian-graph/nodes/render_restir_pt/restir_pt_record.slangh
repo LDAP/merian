@@ -1,41 +1,73 @@
 #pragma once
 
-// The path of a reservoir, replayed in the domain it is shaded in, for the path record stream.
-// Resampling selected the path as a whole, so no vertex has a density of its own: the first
-// carries 1/W of the path, the light vertex what the pixel shades with it.
+// The path of a reservoir as the shift into the pixel it is shaded in traces it, for the path
+// record stream. Resampling selected the path as a whole, so no vertex has a density of its own:
+// the first carries 1/W of the path, the light vertex what the pixel shades with it.
 
-#include "merian-graph/nodes/render_restir_pt/restir_pt_path.slangh"
+#include "merian-graph/nodes/render_restir_pt/restir_pt_shift.slangh"
 
 namespace merian {
 
-float3 restir_pt_record_light_pos(const ParameterBlock<Scene> scene,
-                                  const RestirPTReservoir r,
-                                  const ShadingPoint sp,
-                                  const uint vertex) {
-    const uint n = restir_pt_light_vertex(r.flags);
-    const uint k = restir_pt_rc_vertex(r.flags);
-    if (k == n) {
-        if ((r.flags & RESTIR_PT_LIGHT_ENV) != 0)
-            return sp.pos + r.rc_wo * ENV_MAP_DISTANCE;
-        const Hit hit = restir_pt_get_hit(r);
-        return scene.get_surface(hit, scene.get_triangle_hit(hit)).pos;
+struct RestirPTPathRecord : IRestirPTPathSink {
+    PathRecordStream stream;
+    PathRecorder rec;
+    float pdf;
+    float3 contribution;
+    float3 last_pos;
+    bool open;
+    bool reconnected;
+
+    bool records() {
+        return true;
     }
-    if (k + 1 < n) {
-        if ((r.flags & RESTIR_PT_LIGHT_ENV) != 0)
-            return sp.pos + octahedral_unproject(r.light_coords) * ENV_MAP_DISTANCE;
-        const Hit light = restir_pt_get_light(r);
-        return light.is_valid() ? scene.get_surface(light, scene.get_triangle_hit(light)).pos
-                                : sp.pos;
+
+    [mutating]
+    void vertex(const float3 pos,
+                const float3 wo,
+                const uint bounce,
+                const uint lobe,
+                const uint method,
+                const uint material) {
+        if (!open)
+            return;
+        rec.vertex(stream, pos, wo, pdf, float3(0), bounce, lobe, method,
+                   path_record_pack_material(material), PATH_RECORD_FLAG_RESAMPLED);
+        pdf = 0.f;
+        last_pos = pos;
+        reconnected |= method == PATH_RECORD_METHOD_RECONNECTION;
     }
-    RayDesc ray;
-    ray.Origin = sp.pos;
-    ray.Direction = r.rc_wo;
-    ray.TMin = SCENE_RAY_TMIN;
-    ray.TMax = SCENE_RAY_TMAX;
-    const Hit hit = scene.trace_ray(ray, RAY_FLAG_NONE, merian_restir_pt_instance_mask);
-    if (scene.is_distant(hit))
-        return sp.pos + r.rc_wo * ENV_MAP_DISTANCE;
-    return scene.get_surface(hit, scene.get_triangle_hit(hit)).pos;
+
+    [mutating]
+    void connection(const float3 from,
+                    const float3 light_pos,
+                    const uint bounce,
+                    const uint method,
+                    const uint material) {
+        if (!open)
+            return;
+        rec.terminal(stream, from);
+        rec.connection(stream, from, light_pos, pdf, float3(0), contribution, bounce, method,
+                       path_record_pack_material(material), PATH_RECORD_FLAG_RESAMPLED);
+        rec.finish(stream);
+        open = false;
+    }
+
+    [mutating]
+    void light(const float3 pos) {
+        if (!open)
+            return;
+        rec.emission(contribution);
+        rec.end(stream, pos);
+        open = false;
+    }
+
+    // ends a path the shift left before its light vertex
+    [mutating]
+    void close() {
+        if (open)
+            rec.end(stream, last_pos);
+        open = false;
+    }
 }
 
 void restir_pt_record_shaded(const ParameterBlock<Scene> scene,
@@ -44,84 +76,25 @@ void restir_pt_record_shaded(const ParameterBlock<Scene> scene,
                              const PathRecordStream records,
                              inout PathRecorder rec,
                              inout RandomGenerator rng) {
-    const uint n = restir_pt_light_vertex(r.flags);
-    const uint k = restir_pt_rc_vertex(r.flags);
-    const bool nee = (r.flags & RESTIR_PT_LIGHT_NEE) != 0;
-    const float3 contribution = r.integrand * r.W;
-    const RestirPTRandom random = {r.seed};
-
-    ShadingPoint sp = scene.get_shading_point(primary.ray, primary.hit);
+    const ShadingPoint sp = scene.get_shading_point(primary.ray, primary.hit);
     if (merian_restir_pt_emission_on_primary && !merian_restir_pt_area)
         rec.emission(sp.emission);
-    if (!(r.W > 0.f) || n < 2 || !all(isfinite(contribution))) {
-        if (n == 1 && r.W > 0.f)
-            rec.emission(contribution);
-        rec.end(records, sp.pos);
-        return;
+
+    RestirPTPathRecord path;
+    path.stream = records;
+    path.rec = rec;
+    path.pdf = 1.f / r.W;
+    path.contribution = r.integrand * r.W;
+    path.last_pos = sp.pos;
+    path.open = true;
+    path.reconnected = false;
+    if (r.W > 0.f && all(isfinite(path.contribution))) {
+        restir_pt_shift(scene, primary, r, false, rng, path);
+        if (path.reconnected)
+            restir_pt_update_suffix(scene, r, false, rng, path);
     }
-
-    float pdf = 1.f / r.W;
-    float3 wi = -primary.ray.Direction;
-    for (uint i = 1; i <= n; i++) {
-        const uint material = path_record_pack_material(sp.material_id);
-        if (nee && i + 1 == n) {
-            rec.terminal(records, sp.pos);
-            rec.connection(records, sp.pos, restir_pt_record_light_pos(scene, r, sp, i), pdf,
-                           float3(0), contribution, i - 1, PATH_RECORD_METHOD_LIGHT, material,
-                           PATH_RECORD_FLAG_RESAMPLED);
-            rec.finish(records);
-            return;
-        }
-        if (i == n) {
-            rec.emission(contribution);
-            break;
-        }
-        if (!sp.has_surface_material)
-            break;
-
-        // 1. the direction leaving x_i: towards x_k, along the one x_k keeps, or replayed
-        float3 wo;
-        uint lobe;
-        uint method = PATH_RECORD_METHOD_BSDF;
-        if (i + 1 == k) {
-            if (k == n && (r.flags & RESTIR_PT_LIGHT_ENV) != 0) {
-                wo = r.rc_wo;
-            } else {
-                const Hit hit = restir_pt_get_hit(r);
-                wo = normalize(scene.get_surface(hit, scene.get_triangle_hit(hit)).pos - sp.pos);
-            }
-            lobe =
-                restir_pt_record_lobe(restir_pt_lobe(r.flags, RESTIR_PT_LOBE_PREV_SHIFT),
-                                      restir_pt_transmission(r.flags, RESTIR_PT_LOBE_PREV_SHIFT));
-            method = PATH_RECORD_METHOD_RESTIR;
-        } else if (i == k) {
-            wo = r.rc_wo;
-            lobe = restir_pt_record_lobe(restir_pt_lobe(r.flags, RESTIR_PT_LOBE_RC_SHIFT),
-                                         restir_pt_transmission(r.flags, RESTIR_PT_LOBE_RC_SHIFT));
-        } else {
-            let bsdf = sp.surface_material.get_bsdf();
-            const Optional<RestirPTScatter> sampled =
-                restir_pt_scatter(bsdf, sp, wi, random, i, rng);
-            if (!sampled.hasValue)
-                break;
-            wo = sampled.value.wo;
-            lobe = restir_pt_record_lobe(sampled.value.lobe, sampled.value.transmission);
-        }
-        const Optional<RayDesc> ray =
-            sp.make_ray(wi, wo, (lobe & PATH_RECORD_LOBE_TRANSMISSION) != 0);
-        if (!ray.hasValue)
-            break;
-
-        // 2. x_i, then on to x_{i+1}
-        rec.vertex(records, sp.pos, wo, pdf, float3(0), i - 1, lobe, method, material,
-                   PATH_RECORD_FLAG_RESAMPLED);
-        pdf = 0.f;
-        const Hit hit = scene.trace_ray(ray.value, RAY_FLAG_NONE, merian_restir_pt_instance_mask);
-        sp = scene.get_shading_point(ray.value, hit, RenderContext(uint16_t(i)),
-                                     DefaultLODSampler(), i + 1 < n);
-        wi = -ray.value.Direction;
-    }
-    rec.end(records, sp.pos);
+    path.close();
+    rec = path.rec;
 }
 
 } // namespace merian

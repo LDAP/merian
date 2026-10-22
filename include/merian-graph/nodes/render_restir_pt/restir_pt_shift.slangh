@@ -10,6 +10,62 @@
 
 namespace merian {
 
+// Receives the segments a shift traces, in path order.
+interface IRestirPTPathSink {
+    bool records();
+    [mutating]
+    void vertex(const float3 pos,
+                const float3 wo,
+                const uint bounce,
+                const uint lobe,
+                const uint method,
+                const uint material);
+    // the path ends with a light sample drawn at `from`
+    [mutating]
+    void connection(const float3 from,
+                    const float3 light_pos,
+                    const uint bounce,
+                    const uint method,
+                    const uint material);
+    // the path ends on an emitter
+    [mutating]
+    void light(const float3 pos);
+}
+
+struct RestirPTNoSink : IRestirPTPathSink {
+    bool records() {
+        return false;
+    }
+    [mutating]
+    void vertex(const float3 pos,
+                const float3 wo,
+                const uint bounce,
+                const uint lobe,
+                const uint method,
+                const uint material) {}
+    [mutating]
+    void connection(const float3 from,
+                    const float3 light_pos,
+                    const uint bounce,
+                    const uint method,
+                    const uint material) {}
+    [mutating]
+    void light(const float3 pos) {}
+}
+
+float3 restir_pt_kept_light_pos(const ParameterBlock<Scene> scene,
+                                const RestirPTReservoir r,
+                                const float3 from,
+                                const bool prev_frame) {
+    if ((r.flags & RESTIR_PT_LIGHT_ENV) != 0)
+        return from + octahedral_unproject(r.light_coords) * ENV_MAP_DISTANCE;
+    TriangleHit tri;
+    Surface surface;
+    if (!restir_pt_hit_surface(scene, restir_pt_get_light(r), prev_frame, tri, surface))
+        return from;
+    return surface.pos;
+}
+
 RestirPTShift restir_pt_failed_shift() {
     RestirPTShift s;
     s.integrand = float3(0);
@@ -18,15 +74,16 @@ RestirPTShift restir_pt_failed_shift() {
 }
 
 // `from_inverse_geometry` < 0: x'_{k-1} cannot reconnect because of the segment into it
-RestirPTShift restir_pt_reconnect(const ParameterBlock<Scene> scene,
-                                  const float primary_footprint,
-                                  const ShadingPoint sp,
-                                  const float3 wi,
-                                  const float3 throughput,
-                                  const float from_inverse_geometry,
-                                  const RestirPTReservoir r,
-                                  const bool prev_frame,
-                                  inout RandomGenerator rng) {
+RestirPTShift restir_pt_reconnect<P : IRestirPTPathSink>(const ParameterBlock<Scene> scene,
+                                                         const float primary_footprint,
+                                                         const ShadingPoint sp,
+                                                         const float3 wi,
+                                                         const float3 throughput,
+                                                         const float from_inverse_geometry,
+                                                         const RestirPTReservoir r,
+                                                         const bool prev_frame,
+                                                         inout RandomGenerator rng,
+                                                         inout P path) {
     const RestirPTShift failed = restir_pt_failed_shift();
 
     const uint n = restir_pt_light_vertex(r.flags);
@@ -37,8 +94,9 @@ RestirPTShift restir_pt_reconnect(const ParameterBlock<Scene> scene,
     const RestirPTLobe prev_lobe = restir_pt_lobe(r.flags, RESTIR_PT_LOBE_PREV_SHIFT);
     const RestirPTLobe rc_lobe = restir_pt_lobe(r.flags, RESTIR_PT_LOBE_RC_SHIFT);
     // a delta lobe on either side of x_k has no density to reconnect with
-    if (!sp.has_surface_material || prev_lobe == RestirPTLobeDelta ||
-        (!light_rc && rc_lobe == RestirPTLobeDelta))
+    const bool delta = !sp.has_surface_material || prev_lobe == RestirPTLobeDelta ||
+                       (!light_rc && rc_lobe == RestirPTLobeDelta);
+    if (delta && !path.records())
         return failed;
 
     // 1. where x_k is seen from x'_{k-1}
@@ -58,9 +116,20 @@ RestirPTShift restir_pt_reconnect(const ParameterBlock<Scene> scene,
         dir = d * rsqrt(dist2);
     }
     const float geometry = distant ? 1.f : abs(dot(surface.face_normal, dir)) / dist2;
+    const bool transmission = restir_pt_transmission(r.flags, RESTIR_PT_LOBE_PREV_SHIFT);
+    const float3 rc_pos = distant ? sp.pos + dir * ENV_MAP_DISTANCE : surface.pos;
+    if (light_rc && nee) {
+        path.connection(sp.pos, rc_pos, k - 2, PATH_RECORD_METHOD_RECONNECTION, sp.material_id);
+    } else {
+        path.vertex(sp.pos, dir, k - 2, restir_pt_record_lobe(prev_lobe, transmission),
+                    PATH_RECORD_METHOD_RECONNECTION, sp.material_id);
+        if (light_rc)
+            path.light(rc_pos);
+    }
+    if (delta)
+        return failed;
 
     // 2. the segment leaves x'_{k-1} on the source's side
-    const bool transmission = restir_pt_transmission(r.flags, RESTIR_PT_LOBE_PREV_SHIFT);
     const OrthonormalFrame frame = sp.shading_frame;
     const float3 wi_local = frame.to_local(wi);
     const float3 dir_local = frame.to_local(dir);
@@ -173,10 +242,11 @@ RestirPTShift restir_pt_reconnect(const ParameterBlock<Scene> scene,
 }
 
 // Re-traces the path after x_k in the frame it is evaluated in [Lin et al. 2026, 6].
-RestirPTReservoir restir_pt_update_suffix(const ParameterBlock<Scene> scene,
-                                          const RestirPTReservoir r,
-                                          const bool prev_frame,
-                                          inout RandomGenerator rng) {
+RestirPTReservoir restir_pt_update_suffix<P : IRestirPTPathSink>(const ParameterBlock<Scene> scene,
+                                                                 const RestirPTReservoir r,
+                                                                 const bool prev_frame,
+                                                                 inout RandomGenerator rng,
+                                                                 inout P path) {
     const uint n = restir_pt_light_vertex(r.flags);
     const uint k = restir_pt_rc_vertex(r.flags);
     const bool nee = (r.flags & RESTIR_PT_LIGHT_NEE) != 0;
@@ -195,6 +265,9 @@ RestirPTReservoir restir_pt_update_suffix(const ParameterBlock<Scene> scene,
     Surface surface;
     if (!restir_pt_hit_surface(scene, restir_pt_get_hit(r), prev_frame, tri, surface))
         return updated;
+    const uint rc_lobe =
+        restir_pt_record_lobe(restir_pt_lobe(r.flags, RESTIR_PT_LOBE_RC_SHIFT),
+                              restir_pt_transmission(r.flags, RESTIR_PT_LOBE_RC_SHIFT));
     const float3 ng = surface.face_normal;
     RayDesc ray;
     ray.Origin = offset_ray_origin(surface.pos, ng, surface.spawn_offset, r.rc_wo);
@@ -216,6 +289,16 @@ RestirPTReservoir restir_pt_update_suffix(const ParameterBlock<Scene> scene,
     Hit next = scene.trace_ray(ray, RAY_FLAG_NONE, merian_restir_pt_instance_mask, prev_frame);
     ShadingPoint sp = restir_pt_shading_point(scene, ray, next, k, k + 1 < n, prev_frame);
     if (k + 1 == n) {
+        const float3 light_pos =
+            scene.is_distant(next) ? surface.pos + ray.Direction * ENV_MAP_DISTANCE : sp.pos;
+        if (nee) {
+            path.connection(surface.pos, light_pos, k - 1, PATH_RECORD_METHOD_REPLAYED_LIGHT,
+                            surface.material_id);
+        } else {
+            path.vertex(surface.pos, r.rc_wo, k - 1, rc_lobe, PATH_RECORD_METHOD_REPLAYED_BSDF,
+                        surface.material_id);
+            path.light(light_pos);
+        }
         updated.light_pdf =
             restir_pt_emitter_light_pdf(scene, random, from, r.rc_wo, next, prev_frame);
         updated.rc_radiance = sp.emission;
@@ -223,11 +306,14 @@ RestirPTReservoir restir_pt_update_suffix(const ParameterBlock<Scene> scene,
     }
 
     // 2. the vertices after it
+    path.vertex(surface.pos, r.rc_wo, k - 1, rc_lobe, PATH_RECORD_METHOD_REPLAYED_BSDF,
+                surface.material_id);
     const float roughness = RestirPTThresholds(r.seed).roughness;
     float3 throughput = float3(1);
     float3 wi = -r.rc_wo;
     for (uint i = k + 1;; i++) {
         if (i == n) {
+            path.light(scene.is_distant(next) ? from.pos - wi * ENV_MAP_DISTANCE : sp.pos);
             const float light_pdf =
                 restir_pt_emitter_light_pdf(scene, random, from, -wi, next, prev_frame);
             updated.rc_radiance = throughput * sp.emission * (from.pdf / (from.pdf + light_pdf));
@@ -237,6 +323,9 @@ RestirPTReservoir restir_pt_update_suffix(const ParameterBlock<Scene> scene,
             return updated;
         let bsdf = sp.surface_material.get_bsdf();
         if (nee && i + 1 == n) {
+            if (path.records())
+                path.connection(sp.pos, restir_pt_kept_light_pos(scene, r, sp.pos, prev_frame),
+                                i - 1, PATH_RECORD_METHOD_REPLAYED_LIGHT, sp.material_id);
             if (restir_pt_samples_lights(scene, bsdf, prev_frame))
                 updated.rc_radiance = throughput * restir_pt_kept_light(scene, bsdf, sp, wi, r,
                                                                         random, i, prev_frame, rng);
@@ -246,6 +335,9 @@ RestirPTReservoir restir_pt_update_suffix(const ParameterBlock<Scene> scene,
         if (!sampled.hasValue)
             return updated;
         const RestirPTScatter scatter = sampled.value;
+        path.vertex(sp.pos, scatter.wo, i - 1,
+                    restir_pt_record_lobe(scatter.lobe, scatter.transmission),
+                    PATH_RECORD_METHOD_REPLAYED_BSDF, sp.material_id);
         throughput *= scatter.f / scatter.pdf;
         from = restir_pt_from(scene, bsdf, sp, i, scatter, roughness, prev_frame);
         next =
@@ -257,11 +349,12 @@ RestirPTReservoir restir_pt_update_suffix(const ParameterBlock<Scene> scene,
 }
 
 // hybrid shift; fails where the destination would reconnect earlier [Lin et al. 2026, 4]
-RestirPTShift restir_pt_shift(const ParameterBlock<Scene> scene,
-                              const RestirPTPrimary primary,
-                              const RestirPTReservoir r,
-                              const bool prev_frame,
-                              inout RandomGenerator rng) {
+RestirPTShift restir_pt_shift<P : IRestirPTPathSink>(const ParameterBlock<Scene> scene,
+                                                     const RestirPTPrimary primary,
+                                                     const RestirPTReservoir r,
+                                                     const bool prev_frame,
+                                                     inout RandomGenerator rng,
+                                                     inout P path) {
     const RestirPTShift failed = restir_pt_failed_shift();
     const uint n = restir_pt_light_vertex(r.flags);
     const uint k = restir_pt_rc_vertex(r.flags);
@@ -270,8 +363,10 @@ RestirPTShift restir_pt_shift(const ParameterBlock<Scene> scene,
 
     ShadingPoint sp = restir_pt_shading_point(scene, primary.ray, primary.hit, 0, true, prev_frame);
     // 1. a path that ends on the primary vertex, which the film sample places
-    if (n == 1)
+    if (n == 1) {
+        path.light(sp.pos);
         return {sp.emission, 1.f};
+    }
 
     const uint end = k != 0 ? k - 1 : n;
     const RestirPTRandom random = {r.seed};
@@ -298,6 +393,9 @@ RestirPTShift restir_pt_shift(const ParameterBlock<Scene> scene,
         if (!sampled.hasValue)
             return failed;
         const RestirPTScatter scatter = sampled.value;
+        path.vertex(sp.pos, scatter.wo, i - 1,
+                    restir_pt_record_lobe(scatter.lobe, scatter.transmission),
+                    PATH_RECORD_METHOD_REPLAYED_BSDF, sp.material_id);
         // a vertex before x_{k-1} that reconnects would have been the destination's x_k
         if (hybrid && i > 1 && segment.reconnects(scatter.footprint_pdf(), limit))
             return failed;
@@ -319,10 +417,11 @@ RestirPTShift restir_pt_shift(const ParameterBlock<Scene> scene,
                                            ? segment.inverse_geometry
                                            : -1.f;
         return restir_pt_reconnect(scene, footprint, sp, wi, throughput, inverse_geometry, r,
-                                   prev_frame, rng);
+                                   prev_frame, rng, path);
     }
 
     // 4. the whole path was replayed: its light vertex must not reconnect either
+    path.light(scene.is_distant(hit) ? from.pos - wi * ENV_MAP_DISTANCE : sp.pos);
     if (!any(sp.emission > 0.f) || (hybrid && segment.reconnects_emitter(limit)))
         return failed;
     const float light_pdf = restir_pt_emitter_light_pdf(scene, random, from, -wi, hit, prev_frame);

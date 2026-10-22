@@ -848,7 +848,8 @@ RenderRestirPT::NodeStatusFlags RenderRestirPT::properties(Properties& config) {
     if (config.config_options("debugger records", record_mode, {"candidates", "shaded paths"},
                               Properties::OptionsStyle::COMBO,
                               "'candidates' are the paths the initial pass traces, with their "
-                              "densities. 'shaded paths' replays the path each pixel shades.")) {
+                              "densities. 'shaded paths' records the path in the reservoir each "
+                              "pixel shades, as the shift into the pixel traces it.")) {
         constants_changed = true;
         needs_reconnect = true;
     }

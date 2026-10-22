@@ -9,7 +9,8 @@
 namespace merian {
 
 constexpr std::array<const char*, PATH_RECORD_METHOD_COUNT> PATH_RECORD_METHOD_NAMES = {
-    "unknown", "uniform", "cosine", "BSDF", "guiding", "ReSTIR", "light"};
+    "unknown", "uniform",       "cosine",         "BSDF",        "guiding",
+    "light",   "replayed BSDF", "replayed light", "reconnection"};
 
 inline const char* path_record_method_name(const uint32_t method) {
     return PATH_RECORD_METHOD_NAMES.at(method < PATH_RECORD_METHOD_NAMES.size() ? method : 0);

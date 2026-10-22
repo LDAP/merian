@@ -775,14 +775,16 @@ void restir_pt_pass_shift(const uint item_index,
         result = restir_pt_shift_index(index, slot, direction);
     }
     if (restir_pt_shift_kind != RestirPTShiftSpatial && merian_restir_pt_retrace_suffix) {
-        r = restir_pt_update_suffix(scene, r, prev_frame, rng);
+        RestirPTNoSink no_sink;
+        r = restir_pt_update_suffix(scene, r, prev_frame, rng, no_sink);
         if (restir_pt_shift_kind == RestirPTShiftTemporal)
             pc.history[restir_pt_slot(index, slot)] = {r.rc_radiance, r.light_pdf};
     }
     const RestirPTPrimary primary =
         prev_frame ? restir_pt_primary(scene, params.prev_gbuffer, true, image_pos, dim, r.seed)
                    : restir_pt_primary(scene, params.gbuffer, false, image_pos, dim, r.seed);
-    pc.shifts[result] = restir_pt_shift(scene, primary, r, prev_frame, rng);
+    RestirPTNoSink no_sink;
+    pc.shifts[result] = restir_pt_shift(scene, primary, r, prev_frame, rng, no_sink);
 }
 
 // Streaming resampling of shifted reservoirs [Lin et al. 2022, eq. 19], w = m_i p_hat(T(x)) W |T'|.

@@ -64,8 +64,12 @@ static const uint32_t PATH_RECORD_METHOD_UNIFORM = 1;
 static const uint32_t PATH_RECORD_METHOD_COSINE = 2;
 static const uint32_t PATH_RECORD_METHOD_BSDF = 3;
 static const uint32_t PATH_RECORD_METHOD_GUIDING = 4;
-static const uint32_t PATH_RECORD_METHOD_RESTIR = 5;
-static const uint32_t PATH_RECORD_METHOD_LIGHT = 6;
-static const uint32_t PATH_RECORD_METHOD_COUNT = 7;
+static const uint32_t PATH_RECORD_METHOD_LIGHT = 5;
+// a segment of a sample reused from another pixel or frame, drawn again from its random numbers
+static const uint32_t PATH_RECORD_METHOD_REPLAYED_BSDF = 6;
+static const uint32_t PATH_RECORD_METHOD_REPLAYED_LIGHT = 7;
+// a segment a shift connected to a vertex of the source path
+static const uint32_t PATH_RECORD_METHOD_RECONNECTION = 8;
+static const uint32_t PATH_RECORD_METHOD_COUNT = 9;
 
 } // namespace merian

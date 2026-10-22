@@ -284,11 +284,11 @@ void shade(ParameterBlock<Scene> scene, ParameterBlock<RestirBinding> params) {
         const float weight = reservoir.get_ucw() * geo;
         rec.connection(params.path_records, surface.sp.pos, reservoir.y.pos,
                        weight > 0.f ? 1.f / weight : 0.f, f_cos * weight, direct, 0,
-                       PATH_RECORD_METHOD_RESTIR, path_record_pack_material(surface.sp.material_id),
-                       reuse);
+                       PATH_RECORD_METHOD_RECONNECTION,
+                       path_record_pack_material(surface.sp.material_id), reuse);
     } else if (surface.valid && surface.sp.has_surface_material) {
         rec.connection(params.path_records, surface.sp.pos, surface.sp.pos, 0.f, float3(0.f),
-                       float3(0.f), 0, PATH_RECORD_METHOD_RESTIR,
+                       float3(0.f), 0, PATH_RECORD_METHOD_RECONNECTION,
                        path_record_pack_material(surface.sp.material_id), reuse);
     }
     rec.finish(params.path_records);
