@@ -1,6 +1,6 @@
 python_core_module = py.extension_module(
     '_core',
-    'core.cpp',
+    ['core.cpp', 'log_sink.cpp'],
     dependencies: [merian_dep, nanobind],
     include_directories: include_directories('..'),
     gnu_symbol_visibility: 'hidden',

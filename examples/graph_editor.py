@@ -14,13 +14,21 @@ nodes and connections. Hollow inputs are optional; grey connectors and dashed
 connections were connected but are not described by their node now. Positions are
 stored in the saved config.
 
+The graph navigates like Blender's node editor: the middle button pans, with Ctrl it
+zooms, the wheel zooms, with Ctrl or Shift it pans, Home shows all nodes. Shift+A adds a
+node, G moves the selected ones, X deletes, Ctrl+right-drag cuts connections, Shift+click
+adds to the selection.
+
 Space plays and pauses, . steps. A graph's view sends the keys to the graph; there,
 Shift+Alt+Space plays and pauses, Shift+Alt+. steps and Shift+Alt+Backspace gives the
-mouse back.
+mouse back, in the editor too; the Preferences tab sets their modifier, and the log
+level. The Log tab shows merian's log. The preferences are stored for the user, not in
+the config.
 """
 
 import argparse
 import functools
+import itertools
 import json
 import math
 import queue
@@ -44,23 +52,27 @@ except ImportError:
 from lib import scene
 
 # isort: split
+import merian
 import merian.graph as mg
+from gui.log_view import LogView
 from gui.output_view import (
     CaptureImage,
-    OutputPanel,
     OutputView,
+    PanelColumn,
     Source,
     SourceKind,
     fit_properties,
     resize_timer,
+    save_capture,
     set_source_actions,
 )
+from gui.preferences_view import PreferencesView
 from gui.qt_properties import QtProperties, Recorder
 from gui.report_views import (
     WIDEST_SIZE,
     MemoryView,
     ProfilerView,
-    format_ms,
+    TimeFormat,
     format_size,
     node_times,
 )
@@ -82,9 +94,15 @@ _SINK_TYPES = {
 _SINK_CONTENTS = {node_type: content for content, node_type in _SINK_TYPES.items()}
 _VIEW_FORMAT = "R8G8B8A8Srgb"
 _VIEW_SINK = "gui view"
+_SETTINGS = ("merian", "graph-editor")
 
 _CLOCK_INTERVAL = timedelta(milliseconds=33)
+_COMPILING_INTERVAL = timedelta(milliseconds=50)
 _CONNECTED = "/graph/connect"
+_SAVE_FILTERS = {
+    mg.ConnectorKind.IMAGE: ("png", "Images (*.png *.jpg *.bmp *.tif)"),
+    mg.ConnectorKind.BUFFER: ("bin", "Raw data (*.bin)"),
+}
 _FRAME_INTERVAL = timedelta(milliseconds=4)
 _MEMORY_INTERVAL = timedelta(seconds=1)
 _PROPERTIES_INTERVAL = timedelta(milliseconds=100)
@@ -92,13 +110,7 @@ _REPORT_INTERVAL = timedelta(milliseconds=100)
 _RUN_SLICE = timedelta(milliseconds=15)
 
 _PLAYBACK_KEYS = (QtCore.Qt.Key.Key_Space, QtCore.Qt.Key.Key_Period)
-_VIEW_MODIFIERS = (
-    QtCore.Qt.KeyboardModifier.ShiftModifier | QtCore.Qt.KeyboardModifier.AltModifier
-)
-_RELEASE_MOUSE = QtCore.QKeyCombination(_VIEW_MODIFIERS, QtCore.Qt.Key.Key_Backspace)
-_VIEW_SHORTCUTS = {_RELEASE_MOUSE.toCombined()} | {
-    QtCore.QKeyCombination(_VIEW_MODIFIERS, key).toCombined() for key in _PLAYBACK_KEYS
-}
+_RELEASE_MOUSE_KEY = QtCore.Qt.Key.Key_Backspace
 _PLAYBACK_KEY_USERS = (
     QtWidgets.QAbstractButton,
     QtWidgets.QAbstractItemView,
@@ -127,13 +139,17 @@ _CORNER_RADIUS = 8
 _GRID_SPACING = 24
 _HEADER_HEIGHT = 28
 _LAYER_SPACING = 80
+_MAX_SCALE = 4.0
 _MIN_FIT_SCALE = 0.8
+_MIN_SCALE = 0.1
 _NODE_SPACING = 30
 _ROW_HEIGHT = 20
 _SHADOW = ((5, 22), (2, 34))
 _SHADOW_OFFSET = 3
 # The center of the first connector row
 _TITLE_HEIGHT = 44
+_WORLD = QtCore.QRectF(-1e5, -1e5, 2e5, 2e5)
+_WIDEST_TIME = "88.88 µs"
 
 
 # Nodes and Sources
@@ -268,6 +284,14 @@ def _stored_positions(description: mg.Description) -> dict[str, QtCore.QPointF]:
 
 
 @dataclass
+class _Save:
+    path: Path
+    first: int
+    end: int | None = None
+    properties: dict | None = None
+
+
+@dataclass
 class _ViewSink:
     identifier: str
     content: mg.ConnectorKind
@@ -278,6 +302,15 @@ class _ViewSink:
     unshown: int = 0
     interval: float = 0.0
     requested_time: float = -math.inf
+    save: _Save | None = None
+
+    def whole(self, capture: mg.Capture) -> bool:
+        save = self.save
+        return (
+            save is not None
+            and capture.run_iteration >= save.first
+            and (save.end is None or capture.run_iteration < save.end)
+        )
 
 
 class _GraphWorker(QtCore.QObject):
@@ -298,6 +331,8 @@ class _GraphWorker(QtCore.QObject):
     window_shown = QtCore.Signal(str, int, object)
     playing_changed = QtCore.Signal(bool)
     message = QtCore.Signal(str)
+    # path, capture
+    save_captured = QtCore.Signal(object, object)
 
     def __init__(self, graph: mg.Graph):
         super().__init__()
@@ -395,6 +430,7 @@ class _GraphWorker(QtCore.QObject):
             if not self.playing:
                 self.paused_time = self.graph.time
             if result.stop_reason == mg.StopReason.EVENT:
+                self.restart_saves()
                 self.publish_state()
         except Exception:
             self.set_playing(False)
@@ -403,10 +439,47 @@ class _GraphWorker(QtCore.QObject):
     def take_captures(self) -> None:
         """Publishes the latest captures, to be confirmed with capture_shown."""
         for view, view_sink in self.view_sinks.items():
-            if captures := view_sink.sink.get_all():
-                view_sink.requested = False
+            if not (captures := view_sink.sink.get_all()):
+                continue
+            view_sink.requested = False
+            if (save := view_sink.save) and save.end is None:
+                if whole := next(filter(view_sink.whole, captures), None):
+                    self.complete_save(view_sink, whole)
+            shown = [capture for capture in captures if not view_sink.whole(capture)]
+            if (save := view_sink.save) and save.end is not None:
+                if any(capture.run_iteration >= save.end for capture in captures):
+                    view_sink.save = None
+            if shown:
                 view_sink.unshown += 1
-                self.captured.emit(view, view_sink.generation, captures[-1])
+                self.captured.emit(view, view_sink.generation, shown[-1])
+
+    def save_capture(self, view: str, path: Path, properties: dict) -> None:
+        view_sink = self.view_sinks.get(view)
+        if view_sink is None:
+            raise RuntimeError("the view shows nothing to save")
+        if view_sink.save and view_sink.save.end is None:
+            self.message.emit(
+                f"not saved {view_sink.save.path}, a newer save replaced it"
+            )
+        view_sink.save = _Save(path, self.graph.run_iteration)
+        if view_sink.owned:
+            view_sink.save.properties = properties
+            whole = (
+                {"fit": [0, 0]}
+                if view_sink.content == mg.ConnectorKind.IMAGE
+                else {"offset": 0, "size": 0}
+            )
+            self.graph.nodes[view_sink.identifier].set_properties(whole)
+        view_sink.sink.capture()
+        if not self.playing:
+            self.steps += 1
+
+    def complete_save(self, view_sink: _ViewSink, capture: mg.Capture) -> None:
+        save = view_sink.save
+        save.end = self.graph.run_iteration
+        if save.properties is not None:
+            self.graph.nodes[view_sink.identifier].set_properties(save.properties)
+        self.save_captured.emit(save.path, capture)
 
     def report(self) -> None:
         now = time.monotonic()
@@ -440,8 +513,17 @@ class _GraphWorker(QtCore.QObject):
 
     def connect_graph(self) -> None:
         self.graph.connect()
+        self.restart_saves()
         self.show_profiler_interval()
         self.publish_state()
+
+    def restart_saves(self) -> None:
+        for view_sink in self.view_sinks.values():
+            if (save := view_sink.save) and save.end is None:
+                save.first = self.graph.run_iteration
+                view_sink.sink.capture()
+            elif save:
+                view_sink.save = None
 
     def publish_state(self) -> None:
         nodes = self.graph.nodes
@@ -560,6 +642,7 @@ class _GraphWorker(QtCore.QObject):
             False,
             0,
         )
+        view_sink.save = None
         view_sink.interval = interval.total_seconds()
         self.view_sinks[view] = view_sink
         if reason := self.graph.inactive_nodes.get(view_sink.identifier):
@@ -641,7 +724,10 @@ class _GraphWorker(QtCore.QObject):
 
     def set_view_properties(self, view: str, properties: dict) -> None:
         if (view_sink := self.view_sinks.get(view)) and view_sink.owned:
-            self.graph.nodes[view_sink.identifier].set_properties(properties)
+            if view_sink.save and view_sink.save.end is None:
+                view_sink.save.properties = properties
+            else:
+                self.graph.nodes[view_sink.identifier].set_properties(properties)
 
     def load(self, description: mg.Description) -> None:
         self.view_sinks = {}
@@ -705,11 +791,28 @@ class _GraphWorker(QtCore.QObject):
             self.profiler_interval_changed.emit(interval)
 
 
+def _menu_on_release() -> bool:
+    trigger = QtGui.QGuiApplication.styleHints().contextMenuTrigger()
+    return trigger == QtCore.Qt.ContextMenuTrigger.Release
+
+
 @functools.cache
 def _bold_font() -> QtGui.QFont:
     font = QtGui.QFont(QtWidgets.QApplication.font())
     font.setBold(True)
     return font
+
+
+@functools.cache
+def _tabular_font() -> QtGui.QFont:
+    font = QtGui.QFont(QtWidgets.QApplication.font())
+    font.setFeature(QtGui.QFont.Tag("tnum"), 1)
+    return font
+
+
+@functools.cache
+def _tabular_metrics() -> QtGui.QFontMetricsF:
+    return QtGui.QFontMetricsF(_tabular_font())
 
 
 @functools.cache
@@ -794,8 +897,8 @@ class _NodeItem(QtWidgets.QGraphicsRectItem):
         height = _TITLE_HEIGHT + _ROW_HEIGHT * (rows - 1) + _ROW_HEIGHT // 2 + 6
         super().__init__(0, 0, width, height)
         self.identifier, self.node_type = identifier, node.node_type
-        # GPU ms and share of the total
-        self.time: float | None = None
+        # GPU time and share of the total
+        self.time: str | None = None
         self.share = 0.0
         self.state = node.state
         state_color = THEME[NODE_STATE_COLORS[node.state]]
@@ -829,9 +932,9 @@ class _NodeItem(QtWidgets.QGraphicsRectItem):
             -grow, -_CHIP_HEIGHT - _CHIP_GAP - 2, grow, grow + _SHADOW_OFFSET
         )
 
-    def set_time(self, milliseconds: float | None, share: float) -> None:
-        if (milliseconds, share) != (self.time, self.share):
-            self.time, self.share = milliseconds, share
+    def set_time(self, time: str | None, share: float) -> None:
+        if (time, share) != (self.time, self.share):
+            self.time, self.share = time, share
             rect = self.rect()
             self.update(
                 rect.left(),
@@ -888,8 +991,13 @@ class _NodeItem(QtWidgets.QGraphicsRectItem):
         painter.drawPath(body)
 
         if self.time is not None:
-            text = format_ms(self.time)
-            width = _text_width(text) + 14
+            width = (
+                max(
+                    _tabular_metrics().horizontalAdvance(text)
+                    for text in (self.time, _WIDEST_TIME)
+                )
+                + 14
+            )
             chip = QtCore.QRectF(
                 rect.right() - width,
                 rect.top() - _CHIP_HEIGHT - _CHIP_GAP,
@@ -901,8 +1009,8 @@ class _NodeItem(QtWidgets.QGraphicsRectItem):
             painter.setBrush(_mixed(THEME["surface_hi"], THEME["red"], heat))
             painter.drawRoundedRect(chip, _CHIP_HEIGHT / 2, _CHIP_HEIGHT / 2)
             painter.setPen(QtGui.QColor(THEME["bg" if heat > 0.5 else "text"]))
-            painter.setFont(QtWidgets.QApplication.font())
-            painter.drawText(chip, QtCore.Qt.AlignmentFlag.AlignCenter, text)
+            painter.setFont(_tabular_font())
+            painter.drawText(chip, QtCore.Qt.AlignmentFlag.AlignCenter, self.time)
 
     def itemChange(self, change, value):
         if change == self.GraphicsItemChange.ItemPositionHasChanged:
@@ -930,6 +1038,14 @@ class _Edge(QtWidgets.QGraphicsPathItem):
         source.node.edges.append(self)
         target.node.edges.append(self)
         self.update_path()
+
+    def connection(self) -> tuple[str, str, str]:
+        """Returns (src, dst, dst_input)."""
+        return (
+            self.source.node.identifier,
+            self.target.node.identifier,
+            self.target.name,
+        )
 
     def paint(self, painter: QtGui.QPainter, _option, _widget=None) -> None:
         pen = QtGui.QPen(self.pen())
@@ -989,6 +1105,28 @@ class _NodePicker(QtWidgets.QMenu):
         self.filter.setFocus()
 
 
+def _segments(path: QtGui.QPainterPath) -> list[QtCore.QLineF]:
+    return [
+        QtCore.QLineF(start, end)
+        for polygon in path.toSubpathPolygons()
+        for start, end in itertools.pairwise(polygon)
+    ]
+
+
+def _shift_as_control(event: QtGui.QMouseEvent) -> QtGui.QMouseEvent:
+    modifiers = QtCore.Qt.KeyboardModifier
+    if not event.modifiers() & modifiers.ShiftModifier:
+        return event
+    return QtGui.QMouseEvent(
+        event.type(),
+        event.position(),
+        event.globalPosition(),
+        event.button(),
+        event.buttons(),
+        event.modifiers() & ~modifiers.ShiftModifier | modifiers.ControlModifier,
+    )
+
+
 class _GraphView(QtWidgets.QGraphicsView):
     # src, src_output, dst, dst_input
     connection_requested = QtCore.Signal(str, str, str, str)
@@ -1014,9 +1152,21 @@ class _GraphView(QtWidgets.QGraphicsView):
         self.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
         self.setBackgroundBrush(QtGui.QColor(THEME["canvas"]))
         self.setDragMode(self.DragMode.RubberBandDrag)
-        self.setTransformationAnchor(self.ViewportAnchor.AnchorUnderMouse)
+        self.setTransformationAnchor(self.ViewportAnchor.NoAnchor)
+        self.setSceneRect(_WORLD)
+        self.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.viewport().setMouseTracking(True)
+        self.navigation: tuple[QtCore.QPointF, QtCore.QPointF] | None = None
+        self.zooming = False
+        self.grabbed: dict[_NodeItem, QtCore.QPointF] = {}
+        self.grab_start = QtCore.QPointF()
+        self.cut_line: QtWidgets.QGraphicsPathItem | None = None
+        self.cut_points: list[QtCore.QPointF] = []
+        self.menu_suppressed = False
         self.scene().selectionChanged.connect(self.emit_selection)
         self.node_times: dict[str, float] = {}
+        self.time_formats: defaultdict[str, TimeFormat] = defaultdict(TimeFormat)
         self.picker_position = QtCore.QPointF()
         self.picker = _NodePicker(self)
         self.picker.picked.connect(
@@ -1083,6 +1233,7 @@ class _GraphView(QtWidgets.QGraphicsView):
         positions = self.positions() | new_positions
         graphics = self.scene()
         graphics.blockSignals(True)
+        self.end_gestures()
         graphics.clear()
         self.dragged = self.drag_line = None
         extra_outputs = _undescribed_outputs(nodes)
@@ -1137,24 +1288,56 @@ class _GraphView(QtWidgets.QGraphicsView):
             item.setPos(column_x[layer], column_y[layer])
             column_y[layer] += item.rect().height() + _NODE_SPACING
 
-    def fit(self) -> None:
+    def fit(self, min_scale: float = _MIN_FIT_SCALE) -> None:
         bounds = self.scene().itemsBoundingRect()
+        self.resetTransform()
+        if bounds.isEmpty():
+            self.centerOn(0, 0)
+            return
         self.fitInView(bounds, QtCore.Qt.AspectRatioMode.KeepAspectRatio)
-        scale = min(max(self.transform().m11(), _MIN_FIT_SCALE), 1.0)
+        scale = min(max(self.transform().m11(), min_scale), 1.0)
         self.resetTransform()
         self.scale(scale, scale)
         self.centerOn(bounds.center())
 
+    def zoom(self, factor: float, position: QtCore.QPointF) -> None:
+        anchor = self.mapToScene(position.toPoint())
+        current = self.transform().m11()
+        factor = min(max(current * factor, _MIN_SCALE), _MAX_SCALE) / current
+        self.scale(factor, factor)
+        self.pan(position - QtCore.QPointF(self.mapFromScene(anchor)))
+
+    def pan(self, delta: QtCore.QPointF) -> None:
+        for bar, offset in (
+            (self.horizontalScrollBar(), delta.x()),
+            (self.verticalScrollBar(), delta.y()),
+        ):
+            bar.setValue(bar.value() - round(offset))
+
+    def end_gestures(self) -> None:
+        if self.cut_line:
+            self.menu_suppressed = _menu_on_release()
+        if self.grabbed or self.cut_line:
+            self.grabbed, self.cut_line, self.cut_points = {}, None, []
+            self.viewport().unsetCursor()
+
     def clear_graph(self) -> None:
+        self.end_gestures()
         self.scene().clear()
         self.items_by_identifier = {}
 
     def set_node_times(self, times: dict[str, float]) -> None:
         self.node_times = times
+        for identifier in self.time_formats.keys() - times.keys():
+            del self.time_formats[identifier]
         total = sum(times.values()) or 1.0
         for identifier, item in self.items_by_identifier.items():
-            time = times.get(identifier)
-            item.set_time(time, (time or 0.0) / total)
+            if (milliseconds := times.get(identifier)) is None:
+                item.set_time(None, 0.0)
+            else:
+                item.set_time(
+                    self.time_formats[identifier](milliseconds), milliseconds / total
+                )
 
     def positions(self) -> dict[str, QtCore.QPointF]:
         return {
@@ -1182,16 +1365,50 @@ class _GraphView(QtWidgets.QGraphicsView):
         return item if isinstance(item, _Connector) else None
 
     def contextMenuEvent(self, event: QtGui.QContextMenuEvent) -> None:
+        if self.menu_suppressed or self.cut_line:
+            self.menu_suppressed = False
+            return
         connector = self.connector_at(QtCore.QPointF(event.pos()))
         if connector and connector.is_output:
             self.output_menu_requested.emit(
                 connector.node.identifier, connector.name, event.globalPos()
             )
             return
-        self.picker_position = self.mapToScene(event.pos())
-        self.picker.exec(event.globalPos())
+        self.show_picker(event.pos(), event.globalPos())
+
+    def show_picker(
+        self, position: QtCore.QPoint, global_position: QtCore.QPoint
+    ) -> None:
+        self.picker_position = self.mapToScene(position)
+        self.picker.exec(global_position)
 
     def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:
+        buttons, modifiers = QtCore.Qt.MouseButton, QtCore.Qt.KeyboardModifier
+        if self.grabbed:
+            self.menu_suppressed = event.button() == buttons.RightButton
+            self.end_grab(event.button() == buttons.LeftButton)
+            return
+        if event.button() == buttons.MiddleButton:
+            self.zooming = bool(event.modifiers() & modifiers.ControlModifier)
+            position = event.position()
+            self.navigation = (position, position)
+            self.viewport().setCursor(
+                QtCore.Qt.CursorShape.SizeVerCursor
+                if self.zooming
+                else QtCore.Qt.CursorShape.ClosedHandCursor
+            )
+            return
+        if event.button() == buttons.RightButton and (
+            event.modifiers() & modifiers.ControlModifier
+        ):
+            self.cut_points = [self.mapToScene(event.position().toPoint())]
+            pen = QtGui.QPen(
+                QtGui.QColor(THEME["red"]), 1.5, QtCore.Qt.PenStyle.DashLine
+            )
+            pen.setCosmetic(True)
+            self.cut_line = self.scene().addPath(QtGui.QPainterPath(), pen)
+            return
+        event = _shift_as_control(event)
         connector = self.connector_at(event.position())
         if (
             event.button() == QtCore.Qt.MouseButton.LeftButton
@@ -1206,6 +1423,26 @@ class _GraphView(QtWidgets.QGraphicsView):
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event: QtGui.QMouseEvent) -> None:
+        position = event.position()
+        if self.navigation:
+            last, pressed = self.navigation
+            self.navigation = (position, pressed)
+            if self.zooming:
+                self.zoom(1.005 ** (last.y() - position.y()), pressed)
+            else:
+                self.pan(position - last)
+            return
+        if self.grabbed:
+            offset = self.mapToScene(position.toPoint()) - self.grab_start
+            for item, start in self.grabbed.items():
+                item.setPos(start + offset)
+            return
+        if self.cut_line:
+            self.cut_points.append(self.mapToScene(position.toPoint()))
+            path = QtGui.QPainterPath()
+            path.addPolygon(QtGui.QPolygonF(self.cut_points))
+            self.cut_line.setPath(path)
+            return
         if self.drag_line:
             end = self.mapToScene(event.position().toPoint())
             self.drag_line.setLine(QtCore.QLineF(self.dragged.scenePos(), end))
@@ -1213,8 +1450,19 @@ class _GraphView(QtWidgets.QGraphicsView):
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: QtGui.QMouseEvent) -> None:
+        buttons = QtCore.Qt.MouseButton
+        if self.navigation and event.button() == buttons.MiddleButton:
+            self.navigation = None
+            self.viewport().unsetCursor()
+            return
+        if self.cut_line and event.button() == buttons.RightButton:
+            self.cut(self.cut_line.path())
+            self.scene().removeItem(self.cut_line)
+            self.cut_line = None
+            self.menu_suppressed = _menu_on_release()
+            return
         if not self.drag_line:
-            super().mouseReleaseEvent(event)
+            super().mouseReleaseEvent(_shift_as_control(event))
             return
         self.scene().removeItem(self.drag_line)
         source, self.dragged, self.drag_line = self.dragged, None, None
@@ -1226,27 +1474,81 @@ class _GraphView(QtWidgets.QGraphicsView):
                 source.node.identifier, source.name, target.node.identifier, target.name
             )
 
-    def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
-        if event.key() != QtCore.Qt.Key.Key_Delete:
-            super().keyPressEvent(event)
+    def cut(self, line: QtGui.QPainterPath) -> None:
+        cut = _segments(line)
+        connections = [
+            item.connection()
+            for item in self.scene().items(
+                line.boundingRect().adjusted(-1, -1, 1, 1),
+                QtCore.Qt.ItemSelectionMode.IntersectsItemBoundingRect,
+            )
+            if isinstance(item, _Edge)
+            and any(
+                segment.intersects(other)[0]
+                == QtCore.QLineF.IntersectionType.BoundedIntersection
+                for segment in _segments(item.path())
+                for other in cut
+            )
+        ]
+        if connections:
+            self.delete_requested.emit([], connections)
+
+    def start_grab(self) -> None:
+        nodes = [
+            item for item in self.scene().selectedItems() if isinstance(item, _NodeItem)
+        ]
+        if not nodes:
             return
+        self.grab_start = self.mapToScene(
+            self.viewport().mapFromGlobal(QtGui.QCursor.pos())
+        )
+        self.grabbed = {item: item.pos() for item in nodes}
+        self.viewport().setCursor(QtCore.Qt.CursorShape.SizeAllCursor)
+
+    def end_grab(self, confirmed: bool) -> None:
+        if not confirmed:
+            for item, start in self.grabbed.items():
+                item.setPos(start)
+        self.grabbed = {}
+        self.viewport().unsetCursor()
+
+    def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
+        keys, modifiers = QtCore.Qt.Key, QtCore.Qt.KeyboardModifier
+        key, plain = event.key(), event.modifiers() == modifiers.NoModifier
+        if self.grabbed:
+            if key in (keys.Key_Escape, keys.Key_Return, keys.Key_Enter):
+                self.end_grab(key != keys.Key_Escape)
+        elif key == keys.Key_Home:
+            self.fit(_MIN_SCALE)
+        elif key == keys.Key_A and event.modifiers() == modifiers.ShiftModifier:
+            cursor = QtGui.QCursor.pos()
+            self.show_picker(self.viewport().mapFromGlobal(cursor), cursor)
+        elif key == keys.Key_G and plain:
+            self.start_grab()
+        elif key == keys.Key_Delete or (key == keys.Key_X and plain):
+            self.delete_selected()
+        else:
+            super().keyPressEvent(event)
+
+    def delete_selected(self) -> None:
         identifiers, connections = [], []
         for item in self.scene().selectedItems():
             if isinstance(item, _NodeItem):
                 identifiers.append(item.identifier)
             elif isinstance(item, _Edge):
-                connections.append(
-                    (
-                        item.source.node.identifier,
-                        item.target.node.identifier,
-                        item.target.name,
-                    )
-                )
+                connections.append(item.connection())
         self.delete_requested.emit(identifiers, connections)
 
     def wheelEvent(self, event: QtGui.QWheelEvent) -> None:
-        factor = 1.0015 ** event.angleDelta().y()
-        self.scale(factor, factor)
+        modifiers = QtCore.Qt.KeyboardModifier
+        delta = event.angleDelta()
+        steps = delta.y() or delta.x()
+        if not delta.y() or event.modifiers() & modifiers.ControlModifier:
+            self.pan(QtCore.QPointF(steps / 2, 0))
+        elif event.modifiers() & modifiers.ShiftModifier:
+            self.pan(QtCore.QPointF(0, steps / 2))
+        else:
+            self.zoom(1.0015**steps, event.position())
 
 
 def _pointer(path: list[str]) -> str:
@@ -1361,6 +1663,9 @@ class _Window(QtWidgets.QMainWindow):
         worker: _GraphWorker,
         path: Path | None,
         new_positions: dict[str, QtCore.QPointF],
+        context: merian.Context,
+        log_sink: merian.LogSink,
+        preferences: PreferencesView,
     ):
         super().__init__()
         self.worker = worker
@@ -1381,6 +1686,7 @@ class _Window(QtWidgets.QMainWindow):
         self.sequence = 0
         self.change_sequences: dict[str | None, int] = {}
         self.properties_scheduled = False
+        self.view_shortcuts: set[int] = set()
 
         self.graph_view = _GraphView()
         self.graph_view.connection_requested.connect(
@@ -1403,7 +1709,6 @@ class _Window(QtWidgets.QMainWindow):
             lambda properties: self.set_view_properties(_BACKDROP, properties)
         )
         self.graph_view.input.message.connect(self.show_message)
-        self.graph_view.input.shortcuts = _VIEW_SHORTCUTS
         self.properties = QtProperties(self.schedule_properties, _property_pointer)
         self.graph_properties = QtProperties(
             self.schedule_properties, _graph_property_pointer
@@ -1428,14 +1733,18 @@ class _Window(QtWidgets.QMainWindow):
             "select what to preview above, or click an output", "Show nothing"
         )
         self.connect_view(_PREVIEW, self.preview)
-        self.panel = OutputPanel()
-        self.panel.hide()
+        self.panel = PanelColumn()
+        self.log_view = LogView(log_sink)
+        self.preferences = preferences
+        preferences.shortcut_modifiers_changed.connect(self.set_shortcut_modifiers)
         self.tabs = QtWidgets.QTabWidget()
         for page, name in (
             (self.properties.widget, "Node"),
             (self.graph_properties.widget, "Graph"),
             (self.profiler, "Times"),
             (self.memory, "Memory"),
+            (self.log_view, "Log"),
+            (preferences, "Preferences"),
         ):
             self.tabs.addTab(page, name)
         self.tabs.currentChanged.connect(self.tab_changed)
@@ -1451,6 +1760,7 @@ class _Window(QtWidgets.QMainWindow):
         self.setCentralWidget(self.split)
         self.add_menus()
         self.add_footer()
+        self.set_shortcut_modifiers(preferences.shortcut_modifiers())
         self.node_times_action.setChecked(True)
 
         worker.nodes_changed.connect(self.refresh)
@@ -1463,10 +1773,16 @@ class _Window(QtWidgets.QMainWindow):
         worker.window_shown.connect(self.window_shown)
         worker.playing_changed.connect(self.show_playing)
         worker.message.connect(self.show_message)
+        worker.save_captured.connect(self.write_capture)
         QtCore.QTimer(
             self,
             interval=_PROPERTIES_INTERVAL // timedelta(milliseconds=1),
             timeout=self.request_properties,
+        ).start()
+        QtCore.QTimer(
+            self,
+            interval=_COMPILING_INTERVAL // timedelta(milliseconds=1),
+            timeout=lambda: self.compiling_label.setVisible(context.compiling_shaders),
         ).start()
         self.frame_timer = QtCore.QTimer(
             self,
@@ -1523,13 +1839,12 @@ class _Window(QtWidgets.QMainWindow):
             checkable=True,
         )
         view_menu.addSeparator()
-        _add_action(
+        self.release_action = _add_action(
             view_menu,
             "&Release Mouse",
             self.release_mouse,
-            QtGui.QKeySequence(_RELEASE_MOUSE),
-            "Give the mouse back from a graph's view that takes raw input, which a click "
-            "into the view captures again",
+            tip="Give the mouse back from a graph's view that takes raw input, which a "
+            "click into the view captures again",
         )
 
         playback_menu = self.menuBar().addMenu("&Playback")
@@ -1539,22 +1854,29 @@ class _Window(QtWidgets.QMainWindow):
         self.step_action = _add_action(
             playback_menu, "&Step", lambda: self.worker.post(self.worker.step)
         )
-        for action, key in zip((self.play_action, self.step_action), _PLAYBACK_KEYS):
-            action.setShortcuts(
-                [
-                    QtGui.QKeySequence(key),
-                    QtGui.QKeySequence(QtCore.QKeyCombination(_VIEW_MODIFIERS, key)),
-                ]
-            )
-        self.step_action.setToolTip(
-            f"Step: runs one iteration ({_keys(self.step_action)})"
-        )
         _add_action(
             playback_menu,
             "S&top",
             lambda: self.worker.post(self.worker.stop),
             tip=_STOP_TIP,
         )
+
+    def set_shortcut_modifiers(self, modifiers: QtCore.Qt.KeyboardModifier) -> None:
+        release = QtCore.QKeyCombination(modifiers, _RELEASE_MOUSE_KEY)
+        self.release_action.setShortcut(QtGui.QKeySequence(release))
+        self.view_shortcuts = {release.toCombined()}
+        for action, key in zip((self.play_action, self.step_action), _PLAYBACK_KEYS):
+            combination = QtCore.QKeyCombination(modifiers, key)
+            action.setShortcuts(
+                [QtGui.QKeySequence(key), QtGui.QKeySequence(combination)]
+            )
+            self.view_shortcuts.add(combination.toCombined())
+        for view in (self.graph_view, self.preview, *self.panel_views.values()):
+            view.input.shortcuts = self.view_shortcuts
+        step_tip = f"Step: runs one iteration ({_keys(self.step_action)})"
+        self.step_action.setToolTip(step_tip)
+        self.step_button.setToolTip(step_tip)
+        self.show_playing(self.playing)
 
     def event(self, event: QtCore.QEvent) -> bool:
         if (
@@ -1594,9 +1916,7 @@ class _Window(QtWidgets.QMainWindow):
             return tool
 
         self.play_button = button("play", "", self.play_action.trigger)
-        self.step_button = button(
-            "step", self.step_action.toolTip(), self.step_action.trigger
-        )
+        self.step_button = button("step", "", self.step_action.trigger)
         button("stop", _STOP_TIP, lambda: self.worker.post(self.worker.stop))
         button(
             "reconnect",
@@ -1645,8 +1965,10 @@ class _Window(QtWidgets.QMainWindow):
         self.iteration_label = stat("iteration", "8888888")
         self.time_label = stat("time", "8888.88 s")
         self.memory_label = stat("memory", WIDEST_SIZE)
+        self.compiling_label = QtWidgets.QLabel("Compiling shaders...", visible=False)
+        self.compiling_label.setObjectName("footerCaption")
+        footer.addPermanentWidget(self.compiling_label)
         footer.addPermanentWidget(stats)
-        self.show_playing(True)
 
     def show_message(self, text: str) -> None:
         self.message_label.setText(text)
@@ -1789,8 +2111,53 @@ class _Window(QtWidgets.QMainWindow):
         action.setChecked(bool(panels))
         action.setEnabled(showable)
         action.toggled.connect(set_panel_shown)
+        menu.addSeparator()
+        views = [view for view in self.shown if self.shows(view, source)]
+        buffer = source.content == mg.ConnectorKind.BUFFER
+        action = menu.addAction(
+            "Save Buffer..." if buffer else "Save Image...",
+            lambda: self.save_view(views[0]),
+        )
+        action.setEnabled(bool(views))
+        if not views:
+            menu.setToolTipsVisible(True)
+            action.setToolTip(
+                "Show it in a view first: capturing it reconnects the graph, which "
+                "restarts the run"
+            )
         menu.exec(position)
         menu.deleteLater()
+
+    def write_capture(self, path: Path, capture: mg.Capture) -> None:
+        try:
+            save_capture(capture, path)
+            self.show_message(f"saved {path}")
+        except OSError as error:
+            self.show_message(str(error))
+
+    def save_view(self, view: str) -> None:
+        if (shown := self.shown.get(view)) is None:
+            return
+        source = shown.source
+        suffix, filters = _SAVE_FILTERS[source.content]
+        name = "".join(
+            character if character.isalnum() or character in "-_." else "_"
+            for character in source.label()
+        )
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, "Save", str(Path.cwd() / f"{name}.{suffix}"), filters
+        )
+        if not path:
+            return
+        if source.kind == SourceKind.WINDOW:
+            try:
+                self.capture_image(view).save(Path(path))
+                self.show_message(f"saved {path}")
+            except OSError as error:
+                self.show_message(str(error))
+            return
+        properties = self.view_of(view).sink_properties()
+        self.worker.post(self.worker.save_capture, view, Path(path), properties)
 
     def shows(self, view: str, source: Source) -> bool:
         return view in self.shown and self.shown[view].source == source
@@ -1869,6 +2236,11 @@ class _Window(QtWidgets.QMainWindow):
             ):
                 self.show_source(_PREVIEW, window)
 
+    def capture_image(self, view: str) -> CaptureImage:
+        if view == _BACKDROP:
+            return self.graph_view.backdrop
+        return self.output_view(view).image.capture_image
+
     def output_view(self, view: str) -> OutputView:
         return self.preview if view == _PREVIEW else self.panel_views[view]
 
@@ -1884,15 +2256,22 @@ class _Window(QtWidgets.QMainWindow):
         output_view.set_sources(self.sources)
         self.panel_views[view] = output_view
         self.connect_view(view, output_view)
+        appearing = self.panel.isHidden()
         self.panel.add(output_view)
-        self.panel.show()
+        if appearing:
+            sizes = self.split.sizes()
+            widest = max(range(len(sizes)), key=sizes.__getitem__)
+            sizes[self.split.indexOf(self.panel)] = sizes[widest] // 3
+            sizes[widest] -= sizes[widest] // 3
+            self.split.setSizes(sizes)
         if source is not None:
             self.show_source(view, source)
 
     def remove_panel(self, view: str) -> None:
         self.hide_source(view)
-        self.panel_views.pop(view).deleteLater()
-        self.panel.setVisible(bool(self.panel_views))
+        output_view = self.panel_views.pop(view)
+        self.panel.remove(output_view)
+        output_view.deleteLater()
 
     def connect_view(self, view: str, output_view: OutputView) -> None:
         def close() -> None:
@@ -1902,6 +2281,7 @@ class _Window(QtWidgets.QMainWindow):
                 self.hide_source(view)
 
         output_view.closed.connect(close)
+        output_view.save_requested.connect(lambda: self.save_view(view))
         output_view.source_requested.connect(
             lambda source: self.show_source(view, source)
         )
@@ -1912,7 +2292,7 @@ class _Window(QtWidgets.QMainWindow):
             functools.partial(self.worker.post, self.worker.set_capture_interval, view)
         )
         output_view.input.message.connect(self.show_message)
-        output_view.input.shortcuts = _VIEW_SHORTCUTS
+        output_view.input.shortcuts = self.view_shortcuts
 
     def set_view_properties(self, view: str, properties: dict) -> None:
         if window := self.windows.get(view):
@@ -2080,18 +2460,21 @@ def main(argv: list[str] | None = None) -> int:
     signal.signal(
         signal.SIGINT, lambda *_: QtCore.QTimer.singleShot(0, application.quit)
     )
-    with mg.Graph(
-        scene.context((mg.HOST_WINDOWS_EXTENSION,)), description, strict=False
-    ) as graph:
-        worker = _GraphWorker(graph)
-        window = _Window(worker, path, new_positions)
-        window.resize(1600, 900)
-        window.show()
-        worker.start()
-        try:
-            return application.exec()
-        finally:
-            worker.quit()
+    preferences = PreferencesView(QtCore.QSettings(*_SETTINGS))
+    with merian.LogSink() as log_sink:
+        context = scene.context((mg.HOST_WINDOWS_EXTENSION,))
+        with mg.Graph(context, description, strict=False) as graph:
+            worker = _GraphWorker(graph)
+            window = _Window(
+                worker, path, new_positions, context, log_sink, preferences
+            )
+            window.resize(1600, 900)
+            window.show()
+            worker.start()
+            try:
+                return application.exec()
+            finally:
+                worker.quit()
 
 
 if __name__ == "__main__":

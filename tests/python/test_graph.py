@@ -274,6 +274,34 @@ class GraphTest(unittest.TestCase):
             graph.run(time=2)
             self.assertEqual(graph.time, 2)
 
+    def test_log_sink(self):
+        def load() -> None:
+            mg.Graph(self.context, mg.Description()).close()
+
+        def loaded(sink: merian.LogSink) -> list[merian.LogRecord]:
+            return [
+                record
+                for record in sink.get_new_records()
+                if record.message.startswith("Graph loaded")
+            ]
+
+        merian.set_log_level(merian.LogLevel.INFO)
+        with merian.LogSink(level=merian.LogLevel.WARN) as sink:
+            load()
+            self.assertEqual(loaded(sink), [])
+            sink.level = merian.LogLevel.INFO
+            load()
+            (record,) = loaded(sink)
+        self.assertEqual(record.level, merian.LogLevel.INFO)
+        self.assertTrue(record.source_file.endswith("graph_load_store.cpp"))
+        load()
+        self.assertEqual(loaded(sink), [])
+
+        with merian.LogSink(capacity=1) as sink:
+            for _ in range(3):
+                load()
+        self.assertEqual(len(sink.get_new_records()), 1)
+
     def test_infinity_is_no_limit(self):
         with self.color_graph() as graph:
             result = graph.run(iterations=3, duration=math.inf)

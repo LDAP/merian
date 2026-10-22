@@ -23,6 +23,7 @@ SlangProgram::SlangProgram(const ShaderCompileContextHandle& compile_context,
             throw ShaderCompiler::compilation_failed(retry_error.what());
         }
     }
+    const ShaderCompileContext::Compiling compiling(compile_context);
     program = merian::SlangSession::link(composed);
 }
 
@@ -40,6 +41,7 @@ ShaderModuleHandle SlangProgram::get_shader_module(const ContextHandle& context,
 Slang::ComPtr<slang::IBlob> SlangProgram::get_binary(const uint64_t entry_point_index) {
     auto [it, inserted] = entry_point_binaries.try_emplace(entry_point_index);
     if (inserted) {
+        const ShaderCompileContext::Compiling compiling(compile_context);
         it->second =
             merian::SlangSession::compile(program, static_cast<uint32_t>(entry_point_index));
     }
@@ -48,6 +50,7 @@ Slang::ComPtr<slang::IBlob> SlangProgram::get_binary(const uint64_t entry_point_
 
 Slang::ComPtr<slang::IBlob> SlangProgram::get_binary() {
     if (binary == nullptr) {
+        const ShaderCompileContext::Compiling compiling(compile_context);
         binary = merian::SlangSession::compile(program);
     }
     return binary;

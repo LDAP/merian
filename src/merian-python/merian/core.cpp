@@ -1,6 +1,7 @@
 // Python.h must precede the standard headers
 #include "json_caster.hpp"
 
+#include "log_sink.hpp"
 #include "merian/io/image_io.hpp"
 #include "merian/plugin/plugins.hpp"
 #include "merian/utils/properties.hpp"
@@ -11,6 +12,7 @@
 
 #include <array>
 #include <nanobind/ndarray.h>
+#include <nanobind/stl/chrono.h>
 #include <nanobind/stl/filesystem.h>
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/shared_ptr.h>
@@ -30,10 +32,54 @@ NB_MODULE(_core, m) {
     nb::exception<merian::MissingExtension>(m, "MissingExtension", merian_error);
     nb::exception<merian::VulkanException>(m, "VulkanError", merian_error);
 
+    nb::enum_<spdlog::level::level_enum>(m, "LogLevel", nb::is_arithmetic())
+        .value("TRACE", spdlog::level::trace)
+        .value("DEBUG", spdlog::level::debug)
+        .value("INFO", spdlog::level::info)
+        .value("WARN", spdlog::level::warn)
+        .value("ERROR", spdlog::level::err)
+        .value("CRITICAL", spdlog::level::critical)
+        .value("OFF", spdlog::level::off);
     m.def(
         "set_log_level",
         [](const std::string& level) { spdlog::set_level(spdlog::level::from_str(level)); },
         "level"_a, "One of trace, debug, info, warn, error, critical, off.");
+    m.def(
+        "set_log_level", [](const spdlog::level::level_enum level) { spdlog::set_level(level); },
+        "level"_a);
+
+    using merian::python::LogSink;
+    nb::class_<LogSink::Record>(m, "LogRecord", "A message of merian's log.")
+        .def_ro("level", &LogSink::Record::level)
+        .def_ro("time", &LogSink::Record::time, "Local time.")
+        .def_ro("logger_name", &LogSink::Record::logger_name)
+        .def_ro("message", &LogSink::Record::message)
+        .def_ro("source_file", &LogSink::Record::source_file, "None if not logged with one.")
+        .def_ro("source_line", &LogSink::Record::source_line)
+        .def_ro("source_function", &LogSink::Record::source_function)
+        .def("__repr__", [](const LogSink::Record& record) {
+            return fmt::format("LogRecord({}, '{}')", spdlog::level::to_string_view(record.level),
+                               record.message);
+        });
+    LogSink::install();
+    nb::class_<LogSink>(m, "LogSink",
+                        "Buffers the records of merian's log, logged on any thread, until "
+                        "get_new_records() reads them, e.g. from a GUI timer. Attached from its "
+                        "creation until detach(), the end of a with block or its last reference.")
+        .def(nb::new_([](const spdlog::level::level_enum level, const std::size_t capacity) {
+                 return LogSink::attach(capacity, level);
+             }),
+             "level"_a = spdlog::level::trace, "capacity"_a = 4096,
+             "capacity: the most records buffered, the oldest are dropped first.")
+        .def_prop_rw(
+            "level", [](const LogSink& sink) { return sink.level(); },
+            [](LogSink& sink, const spdlog::level::level_enum level) { sink.set_level(level); },
+            "The least level buffered, of the records set_log_level() lets through.")
+        .def("get_new_records", &LogSink::get_new_records,
+             "The records logged since the last call, oldest first.")
+        .def("detach", &LogSink::detach, "Stops buffering; the buffered records stay readable.")
+        .def("__enter__", [](const std::shared_ptr<LogSink>& sink) { return sink; })
+        .def("__exit__", [](LogSink& sink, const nb::args&) { sink.detach(); });
 
     nb::class_<merian::Context>(m, "Context", "Vulkan instance and device.")
         .def(nb::new_([](const std::vector<std::string>& extensions, const bool validation,
@@ -60,6 +106,12 @@ NB_MODULE(_core, m) {
             [](const merian::Context& context) -> std::string {
                 return context.get_physical_device()->get_properties().get_properties().deviceName;
             })
+        .def_prop_ro(
+            "compiling_shaders",
+            [](const merian::Context& context) {
+                return context.get_shader_compile_context()->is_compiling();
+            },
+            "Whether shaders are loaded or compiled right now, on any thread.")
         .def(
             "dump_device_fault",
             [](merian::Context& context) {

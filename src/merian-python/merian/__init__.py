@@ -33,6 +33,9 @@ from ._core import (  # noqa: E402
     DEBUG_BUILD,
     DEVICE_FAULT_EXTENSION,
     Context,
+    LogLevel,
+    LogRecord,
+    LogSink,
     MerianError,
     MissingExtension,
     ProfilerReport,
@@ -59,6 +62,9 @@ __all__ = (
     "ProfilerReport",
     "Properties",
     # Logging
+    "LogLevel",
+    "LogRecord",
+    "LogSink",
     "set_log_level",
     # Submodules
     "io",

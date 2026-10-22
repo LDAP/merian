@@ -8,7 +8,6 @@
 
 namespace merian {
 
-
 SystemGlslcCompiler::SystemGlslcCompiler()
     : GLSLShaderCompiler(), compiler_executable(subprocess::find_program("glslc")) {}
 
@@ -22,6 +21,7 @@ SystemGlslcCompiler::compile_glsl(const std::string& source,
     if (compiler_executable.empty()) {
         throw compilation_failed{"compiler not available"};
     }
+    const ShaderCompileContext::Compiling compiling(shader_compile_context);
 
     std::vector<std::string> command = {compiler_executable};
 

@@ -6,7 +6,9 @@
 
 #include "vulkan/vulkan_core.h"
 
+#include <atomic>
 #include <cstdint>
+#include <utility>
 namespace merian {
 
 class ShaderCompileContext;
@@ -127,6 +129,22 @@ class ShaderCompileContext : public std::enable_shared_from_this<ShaderCompileCo
     // Retires the session if a file it compiled from changed since. Returns whether it did.
     bool retire_stale_session();
 
+    // Whether a session of this context loads or compiles shaders, on any thread.
+    bool is_compiling() const;
+
+    class Compiling {
+      public:
+        explicit Compiling(ShaderCompileContextHandle context);
+
+        Compiling(const Compiling&) = delete;
+        Compiling& operator=(const Compiling&) = delete;
+
+        ~Compiling();
+
+      private:
+        const ShaderCompileContextHandle context;
+    };
+
     // -------------------------------------------------
 
     static ShaderCompileContextHandle create(const ContextHandle& context) {
@@ -165,6 +183,8 @@ class ShaderCompileContext : public std::enable_shared_from_this<ShaderCompileCo
 
     SlangSessionHandle hot_session;
     uint64_t hot_session_epoch = UINT64_MAX;
+
+    std::atomic_uint32_t compilations = 0;
 };
 
 } // namespace merian

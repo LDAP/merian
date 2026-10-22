@@ -21,6 +21,7 @@ BlobHandle SystemGlslangValidatorCompiler::compile_glsl(
     if (compiler_executable.empty()) {
         throw compilation_failed{"compiler not available"};
     }
+    const ShaderCompileContext::Compiling compiling(shader_compile_context);
 
     std::vector<std::string> command = {compiler_executable};
 

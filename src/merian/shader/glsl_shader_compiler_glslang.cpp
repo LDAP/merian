@@ -139,6 +139,7 @@ GlslangCompiler::compile_glsl(const std::string& source,
                               const std::string& source_name,
                               const vk::ShaderStageFlagBits shader_kind,
                               const ShaderCompileContextHandle& shader_compile_context) const {
+    const ShaderCompileContext::Compiling compiling(shader_compile_context);
     const EShLanguage stage = vk_stage_to_esh_language(shader_kind);
 
     glslang::TShader shader(stage);

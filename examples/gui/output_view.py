@@ -4,6 +4,7 @@ import math
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from datetime import timedelta
+from pathlib import Path
 
 import numpy as np
 from PySide6 import QtCore, QtGui, QtWidgets
@@ -97,6 +98,26 @@ def _centered(size: QtCore.QSize, rect: QtCore.QRect) -> QtCore.QRect:
     target = QtCore.QRect(QtCore.QPoint(), size)
     target.moveCenter(rect.center())
     return target
+
+
+def _texel_image(texels: np.ndarray) -> QtGui.QImage:
+    height, width, _ = texels.shape
+    return QtGui.QImage(
+        texels.data,
+        width,
+        height,
+        texels.strides[0],
+        QtGui.QImage.Format.Format_RGBX8888,
+    )
+
+
+def save_capture(capture: mg.Capture | mg.HostWindow.Frame, path: Path) -> None:
+    if capture.array.ndim == 1:
+        path.write_bytes(capture.array.tobytes())
+        return
+    texels = _display_texels(capture.array, capture.format)
+    if not _texel_image(texels).save(str(path)):
+        raise OSError(f"cannot write {path}")
 
 
 def fit_properties(widget: QtWidgets.QWidget) -> dict:
@@ -233,6 +254,12 @@ class CaptureImage:
         self.texels = None
         self.drawn = QtCore.QRectF()
 
+    def save(self, path: Path) -> None:
+        if self.texels is None:
+            raise OSError("the view shows nothing to save yet")
+        if not _texel_image(self.texels).save(str(path)):
+            raise OSError(f"cannot write {path}")
+
     def area(self, rect: QtCore.QRect) -> QtCore.QRectF:
         return self.drawn if self.image is not None else QtCore.QRectF(rect)
 
@@ -244,14 +271,7 @@ class CaptureImage:
         )
         self.image = None
         if self.texels is not None:
-            height, width, _ = self.texels.shape
-            self.image = QtGui.QImage(
-                self.texels.data,
-                width,
-                height,
-                self.texels.strides[0],
-                QtGui.QImage.Format.Format_RGBX8888,
-            )
+            self.image = _texel_image(self.texels)
             self.image.setDevicePixelRatio(pixel_ratio)
 
     def draw(self, painter: QtGui.QPainter, rect: QtCore.QRect) -> None:
@@ -431,6 +451,7 @@ class OutputView(QtWidgets.QWidget):
     sink_changed = QtCore.Signal(dict)
     interval_changed = QtCore.Signal(object)
     aspect_changed = QtCore.Signal()
+    save_requested = QtCore.Signal()
 
     def __init__(self, placeholder: str, close_tooltip: str):
         super().__init__()
@@ -455,6 +476,17 @@ class OutputView(QtWidgets.QWidget):
         self.interval.valueChanged.connect(
             lambda: self.interval_changed.emit(self.capture_interval())
         )
+        self.menu = QtWidgets.QMenu(self)
+        self.save_action = self.menu.addAction(
+            "Save Image...", lambda: self.save_requested.emit()
+        )
+        self.menu_button = QtWidgets.QToolButton(
+            text="\u2630",
+            autoRaise=True,
+            popupMode=QtWidgets.QToolButton.ToolButtonPopupMode.InstantPopup,
+        )
+        self.menu_button.setMenu(self.menu)
+        self.menu_button.setStyleSheet("QToolButton::menu-indicator { image: none; }")
         self.close_button = QtWidgets.QToolButton(
             text="\u00d7", autoRaise=True, toolTip=close_tooltip
         )
@@ -478,6 +510,7 @@ class OutputView(QtWidgets.QWidget):
         header.setContentsMargins(_SPACING, 0, 0, 0)
         header.addWidget(self.source_combo, 1)
         header.addWidget(self.interval)
+        header.addWidget(self.menu_button)
         header.addWidget(self.close_button)
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -508,6 +541,12 @@ class OutputView(QtWidgets.QWidget):
         _select_source_item(self.source_combo, source)
         self.interval.setVisible(
             source is not None and source.kind != SourceKind.WINDOW
+        )
+        self.save_action.setEnabled(source is not None)
+        self.save_action.setText(
+            "Save Buffer..."
+            if source is not None and source.content == mg.ConnectorKind.BUFFER
+            else "Save Image..."
         )
         self.pages.setCurrentWidget(self.page())
         self.input.set_window(None)
@@ -553,27 +592,40 @@ class OutputView(QtWidgets.QWidget):
         return self.source_combo.sizeHint().height() + content
 
 
-class OutputPanel(QtWidgets.QScrollArea):
+class PanelColumn(QtWidgets.QSplitter):
     def __init__(self):
-        super().__init__()
-        self.setWidgetResizable(True)
-        self.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        content = QtWidgets.QWidget()
-        self.entries = QtWidgets.QVBoxLayout(content)
-        self.entries.addStretch()
-        self.setWidget(content)
+        super().__init__(QtCore.Qt.Orientation.Vertical)
+        self.setChildrenCollapsible(False)
+        self.resized_by_user = False
+        self.splitterMoved.connect(lambda: setattr(self, "resized_by_user", True))
+        self.hide()
 
     def add(self, output_view: OutputView) -> None:
-        self.entries.insertWidget(self.entries.count() - 1, output_view)
+        sizes = self.sizes()
+        self.addWidget(output_view)
         output_view.aspect_changed.connect(self.fit_entries)
-        self.fit_entries()
+        self.show()
+        if self.resized_by_user:
+            self.setSizes([*sizes, output_view.height_for(self.width())])
+        else:
+            self.fit_entries()
 
-    def fit_entries(self) -> None:
-        width = self.viewport().width()
-        for index in range(self.entries.count() - 1):
-            output_view = self.entries.itemAt(index).widget()
-            output_view.setFixedHeight(output_view.height_for(width))
+    def remove(self, output_view: OutputView) -> None:
+        output_view.hide()
+        output_view.setParent(None)
+        if self.count():
+            self.fit_entries()
+        else:
+            self.hide()
+            self.resized_by_user = False
 
     def resizeEvent(self, event: QtGui.QResizeEvent) -> None:
         super().resizeEvent(event)
         self.fit_entries()
+
+    def fit_entries(self) -> None:
+        if not self.resized_by_user:
+            width = self.width()
+            self.setSizes(
+                [self.widget(index).height_for(width) for index in range(self.count())]
+            )

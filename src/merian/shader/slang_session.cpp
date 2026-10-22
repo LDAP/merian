@@ -605,6 +605,7 @@ SlangSession::load_module_from_source(const std::string& name,
                                       const std::string& source,
                                       const std::optional<std::filesystem::path>& path) {
     const auto start = std::chrono::steady_clock::now();
+    const ShaderCompileContext::Compiling compiling(compile_context());
     Slang::ComPtr<slang::IBlob> diagnostics;
     Slang::ComPtr<slang::IModule> module;
 
@@ -1137,6 +1138,23 @@ SlangSessionHandle ShaderCompileContext::current_session() {
         hot_session_epoch = epoch;
     }
     return hot_session;
+}
+
+bool ShaderCompileContext::is_compiling() const {
+    return compilations.load(std::memory_order_relaxed) > 0;
+}
+
+ShaderCompileContext::Compiling::Compiling(ShaderCompileContextHandle context)
+    : context(std::move(context)) {
+    if (this->context) {
+        this->context->compilations.fetch_add(1, std::memory_order_relaxed);
+    }
+}
+
+ShaderCompileContext::Compiling::~Compiling() {
+    if (context) {
+        context->compilations.fetch_sub(1, std::memory_order_relaxed);
+    }
 }
 
 bool ShaderCompileContext::retire_stale_session() {

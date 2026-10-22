@@ -1,4 +1,7 @@
+import bisect
+import itertools
 import math
+import time
 import zlib
 from collections import defaultdict, deque
 from collections.abc import Callable
@@ -13,6 +16,7 @@ import merian.graph as mg
 from .theme import RIGHT_ALIGNED, THEME, scrolled
 
 _BLOCK_HEIGHT = 200
+_MIN_SPAN_HEIGHT = 7
 _HISTORY = 300
 _RUN_NODES = "Run nodes"
 _REPORT_KINDS = {
@@ -22,6 +26,7 @@ _REPORT_KINDS = {
 }
 _SECTION_COLORS = ("accent", "peach", "blue", "green", "yellow", "red", "teal")
 _TOTAL = ()
+_UNIT_HOLD = 1.0
 
 _NODE_ROLE = QtCore.Qt.ItemDataRole.UserRole + 2
 _PATH_ROLE = QtCore.Qt.ItemDataRole.UserRole
@@ -45,6 +50,24 @@ def format_ms(milliseconds: float) -> str:
         if 0 < milliseconds < 0.1
         else f"{milliseconds:.3g} ms"
     )
+
+
+class TimeFormat:
+    def __init__(self):
+        self.micro = False
+        self.other_since: float | None = None
+
+    def __call__(self, milliseconds: float) -> str:
+        micro = milliseconds < 0.1
+        if micro == self.micro:
+            self.other_since = None
+        elif self.other_since is None:
+            self.other_since = time.monotonic()
+        elif time.monotonic() - self.other_since >= _UNIT_HOLD:
+            self.micro, self.other_since = micro, None
+        if self.micro:
+            return f"{milliseconds * 1000:.2f} µs"
+        return f"{milliseconds:.2f} ms"
 
 
 def _nice_ceiling(value: float) -> float:
@@ -344,8 +367,14 @@ class ProfilerView(QtWidgets.QWidget):
         self.cpu = _StatCard("CPU", "accent")
         self.gpu = _StatCard("GPU", "peach")
         self.rate = _StatCard("Frame rate")
-        self.slowest = _StatCard("Slowest node")
+        self.selected_card = _StatCard("Selected node")
         self.selected: str | None = None
+        self.node_times: dict[str, float] = {}
+        self.gpu_total = 0.0
+        self.formats = {
+            name: TimeFormat()
+            for name in ("cpu", "cpu std", "gpu", "gpu std", "frame", "node")
+        }
         restart = QtWidgets.QToolButton(
             text="Restart", toolTip="Restarts the run report"
         )
@@ -385,14 +414,28 @@ class ProfilerView(QtWidgets.QWidget):
         split.setSizes([160, 400])
         layout = QtWidgets.QVBoxLayout(self)
         layout.addLayout(controls)
-        layout.addLayout(_card_row(self.cpu, self.gpu, self.rate, self.slowest))
+        layout.addLayout(_card_row(self.cpu, self.gpu, self.rate, self.selected_card))
         layout.addWidget(split, 1)
         self.plot_selected()
 
     def set_selected(self, node: str | None) -> None:
+        if node != self.selected:
+            self.formats["node"] = TimeFormat()
         self.selected = node
+        self.show_selected_time()
         for path, item in self.items.items():
             self.mark(path, item)
+
+    def show_selected_time(self) -> None:
+        if self.selected is None:
+            self.selected_card.set("-", "select a node")
+        elif (milliseconds := self.node_times.get(self.selected)) is None:
+            self.selected_card.set(self.selected, "did not run")
+        else:
+            share = milliseconds / self.gpu_total if self.gpu_total else 0.0
+            self.selected_card.set(
+                self.selected, f"{self.formats['node'](milliseconds)} GPU, {share:.0%}"
+            )
 
     def mark(self, path: tuple[str, ...], item: QtWidgets.QTreeWidgetItem) -> None:
         marked = self.selected is not None and path[-1].startswith(f"{self.selected} (")
@@ -448,27 +491,23 @@ class ProfilerView(QtWidgets.QWidget):
 
     def show_report(self, report: merian.ProfilerReport) -> None:
         totals = (report.cpu_total_ms(), report.gpu_total_ms())
+        formats = self.formats
         self.cpu.set(
-            format_ms(totals[0]),
-            f"\u00b1 {format_ms(report.cpu_total_std_deviation_ms())}",
+            formats["cpu"](totals[0]),
+            f"\u00b1 {formats['cpu std'](report.cpu_total_std_deviation_ms())}",
         )
         self.gpu.set(
-            format_ms(totals[1]),
-            f"\u00b1 {format_ms(report.gpu_total_std_deviation_ms())}",
+            formats["gpu"](totals[1]),
+            f"\u00b1 {formats['gpu std'](report.gpu_total_std_deviation_ms())}",
         )
         frame = max(totals)
         self.rate.set(
             f"{1000 / frame:.0f} fps" if frame > 0 else "-",
-            f"{format_ms(frame)} per frame",
+            f"{formats['frame'](frame)} per frame",
             "Bounded by the slower of CPU and GPU",
         )
-        times = node_times(report)
-        if times:
-            node, slowest = max(times.items(), key=lambda entry: entry[1])
-            share = slowest / totals[1] if totals[1] else 0.0
-            self.slowest.set(node, f"{format_ms(slowest)} GPU, {share:.0%}")
-        else:
-            self.slowest.set("-")
+        self.node_times, self.gpu_total = node_times(report), totals[1]
+        self.show_selected_time()
         seen = set()
 
         def update(
@@ -688,7 +727,23 @@ class _BlockMap(QtWidgets.QWidget):
         self.selected: str | None = None
         self.hovered: dict | None = None
         self.setMouseTracking(True)
-        self.setFixedHeight(_BLOCK_HEIGHT)
+        size = max(block["size"], 1)
+        self.boundaries = sorted(
+            {0, size}
+            | {entry["offset"] for entry in transient}
+            | {entry["offset"] + entry["size"] for entry in transient}
+        )
+        self.heights_below = list(
+            itertools.accumulate(
+                (
+                    max((upper - lower) / size * _BLOCK_HEIGHT, _MIN_SPAN_HEIGHT)
+                    for lower, upper in itertools.pairwise(self.boundaries)
+                ),
+                initial=0.0,
+            )
+        )
+        metrics = self.fontMetrics()
+        self.setFixedHeight(round(self.heights_below[-1] + 1.5 * metrics.height() + 7))
 
     def set_selected(self, node: str | None) -> None:
         self.selected = node
@@ -701,11 +756,23 @@ class _BlockMap(QtWidgets.QWidget):
             left, metrics.height() / 2 + 1, -1, -metrics.height() - 6
         )
 
+    def y_of(self, rect: QtCore.QRectF, offset: float) -> float:
+        """The y of an offset into the block, linear between resource boundaries."""
+        index = min(
+            max(bisect.bisect_right(self.boundaries, offset) - 1, 0),
+            len(self.boundaries) - 2,
+        )
+        lower, upper = self.boundaries[index], self.boundaries[index + 1]
+        fraction = (offset - lower) / (upper - lower)
+        height = self.heights_below[index] + fraction * (
+            self.heights_below[index + 1] - self.heights_below[index]
+        )
+        return rect.bottom() - height / self.heights_below[-1] * rect.height()
+
     def entry_rects(self, entry: dict) -> list[QtCore.QRectF]:
         rect = self.map_rect()
-        size = self.block["size"] or 1
-        top = rect.bottom() - (entry["offset"] + entry["size"]) / size * rect.height()
-        height = max(entry["size"] / size * rect.height(), 1)
+        top = self.y_of(rect, entry["offset"] + entry["size"])
+        height = max(self.y_of(rect, entry["offset"]) - top, 1)
         positions = range(self.positions) if entry["persistent"] else entry["in_use"]
         return [
             QtCore.QRectF(
@@ -727,7 +794,7 @@ class _BlockMap(QtWidgets.QWidget):
 
         painter.setPen(QtGui.QColor(THEME["text_dim"]))
         for fraction in (0.0, 0.5, 1.0):
-            y = rect.bottom() - fraction * rect.height()
+            y = self.y_of(rect, fraction * self.block["size"])
             painter.drawText(
                 QtCore.QRectF(
                     0, y - metrics.height() / 2, rect.left() - 8, metrics.height()
@@ -969,7 +1036,7 @@ class MemoryView(QtWidgets.QWidget):
             )
         for node, node_kinds in kinds.items():
             if node_kinds["own"]:
-                children[node].append(("(the node's)", node_kinds["own"], "own", ""))
+                children[node].append(("internal", node_kinds["own"], "own", ""))
         totals = {
             node: sum(child[1] for child in entries)
             for node, entries in children.items()

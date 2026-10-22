@@ -16,5 +16,6 @@ spdlog_lib = library(
   src,
   include_directories: inc,
   dependencies: spdlog_dependencies,
-  cpp_args: spdlog_compile_args,
+  cpp_args: spdlog_compile_args + spdlog_library_args,
+  install: true,
 )
