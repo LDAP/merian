@@ -7,16 +7,16 @@ which take the input of their view.
   graph_editor.py [scene or graph.json] [graph options]
 
 Right-click adds a node. Drag from an output to an input to connect them. Click an
-output to preview it above the properties; right-click it to show it as the backdrop of
-the graph or in a panel next to the graph. The header of each view, and View > Backdrop
-for the backdrop, select what it shows. Delete removes the selected nodes and
-connections. Hollow inputs are optional; grey connectors and dashed connections were
-connected but are not described by their node now. Positions are stored in the saved
-config.
+output to preview it, left of the graph and properties; right-click it to show it as the
+backdrop of the graph or in a panel next to the graph. The header of each view, and
+View > Backdrop for the backdrop, select what it shows. Delete removes the selected
+nodes and connections. Hollow inputs are optional; grey connectors and dashed
+connections were connected but are not described by their node now. Positions are
+stored in the saved config.
 
 Space plays and pauses, . steps. A graph's view sends the keys to the graph; there,
-Shift+Alt+Space plays and pauses, Shift+Alt+. steps and Shift+Alt+Esc gives the mouse
-back.
+Shift+Alt+Space plays and pauses, Shift+Alt+. steps and Shift+Alt+Backspace gives the
+mouse back.
 """
 
 import argparse
@@ -95,7 +95,7 @@ _PLAYBACK_KEYS = (QtCore.Qt.Key.Key_Space, QtCore.Qt.Key.Key_Period)
 _VIEW_MODIFIERS = (
     QtCore.Qt.KeyboardModifier.ShiftModifier | QtCore.Qt.KeyboardModifier.AltModifier
 )
-_RELEASE_MOUSE = QtCore.QKeyCombination(_VIEW_MODIFIERS, QtCore.Qt.Key.Key_Escape)
+_RELEASE_MOUSE = QtCore.QKeyCombination(_VIEW_MODIFIERS, QtCore.Qt.Key.Key_Backspace)
 _VIEW_SHORTCUTS = {_RELEASE_MOUSE.toCombined()} | {
     QtCore.QKeyCombination(_VIEW_MODIFIERS, key).toCombined() for key in _PLAYBACK_KEYS
 }
@@ -1440,11 +1440,11 @@ class _Window(QtWidgets.QMainWindow):
             self.tabs.addTab(page, name)
         self.tabs.currentChanged.connect(self.tab_changed)
         self.side = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical)
-        self.side.addWidget(self.preview)
+        self.side.addWidget(self.graph_view)
         self.side.addWidget(self.tabs)
         self.side.setSizes([350, 550])
         self.split = QtWidgets.QSplitter()
-        self.split.addWidget(self.graph_view)
+        self.split.addWidget(self.preview)
         self.split.addWidget(self.panel)
         self.split.addWidget(self.side)
         self.split.setSizes([1000, 450, 600])
@@ -1494,7 +1494,7 @@ class _Window(QtWidgets.QMainWindow):
             "&Swap Preview and Graph",
             self.swap,
             "F2",
-            "The preview large, the graph with its backdrop above the properties",
+            "The graph with its backdrop large, the preview above the properties",
             checkable=True,
         )
         _add_action(

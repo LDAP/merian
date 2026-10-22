@@ -8,6 +8,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 import merian.graph as mg
 
 from .wayland_pointer import wayland_pointer
+from .windows_pointer import windows_pointer
 
 _Qt = QtCore.Qt
 _K = mg.Key
@@ -122,6 +123,7 @@ _CURSORS = {
     mg.CursorShape.HIDDEN: _Qt.CursorShape.BlankCursor,
 }
 _RECENTER_DISTANCE = 100
+_ACTIVATION_TIMEOUT_MS = 500
 
 
 def _key_of(event: QtGui.QKeyEvent) -> mg.Key:
@@ -144,6 +146,8 @@ class _RawMotion(enum.Enum):
 
 
 def _raw_motion() -> tuple[_RawMotion, bool, str | None]:
+    if windows_pointer():
+        return _RawMotion.RELATIVE, False, None
     if not QtGui.QGuiApplication.platformName().startswith("wayland"):
         return _RawMotion.WARPED, True, None
     pointer = wayland_pointer()
@@ -218,6 +222,8 @@ class WindowInput(QtCore.QObject):
         self.shortcuts: set[int] = set()
         self.raw = False
         self.released = False
+        # A click took raw input before its window was activated
+        self.activating: QtCore.QDeadlineTimer | None = None
         self.pressed_keys: dict[int, tuple[mg.Key, int]] = {}
         self.pressed_buttons: set[mg.MouseButton] = set()
         self.position = (0.0, 0.0)
@@ -232,11 +238,15 @@ class WindowInput(QtCore.QObject):
         widget.installEventFilter(self)
         if self.mouse_source is not widget:
             self.mouse_source.installEventFilter(self)
+        QtGui.QGuiApplication.instance().applicationStateChanged.connect(
+            self.application_state_changed
+        )
 
     def set_window(self, window: mg.HostWindow | None) -> None:
         self.release_all()
         self.set_raw(False)
         self.released = False
+        self.activating = None
         self.window = window
         self.widget.setFocusPolicy(
             _Qt.FocusPolicy.StrongFocus if window else self.focus_policy
@@ -250,8 +260,22 @@ class WindowInput(QtCore.QObject):
             return
         grabbed = self.window.mouse_grabbed
         self.released &= grabbed
-        raw = grabbed and self.widget.hasFocus() and not self.released
+        if self.activating is not None and (
+            self.widget.isActiveWindow() or self.activating.hasExpired()
+        ):
+            self.released |= not self.widget.isActiveWindow()
+            self.activating = None
+        focused = self.widget.hasFocus() or self.activating is not None
+        raw = grabbed and focused and not self.released
         self.set_raw(raw)
+        if (
+            raw
+            and self.motion == _RawMotion.RELATIVE
+            and (pointer := windows_pointer())
+        ):
+            pointer.hold(
+                self.mouse_source.mapTo(self.widget.window(), self.area().center())
+            )
         if grabbed and not raw:
             self.mouse_source.setCursor(_Qt.CursorShape.ArrowCursor)
         elif not raw:
@@ -290,10 +314,15 @@ class WindowInput(QtCore.QObject):
                 self.mouse_source.mapFromGlobal(self.raw_start)
             )
             self.raw_cursor = _WarpedCursor(self.cursor)
+            window = self.widget.window().windowHandle()
             if self.motion == _RawMotion.RELATIVE:
-                wayland_pointer().start(
-                    self.widget.window().windowHandle(), self.send_relative_motion
-                )
+                if pointer := windows_pointer():
+                    if not pointer.start(
+                        window, self.send_relative_motion, self.lose_raw
+                    ):
+                        self.motion, self.recenters = _RawMotion.WARPED, True
+                else:
+                    wayland_pointer().start(window, self.send_relative_motion)
             if self.recenters:
                 self.recenter()
             return
@@ -301,7 +330,10 @@ class WindowInput(QtCore.QObject):
         if self.window is not None and self.window.mouse_grabbed:
             self.release_buttons()
         if self.motion == _RawMotion.RELATIVE:
-            wayland_pointer().stop()
+            if pointer := windows_pointer():
+                pointer.stop(self.send_relative_motion)
+            else:
+                wayland_pointer().stop()
         if QtWidgets.QWidget.mouseGrabber() is self.mouse_source:
             self.mouse_source.releaseMouse()
         if self.recenters:
@@ -337,7 +369,7 @@ class WindowInput(QtCore.QObject):
             if kind in (Type.FocusIn, Type.FocusOut):
                 if kind == Type.FocusOut:
                     self.release_all()
-                    self.set_raw(False)
+                    self.lose_raw()
                 self.window.send_focus(kind == Type.FocusIn)
         if watched is self.mouse_source:
             if kind in (
@@ -351,6 +383,13 @@ class WindowInput(QtCore.QObject):
                     self.send_button(event)
                 elif kind != Type.MouseButtonRelease:
                     self.released = False
+                    self.activating = (
+                        None
+                        if self.widget.isActiveWindow()
+                        else QtCore.QDeadlineTimer(_ACTIVATION_TIMEOUT_MS)
+                    )
+                    self.widget.activateWindow()
+                    self.set_raw(True)
                     self.update()
                 return True
             if kind == Type.MouseMove:
@@ -365,6 +404,17 @@ class WindowInput(QtCore.QObject):
             if kind == Type.ContextMenu:
                 return True
         return False
+
+    def application_state_changed(self, state: _Qt.ApplicationState) -> None:
+        if state != _Qt.ApplicationState.ApplicationActive:
+            self.release_all()
+            self.lose_raw()
+
+    def lose_raw(self) -> None:
+        """Gives up raw input until the next click."""
+        self.activating = None
+        self.released |= self.raw
+        self.set_raw(False)
 
     def send_button(self, event: QtGui.QMouseEvent) -> None:
         """Sends a release only for a sent press."""
