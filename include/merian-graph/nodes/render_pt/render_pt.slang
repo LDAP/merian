@@ -158,6 +158,7 @@ bool survives_roulette(inout float3 throughput, inout RandomGenerator rng) {
 }
 
 void record_connection(inout PathRecorder rec,
+                       const ParameterBlock<Scene> scene,
                        const ParameterBlock<RenderBinding> params,
                        const float3 from,
                        const bool attempted,
@@ -167,8 +168,14 @@ void record_connection(inout PathRecorder rec,
                        const uint bounce,
                        const uint material) {
     if (let d = direct) {
-        rec.connection(params.path_records, from, d.light.pos, d.realized_pdf, throughput * d.value,
-                       contrib, bounce, PATH_RECORD_METHOD_LIGHT, material);
+        const uint2 surface =
+            d.light.index == LIGHT_ENV_INDEX
+                ? PATH_RECORD_SURFACE_ENVIRONMENT
+                : path_record_surface(scene.get_emitter_hit(d.light.index, d.light.pos), false);
+        // the path's weight up to the light, without what the light emits
+        rec.connection(params.path_records, from, d.light.pos, d.realized_pdf,
+                       select(d.light.Li > 0.f, throughput * d.value / d.light.Li, float3(0.f)),
+                       contrib, bounce, PATH_RECORD_METHOD_LIGHT, material, 0, surface);
     } else if (attempted) {
         rec.connection(params.path_records, from, from, 0.f, float3(0.f), float3(0.f), bounce,
                        PATH_RECORD_METHOD_LIGHT, material);
@@ -180,6 +187,7 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
                                             const uint2 pixel,
                                             RayDesc ray,
                                             ShadingPoint sp,
+                                            Hit sp_hit,
                                             const uint16_t sample_index,
                                             inout RandomGenerator rng,
                                             inout float3 scatter_stats,
@@ -354,12 +362,14 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
                                    : guided      ? PATH_RECORD_METHOD_GUIDING
                                                  : PATH_RECORD_METHOD_BSDF;
         const uint record_material = path_record_pack_material(sp.material_id);
+        const uint2 record_surface = path_record_surface(sp_hit, scene.is_distant(sp_hit));
         bool record_waits = techniques.p_light > 0.f && scattered && !delta;
         if (!record_waits) {
             rec.vertex(params.path_records, vertex.pos, wo_world, record_pdf,
                        segment.pdf > 0.f ? record_f_cos / segment.pdf : float3(0),
-                       uint(bounce) - 1u, record_lobe, record_method, record_material);
-            record_connection(rec, params, vertex.pos,
+                       uint(bounce) - 1u, record_lobe, record_method, record_material, 0,
+                       record_surface);
+            record_connection(rec, scene, params, vertex.pos,
                               merian_render_surface_nee_mode == NEEMode::Resampled && nee_surface,
                               direct, throughput, direct_light, uint(bounce) - 1u, record_material);
         }
@@ -420,7 +430,8 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
                         rec.vertex(params.path_records, vertex.pos, wo_world,
                                    record_pdf + light_pdf,
                                    segment.pdf > 0.f ? record_f_cos / segment.pdf : float3(0),
-                                   uint(bounce) - 1u, record_lobe, record_method, record_material);
+                                   uint(bounce) - 1u, record_lobe, record_method, record_material,
+                                   0, record_surface);
                         record_waits = false;
                     }
                     light_reached = scene.nee.reaches(sampled_light, sampled_entry, light_index);
@@ -434,6 +445,7 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
             sp = scene.get_shading_point(
                 ray, hit, RenderContext(bounce), DefaultLODSampler(),
                 bounce + uint16_t(1) < merian_render_max_path_length && !bounces.used_up());
+            sp_hit = hit;
 
             const float distance_travelled = distance(ray.Origin, sp.pos);
             if (sampled_light != LIGHT_INVALID_INDEX && !through_specular) {
@@ -478,7 +490,8 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
                        uint(bounce),
                        path_record_pack_lobe(chain_sample.value.lobe) |
                            (chain_transmission ? PATH_RECORD_LOBE_TRANSMISSION : 0u),
-                       PATH_RECORD_METHOD_BSDF, path_record_pack_material(sp.material_id));
+                       PATH_RECORD_METHOD_BSDF, path_record_pack_material(sp.material_id), 0,
+                       path_record_surface(hit, false));
 
             chain_weight *= chain_sample.value.weight;
             segment.chain = specular_chain_append(
@@ -549,7 +562,7 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
             const float mixed_pdf = segment.pdf + light_pdf;
             rec.vertex(params.path_records, vertex.pos, wo_world, record_pdf + light_pdf,
                        mixed_pdf > 0.f ? record_f_cos / mixed_pdf : float3(0), uint(bounce) - 1u,
-                       record_lobe, record_method, record_material);
+                       record_lobe, record_method, record_material, 0, record_surface);
         }
 
         // 4. guiding update
@@ -560,7 +573,7 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
         }
     }
 
-    rec.end(params.path_records, sp.pos);
+    rec.end(params.path_records, sp.pos, path_record_surface(sp_hit, scene.is_distant(sp_hit)));
     return radiance;
 }
 
@@ -598,7 +611,7 @@ void render_pixel<Reorder : IThreadReorder>(const uint2 pixel,
                                 merian_render_spp == 1
                                     ? primary_sp
                                     : scene.get_shading_point(primary_ray, primary_hit),
-                                uint16_t(s), rng, scatter_stats, rec) /
+                                primary_hit, uint16_t(s), rng, scatter_stats, rec) /
             demod_albedo;
         if (!any(isnan(contrib)) && !any(isinf(contrib))) {
             irradiance += contrib;

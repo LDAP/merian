@@ -819,6 +819,7 @@ struct RestirPTLightRecord {
     float pdf;
     float3 throughput;
     float3 contribution;
+    uint2 surface;
 
     __init() {
         drawn = false;
@@ -826,6 +827,7 @@ struct RestirPTLightRecord {
         pdf = 0.f;
         throughput = float3(0);
         contribution = float3(0);
+        surface = PATH_RECORD_SURFACE_NONE;
     }
 
     void record(inout PathRecorder rec,
@@ -835,7 +837,7 @@ struct RestirPTLightRecord {
                 const uint material) {
         if (drawn)
             rec.connection(records, from, pdf > 0.f ? pos : from, pdf, throughput, contribution,
-                           bounce, PATH_RECORD_METHOD_LIGHT, material);
+                           bounce, PATH_RECORD_METHOD_LIGHT, material, 0, surface);
     }
 }
 
@@ -868,6 +870,7 @@ float3 restir_pt_trace_candidates(const ParameterBlock<Scene> scene,
 
     for (uint i = 1;; i++) {
         const bool distant = i > 1 && scene.is_distant(hit);
+        const uint2 surface = path_record_surface(hit, distant || !hit.is_valid());
         RestirPTSegment segment;
         if (i > 1)
             segment = RestirPTSegment(from, sp, distant);
@@ -911,7 +914,7 @@ float3 restir_pt_trace_candidates(const ParameterBlock<Scene> scene,
         }
 
         if (i >= max_length || !sp.has_surface_material || all(throughput <= 0.f)) {
-            rec.terminal(records, sp.pos);
+            rec.terminal(records, sp.pos, surface);
             break;
         }
 
@@ -932,6 +935,12 @@ float3 restir_pt_trace_candidates(const ParameterBlock<Scene> scene,
             if (resampled.hasValue) {
                 light_record.pos = resampled.value.light_point;
                 light_record.pdf = resampled.value.realized_pdf;
+                light_record.surface =
+                    resampled.value.light.index == LIGHT_ENV_INDEX
+                        ? PATH_RECORD_SURFACE_ENVIRONMENT
+                        : path_record_surface(scene.get_emitter_hit(resampled.value.light.index,
+                                                                    resampled.value.light_point),
+                                              false);
             }
             if (visible) {
                 const DirectLightSample direct = resampled.value;
@@ -988,7 +997,7 @@ float3 restir_pt_trace_candidates(const ParameterBlock<Scene> scene,
         if (merian_restir_pt_russian_roulette && i > merian_restir_pt_roulette_depth) {
             const float survive = russian_roulette_survival(throughput);
             if (!(rng.next_float() < survive)) {
-                rec.terminal(records, sp.pos);
+                rec.terminal(records, sp.pos, surface);
                 light_record.record(rec, records, sp.pos, i - 1, material);
                 break;
             }
@@ -999,7 +1008,7 @@ float3 restir_pt_trace_candidates(const ParameterBlock<Scene> scene,
         // 4. the scatter direction, replayable from the path's seed
         const Optional<RestirPTScatter> sampled = restir_pt_scatter(bsdf, sp, wi, random, i, rng);
         if (!sampled.hasValue) {
-            rec.terminal(records, sp.pos);
+            rec.terminal(records, sp.pos, surface);
             light_record.record(rec, records, sp.pos, i - 1, material);
             break;
         }
@@ -1027,7 +1036,7 @@ float3 restir_pt_trace_candidates(const ParameterBlock<Scene> scene,
         from = restir_pt_from(scene, bsdf, sp, i, scatter, thresholds.roughness, false);
         rec.vertex(records, sp.pos, scatter.wo, scatter.pdf, throughput, i - 1,
                    restir_pt_record_lobe(scatter.lobe, scatter.transmission),
-                   PATH_RECORD_METHOD_BSDF, material);
+                   PATH_RECORD_METHOD_BSDF, material, 0, surface);
         light_record.record(rec, records, sp.pos, i - 1, material);
 
         const bool last = i + 1 >= max_length;

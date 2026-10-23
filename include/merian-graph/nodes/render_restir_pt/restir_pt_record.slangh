@@ -14,6 +14,7 @@ struct RestirPTPathRecord : IRestirPTPathSink {
     float pdf;
     float3 contribution;
     float3 last_pos;
+    uint2 last_surface;
     bool open;
     bool reconnected;
 
@@ -27,13 +28,15 @@ struct RestirPTPathRecord : IRestirPTPathSink {
                 const uint bounce,
                 const uint lobe,
                 const uint method,
-                const uint material) {
+                const uint material,
+                const uint2 surface) {
         if (!open)
             return;
         rec.vertex(stream, pos, wo, pdf, float3(0), bounce, lobe, method,
-                   path_record_pack_material(material), PATH_RECORD_FLAG_RESAMPLED);
+                   path_record_pack_material(material), PATH_RECORD_FLAG_RESAMPLED, surface);
         pdf = 0.f;
         last_pos = pos;
+        last_surface = surface;
         reconnected |= method == PATH_RECORD_METHOD_RECONNECTION;
     }
 
@@ -42,22 +45,25 @@ struct RestirPTPathRecord : IRestirPTPathSink {
                     const float3 light_pos,
                     const uint bounce,
                     const uint method,
-                    const uint material) {
+                    const uint material,
+                    const uint2 from_surface,
+                    const uint2 light_surface) {
         if (!open)
             return;
-        rec.terminal(stream, from);
+        rec.terminal(stream, from, from_surface);
         rec.connection(stream, from, light_pos, pdf, float3(0), contribution, bounce, method,
-                       path_record_pack_material(material), PATH_RECORD_FLAG_RESAMPLED);
+                       path_record_pack_material(material), PATH_RECORD_FLAG_RESAMPLED,
+                       light_surface);
         rec.finish(stream);
         open = false;
     }
 
     [mutating]
-    void light(const float3 pos) {
+    void light(const float3 pos, const uint2 surface) {
         if (!open)
             return;
         rec.emission(contribution);
-        rec.end(stream, pos);
+        rec.end(stream, pos, surface);
         open = false;
     }
 
@@ -65,7 +71,7 @@ struct RestirPTPathRecord : IRestirPTPathSink {
     [mutating]
     void close() {
         if (open)
-            rec.end(stream, last_pos);
+            rec.end(stream, last_pos, last_surface);
         open = false;
     }
 }
@@ -86,6 +92,7 @@ void restir_pt_record_shaded(const ParameterBlock<Scene> scene,
     path.pdf = 1.f / r.W;
     path.contribution = r.integrand * r.W;
     path.last_pos = sp.pos;
+    path.last_surface = path_record_surface(primary.hit, scene.is_distant(primary.hit));
     path.open = true;
     path.reconnected = false;
     if (r.W > 0.f && all(isfinite(path.contribution))) {

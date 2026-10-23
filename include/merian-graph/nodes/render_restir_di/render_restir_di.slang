@@ -255,7 +255,9 @@ void shade(ParameterBlock<Scene> scene, ParameterBlock<RestirBinding> params) {
         rec.emission(primary.emission);
         end_pos = primary.pos;
     }
-    rec.terminal(params.path_records, end_pos);
+    const Hit primary_hit = params.gbuffer.get_hit(pixel);
+    rec.terminal(params.path_records, end_pos,
+                 path_record_surface(primary_hit, scene.is_distant(primary_hit)));
     const uint reuse = reservoir.confidence > 1.f ? PATH_RECORD_FLAG_REUSED : 0u;
 
     if (surface.valid && surface.sp.has_surface_material && restir_sample_valid(reservoir.y) &&
@@ -285,7 +287,10 @@ void shade(ParameterBlock<Scene> scene, ParameterBlock<RestirBinding> params) {
         rec.connection(params.path_records, surface.sp.pos, reservoir.y.pos,
                        weight > 0.f ? 1.f / weight : 0.f, f_cos * weight, direct, 0,
                        PATH_RECORD_METHOD_RECONNECTION,
-                       path_record_pack_material(surface.sp.material_id), reuse);
+                       path_record_pack_material(surface.sp.material_id), reuse,
+                       (reservoir.y.flags & RestirSampleFlags::RestirSampleDistant) != 0
+                           ? PATH_RECORD_SURFACE_ENVIRONMENT
+                           : PATH_RECORD_SURFACE_NONE);
     } else if (surface.valid && surface.sp.has_surface_material) {
         rec.connection(params.path_records, surface.sp.pos, surface.sp.pos, 0.f, float3(0.f),
                        float3(0.f), 0, PATH_RECORD_METHOD_RECONNECTION,

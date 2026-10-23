@@ -2,6 +2,8 @@
 
 #ifdef __cplusplus
 #include "merian-shaders/types.slang.h"
+
+#include <cmath>
 #define PATH_RECORD_FUNC inline
 #else
 #define PATH_RECORD_FUNC
@@ -16,7 +18,7 @@ namespace merian {
 static const uint32_t PATH_RECORD_HEADER_UINTS = 16;
 static const uint32_t PATH_RECORD_REGION_RATIO = 17;
 static const uint32_t PATH_RECORD_UINTS = 4;
-static const uint32_t PATH_RECORD_VERTEX_UINTS = 10;
+static const uint32_t PATH_RECORD_VERTEX_UINTS = 12;
 
 // the counters may exceed the capacity; the overshoot measures demand
 static const uint32_t PATH_RECORD_HDR_PATH_COUNT = 0;
@@ -25,6 +27,8 @@ static const uint32_t PATH_RECORD_HDR_ENABLE = 2;
 static const uint32_t PATH_RECORD_HDR_PIXEL_FILTER = 3;
 static const uint32_t PATH_RECORD_HDR_KEEP_PROB = 4;
 static const uint32_t PATH_RECORD_HDR_FRAME = 5;
+// a pixel recorded in full while the others follow the keep probability
+static const uint32_t PATH_RECORD_HDR_KEEP_PIXEL = 6;
 
 static const uint32_t PATH_RECORD_ALL_PIXELS = 0xFFFFFFFFu;
 
@@ -37,8 +41,13 @@ static const uint32_t PATH_RECORD_VERTEX_POS = 0;
 static const uint32_t PATH_RECORD_VERTEX_WO = 3;
 static const uint32_t PATH_RECORD_VERTEX_CONTRIB = 4;
 static const uint32_t PATH_RECORD_VERTEX_PDF = 7;
+// rgb, see path_record_unpack_rgb
 static const uint32_t PATH_RECORD_VERTEX_THROUGHPUT = 8;
 static const uint32_t PATH_RECORD_VERTEX_META = 9;
+// the surface the vertex sits on: GeometryID, primitive
+static const uint32_t PATH_RECORD_VERTEX_SURFACE = 10;
+static const uint32_t PATH_RECORD_GEOMETRY_NONE = 0xFFFFFFFFu;
+static const uint32_t PATH_RECORD_GEOMETRY_ENVIRONMENT = 0xFFFFFFFEu;
 
 // meta word: bounce | lobe << 8 | flags | method << 16 | material << 20
 static const uint32_t PATH_RECORD_BOUNCE_MASK = 0xFFu;
@@ -81,6 +90,21 @@ PATH_RECORD_FUNC uint32_t path_record_pack_pixel(const uint2 pixel) {
 
 PATH_RECORD_FUNC uint2 path_record_unpack_pixel(const uint32_t packed) {
     return uint2(packed & 0xFFFFu, packed >> 16);
+}
+
+// rgb per channel in 10 bits on a log2 scale over 64 stops, 0 for black
+static const float PATH_RECORD_RGB_LOG2_MIN = -40.f;
+static const float PATH_RECORD_RGB_LOG2_STEP = 64.f / 1022.f;
+
+PATH_RECORD_FUNC float path_record_unpack_channel(const uint32_t code) {
+    return code == 0 ? 0.f
+                     : exp2(PATH_RECORD_RGB_LOG2_MIN + float(code - 1) * PATH_RECORD_RGB_LOG2_STEP);
+}
+
+PATH_RECORD_FUNC float3 path_record_unpack_rgb(const uint32_t packed) {
+    return float3(path_record_unpack_channel(packed & 0x3FFu),
+                  path_record_unpack_channel((packed >> 10) & 0x3FFu),
+                  path_record_unpack_channel((packed >> 20) & 0x3FFu));
 }
 
 } // namespace merian

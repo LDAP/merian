@@ -107,6 +107,14 @@ class Scene : public std::enable_shared_from_this<Scene> {
 
     // --- Instance ---
 
+    // what a live GeometryID draws
+    struct GeometryPlacement {
+        MeshID mesh_id;
+        NodeID node_id;
+
+        bool operator==(const GeometryPlacement&) const = default;
+    };
+
     // A mesh placed at a scene node.
     struct Instance {
         NodeID node_id;
@@ -514,6 +522,11 @@ class Scene : public std::enable_shared_from_this<Scene> {
         return mesh_infos;
     }
 
+    // indexed with this frame's live GeometryIDs
+    const std::vector<GeometryPlacement>& get_geometry_placements() const {
+        return geometry.placements;
+    }
+
     // to get transforms use get_*_transform(...)
     const Node& get_node(const NodeID node_id) {
         assert(node_ids.is_used(node_id));
@@ -838,6 +851,8 @@ class Scene : public std::enable_shared_from_this<Scene> {
         std::vector<uint64_t> geometry_keys;
         // GeometryID -> instance index
         std::vector<uint32_t> instance_indices;
+        // of the live geometries
+        std::vector<GeometryPlacement> placements;
         std::vector<float4x4> instance_transforms;
         std::vector<float4x4> inverse_transposed_instance_transforms;
         std::vector<float4x4> prev_instance_transforms;

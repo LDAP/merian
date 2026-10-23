@@ -107,9 +107,9 @@ The settings that remove a bias at a cost:
 Connected to the Path Debugger, `debugger records` writes either the `shaded paths`: the path in
 the reservoir each pixel shades, recorded by the shift into the pixel and a re-trace of its suffix
 in the current frame (with `re-trace suffixes` off, the suffix the reservoir keeps may differ), or
-the `candidates` of the initial pass, with their per-vertex densities and light samples. Colored by
-technique, candidates show `BSDF` and `light` segments; shaded paths show the segment into x_k as
-`reconnection` and the others as `replayed BSDF` and `replayed light`. ReSTIR DI shows its
+the `candidates` of the initial pass, with their per-vertex pdfs and light samples. Colored by
+technique, candidates show `BSDF` and `NEE` segments; shaded paths show the segment into x_k as
+`reconnection` and the others as `replayed BSDF` and `replayed NEE`. ReSTIR DI shows its
 resampled light connections as `reconnection`.
 
 ## Not supported

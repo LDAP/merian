@@ -1205,6 +1205,7 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
     geometry.geometries.clear();
     geometry.geometry_keys.clear();
     geometry.instance_indices.clear();
+    geometry.placements.clear();
     geometry.instance_transforms.clear();
     geometry.inverse_transposed_instance_transforms.clear();
     geometry.prev_instance_transforms.clear();
@@ -1313,6 +1314,7 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
                 geometry.geometries.emplace_back(gd);
                 geometry.geometry_keys.push_back(geometry_key);
                 geometry.instance_indices.push_back(instance_index);
+                geometry.placements.push_back({mesh_id, node_id});
             }
             instance_index++;
         }

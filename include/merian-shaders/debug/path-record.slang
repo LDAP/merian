@@ -2,6 +2,7 @@ import merian_shaders.shading.shading_function;
 import merian_shaders.utils.encoding;
 import merian_shaders.utils.hash;
 import merian_shaders.colors.colorspaces;
+import merian_shaders.scene.hit;
 
 #include "merian-shaders/debug/path_record.slangh"
 
@@ -12,6 +13,30 @@ extern static const bool merian_path_record = false;
 
 uint path_record_pack_material(const uint material_id) {
     return min(material_id, PATH_RECORD_MATERIAL_NONE);
+}
+
+static const uint2 PATH_RECORD_SURFACE_NONE = uint2(PATH_RECORD_GEOMETRY_NONE, 0u);
+static const uint2 PATH_RECORD_SURFACE_ENVIRONMENT = uint2(PATH_RECORD_GEOMETRY_ENVIRONMENT, 0u);
+
+// the surface of a hit, the environment for a distant one
+uint2 path_record_surface(const Hit hit, const bool distant) {
+    return distant ? PATH_RECORD_SURFACE_ENVIRONMENT
+                   : uint2(hit.get_geometry_id(), hit.primitive_id);
+}
+
+uint path_record_pack_channel(const float value) {
+    if (!(value > exp2(PATH_RECORD_RGB_LOG2_MIN))) {
+        return 0u;
+    }
+    const float stops =
+        min(log2(value) - PATH_RECORD_RGB_LOG2_MIN, 1022.f * PATH_RECORD_RGB_LOG2_STEP);
+    return uint(round(stops / PATH_RECORD_RGB_LOG2_STEP)) + 1u;
+}
+
+// see path_record_unpack_rgb
+uint path_record_pack_rgb(const float3 rgb) {
+    return path_record_pack_channel(rgb.r) | (path_record_pack_channel(rgb.g) << 10) |
+           (path_record_pack_channel(rgb.b) << 20);
 }
 
 uint path_record_pack_lobe(const BSDFLobe lobe) {
@@ -63,11 +88,13 @@ struct PathRecordVertex {
     float3 wo;
     float pdf;
     float3 contrib;
+    float3 throughput_rgb;
     float throughput;
     uint bounce;
     uint lobe;
     uint method;
     uint material;
+    uint2 surface;
     bool terminal;
     bool nee;
     bool reused;
@@ -92,6 +119,14 @@ uint path_record_load_vertex_meta(PathRecordStream buf,
     return buf[vertex_region_offset + index * PATH_RECORD_VERTEX_UINTS + PATH_RECORD_VERTEX_META];
 }
 
+float3 path_record_load_vertex_float3(PathRecordStream buf,
+                                      const uint vertex_region_offset,
+                                      const uint index,
+                                      const uint word) {
+    const uint at = vertex_region_offset + index * PATH_RECORD_VERTEX_UINTS + word;
+    return float3(asfloat(buf[at]), asfloat(buf[at + 1]), asfloat(buf[at + 2]));
+}
+
 PathRecordVertex path_record_load_vertex(PathRecordStream buf,
                                          const uint vertex_region_offset,
                                          const uint index) {
@@ -103,7 +138,8 @@ PathRecordVertex path_record_load_vertex(PathRecordStream buf,
     v.contrib =
         float3(asfloat(buf[contrib + 0]), asfloat(buf[contrib + 1]), asfloat(buf[contrib + 2]));
     v.pdf = asfloat(buf[base + PATH_RECORD_VERTEX_PDF]);
-    v.throughput = asfloat(buf[base + PATH_RECORD_VERTEX_THROUGHPUT]);
+    v.throughput_rgb = path_record_unpack_rgb(buf[base + PATH_RECORD_VERTEX_THROUGHPUT]);
+    v.throughput = yuv_luminance(v.throughput_rgb);
     const uint meta = buf[base + PATH_RECORD_VERTEX_META];
     v.bounce = meta & PATH_RECORD_BOUNCE_MASK;
     v.lobe = (meta >> PATH_RECORD_LOBE_SHIFT) & PATH_RECORD_LOBE_MASK;
@@ -113,6 +149,8 @@ PathRecordVertex path_record_load_vertex(PathRecordStream buf,
     v.nee = (meta & PATH_RECORD_FLAG_NEE) != 0;
     v.reused = (meta & PATH_RECORD_FLAG_REUSED) != 0;
     v.resampled = (meta & PATH_RECORD_FLAG_RESAMPLED) != 0;
+    v.surface =
+        uint2(buf[base + PATH_RECORD_VERTEX_SURFACE], buf[base + PATH_RECORD_VERTEX_SURFACE + 1]);
     // the terminal flag decides, not the encoding: encode_normal(+z) is 0 and would alias
     v.wo = v.terminal ? float3(0) : decode_normal(buf[base + PATH_RECORD_VERTEX_WO]);
     return v;
@@ -143,7 +181,8 @@ interface IPathRecorder {
                 const uint lobe,
                 const uint method = PATH_RECORD_METHOD_UNKNOWN,
                 const uint material = PATH_RECORD_MATERIAL_NONE,
-                const uint flags = 0);
+                const uint flags = 0,
+                const uint2 surface = PATH_RECORD_SURFACE_NONE);
 
     // A next-event connection from the vertex recorded last to a point on a light.
     [mutating]
@@ -156,17 +195,22 @@ interface IPathRecorder {
                     const uint bounce,
                     const uint method,
                     const uint material,
-                    const uint flags = 0);
+                    const uint flags = 0,
+                    const uint2 surface = PATH_RECORD_SURFACE_NONE);
 
     [mutating]
-    void terminal(PathRecordStream buf, const float3 end_pos);
+    void terminal(PathRecordStream buf,
+                  const float3 end_pos,
+                  const uint2 surface = PATH_RECORD_SURFACE_NONE);
 
     // Writes the path record; every begun path must reach it.
     [mutating]
     void finish(PathRecordStream buf);
 
     [mutating]
-    void end(PathRecordStream buf, const float3 end_pos);
+    void end(PathRecordStream buf,
+             const float3 end_pos,
+             const uint2 surface = PATH_RECORD_SURFACE_NONE);
 }
 
 struct NullPathRecorder : IPathRecorder {
@@ -192,7 +236,8 @@ struct NullPathRecorder : IPathRecorder {
                 const uint lobe,
                 const uint method = PATH_RECORD_METHOD_UNKNOWN,
                 const uint material = PATH_RECORD_MATERIAL_NONE,
-                const uint flags = 0) {}
+                const uint flags = 0,
+                const uint2 surface = PATH_RECORD_SURFACE_NONE) {}
     [mutating]
     void connection(PathRecordStream buf,
                     const float3 from,
@@ -203,13 +248,18 @@ struct NullPathRecorder : IPathRecorder {
                     const uint bounce,
                     const uint method,
                     const uint material,
-                    const uint flags = 0) {}
+                    const uint flags = 0,
+                    const uint2 surface = PATH_RECORD_SURFACE_NONE) {}
     [mutating]
-    void terminal(PathRecordStream buf, const float3 end_pos) {}
+    void terminal(PathRecordStream buf,
+                  const float3 end_pos,
+                  const uint2 surface = PATH_RECORD_SURFACE_NONE) {}
     [mutating]
     void finish(PathRecordStream buf) {}
     [mutating]
-    void end(PathRecordStream buf, const float3 end_pos) {}
+    void end(PathRecordStream buf,
+             const float3 end_pos,
+             const uint2 surface = PATH_RECORD_SURFACE_NONE) {}
 }
 
 struct LivePathRecorder : IPathRecorder {
@@ -247,7 +297,7 @@ struct LivePathRecorder : IPathRecorder {
             return r;
         }
 
-        if (filter == PATH_RECORD_ALL_PIXELS) {
+        if (filter == PATH_RECORD_ALL_PIXELS && buf[PATH_RECORD_HDR_KEEP_PIXEL] != pixel_packed) {
             const float keep_prob = asfloat(buf[PATH_RECORD_HDR_KEEP_PROB]);
             const uint h = pcg(pcg(pixel_packed) ^ pcg(frame * 0x9E3779B9u + sample_idx));
             if (float(h) * (1.f / 4294967296.f) >= keep_prob) {
@@ -305,12 +355,13 @@ struct LivePathRecorder : IPathRecorder {
                 const uint lobe,
                 const uint method = PATH_RECORD_METHOD_UNKNOWN,
                 const uint material = PATH_RECORD_MATERIAL_NONE,
-                const uint flags = 0) {
+                const uint flags = 0,
+                const uint2 surface = PATH_RECORD_SURFACE_NONE) {
         if (!active || written >= max_vertices) {
             return;
         }
-        store_vertex(buf, pos, encode_normal(wo), pdf, yuv_luminance(throughput), bounce, lobe,
-                     method, material, flags, pending_contrib);
+        store_vertex(buf, pos, encode_normal(wo), pdf, throughput, bounce, lobe, method, material,
+                     flags, pending_contrib, surface);
         pending_contrib = float3(0.f);
     }
 
@@ -324,7 +375,8 @@ struct LivePathRecorder : IPathRecorder {
                     const uint bounce,
                     const uint method,
                     const uint material,
-                    const uint flags = 0) {
+                    const uint flags = 0,
+                    const uint2 surface = PATH_RECORD_SURFACE_NONE) {
         if (!active || written >= max_vertices) {
             return;
         }
@@ -332,23 +384,28 @@ struct LivePathRecorder : IPathRecorder {
         const float3 to_light = light_pos - from;
         store_vertex(buf, light_pos,
                      pdf > 0.f && any(to_light != 0.f) ? encode_normal(normalize(to_light)) : 0,
-                     pdf, yuv_luminance(throughput), bounce, 0, method, material,
-                     PATH_RECORD_FLAG_NEE | flags, contrib);
+                     pdf, throughput, bounce, 0, method, material,
+                     PATH_RECORD_FLAG_NEE | flags, contrib, surface);
     }
 
     [mutating]
-    void terminal(PathRecordStream buf, const float3 end_pos) {
+    void terminal(PathRecordStream buf,
+                  const float3 end_pos,
+                  const uint2 surface = PATH_RECORD_SURFACE_NONE) {
         if (!active || written >= max_vertices) {
             return;
         }
-        store_vertex(buf, end_pos, 0, 0.f, 0.f, written, 0, PATH_RECORD_METHOD_UNKNOWN,
-                     PATH_RECORD_MATERIAL_NONE, PATH_RECORD_FLAG_TERMINAL, pending_contrib);
+        store_vertex(buf, end_pos, 0, 0.f, float3(0.f), written, 0, PATH_RECORD_METHOD_UNKNOWN,
+                     PATH_RECORD_MATERIAL_NONE, PATH_RECORD_FLAG_TERMINAL, pending_contrib,
+                     surface);
         pending_contrib = float3(0.f);
     }
 
     [mutating]
-    void end(PathRecordStream buf, const float3 end_pos) {
-        terminal(buf, end_pos);
+    void end(PathRecordStream buf,
+             const float3 end_pos,
+             const uint2 surface = PATH_RECORD_SURFACE_NONE) {
+        terminal(buf, end_pos, surface);
         finish(buf);
     }
 
@@ -370,13 +427,14 @@ struct LivePathRecorder : IPathRecorder {
                       const float3 pos,
                       const uint enc_wo,
                       const float pdf,
-                      const float throughput_lum,
+                      const float3 throughput,
                       const uint bounce,
                       const uint lobe,
                       const uint method,
                       const uint material,
                       const uint flags,
-                      const float3 contrib) {
+                      const float3 contrib,
+                      const uint2 surface) {
         const uint base = vertex_region_offset + (vertex_base + written) * PATH_RECORD_VERTEX_UINTS;
         buf[base + PATH_RECORD_VERTEX_POS + 0] = asuint(pos.x);
         buf[base + PATH_RECORD_VERTEX_POS + 1] = asuint(pos.y);
@@ -386,11 +444,13 @@ struct LivePathRecorder : IPathRecorder {
         buf[base + PATH_RECORD_VERTEX_CONTRIB + 1] = asuint(contrib.g);
         buf[base + PATH_RECORD_VERTEX_CONTRIB + 2] = asuint(contrib.b);
         buf[base + PATH_RECORD_VERTEX_PDF] = asuint(pdf);
-        buf[base + PATH_RECORD_VERTEX_THROUGHPUT] = asuint(throughput_lum);
+        buf[base + PATH_RECORD_VERTEX_THROUGHPUT] = path_record_pack_rgb(throughput);
         buf[base + PATH_RECORD_VERTEX_META] =
             (bounce & PATH_RECORD_BOUNCE_MASK) |
             ((lobe & PATH_RECORD_LOBE_MASK) << PATH_RECORD_LOBE_SHIFT) |
             (method << PATH_RECORD_METHOD_SHIFT) | (material << PATH_RECORD_MATERIAL_SHIFT) | flags;
+        buf[base + PATH_RECORD_VERTEX_SURFACE + 0] = surface.x;
+        buf[base + PATH_RECORD_VERTEX_SURFACE + 1] = surface.y;
         written++;
     }
 }
