@@ -500,7 +500,13 @@ MaterialID PBRTScene::material_for_shape(const CommandBufferHandle& cmd,
 
     const auto type_id = get_material_system()->register_material_type(
         build.material.variant_type_name(), OPENPBR_MATERIAL_SLANG_MODULE_PATH);
-    const MaterialID id = get_material_system()->add_material(type_id, build.material);
+    std::string name = "default";
+    if (shape.material >= 0) {
+        const pbrt::MaterialDesc& desc_material = desc->materials[shape.material];
+        name = desc_material.name.empty() ? desc_material.type : desc_material.name;
+    }
+    const MaterialID id =
+        get_material_system()->add_material(type_id, build.material, std::move(name));
 
     material_cache.emplace(key, CachedMaterial{id, build.flags});
     out_flags = build.flags;

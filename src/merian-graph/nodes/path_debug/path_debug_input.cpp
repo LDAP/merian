@@ -54,8 +54,8 @@ bool PathDebugInput::Observer::on_key([[maybe_unused]] InputController& controll
     } else {
         held_mods = mods;
     }
-    if (key == InputController::Key::ESCAPE && action == InputController::KeyStatus::PRESS) {
-        escape_mods = held_mods | mods;
+    if (key == InputController::Key::BACKSPACE && action == InputController::KeyStatus::PRESS) {
+        clear_mods = held_mods | mods;
     }
     return false;
 }
@@ -64,7 +64,7 @@ bool PathDebugInput::on_key([[maybe_unused]] InputController& controller,
                             const InputController::Key key,
                             [[maybe_unused]] const InputController::KeyStatus action,
                             const int mods) {
-    return key == InputController::Key::ESCAPE && modifier_held(mods);
+    return key == InputController::Key::BACKSPACE && modifier_held(mods);
 }
 
 bool PathDebugInput::on_mouse_button([[maybe_unused]] InputController& controller,
@@ -131,7 +131,7 @@ std::optional<float2> PathDebugInput::cursor() const {
 }
 
 PathDebugInput::Events PathDebugInput::consume_events() {
-    const std::optional<int> mods = std::exchange(observed->escape_mods, std::nullopt);
+    const std::optional<int> mods = std::exchange(observed->clear_mods, std::nullopt);
     events.clear = mods && (*mods & modifier) != 0;
     return std::exchange(events, Events{});
 }

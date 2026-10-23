@@ -92,8 +92,8 @@ class PathDebugNode : public Node {
         "path luminance", "segment contribution", "scatter events", "random",
         "technique",      "throughput gain"};
     static constexpr std::array<const char*, 6> BACKDROP_NAMES = {
-        "render",     "selection only",           "reference",
-        "difference", "split render | reference", "backdrop input"};
+        "render",        "filtered", "reference", "difference", "split render | reference",
+        "backdrop input"};
     static constexpr std::array<const char*, 5> DRAWS_NAMES = {"all", "scatter", "BSDF only",
                                                                "guiding only", "NEE only"};
     static constexpr std::array<const char*, 2> WI_NAMES = {"camera ray", "manual"};
@@ -203,6 +203,8 @@ class PathDebugNode : public Node {
         bool keep_update;
         bool pixel_stats_accumulate;
         bool heat_splat;
+        // a point records only its pixel
+        bool one_pixel;
         uint32_t panel_mask;
         uint32_t sphere_channel;
         bool maps_active;
@@ -264,7 +266,7 @@ class PathDebugNode : public Node {
                                  const FrameActivity& activity,
                                  uint32_t observed_paths) const;
     void build_selection_params(PathDebugParams& p, const NodeIO& io) const;
-    void build_capture_params(PathDebugParams& p) const;
+    void build_capture_params(PathDebugParams& p, const FrameActivity& activity) const;
     void build_overlay_params(PathDebugParams& p, const FrameActivity& activity) const;
     void build_map_params(PathDebugParams& p,
                           const FrameActivity& activity,
@@ -274,7 +276,7 @@ class PathDebugNode : public Node {
                                   const NodeIO& io,
                                   const FrameActivity& activity) const;
     void build_backdrop_params(PathDebugParams& p, const NodeProcessInfo& info) const;
-    std::array<std::optional<ComputeKernel>*, 12> kernels();
+    std::array<std::optional<ComputeKernel>*, 11> kernels();
     void bind_globals(const NodeIO& io);
     void bind_node_buffers(ShaderCursor cursor, const NodeIO& io) const;
     void record_analysis(const NodeIO& io,
@@ -335,10 +337,13 @@ class PathDebugNode : public Node {
 
     uint32_t selection_mode() const;
     bool selection_visible() const;
-    // a point selection, which records only its pixel
     bool selects_point() const;
+    // the filtered image or the pixel statistic, which need every pixel's paths
+    bool shows_pixel_image(const NodeIO& io) const;
     bool point_hidden() const;
     const char* modifier_name() const;
+    // the material's id and name
+    std::string material_label(uint32_t id) const;
     uint32_t shown_panel_mask() const;
     int32_t label_px(uint32_t size) const;
     int32_t panel_top(uint32_t slot) const;
@@ -405,7 +410,6 @@ class PathDebugNode : public Node {
     std::optional<ComputeKernel> map_view_kernel;
     std::optional<ComputeKernel> heat_decay_kernel;
     std::optional<ComputeKernel> heat_splat_kernel;
-    std::optional<ComputeKernel> filter_render_kernel;
     std::optional<ComputeKernel> finalize_kernel;
     std::optional<ComputeKernel> stats_kernel;
     std::optional<ComputeKernel> compose_kernel;
@@ -506,6 +510,8 @@ class PathDebugNode : public Node {
     uint32_t method_mask = 0;
     int32_t method_mode = static_cast<int32_t>(PATH_DEBUG_METHOD_ANY_VERTEX);
     int32_t material_id = -1;
+    // the scene's, for the material names
+    std::weak_ptr<MaterialSystem> material_system;
     int32_t contribution_filter = static_cast<int32_t>(PATH_DEBUG_FINITE_ANY);
 
     int32_t overlay_rank = PATH_DEBUG_RANK_RESAMPLED;

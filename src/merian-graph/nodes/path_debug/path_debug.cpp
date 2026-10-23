@@ -33,12 +33,11 @@ constexpr const char* BSDF_CHECK_MODULE = "merian-graph/nodes/path_debug/bsdf_ch
 constexpr const char* HEAT_DECAY_MODULE = "merian-graph/nodes/path_debug/heat_decay.slang";
 constexpr const char* HEAT_SPLAT_MODULE = "merian-graph/nodes/path_debug/heat_splat.slang";
 constexpr const char* FINALIZE_MODULE = "merian-graph/nodes/path_debug/finalize.slang";
-constexpr const char* FILTER_RENDER_MODULE = "merian-graph/nodes/path_debug/filter_render.slang";
 
-constexpr std::array<const char*, 13> STANDALONE_MODULES = {
-    SELECT_MODULE,   THRESHOLD_MODULE,     COLLECT_MODULE,  KEEP_MODULE,       COMPOSE_MODULE,
-    STATS_MODULE,    MAP_REDUCE_MODULE,    MAP_VIEW_MODULE, HEAT_DECAY_MODULE, HEAT_SPLAT_MODULE,
-    FINALIZE_MODULE, FILTER_RENDER_MODULE, OVERLAY_MODULE};
+constexpr std::array<const char*, 12> STANDALONE_MODULES = {
+    SELECT_MODULE,     THRESHOLD_MODULE,  COLLECT_MODULE,    KEEP_MODULE,
+    COMPOSE_MODULE,    STATS_MODULE,      MAP_REDUCE_MODULE, MAP_VIEW_MODULE,
+    HEAT_DECAY_MODULE, HEAT_SPLAT_MODULE, FINALIZE_MODULE,   OVERLAY_MODULE};
 
 vk::BufferMemoryBarrier2 compute_to_transfer(const BufferHandle& buffer) {
     return buffer->buffer_barrier2(vk::PipelineStageFlagBits2::eComputeShader |
@@ -146,8 +145,6 @@ void PathDebugNode::initialize(const ContextHandle& context,
     heat_decay_kernel.emplace(context, allocator, compile_context, HEAT_DECAY_MODULE, spec_info);
     heat_splat_kernel.emplace(context, allocator, compile_context, HEAT_SPLAT_MODULE, spec_info);
     finalize_kernel.emplace(context, allocator, compile_context, FINALIZE_MODULE, spec_info);
-    filter_render_kernel.emplace(context, allocator, compile_context, FILTER_RENDER_MODULE,
-                                 spec_info);
     build_gbuffer_kernels(context, allocator);
 
     state_buffer = create_uint_buffer(allocator, vk::DeviceSize{PATH_DEBUG_STATE_UINTS},
@@ -491,7 +488,8 @@ void PathDebugNode::handle_input(const NodeIO& io) {
     }
     input->set_modifier(MODIFIER_KEYS.at(modifier));
     const PathDebugInput::Events events = input->consume_events();
-    if (events.clear) {
+    // Backspace belongs to a text field that is being typed in
+    if (events.clear && !imgui_ctx->get_io().WantTextInput) {
         clear_selection();
     }
     if (events.panel_scroll != 0.) {
@@ -610,7 +608,8 @@ uint32_t PathDebugNode::apply_readback_feedback(const NodeProcessInfo& info,
 }
 
 void PathDebugNode::adapt_keep_prob(const PathRecordCapacities& capacities) {
-    if (!auto_keep_prob || capture != CAPTURE_LIVE || selects_point()) {
+    if (!auto_keep_prob || capture != CAPTURE_LIVE ||
+        traced_pixel_filter != PATH_RECORD_ALL_PIXELS) {
         return;
     }
     const float vertex_fill = static_cast<float>(latest_readback.frame.vertices) /
@@ -718,9 +717,7 @@ void PathDebugNode::record_clears(const NodeIO& io,
         heat_splatted = false;
     }
     // a reset waits for something to read the moments or the re-render
-    const bool pixel_buffers_read =
-        pixel_stats_read() || backdrop == static_cast<int32_t>(PATH_DEBUG_BACKDROP_FILTERED) ||
-        io.is_connected(con_filtered);
+    const bool pixel_buffers_read = pixel_stats_read() || shows_pixel_image(io);
     if ((pixel_stats_dirty && pixel_buffers_read) || first_frame) {
         cmd->fill(moments_buffer);
         cmd->fill(filtered_buffer);
@@ -766,6 +763,9 @@ PathDebugNode::FrameActivity PathDebugNode::update_frame(const NodeIO& io, const
             selection_visible() ? std::optional<int2>(selected_pixel) : std::optional<int2>();
     }
     reference_input_connected = io.is_connected(con_reference);
+    if (const SceneHandle& scene = io[con_scene]) {
+        material_system = scene->get_material_system();
+    }
     backdrop_missing = (shows_reference() && !has_reference()) ||
                        (backdrop == static_cast<int32_t>(PATH_DEBUG_BACKDROP_INPUT) &&
                         !io.is_connected(con_backdrop));
@@ -781,6 +781,7 @@ PathDebugNode::FrameActivity PathDebugNode::update_frame(const NodeIO& io, const
         pixel_stats_read() && (!activity.frozen || !pixel_stats_accumulated);
     pixel_stats_accumulated |= activity.pixel_stats_accumulate && activity.active;
     activity.heat_splat = !activity.frozen || !heat_splatted;
+    activity.one_pixel = selects_point() && !shows_pixel_image(io);
 
     activity.panel_mask = panels_enabled && activity.active ? shown_panel_mask() : 0;
     update_panel_layout(io, activity.panel_mask);
@@ -842,7 +843,7 @@ PathDebugParams PathDebugNode::build_params(const NodeIO& io,
     p.out_x = out_extent.width;
     p.out_y = out_extent.height;
     build_selection_params(p, io);
-    build_capture_params(p);
+    build_capture_params(p, activity);
     build_overlay_params(p, activity);
     build_map_params(p, activity, observed_paths);
     build_heat_params(p, activity);
@@ -910,8 +911,8 @@ void PathDebugNode::build_selection_params(PathDebugParams& p, const NodeIO& io)
     p.pick_seq = pending_pick_seq;
 }
 
-void PathDebugNode::build_capture_params(PathDebugParams& p) const {
-    const bool one_pixel = selects_point();
+void PathDebugNode::build_capture_params(PathDebugParams& p, const FrameActivity& activity) const {
+    const bool one_pixel = activity.one_pixel;
     p.freeze = capture == CAPTURE_FROZEN ? 1 : 0;
     p.capture_off = capture == CAPTURE_OFF ? 1 : 0;
     p.keep_prob = one_pixel ? 1.f : keep_prob;
@@ -1054,10 +1055,10 @@ void PathDebugNode::bind_node_buffers(ShaderCursor cursor, const NodeIO& io) con
     }
 }
 
-std::array<std::optional<ComputeKernel>*, 12> PathDebugNode::kernels() {
-    return {&select_kernel,     &threshold_kernel,  &collect_kernel,       &keep_kernel,
-            &stats_kernel,      &map_reduce_kernel, &map_view_kernel,      &compose_kernel,
-            &heat_decay_kernel, &heat_splat_kernel, &filter_render_kernel, &finalize_kernel};
+std::array<std::optional<ComputeKernel>*, 11> PathDebugNode::kernels() {
+    return {&select_kernel,     &threshold_kernel,  &collect_kernel,  &keep_kernel,
+            &stats_kernel,      &map_reduce_kernel, &map_view_kernel, &compose_kernel,
+            &heat_decay_kernel, &heat_splat_kernel, &finalize_kernel};
 }
 
 void PathDebugNode::bind_globals(const NodeIO& io) {
@@ -1096,11 +1097,6 @@ void PathDebugNode::record_analysis(const NodeIO& io,
         cmd->dispatch(path_groups, 1, 1);
     }
     cmd->barrier(compute_to_compute(matches_buffer));
-    if (params.filtered_active != 0) {
-        MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "filter render");
-        filter_render_kernel->bind(io, info, submission);
-        cmd->dispatch(path_groups, 1, 1);
-    }
     if (activity.maps_accumulate) {
         MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "stats");
         const uint32_t stats_threads = ceil_div(capacities.path_capacity, params.stats_stride);
@@ -1520,6 +1516,11 @@ uint32_t PathDebugNode::selection_mode() const {
                : PATH_DEBUG_SELECT_THROUGH + static_cast<uint32_t>(region_match);
 }
 
+bool PathDebugNode::shows_pixel_image(const NodeIO& io) const {
+    return backdrop == static_cast<int32_t>(PATH_DEBUG_BACKDROP_FILTERED) ||
+           io.is_connected(con_filtered) || false_color == FALSE_COLOR_PIXEL_STAT;
+}
+
 bool PathDebugNode::selects_point() const {
     return has_selection && select_kind == SELECT_POINT;
 }
@@ -1530,6 +1531,15 @@ bool PathDebugNode::selection_visible() const {
 
 bool PathDebugNode::point_hidden() const {
     return maps_at_point() && selected_pos_valid && point_behind_surface;
+}
+
+std::string PathDebugNode::material_label(const uint32_t id) const {
+    const MaterialSystemHandle materials = material_system.lock();
+    if (!materials || id >= materials->get_material_count() ||
+        materials->get_material_name(id).empty()) {
+        return std::to_string(id);
+    }
+    return fmt::format("{} {}", id, materials->get_material_name(id));
 }
 
 const char* PathDebugNode::modifier_name() const {

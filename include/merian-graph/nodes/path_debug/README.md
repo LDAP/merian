@@ -13,7 +13,7 @@ python examples/graph_run.py examples/pbrt.json scene.pbrt --mixin debug
 | --- | --- |
 | Alt+click | select the surface under the cursor |
 | Alt+scroll | resize a region |
-| Alt+Esc | clear the selection |
+| Alt+Backspace | clear the selection |
 | click the LIVE badge | LIVE → FROZEN (hold the paths) → OFF |
 
 Every binding uses one modifier, `keys/modifier`. The header holds what changes most: point or
@@ -24,7 +24,7 @@ pixel, histograms). The image under the paths can also be chosen at the bottom l
 ## Selection
 
 - **point**: the paths of the clicked pixel that start at the clicked surface. The renderer then
-  records only that pixel, every sample. The panels need it.
+  records only that pixel, every sample, unless a per-pixel image is shown. The panels need it.
 - **region**: the paths that pass through, start inside or end inside a sphere around the clicked
   surface. It looks through glass.
 - `anchor: surface point` follows the surface when the camera moves; a point behind another surface
@@ -32,6 +32,8 @@ pixel, histograms). The image under the paths can also be chosen at the bottom l
 - The filter narrows the selection: expression, contribution (finite or NaN/Inf), scatter events,
   material, technique.
 - Every view shows the selection. With nothing selected, that is every path passing the filter.
+- The per-pixel images, `image: filtered` and `false color: pixel statistic`, leave a point out:
+  they show the filter and a region over the whole image.
 
 Path expressions match a path's scatter events: `S G D U` specular, glossy, diffuse, unclassified;
 `R T` reflection, transmission; `.` any; `<RD>` both; `[SG]` either; `* + ? {n} {n,m}`; a trailing
@@ -48,7 +50,8 @@ NEE, `.*S.+N` is NEE after a specular bounce.
 | NaN or Inf | filter `contribution: NaN or Inf` |
 | Light through or into a spot | region, `passes through` or `ends inside` |
 | Orbit around paths | FROZEN or `keep on camera move` |
-| Only the selection's light | `image: selection only` |
+| One kind of light: refracted, NEE, n bounces | the filter, `image: filtered` |
+| Where light through a spot lands | region, `image: filtered` |
 | Noisy pixels | `false color: pixel statistic` |
 | Where light flows in the scene | `false color: scene heatmap` |
 | Bias | the Error Plot node, or `examples/compare_methods.py` |

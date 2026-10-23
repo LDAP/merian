@@ -367,16 +367,19 @@ bool path_debug_needs_scatter_count() {
            (params.expr_count & PATH_DEBUG_EXPR_COUNT_MASK) != 0;
 }
 
-bool path_debug_selection_matches(const PathRecordPath p,
-                                  const uint vertex_region,
-                                  const uint scatter) {
+// the paths of the selected point's pixel that start at it, every path without a point
+bool path_debug_point_matches(const PathRecordPath p, const uint vertex_region) {
+    return !path_debug_selects_point() ||
+           (path_debug_in_selected_pixel(p) && path_debug_starts_at_point(p, vertex_region));
+}
+
+// the selection without its point: the filter and a region
+bool path_debug_filter_matches(const PathRecordPath p,
+                               const uint vertex_region,
+                               const uint scatter) {
     const bool finite = isfinite(p.luminance);
     if ((params.sel_finite == PATH_DEBUG_FINITE_ONLY && !finite) ||
         (params.sel_finite == PATH_DEBUG_FINITE_NONFINITE && finite)) {
-        return false;
-    }
-    if (path_debug_selects_point() &&
-        (!path_debug_in_selected_pixel(p) || !path_debug_starts_at_point(p, vertex_region))) {
         return false;
     }
     if (scatter < params.sel_scatters_min || scatter > params.sel_scatters_max) {

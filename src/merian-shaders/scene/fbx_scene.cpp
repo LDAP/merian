@@ -173,7 +173,8 @@ void FBXScene::load_materials(const CommandBufferHandle& cmd) {
 
         const auto type_id = get_material_system()->register_material_type(
             mat.variant_type_name(), OPENPBR_MATERIAL_SLANG_MODULE_PATH);
-        material_map[i] = get_material_system()->add_material(type_id, mat);
+        material_map[i] = get_material_system()->add_material(
+            type_id, mat, std::string(fmat->name.data, fmat->name.length));
     }
 
     // Default material for mesh parts without an assigned material.

@@ -288,7 +288,7 @@ std::vector<BSDFVerdict> bsdf_verdicts(const Stats& stats) {
     return verdicts;
 }
 
-void vertex_row(const uint32_t index, const uint32_t* const words) {
+void vertex_row(const uint32_t index, const uint32_t* const words, const std::string& material) {
     const auto word_f = [&](const uint32_t offset) { return std::bit_cast<float>(words[offset]); };
     const uint32_t meta = words[PATH_RECORD_VERTEX_META];
     const bool terminal = (meta & PATH_RECORD_FLAG_TERMINAL) != 0;
@@ -331,9 +331,8 @@ void vertex_row(const uint32_t index, const uint32_t* const words) {
                                     : path_record_method_name((meta >> PATH_RECORD_METHOD_SHIFT) &
                                                               PATH_RECORD_METHOD_MASK));
     ImGui::TableNextColumn();
-    const uint32_t material = (meta >> PATH_RECORD_MATERIAL_SHIFT) & PATH_RECORD_MATERIAL_MASK;
-    if (!terminal && material != PATH_RECORD_MATERIAL_NONE) {
-        ImGui::Text("%u", material);
+    if (!terminal) {
+        ImGui::TextUnformatted(material.c_str());
     }
     ImGui::TableNextColumn();
     const float3 pos(word_f(PATH_RECORD_VERTEX_POS + 0), word_f(PATH_RECORD_VERTEX_POS + 1),
@@ -559,7 +558,7 @@ void PathDebugNode::draw_header() {
         clear_selection();
     }
     ImGui::EndDisabled();
-    ImGui::SetItemTooltip("%s+Esc", modifier_name());
+    ImGui::SetItemTooltip("%s+Backspace", modifier_name());
 
     // 3. the path color
     labeled_combo("color", overlay_color, COLOR_NAMES, 13.f * font);
@@ -934,11 +933,17 @@ void PathDebugNode::draw_drawn_paths() {
         ImGui::TableSetupColumn("throughput", ImGuiTableColumnFlags_WidthFixed, 82.f);
         ImGui::TableSetupColumn("contribution", ImGuiTableColumnFlags_WidthFixed, 86.f);
         ImGui::TableSetupColumn("technique", ImGuiTableColumnFlags_WidthFixed, 74.f);
-        ImGui::TableSetupColumn("material", ImGuiTableColumnFlags_WidthFixed, 60.f);
+        ImGui::TableSetupColumn("material", ImGuiTableColumnFlags_WidthFixed, 120.f);
         ImGui::TableSetupColumn("position", ImGuiTableColumnFlags_WidthStretch);
         ImGui::TableHeadersRow();
         for (uint32_t v = 0; v < vertices; v++) {
-            vertex_row(v, isolated.vertices.data() + (std::size_t{v} * PATH_RECORD_VERTEX_UINTS));
+            const uint32_t* const words =
+                isolated.vertices.data() + (std::size_t{v} * PATH_RECORD_VERTEX_UINTS);
+            const uint32_t material =
+                (words[PATH_RECORD_VERTEX_META] >> PATH_RECORD_MATERIAL_SHIFT) &
+                PATH_RECORD_MATERIAL_MASK;
+            vertex_row(v, words,
+                       material != PATH_RECORD_MATERIAL_NONE ? material_label(material) : "");
         }
         ImGui::EndTable();
     }

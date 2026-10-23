@@ -117,7 +117,7 @@ void PathDebugNode::properties_selection(Properties& config) {
         }
     }
     if (has_selection &&
-        config.config_bool("clear", fmt::format("{}+Esc does the same.", modifier_name()))) {
+        config.config_bool("clear", fmt::format("{}+Backspace does the same.", modifier_name()))) {
         clear_selection();
     }
 }
@@ -183,8 +183,22 @@ void PathDebugNode::properties_filter(Properties& config) {
                                  fmt::format("Min and max; {} = no limit.", SCATTER_UNLIMITED));
     scatter_range.x = std::clamp(scatter_range.x, 0, SCATTER_UNLIMITED);
     scatter_range.y = std::clamp(scatter_range.y, scatter_range.x, SCATTER_UNLIMITED);
-    changed |= config.config_int("material", material_id, "Material id; -1 = any.", -1,
-                                 static_cast<int32_t>(PATH_RECORD_MATERIAL_NONE) - 1);
+    const MaterialSystemHandle materials = material_system.lock();
+    const uint32_t material_count = materials ? materials->get_material_count() : 0;
+    if (config.is_ui() && material_count > 0) {
+        std::vector<std::string> labels{"any"};
+        for (uint32_t id = 0; id < material_count; id++) {
+            labels.push_back(material_label(id));
+        }
+        int32_t option = material_id < static_cast<int32_t>(material_count) ? material_id + 1 : 0;
+        changed |=
+            config.config_options("material", option, labels, Properties::OptionsStyle::COMBO,
+                                  "Paths with a vertex on it.");
+        material_id = option - 1;
+    } else {
+        changed |= config.config_int("material", material_id, "Material id; -1 = any.", -1,
+                                     static_cast<int32_t>(PATH_RECORD_MATERIAL_NONE) - 1);
+    }
     if (config.st_begin_child("technique", "technique")) {
         for (uint32_t m = 0; m < PATH_RECORD_METHOD_NAMES.size(); m++) {
             bool set = (method_mask & (1u << m)) != 0;
@@ -445,8 +459,9 @@ void PathDebugNode::properties_keys(Properties& config) {
     config.config_options("modifier", modifier, options(MODIFIER_NAMES),
                           Properties::OptionsStyle::COMBO,
                           "Held for every binding, so that the scene keeps its own.");
-    config.output_text("{0}+click select · {0}+scroll region radius · {0}+Esc clear selection",
-                       modifier_name());
+    config.output_text(
+        "{0}+click select · {0}+scroll region radius · {0}+Backspace clear selection",
+        modifier_name());
 }
 
 } // namespace merian

@@ -29,7 +29,7 @@ class PathDebugInput : public InputListener {
         std::optional<Click> click;
         double panel_scroll = 0.;
         double radius_scroll = 0.;
-        // Escape with the modifier held, whoever consumed it
+        // Backspace with the modifier held, whoever consumed it
         bool clear = false;
     };
 
@@ -70,8 +70,8 @@ class PathDebugInput : public InputListener {
         float2 cursor_pos{};
         // the last cursor event did not reach PRIORITY
         bool cursor_taken = false;
-        // the modifiers held at the last Escape press
-        std::optional<int> escape_mods;
+        // the modifiers held at the last Backspace press
+        std::optional<int> clear_mods;
     };
 
     bool over_panels() const;

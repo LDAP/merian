@@ -516,7 +516,7 @@ void bind_scene(nb::module_& m) {
                const std::optional<TextureID>& base_color_texture,
                const std::array<float, 3>& emission,
                const std::optional<TextureID>& emission_texture, const float roughness,
-               const float metallic) {
+               const float metallic, const std::string& name) {
                 Scene& scene = get_scene(reference);
                 const GltfMaterial material =
                     to_material(scene, base_color, base_color_texture, emission, emission_texture,
@@ -525,11 +525,11 @@ void bind_scene(nb::module_& m) {
                 return materials->add_material(
                     materials->register_material_type(material.variant_type_name(),
                                                       GLTF_MATERIAL_SLANG_MODULE_PATH),
-                    material);
+                    material, name);
             },
             "base_color"_a = std::array<float, 4>{1, 1, 1, 1}, "base_color_texture"_a = nb::none(),
             "emission"_a = std::array<float, 3>{0, 0, 0}, "emission_texture"_a = nb::none(),
-            "roughness"_a = 1.f, "metallic"_a = 0.f,
+            "roughness"_a = 1.f, "metallic"_a = 0.f, "name"_a = "",
             "The material id of a glTF metallic-roughness material, defaults: white diffuse. The "
             "textures multiply base_color (linear RGBA) and emission (radiance).")
         .def(

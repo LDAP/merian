@@ -399,6 +399,9 @@ class WindowInput(QtCore.QObject):
                 if self.held_back():
                     return True
                 steps = event.angleDelta()
+                # Qt turns a vertical wheel into a horizontal one while Alt is held
+                if event.modifiers() & _Qt.KeyboardModifier.AltModifier:
+                    steps = steps.transposed()
                 self.window.send_scroll(steps.x() / 120, steps.y() / 120)
                 return True
             if kind == Type.ContextMenu:

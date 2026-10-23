@@ -46,6 +46,29 @@ float3 seen_through_glass(const PathRecordPath p, const uint vertex_region, cons
     return seen;
 }
 
+// the per-pixel moments and the filtered image
+void accumulate_pixel(const PathRecordPath p, const uint vertex_region) {
+    if (params.pixel_stats_accumulate != 0 && isfinite(p.luminance)) {
+        const uint base = path_debug_moments_base(p.pixel);
+        path_debug_atomic_add_float(moments, moments_f, base + PATH_DEBUG_MOMENT_SUM, p.luminance);
+        path_debug_atomic_add_float(moments, moments_f, base + PATH_DEBUG_MOMENT_SQUARES,
+                                    p.luminance * p.luminance);
+        InterlockedAdd(moments[base + PATH_DEBUG_MOMENT_COUNT], 1);
+    }
+    if (params.filtered_active == 0) {
+        return;
+    }
+    float3 contrib = float3(0.f);
+    for (uint k = 0; k < p.vertex_count; k++) {
+        contrib += path_debug_finite_or_zero(
+            path_record_load_vertex(in_records, vertex_region, p.vertex_offset + k).contrib);
+    }
+    if (any(contrib > 0.f)) {
+        path_debug_atomic_add_float3(filtered, filtered_f, path_debug_filtered_base(p.pixel),
+                                     contrib);
+    }
+}
+
 void select_path(const uint i, const uint local) {
     const uint count = path_record_path_count(in_records);
     if (i >= count) {
@@ -81,22 +104,17 @@ void select_path(const uint i, const uint local) {
     const uint scatter = path_debug_needs_scatter_count()
                              ? path_debug_scatter_count(in_records, p, vertex_region)
                              : 0;
-    const bool matched = path_debug_selection_matches(p, vertex_region, scatter) &&
-                         path_debug_expression_matches(p, vertex_region, scatter);
-    if (!matched) {
+    if (!path_debug_filter_matches(p, vertex_region, scatter) ||
+        !path_debug_expression_matches(p, vertex_region, scatter)) {
+        return;
+    }
+    // the per-pixel images leave a point out
+    accumulate_pixel(p, vertex_region);
+    if (!path_debug_point_matches(p, vertex_region)) {
         return;
     }
     InterlockedOr(gs_matches[local >> 5], 1u << (local & 31u));
     InterlockedAdd(gs_matched, 1);
-
-    if (params.pixel_stats_accumulate != 0 && isfinite(p.luminance)) {
-        const uint base = path_debug_moments_base(p.pixel);
-        path_debug_atomic_add_float(moments, moments_f, base + PATH_DEBUG_MOMENT_SUM, p.luminance);
-        path_debug_atomic_add_float(moments, moments_f, base + PATH_DEBUG_MOMENT_SQUARES,
-                                    p.luminance * p.luminance);
-        InterlockedAdd(moments[base + PATH_DEBUG_MOMENT_COUNT], 1);
-    }
-
     count_overlay_path(p);
 }
 
@@ -113,6 +131,10 @@ void main(uint3 gid: SV_DispatchThreadID, uint3 tid: SV_GroupThreadID) {
         gs_matched = 0;
     }
     GroupMemoryBarrierWithGroupSync();
+    if (gid.x == 0 && params.filtered_active != 0) {
+        path_debug_atomic_add_float(filtered, filtered_f, path_debug_filtered_paths_at(),
+                                    float(path_record_path_count(in_records)));
+    }
     select_path(gid.x, tid.x);
     GroupMemoryBarrierWithGroupSync();
     if (tid.x < PATH_DEBUG_HIST_BINS && gs_hist[tid.x] != 0) {

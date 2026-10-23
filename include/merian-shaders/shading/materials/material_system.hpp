@@ -83,7 +83,8 @@ class MaterialSystem : public std::enable_shared_from_this<MaterialSystem> {
     }
 
     // Add a material instance. Returns MaterialID.
-    MaterialID add_material(MaterialModelID type_id, const Material& material);
+    MaterialID
+    add_material(MaterialModelID type_id, const Material& material, std::string name = {});
 
     // The new payload size must not exceed max_payload_size.
     void update_material(MaterialID id, const Material& material);
@@ -93,6 +94,12 @@ class MaterialSystem : public std::enable_shared_from_this<MaterialSystem> {
 
     uint32_t get_material_count() const {
         return static_cast<uint32_t>(materials.size());
+    }
+
+    // empty for an unnamed material
+    const std::string& get_material_name(const MaterialID id) const {
+        assert(id < materials.size());
+        return materials[id].name;
     }
 
     bool is_emissive(const MaterialID id) const {
@@ -172,6 +179,7 @@ class MaterialSystem : public std::enable_shared_from_this<MaterialSystem> {
     std::unordered_map<std::string, MaterialTypeInfo> material_types;
 
     struct StoredMaterial {
+        std::string name;
         MaterialHeader header;
         std::vector<uint8_t> payload;
         bool emissive = false;

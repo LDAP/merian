@@ -521,7 +521,7 @@ void GLTFScene::load_materials(const CommandBufferHandle& cmd) {
 
         const auto type_id = get_material_system()->register_material_type(
             mat.variant_type_name(), GLTF_MATERIAL_SLANG_MODULE_PATH);
-        material_map[i] = get_material_system()->add_material(type_id, mat);
+        material_map[i] = get_material_system()->add_material(type_id, mat, gmat.name);
     }
 
     // Default material for primitives without one

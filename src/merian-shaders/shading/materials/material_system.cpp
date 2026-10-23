@@ -162,10 +162,13 @@ void MaterialSystem::repack_host_buffers(const uint32_t prev_entry_size) {
     prev_host_buffer = std::move(restrided);
 }
 
-MaterialID MaterialSystem::add_material(const MaterialModelID type_id, const Material& material) {
+MaterialID MaterialSystem::add_material(const MaterialModelID type_id,
+                                        const Material& material,
+                                        std::string name) {
     assert(type_id < material_types.size());
 
     StoredMaterial stored;
+    stored.name = std::move(name);
     stored.header = material.header;
     stored.header.material_model_type_id = type_id;
     stored.emissive = material.is_emissive();
