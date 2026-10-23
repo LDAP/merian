@@ -20,8 +20,10 @@ namespace merian {
 
 namespace {
 constexpr const char* SHADER_MODULE = "merian-graph/nodes/render_restir_pt/render_restir_pt.slang";
-// distinct periods decorrelate the pairs of different slots
-constexpr std::array<uint32_t, RESTIR_PT_MAX_NEIGHBORS> PAIRING_PERIODS = {254, 238, 218, 200, 184};
+// per neighbor count, periods whose multiples rarely coincide on screen
+constexpr std::array<std::array<uint32_t, RESTIR_PT_MAX_NEIGHBORS>, RESTIR_PT_MAX_NEIGHBORS>
+    PAIRING_PERIODS = {
+        {{254}, {248, 210}, {254, 232, 196}, {254, 228, 208, 176}, {254, 238, 218, 200, 184}}};
 
 uint32_t pack_delta(const int dx, const int dy) {
     return static_cast<uint32_t>(dx + 128) | (static_cast<uint32_t>(dy + 128) << 8);
@@ -29,16 +31,20 @@ uint32_t pack_delta(const int dx, const int dy) {
 
 // A perfect matching on a periodic tile whose offsets follow a normal distribution with mean
 // distance `radius`: every pixel holds the offset to its partner, which holds the opposite one.
-std::vector<uint32_t> generate_pairing(const float radius, const uint32_t seed) {
+std::vector<uint32_t>
+generate_pairing(const float radius, const int32_t neighbor_count, const uint32_t seed) {
     std::vector<uint32_t> tables((RESTIR_PT_PAIRING_EXTENT * RESTIR_PT_PAIRING_EXTENT + 1) *
                                      RESTIR_PT_MAX_NEIGHBORS,
                                  pack_delta(0, 0));
     // the mean of a Rayleigh distribution is sigma sqrt(pi / 2)
     const float sigma = std::max(radius, 1.f) / std::sqrt(0.5f * std::numbers::pi_v<float>);
     constexpr int max_delta = 127;
+    const std::array<uint32_t, RESTIR_PT_MAX_NEIGHBORS>& periods = PAIRING_PERIODS
+        [std::clamp(neighbor_count, 1, static_cast<int32_t>(RESTIR_PT_MAX_NEIGHBORS)) - 1];
+    std::ranges::copy(periods, tables.end() - RESTIR_PT_MAX_NEIGHBORS);
 
-    for (uint32_t slot = 0; slot < RESTIR_PT_MAX_NEIGHBORS; slot++) {
-        const int period = static_cast<int>(PAIRING_PERIODS[slot]);
+    for (uint32_t slot = 0; slot < RESTIR_PT_MAX_NEIGHBORS && periods[slot] != 0; slot++) {
+        const int period = static_cast<int>(periods[slot]);
         const int count = period * period;
         std::mt19937 rng(xxhash32(seed, slot));
         std::normal_distribution<float> normal(0.f, sigma);
@@ -82,8 +88,6 @@ std::vector<uint32_t> generate_pairing(const float radius, const uint32_t seed) 
                 }
             }
         }
-        tables[RESTIR_PT_PAIRING_EXTENT * RESTIR_PT_PAIRING_EXTENT * RESTIR_PT_MAX_NEIGHBORS +
-               slot] = PAIRING_PERIODS[slot];
     }
     return tables;
 }
@@ -331,7 +335,7 @@ RenderRestirPT::on_connected(const NodeIOLayout& io_layout,
 
 void RenderRestirPT::upload_pairing(const ResourceAllocatorHandle& allocator,
                                     Submission& submission) {
-    const std::vector<uint32_t> tables = generate_pairing(spatial_radius, seed);
+    const std::vector<uint32_t> tables = generate_pairing(spatial_radius, neighbor_count, seed);
     submission.get_cmd()->barrier(vk::PipelineStageFlagBits::eComputeShader,
                                   vk::PipelineStageFlagBits::eTransfer,
                                   pairing->buffer_barrier(vk::AccessFlagBits::eShaderRead,
@@ -736,9 +740,12 @@ RenderRestirPT::NodeStatusFlags RenderRestirPT::properties(Properties& config) {
             "'reciprocal' pairs pixels so that each shift serves both sides (Lin et al. 2026, "
             "5.1). 'disk' draws neighbors from a low-discrepancy disk. 'CGNS' selects them by how "
             "compatible their primary hits are (Junkins et al. 2026).");
-        constants_changed |= config.config_int("neighbor count", neighbor_count,
-                                               "Neighbors resampled per pixel and round.", 1,
-                                               RESTIR_PT_MAX_NEIGHBORS);
+        if (config.config_int("neighbor count", neighbor_count,
+                              "Neighbors resampled per pixel and round.", 1,
+                              RESTIR_PT_MAX_NEIGHBORS)) {
+            constants_changed = true;
+            pairing_dirty = true;
+        }
         if (config.config_float("radius", spatial_radius,
                                 "Pixel radius of the disk the neighbors are drawn from; the mean "
                                 "distance of a pair with reciprocal selection.",
