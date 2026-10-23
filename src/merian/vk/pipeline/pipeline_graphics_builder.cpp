@@ -396,8 +396,9 @@ GraphicsPipelineBuilder::build(const PipelineLayoutHandle& pipeline_layout,
 
 GraphicsPipelineHandle
 GraphicsPipelineBuilder::build_dynamic_rendering(const PipelineLayoutHandle& pipeline_layout,
-                                                  const vk::Format color_attachment_format,
-                                                  const std::shared_ptr<Pipeline>& base_pipeline) {
+                                                 const vk::Format color_attachment_format,
+                                                 const vk::Format depth_attachment_format,
+                                                 const std::shared_ptr<Pipeline>& base_pipeline) {
     assert(pipeline_layout);
     assert(vertex_shader);
     assert(fragment_shader);
@@ -422,6 +423,7 @@ GraphicsPipelineBuilder::build_dynamic_rendering(const PipelineLayoutHandle& pip
     vk::PipelineRenderingCreateInfo rendering_info;
     rendering_info.colorAttachmentCount = 1;
     rendering_info.pColorAttachmentFormats = &color_attachment_format;
+    rendering_info.depthAttachmentFormat = depth_attachment_format;
 
     return std::make_shared<GraphicsPipeline>(
         stages, vertex_input_state, input_assembly_state, tessellation_state, viewport_state,

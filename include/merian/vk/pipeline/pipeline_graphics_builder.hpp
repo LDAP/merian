@@ -186,13 +186,11 @@ class GraphicsPipelineBuilder {
 
     GraphicsPipelineBuilder& set_vertex_shader(const VulkanEntryPointHandle& vertex_shader);
 
-    GraphicsPipelineBuilder&
-    set_geometry_shader(const VulkanEntryPointHandle& geometry_shader);
+    GraphicsPipelineBuilder& set_geometry_shader(const VulkanEntryPointHandle& geometry_shader);
 
     GraphicsPipelineBuilder& set_mesh_shader(const VulkanEntryPointHandle& mesh_shader);
 
-    GraphicsPipelineBuilder&
-    set_fragment_shader(const VulkanEntryPointHandle& fragment_shader);
+    GraphicsPipelineBuilder& set_fragment_shader(const VulkanEntryPointHandle& fragment_shader);
 
     GraphicsPipelineBuilder&
     set_tessellation_shader(const VulkanEntryPointHandle& tessellation_control_shader,
@@ -207,9 +205,12 @@ class GraphicsPipelineBuilder {
 
     // Build a pipeline using dynamic rendering (no render pass).
     // color_attachment_format: the VkFormat of the single color attachment.
-    GraphicsPipelineHandle build_dynamic_rendering(const PipelineLayoutHandle& pipeline_layout,
-                                                   vk::Format color_attachment_format,
-                                                   const std::shared_ptr<Pipeline>& opt_base_pipeline = {});
+    // depth_attachment_format: eUndefined without a depth attachment.
+    GraphicsPipelineHandle
+    build_dynamic_rendering(const PipelineLayoutHandle& pipeline_layout,
+                            vk::Format color_attachment_format,
+                            vk::Format depth_attachment_format = vk::Format::eUndefined,
+                            const std::shared_ptr<Pipeline>& opt_base_pipeline = {});
 
   private:
     // Shaders
