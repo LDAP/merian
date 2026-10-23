@@ -205,28 +205,15 @@ bool ImGuiProperties::config_percent(const std::string& id, float& value, const 
 bool ImGuiProperties::config_split(const std::string& id,
                                    const std::vector<SplitPart>& parts,
                                    const std::string& desc) {
-    std::vector<const SplitPart*> shown;
-    for (const SplitPart& part : parts) {
-        if (part.shown) {
-            shown.push_back(&part);
-        }
-    }
-    if (shown.size() < 2) {
+    bool value_changed = false;
+    const std::vector<const SplitPart*> shown = shown_split_parts(parts, value_changed);
+    if (shown.empty()) {
         return false;
     }
     const auto count = static_cast<uint32_t>(shown.size());
-
-    bool value_changed = false;
     float total = 0.f;
     for (const SplitPart* part : shown) {
         total += *part->weight;
-    }
-    if (!(total > 0.f)) {
-        for (const SplitPart* part : shown) {
-            *part->weight = 1.f;
-        }
-        total = static_cast<float>(count);
-        value_changed = true;
     }
 
     std::vector<float> ends(count);

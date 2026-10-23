@@ -10,7 +10,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 import merian
 import merian.graph as mg
 
-from .theme import NODE_STATE_COLORS, THEME, scrolled
+from .theme import CATEGORY_COLORS, NODE_STATE_COLORS, THEME, scrolled
 
 _DEFAULT_DECIMALS = 3
 _INDENT = 16
@@ -20,6 +20,7 @@ _MAX_SLIDER_SPAN = 10000
 _MAX_SLIDER_STEPS = 1000
 _NOTE_COLORS = {"Errors:": "red", "Force disabled:": "peach", "Unsupported:": "yellow"}
 _SPACING = 2
+_SPLIT_GRIP_WIDTH = 6
 _TITLE_STATES = {
     "ERROR": mg.NodeState.ERRORED,
     "F-DISABLED": mg.NodeState.FORCE_DISABLED,
@@ -157,6 +158,11 @@ class Recorder(merian.Properties):
 
     def config_button(self, name: str, desc: str) -> bool:
         return bool(self.record("button", name, False, desc))
+
+    def config_split(
+        self, name: str, labels: list[str], weights: tuple[float, ...], desc: str
+    ) -> tuple[float, ...] | None:
+        return self.record("split", name, weights, desc, labels=labels)
 
     def config_options(
         self,
@@ -467,7 +473,7 @@ class _LabeledRow(QtWidgets.QWidget):
             kind == Type.MouseButtonPress
             and event.button() == QtCore.Qt.MouseButton.LeftButton
         ):
-            self.scrub = (event.globalPosition().x(), box.value())
+            self.scrub = (event.globalPosition().x(), box.finite_value())
             return True
         if kind == Type.MouseMove and self.scrub:
             start, value = self.scrub
@@ -535,7 +541,7 @@ class _Rule(QtWidgets.QWidget):
     def __init__(self, label: str):
         super().__init__()
         layout = QtWidgets.QHBoxLayout(self)
-        layout.setContentsMargins(4, 8 if label else 4, 4, 2 if label else 4)
+        layout.setContentsMargins(4, 16 if label else 10, 4, 2 if label else 4)
         layout.setSpacing(8)
         if label:
             title = QtWidgets.QLabel(label)
@@ -571,7 +577,27 @@ class _QuietCombo(_FocusedWheel, QtWidgets.QComboBox):
 
 
 class _QuietSlider(_FocusedWheel, QtWidgets.QSlider):
-    pass
+    def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:
+        if event.button() == QtCore.Qt.MouseButton.LeftButton:
+            option = QtWidgets.QStyleOptionSlider()
+            self.initStyleOption(option)
+            style, control = self.style(), QtWidgets.QStyle.ComplexControl.CC_Slider
+            handle = style.subControlRect(
+                control, option, QtWidgets.QStyle.SubControl.SC_SliderHandle, self
+            )
+            groove = style.subControlRect(
+                control, option, QtWidgets.QStyle.SubControl.SC_SliderGroove, self
+            )
+            if not handle.contains(event.position().toPoint()):
+                self.setValue(
+                    QtWidgets.QStyle.sliderValueFromPosition(
+                        self.minimum(),
+                        self.maximum(),
+                        round(event.position().x() - groove.x() - handle.width() / 2),
+                        groove.width() - handle.width(),
+                    )
+                )
+        super().mousePressEvent(event)
 
 
 class _NumberBox(_FocusedWheel, QtWidgets.QDoubleSpinBox):
@@ -586,6 +612,20 @@ class _NumberBox(_FocusedWheel, QtWidgets.QDoubleSpinBox):
             QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Fixed
         )
         self.setMinimumWidth(56)
+        self.valueChanged.connect(self.dim_infinite)
+
+    def dim_infinite(self) -> None:
+        infinite = math.isinf(self.value())
+        if infinite != self.property("infinite"):
+            self.setProperty("infinite", infinite)
+            self.lineEdit().setStyleSheet(
+                f"color: {THEME['text_dim']};" if infinite else ""
+            )
+
+    def focusInEvent(self, event: QtGui.QFocusEvent) -> None:
+        super().focusInEvent(event)
+        if math.isinf(self.value()):
+            QtCore.QTimer.singleShot(0, self.selectAll)
 
     def set_step(self, step: float) -> None:
         self.setSingleStep(step)
@@ -601,19 +641,26 @@ class _NumberBox(_FocusedWheel, QtWidgets.QDoubleSpinBox):
         return round(value, self.shown_decimals) + 0.0
 
     def textFromValue(self, value: float) -> str:
+        if math.isinf(value):
+            return "inf" if value > 0 else "-inf"
         if self.integer:
             return str(round(value))
         return f"{self.shown(value):.{self.shown_decimals}f}"
 
+    def finite_value(self) -> float:
+        value = self.value()
+        return value if math.isfinite(value) else 0.0
+
     def stepBy(self, steps: int) -> None:
         self.interpretText()
-        self.setValue(self.shown(self.value() + steps * self.singleStep()))
+        self.setValue(self.shown(self.finite_value() + steps * self.singleStep()))
 
     def valueFromText(self, text: str) -> float:
         try:
-            return float(text)
+            value = float(text)
         except ValueError:
             return self.value()
+        return self.value() if math.isnan(value) else value
 
     def validate(self, text: str, position: int):
         return QtGui.QValidator.State.Acceptable, text, position
@@ -652,7 +699,7 @@ class _Numbers(QtWidgets.QWidget):
             self.step, self.bounds = step, bounds
             for box in self.boxes:
                 with QtCore.QSignalBlocker(box):
-                    box.setRange(max(bounds[0], -1e18), min(bounds[1], 1e18))
+                    box.setRange(*bounds)
                     box.set_step(step)
 
     def set_values(self, values) -> None:
@@ -660,6 +707,7 @@ class _Numbers(QtWidgets.QWidget):
             if not _editing(box) and box.value() != value:
                 with QtCore.QSignalBlocker(box):
                     box.setValue(value)
+                box.dim_infinite()
 
 
 class _Slider(_Numbers):
@@ -713,6 +761,111 @@ class _Slider(_Numbers):
         if not _editing(self) and self.box.value() != value:
             super().set_values(value)
             self.follow()
+
+
+class _Split(QtWidgets.QWidget):
+    def __init__(self, commit: Callable[[tuple[float, ...]], None]):
+        super().__init__()
+        self.commit = commit
+        self.labels: list[str] = []
+        self.weights: tuple[float, ...] = ()
+        self.dragged: int | None = None
+        self.setMouseTracking(True)
+        self.setMinimumHeight(self.fontMetrics().height() + 10)
+        self.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed
+        )
+
+    def set_parts(self, labels: list[str], weights: tuple[float, ...]) -> None:
+        if self.dragged is None and (labels, weights) != (self.labels, self.weights):
+            self.labels, self.weights = list(labels), tuple(weights)
+            self.update()
+
+    def total(self) -> float:
+        return sum(self.weights) or 1.0
+
+    def ends(self) -> list[float]:
+        """The right end of each part, as a fraction of the bar."""
+        total, ends, sum_ = self.total(), [], 0.0
+        for weight in self.weights:
+            sum_ += weight
+            ends.append(sum_ / total)
+        return ends
+
+    def divider_at(self, x: float) -> int:
+        dividers = self.ends()[:-1]
+        fraction = x / max(self.width(), 1)
+        return min(range(len(dividers)), key=lambda i: abs(dividers[i] - fraction))
+
+    def move_divider(self, divider: int, x: float) -> None:
+        ends = self.ends()
+        low = ends[divider - 1] if divider > 0 else 0.0
+        ends[divider] = min(max(x / max(self.width(), 1), low), ends[divider + 1])
+        starts = [0.0, *ends[:-1]]
+        total = self.total()
+        self.weights = tuple((end - start) * total for start, end in zip(starts, ends))
+        self.update()
+
+    def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:
+        if event.button() == QtCore.Qt.MouseButton.LeftButton and len(self.weights) > 1:
+            self.dragged = self.divider_at(event.position().x())
+            self.move_divider(self.dragged, event.position().x())
+
+    def mouseMoveEvent(self, event: QtGui.QMouseEvent) -> None:
+        x = event.position().x()
+        if self.dragged is not None:
+            self.move_divider(self.dragged, x)
+            return
+        near = self.weights and any(
+            abs(end * self.width() - x) <= _SPLIT_GRIP_WIDTH for end in self.ends()[:-1]
+        )
+        self.setCursor(
+            QtCore.Qt.CursorShape.SplitHCursor
+            if near
+            else QtCore.Qt.CursorShape.ArrowCursor
+        )
+
+    def mouseReleaseEvent(self, event: QtGui.QMouseEvent) -> None:
+        if (
+            event.button() == QtCore.Qt.MouseButton.LeftButton
+            and self.dragged is not None
+        ):
+            self.dragged = None
+            self.commit(self.weights)
+
+    def paintEvent(self, _: QtGui.QPaintEvent) -> None:
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+        bar = QtCore.QRectF(self.rect()).adjusted(0.5, 2.5, -0.5, -2.5)
+        clip = QtGui.QPainterPath()
+        clip.addRoundedRect(bar, 5, 5)
+        painter.setClipPath(clip)
+        metrics = self.fontMetrics()
+        start = 0.0
+        for index, (label, end) in enumerate(zip(self.labels, self.ends())):
+            part = QtCore.QRectF(
+                bar.left() + start * bar.width(),
+                bar.top(),
+                (end - start) * bar.width(),
+                bar.height(),
+            )
+            color = QtGui.QColor(THEME[CATEGORY_COLORS[index % len(CATEGORY_COLORS)]])
+            color.setAlpha(110)
+            painter.fillRect(part, color)
+            text = f"{label} {round((end - start) * 100)}%"
+            if metrics.horizontalAdvance(text) + 8 > part.width():
+                text = metrics.elidedText(
+                    label, QtCore.Qt.TextElideMode.ElideRight, round(part.width()) - 8
+                )
+            painter.setPen(QtGui.QColor(THEME["text"]))
+            painter.drawText(part, QtCore.Qt.AlignmentFlag.AlignCenter, text)
+            start = end
+        painter.setPen(QtGui.QPen(QtGui.QColor(THEME["bg"]), 2))
+        for end in self.ends()[:-1]:
+            x = bar.left() + end * bar.width()
+            painter.drawLine(
+                QtCore.QPointF(x, bar.top()), QtCore.QPointF(x, bar.bottom())
+            )
 
 
 class _Segments(QtWidgets.QWidget):
@@ -954,6 +1107,10 @@ class QtProperties:
         _filter(self.root, self.filter)
         self.edited()
 
+    @property
+    def empty(self) -> bool:
+        return not self.root.rows
+
     def clear(self) -> None:
         self.root.finish()
         self.changes.clear()
@@ -1074,6 +1231,8 @@ class QtProperties:
                 field = _Slider(kind == "int", commit)
             else:
                 field = _Numbers(count, kind == "int", commit)
+        elif kind == "split":
+            field = _Split(commit)
         elif kind == "bool":
             field = _Switch()
             field.toggled.connect(commit)
@@ -1130,6 +1289,8 @@ class QtProperties:
                 item.details["step"], item.details["minimum"], item.details["maximum"]
             )
             field.set_values(value)
+        elif kind == "split":
+            field.set_parts(item.details["labels"], value)
         elif kind == "bool":
             if field.isChecked() != value:
                 with QtCore.QSignalBlocker(field):

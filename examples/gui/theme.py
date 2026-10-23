@@ -23,6 +23,8 @@ THEME = {
     "red": "#f38ba8",
     "teal": "#94e2d5",
 }
+CATEGORY_COLORS = ("accent", "peach", "blue", "green", "yellow", "red", "teal")
+
 NODE_STATE_COLORS = {
     mg.NodeState.OK: "green",
     mg.NodeState.DISABLED: "text_dim",

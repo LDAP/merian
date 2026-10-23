@@ -1,13 +1,19 @@
 #include "merian-graph/graph/graph.hpp"
 
 #include <algorithm>
+#include <cstddef>
 #include <fmt/chrono.h>
 #include <fmt/ranges.h>
 #include <spdlog/spdlog.h>
+#include <vector>
 
 namespace merian {
 
 namespace {
+
+// Auto-scaled time plots reach this quantile of their samples, times the headroom
+constexpr float SCALE_QUANTILE = 0.95f;
+constexpr float SCALE_HEADROOM = 1.1f;
 
 // level keeps the ids of the CPU and the GPU tree apart
 void draw_profiler_tree(Properties& props,
@@ -268,7 +274,13 @@ void Graph::draw_profiler(Properties& props) {
                 props.st_separate(title);
                 const float* samples = &history[ui.time_history_current + 1];
                 if (auto_scale) {
-                    scale_max = *std::max_element(samples, samples + history.size() - 1);
+                    std::vector<float> sorted(samples, samples + history.size() - 1);
+                    const auto quantile =
+                        sorted.begin() +
+                        static_cast<std::ptrdiff_t>(SCALE_QUANTILE *
+                                                    static_cast<float>(sorted.size() - 1));
+                    std::nth_element(sorted.begin(), quantile, sorted.end());
+                    scale_max = *quantile * SCALE_HEADROOM;
                 }
                 props.output_plot_line(id, samples, history.size() - 1, 0, scale_max);
                 auto_scale &= !props.config_float(fmt::format("{} max ms", id), scale_max, "", 0.1f,

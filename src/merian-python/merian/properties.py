@@ -68,6 +68,12 @@ class Properties:
         """Returns whether the button was pressed since the previous pass."""
         return False
 
+    def config_split(
+        self, name: str, labels: list[str], weights: tuple[float, ...], desc: str
+    ) -> tuple[float, ...] | None:
+        """Weights of the parts, relative to their sum."""
+        return None
+
     def config_options(
         self,
         name: str,

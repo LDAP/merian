@@ -290,6 +290,10 @@ class Properties {
         bool shown = true;
     };
 
+    // The shown parts if at least two; weights summing to no more than 0 become 1 and set reset.
+    static std::vector<const SplitPart*> shown_split_parts(const std::vector<SplitPart>& parts,
+                                                           bool& reset);
+
     virtual bool config_split(const std::string& id,
                               const std::vector<SplitPart>& parts,
                               const std::string& desc = "") {

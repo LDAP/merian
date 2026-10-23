@@ -60,7 +60,7 @@ class PreferencesView(QtWidgets.QWidget):
             _row(
                 "shortcut modifier",
                 self.modifiers_combo,
-                "Held with Space, . and Backspace to play and pause, step and release "
+                "Held with Space, Right and Backspace to play and pause, step and release "
                 "the mouse, also in a graph's view.",
             )
         )

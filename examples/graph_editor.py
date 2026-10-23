@@ -8,7 +8,7 @@ which take the input of their view.
 
 Right-click adds a node. Drag from an output to an input to connect them; pull a
 connection off its input to move or remove it. Click a node for its properties and its
-time for the times. Click an output to preview it, left of the graph and properties;
+time for the profiler. Click an output to preview it, left of the graph and properties;
 right-click it to show it as the backdrop of the graph or in a panel next to the graph,
 or where its memory is. The header of each view, and View > Backdrop for the backdrop,
 select what it shows. Delete removes the selected
@@ -17,12 +17,13 @@ connections were connected but are not described by their node now. Positions ar
 stored in the saved config.
 
 The graph navigates like Blender's node editor: the middle button pans, with Ctrl it
-zooms, the wheel zooms, with Ctrl or Shift it pans, Home shows all nodes. Shift+A adds a
+zooms, the wheel and a pinch zoom, Shift+wheel and two fingers pan, Home shows all nodes.
+Right-click a node for its menu. Shift+A adds a
 node, G moves the selected ones, X deletes, Ctrl+right-drag cuts connections, Shift+click
 adds to the selection.
 
-Space plays and pauses, . steps. A graph's view sends the keys to the graph; there,
-Shift+Alt+Space plays and pauses, Shift+Alt+. steps and Shift+Alt+Backspace gives the
+Space plays and pauses, Right steps. A graph's view sends the keys to the graph; there,
+Shift+Alt+Space plays and pauses, Shift+Alt+Right steps and Shift+Alt+Backspace gives the
 mouse back, in the editor too; the Preferences tab sets their modifier, and the log
 level. The Log tab shows merian's log. The preferences are stored for the user, not in
 the config.
@@ -99,8 +100,11 @@ _VIEW_SINK = "gui view"
 _SETTINGS = ("merian", "graph-editor")
 
 _CLOCK_INTERVAL = timedelta(milliseconds=33)
-_COMPILING_INTERVAL = timedelta(milliseconds=50)
+_BUSY_INTERVAL = timedelta(milliseconds=80)
+_SPINNER = "\u280b\u2819\u2839\u2838\u283c\u2834\u2826\u2827\u2807\u280f"
 _CONNECTED = "/graph/connect"
+# The sequence of the properties published with the graph
+_PUBLISHED = 0
 _SAVE_FILTERS = {
     mg.ConnectorKind.IMAGE: ("png", "Images (*.png *.jpg *.bmp *.tif)"),
     mg.ConnectorKind.BUFFER: ("bin", "Raw data (*.bin)"),
@@ -111,12 +115,16 @@ _PROPERTIES_INTERVAL = timedelta(milliseconds=100)
 _REPORT_INTERVAL = timedelta(milliseconds=100)
 _RUN_SLICE = timedelta(milliseconds=15)
 
-_PLAYBACK_KEYS = (QtCore.Qt.Key.Key_Space, QtCore.Qt.Key.Key_Period)
+_PLAYBACK_KEYS = (QtCore.Qt.Key.Key_Space, QtCore.Qt.Key.Key_Right)
 _RELEASE_MOUSE_KEY = QtCore.Qt.Key.Key_Backspace
 _PLAYBACK_KEY_USERS = (
     QtWidgets.QAbstractButton,
     QtWidgets.QAbstractItemView,
+    QtWidgets.QAbstractSlider,
+    QtWidgets.QAbstractSpinBox,
     QtWidgets.QComboBox,
+    QtWidgets.QLineEdit,
+    QtWidgets.QPlainTextEdit,
 )
 _STOP_TIP = (
     "Stop: completes the iterations in flight and reconnects, which restarts the run at "
@@ -125,6 +133,8 @@ _STOP_TIP = (
 
 _BACKDROP_SHADE = QtGui.QColor(THEME["canvas"])
 _BACKDROP_SHADE.setAlpha(120)
+_VEIL_COLOR = QtGui.QColor(THEME["bg"])
+_VEIL_COLOR.setAlpha(170)
 _INPUT_COLOR = THEME["blue"]
 _OUTPUT_COLORS = {
     mg.ConnectorKind.IMAGE: THEME["accent"],
@@ -333,18 +343,28 @@ class _GraphWorker(QtCore.QObject):
     window_shown = QtCore.Signal(str, int, object)
     playing_changed = QtCore.Signal(bool)
     message = QtCore.Signal(str)
+    # What is loading, empty when done
+    loading = QtCore.Signal(str)
     # path, capture
     save_captured = QtCore.Signal(object, object)
 
-    def __init__(self, graph: mg.Graph):
+    def __init__(
+        self,
+        open_context: Callable[[], merian.Context],
+        description: mg.Description | None,
+    ):
         super().__init__()
-        self.graph = graph
+        self.open_context, self.description = open_context, description
+        self.context: merian.Context | None = None
+        self.graph: mg.Graph | None = None
         self.commands: queue.SimpleQueue[Callable[[], None]] = queue.SimpleQueue()
         self.runner = threading.Thread(target=self.loop, name="graph", daemon=True)
         self.playing = True
         self.steps = 0
         self.paused_time: float | None = None
-        self.quitting = False
+        self.closing = threading.Event()
+        # By whether for the graph: the expanded children and tabs last requested
+        self.expansions: dict[bool, tuple[dict, dict]] = {}
         self.view_sinks: dict[str, _ViewSink] = {}
         # generation, Window node and its HostWindow by view
         self.view_windows: dict[str, tuple[int, str, mg.HostWindow | None]] = {}
@@ -363,22 +383,49 @@ class _GraphWorker(QtCore.QObject):
         self.commands.put(functools.partial(command, *args))
 
     def start(self) -> None:
-        self.post(self.connect_graph)
         self.runner.start()
 
     def quit(self) -> None:
-        self.post(setattr, self, "quitting", True)
-        self.graph.stop()
+        self.closing.set()
+        # Wakes the loop
+        self.post(lambda: None)
         self.runner.join()
+
+    def open_graph(self) -> None:
+        self.loading.emit("Loading merian")
+        self.context = self.open_context()
+        self.loading.emit("Loading graph")
+        try:
+            self.graph = mg.Graph(self.context, self.description, strict=False)
+        except Exception:
+            self.graph = mg.Graph(self.context)
+            raise
+        finally:
+            self.loading.emit("")
+            if self.graph is not None and not self.closing.is_set():
+                self.connect_graph()
 
     @property
     def running(self) -> bool:
         return self.playing or self.steps > 0
 
     def loop(self) -> None:
+        try:
+            self.attempt(self.open_graph)
+            if self.graph is None:
+                self.loading.emit("")
+                self.closing.wait()
+                return
+            self.serve()
+        finally:
+            if self.graph is not None:
+                self.graph.close()
+            self.graph = self.context = None
+
+    def serve(self) -> None:
         while True:
             self.run_commands(block=not self.running)
-            if self.quitting:
+            if self.closing.is_set():
                 return
             if self.properties_request:
                 request, self.properties_request = self.properties_request, None
@@ -534,7 +581,17 @@ class _GraphWorker(QtCore.QObject):
             for view, view_sink in self.view_sinks.items()
             if view_sink.identifier in nodes
         }
-        self.nodes_changed.emit(_read_state(self.graph, self.owned_sinks()))
+        state = _read_state(self.graph, self.owned_sinks())
+        self.nodes_changed.emit(state)
+        for identifier in (None, *state.nodes):
+            self.attempt(
+                functools.partial(
+                    self.record,
+                    _PUBLISHED,
+                    identifier,
+                    Recorder({}, *self.expansions.get(identifier is None, ({}, {}))),
+                )
+            )
         windows = self.graph.windows
         for view, (generation, identifier, window) in list(self.view_windows.items()):
             found = windows.get(identifier)
@@ -768,6 +825,7 @@ class _GraphWorker(QtCore.QObject):
         self, sequence: int, identifier: str | None, recorder: Recorder
     ) -> None:
         """Records the properties of a node, of the graph for identifier None."""
+        self.expansions[identifier is None] = (recorder.expanded, recorder.tabs)
         if self.properties_request:
             _, pending_identifier, pending = self.properties_request
             if pending_identifier == identifier:
@@ -776,9 +834,7 @@ class _GraphWorker(QtCore.QObject):
                 self.record_properties(*self.properties_request)
         self.properties_request = (sequence, identifier, recorder)
 
-    def record_properties(
-        self, sequence: int, identifier: str | None, recorder: Recorder
-    ) -> None:
+    def record(self, sequence: int, identifier: str | None, recorder: Recorder) -> None:
         nodes = self.graph.nodes
         if identifier is None:
             record = self.graph.properties
@@ -786,11 +842,18 @@ class _GraphWorker(QtCore.QObject):
             record = nodes[identifier].properties
         else:
             return
-        changed = bool(recorder.changes)
         try:
             record(recorder)
         finally:
             self.properties_recorded.emit(sequence, identifier, recorder.items)
+
+    def record_properties(
+        self, sequence: int, identifier: str | None, recorder: Recorder
+    ) -> None:
+        changed = bool(recorder.changes)
+        try:
+            self.record(sequence, identifier, recorder)
+        finally:
             if self.graph.needs_reconnect:
                 self.connect_graph()
             elif identifier is None and changed:
@@ -1157,6 +1220,8 @@ class _GraphView(QtWidgets.QGraphicsView):
     output_clicked = QtCore.Signal(str, str)
     # node, output, global position
     output_menu_requested = QtCore.Signal(str, str, object)
+    # node, global position
+    node_menu_requested = QtCore.Signal(str, object)
     # identifiers, [(src, dst, dst_input)]
     delete_requested = QtCore.Signal(list, list)
     # identifier or None
@@ -1404,6 +1469,12 @@ class _GraphView(QtWidgets.QGraphicsView):
                 connector.node.identifier, connector.name, event.globalPos()
             )
             return
+        item = self.itemAt(event.pos())
+        while item is not None and not isinstance(item, _NodeItem):
+            item = item.parentItem()
+        if item is not None:
+            self.node_menu_requested.emit(item.identifier, event.globalPos())
+            return
         self.show_picker(event.pos(), event.globalPos())
 
     def show_picker(
@@ -1623,16 +1694,44 @@ class _GraphView(QtWidgets.QGraphicsView):
                 connections.append(item.connection())
         self.delete_requested.emit(identifiers, connections)
 
+    def event(self, event: QtCore.QEvent) -> bool:
+        if (
+            event.type() == QtCore.QEvent.Type.NativeGesture
+            and event.gestureType() == QtCore.Qt.NativeGestureType.ZoomNativeGesture
+        ):
+            self.zoom(1.0 + event.value(), event.position())
+            return True
+        return super().event(event)
+
     def wheelEvent(self, event: QtGui.QWheelEvent) -> None:
         modifiers = QtCore.Qt.KeyboardModifier
         delta = event.angleDelta()
         steps = delta.y() or delta.x()
-        if not delta.y() or event.modifiers() & modifiers.ControlModifier:
+        # Windows turns a pinch into Ctrl and the wheel
+        if event.modifiers() & modifiers.ControlModifier:
+            self.zoom(1.0015**steps, event.position())
+        elif _from_touchpad(event):
+            pixels = event.pixelDelta()
+            self.pan(
+                QtCore.QPointF(pixels)
+                if not pixels.isNull()
+                else QtCore.QPointF(delta) / 2
+            )
+        elif not delta.y() or event.modifiers() & modifiers.ShiftModifier:
             self.pan(QtCore.QPointF(steps / 2, 0))
-        elif event.modifiers() & modifiers.ShiftModifier:
-            self.pan(QtCore.QPointF(0, steps / 2))
         else:
             self.zoom(1.0015**steps, event.position())
+
+
+def _from_touchpad(event: QtGui.QWheelEvent) -> bool:
+    device = event.pointingDevice()
+    if device is not None and device.type() == QtGui.QInputDevice.DeviceType.TouchPad:
+        return True
+    if event.phase() != QtCore.Qt.ScrollPhase.NoScrollPhase:
+        return True
+    # Mouse wheels turn in notches of 120
+    delta = event.angleDelta()
+    return not event.pixelDelta().isNull() or bool(delta.x() % 120 or delta.y() % 120)
 
 
 def _pointer(path: list[str]) -> str:
@@ -1736,6 +1835,21 @@ def _painted_icon(name: str) -> QtGui.QIcon:
     return QtGui.QIcon(pixmap)
 
 
+class _Veil(QtWidgets.QWidget):
+    def __init__(self, covered: QtWidgets.QWidget):
+        super().__init__(covered)
+        covered.installEventFilter(self)
+        self.setGeometry(covered.rect())
+
+    def eventFilter(self, watched: QtCore.QObject, event: QtCore.QEvent) -> bool:
+        if event.type() == QtCore.QEvent.Type.Resize:
+            self.setGeometry(watched.rect())
+        return False
+
+    def paintEvent(self, _: QtGui.QPaintEvent) -> None:
+        QtGui.QPainter(self).fillRect(self.rect(), _VEIL_COLOR)
+
+
 class _Shown(NamedTuple):
     source: Source
     generation: int
@@ -1747,7 +1861,6 @@ class _Window(QtWidgets.QMainWindow):
         worker: _GraphWorker,
         path: Path | None,
         new_positions: dict[str, QtCore.QPointF],
-        context: merian.Context,
         log_sink: merian.LogSink,
         preferences: PreferencesView,
     ):
@@ -1765,11 +1878,16 @@ class _Window(QtWidgets.QMainWindow):
         self.window_previewed = False
         self.profiled = False
         self.profiled_for_node_times = False
+        self.node_times_resumed = False
         self.playing = True
         self.fitted = False
         self.sequence = 0
         self.change_sequences: dict[str | None, int] = {}
         self.properties_scheduled = False
+        self.loading = ""
+        self.held: list[QtGui.QAction] = []
+        self.spin = 0
+        self.recordings: dict[str | None, list] = {}
         self.view_shortcuts: set[int] = set()
 
         self.graph_view = _GraphView()
@@ -1785,6 +1903,7 @@ class _Window(QtWidgets.QMainWindow):
             )
         )
         self.graph_view.output_menu_requested.connect(self.output_menu)
+        self.graph_view.node_menu_requested.connect(self.node_menu)
         self.graph_view.delete_requested.connect(
             functools.partial(worker.post, worker.delete)
         )
@@ -1832,7 +1951,7 @@ class _Window(QtWidgets.QMainWindow):
         for page, name in (
             (self.properties.widget, "Node"),
             (self.graph_properties.widget, "Graph"),
-            (self.profiler, "Times"),
+            (self.profiler, "Profiler"),
             (self.memory, "Memory"),
             (self.log_view, "Log"),
             (preferences, "Preferences"),
@@ -1849,6 +1968,7 @@ class _Window(QtWidgets.QMainWindow):
         self.split.addWidget(self.side)
         self.split.setSizes([1000, 450, 600])
         self.setCentralWidget(self.split)
+        self.veils = [_Veil(self.preview), _Veil(self.graph_view)]
         self.add_menus()
         self.add_footer()
         self.set_shortcut_modifiers(preferences.shortcut_modifiers())
@@ -1864,6 +1984,7 @@ class _Window(QtWidgets.QMainWindow):
         worker.window_shown.connect(self.window_shown)
         worker.playing_changed.connect(self.show_playing)
         worker.message.connect(self.show_message)
+        worker.loading.connect(self.set_loading)
         worker.save_captured.connect(self.write_capture)
         QtCore.QTimer(
             self,
@@ -1872,8 +1993,8 @@ class _Window(QtWidgets.QMainWindow):
         ).start()
         QtCore.QTimer(
             self,
-            interval=_COMPILING_INTERVAL // timedelta(milliseconds=1),
-            timeout=lambda: self.compiling_label.setVisible(context.compiling_shaders),
+            interval=_BUSY_INTERVAL // timedelta(milliseconds=1),
+            timeout=self.show_busy,
         ).start()
         self.frame_timer = QtCore.QTimer(
             self,
@@ -1882,6 +2003,7 @@ class _Window(QtWidgets.QMainWindow):
             timerType=QtCore.Qt.TimerType.PreciseTimer,
         )
         self.set_path(path)
+        self.set_loading("Loading merian")
 
     def add_menus(self) -> None:
         file_menu = self.menuBar().addMenu("&File")
@@ -2023,7 +2145,8 @@ class _Window(QtWidgets.QMainWindow):
 
     def add_footer(self) -> None:
         footer = self.statusBar()
-        footer.addWidget(self.run_controls())
+        self.controls = self.run_controls()
+        footer.addWidget(self.controls)
         self.message_label = QtWidgets.QLabel()
         self.message_label.setSizePolicy(
             QtWidgets.QSizePolicy.Policy.Ignored, QtWidgets.QSizePolicy.Policy.Preferred
@@ -2056,10 +2179,47 @@ class _Window(QtWidgets.QMainWindow):
         self.iteration_label = stat("iteration", "8888888")
         self.time_label = stat("time", "8888.88 s")
         self.memory_label = stat("memory", WIDEST_SIZE)
-        self.compiling_label = QtWidgets.QLabel("Compiling shaders...", visible=False)
-        self.compiling_label.setObjectName("footerCaption")
-        footer.addPermanentWidget(self.compiling_label)
+        self.busy_label = QtWidgets.QLabel(visible=False)
+        self.busy_label.setObjectName("footerCaption")
+        footer.addPermanentWidget(self.busy_label)
         footer.addPermanentWidget(stats)
+
+    def set_loading(self, text: str) -> None:
+        began, ended = text and not self.loading, self.loading and not text
+        self.loading = text
+        if began:
+            self.held = [
+                action
+                for menu in self.menuBar().findChildren(QtWidgets.QMenu)
+                for action in menu.actions()
+                if action.isEnabled()
+            ]
+        for action in self.held:
+            action.setEnabled(not text)
+        self.controls.setEnabled(not text)
+        for veil in self.veils:
+            veil.parentWidget().setEnabled(not text)
+            veil.setVisible(bool(text))
+            veil.raise_()
+        if began:
+            self.tabs.setCurrentWidget(self.log_view)
+        elif (
+            ended
+            and self.worker.graph is not None
+            and self.tabs.currentWidget() is self.log_view
+        ):
+            self.tabs.setCurrentWidget(self.profiler)
+        self.show_busy()
+
+    def show_busy(self) -> None:
+        context = self.worker.context
+        text = self.loading or (
+            "Compiling shaders" if context and context.compiling_shaders else ""
+        )
+        self.busy_label.setVisible(bool(text))
+        if text:
+            self.spin = (self.spin + 1) % len(_SPINNER)
+            self.busy_label.setText(f"{_SPINNER[self.spin]} {text}\u2026")
 
     def show_message(self, text: str) -> None:
         self.message_label.setText(text)
@@ -2132,12 +2292,21 @@ class _Window(QtWidgets.QMainWindow):
 
     def profiling_changed(self, enabled: bool) -> None:
         if not enabled:
+            self.node_times_resumed = self.node_times_action.isChecked()
             self.node_times_action.setChecked(False)
+        elif self.node_times_resumed:
+            self.node_times_resumed = False
+            self.node_times_action.setChecked(True)
 
     def refresh(self, state: _GraphState) -> None:
         if state == self.state and not self.new_positions:
             return
         self.state = state
+        self.recordings = {
+            identifier: items
+            for identifier, items in self.recordings.items()
+            if identifier is None or identifier in state.nodes
+        }
         self.sources = _view_sources(state)
         for output_view in (self.preview, *self.panel_views.values()):
             output_view.set_sources(self.sources)
@@ -2184,6 +2353,88 @@ class _Window(QtWidgets.QMainWindow):
         self.graph_view.select_node(identifier)
         self.tabs.setCurrentWidget(self.memory)
         self.memory.show_resource(identifier, output)
+
+    def node_menu(self, identifier: str, position: QtCore.QPoint) -> None:
+        nodes = self.state.nodes
+        node = nodes[identifier]
+        menu = QtWidgets.QMenu(self)
+        switch = self.enabled_switch(identifier)
+        enabled = switch is None or switch.value
+        menu.addAction(
+            "Disable" if enabled else "Enable",
+            lambda: self.set_node_enabled(identifier, not enabled),
+        ).setEnabled(switch is not None)
+        menu.addAction(
+            "Remove", lambda: self.worker.post(self.worker.delete, [identifier], [])
+        )
+        menu.addSeparator()
+        outputs = menu.addMenu("Outputs")
+        for output in node.outputs:
+            source = self.output_source(identifier, output.name)
+            showable = source.content in _SINK_TYPES
+            output_menu = outputs.addMenu(output.name)
+            self.add_connect_menu(
+                output_menu, identifier, output.name, from_output=True
+            )
+            output_menu.addAction(
+                "Show in Preview",
+                functools.partial(self.show_source, _PREVIEW, source),
+            ).setEnabled(showable)
+            output_menu.addAction(
+                "Show in Panel", functools.partial(self.add_panel, source=source)
+            ).setEnabled(showable)
+        outputs.setEnabled(bool(node.outputs))
+        inputs = menu.addMenu("Inputs")
+        for input_ in node.inputs:
+            self.add_connect_menu(
+                inputs.addMenu(input_.name), identifier, input_.name, from_output=False
+            )
+        inputs.setEnabled(bool(node.inputs))
+        menu.exec(position)
+        menu.deleteLater()
+
+    def add_connect_menu(
+        self, menu: QtWidgets.QMenu, identifier: str, name: str, from_output: bool
+    ) -> None:
+        nodes = self.state.nodes
+        connect = menu.addMenu("Connect To")
+        for other in sorted(nodes.keys() - {identifier}):
+            connectors = nodes[other].inputs if from_output else nodes[other].outputs
+            targets = connect.addMenu(other)
+            targets.setEnabled(bool(connectors))
+            for connector in connectors:
+                ends = (
+                    (identifier, name, other, connector.name)
+                    if from_output
+                    else (other, connector.name, identifier, name)
+                )
+                targets.addAction(
+                    connector.name,
+                    functools.partial(
+                        self.worker.post, self.worker.add_connection, *ends
+                    ),
+                )
+
+    def enabled_switch(self, identifier: str):
+        return next(
+            (
+                item
+                for item in self.recordings.get(identifier, [])
+                if item.kind == "bool" and item.label == "enabled"
+            ),
+            None,
+        )
+
+    def set_node_enabled(self, identifier: str, enabled: bool) -> None:
+        key = self.enabled_switch(identifier).key
+        self.sequence += 1
+        self.change_sequences[identifier] = self.sequence
+        self.worker.post(
+            self.worker.request_properties,
+            self.sequence,
+            identifier,
+            Recorder({key: enabled}, {}, {}),
+        )
 
     def output_menu(
         self, identifier: str, output: str, position: QtCore.QPoint
@@ -2463,6 +2714,8 @@ class _Window(QtWidgets.QMainWindow):
                 self.request_properties()
             self.selected = identifier
             self.properties.clear()
+            if identifier in self.recordings:
+                self.properties.show(self.recordings[identifier], consumed=False)
             self.request_properties()
 
     def schedule_properties(self) -> None:
@@ -2475,10 +2728,8 @@ class _Window(QtWidgets.QMainWindow):
         self.properties_scheduled = False
         if QtWidgets.QApplication.activeModalWidget():
             return
-        panels = [(None, self.graph_properties)]
-        if self.selected:
-            panels.append((self.selected, self.properties))
-        for identifier, panel in panels:
+        for identifier in (None, self.selected) if self.selected else (None,):
+            panel = self.panel_of(identifier)
             if panel.changes or self.tabs.currentWidget() is panel.widget:
                 self.sequence += 1
                 recorder = panel.recorder()
@@ -2491,11 +2742,18 @@ class _Window(QtWidgets.QMainWindow):
     def show_recording(
         self, sequence: int, identifier: str | None, items: list
     ) -> None:
-        consumed = sequence >= self.change_sequences.get(identifier, 0)
+        self.recordings[identifier] = items
+        panel = self.panel_of(identifier)
+        if sequence == _PUBLISHED:
+            if panel is not None and panel.empty:
+                panel.show(items, consumed=False)
+        elif panel is not None:
+            panel.show(items, sequence >= self.change_sequences.get(identifier, 0))
+
+    def panel_of(self, identifier: str | None) -> QtProperties | None:
         if identifier is None:
-            self.graph_properties.show(items, consumed)
-        elif identifier == self.selected:
-            self.properties.show(items, consumed)
+            return self.graph_properties
+        return self.properties if identifier == self.selected else None
 
     def open_config(self) -> None:
         directory = str(self.path.parent) if self.path else str(scene.EXAMPLES)
@@ -2514,6 +2772,7 @@ class _Window(QtWidgets.QMainWindow):
             self.clear_view(view)
         self.window_previewed = False
         self.graph_view.clear_graph()
+        self.recordings = {}
         self.state = _GraphState({}, {})
         self.fitted = False
         self.new_positions = _stored_positions(description)
@@ -2565,19 +2824,17 @@ def main(argv: list[str] | None = None) -> int:
     )
     preferences = PreferencesView(QtCore.QSettings(*_SETTINGS))
     with merian.LogSink() as log_sink:
-        context = scene.context((mg.HOST_WINDOWS_EXTENSION,))
-        with mg.Graph(context, description, strict=False) as graph:
-            worker = _GraphWorker(graph)
-            window = _Window(
-                worker, path, new_positions, context, log_sink, preferences
-            )
-            window.resize(1600, 900)
-            window.show()
-            worker.start()
-            try:
-                return application.exec()
-            finally:
-                worker.quit()
+        worker = _GraphWorker(
+            lambda: scene.context((mg.HOST_WINDOWS_EXTENSION,)), description
+        )
+        window = _Window(worker, path, new_positions, log_sink, preferences)
+        window.showMaximized()
+        worker.start()
+        try:
+            return application.exec()
+        finally:
+            window.hide()
+            worker.quit()
 
 
 if __name__ == "__main__":

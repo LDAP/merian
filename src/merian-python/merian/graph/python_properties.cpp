@@ -204,17 +204,33 @@ bool PythonProperties::config_angle(const std::string& id,
 bool PythonProperties::config_split(const std::string& id,
                                     const std::vector<SplitPart>& parts,
                                     const std::string& desc) {
-    if (!st_begin_child(id, id)) {
+    bool reset = false;
+    const std::vector<const SplitPart*> shown = shown_split_parts(parts, reset);
+    if (shown.empty()) {
         return false;
     }
-    bool changed = false;
-    for (const SplitPart& part : parts) {
-        if (part.shown) {
-            changed |= config_float(part.label, *part.weight, desc, 0.01f, 0.0f);
-        }
+    std::vector<float> weights;
+    const nb::gil_scoped_acquire acquire;
+    nb::list labels;
+    for (const SplitPart* part : shown) {
+        weights.push_back(*part->weight);
+        labels.append(part->label);
     }
-    st_end_child();
-    return changed;
+    const int count = static_cast<int>(weights.size());
+    const nb::object answer =
+        call("config_split", id, labels, to_python(weights.data(), count), "desc"_a = desc);
+    // A change made while other parts were shown
+    if (!answer.is_none() && nb::len(answer) != weights.size()) {
+        return reset;
+    }
+    if (!assign(answer, weights.data(), count,
+                clamp_to(0.f, std::numeric_limits<float>::infinity()))) {
+        return reset;
+    }
+    for (std::size_t i = 0; i < shown.size(); i++) {
+        *shown[i]->weight = weights[i];
+    }
+    return true;
 }
 
 bool PythonProperties::config_color3(const std::string& id,

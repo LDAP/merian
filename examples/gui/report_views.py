@@ -13,18 +13,21 @@ from PySide6 import QtCore, QtGui, QtWidgets
 import merian
 import merian.graph as mg
 
-from .theme import RIGHT_ALIGNED, THEME, scrolled
+from .theme import CATEGORY_COLORS, RIGHT_ALIGNED, THEME, scrolled
 
 _BLOCK_HEIGHT = 200
 _MIN_SPAN_HEIGHT = 7
 _HISTORY = 300
+_TIME_PADDING = 16
+# A plot that ignores outliers scales to this quantile of its values, times the headroom
+_PLOT_QUANTILE = 0.95
+_PLOT_HEADROOM = 1.1
 _RUN_NODES = "Run nodes"
 _REPORT_KINDS = {
     "interval": mg.ReportKind.INTERVAL,
     "run": mg.ReportKind.RUN,
     "build": mg.ReportKind.BUILD,
 }
-_SECTION_COLORS = ("accent", "peach", "blue", "green", "yellow", "red", "teal")
 _TOTAL = ()
 _UNIT_HOLD = 1.0
 
@@ -94,9 +97,12 @@ class _Series(NamedTuple):
 
 
 class _HistoryPlot(QtWidgets.QWidget):
-    def __init__(self, format_value: Callable[[float], str]):
+    def __init__(
+        self, format_value: Callable[[float], str], ignore_outliers: bool = False
+    ):
         super().__init__()
         self.format_value = format_value
+        self.ignore_outliers = ignore_outliers
         self.capacity = _HISTORY
         self.series: list[_Series] = []
         self.hovered: int | None = None
@@ -109,17 +115,18 @@ class _HistoryPlot(QtWidgets.QWidget):
         self.update()
 
     def top(self) -> float:
-        return _nice_ceiling(
-            max(
-                (
-                    value
-                    for entry in self.series
-                    for value in entry.values
-                    if value is not None
-                ),
-                default=0,
-            )
+        values = sorted(
+            value
+            for entry in self.series
+            for value in entry.values
+            if value is not None
         )
+        if not values:
+            return _nice_ceiling(0)
+        if not self.ignore_outliers:
+            return _nice_ceiling(values[-1])
+        quantile = values[round(_PLOT_QUANTILE * (len(values) - 1))]
+        return _nice_ceiling(quantile * _PLOT_HEADROOM)
 
     def labels(self) -> list[str]:
         return [self.format_value(self.top() * step / 4) for step in range(5)]
@@ -167,6 +174,8 @@ class _HistoryPlot(QtWidgets.QWidget):
                 0, y - metrics.height() / 2, rect.left() - 6, metrics.height()
             )
             painter.drawText(label_rect, RIGHT_ALIGNED, label)
+        painter.save()
+        painter.setClipRect(rect)
         for entry in self.series:
             path = QtGui.QPainterPath()
             drawing = False
@@ -192,6 +201,7 @@ class _HistoryPlot(QtWidgets.QWidget):
                 )
             )
             painter.drawPath(path)
+        painter.restore()
         if self.hovered is not None:
             painter.setPen(
                 QtGui.QPen(
@@ -236,17 +246,33 @@ class _HistoryPlot(QtWidgets.QWidget):
 
 
 class _BarDelegate(QtWidgets.QStyledItemDelegate):
-    def __init__(self, color: str, parent: QtCore.QObject):
+    def __init__(
+        self,
+        color: str | None,
+        parent: QtCore.QObject,
+        padding: int = 0,
+        ruled: bool = False,
+    ):
         super().__init__(parent)
-        self.color = QtGui.QColor(color)
-        self.color.setAlpha(70)
+        self.color = QtGui.QColor(color) if color else None
+        if self.color:
+            self.color.setAlpha(70)
+        self.padding, self.ruled = padding, ruled
+
+    def sizeHint(self, option, index: QtCore.QModelIndex) -> QtCore.QSize:
+        return super().sizeHint(option, index) + QtCore.QSize(self.padding, 0)
 
     def paint(self, painter: QtGui.QPainter, option, index: QtCore.QModelIndex) -> None:
-        if share := index.data(_SHARE_ROLE):
+        if self.color and (share := index.data(_SHARE_ROLE)):
             bar = QtCore.QRectF(option.rect).adjusted(1, 3, -1, -3)
             bar.setWidth(bar.width() * min(share, 1.0))
             painter.fillRect(bar, self.color)
-        super().paint(painter, option, index)
+        text = QtWidgets.QStyleOptionViewItem(option)
+        text.rect = option.rect.adjusted(self.padding // 2, 0, -self.padding // 2, 0)
+        super().paint(painter, text, index)
+        if self.ruled:
+            painter.setPen(QtGui.QColor(THEME["overlay"]))
+            painter.drawLine(option.rect.topLeft(), option.rect.bottomLeft())
 
 
 class _StatCard(QtWidgets.QFrame):
@@ -385,7 +411,7 @@ class ProfilerView(QtWidgets.QWidget):
             controls.addWidget(widget)
         controls.addStretch()
 
-        self.plot = _HistoryPlot(format_ms)
+        self.plot = _HistoryPlot(format_ms, ignore_outliers=True)
         self.tree = QtWidgets.QTreeWidget()
         self.tree.setHeaderLabels(["section", "CPU ms", "\u00b1", "GPU ms", "\u00b1"])
         self.tree.setUniformRowHeights(True)
@@ -397,8 +423,18 @@ class ProfilerView(QtWidgets.QWidget):
             header.setSectionResizeMode(
                 column, QtWidgets.QHeaderView.ResizeMode.ResizeToContents
             )
-        for column, color in ((1, THEME["accent"]), (3, THEME["peach"])):
-            self.tree.setItemDelegateForColumn(column, _BarDelegate(color, self.tree))
+        for column, color in (
+            (1, THEME["accent"]),
+            (2, None),
+            (3, THEME["peach"]),
+            (4, None),
+        ):
+            self.tree.setItemDelegateForColumn(
+                column,
+                _BarDelegate(
+                    color, self.tree, padding=_TIME_PADDING, ruled=column == 3
+                ),
+            )
         self.tree.setSelectionMode(
             QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection
         )
@@ -478,7 +514,7 @@ class ProfilerView(QtWidgets.QWidget):
 
     def selected_paths(self) -> list[tuple[str, ...]]:
         paths = [item.data(0, _PATH_ROLE) for item in self.tree.selectedItems()]
-        return paths[: len(_SECTION_COLORS)] or [_TOTAL]
+        return paths[: len(CATEGORY_COLORS)] or [_TOTAL]
 
     def add_sample(self, report: merian.ProfilerReport) -> None:
         times = _section_times(_merged_sections(report))
@@ -492,8 +528,8 @@ class ProfilerView(QtWidgets.QWidget):
         for index, path in enumerate(paths):
             samples = [times.get(path, (None, None)) for times in self.history]
             name = path[-1] if path else "total"
-            cpu_color = THEME[_SECTION_COLORS[index]]
-            gpu_color = THEME[_SECTION_COLORS[1]] if len(paths) == 1 else cpu_color
+            cpu_color = THEME[CATEGORY_COLORS[index]]
+            gpu_color = THEME[CATEGORY_COLORS[1]] if len(paths) == 1 else cpu_color
             series += [
                 _Series(f"{name} CPU", cpu_color, [cpu for cpu, _ in samples]),
                 _Series(

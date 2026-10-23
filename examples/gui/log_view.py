@@ -79,6 +79,15 @@ class LogView(QtWidgets.QWidget):
             QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.SystemFont.FixedFont)
         )
         self.text.viewport().installEventFilter(self)
+        # Follows the newest records while scrolled to them
+        self.following = True
+        bar = self.text.verticalScrollBar()
+        bar.valueChanged.connect(
+            lambda value: setattr(self, "following", value == bar.maximum())
+        )
+        bar.rangeChanged.connect(
+            lambda _, maximum: bar.setValue(maximum) if self.following else None
+        )
         header = QtWidgets.QHBoxLayout()
         header.addWidget(self.level_combo)
         header.addWidget(self.filter, 1)
@@ -117,8 +126,6 @@ class LogView(QtWidgets.QWidget):
     def append(self, records: list[merian.LogRecord]) -> None:
         if not records:
             return
-        bar = self.text.verticalScrollBar()
-        following = bar.value() == bar.maximum()
         cursor = QtGui.QTextCursor(self.text.document())
         cursor.movePosition(QtGui.QTextCursor.MoveOperation.End)
         cursor.beginEditBlock()
@@ -138,11 +145,10 @@ class LogView(QtWidgets.QWidget):
                 _BLOCK_BREAKS.sub("\u2028", record.message), self.message_format
             )
         cursor.endEditBlock()
-        if following:
-            bar.setValue(bar.maximum())
 
     def show_records(self) -> None:
         self.stale = False
+        self.following = True
         self.text.clear()
         self.shown.clear()
         self.append(self.matching(self.records))
@@ -155,6 +161,9 @@ class LogView(QtWidgets.QWidget):
         super().showEvent(event)
         if self.stale:
             self.show_records()
+        if self.following:
+            bar = self.text.verticalScrollBar()
+            bar.setValue(bar.maximum())
 
     def eventFilter(self, watched: QtCore.QObject, event: QtCore.QEvent) -> bool:
         if event.type() != QtCore.QEvent.Type.ToolTip:
