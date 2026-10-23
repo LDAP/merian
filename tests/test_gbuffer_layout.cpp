@@ -111,6 +111,23 @@ TEST(GBufferLayout, NextToTheGroupInTheFormItHas) {
               delta_z.get_texture_index(Field::DeltaZ));
 }
 
+TEST(GBufferLayout, WideFieldsSpanTextures) {
+    const GBufferLayout layout({{{Field::Hit, Field::DeltaZ}}});
+
+    uint32_t hit_channels = 0;
+    for (const GBufferLayout::Texture& texture : layout.get_textures()) {
+        for (const GBufferLayout::Placement& placement : texture.placements) {
+            if (placement.field == Field::Hit) {
+                hit_channels += placement.count;
+            }
+        }
+    }
+    EXPECT_EQ(hit_channels, 5u);
+    EXPECT_EQ(texture_of(layout, Field::Hit).channel_count, 4u);
+    EXPECT_EQ(layout.get_textures().size(), 2u);
+    EXPECT_NE(layout.get_texture_index(Field::DeltaZ), layout.get_texture_index(Field::Hit));
+}
+
 TEST(GBufferLayout, TextureGroupPrefixIsShared) {
     const GBufferLayout layout({
         {.fields = {Field::Normal}, .texture = true},
@@ -161,7 +178,7 @@ GBufferSample make_sample() {
     sample.grad_z = half2(0.25, -0.5);
     sample.delta_z = -0.75;
     sample.motion_vectors = float2(3.5, -1.25);
-    sample.hit = Hit(7, 3, 11, 2, float2(0.25, 0.5));
+    sample.hit = Hit(7, 3, 11, 2, float2(0.1234567, 0.8765431));
     sample.albedo = float3(0.5, 0.25, 0.125);
     sample.diffuse_albedo = float3(0.375, 0.125, 0.0625);
     sample.specular_albedo = float3(0.125, 0.125, 0.0625);
@@ -203,7 +220,7 @@ void read(uint3 tid: SV_DispatchThreadID, ParameterBlock<GBuffer> gbuffer) {
     results[2] = error(float2(gbuffer.get_grad_z(p)), float2(expected.grad_z));
     results[3] = error(gbuffer.get_delta_z(p), expected.delta_z);
     results[4] = error(gbuffer.get_motion_vectors(p), expected.motion_vectors);
-    results[5] = ids ? distance(hit.barycentrics, expected.hit.barycentrics) : 1;
+    results[5] = ids && all(hit.barycentrics == expected.hit.barycentrics) ? 0 : 1;
     results[6] = error(gbuffer.get_albedo(p), expected.albedo);
     results[7] = error(gbuffer.get_diffuse_albedo(p), expected.diffuse_albedo);
     results[8] = error(gbuffer.get_specular_albedo(p), expected.specular_albedo);

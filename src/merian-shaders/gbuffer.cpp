@@ -82,7 +82,8 @@ bool holds(const GBufferLayout::Texture& texture, const GBufferField field) {
 
 bool fits(const GBufferLayout::Texture& texture,
           const std::vector<GBufferField>& fields,
-          const bool packed) {
+          const bool packed,
+          const uint32_t channel_count) {
     if (texture.exact || (texture.storage == Storage::Uint32) != packed ||
         !has_form(fields, packed)) {
         return false;
@@ -90,12 +91,26 @@ bool fits(const GBufferLayout::Texture& texture,
     const bool storage_suffices = packed || std::ranges::all_of(fields, [&](const GBufferField f) {
                                       return traits(f).float_storage <= texture.storage;
                                   });
-    return storage_suffices && texture.channel_count + channels(fields, packed) <= TEXTURE_CHANNELS;
+    return storage_suffices && texture.channel_count + channel_count <= TEXTURE_CHANNELS;
+}
+
+bool fits(const GBufferLayout::Texture& texture,
+          const std::vector<GBufferField>& fields,
+          const bool packed) {
+    return fits(texture, fields, packed, channels(fields, packed));
+}
+
+void append(GBufferLayout::Texture& texture,
+            const GBufferField field,
+            const bool packed,
+            const uint32_t first,
+            const uint32_t count) {
+    texture.placements.push_back({field, texture.channel_count, packed, first, count});
+    texture.channel_count += count;
 }
 
 void append(GBufferLayout::Texture& texture, const GBufferField field, const bool packed) {
-    texture.placements.push_back({field, texture.channel_count, packed});
-    texture.channel_count += channels(field, packed);
+    append(texture, field, packed, 0, channels(field, packed));
 }
 
 struct FormatCandidate {
@@ -155,17 +170,21 @@ void fill_fresh_textures(std::vector<GBufferLayout::Texture>& textures,
     });
     const size_t first_fresh = textures.size();
     for (const GBufferField field : by_size) {
-        const auto fresh = textures | std::views::drop(first_fresh);
-        const auto it = std::ranges::find_if(fresh, [&](const GBufferLayout::Texture& texture) {
-            return fits(texture, {field}, packed);
-        });
-        GBufferLayout::Texture& texture =
-            it != fresh.end() ? *it
-                              : textures.emplace_back(GBufferLayout::Texture{
-                                    .storage = packed ? Storage::Uint32 : Storage::Float16});
-        texture.storage =
-            packed ? Storage::Uint32 : std::max(texture.storage, traits(field).float_storage);
-        append(texture, field, packed);
+        const uint32_t field_channels = channels(field, packed);
+        for (uint32_t first = 0; first < field_channels; first += TEXTURE_CHANNELS) {
+            const uint32_t count = std::min(field_channels - first, TEXTURE_CHANNELS);
+            const auto fresh = textures | std::views::drop(first_fresh);
+            const auto it = std::ranges::find_if(fresh, [&](const GBufferLayout::Texture& texture) {
+                return fits(texture, {field}, packed, count);
+            });
+            GBufferLayout::Texture& texture =
+                it != fresh.end() ? *it
+                                  : textures.emplace_back(GBufferLayout::Texture{
+                                        .storage = packed ? Storage::Uint32 : Storage::Float16});
+            texture.storage =
+                packed ? Storage::Uint32 : std::max(texture.storage, traits(field).float_storage);
+            append(texture, field, packed, first, count);
+        }
     }
 }
 
@@ -202,7 +221,7 @@ std::string decode(const GBufferField field, const bool packed, const std::strin
     case GBufferField::MotionVectors:
         return packed ? fmt::format("unpackHalf2x16ToFloat({})", channels) : channels;
     case GBufferField::Hit:
-        return fmt::format("reinterpret<PackedHitInfo>({}).unpack()", channels);
+        return fmt::format("PackedHitInfo({}).unpack()", channels);
     default:
         return channels;
     }
@@ -226,7 +245,7 @@ std::string encode(const GBufferField field, const bool packed) {
     case GBufferField::MotionVectors:
         return packed ? fmt::format("packHalf2x16({})", value) : value;
     case GBufferField::Hit:
-        return fmt::format("reinterpret<uint4>(PackedHitInfo::pack({}))", value);
+        return fmt::format("PackedHitInfo::pack({}).channels", value);
     default:
         return value;
     }
@@ -350,7 +369,9 @@ GBufferLayout::GBufferLayout(const std::vector<GBufferGroup>& groups) {
 
     for (uint32_t i = 0; i < textures.size(); i++) {
         for (const Placement& placement : textures[i].placements) {
-            field_texture[static_cast<uint32_t>(placement.field)] = static_cast<uint8_t>(i);
+            if (placement.first == 0) {
+                field_texture[static_cast<uint32_t>(placement.field)] = static_cast<uint8_t>(i);
+            }
         }
     }
 
@@ -358,7 +379,8 @@ GBufferLayout::GBufferLayout(const std::vector<GBufferGroup>& groups) {
     for (const Texture& texture : textures) {
         hash_combine(seed, texture.storage, texture.channel_count, texture.exact);
         for (const Placement& placement : texture.placements) {
-            hash_combine(seed, placement.field, placement.channel, placement.packed);
+            hash_combine(seed, placement.field, placement.channel, placement.packed,
+                         placement.first, placement.count);
         }
     }
     suffix = fmt::format("{:016x}", seed);
@@ -513,7 +535,14 @@ std::string GBufferLayout::generate_module() const {
 
         std::vector<std::string> components;
         for (const Placement& placement : texture.placements) {
-            components.push_back(encode(placement.field, placement.packed));
+            const std::string value = encode(placement.field, placement.packed);
+            if (placement.count == channels(placement.field, placement.packed)) {
+                components.push_back(value);
+                continue;
+            }
+            for (uint32_t c = placement.first; c < placement.first + placement.count; c++) {
+                components.push_back(fmt::format("{}[{}]", value, c));
+            }
         }
         components.resize(components.size() + element_channels(texture) - texture.channel_count,
                           "0");
@@ -530,9 +559,25 @@ std::string GBufferLayout::generate_module() const {
             const uint32_t index = get_texture_index(field);
             const Placement& placement =
                 *std::ranges::find(textures[index].placements, field, &Placement::field);
-            const std::string texel = fmt::format(
-                "tex{}.{}", index,
-                CHANNEL_NAMES.substr(placement.channel, channels(field, placement.packed)));
+            std::string texel;
+            if (placement.count == channels(field, placement.packed)) {
+                texel = fmt::format("tex{}.{}", index,
+                                    CHANNEL_NAMES.substr(placement.channel, placement.count));
+            } else {
+                std::vector<std::string> scalars(channels(field, placement.packed));
+                for (uint32_t i = 0; i < textures.size(); i++) {
+                    for (const Placement& part : textures[i].placements) {
+                        if (part.field != field) {
+                            continue;
+                        }
+                        for (uint32_t c = 0; c < part.count; c++) {
+                            scalars[part.first + c] =
+                                fmt::format("tex{}.{}", i, CHANNEL_NAMES[part.channel + c]);
+                        }
+                    }
+                }
+                texel = fmt::format("{}", fmt::join(scalars, ", "));
+            }
             value = decode(field, placement.packed, texel);
             if (placement.packed) {
                 encoded_normal = texel;

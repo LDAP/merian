@@ -30,25 +30,21 @@ float2 dilate_motion_vectors<let N : int, int sampleCount, int isCombined, int f
 }
 
 struct PackedHitInfo {
-    uint instance_id;
-    uint primitive_id;
-    uint16_t geometry_index;
-    uint16_t instance_index;
-    half2 barycentrics;
+    uint channels[5];
 
-    static PackedHitInfo pack(Hit hit) {
-        PackedHitInfo p;
-        p.instance_id = hit.instance_id;
-        p.primitive_id = hit.primitive_id;
-        p.geometry_index = uint16_t(hit.geometry_index);
-        p.instance_index = uint16_t(hit.instance_index);
-        p.barycentrics = half2(hit.barycentrics);
-        return p;
+    __init(const uint c0, const uint c1, const uint c2, const uint c3, const uint c4) {
+        channels = {c0, c1, c2, c3, c4};
+    }
+
+    static PackedHitInfo pack(const Hit hit) {
+        return PackedHitInfo(hit.instance_id, hit.primitive_id,
+                             (hit.geometry_index & 0xFFFFu) | (hit.instance_index << 16),
+                             asuint(hit.barycentrics.x), asuint(hit.barycentrics.y));
     }
 
     Hit unpack() {
-        return Hit(instance_id, uint(instance_index), primitive_id, uint(geometry_index),
-                   float2(barycentrics));
+        return Hit(channels[0], channels[2] >> 16, channels[1], channels[2] & 0xFFFFu,
+                   asfloat(uint2(channels[3], channels[4])));
     }
 }
 

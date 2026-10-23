@@ -354,6 +354,11 @@ void GLTFScene::load_materials(const CommandBufferHandle& cmd) {
             mat.emissive_texture =
                 get_or_load_texture(cmd, gmat.emissiveTexture.index, /*linear=*/false);
         }
+        if (const auto it = gmat.extensions.find("KHR_materials_emissive_strength");
+            it != gmat.extensions.end() && it->second.Has("emissiveStrength")) {
+            mat.emissive_factor *=
+                static_cast<float>(it->second.Get("emissiveStrength").GetNumberAsDouble());
+        }
 
         // occlusion (linear) + strength
         if (gmat.occlusionTexture.index >= 0) {

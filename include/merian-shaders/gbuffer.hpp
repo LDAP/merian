@@ -26,7 +26,7 @@ namespace merian {
     X(DeltaZ, "delta_z", "float", 1, Float16, 1)                                                   \
     /* pixel offset to the surface point in the previous frame */                                  \
     X(MotionVectors, "motion_vectors", "float2", 2, Float16, 1)                                    \
-    X(Hit, "hit", "Hit", 0, Float16, 4)                                                            \
+    X(Hit, "hit", "Hit", 0, Float16, 5)                                                            \
     /* directional albedo summed over the lobes */                                                 \
     X(Albedo, "albedo", "float3", 3, Float16, 0)                                                   \
     X(DiffuseAlbedo, "diffuse_albedo", "float3", 3, Float16, 0)                                    \
@@ -79,6 +79,9 @@ class GBufferLayout {
         uint32_t channel;
         // bit packed into a single uint channel
         bool packed;
+        // the field's channels held here
+        uint32_t first;
+        uint32_t count;
 
         bool operator==(const Placement&) const = default;
     };
