@@ -6,10 +6,12 @@ which take the input of their view.
 
   graph_editor.py [scene or graph.json] [graph options]
 
-Right-click adds a node. Drag from an output to an input to connect them. Click an
-output to preview it, left of the graph and properties; right-click it to show it as the
-backdrop of the graph or in a panel next to the graph. The header of each view, and
-View > Backdrop for the backdrop, select what it shows. Delete removes the selected
+Right-click adds a node. Drag from an output to an input to connect them; pull a
+connection off its input to move or remove it. Click a node for its properties and its
+time for the times. Click an output to preview it, left of the graph and properties;
+right-click it to show it as the backdrop of the graph or in a panel next to the graph,
+or where its memory is. The header of each view, and View > Backdrop for the backdrop,
+select what it shows. Delete removes the selected
 nodes and connections. Hollow inputs are optional; grey connectors and dashed
 connections were connected but are not described by their node now. Positions are
 stored in the saved config.
@@ -599,6 +601,20 @@ class _GraphWorker(QtCore.QObject):
     ) -> None:
         self.edit(lambda graph: graph.add_connection(src, dst, src_output, dst_input))
 
+    def move_connection(
+        self,
+        old: tuple[str, str, str],
+        src: str,
+        src_output: str,
+        dst: str,
+        dst_input: str,
+    ) -> None:
+        def move(graph: mg.Graph) -> None:
+            graph.add_connection(src, dst, src_output, dst_input)
+            graph.remove_connection(*old)
+
+        self.edit(move)
+
     def delete(
         self, identifiers: list[str], connections: list[tuple[str, str, str]]
     ) -> None:
@@ -990,20 +1006,7 @@ class _NodeItem(QtWidgets.QGraphicsRectItem):
         painter.setBrush(QtCore.Qt.BrushStyle.NoBrush)
         painter.drawPath(body)
 
-        if self.time is not None:
-            width = (
-                max(
-                    _tabular_metrics().horizontalAdvance(text)
-                    for text in (self.time, _WIDEST_TIME)
-                )
-                + 14
-            )
-            chip = QtCore.QRectF(
-                rect.right() - width,
-                rect.top() - _CHIP_HEIGHT - _CHIP_GAP,
-                width,
-                _CHIP_HEIGHT,
-            )
+        if (chip := self.chip_rect()) is not None:
             heat = min(self.share * 2, 1.0)
             painter.setPen(QtCore.Qt.PenStyle.NoPen)
             painter.setBrush(_mixed(THEME["surface_hi"], THEME["red"], heat))
@@ -1011,6 +1014,24 @@ class _NodeItem(QtWidgets.QGraphicsRectItem):
             painter.setPen(QtGui.QColor(THEME["bg" if heat > 0.5 else "text"]))
             painter.setFont(_tabular_font())
             painter.drawText(chip, QtCore.Qt.AlignmentFlag.AlignCenter, self.time)
+
+    def chip_rect(self) -> QtCore.QRectF | None:
+        if self.time is None:
+            return None
+        width = (
+            max(
+                _tabular_metrics().horizontalAdvance(text)
+                for text in (self.time, _WIDEST_TIME)
+            )
+            + 14
+        )
+        rect = self.rect()
+        return QtCore.QRectF(
+            rect.right() - width,
+            rect.top() - _CHIP_HEIGHT - _CHIP_GAP,
+            width,
+            _CHIP_HEIGHT,
+        )
 
     def itemChange(self, change, value):
         if change == self.GraphicsItemChange.ItemPositionHasChanged:
@@ -1130,6 +1151,8 @@ def _shift_as_control(event: QtGui.QMouseEvent) -> QtGui.QMouseEvent:
 class _GraphView(QtWidgets.QGraphicsView):
     # src, src_output, dst, dst_input
     connection_requested = QtCore.Signal(str, str, str, str)
+    # (src, dst, dst_input) it leaves, src, src_output, dst, dst_input
+    connection_moved = QtCore.Signal(object, str, str, str, str)
     # node, output
     output_clicked = QtCore.Signal(str, str)
     # node, output, global position
@@ -1138,6 +1161,8 @@ class _GraphView(QtWidgets.QGraphicsView):
     delete_requested = QtCore.Signal(list, list)
     # identifier or None
     node_selected = QtCore.Signal(object)
+    node_clicked = QtCore.Signal(str)
+    time_clicked = QtCore.Signal(str)
     # node type, scene position
     node_requested = QtCore.Signal(str, object)
     # Properties of the backdrop's Host Sink
@@ -1149,6 +1174,10 @@ class _GraphView(QtWidgets.QGraphicsView):
         self.items_by_identifier: dict[str, _NodeItem] = {}
         self.dragged: _Connector | None = None
         self.drag_line: QtWidgets.QGraphicsLineItem | None = None
+        self.detached: _Edge | None = None
+        self.drag_start = QtCore.QPointF()
+        # The node a left press landed on, and where it was
+        self.pressed: tuple[_NodeItem, QtCore.QPointF] | None = None
         self.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
         self.setBackgroundBrush(QtGui.QColor(THEME["canvas"]))
         self.setDragMode(self.DragMode.RubberBandDrag)
@@ -1235,7 +1264,7 @@ class _GraphView(QtWidgets.QGraphicsView):
         graphics.blockSignals(True)
         self.end_gestures()
         graphics.clear()
-        self.dragged = self.drag_line = None
+        self.dragged = self.drag_line = self.detached = self.pressed = None
         extra_outputs = _undescribed_outputs(nodes)
         self.items_by_identifier = {
             identifier: _NodeItem(identifier, node, extra_outputs.get(identifier, []))
@@ -1323,6 +1352,7 @@ class _GraphView(QtWidgets.QGraphicsView):
 
     def clear_graph(self) -> None:
         self.end_gestures()
+        self.dragged = self.drag_line = self.detached = self.pressed = None
         self.scene().clear()
         self.items_by_identifier = {}
 
@@ -1388,6 +1418,8 @@ class _GraphView(QtWidgets.QGraphicsView):
             self.menu_suppressed = event.button() == buttons.RightButton
             self.end_grab(event.button() == buttons.LeftButton)
             return
+        if self.drag_line:
+            return
         if event.button() == buttons.MiddleButton:
             self.zooming = bool(event.modifiers() & modifiers.ControlModifier)
             position = event.position()
@@ -1408,19 +1440,46 @@ class _GraphView(QtWidgets.QGraphicsView):
             pen.setCosmetic(True)
             self.cut_line = self.scene().addPath(QtGui.QPainterPath(), pen)
             return
+        plain = event.modifiers() == modifiers.NoModifier
         event = _shift_as_control(event)
+        if event.button() != buttons.LeftButton:
+            super().mousePressEvent(event)
+            return
+        scene_position = self.mapToScene(event.position().toPoint())
+        if node := self.chip_at(scene_position):
+            self.select_node(node.identifier)
+            self.time_clicked.emit(node.identifier)
+            return
         connector = self.connector_at(event.position())
-        if (
-            event.button() == QtCore.Qt.MouseButton.LeftButton
-            and connector
-            and connector.is_output
-        ):
+        if connector and not connector.is_output and plain:
+            self.detached = next(
+                (edge for edge in connector.node.edges if edge.target is connector),
+                None,
+            )
+            if self.detached:
+                self.detached.hide()
+                connector = self.detached.source
+        if connector and connector.is_output:
             self.dragged = connector
-            line = QtCore.QLineF(connector.scenePos(), connector.scenePos())
+            self.drag_start = event.position()
+            line = QtCore.QLineF(connector.scenePos(), scene_position)
             pen = QtGui.QPen(QtGui.QColor(THEME["text_dim"]), 2)
             self.drag_line = self.scene().addLine(line, pen)
             return
+        item = self.itemAt(event.position().toPoint())
+        if isinstance(item, _NodeItem):
+            self.pressed = (item, item.pos())
         super().mousePressEvent(event)
+
+    def chip_at(self, position: QtCore.QPointF) -> _NodeItem | None:
+        covering = self.scene().itemAt(position, self.transform())
+        if covering is not None and not isinstance(covering, _Edge):
+            return None
+        for item in self.items_by_identifier.values():
+            chip = item.chip_rect()
+            if chip is not None and item.mapRectToScene(chip).contains(position):
+                return item
+        return None
 
     def mouseMoveEvent(self, event: QtGui.QMouseEvent) -> None:
         position = event.position()
@@ -1462,17 +1521,42 @@ class _GraphView(QtWidgets.QGraphicsView):
             self.menu_suppressed = _menu_on_release()
             return
         if not self.drag_line:
+            pressed, self.pressed = self.pressed, None
             super().mouseReleaseEvent(_shift_as_control(event))
+            if pressed and event.button() == buttons.LeftButton:
+                node, position = pressed
+                if node.pos() == position and node.isSelected():
+                    self.node_clicked.emit(node.identifier)
+            return
+        if event.button() != buttons.LeftButton:
             return
         self.scene().removeItem(self.drag_line)
         source, self.dragged, self.drag_line = self.dragged, None, None
+        detached, self.detached = self.detached, None
         target = self.connector_at(event.position())
-        if target is source:
+        distance = (event.position() - self.drag_start).manhattanLength()
+        if detached and (
+            target is detached.target
+            or (
+                target is None and distance < QtWidgets.QApplication.startDragDistance()
+            )
+        ):
+            detached.show()
+        elif target is source and not detached:
             self.output_clicked.emit(source.node.identifier, source.name)
         elif target and not target.is_output:
-            self.connection_requested.emit(
-                source.node.identifier, source.name, target.node.identifier, target.name
+            new = (
+                source.node.identifier,
+                source.name,
+                target.node.identifier,
+                target.name,
             )
+            if detached:
+                self.connection_moved.emit(detached.connection(), *new)
+            else:
+                self.connection_requested.emit(*new)
+        elif detached:
+            self.delete_requested.emit([], [detached.connection()])
 
     def cut(self, line: QtGui.QPainterPath) -> None:
         cut = _segments(line)
@@ -1692,6 +1776,9 @@ class _Window(QtWidgets.QMainWindow):
         self.graph_view.connection_requested.connect(
             functools.partial(worker.post, worker.add_connection)
         )
+        self.graph_view.connection_moved.connect(
+            functools.partial(worker.post, worker.move_connection)
+        )
         self.graph_view.output_clicked.connect(
             lambda identifier, output: self.show_source(
                 _PREVIEW, self.output_source(identifier, output)
@@ -1702,6 +1789,10 @@ class _Window(QtWidgets.QMainWindow):
             functools.partial(worker.post, worker.delete)
         )
         self.graph_view.node_selected.connect(self.select)
+        self.graph_view.node_clicked.connect(
+            lambda: self.tabs.setCurrentWidget(self.properties.widget)
+        )
+        self.graph_view.time_clicked.connect(self.show_node_time)
         self.graph_view.node_requested.connect(
             functools.partial(worker.post, worker.add_node)
         )
@@ -2085,6 +2176,15 @@ class _Window(QtWidgets.QMainWindow):
         )
         return Source(SourceKind.OUTPUT, identifier, output, kind)
 
+    def show_node_time(self, identifier: str) -> None:
+        self.tabs.setCurrentWidget(self.profiler)
+        self.profiler.show_node(identifier)
+
+    def show_memory(self, identifier: str, output: str) -> None:
+        self.graph_view.select_node(identifier)
+        self.tabs.setCurrentWidget(self.memory)
+        self.memory.show_resource(identifier, output)
+
     def output_menu(
         self, identifier: str, output: str, position: QtCore.QPoint
     ) -> None:
@@ -2111,6 +2211,9 @@ class _Window(QtWidgets.QMainWindow):
         action.setChecked(bool(panels))
         action.setEnabled(showable)
         action.toggled.connect(set_panel_shown)
+        menu.addAction(
+            "Memory", lambda: self.show_memory(identifier, output)
+        ).setToolTip("Where the output's memory is, in the memory view")
         menu.addSeparator()
         views = [view for view in self.shown if self.shows(view, source)]
         buffer = source.content == mg.ConnectorKind.BUFFER

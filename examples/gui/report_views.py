@@ -369,6 +369,7 @@ class ProfilerView(QtWidgets.QWidget):
         self.rate = _StatCard("Frame rate")
         self.selected_card = _StatCard("Selected node")
         self.selected: str | None = None
+        self.pending_node: str | None = None
         self.node_times: dict[str, float] = {}
         self.gpu_total = 0.0
         self.formats = {
@@ -425,6 +426,21 @@ class ProfilerView(QtWidgets.QWidget):
         self.show_selected_time()
         for path, item in self.items.items():
             self.mark(path, item)
+
+    def show_node(self, node: str, wait: bool = True) -> None:
+        """Selects the node's section, the one of its run if it has several."""
+        self.pending_node = None
+        sections = [
+            (_RUN_NODES not in path, path, item)
+            for path, item in self.items.items()
+            if path[-1].startswith(f"{node} (")
+        ]
+        if sections:
+            *_, item = min(sections, key=lambda section: section[:2])
+            self.tree.setCurrentItem(item)
+            self.tree.scrollToItem(item)
+        elif wait:
+            self.pending_node = node
 
     def show_selected_time(self) -> None:
         if self.selected is None:
@@ -544,6 +560,9 @@ class ProfilerView(QtWidgets.QWidget):
                 update(item, section.children, path)
 
         update(self.tree.invisibleRootItem(), _merged_sections(report), ())
+        if self.pending_node:
+            node, self.pending_node = self.pending_node, None
+            self.show_node(node, wait=False)
         for path in sorted(self.items.keys() - seen, key=len, reverse=True):
             item = self.items.pop(path)
             (item.parent() or self.tree.invisibleRootItem()).removeChild(item)
@@ -880,6 +899,7 @@ class MemoryView(QtWidgets.QWidget):
         super().__init__()
         self.report: dict | None = None
         self.selected: str | None = None
+        self.pending_resource: tuple[str, str] | None = None
         self.total = _StatCard("Total")
         self.cards = {
             kind: _StatCard(kind.capitalize(), _KIND_COLORS[kind])
@@ -924,22 +944,25 @@ class MemoryView(QtWidgets.QWidget):
         resources_layout.addWidget(self.search)
         resources_layout.addWidget(self.resources, 1)
 
-        tabs = QtWidgets.QTabWidget()
-        tabs.addTab(scrolled(self.nodes), "Nodes")
-        tabs.addTab(scrolled(blocks), "Blocks")
-        tabs.addTab(resources, "Resources")
+        self.tabs = QtWidgets.QTabWidget()
+        self.tabs.addTab(scrolled(self.nodes), "Nodes")
+        self.tabs.addTab(scrolled(blocks), "Blocks")
+        self.tabs.addTab(resources, "Resources")
         layout = QtWidgets.QVBoxLayout(self)
         layout.addLayout(_card_row(self.total, *self.cards.values()))
-        layout.addWidget(tabs, 1)
+        layout.addWidget(self.tabs, 1)
 
     def set_selected(self, node: str | None) -> None:
         self.selected = node
         self.nodes.set_selected(node)
         for block_map in self.block_maps:
             block_map.set_selected(node)
+        current = self.resources.currentItem()
         for row in range(self.resources.topLevelItemCount()):
             item = self.resources.topLevelItem(row)
-            if item.text(0) == node:
+            if item.text(0) == node and (
+                current is None or current.data(0, _NODE_ROLE) != node
+            ):
                 item.setExpanded(True)
                 self.resources.setCurrentItem(item)
                 self.resources.scrollToItem(item)
@@ -1066,6 +1089,39 @@ class MemoryView(QtWidgets.QWidget):
             self.resources.addTopLevelItem(item)
             item.setExpanded(node in expanded)
         self.filter_resources(self.search.text())
+        if self.pending_resource:
+            resource, self.pending_resource = self.pending_resource, None
+            self.show_resource(*resource, wait=False)
+
+    def show_resource(self, node: str, output: str, wait: bool = True) -> None:
+        """Selects the output's resource, or its node's if it has none of its own."""
+        self.tabs.setCurrentWidget(self.resources.parentWidget())
+        self.pending_resource = None
+        rows = (
+            self.resources.topLevelItem(row)
+            for row in range(self.resources.topLevelItemCount())
+        )
+        item = next((row for row in rows if row.text(0) == node), None)
+        if item is None:
+            if wait:
+                self.pending_resource = (node, output)
+            return
+        name = f"{node}.{output}"
+        children = (item.child(index) for index in range(item.childCount()))
+        shown = next(
+            (
+                child
+                for child in children
+                if child.text(0) == name
+                or child.text(0).startswith((f"{name} (", f"{name} ["))
+            ),
+            item,
+        )
+        if item.isHidden() or shown.isHidden():
+            self.search.clear()
+        item.setExpanded(True)
+        self.resources.setCurrentItem(shown)
+        self.resources.scrollToItem(shown)
 
     def filter_resources(self, text: str) -> None:
         text = text.strip().lower()
