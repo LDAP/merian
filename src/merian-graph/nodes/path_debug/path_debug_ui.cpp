@@ -12,6 +12,7 @@
 #include <bit>
 #include <cfloat>
 #include <cmath>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -267,7 +268,7 @@ std::vector<BSDFVerdict> bsdf_verdicts(const Stats& stats) {
         std::abs(eval_lum - albedo_lum) / std::max({eval_lum, albedo_lum, 1e-6f});
     verdicts.push_back(
         integral("sampling integrates eval", eval_rel <= 0.02f,
-                 fmt::format("∫f·cos dω {:.4f} vs sampled {:.4f}", eval_lum, albedo_lum)));
+                 fmt::format("∫BSDF·cos dω {:.4f} vs sampled {:.4f}", eval_lum, albedo_lum)));
 
     // an approximation for demodulation, without the eta^2 radiance scaling of refraction
     const float albedo_fn = yuv_luminance(stat_rgb(stats, PATH_DEBUG_CHECK_ALBEDO));
@@ -315,7 +316,8 @@ void vertex_row(const uint32_t index, const uint32_t* const words, const std::st
         ImGui::Text("%.4g", pdf);
     }
     ImGui::TableNextColumn();
-    ImGui::Text("%.4g", word_f(PATH_RECORD_VERTEX_THROUGHPUT));
+    ImGui::Text("%.4g",
+                yuv_luminance(path_record_unpack_rgb(words[PATH_RECORD_VERTEX_THROUGHPUT])));
     ImGui::TableNextColumn();
     const float3 contrib(word_f(PATH_RECORD_VERTEX_CONTRIB + 0),
                          word_f(PATH_RECORD_VERTEX_CONTRIB + 1),
@@ -440,11 +442,16 @@ void PathDebugNode::draw_image_choice() {
         ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
         ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove;
     if (ImGui::Begin("##image choice", nullptr, FLAGS)) {
-        labeled_combo("image", backdrop, BACKDROP_NAMES, 13.f * ImGui::GetFontSize());
+        const float font = ImGui::GetFontSize();
+        labeled_combo("image", backdrop, BACKDROP_NAMES, 13.f * font);
+        ImGui::SameLine();
+        ImGui::TextUnformatted("exposure");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(5.f * font);
+        ImGui::DragFloat("##exposure", &image_exposure, 0.01f, 0.f, FLT_MAX, "%.2f");
         if (backdrop_missing) {
             ImGui::SameLine();
-            ImGui::TextColored(WARN_COLOR, "%s",
-                               shows_reference() ? "reference required" : "input required");
+            ImGui::TextColored(WARN_COLOR, "%s required", missing_image_input());
         }
     }
     ImGui::End();
@@ -531,26 +538,31 @@ void PathDebugNode::draw_header() {
     }
     ImGui::PopItemWidth();
 
-    // 2. the selection
+    // 2. the selection; a region names its target on a line of its own
     int32_t kind = select_kind;
     if (segmented("kind", kind, SELECT_NAMES)) {
         set_select_kind(kind);
     }
+    ImGui::SameLine();
+    const std::string status = selection_status();
+    const auto draw_status = [&]() {
+        if (targets_ids() && region_target != TARGET_TRIANGLE) {
+            draw_target_choice(status);
+        } else if (has_selection && !targets_ids() && (selected_offscreen || point_hidden())) {
+            ImGui::TextColored(WARN_COLOR, "%s", status.c_str());
+        } else if (!has_selection || (targets_ids() ? !target_resolved() : !selected_pos_valid)) {
+            ImGui::TextDisabled("%s", status.c_str());
+        } else {
+            ImGui::TextUnformatted(status.c_str());
+        }
+    };
     if (select_kind == SELECT_REGION) {
-        ImGui::SameLine();
         int32_t match = region_match;
         if (segmented("match", match, MATCH_NAMES)) {
             set_region_match(match);
         }
-    }
-    ImGui::SameLine();
-    const std::string status = selection_status();
-    if (has_selection && (selected_offscreen || point_hidden())) {
-        ImGui::TextColored(WARN_COLOR, "%s", status.c_str());
-    } else if (!has_selection || !selected_pos_valid) {
-        ImGui::TextDisabled("%s", status.c_str());
     } else {
-        ImGui::TextUnformatted(status.c_str());
+        draw_status();
     }
     right_aligned({"Clear"});
     ImGui::BeginDisabled(!has_selection);
@@ -559,17 +571,31 @@ void PathDebugNode::draw_header() {
     }
     ImGui::EndDisabled();
     ImGui::SetItemTooltip("%s+Backspace", modifier_name());
+    if (select_kind == SELECT_REGION) {
+        int32_t target_kind = region_target;
+        labeled_combo("target", target_kind, TARGET_NAMES, 6.f * font);
+        if (target_kind != region_target) {
+            set_region_target(target_kind);
+        }
+        ImGui::SameLine();
+        draw_status();
+    }
 
     // 3. the path color
     labeled_combo("color", overlay_color, COLOR_NAMES, 13.f * font);
-    ImGui::SameLine();
-    draw_color_legend();
+    if (overlay_color != static_cast<int32_t>(PATH_DEBUG_COLOR_OFF)) {
+        ImGui::SameLine();
+        draw_color_legend();
+    }
     ImGui::Separator();
 }
 
 std::string PathDebugNode::selection_status() const {
     if (!has_selection) {
         return fmt::format("no selection · {}+click the image", modifier_name());
+    }
+    if (targets_ids()) {
+        return target_resolved() ? target_label() : "resolving surface";
     }
     if (selected_offscreen) {
         return "off screen";
@@ -584,6 +610,73 @@ std::string PathDebugNode::selection_status() const {
         return fmt::format("pixel {}, {}", selected_pixel.x, selected_pixel.y);
     }
     return fmt::format("radius {:.3g}", selected_radius);
+}
+
+void PathDebugNode::draw_target_choice(const std::string& status) {
+    ImGui::SetNextItemWidth(18.f * ImGui::GetFontSize());
+    if (!ImGui::BeginCombo("##target", status.c_str(), ImGuiComboFlags_HeightLarge)) {
+        return;
+    }
+    if (ImGui::Selectable("environment", target.environment)) {
+        set_target({.environment = true});
+    }
+    const SceneHandle scene = current_scene.lock();
+    const MaterialSystemHandle materials = material_system.lock();
+    const auto material_of = [&](const Scene::MeshID mesh_id) {
+        return static_cast<int32_t>(scene->get_mesh_infos()[mesh_id].mesh->material_id);
+    };
+    if (region_target == TARGET_MATERIAL && materials) {
+        for (uint32_t id = 0; id < materials->get_material_count(); id++) {
+            ImGui::PushID(static_cast<int>(id));
+            if (ImGui::Selectable(material_label(id).c_str(),
+                                  !target.environment &&
+                                      target.material == static_cast<int32_t>(id))) {
+                set_target({.material = static_cast<int32_t>(id)});
+            }
+            ImGui::PopID();
+        }
+    } else if (region_target == TARGET_MESH && scene) {
+        for (Scene::MeshID id = 0; id < scene->get_mesh_infos().size(); id++) {
+            if (!scene->get_mesh_infos()[id].mesh) {
+                continue;
+            }
+            const auto mesh = static_cast<int32_t>(id);
+            ImGui::PushID(mesh);
+            if (ImGui::Selectable(mesh_label(mesh).c_str(),
+                                  !target.environment && target.mesh == mesh)) {
+                set_target({.mesh = mesh, .material = material_of(id)});
+            }
+            ImGui::PopID();
+        }
+    } else if (scene) {
+        // the objects and parts placed this frame
+        std::set<std::pair<Scene::NodeID, Scene::MeshID>> listed;
+        for (const Scene::GeometryPlacement& placement : scene->get_geometry_placements()) {
+            const Scene::MeshID listed_mesh =
+                region_target == TARGET_OBJECT ? Scene::MeshID{0} : placement.mesh_id;
+            if (!listed.emplace(placement.node_id, listed_mesh).second) {
+                continue;
+            }
+            const auto mesh = static_cast<int32_t>(placement.mesh_id);
+            const auto node = static_cast<int32_t>(placement.node_id);
+            const std::string label =
+                region_target == TARGET_OBJECT
+                    ? node_label(node)
+                    : fmt::format("{} @ {}", mesh_label(mesh), node_label(node));
+            ImGui::PushID(static_cast<int>(listed.size()));
+            const bool chosen = !target.environment && target.node == node &&
+                                (region_target == TARGET_OBJECT || target.mesh == mesh);
+            if (ImGui::Selectable(label.c_str(), chosen)) {
+                set_target(region_target == TARGET_OBJECT
+                               ? RegionTarget{.node = node}
+                               : RegionTarget{.mesh = mesh,
+                                              .node = node,
+                                              .material = material_of(placement.mesh_id)});
+            }
+            ImGui::PopID();
+        }
+    }
+    ImGui::EndCombo();
 }
 
 void PathDebugNode::draw_color_legend() const {
@@ -616,14 +709,18 @@ void PathDebugNode::draw_color_legend() const {
         bar(imgui_colormap_plasma, range(-0.5f * PATH_DEBUG_CONTRIBUTION_STOPS),
             range(0.5f * PATH_DEBUG_CONTRIBUTION_STOPS));
         break;
-    case PATH_DEBUG_COLOR_THROUGHPUT_GAIN:
+    case PATH_DEBUG_COLOR_SAMPLE_WEIGHT:
         bar(imgui_colormap_diverging,
-            fmt::format("{:.3g}", std::exp2(-0.5f * PATH_DEBUG_GAIN_STOPS)),
-            fmt::format("{:.3g}", std::exp2(0.5f * PATH_DEBUG_GAIN_STOPS)));
+            fmt::format("{:.3g}", std::exp2(-0.5f * PATH_DEBUG_SAMPLE_WEIGHT_STOPS)),
+            fmt::format("{:.3g}", std::exp2(0.5f * PATH_DEBUG_SAMPLE_WEIGHT_STOPS)));
         break;
     case PATH_DEBUG_COLOR_SCATTER_EVENTS:
         bar(imgui_colormap_turbo, "0",
             fmt::format("{} scatter events", PATH_DEBUG_SCATTER_COLOR_EVENTS));
+        break;
+    case PATH_DEBUG_COLOR_TRANSPORTED:
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextDisabled("the hue of the light along each segment");
         break;
     case PATH_DEBUG_COLOR_TECHNIQUE:
         ImGui::AlignTextToFramePadding();
@@ -743,7 +840,8 @@ void PathDebugNode::draw_histograms_section() const {
     };
     count_histogram("path luminance (log2)", PATH_DEBUG_STATS_LUM, PATH_DEBUG_HIST_SMALL_BINS);
     count_histogram("pdf (log2)", PATH_DEBUG_STATS_PDF, PATH_DEBUG_HIST_SMALL_BINS);
-    count_histogram("paths by scatter events", PATH_DEBUG_STATS_SCATTER, PATH_DEBUG_SCATTER_BINS);
+    count_histogram("light paths by scatter events", PATH_DEBUG_STATS_SCATTER,
+                    PATH_DEBUG_SCATTER_BINS);
 
     std::array<float, PATH_DEBUG_SCATTER_BINS> contrib{};
     std::array<float, PATH_DEBUG_SCATTER_BINS> mean{};
@@ -891,7 +989,6 @@ void PathDebugNode::draw_drawn_paths() {
                 set_expression(events);
                 scatter_range = int2(0, SCATTER_UNLIMITED);
                 method_mask = 0;
-                material_id = -1;
             }
             ImGui::SetItemTooltip("Filter by %s; resets the constraints.", events.c_str());
         }
@@ -962,7 +1059,7 @@ void PathDebugNode::draw_polar_profile() const {
         records_curve[band] = static_cast<float>(stats[base + 0]) / solid_angle;
         pdf_curve[band] = stat_float(stats, base + 1) / solid_angle;
     }
-    ImGui::SeparatorText("polar profile: pdf and recorded density");
+    ImGui::SeparatorText("polar profile: pdf and sampled directions");
     ImDrawList* const dl = ImGui::GetWindowDrawList();
     const ImVec2 origin = ImGui::GetCursorScreenPos();
     const float plot_w = ImGui::GetContentRegionAvail().x - 10.f;

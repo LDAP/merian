@@ -8,7 +8,7 @@ using namespace merian;
 namespace {
 
 uint32_t token(const PathExpression& expression, const uint32_t index) {
-    return (expression.words[index / 2] >> (16 * (index % 2))) & 0xFFFFu;
+    return expression.tokens[index];
 }
 
 uint32_t scattering(const uint32_t t) {
@@ -27,11 +27,23 @@ uint32_t repeat_max(const uint32_t t) {
     return (t >> PATH_DEBUG_MAX_SHIFT) & 0xFu;
 }
 
+uint32_t labels(const uint32_t t) {
+    return t >> PATH_DEBUG_LABEL_SHIFT;
+}
+
 } // namespace
 
 TEST(PathExpression, EmptyAcceptsEverything) {
-    const PathExpression expression = compile_path_expression("");
+    const PathExpression expression = compile_path_expression(" ");
     EXPECT_TRUE(expression.valid);
+    EXPECT_FALSE(expression.active);
+    EXPECT_EQ(expression.token_count, 0u);
+}
+
+TEST(PathExpression, LightAloneIsSeenByTheCamera) {
+    const PathExpression expression = compile_path_expression("L");
+    ASSERT_TRUE(expression.valid);
+    EXPECT_TRUE(expression.active);
     EXPECT_EQ(expression.token_count, 0u);
 }
 
@@ -83,24 +95,47 @@ TEST(PathExpression, BoundedRepeats) {
     EXPECT_EQ(repeat_max(token(optional, 0)), 1u);
 }
 
-TEST(PathExpression, TrailingNMatchesNextEventConnections) {
-    const PathExpression plain = compile_path_expression("CD+");
-    EXPECT_FALSE(plain.nee);
+TEST(PathExpression, QuotedCodesNameTechniques) {
+    const PathExpression nee = compile_path_expression(".'n'");
+    ASSERT_TRUE(nee.valid);
+    ASSERT_EQ(nee.token_count, 2u);
+    EXPECT_EQ(labels(token(nee, 0)), PATH_DEBUG_LABEL_ANY);
+    EXPECT_EQ(labels(token(nee, 1)), 1u << PATH_RECORD_METHOD_LIGHT);
+    EXPECT_EQ(scattering(token(nee, 1)), PATH_DEBUG_CLS_ANY);
 
-    const PathExpression direct = compile_path_expression("CDN");
+    const PathExpression combined = compile_path_expression("<D'g'>+");
+    ASSERT_TRUE(combined.valid);
+    ASSERT_EQ(combined.token_count, 1u);
+    EXPECT_EQ(scattering(token(combined, 0)), PATH_DEBUG_CLS_DIFFUSE);
+    EXPECT_EQ(labels(token(combined, 0)), 1u << PATH_RECORD_METHOD_GUIDING);
+    EXPECT_EQ(repeat_max(token(combined, 0)), PATH_DEBUG_REPEAT_INF);
+
+    // outside brackets every symbol is an event of its own
+    const PathExpression two = compile_path_expression("D'g'");
+    ASSERT_TRUE(two.valid);
+    EXPECT_EQ(two.token_count, 2u);
+
+    const PathExpression either = compile_path_expression("['rrb''rrn''rec']");
+    ASSERT_TRUE(either.valid);
+    EXPECT_EQ(labels(token(either, 0)), (1u << PATH_RECORD_METHOD_REPLAYED_BSDF) |
+                                            (1u << PATH_RECORD_METHOD_REPLAYED_LIGHT) |
+                                            (1u << PATH_RECORD_METHOD_RECONNECTION));
+
+    EXPECT_FALSE(compile_path_expression("'r'").valid);
+    EXPECT_FALSE(compile_path_expression("'B'").valid);
+    EXPECT_FALSE(compile_path_expression("'g").valid);
+    EXPECT_FALSE(compile_path_expression("''").valid);
+}
+
+TEST(PathExpression, LightEndsTheExpression) {
+    const PathExpression direct = compile_path_expression(".L");
     ASSERT_TRUE(direct.valid);
-    EXPECT_TRUE(direct.nee);
-    ASSERT_EQ(direct.token_count, 1u);
-    EXPECT_EQ(scattering(token(direct, 0)), PATH_DEBUG_CLS_DIFFUSE);
+    EXPECT_EQ(direct.token_count, 1u);
 
-    const PathExpression any = compile_path_expression("N");
-    ASSERT_TRUE(any.valid);
-    EXPECT_TRUE(any.nee);
-    ASSERT_EQ(any.token_count, 1u);
-    EXPECT_EQ(repeat_min(token(any, 0)), 0u);
-    EXPECT_EQ(repeat_max(token(any, 0)), PATH_DEBUG_REPEAT_INF);
-
-    EXPECT_FALSE(compile_path_expression("NDD").valid);
+    EXPECT_FALSE(compile_path_expression("L.").valid);
+    EXPECT_FALSE(compile_path_expression("<DL>").valid);
+    EXPECT_FALSE(compile_path_expression("<L'n'>").valid);
+    EXPECT_FALSE(compile_path_expression(".N").valid);
 }
 
 TEST(PathExpression, RejectsWhatDoesNotParse) {

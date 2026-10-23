@@ -32,9 +32,9 @@ void main(uint3 gid: SV_DispatchThreadID, ParameterBlock<Scene> scene) {
         return;
     }
 
-    const float3x3 to_map =
-        dir_map_frame(path_debug_map_normal(gbuffer.get_normal(path_debug_selected_pixel())),
-                      params.map_frame == PATH_DEBUG_FRAME_LOCAL);
+    const float3 selected_normal = gbuffer.get_first_hit_normal(path_debug_selected_pixel());
+    const float3x3 to_map = dir_map_frame(path_debug_map_normal(selected_normal),
+                                          params.map_frame == PATH_DEBUG_FRAME_LOCAL);
     const OrthonormalFrame frame = sp.shading_frame;
     let bsdf = sp.surface_material.get_bsdf();
     const float3 wi_local = path_debug_wi_local(frame.to_local(-ray.Direction));

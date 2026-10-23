@@ -22,7 +22,7 @@ constexpr int32_t ANCHOR_SURFACE_POINT = 0;
 constexpr int32_t ANCHOR_PIXEL = 1;
 constexpr std::array<const char*, 2> ANCHOR_NAMES = {"surface point", "pixel"};
 constexpr std::array<const char*, 3> FINITE_NAMES = {"any", "finite", "NaN or Inf"};
-constexpr std::array<const char*, 2> METHOD_MODE_NAMES = {"any vertex", "every vertex"};
+constexpr std::array<const char*, 2> METHOD_MODE_NAMES = {"any event", "every event"};
 constexpr std::array<const char*, 4> RANK_NAMES = {"most recent", "brightest", "brightest share",
                                                    "resampled by contribution"};
 constexpr std::array<const char*, 3> DEPTH_NAMES = {"x-ray", "hide", "dash"};
@@ -33,27 +33,50 @@ constexpr std::array<const char*, 2> PDF_REF_NAMES = {"BSDF pdf()", "recorded pd
 constexpr std::array<const char*, 3> FALSE_COLOR_NAMES = {"off", "scene heatmap",
                                                           "pixel statistic"};
 // without the off state at 0
-constexpr std::array<const char*, 3> HEAT_NAMES = {"vertex density", "downstream contribution",
-                                                   "throughput"};
-constexpr std::array<const char*, 3> PIXEL_STAT_NAMES = {"mean", "sample variance",
-                                                         "relative standard error"};
+constexpr std::array<const char*, 8> HEAT_NAMES = {
+    "vertex count", "contribution", "throughput", "incident radiance",
+    "BSDF·cos/pdf", "NEE success",  "NEE failed", "path ends"};
+constexpr std::array<const char*, 8> HEAT_HELP = {
+    "Per cell, the vertices of the selection's paths.",
+    "Per cell, the light that reaches the camera through the vertices.",
+    "Mean throughput T, the product of BSDF·cos/pdf from the camera: how much light arriving at "
+    "a vertex reaches the camera.",
+    "Mean radiance arriving along the drawn direction: the contribution after a vertex over T.",
+    "Mean BSDF·cos/pdf of the drawn directions, the BSDF for the incoming and the drawn "
+    "direction: above 1 a draw was rarer than the integrand asks for.",
+    "Per cell, the NEE connections that delivered light.",
+    "Per cell, the NEE connections that delivered nothing: occluded, or the light behind the "
+    "surface.",
+    "Per cell, the vertices where paths stop: roulette, the length limit, a refused sample."};
+constexpr std::array<const char*, 7> PIXEL_STAT_NAMES = {
+    "mean luminance",          "sample count", "variance",     "relative variance",
+    "relative standard error", "max / mean",   "zero fraction"};
+constexpr std::array<const char*, 7> PIXEL_STAT_HELP = {
+    "mean(X), X what one recorded path adds to the pixel through the selection.",
+    "n, the recorded paths of the pixel.",
+    "Var(X) = mean(X²) - mean(X)².",
+    "Var(X) / mean(X)²: one path's noise, whatever the brightness.",
+    "sqrt(Var(X) / n) / mean(X): the error of the pixel's mean, falls with n.",
+    "max(X) / mean(X): fireflies lie far above 1.",
+    "(paths with X = 0) / n."};
 
 constexpr Properties::ChildFlags HEADERLESS_OPEN =
     Properties::ChildFlagBits::HEADERLESS | Properties::ChildFlagBits::DEFAULT_OPEN;
 
 constexpr std::array<const char*, PATH_DEBUG_MAP_CHANNEL_COUNT> MAP_CHANNEL_DESCRIPTIONS = {
-    "f * L * cos over every technique as a density: what a zero-variance sampler samples.",
+    "BSDF·L·cos over every technique, normalized to integrate to 1: what a zero-variance sampler "
+    "samples.",
     "Directions per steradian of the binned draws.",
     "The pdf the renderer recorded for the binned draws.",
     "The material's pdf for the incident direction.",
     "The material's own sample(), without the renderer.",
-    "f * cos, normalized: the distribution an ideal BSDF sampler follows.",
+    "BSDF·cos, normalized: what an ideal BSDF sampler samples.",
     "Poisson deviation of each bin from the pdf it is tested against; chi2/dof sums them.",
-    "Sampled density over the pdf it is tested against: white at 1, blue undersampled, red "
+    "The sampled directions over the pdf they are tested against: white at 1, blue undersampled, "
+    "red oversampled.",
+    "The sampled directions over the normalized integrand: white at 1, blue undersampled, red "
     "oversampled.",
-    "Sampled density over the normalized integrand: white at 1, blue undersampled, red "
-    "oversampled.",
-    "f * L * cos over every technique, per steradian.",
+    "BSDF·L·cos over every technique, per steradian.",
     "The integrand in its own color, on the integrand's brightness scale.",
     "Squared contributions per steradian: where the variance comes from.",
     "The integrand over BSDF eval(): the light arriving at the point.",
@@ -104,16 +127,23 @@ void PathDebugNode::properties_selection(Properties& config) {
     if (config.config_options("kind", kind, options(SELECT_NAMES),
                               Properties::OptionsStyle::RADIO_BUTTON,
                               "Point: the pixel's paths that start at the surface. Region: the "
-                              "paths through a sphere around it.")) {
+                              "light paths that hit a target, start or end on it.")) {
         set_select_kind(kind);
     }
     if (select_kind == SELECT_REGION) {
         int32_t match = region_match;
         if (config.config_options("match", match, options(MATCH_NAMES),
                                   Properties::OptionsStyle::RADIO_BUTTON,
-                                  "Whether a segment crosses the sphere, or the first or the last "
-                                  "vertex lies inside it.")) {
+                                  "Light paths, camera to light, that hit the target, start or end "
+                                  "on it.")) {
             set_region_match(match);
+        }
+        int32_t kind = region_target;
+        if (config.config_options("target", kind, options(TARGET_NAMES),
+                                  Properties::OptionsStyle::COMBO,
+                                  "A sphere around the clicked surface, or what the click sees; "
+                                  "the sky selects the environment.")) {
+            set_region_target(kind);
         }
     }
     if (has_selection &&
@@ -124,7 +154,18 @@ void PathDebugNode::properties_selection(Properties& config) {
 
 void PathDebugNode::properties_selection_details(Properties& config) {
     bool changed = false;
-    if (select_kind == SELECT_REGION && selected_pos_valid) {
+    if (targets_ids()) {
+        RegionTarget ids = target;
+        bool set = config.config_bool("environment", ids.environment);
+        set |= config.config_int("mesh", ids.mesh, "Id; -1 = none.");
+        set |= config.config_int("object", ids.node, "Scene node id; -1 = none.");
+        set |= config.config_int("triangle", ids.primitive, "Of the mesh.");
+        set |= config.config_int("material", ids.material, "Id; -1 = none.");
+        if (set) {
+            set_target(ids);
+        }
+    }
+    if (select_kind == SELECT_REGION && region_target == TARGET_SPHERE && selected_pos_valid) {
         changed |= config.config_float(
             "radius", selected_radius,
             fmt::format("World units; {}+scroll over the image.", modifier_name()), 0.001f);
@@ -159,21 +200,30 @@ void PathDebugNode::properties_selection_details(Properties& config) {
 void PathDebugNode::properties_color(Properties& config) {
     config.config_options("color", overlay_color, options(COLOR_NAMES),
                           Properties::OptionsStyle::COMBO,
-                          "Path luminance: what the path adds to its pixel. Segment contribution: "
-                          "the radiance each segment carries to the camera.");
+                          "Path luminance: what the selection's light paths add to the pixel. "
+                          "Transported radiance: the radiance each segment carries towards the "
+                          "camera; transported color its hue, the light's color after every "
+                          "surface it left. BSDF·cos/pdf: the weight a segment's direction was "
+                          "drawn with. Off: no paths.");
 }
 
 void PathDebugNode::properties_filter(Properties& config) {
     std::string text = expression;
-    if (config.config_text(
-            "expression", text, false,
-            "S G D U specular, glossy, diffuse, unclassified; R T reflected, transmitted; . any; "
-            "<RD> both; [SG] either; * + ? {n} {n,m}. A trailing N ends at an NEE connection (.N "
-            "direct, .*S.+N after a specular event). Empty matches every path.")) {
+    if (config.config_text("expression", text, false, "Empty matches every path.")) {
         set_expression(text);
     }
     if (!compiled_expression.valid) {
         config.output_text("invalid expression");
+    }
+    if (config.is_ui()) {
+        config.output_text("S specular  G glossy  D diffuse  U unclassified  R reflect  T transmit"
+                           "  . any");
+        config.output_text("'b' BSDF  'g' guiding  'n' NEE  'c' cosine  'u' uniform: what drew the "
+                           "event's direction");
+        config.output_text("'rrb' 'rrn' replayed BSDF, NEE  'rec' reconnection  <D'g'> all of  "
+                           "[SG] either");
+        config.output_text("* + ? {n} {n,m}  L alone: a light the camera sees");
+        config.output_text(".'n' direct light by NEE  .'b' direct light a BSDF sample hit");
     }
 
     bool changed =
@@ -183,22 +233,6 @@ void PathDebugNode::properties_filter(Properties& config) {
                                  fmt::format("Min and max; {} = no limit.", SCATTER_UNLIMITED));
     scatter_range.x = std::clamp(scatter_range.x, 0, SCATTER_UNLIMITED);
     scatter_range.y = std::clamp(scatter_range.y, scatter_range.x, SCATTER_UNLIMITED);
-    const MaterialSystemHandle materials = material_system.lock();
-    const uint32_t material_count = materials ? materials->get_material_count() : 0;
-    if (config.is_ui() && material_count > 0) {
-        std::vector<std::string> labels{"any"};
-        for (uint32_t id = 0; id < material_count; id++) {
-            labels.push_back(material_label(id));
-        }
-        int32_t option = material_id < static_cast<int32_t>(material_count) ? material_id + 1 : 0;
-        changed |=
-            config.config_options("material", option, labels, Properties::OptionsStyle::COMBO,
-                                  "Paths with a vertex on it.");
-        material_id = option - 1;
-    } else {
-        changed |= config.config_int("material", material_id, "Material id; -1 = any.", -1,
-                                     static_cast<int32_t>(PATH_RECORD_MATERIAL_NONE) - 1);
-    }
     if (config.st_begin_child("technique", "technique")) {
         for (uint32_t m = 0; m < PATH_RECORD_METHOD_NAMES.size(); m++) {
             bool set = (method_mask & (1u << m)) != 0;
@@ -226,18 +260,18 @@ void PathDebugNode::properties_path_choice(Properties& config) {
         kept_dirty = true;
         isolate_path.reset();
     }
-    kept_dirty |= config.config_int("max paths", overlay_max_paths, "", 1,
+    kept_dirty |= config.config_int("max paths", overlay_max_paths, "", 0,
                                     static_cast<int32_t>(PATH_DEBUG_KEPT_SLOTS));
     overlay_max_paths =
-        std::clamp(overlay_max_paths, 1, static_cast<int32_t>(PATH_DEBUG_KEPT_SLOTS));
+        std::clamp(overlay_max_paths, 0, static_cast<int32_t>(PATH_DEBUG_KEPT_SLOTS));
     if (overlay_rank == static_cast<int32_t>(PATH_DEBUG_RANK_BRIGHTEST_SHARE)) {
         config.config_float("share", overlay_brightest_share, "Of the frame's paths.", 1e-5f);
         overlay_brightest_share = std::clamp(overlay_brightest_share, 1e-7f, 1.f);
     }
     if (overlay_rank == static_cast<int32_t>(PATH_DEBUG_RANK_RESAMPLED)) {
-        config.config_float("history", resample_history,
-                            "Frames over which drawn paths lose weight; 0 = since the last "
-                            "change.",
+        config.config_float("fade frames", resample_history,
+                            "A drawn path's weight falls to 1/e in this many frames; 0 keeps it "
+                            "until a change.",
                             1.f);
         resample_history = std::max(resample_history, 0.f);
     }
@@ -266,12 +300,14 @@ void PathDebugNode::properties_view(Properties& config) {
     config.config_options("image", backdrop, options(BACKDROP_NAMES),
                           Properties::OptionsStyle::COMBO, "What the paths are drawn on.");
     if (config.is_ui() && backdrop_missing) {
-        config.output_text(shows_reference() ? "reference required · showing render"
-                                             : "backdrop input required · showing render");
+        config.output_text("{} required · showing source input", missing_image_input());
     }
-    if (backdrop == static_cast<int32_t>(PATH_DEBUG_BACKDROP_FILTERED)) {
-        config.config_float("exposure", filtered_exposure,
-                            "0 = raw radiance. Accumulates until the selection changes.", 0.01f);
+    config.config_float("exposure", image_exposure,
+                        "Scales the image; the filtered radiance is tone mapped.", 0.01f);
+    image_exposure = std::max(image_exposure, 0.f);
+    if (backdrop == static_cast<int32_t>(PATH_DEBUG_BACKDROP_FILTERED) &&
+        config.config_bool("reset")) {
+        image_dirty = true;
     }
     if (backdrop == static_cast<int32_t>(PATH_DEBUG_BACKDROP_DIFFERENCE)) {
         config.config_float("gain", difference_gain, "", 0.1f);
@@ -280,7 +316,8 @@ void PathDebugNode::properties_view(Properties& config) {
         config.config_percent("split position", backdrop_split);
     }
     if (shows_reference() && backdrop != static_cast<int32_t>(PATH_DEBUG_BACKDROP_DIFFERENCE)) {
-        config.config_bool("alternate", reference_flip, "Blinks between render and reference.");
+        config.config_bool("alternate", reference_flip,
+                           "Blinks between source input and reference.");
         if (reference_flip) {
             config.config_float("rate", reference_flip_hz, "In Hz.", 0.1f);
         }
@@ -314,21 +351,25 @@ void PathDebugNode::properties_view(Properties& config) {
         if (!gbuffer_connected) {
             config.output_text("gbuffer required");
         }
-        heat_dirty |= config.config_options(
-            "quantity", heat_quantity, options(HEAT_NAMES), Properties::OptionsStyle::COMBO,
-            "Per world-space cell: the path vertices, the contribution downstream of them, or "
-            "their throughput.");
-        heat_dirty |= config.config_vec("bounces", heat_bounce_range);
+        heat_dirty |= config.config_options("quantity", heat_quantity, options(HEAT_NAMES),
+                                            Properties::OptionsStyle::COMBO,
+                                            "Of the selection's paths in world-space cells.");
+        if (config.is_ui()) {
+            config.output_text(HEAT_HELP.at(heat_quantity));
+        }
+        heat_dirty |= config.config_vec("scatter events", heat_bounce_range,
+                                        "The vertices this far from the camera, min and max.");
         heat_bounce_range.x = std::clamp(heat_bounce_range.x, 0, HEAT_BOUNCE_MAX);
         heat_bounce_range.y = std::clamp(heat_bounce_range.y, heat_bounce_range.x, HEAT_BOUNCE_MAX);
         heat_dirty |= config.config_float("cell size", heat_cell_size, "World units.", 0.001f);
         heat_cell_size = std::max(heat_cell_size, 1e-4f);
-        config.config_float("history", heat_history, "Frames; 0 = keep forever.", 1.f);
+        config.config_float("fade frames", heat_history,
+                            "A cell's weight falls to 1/e in this many frames; 0 keeps it.", 1.f);
         heat_history = std::max(heat_history, 0.f);
         config.config_float("exposure", heat_exposure, "", 0.01f);
-        config.config_bool("smooth", heat_smooth);
-        if (config.config_int("log2 grid slots", grid_slots_log2, "", GRID_SLOTS_LOG2_MIN,
-                              GRID_SLOTS_LOG2_MAX)) {
+        config.config_bool("blur", heat_smooth, "Averages each cell with its six neighbors.");
+        if (config.config_int("log2 cells", grid_slots_log2, "The cells the grid holds.",
+                              GRID_SLOTS_LOG2_MIN, GRID_SLOTS_LOG2_MAX)) {
             heat_dirty = true;
             pending_reconnect = true;
         }
@@ -348,8 +389,11 @@ void PathDebugNode::properties_view(Properties& config) {
         config.st_begin_child("pixel statistic", "pixel statistic", HEADERLESS_OPEN)) {
         config.config_options("statistic", pixel_statistic, options(PIXEL_STAT_NAMES),
                               Properties::OptionsStyle::COMBO,
-                              "Of each pixel's path luminance over frames: mean, variance, and the "
-                              "standard error relative to the mean. No reference needed.");
+                              "Over the frames, of every path recorded at a pixel and what the "
+                              "selection's light paths add to it. No reference needed.");
+        if (config.is_ui()) {
+            config.output_text(PIXEL_STAT_HELP.at(pixel_statistic));
+        }
         config.config_float("exposure", pixel_stats_exposure,
                             "The value at the top of the color map is 1 / exposure.", 0.1f);
         if (config.config_bool("reset")) {
@@ -380,8 +424,8 @@ void PathDebugNode::properties_sampling(Properties& config) {
     config.st_separate("binning");
     maps_dirty |= config.config_options("binned", map_draws, options(DRAWS_NAMES),
                                         Properties::OptionsStyle::COMBO,
-                                        "Scatter: every continuation, recorded with the mixture "
-                                        "density. NEE: the light connections.");
+                                        "Scatter: every continuation, recorded with the mixture's "
+                                        "pdf. NEE: the light connections.");
     maps_dirty |= config.config_options("frame", map_frame, options(FRAME_NAMES),
                                         Properties::OptionsStyle::COMBO);
     maps_dirty |= config.config_options("projection", map_transform, options(TRANSFORM_NAMES),

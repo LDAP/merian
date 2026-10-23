@@ -40,13 +40,13 @@ void main(uint3 gid: SV_DispatchThreadID) {
         return;
     }
 
-    const PathRecordPath p = path_record_load_path(in_records, i);
-    if (p.vertex_count == 0 || any(p.pixel >= path_debug_dim()) || !path_debug_matched(i)) {
+    if (!path_debug_matched(i)) {
         return;
     }
+    const PathRecordPath p = path_debug_load_selected_path(i);
     if (path_debug_keeps_top()) {
         collect_kept_top(i, p);
     } else {
-        path_debug_recent_commit(p);
+        path_debug_recent_commit(i, p);
     }
 }

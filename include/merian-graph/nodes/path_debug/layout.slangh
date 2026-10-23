@@ -37,14 +37,19 @@ static const uint32_t PATH_DEBUG_MAX_SEGMENTS = 64;
 // segments of the drawn region outline
 static const uint32_t PATH_DEBUG_RING_SEGMENTS = 64;
 
-// kept: a record stream with one path per slot, then the slot keys (0 = empty)
+// kept: a record stream with one path per slot, then the slot keys (0 = empty), then per slot the
+// mask of the selection's events
 static const uint32_t PATH_DEBUG_KEPT_SLOTS = 256;
 static const uint32_t PATH_DEBUG_KEPT_VERTICES =
     PATH_RECORD_HEADER_UINTS + PATH_DEBUG_KEPT_SLOTS * PATH_RECORD_UINTS;
 static const uint32_t PATH_DEBUG_KEPT_KEYS =
     PATH_DEBUG_KEPT_VERTICES +
     PATH_DEBUG_KEPT_SLOTS * PATH_DEBUG_MAX_SEGMENTS * PATH_RECORD_VERTEX_UINTS;
-static const uint32_t PATH_DEBUG_KEPT_HEAD = PATH_DEBUG_KEPT_KEYS + PATH_DEBUG_KEPT_SLOTS;
+static const uint32_t PATH_DEBUG_KEPT_EVENTS = PATH_DEBUG_KEPT_KEYS + PATH_DEBUG_KEPT_SLOTS;
+static const uint32_t PATH_DEBUG_KEPT_HEAD = PATH_DEBUG_KEPT_EVENTS + 2 * PATH_DEBUG_KEPT_SLOTS;
+
+// per record path of the selection: the mask of its events' vertices and their luminance
+static const uint32_t PATH_DEBUG_EVENT_UINTS = 3;
 static const uint32_t PATH_DEBUG_KEPT_UINTS = PATH_DEBUG_KEPT_HEAD + 1;
 
 // --- state: scratch, cleared every frame ---
@@ -61,14 +66,16 @@ static const uint32_t PATH_DEBUG_STATE_SPHERE_PROBE = 6;
 // answers (0 = none)
 static const uint32_t PATH_DEBUG_STATE_PICK = 7;
 static const uint32_t PATH_DEBUG_PICK_RECORD_SEQ = 0;
-// the first vertex, and the first one past specular transmissions
+// the first vertex, and the first one past specular transmissions with its recorded surface
 static const uint32_t PATH_DEBUG_PICK_FIRST = 1;
 static const uint32_t PATH_DEBUG_PICK_SEEN = 4;
-static const uint32_t PATH_DEBUG_PICK_SURFACE_SEQ = 7;
-// the gbuffer's position, PATH_DEBUG_ENV_DISTANCE away for the sky, and normal
-static const uint32_t PATH_DEBUG_PICK_SURFACE = 8;
-static const uint32_t PATH_DEBUG_PICK_NORMAL = 11;
-static const uint32_t PATH_DEBUG_PICK_UINTS = 14;
+static const uint32_t PATH_DEBUG_PICK_SEEN_SURFACE = 7;
+static const uint32_t PATH_DEBUG_PICK_SURFACE_SEQ = 9;
+// the gbuffer's position, PATH_DEBUG_ENV_DISTANCE away for the sky, normal and hit surface
+static const uint32_t PATH_DEBUG_PICK_SURFACE = 10;
+static const uint32_t PATH_DEBUG_PICK_NORMAL = 13;
+static const uint32_t PATH_DEBUG_PICK_HIT = 16;
+static const uint32_t PATH_DEBUG_PICK_UINTS = 18;
 // paths of the selected point's pixel: [0] starting at the point, [1] at a surface in front of it
 static const uint32_t PATH_DEBUG_STATE_POINT = PATH_DEBUG_STATE_PICK + PATH_DEBUG_PICK_UINTS;
 static const uint32_t PATH_DEBUG_POINT_UINTS = 2;
@@ -137,10 +144,17 @@ static const uint32_t PATH_DEBUG_OUT_UINTS = PATH_DEBUG_OUT_POINT + PATH_DEBUG_P
 static const uint32_t PATH_DEBUG_SELECT_NONE = 0;
 // the paths of the pixel that sees the point
 static const uint32_t PATH_DEBUG_SELECT_POINT = 1;
-// the paths with a segment, the first or the last vertex inside the region sphere
+// the light paths that hit the region's target, start or end on it
 static const uint32_t PATH_DEBUG_SELECT_THROUGH = 2;
 static const uint32_t PATH_DEBUG_SELECT_FROM = 3;
 static const uint32_t PATH_DEBUG_SELECT_TO = 4;
+
+// a region's target: the sphere around the selected point, a triangle, the geometries in
+// target_geometries or the environment
+static const uint32_t PATH_DEBUG_TARGET_SPHERE = 0;
+static const uint32_t PATH_DEBUG_TARGET_TRIANGLE = 1;
+static const uint32_t PATH_DEBUG_TARGET_GEOMETRIES = 2;
+static const uint32_t PATH_DEBUG_TARGET_ENVIRONMENT = 3;
 
 // sel_scatters_max without a limit
 static const uint32_t PATH_DEBUG_NO_SCATTER_LIMIT = 0xFFFFFFFFu;
@@ -263,8 +277,7 @@ static const uint32_t PATH_DEBUG_WI_MANUAL = 1;
 static const uint32_t PATH_DEBUG_FRAME_WORLD = 0;
 static const uint32_t PATH_DEBUG_FRAME_LOCAL = 1;
 
-// path expression token (Heckbert 1990; OSL LPE): scattering | side << 4 | repeat range
-static const uint32_t PATH_DEBUG_TOKEN_BITS = 16;
+// path expression token (Heckbert 1990; OSL LPE): scattering | side << 4 | repeat range | labels
 static const uint32_t PATH_DEBUG_CLS_DELTA = PATH_RECORD_LOBE_DELTA;
 static const uint32_t PATH_DEBUG_CLS_GLOSSY = PATH_RECORD_LOBE_GLOSSY;
 static const uint32_t PATH_DEBUG_CLS_DIFFUSE = PATH_RECORD_LOBE_DIFFUSE;
@@ -283,10 +296,13 @@ static const uint32_t PATH_DEBUG_MIN_MASK =
     (1u << (PATH_DEBUG_MAX_SHIFT - PATH_DEBUG_MIN_SHIFT)) - 1;
 static const uint32_t PATH_DEBUG_MAX_MASK = 0xFu;
 static const uint32_t PATH_DEBUG_REPEAT_INF = PATH_DEBUG_MAX_MASK;
+// a label per PATH_RECORD_METHOD_*: the technique that drew the event's outgoing direction
+static const uint32_t PATH_DEBUG_LABEL_SHIFT = 13;
+static const uint32_t PATH_DEBUG_LABEL_ANY = (1u << PATH_RECORD_METHOD_COUNT) - 1;
 static const uint32_t PATH_DEBUG_MAX_TOKENS = 8;
-// expr_count: token count | PATH_DEBUG_EXPR_NEE
+// expr_count: token count | PATH_DEBUG_EXPR_ACTIVE
 static const uint32_t PATH_DEBUG_EXPR_COUNT_MASK = 0xFFu;
-static const uint32_t PATH_DEBUG_EXPR_NEE = 1u << 8;
+static const uint32_t PATH_DEBUG_EXPR_ACTIVE = 1u << 8;
 
 // the distributions on one scale first, panels in this order
 static const uint32_t PATH_DEBUG_MAP_INTEGRAND_NORMALIZED = 0;
@@ -321,15 +337,27 @@ static const float PATH_DEBUG_PDF_MIN_LOG = -10.f;
 static const float PATH_DEBUG_PDF_MAX_LOG = 30.f;
 
 static const uint32_t PATH_DEBUG_HEAT_OFF = 0;
-static const uint32_t PATH_DEBUG_HEAT_DENSITY = 1;
+static const uint32_t PATH_DEBUG_HEAT_VERTICES = 1;
 static const uint32_t PATH_DEBUG_HEAT_CONTRIBUTION = 2;
 static const uint32_t PATH_DEBUG_HEAT_THROUGHPUT = 3;
+static const uint32_t PATH_DEBUG_HEAT_INCIDENT = 4;
+static const uint32_t PATH_DEBUG_HEAT_SAMPLE_WEIGHT = 5;
+static const uint32_t PATH_DEBUG_HEAT_NEE_SUCCESS = 6;
+static const uint32_t PATH_DEBUG_HEAT_NEE_FAILED = 7;
+static const uint32_t PATH_DEBUG_HEAT_PATH_ENDS = 8;
+
+// a cell shows its weight over its vertices, else the weight
+PATH_DEBUG_FUNC bool path_debug_heat_averages(const uint32_t mode) {
+    return mode == PATH_DEBUG_HEAT_THROUGHPUT || mode == PATH_DEBUG_HEAT_INCIDENT ||
+           mode == PATH_DEBUG_HEAT_SAMPLE_WEIGHT;
+}
 
 static const uint32_t PATH_DEBUG_GRID_PROBES = 8;
 static const uint32_t PATH_DEBUG_GRID_INVALID = 0xFFFFFFFFu;
 static const uint32_t PATH_DEBUG_GRID_TOMBSTONE = 0xFFFFFFFFu;
-// heat grid: [0, slots) cell keys (0 = empty), [slots, 2 * slots) weights
-static const uint32_t PATH_DEBUG_GRID_REGIONS = 2;
+// heat grid: [0, slots) cell keys (0 = empty), [slots, 2 * slots) weights, then the vertices
+// splatted, both decaying
+static const uint32_t PATH_DEBUG_GRID_REGIONS = 3;
 
 static const uint32_t PATH_DEBUG_DEPTH_XRAY = 0;
 static const uint32_t PATH_DEBUG_DEPTH_HIDE = 1;
@@ -340,11 +368,14 @@ static const uint32_t PATH_DEBUG_COLOR_CONTRIBUTION = 1;
 static const uint32_t PATH_DEBUG_COLOR_SCATTER_EVENTS = 2;
 static const uint32_t PATH_DEBUG_COLOR_RANDOM = 3;
 static const uint32_t PATH_DEBUG_COLOR_TECHNIQUE = 4;
-static const uint32_t PATH_DEBUG_COLOR_THROUGHPUT_GAIN = 5;
+static const uint32_t PATH_DEBUG_COLOR_SAMPLE_WEIGHT = 5;
+// the hue of the light a segment carries
+static const uint32_t PATH_DEBUG_COLOR_TRANSPORTED = 6;
+static const uint32_t PATH_DEBUG_COLOR_OFF = 7;
 // the log2 range the color maps span around 1
 static const float PATH_DEBUG_LUMINANCE_STOPS = 16.f;
 static const float PATH_DEBUG_CONTRIBUTION_STOPS = 10.f;
-static const float PATH_DEBUG_GAIN_STOPS = 8.f;
+static const float PATH_DEBUG_SAMPLE_WEIGHT_STOPS = 8.f;
 
 // 0xRRGGBB per PATH_RECORD_METHOD_*
 static const uint32_t PATH_DEBUG_METHOD_COLORS[PATH_RECORD_METHOD_COUNT] = {
@@ -362,7 +393,7 @@ PATH_DEBUG_FUNC float3 path_debug_unpack_rgb(const uint32_t rgb) {
            255.f;
 }
 
-static const uint32_t PATH_DEBUG_BACKDROP_RENDER = 0;
+static const uint32_t PATH_DEBUG_BACKDROP_SOURCE = 0;
 static const uint32_t PATH_DEBUG_BACKDROP_FILTERED = 1;
 static const uint32_t PATH_DEBUG_BACKDROP_REFERENCE = 2;
 static const uint32_t PATH_DEBUG_BACKDROP_DIFFERENCE = 3;
@@ -371,8 +402,12 @@ static const uint32_t PATH_DEBUG_BACKDROP_INPUT = 5;
 
 static const uint32_t PATH_DEBUG_PIXEL_STAT_OFF = 0;
 static const uint32_t PATH_DEBUG_PIXEL_STAT_MEAN = 1;
-static const uint32_t PATH_DEBUG_PIXEL_STAT_VARIANCE = 2;
-static const uint32_t PATH_DEBUG_PIXEL_STAT_REL_ERROR = 3;
+static const uint32_t PATH_DEBUG_PIXEL_STAT_SAMPLES = 2;
+static const uint32_t PATH_DEBUG_PIXEL_STAT_VARIANCE = 3;
+static const uint32_t PATH_DEBUG_PIXEL_STAT_REL_VARIANCE = 4;
+static const uint32_t PATH_DEBUG_PIXEL_STAT_REL_ERROR = 5;
+static const uint32_t PATH_DEBUG_PIXEL_STAT_MAX_RATIO = 6;
+static const uint32_t PATH_DEBUG_PIXEL_STAT_ZERO = 7;
 
 // scalars only: a vector would pad to its alignment and the two sides would drift apart
 struct PathDebugParams {
@@ -400,16 +435,25 @@ struct PathDebugParams {
     // a point's path must start this close to it, else its pixel sees another surface; 0 = any
     float sel_point_tolerance;
     uint32_t sel_mode;
+    uint32_t sel_target;
+    // the triangle target
+    uint32_t sel_geometry;
+    uint32_t sel_primitive;
+    // the GeometryIDs target_geometries holds a bit for
+    uint32_t sel_target_geometries;
     uint32_t sel_scatters_min;
     uint32_t sel_scatters_max;
     uint32_t sel_method_mask;
     uint32_t sel_method_mode;
-    uint32_t sel_material;
     uint32_t sel_finite;
     uint32_t expr_0;
     uint32_t expr_1;
     uint32_t expr_2;
     uint32_t expr_3;
+    uint32_t expr_4;
+    uint32_t expr_5;
+    uint32_t expr_6;
+    uint32_t expr_7;
     uint32_t expr_count;
 
     uint32_t overlay_rank;
@@ -427,7 +471,7 @@ struct PathDebugParams {
     uint32_t backdrop;
     float backdrop_split;
     float difference_gain;
-    float filtered_exposure;
+    float image_exposure;
 
     uint32_t map_res;
     uint32_t map_transform;
@@ -456,9 +500,15 @@ struct PathDebugParams {
     uint32_t grid_slots;
 
     uint32_t pixel_stats_accumulate;
+    // the filtered image or output is read
     uint32_t filtered_active;
     // the filtered output is connected
     uint32_t filtered_out;
+    uint32_t image_accumulate;
+    // the record pixels' first-hit depths are captured for the voxels
+    uint32_t image_depth;
+    // the filtered image is drawn from voxels, the camera moved since the depths were captured
+    uint32_t image_voxels;
     uint32_t pixel_stats_view;
     float pixel_stats_scale;
 
@@ -466,6 +516,8 @@ struct PathDebugParams {
     uint32_t capture_off;
     float keep_prob;
     uint32_t record_pixel;
+    // a point's pixel the whole-image recording keeps every path of
+    uint32_t record_keep_pixel;
 
     uint32_t cursor_x;
     uint32_t cursor_y;
@@ -492,6 +544,10 @@ struct PathDebugOverlayView {
     float h;
     float scale;
 };
+
+PATH_DEBUG_FUNC uint32_t path_debug_drawn_paths(const uint32_t max_paths, const uint32_t color) {
+    return color == PATH_DEBUG_COLOR_OFF ? 0 : max_paths;
+}
 
 // line and vertex quads per path segment, then the region's ring and the point's marker
 PATH_DEBUG_FUNC uint32_t path_debug_overlay_instances(const uint32_t max_paths) {
@@ -523,11 +579,16 @@ PATH_DEBUG_FUNC float path_debug_resample_key(const float weight, const float u)
     return weight / (neg_log > min_neg_log ? neg_log : min_neg_log);
 }
 
+// per pixel over every recorded path: what the selection adds to it, its square, the paths, the
+// brightest one (positive float bits) and the ones that add nothing
 static const uint32_t PATH_DEBUG_MOMENT_SUM = 0;
 static const uint32_t PATH_DEBUG_MOMENT_SQUARES = 1;
 static const uint32_t PATH_DEBUG_MOMENT_COUNT = 2;
-static const uint32_t PATH_DEBUG_MOMENT_UINTS = 3;
+static const uint32_t PATH_DEBUG_MOMENT_MAX = 3;
+static const uint32_t PATH_DEBUG_MOMENT_ZEROS = 4;
+static const uint32_t PATH_DEBUG_MOMENT_UINTS = 5;
 static const uint32_t PATH_DEBUG_FILTERED_UINTS = 4;
+static const uint32_t PATH_DEBUG_FILTERED_COUNT = 3;
 
 } // namespace merian
 
@@ -548,13 +609,21 @@ RWStructuredBuffer<uint, ScalarDataLayout> grid;
 RWStructuredBuffer<float, ScalarDataLayout> stats_f;
 RWStructuredBuffer<float, ScalarDataLayout> maps_f;
 RWStructuredBuffer<float, ScalarDataLayout> grid_f;
-// per pixel: sum, sum of squares and count of the luminance of the selection's paths
+// PATH_DEBUG_MOMENT_UINTS per pixel
 RWStructuredBuffer<uint, ScalarDataLayout> moments;
 RWStructuredBuffer<float, ScalarDataLayout> moments_f;
-// filtered re-render: rgb + pad per pixel, then the accumulated path count
+// the record pixel + 1 whose voxel the camera sees, 0 for none
+RWTexture2D<uint> voxel_image;
+// filtered image: per pixel the rgb of the filtered paths and the count of every path
 RWStructuredBuffer<uint, ScalarDataLayout> filtered;
 RWStructuredBuffer<float, ScalarDataLayout> filtered_f;
+// per record pixel the first-hit distance and |dz/dx| + |dz/dy|
+RWStructuredBuffer<float2, ScalarDataLayout> voxel_depth;
 RWStructuredBuffer<uint, ScalarDataLayout> matches;
+// PATH_DEBUG_EVENT_UINTS per record path the selection holds
+RWStructuredBuffer<uint, ScalarDataLayout> events;
+// a bit per GeometryID of the region's target
+RWStructuredBuffer<uint, ScalarDataLayout> target_geometries;
 RWStructuredBuffer<uint, ScalarDataLayout> kept;
 uniform merian::Camera camera;
 uniform PathDebugParams params;

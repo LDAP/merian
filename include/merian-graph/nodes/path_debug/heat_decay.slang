@@ -22,15 +22,18 @@ void main(uint3 gid: SV_DispatchThreadID) {
         return;
     }
 
-    const float decayed = asfloat(grid[params.grid_slots + slot]) * params.heat_decay;
-    const bool faded = decayed < MIN_WEIGHT;
+    const float2 decayed = float2(asfloat(grid[params.grid_slots + slot]),
+                                  asfloat(grid[2 * params.grid_slots + slot])) *
+                           params.heat_decay;
+    const bool faded = decayed.y < MIN_WEIGHT;
     if (faded) {
         grid[slot] = PATH_DEBUG_GRID_TOMBSTONE;
     }
-    const float w = faded ? 0.f : decayed;
-    grid[params.grid_slots + slot] = asuint(w);
-    if (w > 0.f) {
+    const float2 cell = faded ? float2(0.f) : decayed;
+    grid[params.grid_slots + slot] = asuint(cell.x);
+    grid[2 * params.grid_slots + slot] = asuint(cell.y);
+    if (!faded) {
         InterlockedAdd(state[PATH_DEBUG_STATE_GRID_CELLS], 1);
     }
-    path_debug_atomic_max_float(state, PATH_DEBUG_STATE_HEAT_MAX, w);
+    path_debug_atomic_max_float(state, PATH_DEBUG_STATE_HEAT_MAX, path_debug_heat_value(cell));
 }

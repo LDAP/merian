@@ -33,15 +33,20 @@ constexpr const char* BSDF_CHECK_MODULE = "merian-graph/nodes/path_debug/bsdf_ch
 constexpr const char* HEAT_DECAY_MODULE = "merian-graph/nodes/path_debug/heat_decay.slang";
 constexpr const char* HEAT_SPLAT_MODULE = "merian-graph/nodes/path_debug/heat_splat.slang";
 constexpr const char* FINALIZE_MODULE = "merian-graph/nodes/path_debug/finalize.slang";
+constexpr const char* VOXELS_MODULE = "merian-graph/nodes/path_debug/voxels.slang";
 
-constexpr std::array<const char*, 12> STANDALONE_MODULES = {
-    SELECT_MODULE,     THRESHOLD_MODULE,  COLLECT_MODULE,    KEEP_MODULE,
-    COMPOSE_MODULE,    STATS_MODULE,      MAP_REDUCE_MODULE, MAP_VIEW_MODULE,
-    HEAT_DECAY_MODULE, HEAT_SPLAT_MODULE, FINALIZE_MODULE,   OVERLAY_MODULE};
+constexpr std::array<const char*, 13> STANDALONE_MODULES = {
+    SELECT_MODULE,   THRESHOLD_MODULE,  COLLECT_MODULE,  KEEP_MODULE,       COMPOSE_MODULE,
+    STATS_MODULE,    MAP_REDUCE_MODULE, MAP_VIEW_MODULE, HEAT_DECAY_MODULE, HEAT_SPLAT_MODULE,
+    FINALIZE_MODULE, OVERLAY_MODULE,    VOXELS_MODULE};
+
+constexpr vk::Format VOXEL_FORMAT = vk::Format::eR32Uint;
+constexpr vk::Format VOXEL_DEPTH_FORMAT = vk::Format::eD32Sfloat;
 
 vk::BufferMemoryBarrier2 compute_to_transfer(const BufferHandle& buffer) {
     return buffer->buffer_barrier2(vk::PipelineStageFlagBits2::eComputeShader |
-                                       vk::PipelineStageFlagBits2::eRayTracingShaderKHR,
+                                       vk::PipelineStageFlagBits2::eRayTracingShaderKHR |
+                                       vk::PipelineStageFlagBits2::eVertexShader,
                                    vk::PipelineStageFlagBits2::eTransfer,
                                    vk::AccessFlagBits2::eShaderRead |
                                        vk::AccessFlagBits2::eShaderWrite,
@@ -151,6 +156,8 @@ void PathDebugNode::initialize(const ContextHandle& context,
                                       vk::BufferUsageFlagBits::eTransferDst, "path_debug state");
     kept_buffer = create_uint_buffer(allocator, vk::DeviceSize{PATH_DEBUG_KEPT_UINTS},
                                      vk::BufferUsageFlagBits::eTransferDst, "path_debug kept");
+    target_buffer = create_uint_buffer(allocator, 1, vk::BufferUsageFlagBits::eTransferDst,
+                                       "path_debug target geometries");
     out_state_buffer =
         create_uint_buffer(allocator, vk::DeviceSize{PATH_DEBUG_OUT_UINTS},
                            vk::BufferUsageFlagBits::eTransferSrc, "path_debug out state");
@@ -193,6 +200,33 @@ void PathDebugNode::build_gbuffer_kernels(const ContextHandle& context,
     overlay_fragment = SlangProgramEntryPoint::create(overlay_program, "fragment_main");
     overlay_out = {};
     overlay_canvas = {};
+
+    voxel_composition = make(VOXELS_MODULE);
+    voxel_program = SlangProgram::create(compile_context, voxel_composition);
+    voxel_vertex = SlangProgramEntryPoint::create(voxel_program, "vertex_main");
+    voxel_fragment = SlangProgramEntryPoint::create(voxel_program, "fragment_main");
+    voxel_globals = Versioned<ShaderObject>([this, context, allocator] {
+        return voxel_vertex.get()->create_global_shader_object(context, allocator);
+    });
+    voxel_globals.depends_on(voxel_vertex);
+    voxel_pipeline = Versioned<Pipeline>([this, context] {
+        const auto vertex = voxel_vertex.get();
+        return GraphicsPipelineBuilder()
+            .set_vertex_shader(vertex->specialize())
+            .set_fragment_shader(voxel_fragment.get()->specialize())
+            .input_assembly_topology(vk::PrimitiveTopology::eTriangleStrip)
+            .rasterizer_cull_mode(vk::CullModeFlagBits::eNone)
+            .depth_compare(vk::CompareOp::eGreater)
+            .depth_write_enable()
+            .blend_add_attachment(VK_FALSE)
+            .dyanmic_state_add(vk::DynamicState::eViewport)
+            .dyanmic_state_add(vk::DynamicState::eScissor)
+            .viewport_add(1.f, 1.f) // count only, the dynamic state supplies the extent
+            .build_dynamic_rendering(vertex->get_pipeline_layout(context), VOXEL_FORMAT,
+                                     VOXEL_DEPTH_FORMAT);
+    });
+    voxel_pipeline.depends_on(voxel_vertex);
+    voxel_pipeline.depends_on(voxel_fragment);
 }
 
 void PathDebugNode::ensure_overlay_target(const ContextHandle& context,
@@ -255,8 +289,8 @@ void PathDebugNode::ensure_scene_pipeline(const ContextHandle& context,
 
 std::vector<InputConnectorDescriptor> PathDebugNode::describe_inputs() {
     con_gbuffer = GBufferIn::create({{{GBufferField::Hit}},
-                                     {{GBufferField::Normal}},
-                                     {{GBufferField::LinearZ}},
+                                     {{GBufferField::FirstHitNormal}},
+                                     {{GBufferField::FirstHitLinearZ}},
                                      {{GBufferField::GradZ}}});
     return {
         {"scene", con_scene},
@@ -314,8 +348,38 @@ PathDebugNode::describe_outputs(const NodeIOLayout& io_layout) {
         create_uint_buffer(allocator, pixels * PATH_DEBUG_MOMENT_UINTS,
                            vk::BufferUsageFlagBits::eTransferDst, "path_debug moments");
     filtered_buffer =
-        create_uint_buffer(allocator, ((pixels * PATH_DEBUG_FILTERED_UINTS) + 1),
+        create_uint_buffer(allocator, pixels * PATH_DEBUG_FILTERED_UINTS,
                            vk::BufferUsageFlagBits::eTransferDst, "path_debug filtered");
+    voxel_depth_buffer = create_uint_buffer(allocator, pixels * 2, {}, "path_debug voxel depth");
+    const auto voxel_image_info = [this](const vk::Format format, const vk::ImageUsageFlags usage) {
+        return vk::ImageCreateInfo{{},
+                                   vk::ImageType::e2D,
+                                   format,
+                                   extent,
+                                   1,
+                                   1,
+                                   vk::SampleCountFlagBits::e1,
+                                   vk::ImageTiling::eOptimal,
+                                   usage,
+                                   vk::SharingMode::eExclusive,
+                                   {},
+                                   {},
+                                   vk::ImageLayout::eUndefined};
+    };
+    const ImageHandle voxel_image = allocator->create_image(
+        voxel_image_info(VOXEL_FORMAT, vk::ImageUsageFlagBits::eStorage |
+                                           vk::ImageUsageFlagBits::eColorAttachment),
+        MemoryMappingType::NONE, "path_debug voxels");
+    voxel_texture = allocator->create_texture(
+        voxel_image, voxel_image->make_view_create_info(),
+        allocator->get_sampler_pool()->nearest_clamp_to_edge(), "path_debug voxels");
+    const ImageHandle voxel_depth_image = allocator->create_image(
+        voxel_image_info(VOXEL_DEPTH_FORMAT, vk::ImageUsageFlagBits::eDepthStencilAttachment),
+        MemoryMappingType::NONE, "path_debug voxel depth");
+    vk::ImageViewCreateInfo depth_view_info = voxel_depth_image->make_view_create_info();
+    depth_view_info.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eDepth;
+    voxel_depth_view =
+        allocator->create_image_view(voxel_depth_image, depth_view_info, "path_debug voxel depth");
     grid_buffer = create_uint_buffer(allocator,
                                      vk::DeviceSize{PATH_DEBUG_GRID_REGIONS}
                                          << static_cast<uint32_t>(grid_slots_log2),
@@ -368,9 +432,11 @@ PathDebugNode::NodeStatusFlags PathDebugNode::on_connected(const NodeIOLayout& i
     bsdf_check = {};
     maps_dirty = true;
     heat_dirty = true;
+    image_dirty = true;
 
     submission.get_cmd()->barrier(
-        panel_texture->get_image()->barrier2(vk::ImageLayout::eGeneral, true));
+        {panel_texture->get_image()->barrier2(vk::ImageLayout::eGeneral, true),
+         voxel_texture->get_image()->barrier2(vk::ImageLayout::eGeneral, true)});
     imgui_renderer->unregister_texture(panel_texture_id);
     panel_texture_id = imgui_renderer->register_texture(panel_texture);
 
@@ -380,6 +446,11 @@ PathDebugNode::NodeStatusFlags PathDebugNode::on_connected(const NodeIOLayout& i
         allocator,
         std::max<vk::DeviceSize>(vk::DeviceSize{(capacities.path_capacity + 31) / 32}, 2),
         vk::BufferUsageFlagBits::eTransferDst, "path_debug matches");
+    events_buffer =
+        create_uint_buffer(allocator,
+                           std::max<vk::DeviceSize>(vk::DeviceSize{capacities.path_capacity}, 1) *
+                               PATH_DEBUG_EVENT_UINTS,
+                           {}, "path_debug events");
 
     io_layout.register_event_listener(
         "/graph/reload_shaders", [this](const GraphEvent::Info&, const GraphEvent::Data& force) {
@@ -388,7 +459,8 @@ PathDebugNode::NodeStatusFlags PathDebugNode::on_connected(const NodeIOLayout& i
                 (*kernel)->reload(forced, compile_context);
             }
             for (const SlangCompositionHandle& composition :
-                 {bsdf_map.composition, bsdf_check.composition, overlay_composition}) {
+                 {bsdf_map.composition, bsdf_check.composition, overlay_composition,
+                  voxel_composition}) {
                 if (!composition) {
                     continue;
                 }
@@ -409,6 +481,7 @@ PathDebugNode::NodeStatusFlags PathDebugNode::on_connected(const NodeIOLayout& i
                                           maps_dirty = true;
                                           kept_dirty = true;
                                           heat_dirty = true;
+                                          image_dirty = true;
                                           // a selection on its pixel sees what moved there
                                           if (!reproject && capture != CAPTURE_FROZEN) {
                                               repick();
@@ -433,13 +506,17 @@ PathDebugNode::process(const NodeIO& io, const NodeProcessInfo& info, Submission
     const uint32_t observed_paths = apply_readback_feedback(info, capacities);
     const bool ready = ready_camera(io) != nullptr;
 
-    record_clears(io, info, submission);
+    record_clears(info, submission);
     const FrameActivity activity = update_frame(io, ready);
+    upload_target(io.get_allocator(), submission);
     params = build_params(io, info, activity, observed_paths);
     bind_globals(io);
 
     if (activity.active) {
         record_analysis(io, info, submission, capacities, activity);
+    }
+    if (activity.image_voxels) {
+        record_voxels(io, info, submission);
     }
     record_compose(io, info, submission);
     if (activity.active) {
@@ -496,7 +573,8 @@ void PathDebugNode::handle_input(const NodeIO& io) {
         panel_scroll = std::max(
             0, panel_scroll - static_cast<int32_t>(events.panel_scroll * PANEL_SCROLL_PIXELS));
     }
-    if (events.radius_scroll != 0. && selected_pos_valid && select_kind == SELECT_REGION) {
+    if (events.radius_scroll != 0. && selected_pos_valid && select_kind == SELECT_REGION &&
+        region_target == TARGET_SPHERE) {
         selected_radius =
             std::max(MIN_REGION_RADIUS,
                      selected_radius *
@@ -536,6 +614,7 @@ void PathDebugNode::select_at(const int2& pixel) {
     reset_selected_point();
     point_behind_surface = false;
     request_pick(pixel);
+    target_from_click = true;
     invalidate_selection();
 }
 
@@ -550,6 +629,161 @@ void PathDebugNode::set_select_kind(const int32_t kind) {
 void PathDebugNode::set_region_match(const int32_t match) {
     region_match = match;
     invalidate_selection();
+}
+
+void PathDebugNode::set_region_target(const int32_t kind) {
+    region_target = kind;
+    invalidate_selection();
+}
+
+bool PathDebugNode::targets_ids() const {
+    return select_kind == SELECT_REGION && region_target != TARGET_SPHERE;
+}
+
+bool PathDebugNode::target_resolved() const {
+    return target.environment || target.mesh >= 0 || target.material >= 0;
+}
+
+void PathDebugNode::set_target(const RegionTarget& ids) {
+    target = ids;
+    target_from_click = false;
+    has_selection = true;
+    invalidate_selection();
+}
+
+void PathDebugNode::pick_target(const uint2 surface, const Placements& at) {
+    target = {};
+    if (surface.x == PATH_RECORD_GEOMETRY_ENVIRONMENT) {
+        target.environment = true;
+        return;
+    }
+    const SceneHandle scene = current_scene.lock();
+    if (!scene || !at || surface.x >= at->size() ||
+        (*at)[surface.x].mesh_id >= scene->get_mesh_infos().size() ||
+        !scene->get_mesh_infos()[(*at)[surface.x].mesh_id].mesh) {
+        return;
+    }
+    const Scene::GeometryPlacement& placement = (*at)[surface.x];
+    const Scene::Mesh& mesh = *scene->get_mesh_infos()[placement.mesh_id].mesh;
+    if (mesh.flags & Scene::MeshFlags::UseEnvMap) {
+        target.environment = true;
+        return;
+    }
+    target.mesh = static_cast<int32_t>(placement.mesh_id);
+    target.node = static_cast<int32_t>(placement.node_id);
+    target.primitive = static_cast<int32_t>(surface.y);
+    target.material = static_cast<int32_t>(mesh.material_id);
+}
+
+void PathDebugNode::update_target() {
+    const TargetBuild build{records_placements, target,
+                            targets_ids() && !target.environment ? region_target : -1};
+    const SceneHandle scene = current_scene.lock();
+    if (build == target_built || !scene) {
+        return;
+    }
+    target_built = build;
+    target_geometry = PATH_RECORD_GEOMETRY_NONE;
+    target_bits.clear();
+    target_bits_dirty = true;
+    if (build.kind < 0 || !build.placements) {
+        return;
+    }
+    const std::vector<Scene::GeometryPlacement>& at = *build.placements;
+    target_bits.assign((at.size() + 31) / 32, 0);
+    for (uint32_t geometry = 0; geometry < at.size(); geometry++) {
+        const Scene::GeometryPlacement& placement = at[geometry];
+        const bool same_mesh = static_cast<int32_t>(placement.mesh_id) == target.mesh;
+        const bool same_node = static_cast<int32_t>(placement.node_id) == target.node;
+        bool in_target = false;
+        switch (region_target) {
+        case TARGET_TRIANGLE:
+            if (same_mesh && same_node) {
+                target_geometry = geometry;
+            }
+            break;
+        case TARGET_PART:
+            in_target = same_mesh && same_node;
+            break;
+        case TARGET_OBJECT:
+            in_target = same_node;
+            break;
+        case TARGET_MESH:
+            in_target = same_mesh;
+            break;
+        default: {
+            const Scene::MeshHandle& mesh = scene->get_mesh_infos()[placement.mesh_id].mesh;
+            in_target = mesh && static_cast<int32_t>(mesh->material_id) == target.material;
+            break;
+        }
+        }
+        target_bits[geometry / 32] |= in_target ? 1u << (geometry % 32) : 0u;
+    }
+}
+
+void PathDebugNode::upload_target(const ResourceAllocatorHandle& allocator,
+                                  Submission& submission) {
+    if (!target_bits_dirty) {
+        return;
+    }
+    target_bits_dirty = false;
+    const vk::DeviceSize size = std::max<vk::DeviceSize>(target_bits.size(), 1) * sizeof(uint32_t);
+    if (target_buffer->get_size() < size) {
+        target_buffer = create_uint_buffer(allocator, size / sizeof(uint32_t),
+                                           vk::BufferUsageFlagBits::eTransferDst,
+                                           "path_debug target geometries");
+    }
+    const CommandBufferHandle& cmd = submission.get_cmd();
+    cmd->barrier(compute_to_transfer(target_buffer));
+    // vkCmdUpdateBuffer takes at most 64 KiB
+    constexpr std::size_t CHUNK = 65536 / sizeof(uint32_t);
+    for (std::size_t at = 0; at < target_bits.size(); at += CHUNK) {
+        const std::size_t count = std::min(CHUNK, target_bits.size() - at);
+        cmd->update<const uint32_t>(target_buffer, at * sizeof(uint32_t),
+                                    vk::ArrayProxy<const uint32_t>(count, target_bits.data() + at));
+    }
+    cmd->barrier(transfer_to_compute(target_buffer));
+}
+
+std::string PathDebugNode::mesh_label(const int32_t mesh) const {
+    const SceneHandle scene = current_scene.lock();
+    if (!scene || mesh < 0 || static_cast<std::size_t>(mesh) >= scene->get_mesh_infos().size() ||
+        !scene->get_mesh_infos()[mesh].mesh) {
+        return "no mesh";
+    }
+    const std::string& name = scene->get_mesh_infos()[mesh].mesh->name;
+    return name.empty() ? fmt::format("mesh {}", mesh) : name;
+}
+
+std::string PathDebugNode::node_label(const int32_t node) const {
+    const SceneHandle scene = current_scene.lock();
+    if (!scene || node < 0 || static_cast<std::size_t>(node) >= scene->get_scene_graph().size() ||
+        !scene->get_scene_graph()[node]) {
+        return "no object";
+    }
+    const std::string& name = scene->get_scene_graph()[node]->name;
+    return name.empty() ? fmt::format("object {}", node) : name;
+}
+
+std::string PathDebugNode::target_label() const {
+    if (target.environment) {
+        return "environment";
+    }
+    switch (region_target) {
+    case TARGET_TRIANGLE:
+        return target.primitive < 0 ? "no triangle"
+                                    : fmt::format("triangle {} of {} @ {}", target.primitive,
+                                                  mesh_label(target.mesh), node_label(target.node));
+    case TARGET_PART:
+        return fmt::format("{} @ {}", mesh_label(target.mesh), node_label(target.node));
+    case TARGET_OBJECT:
+        return node_label(target.node);
+    case TARGET_MESH:
+        return mesh_label(target.mesh);
+    default:
+        return target.material < 0 ? "no material"
+                                   : material_label(static_cast<uint32_t>(target.material));
+    }
 }
 
 std::optional<float2> PathDebugNode::project_point(Camera& camera) const {
@@ -637,14 +871,26 @@ void PathDebugNode::resolve_pick(Camera& camera) {
         return;
     }
     pending_pick = false;
+    // only a click picks the target, a pick that follows the camera keeps it
+    if (std::exchange(target_from_click, false)) {
+        // the records see through glass, the gbuffer answers where they hold no surface
+        const uint2 seen = records_answer ? pick.seen_surface : uint2(PATH_RECORD_GEOMETRY_NONE, 0);
+        const bool hit_known = gbuffer_connected && pick.surface_seq == pending_pick_seq;
+        const bool held = records_answer && capture == CAPTURE_FROZEN;
+        pick_target(seen.x != PATH_RECORD_GEOMETRY_NONE ? seen
+                    : hit_known                         ? pick.hit
+                                                        : uint2(PATH_RECORD_GEOMETRY_NONE, 0),
+                    held && seen.x != PATH_RECORD_GEOMETRY_NONE ? records_placements
+                                                                : readback_placements);
+    }
     const float3 surface = pick.surface;
     const float3 hit = !records_answer                ? surface
                        : select_kind == SELECT_REGION ? pick.seen
                                                       : pick.first;
     const float distance_to_camera = distance(camera.get_position(), hit);
-    // the sky keeps the previous surface, or selects nothing
+    // the sky keeps the previous surface, or selects nothing but the environment
     if (distance_to_camera >= PATH_DEBUG_ENV_DISTANCE * 0.5f) {
-        if (!selected_pos_valid) {
+        if (!selected_pos_valid && !targets_ids()) {
             clear_selection();
         }
         return;
@@ -678,9 +924,7 @@ float PathDebugNode::pixel_angle(const Camera& camera) const {
            static_cast<float>(extent.height);
 }
 
-void PathDebugNode::record_clears(const NodeIO& io,
-                                  const NodeProcessInfo& info,
-                                  Submission& submission) {
+void PathDebugNode::record_clears(const NodeProcessInfo& info, Submission& submission) {
     const CommandBufferHandle& cmd = submission.get_cmd();
     const bool first_frame = info.get_iteration() == 0;
     cmd->barrier({compute_to_transfer(state_buffer), compute_to_transfer(matches_buffer),
@@ -691,6 +935,7 @@ void PathDebugNode::record_clears(const NodeIO& io,
     if (camera_moved && capture != CAPTURE_FROZEN && !was_frozen) {
         camera_moved = false;
         pixel_stats_dirty = true;
+        image_dirty = true;
         maps_dirty = true;
         kept_dirty |= !keep_on_camera_move;
         // a selection on its pixel now sees another surface
@@ -716,15 +961,22 @@ void PathDebugNode::record_clears(const NodeIO& io,
         heat_dirty = false;
         heat_splatted = false;
     }
-    // a reset waits for something to read the moments or the re-render
-    const bool pixel_buffers_read = pixel_stats_read() || shows_pixel_image(io);
-    if ((pixel_stats_dirty && pixel_buffers_read) || first_frame) {
+    // a moments reset waits for something to read them
+    if ((pixel_stats_dirty && pixel_stats_read()) || first_frame) {
         cmd->fill(moments_buffer);
-        cmd->fill(filtered_buffer);
         pixel_stats_dirty = false;
         pixel_stats_accumulated = false;
         pixel_stats_generation++;
         pixel_history.clear();
+    }
+    if (ImageSignature signature = image_signature(); !(signature == image_held)) {
+        image_held = std::move(signature);
+        image_dirty = true;
+    }
+    if (image_dirty || first_frame) {
+        cmd->fill(filtered_buffer);
+        image_dirty = false;
+        image_accumulated = false;
     }
     if (kept_dirty || first_frame) {
         cmd->fill(kept_buffer);
@@ -742,10 +994,23 @@ PathDebugNode::FrameActivity PathDebugNode::update_frame(const NodeIO& io, const
     if (params.freeze == 0) {
         traced_pixel_filter = params.record_pixel;
     }
+    if (const SceneHandle& scene = io[con_scene]) {
+        current_scene = scene;
+        material_system = scene->get_material_system();
+        if (!placements || *placements != scene->get_geometry_placements()) {
+            placements = std::make_shared<const std::vector<Scene::GeometryPlacement>>(
+                scene->get_geometry_placements());
+        }
+    }
+    // held records keep the GeometryIDs of the frame they were traced in
+    if (capture != CAPTURE_FROZEN && !was_frozen) {
+        records_placements = placements;
+    }
     if (const CameraHandle camera = ready_camera(io)) {
         resolve_pick(*camera);
     }
     reproject_pick(io);
+    update_target();
     selected_pixel = clamp(selected_pixel, int2(0), to_int2(extent) - 1);
     // held records keep matching the pixel they were traced through
     const bool held =
@@ -763,9 +1028,6 @@ PathDebugNode::FrameActivity PathDebugNode::update_frame(const NodeIO& io, const
             selection_visible() ? std::optional<int2>(selected_pixel) : std::optional<int2>();
     }
     reference_input_connected = io.is_connected(con_reference);
-    if (const SceneHandle& scene = io[con_scene]) {
-        material_system = scene->get_material_system();
-    }
     backdrop_missing = (shows_reference() && !has_reference()) ||
                        (backdrop == static_cast<int32_t>(PATH_DEBUG_BACKDROP_INPUT) &&
                         !io.is_connected(con_backdrop));
@@ -782,6 +1044,22 @@ PathDebugNode::FrameActivity PathDebugNode::update_frame(const NodeIO& io, const
     pixel_stats_accumulated |= activity.pixel_stats_accumulate && activity.active;
     activity.heat_splat = !activity.frozen || !heat_splatted;
     activity.one_pixel = selects_point() && !shows_pixel_image(io);
+    const bool shows_filtered = backdrop == static_cast<int32_t>(PATH_DEBUG_BACKDROP_FILTERED) ||
+                                io.is_connected(con_filtered);
+    activity.image_accumulate = shows_filtered && (!activity.frozen || !image_accumulated);
+    image_accumulated |= activity.image_accumulate && activity.active;
+    // a frozen capture keeps the depths of the view its records were traced from
+    const CameraHandle camera = ready_camera(io);
+    if (!activity.frozen) {
+        image_camera.reset();
+    }
+    activity.image_depth =
+        gbuffer_connected && camera && activity.frozen && !camera_moved && !image_camera;
+    if (activity.image_depth) {
+        image_camera = std::make_shared<Camera>(*camera);
+    }
+    activity.image_voxels = shows_pixel_image(io) && activity.active && image_camera && camera &&
+                            !(*camera == *image_camera);
 
     activity.panel_mask = panels_enabled && activity.active ? shown_panel_mask() : 0;
     update_panel_layout(io, activity.panel_mask);
@@ -850,7 +1128,7 @@ PathDebugParams PathDebugNode::build_params(const NodeIO& io,
     build_pixel_stats_params(p, io, activity);
     build_backdrop_params(p, info);
     if (capture == CAPTURE_OFF) {
-        p.backdrop = PATH_DEBUG_BACKDROP_RENDER;
+        p.backdrop = PATH_DEBUG_BACKDROP_SOURCE;
         p.heat_mode = PATH_DEBUG_HEAT_OFF;
         p.pixel_stats_view = PATH_DEBUG_PIXEL_STAT_OFF;
         p.filtered_active = 0;
@@ -883,6 +1161,16 @@ void PathDebugNode::build_selection_params(PathDebugParams& p, const NodeIO& io)
     p.sel_region_radius = selected_pos_valid ? selected_radius : 0.f;
     p.sel_point_valid = has_selection && selected_pos_valid ? 1 : 0;
     p.sel_mode = selection_mode();
+    p.sel_target = !targets_ids()       ? PATH_DEBUG_TARGET_SPHERE
+                   : target.environment ? PATH_DEBUG_TARGET_ENVIRONMENT
+                   : region_target == TARGET_TRIANGLE &&
+                           target_geometry != PATH_RECORD_GEOMETRY_NONE && target.primitive >= 0
+                       ? PATH_DEBUG_TARGET_TRIANGLE
+                       // an unresolved target holds no geometry
+                       : PATH_DEBUG_TARGET_GEOMETRIES;
+    p.sel_geometry = target_geometry;
+    p.sel_primitive = static_cast<uint32_t>(std::max(target.primitive, 0));
+    p.sel_target_geometries = static_cast<uint32_t>(target_bits.size() * 32);
     // jitter, the pixel grid and a grazing surface move the hit within a few pixel footprints
     p.sel_point_tolerance = 0.f;
     if (const CameraHandle camera = ready_camera(io); reproject && selected_pos_valid && camera) {
@@ -896,16 +1184,18 @@ void PathDebugNode::build_selection_params(PathDebugParams& p, const NodeIO& io)
     p.sel_method_mask = method_mask;
     p.sel_method_mode = static_cast<uint32_t>(method_mode);
     p.sel_finite = static_cast<uint32_t>(contribution_filter);
-    p.sel_material =
-        material_id >= 0 ? static_cast<uint32_t>(material_id) : PATH_RECORD_MATERIAL_NONE;
-    p.expr_0 = compiled_expression.words[0];
-    p.expr_1 = compiled_expression.words[1];
-    p.expr_2 = compiled_expression.words[2];
-    p.expr_3 = compiled_expression.words[3];
-    p.expr_count =
-        compiled_expression.valid
-            ? compiled_expression.token_count | (compiled_expression.nee ? PATH_DEBUG_EXPR_NEE : 0u)
-            : 0;
+    const std::array<uint32_t, PATH_DEBUG_MAX_TOKENS>& tokens = compiled_expression.tokens;
+    p.expr_0 = tokens[0];
+    p.expr_1 = tokens[1];
+    p.expr_2 = tokens[2];
+    p.expr_3 = tokens[3];
+    p.expr_4 = tokens[4];
+    p.expr_5 = tokens[5];
+    p.expr_6 = tokens[6];
+    p.expr_7 = tokens[7];
+    p.expr_count = compiled_expression.valid && compiled_expression.active
+                       ? compiled_expression.token_count | PATH_DEBUG_EXPR_ACTIVE
+                       : 0;
     p.pick_x = pending_pick ? static_cast<uint32_t>(pending_pick_pixel.x) : PATH_DEBUG_NO_PIXEL;
     p.pick_y = pending_pick ? static_cast<uint32_t>(pending_pick_pixel.y) : PATH_DEBUG_NO_PIXEL;
     p.pick_seq = pending_pick_seq;
@@ -921,12 +1211,15 @@ void PathDebugNode::build_capture_params(PathDebugParams& p, const FrameActivity
                      : pending_pick        ? path_record_pack_pixel(uint2(pending_pick_pixel))
                      : selection_visible() ? path_record_pack_pixel(uint2(selected_pixel))
                                            : PATH_DEBUG_RECORD_NO_PIXEL;
+    p.record_keep_pixel = !one_pixel && selects_point() && selection_visible()
+                              ? path_record_pack_pixel(uint2(selected_pixel))
+                              : PATH_RECORD_ALL_PIXELS;
 }
 
 void PathDebugNode::build_overlay_params(PathDebugParams& p, const FrameActivity& activity) const {
     p.overlay_rank = static_cast<uint32_t>(overlay_rank);
     p.overlay_max_paths = static_cast<uint32_t>(overlay_max_paths);
-    p.overlay_keep_update = activity.keep_update ? 1 : 0;
+    p.overlay_keep_update = activity.keep_update && overlay_max_paths > 0 ? 1 : 0;
     p.overlay_brightest_share = overlay_brightest_share;
     p.overlay_key_decay =
         overlay_rank == static_cast<int32_t>(PATH_DEBUG_RANK_RESAMPLED) && resample_history > 0.f
@@ -965,7 +1258,7 @@ void PathDebugNode::build_map_params(PathDebugParams& p,
 
 void PathDebugNode::build_heat_params(PathDebugParams& p, const FrameActivity& activity) const {
     p.heat_mode = gbuffer_connected && false_color == FALSE_COLOR_HEAT
-                      ? PATH_DEBUG_HEAT_DENSITY + static_cast<uint32_t>(heat_quantity)
+                      ? PATH_DEBUG_HEAT_VERTICES + static_cast<uint32_t>(heat_quantity)
                       : PATH_DEBUG_HEAT_OFF;
     p.heat_bounce_min = static_cast<uint32_t>(heat_bounce_range.x);
     p.heat_bounce_max = static_cast<uint32_t>(heat_bounce_range.y);
@@ -991,22 +1284,25 @@ void PathDebugNode::build_pixel_stats_params(PathDebugParams& p,
     p.filtered_active =
         backdrop == static_cast<int32_t>(PATH_DEBUG_BACKDROP_FILTERED) || p.filtered_out != 0 ? 1
                                                                                               : 0;
-    p.filtered_exposure = filtered_exposure;
+    p.image_exposure = image_exposure;
+    p.image_accumulate = activity.image_accumulate ? 1 : 0;
+    p.image_depth = activity.image_depth ? 1 : 0;
+    p.image_voxels = activity.image_voxels ? 1 : 0;
 }
 
 void PathDebugNode::build_backdrop_params(PathDebugParams& p, const NodeProcessInfo& info) const {
     p.backdrop_split = backdrop_split;
     p.difference_gain = difference_gain;
-    p.backdrop = backdrop_missing ? PATH_DEBUG_BACKDROP_RENDER : static_cast<uint32_t>(backdrop);
+    p.backdrop = backdrop_missing ? PATH_DEBUG_BACKDROP_SOURCE : static_cast<uint32_t>(backdrop);
     if (reference_flip && (p.backdrop == PATH_DEBUG_BACKDROP_REFERENCE ||
                            p.backdrop == PATH_DEBUG_BACKDROP_SPLIT_REFERENCE)) {
         const auto phase = static_cast<uint64_t>(info.get_elapsed() * reference_flip_hz);
-        p.backdrop = (phase & 1u) == 0 ? PATH_DEBUG_BACKDROP_RENDER : PATH_DEBUG_BACKDROP_REFERENCE;
+        p.backdrop = (phase & 1u) == 0 ? PATH_DEBUG_BACKDROP_SOURCE : PATH_DEBUG_BACKDROP_REFERENCE;
     }
 }
 
 void PathDebugNode::bind_node_buffers(ShaderCursor cursor, const NodeIO& io) const {
-    const std::array<std::pair<const char*, BufferHandle>, 15> buffers = {{
+    const std::array<std::pair<const char*, BufferHandle>, 18> buffers = {{
         {"state", state_buffer},
         {"out_state", out_state_buffer},
         {"stats", stats_buffer},
@@ -1019,7 +1315,10 @@ void PathDebugNode::bind_node_buffers(ShaderCursor cursor, const NodeIO& io) con
         {"moments_f", moments_buffer},
         {"filtered", filtered_buffer},
         {"filtered_f", filtered_buffer},
+        {"voxel_depth", voxel_depth_buffer},
         {"matches", matches_buffer},
+        {"events", events_buffer},
+        {"target_geometries", target_buffer},
         {"kept", kept_buffer},
         {"in_records", io[con_records]},
     }};
@@ -1030,6 +1329,9 @@ void PathDebugNode::bind_node_buffers(ShaderCursor cursor, const NodeIO& io) con
     }
     if (auto c = cursor.find("out_panels"); c.is_valid() && panel_texture) {
         c = panel_texture->get_view();
+    }
+    if (auto c = cursor.find("voxel_image"); c.is_valid() && voxel_texture) {
+        c = voxel_texture->get_view();
     }
     if (auto c = cursor.find("in_reference"); c.is_valid()) {
         if (io.is_connected(con_reference)) {
@@ -1049,6 +1351,9 @@ void PathDebugNode::bind_node_buffers(ShaderCursor cursor, const NodeIO& io) con
         if (const CameraHandle camera = ready_camera(io)) {
             camera->write_to(c);
         }
+    }
+    if (auto c = cursor.find("voxel_camera"); c.is_valid() && image_camera) {
+        image_camera->write_to(c);
     }
     if (auto c = cursor.find("gbuffer"); c.is_valid() && gbuffer_connected) {
         c = io[con_gbuffer].r();
@@ -1096,7 +1401,7 @@ void PathDebugNode::record_analysis(const NodeIO& io,
         select_kernel->bind(io, info, submission);
         cmd->dispatch(path_groups, 1, 1);
     }
-    cmd->barrier(compute_to_compute(matches_buffer));
+    cmd->barrier({compute_to_compute(matches_buffer), compute_to_compute(events_buffer)});
     if (activity.maps_accumulate) {
         MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "stats");
         const uint32_t stats_threads = ceil_div(capacities.path_capacity, params.stats_stride);
@@ -1193,6 +1498,12 @@ void PathDebugNode::record_compose(const NodeIO& io,
                                    Submission& submission) {
     const CommandBufferHandle& cmd = submission.get_cmd();
     MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "compose");
+    // a capture overwrites the depths earlier voxel draws read
+    if (params.image_depth != 0) {
+        cmd->barrier(voxel_depth_buffer->buffer_barrier2(
+            vk::PipelineStageFlagBits2::eVertexShader, vk::PipelineStageFlagBits2::eComputeShader,
+            vk::AccessFlagBits2::eShaderRead, vk::AccessFlagBits2::eShaderWrite));
+    }
     compose_kernel->bind(io, info, submission);
     cmd->dispatch(vk::Extent3D{std::max(extent.width, out_extent.width),
                                std::max(extent.height, out_extent.height), 1},
@@ -1253,11 +1564,72 @@ void PathDebugNode::record_overlay(const NodeIO& io,
     cmd->set_viewport(
         vk::Viewport{overlay_view.x, overlay_view.y, overlay_view.w, overlay_view.h, 0.f, 1.f});
     cmd->set_scissor(view);
-    cmd->draw(6, path_debug_overlay_instances(params.overlay_max_paths));
+    cmd->draw(6, path_debug_overlay_instances(
+                     path_debug_drawn_paths(params.overlay_max_paths, params.overlay_color)));
     cmd->end_rendering();
     if (!onto_canvas) {
         cmd->barrier(from_color_attachment(image));
     }
+}
+
+void PathDebugNode::record_voxels(const NodeIO& io,
+                                  const NodeProcessInfo& info,
+                                  Submission& submission) {
+    const CommandBufferHandle& cmd = submission.get_cmd();
+    MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "voxels");
+    const auto vertex = voxel_vertex.get();
+    const auto pipe = voxel_pipeline.get();
+    const auto globals = voxel_globals.get();
+    bind_node_buffers(globals->get_cursor(), io);
+
+    const ImageHandle& image = voxel_texture->get_image();
+    const ImageHandle& depth = voxel_depth_view->get_image();
+    cmd->barrier({compute_to_vertex(filtered_buffer), compute_to_vertex(moments_buffer),
+                  compute_to_vertex(voxel_depth_buffer)});
+    cmd->barrier(
+        {image->barrier2(vk::ImageLayout::eColorAttachmentOptimal, vk::AccessFlagBits2::eShaderRead,
+                         vk::AccessFlagBits2::eColorAttachmentWrite,
+                         vk::PipelineStageFlagBits2::eComputeShader,
+                         vk::PipelineStageFlagBits2::eColorAttachmentOutput),
+         depth->barrier2(vk::ImageLayout::eDepthAttachmentOptimal,
+                         vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+                         vk::AccessFlagBits2::eDepthStencilAttachmentRead |
+                             vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+                         vk::PipelineStageFlagBits2::eLateFragmentTests,
+                         vk::PipelineStageFlagBits2::eEarlyFragmentTests |
+                             vk::PipelineStageFlagBits2::eLateFragmentTests,
+                         VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
+                         all_levels_and_layers(vk::ImageAspectFlagBits::eDepth), true)});
+    const vk::RenderingAttachmentInfo color{*voxel_texture->get_view(),
+                                            vk::ImageLayout::eColorAttachmentOptimal,
+                                            vk::ResolveModeFlagBits::eNone,
+                                            {},
+                                            {},
+                                            vk::AttachmentLoadOp::eClear,
+                                            vk::AttachmentStoreOp::eStore,
+                                            vk::ClearColorValue{std::array<uint32_t, 4>{}}};
+    // reversed z
+    const vk::RenderingAttachmentInfo depth_attachment{*voxel_depth_view,
+                                                       vk::ImageLayout::eDepthAttachmentOptimal,
+                                                       vk::ResolveModeFlagBits::eNone,
+                                                       {},
+                                                       {},
+                                                       vk::AttachmentLoadOp::eClear,
+                                                       vk::AttachmentStoreOp::eDontCare,
+                                                       vk::ClearDepthStencilValue{0.f, 0}};
+    cmd->bind(pipe);
+    vertex->bind_global(globals, cmd, pipe, info.get_shader_object_allocator());
+    const vk::Rect2D area{{0, 0}, {extent.width, extent.height}};
+    cmd->begin_rendering(vk::RenderingInfo{{}, area, 1, 0, color, &depth_attachment});
+    cmd->set_viewport(vk::Viewport{0.f, 0.f, static_cast<float>(extent.width),
+                                   static_cast<float>(extent.height), 0.f, 1.f});
+    cmd->set_scissor(area);
+    cmd->draw(14, extent.width * extent.height);
+    cmd->end_rendering();
+    cmd->barrier(image->barrier2(
+        vk::ImageLayout::eGeneral, vk::AccessFlagBits2::eColorAttachmentWrite,
+        vk::AccessFlagBits2::eShaderRead, vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+        vk::PipelineStageFlagBits2::eComputeShader));
 }
 
 void PathDebugNode::record_map_panels(const NodeIO& io,
@@ -1373,10 +1745,12 @@ void PathDebugNode::record_readback(const NodeIO& io,
     cmd->barrier(readback->buffer_barrier2(
         vk::PipelineStageFlagBits2::eTransfer, vk::PipelineStageFlagBits2::eHost,
         vk::AccessFlagBits2::eTransferWrite, vk::AccessFlagBits2::eHostRead));
-    submission.sync_to_cpu([this, readback, recorded_pixel_stats = pixel_stats_generation]() {
+    submission.sync_to_cpu([this, readback, recorded_pixel_stats = pixel_stats_generation,
+                            frame_placements = placements]() {
         const Readback data = *readback->get_memory()->map_as<Readback>();
         readback->get_memory()->unmap();
         latest_readback = data;
+        readback_placements = frame_placements;
         readback_valid = true;
         if (recorded_pixel_stats != pixel_stats_generation) {
             return;
@@ -1447,6 +1821,26 @@ void PathDebugNode::ensure_reference(const ResourceAllocatorHandle& allocator,
         reference_texture->get_image()->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal));
 }
 
+PathDebugNode::ImageSignature PathDebugNode::image_signature() const {
+    ImageSignature signature{.expression = expression,
+                             .contribution = contribution_filter,
+                             .scatters_min = scatter_range.x,
+                             .scatters_max = scatter_range.y,
+                             .methods = method_mask,
+                             .method_mode = method_mode,
+                             .target = target_built};
+    if (has_selection && select_kind == SELECT_REGION) {
+        signature.match = region_match;
+    }
+    if (signature.match >= 0 && region_target == TARGET_SPHERE && selected_pos_valid) {
+        signature.sphere_x = selected_pos.x;
+        signature.sphere_y = selected_pos.y;
+        signature.sphere_z = selected_pos.z;
+        signature.sphere_radius = selected_radius;
+    }
+    return signature;
+}
+
 void PathDebugNode::invalidate_selection() {
     maps_dirty = true;
     pixel_stats_dirty = true;
@@ -1514,6 +1908,10 @@ uint32_t PathDebugNode::selection_mode() const {
     return select_kind == SELECT_POINT
                ? PATH_DEBUG_SELECT_POINT
                : PATH_DEBUG_SELECT_THROUGH + static_cast<uint32_t>(region_match);
+}
+
+const char* PathDebugNode::missing_image_input() const {
+    return shows_reference() ? "reference" : "backdrop input";
 }
 
 bool PathDebugNode::shows_pixel_image(const NodeIO& io) const {

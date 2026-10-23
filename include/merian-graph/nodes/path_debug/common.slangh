@@ -61,7 +61,8 @@ bool path_debug_bsdf_comparable() {
 }
 
 bool path_debug_selects_region() {
-    return params.sel_mode >= PATH_DEBUG_SELECT_THROUGH && params.sel_region_radius > 0.f;
+    return params.sel_mode >= PATH_DEBUG_SELECT_THROUGH &&
+           (params.sel_target != PATH_DEBUG_TARGET_SPHERE || params.sel_region_radius > 0.f);
 }
 
 bool path_debug_in_selected_pixel(const PathRecordPath p) {
@@ -81,10 +82,6 @@ uint path_debug_filtered_base(const uint2 pixel) {
     return PATH_DEBUG_FILTERED_UINTS * (pixel.y * params.dim_x + pixel.x);
 }
 
-uint path_debug_filtered_paths_at() {
-    return PATH_DEBUG_FILTERED_UINTS * params.dim_x * params.dim_y;
-}
-
 uint path_debug_moments_base(const uint2 pixel) {
     return PATH_DEBUG_MOMENT_UINTS * (pixel.y * params.dim_x + pixel.x);
 }
@@ -93,19 +90,52 @@ struct PathDebugPixelMoments {
     float mean;
     float variance;
     float rel_error;
+    float max;
     uint count;
+    uint zeros;
 }
 
 PathDebugPixelMoments path_debug_pixel_moments(const uint2 pixel) {
     const uint base = path_debug_moments_base(pixel);
     PathDebugPixelMoments m;
     m.count = moments[base + PATH_DEBUG_MOMENT_COUNT];
+    m.zeros = moments[base + PATH_DEBUG_MOMENT_ZEROS];
+    m.max = asfloat(moments[base + PATH_DEBUG_MOMENT_MAX]);
     m.mean = m.count > 0 ? asfloat(moments[base + PATH_DEBUG_MOMENT_SUM]) / float(m.count) : 0.f;
     const float mean_square =
         m.count > 0 ? asfloat(moments[base + PATH_DEBUG_MOMENT_SQUARES]) / float(m.count) : 0.f;
     m.variance = m.count > 1 ? max(mean_square - m.mean * m.mean, 0.f) : 0.f;
     m.rel_error = (m.count > 1 && m.mean > 0.f) ? sqrt(m.variance / float(m.count)) / m.mean : 0.f;
     return m;
+}
+
+float path_debug_pixel_statistic(const PathDebugPixelMoments m, const uint statistic) {
+    switch (statistic) {
+    case PATH_DEBUG_PIXEL_STAT_SAMPLES:
+        return float(m.count);
+    case PATH_DEBUG_PIXEL_STAT_VARIANCE:
+        return m.variance;
+    case PATH_DEBUG_PIXEL_STAT_REL_VARIANCE:
+        return m.mean > 0.f ? m.variance / (m.mean * m.mean) : 0.f;
+    case PATH_DEBUG_PIXEL_STAT_REL_ERROR:
+        return m.rel_error;
+    case PATH_DEBUG_PIXEL_STAT_MAX_RATIO:
+        return m.mean > 0.f ? m.max / m.mean : 0.f;
+    case PATH_DEBUG_PIXEL_STAT_ZERO:
+        return m.count > 0 ? float(m.zeros) / float(m.count) : 0.f;
+    default:
+        return m.mean;
+    }
+}
+
+// the record pixel shown at a render pixel: its own, or whose voxel the camera sees once it moved
+uint2 path_debug_source_pixel(const uint2 render_pixel) {
+    if (params.image_voxels == 0) {
+        return render_pixel;
+    }
+    const uint source = voxel_image[render_pixel];
+    return source == 0 ? uint2(PATH_DEBUG_NO_PIXEL)
+                       : uint2((source - 1) % params.dim_x, (source - 1) / params.dim_x);
 }
 
 // maps buffer, regions of N = map_res^2:
@@ -247,24 +277,47 @@ uint path_debug_grid_find(const uint key, const bool insert) {
     return PATH_DEBUG_GRID_INVALID;
 }
 
-float path_debug_grid_weight_at(const float3 pos) {
+// a cell's weight and vertices
+float2 path_debug_grid_at(const float3 pos) {
     const uint slot = path_debug_grid_find(path_debug_grid_key(pos), false);
-    return slot == PATH_DEBUG_GRID_INVALID ? 0.f : asfloat(grid[params.grid_slots + slot]);
+    return slot == PATH_DEBUG_GRID_INVALID
+               ? float2(0.f)
+               : float2(asfloat(grid[params.grid_slots + slot]),
+                        asfloat(grid[2 * params.grid_slots + slot]));
+}
+
+float path_debug_heat_value(const float2 cell) {
+    return path_debug_heat_averages(params.heat_mode) ? (cell.y > 0.f ? cell.x / cell.y : 0.f)
+                                                      : cell.x;
 }
 
 uint path_debug_token(const uint index) {
-    uint word = params.expr_0;
-    if (index >= 6) {
-        word = params.expr_3;
-    } else if (index >= 4) {
-        word = params.expr_2;
-    } else if (index >= 2) {
-        word = params.expr_1;
+    switch (index) {
+    case 0:
+        return params.expr_0;
+    case 1:
+        return params.expr_1;
+    case 2:
+        return params.expr_2;
+    case 3:
+        return params.expr_3;
+    case 4:
+        return params.expr_4;
+    case 5:
+        return params.expr_5;
+    case 6:
+        return params.expr_6;
+    default:
+        return params.expr_7;
     }
-    return (word >> (PATH_DEBUG_TOKEN_BITS * (index & 1))) & ((1u << PATH_DEBUG_TOKEN_BITS) - 1);
 }
 
-bool path_debug_token_matches(const uint token, const uint meta) {
+// the technique that drew the vertex's outgoing direction
+uint path_debug_vertex_labels(const uint meta) {
+    return 1u << ((meta >> PATH_RECORD_METHOD_SHIFT) & PATH_RECORD_METHOD_MASK);
+}
+
+bool path_debug_token_matches(const uint token, const uint meta, const uint labels) {
     const uint lobe = (meta >> PATH_RECORD_LOBE_SHIFT) & PATH_RECORD_LOBE_MASK;
     const uint smoothness =
         lobe & (PATH_DEBUG_CLS_DELTA | PATH_DEBUG_CLS_GLOSSY | PATH_DEBUG_CLS_DIFFUSE);
@@ -272,7 +325,8 @@ bool path_debug_token_matches(const uint token, const uint meta) {
     const uint side = (lobe & PATH_RECORD_LOBE_TRANSMISSION) != 0 ? PATH_DEBUG_SIDE_TRANSMIT
                                                                   : PATH_DEBUG_SIDE_REFLECT;
     return (cls & token & PATH_DEBUG_CLS_MASK) != 0 &&
-           (side & (token >> PATH_DEBUG_SIDE_SHIFT) & PATH_DEBUG_SIDE_MASK) != 0;
+           (side & (token >> PATH_DEBUG_SIDE_SHIFT) & PATH_DEBUG_SIDE_MASK) != 0 &&
+           (labels & (token >> PATH_DEBUG_LABEL_SHIFT)) != 0;
 }
 
 uint path_debug_token_repeat_min(const uint token) {
@@ -320,174 +374,272 @@ bool path_debug_is_empty_draw(const PathRecordVertex v) {
     return v.nee && !v.resampled && !(v.pdf > 0.f);
 }
 
-bool path_debug_is_event(const uint meta) {
-    return (meta & (PATH_RECORD_FLAG_NEE | PATH_RECORD_FLAG_TERMINAL)) == 0;
-}
-
-uint path_debug_scatter_count(PathRecordStream records,
-                              const PathRecordPath p,
-                              const uint vertex_region) {
-    return path_debug_count_vertices(records, p, vertex_region,
-                                     PATH_RECORD_FLAG_NEE | PATH_RECORD_FLAG_TERMINAL);
-}
-
-bool path_debug_region_hit(const PathRecordPath p, const uint vertex_region) {
-    const float3 q = path_debug_selected_point();
-    const float r2 = params.sel_region_radius * params.sel_region_radius;
-    if (params.sel_mode != PATH_DEBUG_SELECT_THROUGH) {
-        const uint end = params.sel_mode == PATH_DEBUG_SELECT_FROM ? 0 : p.vertex_count - 1;
-        const float3 pos =
-            path_record_load_vertex(in_records, vertex_region, p.vertex_offset + end).pos;
-        return dot(pos - q, pos - q) <= r2;
-    }
-    float3 chain_pos = path_record_load_vertex(in_records, vertex_region, p.vertex_offset).pos;
-    if (dot(chain_pos - q, chain_pos - q) <= r2) {
-        return true;
-    }
-    for (uint v = 1; v < p.vertex_count; v++) {
-        const PathRecordVertex vertex =
-            path_record_load_vertex(in_records, vertex_region, p.vertex_offset + v);
-        const float3 edge = vertex.pos - chain_pos;
-        const float len2 = dot(edge, edge);
-        const float t = len2 > 0.f ? clamp(dot(q - chain_pos, edge) / len2, 0.f, 1.f) : 0.f;
-        const float3 nearest = chain_pos + t * edge;
-        if (dot(nearest - q, nearest - q) <= r2) {
-            return true;
-        }
-        if (!vertex.nee) {
-            chain_pos = vertex.pos;
-        }
-    }
-    return false;
-}
-
-// the scatter range or an expression ask for a path's scatter events
-bool path_debug_needs_scatter_count() {
-    return params.sel_scatters_min > 0 || params.sel_scatters_max != PATH_DEBUG_NO_SCATTER_LIMIT ||
-           (params.expr_count & PATH_DEBUG_EXPR_COUNT_MASK) != 0;
-}
-
 // the paths of the selected point's pixel that start at it, every path without a point
 bool path_debug_point_matches(const PathRecordPath p, const uint vertex_region) {
     return !path_debug_selects_point() ||
            (path_debug_in_selected_pixel(p) && path_debug_starts_at_point(p, vertex_region));
 }
 
-// the selection without its point: the filter and a region
-bool path_debug_filter_matches(const PathRecordPath p,
-                               const uint vertex_region,
-                               const uint scatter) {
-    const bool finite = isfinite(p.luminance);
-    if ((params.sel_finite == PATH_DEBUG_FINITE_ONLY && !finite) ||
-        (params.sel_finite == PATH_DEBUG_FINITE_NONFINITE && finite)) {
-        return false;
-    }
-    if (scatter < params.sel_scatters_min || scatter > params.sel_scatters_max) {
-        return false;
-    }
-    if (path_debug_selects_region() && !path_debug_region_hit(p, vertex_region)) {
-        return false;
-    }
-    if (params.sel_method_mask != 0 || params.sel_material != PATH_RECORD_MATERIAL_NONE) {
-        bool any_method = false;
-        bool all_methods = true;
-        bool any_material = false;
-        for (uint v = 0; v < p.vertex_count; v++) {
-            const uint meta =
-                path_record_load_vertex_meta(in_records, vertex_region, p.vertex_offset + v);
-            if ((meta & PATH_RECORD_FLAG_TERMINAL) != 0) {
-                continue;
-            }
-            const uint method = (meta >> PATH_RECORD_METHOD_SHIFT) & PATH_RECORD_METHOD_MASK;
-            const bool in_mask = (params.sel_method_mask & (1u << method)) != 0;
-            any_method |= in_mask;
-            all_methods = all_methods && in_mask;
-            any_material |= ((meta >> PATH_RECORD_MATERIAL_SHIFT) & PATH_RECORD_MATERIAL_MASK) ==
-                            params.sel_material;
-        }
-        if (params.sel_method_mask != 0 &&
-            !(params.sel_method_mode == PATH_DEBUG_METHOD_EVERY_VERTEX ? all_methods && any_method
-                                                                       : any_method)) {
-            return false;
-        }
-        if (params.sel_material != PATH_RECORD_MATERIAL_NONE && !any_material) {
-            return false;
-        }
-    }
-    return true;
+bool path_debug_segment_in_sphere(const float3 a, const float3 b) {
+    const float3 q = path_debug_selected_point();
+    const float3 edge = b - a;
+    const float len2 = dot(edge, edge);
+    const float t = len2 > 0.f ? clamp(dot(q - a, edge) / len2, 0.f, 1.f) : 0.f;
+    const float3 d = a + t * edge - q;
+    return dot(d, d) <= params.sel_region_radius * params.sel_region_radius;
 }
 
-static const uint32_t PATH_DEBUG_MATCH_STEPS = 4096;
-bool path_debug_expression_matches(const PathRecordPath p,
-                                   const uint vertex_region,
-                                   const uint scatter) {
-    const uint encoded = params.expr_count;
-    const uint tokens = encoded & PATH_DEBUG_EXPR_COUNT_MASK;
-    const bool nee = (encoded & PATH_DEBUG_EXPR_NEE) != 0;
-    if (tokens == 0) {
-        return true;
+bool path_debug_on_target(const float3 pos, const uint2 surface) {
+    switch (params.sel_target) {
+    case PATH_DEBUG_TARGET_SPHERE:
+        return path_debug_segment_in_sphere(pos, pos);
+    case PATH_DEBUG_TARGET_TRIANGLE:
+        return surface.x != PATH_RECORD_GEOMETRY_NONE &&
+               all(surface == uint2(params.sel_geometry, params.sel_primitive));
+    case PATH_DEBUG_TARGET_ENVIRONMENT:
+        return surface.x == PATH_RECORD_GEOMETRY_ENVIRONMENT;
+    default:
+        return surface.x < params.sel_target_geometries &&
+               ((target_geometries[surface.x >> 5] >> (surface.x & 31u)) & 1u) != 0;
     }
+}
 
-    uint chain[PATH_DEBUG_MAX_SEGMENTS];
-    uint chain_count = 0;
-    uint nee_parent_bits[PATH_DEBUG_MAX_SEGMENTS / 32] = {};
-    for (uint v = 0; v < p.vertex_count && chain_count < PATH_DEBUG_MAX_SEGMENTS; v++) {
+// Where an expression can be before the next scatter event: per token the repeat counts it is
+// at, last the end of the expression.
+struct PathDebugExpressionState {
+    uint counts[PATH_DEBUG_MAX_TOKENS + 1];
+}
+
+uint path_debug_expression_tokens() {
+    return params.expr_count & PATH_DEBUG_EXPR_COUNT_MASK;
+}
+
+// a token whose repeats reach its minimum may hand over to the next
+void path_debug_expression_close(inout PathDebugExpressionState state) {
+    for (uint t = 0; t < path_debug_expression_tokens(); t++) {
+        if ((state.counts[t] >> path_debug_token_repeat_min(path_debug_token(t))) != 0) {
+            state.counts[t + 1] |= 1u;
+        }
+    }
+}
+
+PathDebugExpressionState path_debug_expression_begin() {
+    PathDebugExpressionState state;
+    for (uint t = 0; t <= PATH_DEBUG_MAX_TOKENS; t++) {
+        state.counts[t] = t == 0 ? 1u : 0u;
+    }
+    path_debug_expression_close(state);
+    return state;
+}
+
+// one more repeat; an unbounded token counts no further than its minimum
+uint path_debug_expression_repeat(const uint counts, const uint token) {
+    const uint repeat_min = path_debug_token_repeat_min(token);
+    const uint repeat_max = path_debug_token_repeat_max(token);
+    if (repeat_max == PATH_DEBUG_REPEAT_INF) {
+        const uint next = counts << 1;
+        return (next & ((1u << repeat_min) - 1u)) |
+               ((next >> repeat_min) != 0 ? 1u << repeat_min : 0u);
+    }
+    return (counts & ((1u << repeat_max) - 1u)) << 1;
+}
+
+// one more scatter event, drawn by the techniques in labels
+void path_debug_expression_step(inout PathDebugExpressionState state,
+                                const uint meta,
+                                const uint labels) {
+    const uint tokens = path_debug_expression_tokens();
+    for (uint t = 0; t < tokens; t++) {
+        const uint token = path_debug_token(t);
+        state.counts[t] = path_debug_token_matches(token, meta, labels)
+                              ? path_debug_expression_repeat(state.counts[t], token)
+                              : 0u;
+    }
+    state.counts[tokens] = 0u;
+    path_debug_expression_close(state);
+}
+
+bool path_debug_expression_through(const PathDebugExpressionState state) {
+    return (state.counts[path_debug_expression_tokens()] & 1u) != 0;
+}
+
+// The light paths of a recorded path the selection holds, without its point. An NEE connection
+// or a vertex that carries contribution ends one; its scatter events are the chain vertices
+// before it, the last drawn towards the light by the connection or by its own technique.
+struct PathDebugEvents {
+    uint2 mask;
+    float3 contrib;
+}
+
+PathDebugEvents path_debug_match_events(const PathRecordPath p, const uint vertex_region) {
+    const bool expression = (params.expr_count & PATH_DEBUG_EXPR_ACTIVE) != 0;
+    const bool region = path_debug_selects_region();
+    const bool sphere = params.sel_target == PATH_DEBUG_TARGET_SPHERE;
+    const uint method_mask = params.sel_method_mask;
+    // before and after the last chain vertex, which a connection replaces with its own draw
+    PathDebugExpressionState before = path_debug_expression_begin();
+    PathDebugExpressionState after = before;
+
+    PathDebugEvents events = {uint2(0), float3(0)};
+    uint chain = 0;
+    uint last_meta = 0;
+    bool any_method = false;
+    bool every_method = true;
+    bool starts_on = false;
+    bool hits_on = false;
+    float3 chain_pos = float3(0);
+    const uint vertices = min(p.vertex_count, PATH_DEBUG_MAX_SEGMENTS);
+    // the next vertex's words load while this one is matched
+    uint next_meta = path_record_load_vertex_meta(in_records, vertex_region, p.vertex_offset);
+    float3 next_contrib = path_record_load_vertex_float3(
+        in_records, vertex_region, p.vertex_offset, PATH_RECORD_VERTEX_CONTRIB);
+    for (uint v = 0; v < vertices; v++) {
+        const uint index = p.vertex_offset + v;
+        const uint meta = next_meta;
+        const float3 contrib = next_contrib;
+        if (v + 1 < vertices) {
+            next_meta = path_record_load_vertex_meta(in_records, vertex_region, index + 1);
+            next_contrib = path_record_load_vertex_float3(in_records, vertex_region, index + 1,
+                                                          PATH_RECORD_VERTEX_CONTRIB);
+        }
+        const bool nee = path_debug_is_connection(meta);
+        float3 pos = float3(0);
+        uint2 surface = uint2(0);
+        if (region) {
+            pos = path_record_load_vertex_float3(in_records, vertex_region, index,
+                                                 PATH_RECORD_VERTEX_POS);
+            const uint at = vertex_region + index * PATH_RECORD_VERTEX_UINTS;
+            surface = uint2(in_records[at + PATH_RECORD_VERTEX_SURFACE],
+                            in_records[at + PATH_RECORD_VERTEX_SURFACE + 1]);
+        }
+        const bool drawn = (meta & PATH_RECORD_FLAG_RESAMPLED) != 0 ||
+                           asfloat(in_records[vertex_region + index * PATH_RECORD_VERTEX_UINTS +
+                                              PATH_RECORD_VERTEX_PDF]) > 0.f;
+        // an NEE connection needs the vertex it branches off
+        const bool ends = nee ? chain > 0 && drawn : any(contrib != 0.f);
+        if (ends) {
+            const uint last_labels = nee ? path_debug_vertex_labels(meta)
+                                         : path_debug_vertex_labels(last_meta);
+            const bool finite = all(isfinite(contrib));
+            bool matches = (params.sel_finite != PATH_DEBUG_FINITE_ONLY || finite) &&
+                           (params.sel_finite != PATH_DEBUG_FINITE_NONFINITE || !finite) &&
+                           chain >= params.sel_scatters_min && chain <= params.sel_scatters_max;
+            if (method_mask != 0) {
+                const bool last_method = chain > 0 && (last_labels & method_mask) != 0;
+                matches = matches && (params.sel_method_mode == PATH_DEBUG_METHOD_EVERY_VERTEX
+                                          ? chain > 0 && every_method && last_method
+                                          : any_method || last_method);
+            }
+            if (expression && matches) {
+                PathDebugExpressionState through = after;
+                if (nee) {
+                    through = before;
+                    path_debug_expression_step(through, last_meta, last_labels);
+                }
+                matches = path_debug_expression_through(through);
+            }
+            if (region && matches) {
+                const bool end_on = path_debug_on_target(pos, surface);
+                switch (params.sel_mode) {
+                case PATH_DEBUG_SELECT_FROM:
+                    matches = chain == 0 ? end_on : starts_on;
+                    break;
+                case PATH_DEBUG_SELECT_TO:
+                    matches = end_on;
+                    break;
+                default:
+                    matches = hits_on || end_on ||
+                              (sphere && chain > 0 && path_debug_segment_in_sphere(chain_pos, pos));
+                }
+            }
+            if (matches) {
+                if (v < 32) {
+                    events.mask.x |= 1u << v;
+                } else {
+                    events.mask.y |= 1u << (v - 32);
+                }
+                events.contrib += contrib;
+            }
+        }
+        if (nee) {
+            continue;
+        }
+
+        if (expression) {
+            before = after;
+            path_debug_expression_step(after, meta, path_debug_vertex_labels(meta));
+        }
+        if (chain > 0) {
+            const bool in_mask = (path_debug_vertex_labels(last_meta) & method_mask) != 0;
+            any_method = any_method || in_mask;
+            every_method = every_method && in_mask;
+        }
+        if (region) {
+            const bool on = path_debug_on_target(pos, surface) ||
+                            (sphere && chain > 0 && path_debug_segment_in_sphere(chain_pos, pos));
+            starts_on = starts_on || (chain == 0 && on);
+            hits_on = hits_on || on;
+        }
+        chain_pos = pos;
+        last_meta = meta;
+        chain++;
+    }
+    return events;
+}
+
+bool path_debug_is_event_vertex(const uint2 mask, const uint v) {
+    return v < PATH_DEBUG_MAX_SEGMENTS &&
+           (((v < 32 ? mask.x >> v : mask.y >> (v - 32)) & 1u) != 0);
+}
+
+// the vertex of the deepest event, -1 without one
+int path_debug_last_event(const uint2 mask) {
+    return mask.y != 0 ? 32 + int(firstbithigh(mask.y))
+                       : (mask.x != 0 ? int(firstbithigh(mask.x)) : -1);
+}
+
+// nothing but a point narrows the selection: every path is held whole, light or not
+bool path_debug_selection_open() {
+    return (params.expr_count & PATH_DEBUG_EXPR_ACTIVE) == 0 && !path_debug_selects_region() &&
+           params.sel_finite == PATH_DEBUG_FINITE_ANY && params.sel_scatters_min == 0 &&
+           params.sel_scatters_max == PATH_DEBUG_NO_SCATTER_LIMIT && params.sel_method_mask == 0;
+}
+
+// the chain up to the deepest event, and the NEE connections that are events
+bool path_debug_event_drawn(const uint2 mask, const uint v, const bool nee) {
+    return nee ? path_debug_is_event_vertex(mask, v)
+               : path_debug_selection_open() || int(v) <= path_debug_last_event(mask);
+}
+
+// the scatter events before the deepest event
+uint path_debug_events_depth(PathRecordStream records,
+                             const PathRecordPath p,
+                             const uint vertex_region,
+                             const uint2 mask) {
+    uint chain = 0;
+    for (int v = 0; v < path_debug_last_event(mask); v++) {
         const uint meta =
-            path_record_load_vertex_meta(in_records, vertex_region, p.vertex_offset + v);
-        if (!path_debug_is_connection(meta)) {
-            chain[chain_count++] = meta;
-        } else if (chain_count > 0 &&
-                   !path_debug_is_empty_draw(
-                       path_record_load_vertex(in_records, vertex_region, p.vertex_offset + v))) {
-            nee_parent_bits[(chain_count - 1) >> 5] |= 1u << ((chain_count - 1) & 31u);
-        }
+            path_record_load_vertex_meta(records, vertex_region, p.vertex_offset + uint(v));
+        chain += path_debug_is_connection(meta) ? 0 : 1;
     }
-    const uint length = nee ? chain_count : scatter;
+    return chain;
+}
 
-    uint taken[PATH_DEBUG_MAX_TOKENS] = {};
-    uint start[PATH_DEBUG_MAX_TOKENS] = {};
-    int t = 0;
-    uint v = 0;
-    for (uint step = 0; step < PATH_DEBUG_MATCH_STEPS; step++) {
-        if (uint(t) == tokens) {
-            if (nee ? v > 0 && (nee_parent_bits[(v - 1) >> 5] & (1u << ((v - 1) & 31u))) != 0
-                    : v == scatter) {
-                return true;
-            }
-        } else {
-            const uint token = path_debug_token(uint(t));
-            const uint repeat_min = path_debug_token_repeat_min(token);
-            const uint repeat_max = path_debug_token_repeat_max(token);
-            const uint limit = repeat_max == PATH_DEBUG_REPEAT_INF ? length : repeat_max;
-            start[t] = v;
-            uint count = 0;
-            while (count < limit && v < length && path_debug_token_matches(token, chain[v])) {
-                v++;
-                count++;
-            }
-            taken[t] = count;
-            if (count >= repeat_min) {
-                t++;
-                continue;
-            }
-        }
+uint2 path_debug_path_events(const uint path_index) {
+    const uint base = path_index * PATH_DEBUG_EVENT_UINTS;
+    return uint2(events[base], events[base + 1]);
+}
 
-        bool resumed = false;
-        for (int b = t - 1; b >= 0; b--) {
-            const uint token = path_debug_token(uint(b));
-            if (taken[b] > path_debug_token_repeat_min(token)) {
-                taken[b]--;
-                v = start[b] + taken[b];
-                t = b + 1;
-                resumed = true;
-                break;
-            }
-        }
-        if (!resumed) {
-            return false;
-        }
-    }
-    return false;
+// a path of the selection, its luminance that of the selection's events
+PathRecordPath path_debug_load_selected_path(const uint path_index) {
+    PathRecordPath p = path_record_load_path(in_records, path_index);
+    p.luminance = asfloat(events[path_index * PATH_DEBUG_EVENT_UINTS + 2]);
+    return p;
+}
+
+uint2 path_debug_kept_events(const uint slot) {
+    return uint2(kept[PATH_DEBUG_KEPT_EVENTS + 2 * slot],
+                 kept[PATH_DEBUG_KEPT_EVENTS + 2 * slot + 1]);
 }
 
 bool path_debug_matched(const uint path_index) {
@@ -544,7 +696,10 @@ uint path_debug_kept_key_now(const uint slot) {
     return max(asuint(asfloat(key) * params.overlay_key_decay), 1u);
 }
 
-void path_debug_keep_path(const uint slot, const PathRecordPath p, const uint key) {
+void path_debug_keep_path(const uint slot,
+                          const uint path_index,
+                          const PathRecordPath p,
+                          const uint key) {
     const uint vertex_region = path_record_vertex_region_offset(in_records);
     const uint vertices = min(p.vertex_count, PATH_DEBUG_MAX_SEGMENTS);
     const uint dst = PATH_RECORD_HEADER_UINTS + slot * PATH_RECORD_UINTS;
@@ -559,9 +714,12 @@ void path_debug_keep_path(const uint slot, const PathRecordPath p, const uint ke
         kept[dst_vertices + w] = in_records[src_vertices + w];
     }
     kept[PATH_DEBUG_KEPT_KEYS + slot] = key;
+    const uint2 mask = path_debug_path_events(path_index);
+    kept[PATH_DEBUG_KEPT_EVENTS + 2 * slot] = mask.x;
+    kept[PATH_DEBUG_KEPT_EVENTS + 2 * slot + 1] = mask.y;
 }
 
-void path_debug_recent_commit(const PathRecordPath p) {
+void path_debug_recent_commit(const uint path_index, const PathRecordPath p) {
     if (params.overlay_keep_update == 0) {
         return;
     }
@@ -576,7 +734,8 @@ void path_debug_recent_commit(const PathRecordPath p) {
     if (order >= params.overlay_max_paths) {
         return;
     }
-    path_debug_keep_path((kept[PATH_DEBUG_KEPT_HEAD] + order) % params.overlay_max_paths, p, 1);
+    path_debug_keep_path((kept[PATH_DEBUG_KEPT_HEAD] + order) % params.overlay_max_paths,
+                         path_index, p, 1);
 }
 
 uint path_debug_recent_advance() {

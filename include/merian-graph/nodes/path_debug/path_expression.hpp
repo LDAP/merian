@@ -9,18 +9,20 @@
 namespace merian {
 
 struct PathExpression {
-    // two 16 bit tokens per word
-    std::array<uint32_t, PATH_DEBUG_MAX_TOKENS / 2> words{};
+    std::array<uint32_t, PATH_DEBUG_MAX_TOKENS> tokens{};
     uint32_t token_count = 0;
-    bool nee = false;
+    // blank text matches every light path
+    bool active = false;
     bool valid = true;
 };
 
-// Compiles an expression after light path expressions (Heckbert 1990; OSL LPE): per scatter event
-// S specular, G glossy, D diffuse, U unclassified, R reflected, T transmitted, '.' any, <RD>
-// combined, [SG] alternatives, and the repeats * + ? {n} {n,m}. The expression matches a whole
-// path; C and <L.> anchors are implicit. A trailing N instead matches the events up to a vertex
-// that connected to a light by next-event estimation.
+// Compiles an expression after light path expressions (Heckbert 1990; OSL LPE) over the scatter
+// events of a path from the camera to a light: S specular, G glossy, D diffuse, U unclassified, R
+// reflected, T transmitted, '.' any; a quoted code for the technique that drew the event's
+// outgoing direction, 'b' BSDF, 'g' guiding, 'n' NEE, 'c' cosine, 'u' uniform, 'rrb' replayed
+// BSDF, 'rrn' replayed NEE, 'rec' reconnection, the last event's is how the light was reached;
+// <D'g'> one event of all of it, [SG] of either; the repeats * + ? {n} {n,m}. The expression
+// matches every event; C and a trailing L are implicit, L alone is a light the camera sees.
 PathExpression compile_path_expression(const std::string& text);
 
 std::string path_event_name(uint32_t lobe);

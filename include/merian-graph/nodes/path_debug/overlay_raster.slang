@@ -31,7 +31,7 @@ static const float POINT_OUTLINE = 1.25f;
 static const float OCCLUDED_ALPHA = 0.4f;
 static const float3 SELECTION_COLOR = float3(0.35f, 0.85f, 1.f);
 static const float3 POINT_COLOR = float3(1.f, 0.95f, 0.15f);
-static const float3 CONNECTION_COLOR = float3(0.25f);
+static const float3 NO_LIGHT_COLOR = float3(0.25f);
 
 static const uint KIND_LINE = 0;
 static const uint KIND_VERTEX = 1;
@@ -91,7 +91,7 @@ bool behind_geometry(const float2 target_pixel, const float distance_to_camera) 
     const int2 base = int2(floor(at));
     for (int i = 0; i < 4; i++) {
         const uint2 p = uint2(clamp(base + int2(i & 1, i >> 1), int2(0), dim - 1));
-        const float gz = gbuffer.get_linear_z(p);
+        const float gz = gbuffer.get_first_hit_linear_z(p);
         if (!(gz > 0.f && gz < MAX_LINEAR_Z)) {
             return false;
         }
@@ -138,42 +138,47 @@ float finite_luminance(const float3 rgb) {
     return path_debug_finite_or_zero(yuv_luminance(rgb));
 }
 
-// The radiance a segment carries towards the camera: what its far end contributes, over the
-// throughput up to it; a light connection's is what it adds at its vertex.
-float carried_radiance(PathRecordStream records,
-                       const PathRecordPath p,
-                       const uint vertex_region,
-                       const uint end,
-                       const uint parent) {
+// The radiance a segment carries towards the camera: what the selection's events from its far end
+// on contribute, over the path's weight up to its near end.
+float3 carried_radiance(PathRecordStream records,
+                        const PathRecordPath p,
+                        const uint vertex_region,
+                        const uint2 selected,
+                        const uint end,
+                        const uint parent) {
     const PathRecordVertex end_vertex =
         path_record_load_vertex(records, vertex_region, p.vertex_offset + end);
-    uint throughput_at = parent;
-    float carried = 0.f;
+    // a connection's weight runs up to the light
     if (end_vertex.nee) {
-        carried = finite_luminance(end_vertex.contrib);
-        if (parent == 0) {
-            return carried;
-        }
-        throughput_at = chain_parent(records, p, vertex_region, parent);
-    } else {
-        for (uint v = end; v < p.vertex_count; v++) {
-            carried += finite_luminance(
+        return select(end_vertex.throughput_rgb > 0.f,
+                      path_debug_finite_or_zero(end_vertex.contrib) / end_vertex.throughput_rgb,
+                      float3(0.f));
+    }
+    float3 carried = float3(0.f);
+    for (uint v = end; v < p.vertex_count; v++) {
+        if (path_debug_is_event_vertex(selected, v)) {
+            carried += path_debug_finite_or_zero(
                 path_record_load_vertex(records, vertex_region, p.vertex_offset + v).contrib);
         }
     }
-    const float throughput =
-        path_record_load_vertex(records, vertex_region, p.vertex_offset + throughput_at).throughput;
-    return throughput > 0.f ? carried / throughput : 0.f;
+    const float3 throughput =
+        path_record_load_vertex(records, vertex_region, p.vertex_offset + parent).throughput_rgb;
+    return select(throughput > 0.f, carried / throughput, float3(0.f));
 }
 
-// The weight the segment's direction was drawn with, f * cos / pdf at the vertex it leaves: its
-// throughput over the one before.
-float throughput_gain(PathRecordStream records,
-                      const PathRecordPath p,
-                      const uint vertex_region,
-                      const uint parent) {
+// The weight the segment's direction was drawn with at the vertex it leaves, BSDF·cos/pdf: the
+// throughput after the draw over the throughput before it, 1 at the camera.
+float sample_weight(PathRecordStream records,
+                    const PathRecordPath p,
+                    const uint vertex_region,
+                    const uint end,
+                    const uint parent) {
+    const PathRecordVertex end_vertex =
+        path_record_load_vertex(records, vertex_region, p.vertex_offset + end);
     const float drawn =
-        path_record_load_vertex(records, vertex_region, p.vertex_offset + parent).throughput;
+        path_record_load_vertex(records, vertex_region,
+                                p.vertex_offset + (end_vertex.nee ? end : parent))
+            .throughput;
     const float before =
         parent == 0 ? 1.f
                     : path_record_load_vertex(records, vertex_region,
@@ -252,6 +257,7 @@ Varyings segment(PathRecordStream records,
                  const uint vertex_id,
                  Varyings o) {
     const PathRecordPath p = path_record_load_path(records, path_index);
+    const uint2 selected = path_debug_kept_events(path_index);
 
     const float3 first = path_record_load_vertex(records, vertex_region, p.vertex_offset).pos;
     o.z_ref = max(distance(first, camera.position), 1e-6f);
@@ -262,7 +268,8 @@ Varyings segment(PathRecordStream records,
     }
     const PathRecordVertex end_vertex =
         path_record_load_vertex(records, vertex_region, p.vertex_offset + end);
-    if (path_debug_is_empty_draw(end_vertex)) {
+    if (path_debug_is_empty_draw(end_vertex) ||
+        !path_debug_event_drawn(selected, end, end_vertex.nee)) {
         return o;
     }
     const uint parent = end > 0 ? chain_parent(records, p, vertex_region, end) : 0;
@@ -282,26 +289,29 @@ Varyings segment(PathRecordStream records,
         switch (params.overlay_color) {
         case PATH_DEBUG_COLOR_CONTRIBUTION:
             o.color = srgb_to_rgb(colormap_plasma(color_coordinate(
-                carried_radiance(records, p, vertex_region, end, parent),
+                yuv_luminance(carried_radiance(records, p, vertex_region, selected, end, parent)),
                 PATH_DEBUG_CONTRIBUTION_STOPS)));
             break;
+        case PATH_DEBUG_COLOR_TRANSPORTED: {
+            const float3 carried =
+                carried_radiance(records, p, vertex_region, selected, end, parent);
+            const float peak = max(carried.r, max(carried.g, carried.b));
+            o.color = peak > 0.f ? carried / peak : NO_LIGHT_COLOR;
+            break;
+        }
         case PATH_DEBUG_COLOR_SCATTER_EVENTS:
             o.color = srgb_to_rgb(colormap_turbo(
-                float(path_debug_scatter_count(records, p, vertex_region)) /
+                float(path_debug_events_depth(records, p, vertex_region, selected)) /
                 float(PATH_DEBUG_SCATTER_COLOR_EVENTS)));
             break;
         case PATH_DEBUG_COLOR_RANDOM:
             o.color = random_color(path_index);
             break;
-        case PATH_DEBUG_COLOR_THROUGHPUT_GAIN: {
-            // a light connection's weight carries the light's emission
-            o.color = end_vertex.nee
-                          ? CONNECTION_COLOR
-                          : srgb_to_rgb(colormap_diverging(stops_coordinate(
-                                throughput_gain(records, p, vertex_region, parent),
-                                PATH_DEBUG_GAIN_STOPS)));
+        case PATH_DEBUG_COLOR_SAMPLE_WEIGHT:
+            o.color = srgb_to_rgb(colormap_diverging(
+                stops_coordinate(sample_weight(records, p, vertex_region, end, parent),
+                                 PATH_DEBUG_SAMPLE_WEIGHT_STOPS)));
             break;
-        }
         case PATH_DEBUG_COLOR_TECHNIQUE:
             o.color = method_color(
                 end_vertex.nee
@@ -315,11 +325,12 @@ Varyings segment(PathRecordStream records,
             break;
         }
     } else {
-        o.color = end == 0                ? packed_color(PATH_DEBUG_START_COLOR)
-                  : end_vertex.nee        ? method_color(end_vertex.method)
-                  : escaped               ? packed_color(PATH_DEBUG_ESCAPED_COLOR)
-                  : end_vertex.terminal   ? packed_color(PATH_DEBUG_END_COLOR)
-                                          : float3(1.f);
+        const bool last = int(end) == path_debug_last_event(selected);
+        o.color = end == 0                       ? packed_color(PATH_DEBUG_START_COLOR)
+                  : end_vertex.nee               ? method_color(end_vertex.method)
+                  : escaped                      ? packed_color(PATH_DEBUG_ESCAPED_COLOR)
+                  : end_vertex.terminal || last  ? packed_color(PATH_DEBUG_END_COLOR)
+                                                 : float3(1.f);
     }
     return emit_quad(p0, p1, kind, vertex_id, o);
 }
@@ -332,7 +343,8 @@ float3 ring_point(const float3 center, const float3x3 frame, const float r, cons
 
 // The region's sphere where it meets the selected surface, a circle in its tangent plane.
 Varyings ring_segment(const uint index, const uint vertex_id, Varyings o) {
-    if (!path_debug_selects_region() || params.sel_point_valid == 0) {
+    if (!path_debug_selects_region() || params.sel_target != PATH_DEBUG_TARGET_SPHERE ||
+        params.sel_point_valid == 0) {
         return o;
     }
     const float3 center = path_debug_selected_point();
@@ -382,7 +394,9 @@ Varyings vertex_main(uint vertex_id: SV_VertexID, uint instance_id: SV_InstanceI
     o.kind = KIND_LINE;
     o.world_pos = camera.position;
 
-    const uint per_kind = params.overlay_max_paths * PATH_DEBUG_MAX_SEGMENTS;
+    const uint per_kind =
+        path_debug_drawn_paths(params.overlay_max_paths, params.overlay_color) *
+        PATH_DEBUG_MAX_SEGMENTS;
     if (instance_id >= 2 * per_kind) {
         const uint index = instance_id - 2 * per_kind;
         return index < PATH_DEBUG_RING_SEGMENTS ? ring_segment(index, vertex_id, o)

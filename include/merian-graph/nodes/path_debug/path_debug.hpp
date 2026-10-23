@@ -82,17 +82,24 @@ class PathDebugNode : public Node {
     static constexpr int32_t SELECT_POINT = 0;
     static constexpr int32_t SELECT_REGION = 1;
     static constexpr std::array<const char*, 2> SELECT_NAMES = {"point", "region"};
-    static constexpr std::array<const char*, 3> MATCH_NAMES = {"passes through", "starts inside",
-                                                               "ends inside"};
+    static constexpr std::array<const char*, 3> MATCH_NAMES = {"hits", "starts at", "ends at"};
+    static constexpr int32_t TARGET_SPHERE = 0;
+    static constexpr int32_t TARGET_TRIANGLE = 1;
+    static constexpr int32_t TARGET_PART = 2;
+    static constexpr int32_t TARGET_OBJECT = 3;
+    static constexpr int32_t TARGET_MESH = 4;
+    static constexpr int32_t TARGET_MATERIAL = 5;
+    static constexpr std::array<const char*, 6> TARGET_NAMES = {"sphere", "triangle", "part",
+                                                                "object", "mesh",     "material"};
     static constexpr std::array<const char*, 4> MODIFIER_NAMES = {"Alt", "Ctrl", "Shift", "Super"};
     static constexpr std::array<int, 4> MODIFIER_KEYS = {
         InputController::ALT, InputController::CONTROL, InputController::SHIFT,
         InputController::SUPER};
-    static constexpr std::array<const char*, 6> COLOR_NAMES = {
-        "path luminance", "segment contribution", "scatter events", "random",
-        "technique",      "throughput gain"};
+    static constexpr std::array<const char*, 8> COLOR_NAMES = {
+        "path luminance", "transported radiance", "scatter events",    "random",
+        "technique",      "BSDF·cos/pdf",         "transported color", "off"};
     static constexpr std::array<const char*, 6> BACKDROP_NAMES = {
-        "render",        "filtered", "reference", "difference", "split render | reference",
+        "source input",  "filtered", "reference", "difference", "split source input | reference",
         "backdrop input"};
     static constexpr std::array<const char*, 5> DRAWS_NAMES = {"all", "scatter", "BSDF only",
                                                                "guiding only", "NEE only"};
@@ -108,7 +115,7 @@ class PathDebugNode : public Node {
         "BSDF sample()",
         "BSDF eval()",
         "z-score",
-        "density / pdf",
+        "sampled / pdf",
         "sampled / integrand",
         "integrand",
         "integrand (color)",
@@ -138,9 +145,52 @@ class PathDebugNode : public Node {
         uint32_t record_seq;
         float3 first;
         float3 seen;
+        uint2 seen_surface;
         uint32_t surface_seq;
         float3 surface;
         float3 normal;
+        uint2 hit;
+    };
+
+    // what a region names: a mesh placed at a node, a triangle of it and its material
+    struct RegionTarget {
+        bool environment = false;
+        int32_t mesh = -1;
+        int32_t node = -1;
+        int32_t primitive = -1;
+        int32_t material = -1;
+
+        bool operator==(const RegionTarget&) const = default;
+    };
+
+    // GeometryIDs belong to the frame they were looked up in
+    using Placements = std::shared_ptr<const std::vector<Scene::GeometryPlacement>>;
+
+    // what target_bits was built from
+    struct TargetBuild {
+        Placements placements;
+        RegionTarget target;
+        int32_t kind = -1;
+
+        bool operator==(const TargetBuild&) const = default;
+    };
+
+    // what the filtered image depends on besides the records
+    struct ImageSignature {
+        std::string expression;
+        int32_t contribution = 0;
+        int32_t scatters_min = 0;
+        int32_t scatters_max = 0;
+        uint32_t methods = 0;
+        int32_t method_mode = 0;
+        int32_t match = -1;
+        float sphere_x = 0.f;
+        float sphere_y = 0.f;
+        float sphere_z = 0.f;
+        float sphere_radius = 0.f;
+        TargetBuild target;
+
+        bool operator==(const ImageSignature&) const = default;
     };
 
     struct PointPaths {
@@ -190,7 +240,9 @@ class PathDebugNode : public Node {
     static_assert(offsetof(Readback, isolated) == sizeof(uint32_t) * PATH_DEBUG_OUT_ISOLATE);
     static_assert(offsetof(Readback, top) == sizeof(uint32_t) * PATH_DEBUG_OUT_TOP);
     static_assert(offsetof(Readback, pick) == sizeof(uint32_t) * PATH_DEBUG_OUT_PICK);
+    static_assert(offsetof(Pick, seen_surface) == sizeof(uint32_t) * PATH_DEBUG_PICK_SEEN_SURFACE);
     static_assert(offsetof(Pick, surface_seq) == sizeof(uint32_t) * PATH_DEBUG_PICK_SURFACE_SEQ);
+    static_assert(offsetof(Pick, hit) == sizeof(uint32_t) * PATH_DEBUG_PICK_HIT);
     static_assert(sizeof(Pick) == sizeof(uint32_t) * PATH_DEBUG_PICK_UINTS);
     static_assert(offsetof(Readback, point) == sizeof(uint32_t) * PATH_DEBUG_OUT_POINT);
     static_assert(offsetof(Readback, stats) == sizeof(uint32_t) * PATH_DEBUG_OUT_UINTS);
@@ -205,6 +257,9 @@ class PathDebugNode : public Node {
         bool heat_splat;
         // a point records only its pixel
         bool one_pixel;
+        bool image_accumulate;
+        bool image_depth;
+        bool image_voxels;
         uint32_t panel_mask;
         uint32_t sphere_channel;
         bool maps_active;
@@ -245,6 +300,16 @@ class PathDebugNode : public Node {
     void select_at(const int2& pixel);
     void set_select_kind(int32_t kind);
     void set_region_match(int32_t match);
+    void set_region_target(int32_t kind);
+    // the region's target where a pick sees the surface, the environment where it sees the sky
+    void pick_target(uint2 surface, const Placements& placements);
+    // the GeometryIDs of the region's target in the frame of the matched records
+    void update_target();
+    void upload_target(const ResourceAllocatorHandle& allocator, Submission& submission);
+    bool targets_ids() const;
+    bool target_resolved() const;
+    void set_target(const RegionTarget& ids);
+    std::string target_label() const;
     // where the point lies on screen, in record pixels
     std::optional<float2> project_point(Camera& camera) const;
     void reproject_pick(const NodeIO& io);
@@ -257,7 +322,7 @@ class PathDebugNode : public Node {
     float pixel_angle(const Camera& camera) const;
     // the active camera once the scene is ready, else null
     CameraHandle ready_camera(const NodeIO& io) const;
-    void record_clears(const NodeIO& io, const NodeProcessInfo& info, Submission& submission);
+    void record_clears(const NodeProcessInfo& info, Submission& submission);
     FrameActivity update_frame(const NodeIO& io, bool ready);
     // the panels' size and place in the window, and where they take the input
     void update_panel_layout(const NodeIO& io, uint32_t panel_mask);
@@ -294,6 +359,8 @@ class PathDebugNode : public Node {
                         const NodeProcessInfo& info,
                         Submission& submission,
                         bool onto_canvas);
+    // the filtered image seen from the camera, a box per record pixel
+    void record_voxels(const NodeIO& io, const NodeProcessInfo& info, Submission& submission);
     void record_map_panels(const NodeIO& io, const NodeProcessInfo& info, Submission& submission);
     void record_labels(const NodeIO& io,
                        const NodeProcessInfo& info,
@@ -317,6 +384,7 @@ class PathDebugNode : public Node {
     void ensure_reference(const ResourceAllocatorHandle& allocator, Submission& submission);
 
     void invalidate_selection();
+    ImageSignature image_signature() const;
     void clear_selection();
     // re-resolves the surface at the selected pixel, keeping the current one until it is read back
     void repick();
@@ -340,10 +408,15 @@ class PathDebugNode : public Node {
     bool selects_point() const;
     // the filtered image or the pixel statistic, which need every pixel's paths
     bool shows_pixel_image(const NodeIO& io) const;
+    // what the chosen image lacks while backdrop_missing
+    const char* missing_image_input() const;
     bool point_hidden() const;
     const char* modifier_name() const;
     // the material's id and name
     std::string material_label(uint32_t id) const;
+    // the name of a mesh or a scene node, its id without one
+    std::string mesh_label(int32_t mesh) const;
+    std::string node_label(int32_t node) const;
     uint32_t shown_panel_mask() const;
     int32_t label_px(uint32_t size) const;
     int32_t panel_top(uint32_t slot) const;
@@ -369,6 +442,8 @@ class PathDebugNode : public Node {
     void draw_sampling_fit() const;
     void draw_polar_profile() const;
     std::string selection_status() const;
+    // the names of what a region's target can be, to choose without a click
+    void draw_target_choice(const std::string& status);
     void draw_properties_section(const char* id, void (PathDebugNode::*section)(Properties&));
 
     void draw_panel_labels() const;
@@ -420,6 +495,12 @@ class PathDebugNode : public Node {
     Versioned<SlangProgramEntryPoint> overlay_fragment;
     OverlayTarget overlay_out;
     OverlayTarget overlay_canvas;
+    SlangCompositionHandle voxel_composition;
+    Versioned<SlangProgram> voxel_program;
+    Versioned<SlangProgramEntryPoint> voxel_vertex;
+    Versioned<SlangProgramEntryPoint> voxel_fragment;
+    Versioned<Pipeline> voxel_pipeline;
+    Versioned<ShaderObject> voxel_globals;
 
     ScenePipeline bsdf_map;
     ScenePipeline bsdf_check;
@@ -437,7 +518,12 @@ class PathDebugNode : public Node {
     BufferHandle grid_buffer;
     BufferHandle moments_buffer;
     BufferHandle filtered_buffer;
+    BufferHandle voxel_depth_buffer;
+    TextureHandle voxel_texture;
+    ImageViewHandle voxel_depth_view;
     BufferHandle matches_buffer;
+    BufferHandle events_buffer;
+    BufferHandle target_buffer;
     BufferHandle kept_buffer;
     TextureHandle reference_texture;
     TextureHandle panel_texture;
@@ -486,6 +572,20 @@ class PathDebugNode : public Node {
 
     int32_t select_kind = SELECT_POINT;
     int32_t region_match = 0;
+    int32_t region_target = TARGET_SPHERE;
+    RegionTarget target;
+    // the pending pick comes from a click, which names the target
+    bool target_from_click = false;
+    // in the frame of the matched records: the triangle's GeometryID, a bit per GeometryID of the
+    // other targets
+    uint32_t target_geometry = PATH_RECORD_GEOMETRY_NONE;
+    std::vector<uint32_t> target_bits;
+    TargetBuild target_built;
+    bool target_bits_dirty = true;
+    // of this frame, of the matched records and of the latest readback
+    Placements placements;
+    Placements records_placements;
+    Placements readback_placements;
     bool reproject = true;
     bool has_selection = false;
     // in record pixels
@@ -509,8 +609,8 @@ class PathDebugNode : public Node {
     int2 scatter_range = int2(0, SCATTER_UNLIMITED);
     uint32_t method_mask = 0;
     int32_t method_mode = static_cast<int32_t>(PATH_DEBUG_METHOD_ANY_VERTEX);
-    int32_t material_id = -1;
-    // the scene's, for the material names
+    // the scene's, for the region's targets and their names
+    std::weak_ptr<Scene> current_scene;
     std::weak_ptr<MaterialSystem> material_system;
     int32_t contribution_filter = static_cast<int32_t>(PATH_DEBUG_FINITE_ANY);
 
@@ -526,7 +626,7 @@ class PathDebugNode : public Node {
     float overlay_thickness = 2.f;
     float overlay_exposure = 1.f;
 
-    int32_t backdrop = static_cast<int32_t>(PATH_DEBUG_BACKDROP_RENDER);
+    int32_t backdrop = static_cast<int32_t>(PATH_DEBUG_BACKDROP_FILTERED);
     int32_t false_color = FALSE_COLOR_OFF;
     std::string reference_path;
     bool reference_loaded = false;
@@ -538,7 +638,13 @@ class PathDebugNode : public Node {
     float reference_flip_hz = 2.f;
     float backdrop_split = 0.5f;
     float difference_gain = 10.f;
-    float filtered_exposure = 1.f;
+    float image_exposure = 1.f;
+    bool image_dirty = true;
+    bool image_accumulated = false;
+    // of the filter and region the filtered image holds
+    ImageSignature image_held;
+    // the camera of the voxel depths
+    CameraHandle image_camera;
     float false_color_opacity = 0.6f;
 
     int32_t map_res_log2 = 5;
@@ -572,7 +678,7 @@ class PathDebugNode : public Node {
     // of the distance
     float sphere_size = 0.05f;
 
-    // vertex density, downstream contribution or throughput
+    // PATH_DEBUG_HEAT_* - PATH_DEBUG_HEAT_VERTICES
     int32_t heat_quantity = 0;
     int2 heat_bounce_range = int2(0, HEAT_BOUNCE_MAX);
     // frames, 0 = keep forever
@@ -584,7 +690,7 @@ class PathDebugNode : public Node {
     bool heat_dirty = true;
     bool heat_splatted = false;
 
-    // mean, sample variance or relative standard error
+    // PATH_DEBUG_PIXEL_STAT_* - PATH_DEBUG_PIXEL_STAT_MEAN
     int32_t pixel_statistic =
         static_cast<int32_t>(PATH_DEBUG_PIXEL_STAT_REL_ERROR - PATH_DEBUG_PIXEL_STAT_MEAN);
     float pixel_stats_exposure = 1.f;

@@ -1,6 +1,7 @@
 import merian_shaders.scene.camera;
 import merian_shaders.debug.path_record;
 import merian_shaders.utils.hash;
+import merian_shaders.colors.colorspaces;
 
 using merian;
 
@@ -26,8 +27,10 @@ void count_overlay_path(const PathRecordPath p) {
 
 // The first vertex past the specular transmissions at the path's start, what the pixel shows
 // through clear glass; the first one if the path leaves the scene behind them.
-float3 seen_through_glass(const PathRecordPath p, const uint vertex_region, const float3 first) {
-    float3 seen = first;
+PathRecordVertex seen_through_glass(const PathRecordPath p, const uint vertex_region) {
+    const PathRecordVertex first =
+        path_record_load_vertex(in_records, vertex_region, p.vertex_offset);
+    PathRecordVertex seen = first;
     for (uint v = 0; v < p.vertex_count; v++) {
         const PathRecordVertex vertex =
             path_record_load_vertex(in_records, vertex_region, p.vertex_offset + v);
@@ -37,7 +40,7 @@ float3 seen_through_glass(const PathRecordPath p, const uint vertex_region, cons
         if (distance(vertex.pos, camera.position) >= PATH_DEBUG_ENV_DISTANCE) {
             return first;
         }
-        seen = vertex.pos;
+        seen = vertex;
         if (vertex.terminal ||
             vertex.lobe != (PATH_RECORD_LOBE_DELTA | PATH_RECORD_LOBE_TRANSMISSION)) {
             return seen;
@@ -46,26 +49,31 @@ float3 seen_through_glass(const PathRecordPath p, const uint vertex_region, cons
     return seen;
 }
 
-// the per-pixel moments and the filtered image
-void accumulate_pixel(const PathRecordPath p, const uint vertex_region) {
-    if (params.pixel_stats_accumulate != 0 && isfinite(p.luminance)) {
+// every path at its pixel: the moments of what the selection adds, and the filtered image
+void accumulate_pixel(const PathRecordPath p, const PathDebugEvents selected) {
+    const float luminance = max(yuv_luminance(selected.contrib), 0.f);
+    const bool held = any(selected.mask != 0);
+    if (params.pixel_stats_accumulate != 0 && isfinite(luminance)) {
         const uint base = path_debug_moments_base(p.pixel);
-        path_debug_atomic_add_float(moments, moments_f, base + PATH_DEBUG_MOMENT_SUM, p.luminance);
-        path_debug_atomic_add_float(moments, moments_f, base + PATH_DEBUG_MOMENT_SQUARES,
-                                    p.luminance * p.luminance);
         InterlockedAdd(moments[base + PATH_DEBUG_MOMENT_COUNT], 1);
+        if (luminance > 0.f) {
+            path_debug_atomic_add_float(moments, moments_f, base + PATH_DEBUG_MOMENT_SUM,
+                                        luminance);
+            path_debug_atomic_add_float(moments, moments_f, base + PATH_DEBUG_MOMENT_SQUARES,
+                                        luminance * luminance);
+            InterlockedMax(moments[base + PATH_DEBUG_MOMENT_MAX], asuint(luminance));
+        } else {
+            InterlockedAdd(moments[base + PATH_DEBUG_MOMENT_ZEROS], 1);
+        }
     }
-    if (params.filtered_active == 0) {
+    if (params.image_accumulate == 0) {
         return;
     }
-    float3 contrib = float3(0.f);
-    for (uint k = 0; k < p.vertex_count; k++) {
-        contrib += path_debug_finite_or_zero(
-            path_record_load_vertex(in_records, vertex_region, p.vertex_offset + k).contrib);
-    }
-    if (any(contrib > 0.f)) {
-        path_debug_atomic_add_float3(filtered, filtered_f, path_debug_filtered_base(p.pixel),
-                                     contrib);
+    const uint base = path_debug_filtered_base(p.pixel);
+    InterlockedAdd(filtered[base + PATH_DEBUG_FILTERED_COUNT], 1);
+    const float3 contrib = path_debug_finite_or_zero(selected.contrib);
+    if (held && any(contrib > 0.f)) {
+        path_debug_atomic_add_float3(filtered, filtered_f, base, contrib);
     }
 }
 
@@ -90,9 +98,11 @@ void select_path(const uint i, const uint local) {
         if (claimed != params.pick_seq) {
             const float3 first =
                 path_record_load_vertex(in_records, vertex_region, p.vertex_offset).pos;
-            const float3 seen = seen_through_glass(p, vertex_region, first);
+            const PathRecordVertex seen = seen_through_glass(p, vertex_region);
             path_debug_store_float3(state, PATH_DEBUG_STATE_PICK + PATH_DEBUG_PICK_FIRST, first);
-            path_debug_store_float3(state, PATH_DEBUG_STATE_PICK + PATH_DEBUG_PICK_SEEN, seen);
+            path_debug_store_float3(state, PATH_DEBUG_STATE_PICK + PATH_DEBUG_PICK_SEEN, seen.pos);
+            state[PATH_DEBUG_STATE_PICK + PATH_DEBUG_PICK_SEEN_SURFACE] = seen.surface.x;
+            state[PATH_DEBUG_STATE_PICK + PATH_DEBUG_PICK_SEEN_SURFACE + 1] = seen.surface.y;
         }
     }
 
@@ -101,21 +111,21 @@ void select_path(const uint i, const uint local) {
         InterlockedAdd(state[PATH_DEBUG_STATE_POINT + (at_point ? 0 : 1)], 1);
     }
 
-    const uint scatter = path_debug_needs_scatter_count()
-                             ? path_debug_scatter_count(in_records, p, vertex_region)
-                             : 0;
-    if (!path_debug_filter_matches(p, vertex_region, scatter) ||
-        !path_debug_expression_matches(p, vertex_region, scatter)) {
-        return;
-    }
+    const PathDebugEvents selected = path_debug_match_events(p, vertex_region);
     // the per-pixel images leave a point out
-    accumulate_pixel(p, vertex_region);
-    if (!path_debug_point_matches(p, vertex_region)) {
+    accumulate_pixel(p, selected);
+    if ((all(selected.mask == 0) && !path_debug_selection_open()) ||
+        !path_debug_point_matches(p, vertex_region)) {
         return;
     }
+    PathRecordPath held = p;
+    held.luminance = yuv_luminance(selected.contrib);
+    events[i * PATH_DEBUG_EVENT_UINTS] = selected.mask.x;
+    events[i * PATH_DEBUG_EVENT_UINTS + 1] = selected.mask.y;
+    events[i * PATH_DEBUG_EVENT_UINTS + 2] = asuint(held.luminance);
     InterlockedOr(gs_matches[local >> 5], 1u << (local & 31u));
     InterlockedAdd(gs_matched, 1);
-    count_overlay_path(p);
+    count_overlay_path(held);
 }
 
 [numthreads(PATH_DEBUG_WG, 1, 1)]
@@ -131,10 +141,6 @@ void main(uint3 gid: SV_DispatchThreadID, uint3 tid: SV_GroupThreadID) {
         gs_matched = 0;
     }
     GroupMemoryBarrierWithGroupSync();
-    if (gid.x == 0 && params.filtered_active != 0) {
-        path_debug_atomic_add_float(filtered, filtered_f, path_debug_filtered_paths_at(),
-                                    float(path_record_path_count(in_records)));
-    }
     select_path(gid.x, tid.x);
     GroupMemoryBarrierWithGroupSync();
     if (tid.x < PATH_DEBUG_HIST_BINS && gs_hist[tid.x] != 0) {

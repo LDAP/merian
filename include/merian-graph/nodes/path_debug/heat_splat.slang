@@ -14,8 +14,23 @@ void grid_add(const float3 pos, const float weight) {
         return;
     }
     path_debug_atomic_add_float(grid, grid_f, params.grid_slots + slot, weight);
+    path_debug_atomic_add_float(grid, grid_f, 2 * params.grid_slots + slot, 1.f);
 }
 
+// the throughput before the chain vertex k's draw, 1 at the camera
+float throughput_before(const PathRecordPath p, const uint vertex_region, const int k) {
+    for (int v = k - 1; v >= 0; v--) {
+        const uint meta =
+            path_record_load_vertex_meta(in_records, vertex_region, p.vertex_offset + v);
+        if (!path_debug_is_connection(meta)) {
+            return path_record_load_vertex(in_records, vertex_region, p.vertex_offset + v)
+                .throughput;
+        }
+    }
+    return 1.f;
+}
+
+// the selection's paths at their chain vertices
 [numthreads(PATH_DEBUG_WG, 1, 1)]
 [shader("compute")]
 void main(uint3 gid: SV_DispatchThreadID) {
@@ -25,45 +40,81 @@ void main(uint3 gid: SV_DispatchThreadID) {
         return;
     }
 
-    const PathRecordPath p = path_record_load_path(in_records, i);
-    if (p.vertex_count == 0 || !path_debug_matched(i)) {
+    if (!path_debug_matched(i)) {
         return;
     }
+    const PathRecordPath p = path_record_load_path(in_records, i);
+    const uint2 selected = path_debug_path_events(i);
 
     const uint vertex_region = path_record_vertex_region_offset(in_records);
     uint chain = path_debug_chain_length(in_records, p, vertex_region);
     float downstream = 0.f;
     float nee_at_parent = 0.f;
+    uint delivered = 0;
+    uint failed = 0;
     for (int k = int(p.vertex_count) - 1; k >= 0; k--) {
         const PathRecordVertex v =
             path_record_load_vertex(in_records, vertex_region, p.vertex_offset + k);
-        const float lum = path_debug_finite_or_zero(yuv_luminance(v.contrib));
+        const bool event = path_debug_is_event_vertex(selected, uint(k));
+        const float lum = event ? path_debug_finite_or_zero(yuv_luminance(v.contrib)) : 0.f;
         if (v.nee) {
             nee_at_parent += lum;
+            delivered += event && lum > 0.f ? 1 : 0;
+            failed += event && !(lum > 0.f) ? 1 : 0;
             continue;
         }
+        const float arriving = downstream;
         downstream += lum + nee_at_parent;
+        const uint connections_delivered = delivered;
+        const uint connections_failed = failed;
         nee_at_parent = 0.f;
+        delivered = 0;
+        failed = 0;
         chain--;
-        if (chain < params.heat_bounce_min || chain > params.heat_bounce_max) {
+        // path ends count the terminal vertex, an event or not
+        const bool counted = path_debug_event_drawn(selected, uint(k), false) ||
+                             (params.heat_mode == PATH_DEBUG_HEAT_PATH_ENDS && v.terminal);
+        if (!counted || chain < params.heat_bounce_min || chain > params.heat_bounce_max) {
             continue;
         }
         if (distance(v.pos, camera.position) > PATH_DEBUG_ENV_DISTANCE) {
             continue;
         }
-        float weight;
+        // averaged quantities count every vertex that has one
+        float weight = 0.f;
+        bool has = false;
         switch (params.heat_mode) {
         case PATH_DEBUG_HEAT_CONTRIBUTION:
             weight = downstream;
             break;
         case PATH_DEBUG_HEAT_THROUGHPUT:
-            weight = v.terminal ? 0.f : v.throughput;
+            weight = v.throughput;
+            has = !v.terminal;
+            break;
+        case PATH_DEBUG_HEAT_INCIDENT:
+            weight = v.throughput > 0.f ? arriving / v.throughput : 0.f;
+            has = !v.terminal && v.throughput > 0.f;
+            break;
+        case PATH_DEBUG_HEAT_SAMPLE_WEIGHT: {
+            const float before = throughput_before(p, vertex_region, k);
+            weight = before > 0.f ? v.throughput / before : 0.f;
+            has = !v.terminal && before > 0.f;
+            break;
+        }
+        case PATH_DEBUG_HEAT_NEE_SUCCESS:
+            weight = float(connections_delivered);
+            break;
+        case PATH_DEBUG_HEAT_NEE_FAILED:
+            weight = float(connections_failed);
+            break;
+        case PATH_DEBUG_HEAT_PATH_ENDS:
+            weight = v.terminal ? 1.f : 0.f;
             break;
         default:
             weight = 1.f;
             break;
         }
-        if (weight > 0.f) {
+        if (weight > 0.f || has) {
             grid_add(v.pos, weight);
         }
     }

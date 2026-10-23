@@ -39,32 +39,27 @@ void main(uint3 gid: SV_DispatchThreadID) {
         return;
     }
 
-    const PathRecordPath p = path_record_load_path(in_records, i);
-    if (p.vertex_count == 0 || !path_debug_matched(i)) {
+    if (!path_debug_matched(i)) {
         return;
     }
+    const PathRecordPath p = path_debug_load_selected_path(i);
+    const uint2 selected = path_debug_path_events(i);
     const uint vertex_region = path_record_vertex_region_offset(in_records);
-    const uint scatter = path_debug_scatter_count(in_records, p, vertex_region);
 
     InterlockedAdd(stats[PATH_DEBUG_STATS_COUNT], 1);
     InterlockedAdd(stats[PATH_DEBUG_STATS_LUM +
                          path_debug_log_bin(p.luminance, PATH_DEBUG_HIST_MIN_LOG,
                                             PATH_DEBUG_HIST_MAX_LOG, PATH_DEBUG_HIST_SMALL_BINS)],
                    1);
-    const uint scatter_bin = min(scatter, PATH_DEBUG_SCATTER_BINS - 1);
-    InterlockedAdd(stats[PATH_DEBUG_STATS_SCATTER + scatter_bin], 1);
-    if (isfinite(p.luminance)) {
-        path_debug_atomic_add_float(stats, stats_f, PATH_DEBUG_STATS_SCATTER_CONTRIB + scatter_bin,
-                                    p.luminance);
-    }
 
     // the directions of the selected point's draws
     const bool binning = path_debug_selects_point();
     const bool local_frame =
         merian_path_debug_gbuffer && params.map_frame == PATH_DEBUG_FRAME_LOCAL;
     const float3x3 to_map = dir_map_frame(
-        local_frame ? path_debug_map_normal(gbuffer.get_normal(path_debug_selected_pixel()))
-                    : float3(0, 0, 1),
+        local_frame
+            ? path_debug_map_normal(gbuffer.get_first_hit_normal(path_debug_selected_pixel()))
+            : float3(0, 0, 1),
         local_frame);
 
     uint chain = path_debug_chain_length(in_records, p, vertex_region);
@@ -78,7 +73,8 @@ void main(uint3 gid: SV_DispatchThreadID) {
     for (int k = int(p.vertex_count) - 1; k >= 0; k--) {
         const PathRecordVertex v =
             path_record_load_vertex(in_records, vertex_region, p.vertex_offset + k);
-        const float3 contrib = path_debug_finite_or_zero(v.contrib);
+        const bool event = path_debug_is_event_vertex(selected, uint(k));
+        const float3 contrib = event ? path_debug_finite_or_zero(v.contrib) : float3(0.f);
         const float3 transported = v.nee ? contrib : downstream;
         if (v.nee) {
             nee_at_parent += contrib;
@@ -86,6 +82,14 @@ void main(uint3 gid: SV_DispatchThreadID) {
             downstream += contrib + nee_at_parent;
             nee_at_parent = float3(0.f);
             chain--;
+        }
+        // the light path the vertex ends has as many scatter events as chain vertices before it
+        if (event) {
+            const uint scatter_bin = min(chain, PATH_DEBUG_SCATTER_BINS - 1);
+            InterlockedAdd(stats[PATH_DEBUG_STATS_SCATTER + scatter_bin], 1);
+            path_debug_atomic_add_float(stats, stats_f,
+                                        PATH_DEBUG_STATS_SCATTER_CONTRIB + scatter_bin,
+                                        yuv_luminance(contrib));
         }
         const uint index = v.nee ? chain - 1 : chain;
         if (index != 0 || v.terminal) {

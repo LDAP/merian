@@ -19,8 +19,7 @@ Sampler2D<float4> in_backdrop;
 static const float3 SPLIT_COLOR = float3(1.f, 1.f, 0.1f);
 
 float3 filtered_tonemapped(const float3 radiance) {
-    return params.filtered_exposure > 0.f ? 1.f - exp(-radiance * params.filtered_exposure)
-                                          : radiance;
+    return 1.f - exp(-radiance * params.image_exposure);
 }
 
 float2 out_uv(const uint2 pixel) {
@@ -39,48 +38,52 @@ float3 sample_reference(const uint2 pixel) {
     return in_reference.SampleLevel(out_uv(pixel), 0.f).rgb;
 }
 
-float3 backdrop_color(const uint2 pixel, const float3 render, const float3 filtered) {
+float3 backdrop_color(const uint2 pixel, const float3 render, const uint2 render_pixel) {
     switch (params.backdrop) {
     case PATH_DEBUG_BACKDROP_FILTERED:
-        return filtered_tonemapped(filtered);
+        return filtered_tonemapped(filtered_radiance(render_pixel));
     case PATH_DEBUG_BACKDROP_REFERENCE:
-        return sample_reference(pixel);
+        return params.image_exposure * sample_reference(pixel);
     case PATH_DEBUG_BACKDROP_DIFFERENCE:
-        return abs(render - sample_reference(pixel)) * params.difference_gain;
+        return params.image_exposure * params.difference_gain *
+               abs(render - sample_reference(pixel));
     case PATH_DEBUG_BACKDROP_SPLIT_REFERENCE:
-        return left_of_split(pixel) ? render : sample_reference(pixel);
+        return params.image_exposure * (left_of_split(pixel) ? render : sample_reference(pixel));
     case PATH_DEBUG_BACKDROP_INPUT:
-        return in_backdrop.SampleLevel(out_uv(pixel), 0.f).rgb;
+        return params.image_exposure * in_backdrop.SampleLevel(out_uv(pixel), 0.f).rgb;
     default:
-        return render;
+        return params.image_exposure * render;
     }
 }
 
 float heat_lookup(const float3 pos) {
+    float2 cell = path_debug_grid_at(pos);
     if (params.heat_smooth == 0) {
-        return path_debug_grid_weight_at(pos);
+        return path_debug_heat_value(cell);
     }
     // the cell and its six face neighbors
-    float sum = path_debug_grid_weight_at(pos);
     for (int axis = 0; axis < 3; axis++) {
         for (int side = -1; side <= 1; side += 2) {
             float3 offset = float3(0);
             offset[axis] = float(side) * params.heat_cell_size;
-            sum += path_debug_grid_weight_at(pos + offset);
+            cell += path_debug_grid_at(pos + offset);
         }
     }
-    return sum / 7.f;
+    return path_debug_heat_value(cell / 7.f);
 }
 
-// normalized by the mean recorded paths per pixel
+// the mean contribution of the filtered paths at a record pixel
 float3 filtered_radiance(const uint2 render_pixel) {
     if (params.filtered_active == 0) {
         return float3(0.f);
     }
-    const float recorded = asfloat(filtered[path_debug_filtered_paths_at()]);
-    const float paths_per_pixel = recorded / (float(params.dim_x) * float(params.dim_y));
-    const float norm = paths_per_pixel > 0.f ? 1.f / paths_per_pixel : 0.f;
-    return norm * path_debug_load_float3(filtered, path_debug_filtered_base(render_pixel));
+    const uint2 source = path_debug_source_pixel(render_pixel);
+    if (source.x == PATH_DEBUG_NO_PIXEL) {
+        return float3(0.f);
+    }
+    const uint base = path_debug_filtered_base(source);
+    const uint count = filtered[base + PATH_DEBUG_FILTERED_COUNT];
+    return count > 0 ? path_debug_load_float3(filtered, base) / float(count) : float3(0.f);
 }
 
 // the scene's distance at a displayed pixel, bilinear between the record pixels
@@ -89,10 +92,10 @@ float scene_distance(const uint2 pixel) {
     const int2 base = int2(floor(at));
     const float2 f = at - float2(base);
     const int2 last = int2(path_debug_dim()) - 1;
-    const float z00 = gbuffer.get_linear_z(uint2(clamp(base, 0, last)));
-    const float z10 = gbuffer.get_linear_z(uint2(clamp(base + int2(1, 0), 0, last)));
-    const float z01 = gbuffer.get_linear_z(uint2(clamp(base + int2(0, 1), 0, last)));
-    const float z11 = gbuffer.get_linear_z(uint2(clamp(base + int2(1, 1), 0, last)));
+    const float z00 = gbuffer.get_first_hit_linear_z(uint2(clamp(base, 0, last)));
+    const float z10 = gbuffer.get_first_hit_linear_z(uint2(clamp(base + int2(1, 0), 0, last)));
+    const float z01 = gbuffer.get_first_hit_linear_z(uint2(clamp(base + int2(0, 1), 0, last)));
+    const float z11 = gbuffer.get_first_hit_linear_z(uint2(clamp(base + int2(1, 1), 0, last)));
     return lerp(lerp(z00, z10, f.x), lerp(z01, z11, f.x), f.y);
 }
 
@@ -107,7 +110,7 @@ uint2 cursor_display_pixel() {
 
 float3 compose(const uint2 pixel, const float3 src) {
     const uint2 render_pixel = path_debug_render_pixel(pixel);
-    float3 color = backdrop_color(pixel, src, filtered_radiance(render_pixel));
+    float3 color = backdrop_color(pixel, src, render_pixel);
 
     if (params.backdrop == PATH_DEBUG_BACKDROP_SPLIT_REFERENCE) {
         if (pixel.x == split_x() || pixel.x + 1 == split_x()) {
@@ -115,22 +118,18 @@ float3 compose(const uint2 pixel, const float3 src) {
         }
     }
 
-    if (params.pixel_stats_view != PATH_DEBUG_PIXEL_STAT_OFF) {
-        const PathDebugPixelMoments m = path_debug_pixel_moments(render_pixel);
+    const uint2 source = path_debug_source_pixel(render_pixel);
+    if (params.pixel_stats_view != PATH_DEBUG_PIXEL_STAT_OFF && source.x != PATH_DEBUG_NO_PIXEL) {
+        const PathDebugPixelMoments m = path_debug_pixel_moments(source);
         if (m.count > 1) {
-            float value = m.mean;
-            if (params.pixel_stats_view == PATH_DEBUG_PIXEL_STAT_REL_ERROR) {
-                value = m.rel_error;
-            } else if (params.pixel_stats_view == PATH_DEBUG_PIXEL_STAT_VARIANCE) {
-                value = m.variance;
-            }
+            const float value = path_debug_pixel_statistic(m, params.pixel_stats_view);
             color = lerp(color, colormap_turbo(saturate(value * params.pixel_stats_scale)),
                          params.false_color_opacity);
         }
     }
 
     if (merian_path_debug_gbuffer && params.heat_mode != PATH_DEBUG_HEAT_OFF) {
-        const float linear_z = gbuffer.get_linear_z(render_pixel);
+        const float linear_z = gbuffer.get_first_hit_linear_z(render_pixel);
         if (linear_z > 0.f && linear_z < MAX_LINEAR_Z) {
             const float3 pos =
                 camera.position_from_linear_z(render_pixel, path_debug_dim(), linear_z);
@@ -157,7 +156,8 @@ float3 compose(const uint2 pixel, const float3 src) {
         // the scene in front of it hides it
         if (h2 >= 0.f && t >= 0.f && t < scene_distance(pixel)) {
             const float3 dir = normalize(camera.position + rd * t - center);
-            const float3 selected_normal = gbuffer.get_normal(path_debug_selected_pixel());
+            const float3 selected_normal =
+                gbuffer.get_first_hit_normal(path_debug_selected_pixel());
             const float3x3 to_map = dir_map_frame(path_debug_map_normal(selected_normal),
                                                   params.map_frame == PATH_DEBUG_FRAME_LOCAL);
             const float3 map_dir = mul(to_map, dir);
@@ -186,17 +186,28 @@ void main(uint3 gid: SV_DispatchThreadID) {
             const float lum = yuv_luminance(filtered);
             out_filtered[pixel] = float4(filtered, lum * lum);
         }
+        if (merian_path_debug_gbuffer && params.image_depth != 0) {
+            const float linear_z = gbuffer.get_first_hit_linear_z(pixel);
+            const float2 grad_z = float2(gbuffer.get_grad_z(pixel));
+            voxel_depth[pixel.y * params.dim_x + pixel.x] =
+                float2(linear_z < MAX_LINEAR_Z ? linear_z : PATH_DEBUG_ENV_DISTANCE,
+                       abs(grad_z.x) + abs(grad_z.y));
+        }
         if (merian_path_debug_gbuffer && params.pick_x != PATH_DEBUG_NO_PIXEL &&
             all(pixel == uint2(params.pick_x, params.pick_y))) {
-            const float linear_z = gbuffer.get_linear_z(pixel);
+            const float linear_z = gbuffer.get_first_hit_linear_z(pixel);
             const float3 surface = camera.position_from_linear_z(
                 pixel, path_debug_dim(),
                 linear_z < MAX_LINEAR_Z ? linear_z : PATH_DEBUG_ENV_DISTANCE);
-            const float3 n = gbuffer.get_normal(pixel);
+            const float3 n = gbuffer.get_first_hit_normal(pixel);
             const float3 normal = all(isfinite(n)) ? n : float3(0.f);
             path_debug_store_float3(state, PATH_DEBUG_STATE_PICK + PATH_DEBUG_PICK_SURFACE,
                                     surface);
             path_debug_store_float3(state, PATH_DEBUG_STATE_PICK + PATH_DEBUG_PICK_NORMAL, normal);
+            const Hit hit = gbuffer.get_hit(pixel);
+            state[PATH_DEBUG_STATE_PICK + PATH_DEBUG_PICK_HIT] =
+                hit.is_valid() ? hit.get_geometry_id() : PATH_RECORD_GEOMETRY_ENVIRONMENT;
+            state[PATH_DEBUG_STATE_PICK + PATH_DEBUG_PICK_HIT + 1] = hit.primitive_id;
             state[PATH_DEBUG_STATE_PICK + PATH_DEBUG_PICK_SURFACE_SEQ] = params.pick_seq;
         }
     }

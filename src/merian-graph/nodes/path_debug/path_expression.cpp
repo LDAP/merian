@@ -1,8 +1,10 @@
 #include "merian-graph/nodes/path_debug/path_expression.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <exception>
+#include <string_view>
 
 namespace merian {
 
@@ -58,23 +60,55 @@ bool parse_repeat(const std::string& text,
 
 uint32_t pack_token(const uint32_t scattering,
                     const uint32_t side,
+                    const uint32_t labels,
                     const uint32_t repeat_min,
                     const uint32_t repeat_max) {
     return scattering | (side << PATH_DEBUG_SIDE_SHIFT) | (repeat_min << PATH_DEBUG_MIN_SHIFT) |
-           (repeat_max << PATH_DEBUG_MAX_SHIFT);
+           (repeat_max << PATH_DEBUG_MAX_SHIFT) | (labels << PATH_DEBUG_LABEL_SHIFT);
+}
+
+// the techniques a quoted code names, 0 for an unknown code
+uint32_t technique_labels(const std::string_view code) {
+    static constexpr std::array<std::pair<std::string_view, uint32_t>, 8> CODES = {{
+        {"b", 1u << PATH_RECORD_METHOD_BSDF},
+        {"g", 1u << PATH_RECORD_METHOD_GUIDING},
+        {"n", 1u << PATH_RECORD_METHOD_LIGHT},
+        {"c", 1u << PATH_RECORD_METHOD_COSINE},
+        {"u", 1u << PATH_RECORD_METHOD_UNIFORM},
+        {"rrb", 1u << PATH_RECORD_METHOD_REPLAYED_BSDF},
+        {"rrn", 1u << PATH_RECORD_METHOD_REPLAYED_LIGHT},
+        {"rec", 1u << PATH_RECORD_METHOD_RECONNECTION},
+    }};
+    const auto it = std::ranges::find(CODES, code, &std::pair<std::string_view, uint32_t>::first);
+    return it != CODES.end() ? it->second : 0u;
 }
 
 } // namespace
 
 PathExpression compile_path_expression(const std::string& text) {
     const PathExpression invalid{.valid = false};
-    std::array<uint32_t, PATH_DEBUG_MAX_TOKENS> tokens{};
-    uint32_t count = 0;
-    bool nee = false;
+    PathExpression expression;
+    expression.active = text.find_first_not_of(" \t") != std::string::npos;
     std::size_t i = 0;
 
-    const auto letter_masks = [](const std::string& letters, uint32_t& scattering, uint32_t& side) {
-        for (const char c : letters) {
+    // the masks of an event's letters and quoted techniques; L marks the light
+    const auto masks = [](const std::string& event, uint32_t& scattering, uint32_t& side,
+                          uint32_t& labels, bool& light) {
+        for (std::size_t at = 0; at < event.size(); at++) {
+            const char c = event[at];
+            if (c == '\'') {
+                const std::size_t close = event.find('\'', at + 1);
+                const uint32_t technique =
+                    close == std::string::npos
+                        ? 0u
+                        : technique_labels(std::string_view(event).substr(at + 1, close - at - 1));
+                if (technique == 0) {
+                    return false;
+                }
+                labels |= technique;
+                at = close;
+                continue;
+            }
             switch (std::toupper(static_cast<unsigned char>(c))) {
             case 'S':
                 scattering |= PATH_DEBUG_CLS_DELTA;
@@ -94,7 +128,11 @@ PathExpression compile_path_expression(const std::string& text) {
             case 'T':
                 side |= PATH_DEBUG_SIDE_TRANSMIT;
                 break;
+            case 'L':
+                light = true;
+                break;
             case '.':
+            case ' ':
                 break;
             default:
                 return false;
@@ -103,61 +141,46 @@ PathExpression compile_path_expression(const std::string& text) {
         return true;
     };
 
-    const auto rest_is_blank = [&text](const std::size_t from) {
-        return text.find_first_not_of(" \t", from) == std::string::npos;
-    };
-
     while (i < text.size()) {
         const char c = text[i];
         if (std::isspace(static_cast<unsigned char>(c)) != 0) {
             i++;
             continue;
         }
-        const bool last = rest_is_blank(i + 1);
-        const auto upper = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
-        if (upper == 'N' && last) {
-            nee = true;
+        if (c == 'C' && expression.token_count == 0) {
             i++;
             continue;
-        }
-        if ((c == 'C' && count == 0) || (upper == 'L' && last)) {
-            i++;
-            continue;
-        }
-        if (count == PATH_DEBUG_MAX_TOKENS) {
-            return invalid;
         }
 
-        std::string letters;
+        // one event: a bracket, a quoted technique or a letter
+        std::size_t end_pos = i;
         if (c == '<' || c == '[') {
-            const char closing = c == '<' ? '>' : ']';
-            const std::size_t end_pos = text.find(closing, i);
-            if (end_pos == std::string::npos) {
-                return invalid;
-            }
-            letters = text.substr(i + 1, end_pos - i - 1);
-            i = end_pos + 1;
-            const bool light = std::ranges::any_of(letters, [](const char letter) {
-                return std::toupper(static_cast<unsigned char>(letter)) == 'L';
-            });
-            if (light && rest_is_blank(i)) {
-                continue;
-            }
-        } else {
-            letters = std::string(1, c);
-            i++;
+            end_pos = text.find(c == '<' ? '>' : ']', i);
+        } else if (c == '\'') {
+            end_pos = text.find('\'', i + 1);
         }
+        if (end_pos == std::string::npos) {
+            return invalid;
+        }
+        const bool bracket = c == '<' || c == '[';
+        const std::string event =
+            bracket ? text.substr(i + 1, end_pos - i - 1) : text.substr(i, end_pos - i + 1);
+        i = end_pos + 1;
 
         uint32_t scattering = 0;
         uint32_t side = 0;
-        if (!letter_masks(letters, scattering, side)) {
+        uint32_t labels = 0;
+        bool light = false;
+        if (!masks(event, scattering, side, labels, light)) {
             return invalid;
         }
-        if (scattering == 0) {
-            scattering = PATH_DEBUG_CLS_ANY;
-        }
-        if (side == 0) {
-            side = PATH_DEBUG_SIDE_ANY;
+        // the light ends the expression and carries nothing of its own
+        if (light) {
+            if (text.find_first_not_of(" \t", i) != std::string::npos || scattering != 0 ||
+                side != 0 || labels != 0) {
+                return invalid;
+            }
+            break;
         }
 
         uint32_t repeat_min = 1;
@@ -165,25 +188,15 @@ PathExpression compile_path_expression(const std::string& text) {
         if (!parse_repeat(text, i, repeat_min, repeat_max)) {
             return invalid;
         }
-        if (repeat_min > PATH_DEBUG_MIN_MASK || repeat_min > repeat_max ||
-            repeat_max > PATH_DEBUG_REPEAT_INF) {
+        if (expression.token_count == PATH_DEBUG_MAX_TOKENS || repeat_min > PATH_DEBUG_MIN_MASK ||
+            repeat_min > repeat_max || repeat_max > PATH_DEBUG_REPEAT_INF) {
             return invalid;
         }
-
-        tokens[count++] = pack_token(scattering, side, repeat_min, repeat_max);
+        expression.tokens[expression.token_count++] =
+            pack_token(scattering != 0 ? scattering : PATH_DEBUG_CLS_ANY,
+                       side != 0 ? side : PATH_DEBUG_SIDE_ANY,
+                       labels != 0 ? labels : PATH_DEBUG_LABEL_ANY, repeat_min, repeat_max);
     }
-
-    if (nee && count == 0) {
-        tokens[count++] =
-            pack_token(PATH_DEBUG_CLS_ANY, PATH_DEBUG_SIDE_ANY, 0, PATH_DEBUG_REPEAT_INF);
-    }
-
-    PathExpression expression;
-    for (uint32_t w = 0; w < expression.words.size(); w++) {
-        expression.words[w] = tokens[2 * w] | (tokens[(2 * w) + 1] << PATH_DEBUG_TOKEN_BITS);
-    }
-    expression.token_count = count;
-    expression.nee = nee;
     return expression;
 }
 

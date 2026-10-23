@@ -60,14 +60,16 @@ void write_top_list() {
         out_state[dst + PATH_DEBUG_TOP_SLOT] = slot;
         out_state[dst + PATH_DEBUG_TOP_PIXEL] = path_record_pack_pixel(p.pixel);
         out_state[dst + PATH_DEBUG_TOP_LUMINANCE] = asuint(p.luminance);
+        // the deepest of the selection's light paths
+        const uint2 selected = path_debug_kept_events(slot);
         out_state[dst + PATH_DEBUG_TOP_SAMPLE_SCATTER] = path_debug_pack_sample_count(
-            p.sample_idx, path_debug_scatter_count(kept, p, PATH_DEBUG_KEPT_VERTICES));
+            p.sample_idx, path_debug_events_depth(kept, p, PATH_DEBUG_KEPT_VERTICES, selected));
         uint classes = 0;
         uint e = 0;
-        for (uint v = 0; v < p.vertex_count && e < PATH_DEBUG_TOP_CLASSES; v++) {
-            const uint meta =
-                path_record_load_vertex_meta(kept, PATH_DEBUG_KEPT_VERTICES, p.vertex_offset + v);
-            if (path_debug_is_event(meta)) {
+        for (int v = 0; v < path_debug_last_event(selected) && e < PATH_DEBUG_TOP_CLASSES; v++) {
+            const uint meta = path_record_load_vertex_meta(kept, PATH_DEBUG_KEPT_VERTICES,
+                                                           p.vertex_offset + uint(v));
+            if (!path_debug_is_connection(meta)) {
                 classes |= ((meta >> PATH_RECORD_LOBE_SHIFT) & PATH_RECORD_LOBE_MASK)
                            << (PATH_DEBUG_CLASS_BITS * e);
                 e++;
@@ -146,9 +148,11 @@ void main() {
             path_debug_write_map_probe(PATH_DEBUG_PROBE_SPHERE, params.sphere_channel,
                                        path_debug_map_cell_of(sphere_probe - 1));
         } else if (params.cursor_x != PATH_DEBUG_NO_PIXEL &&
-                   params.cursor_y != PATH_DEBUG_NO_PIXEL) {
-            const PathDebugPixelMoments m =
-                path_debug_pixel_moments(uint2(params.cursor_x, params.cursor_y));
+                   params.cursor_y != PATH_DEBUG_NO_PIXEL &&
+                   path_debug_source_pixel(uint2(params.cursor_x, params.cursor_y)).x !=
+                       PATH_DEBUG_NO_PIXEL) {
+            const PathDebugPixelMoments m = path_debug_pixel_moments(
+                path_debug_source_pixel(uint2(params.cursor_x, params.cursor_y)));
             const uint values_at = PATH_DEBUG_OUT_PROBE + PATH_DEBUG_PROBE_VALUES;
             out_state[PATH_DEBUG_OUT_PROBE + PATH_DEBUG_PROBE_KIND] = PATH_DEBUG_PROBE_PIXEL;
             out_state[values_at + 0] = asuint(m.mean);
@@ -168,5 +172,6 @@ void main() {
     }
     in_records[PATH_RECORD_HDR_ENABLE] = hold || params.capture_off != 0 ? 0 : 1;
     in_records[PATH_RECORD_HDR_PIXEL_FILTER] = params.record_pixel;
+    in_records[PATH_RECORD_HDR_KEEP_PIXEL] = params.record_keep_pixel;
     in_records[PATH_RECORD_HDR_KEEP_PROB] = asuint(params.keep_prob);
 }
