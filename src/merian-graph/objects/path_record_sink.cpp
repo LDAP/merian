@@ -55,16 +55,18 @@ void PathRecordSink::process(const CommandBufferHandle& cmd,
     if (!is_connected) {
         return;
     }
-    // graph memory is uninitialized, and a garbage header would arm recording
+    // graph memory is uninitialized, and a garbage header would arm recording; a node with several
+    // passes clears it once per pass
     if (iteration == 0) {
         const BufferHandle& buffer = io[con];
         cmd->fill(buffer, 0, sizeof(uint32_t) * PATH_RECORD_HEADER_UINTS);
-        cmd->barrier(buffer->buffer_barrier2(vk::PipelineStageFlagBits2::eTransfer,
-                                             vk::PipelineStageFlagBits2::eRayTracingShaderKHR |
-                                                 vk::PipelineStageFlagBits2::eComputeShader,
-                                             vk::AccessFlagBits2::eTransferWrite,
-                                             vk::AccessFlagBits2::eShaderRead |
-                                                 vk::AccessFlagBits2::eShaderWrite));
+        cmd->barrier(buffer->buffer_barrier2(
+            vk::PipelineStageFlagBits2::eTransfer,
+            vk::PipelineStageFlagBits2::eRayTracingShaderKHR |
+                vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer,
+            vk::AccessFlagBits2::eTransferWrite,
+            vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite |
+                vk::AccessFlagBits2::eTransferWrite));
     }
     bind(io, cursor);
 }

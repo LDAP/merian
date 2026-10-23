@@ -560,6 +560,7 @@ RenderRestirPT::process(const NodeIO& io, const NodeProcessInfo& info, Submissio
     if (independent_feedback && scene->get_light_collection().densities_vary()) {
         MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "light training");
         run(Train, nullptr, nullptr, 0u);
+        sync();
     }
     BufferHandle current = next_target();
     {
