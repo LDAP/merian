@@ -264,6 +264,8 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<WGBuffer> gbuffer) {
                 sample.specular_hit_distance = 0.f;
             }
         }
+        sample.first_hit_normal = mat_shading_frame.get_normal();
+        sample.first_hit_linear_z = min(linear_z, MAX_LINEAR_Z);
         gbuffer.store(pixel, sample);
         // the emission bypasses the renderer, so it carries the primary segment's attenuation
         if (merian_gbuffer_write_emission)
@@ -285,6 +287,8 @@ void main(ParameterBlock<Scene> scene, ParameterBlock<WGBuffer> gbuffer) {
     sample.specular_albedo = float3(0.f);
     sample.roughness = 0.f;
     sample.specular_hit_distance = MAX_LINEAR_Z;
+    sample.first_hit_normal = sample.normal;
+    sample.first_hit_linear_z = sample.linear_z;
     gbuffer.store(pixel, sample);
     if (merian_gbuffer_write_emission)
         emission[pixel] = float4(sp.emission * scene.exterior_volume.transmittance(linear_z), 0);

@@ -16,9 +16,9 @@ namespace merian {
 
 // field, shader name, shader type, float channels, float storage, packed channels
 #define MERIAN_GBUFFER_FIELDS(X)                                                                   \
-    /* shading normal, world space */                                                              \
+    /* shading normal, world space; primary surface replacement swaps in the chain's end */        \
     X(Normal, "normal", "float3", 3, Float16, 1)                                                   \
-    /* distance from the camera along the primary ray */                                           \
+    /* distance from the camera along the primary ray, the chain's under replacement */            \
     X(LinearZ, "linear_z", "float", 1, Float16, 1)                                                 \
     /* screen space gradient of LinearZ */                                                         \
     X(GradZ, "grad_z", "half2", 2, Float16, 1)                                                     \
@@ -38,7 +38,10 @@ namespace merian {
     /* distance from the camera along its view axis */                                             \
     X(ViewDepth, "view_depth", "float", 1, Float32, 1)                                             \
     /* perspective depth, 0 at the near and 1 at the far plane */                                  \
-    X(ProjectedDepth, "projected_depth", "float", 1, Float32, 1)
+    X(ProjectedDepth, "projected_depth", "float", 1, Float32, 1)                                   \
+    /* Normal and LinearZ of the surface the primary ray hits, whatever replaces it */             \
+    X(FirstHitNormal, "first_hit_normal", "float3", 3, Float16, 1)                                 \
+    X(FirstHitLinearZ, "first_hit_linear_z", "float", 1, Float32, 1)
 
 #define MERIAN_GBUFFER_FIELD_ENUMERATOR(field, ...) field,
 #define MERIAN_GBUFFER_FIELD_ONE(...) +1

@@ -143,7 +143,7 @@ TEST(GBufferLayout, GroupOrderDoesNotMatter) {
 
 // ROUND_TRIP_SOURCE writes one result per field in GBufferField order, then the derived
 // accessors and the dimensions flag.
-static_assert(GBUFFER_FIELD_COUNT == 13,
+static_assert(GBUFFER_FIELD_COUNT == 15,
               "a field was added or removed, update ROUND_TRIP_SOURCE to match");
 
 const char* const ROUND_TRIP_SOURCE = R"(
@@ -169,6 +169,8 @@ GBufferSample make_sample() {
     sample.specular_hit_distance = 4.75;
     sample.view_depth = 10.25;
     sample.projected_depth = 0.875;
+    sample.first_hit_normal = float3(0.48, 0.6, -0.64);
+    sample.first_hit_linear_z = 6.25;
     return sample;
 }
 
@@ -209,11 +211,13 @@ void read(uint3 tid: SV_DispatchThreadID, ParameterBlock<GBuffer> gbuffer) {
     results[10] = error(gbuffer.get_specular_hit_distance(p), expected.specular_hit_distance);
     results[11] = error(gbuffer.get_view_depth(p), expected.view_depth);
     results[12] = error(gbuffer.get_projected_depth(p), expected.projected_depth);
+    results[13] = error(gbuffer.get_first_hit_normal(p), expected.first_hit_normal);
+    results[14] = error(gbuffer.get_first_hit_linear_z(p), expected.first_hit_linear_z);
 
-    results[13] = abs(gbuffer.get_surface(p).linear_z - expected.linear_z);
-    results[14] = distance(gbuffer.get_motion_vectors_dilated(int2(p), 1), expected.motion_vectors);
-    results[15] = distance(decode_normal(gbuffer.get_encoded_normal(p)), expected.normal);
-    results[16] = float(all(gbuffer.get_dimensions() == uint2(1)));
+    results[15] = abs(gbuffer.get_surface(p).linear_z - expected.linear_z);
+    results[16] = distance(gbuffer.get_motion_vectors_dilated(int2(p), 1), expected.motion_vectors);
+    results[17] = distance(decode_normal(gbuffer.get_encoded_normal(p)), expected.normal);
+    results[18] = float(all(gbuffer.get_dimensions() == uint2(1)));
 }
 )";
 
@@ -375,6 +379,8 @@ INSTANTIATE_TEST_SUITE_P(
                           {.fields = {Field::MotionVectors, Field::Roughness}, .texture = true},
                           {.fields = {Field::Albedo}, .texture = true},
                           {.fields = {Field::ViewDepth, Field::ProjectedDepth}, .texture = true},
+                          {.fields = {Field::FirstHitNormal, Field::FirstHitLinearZ},
+                           .texture = true},
                       },
                       // every field that has a packed form packed
                       std::vector<GBufferGroup>{
@@ -384,6 +390,7 @@ INSTANTIATE_TEST_SUITE_P(
                           {{Field::Hit, Field::DeltaZ}},
                           {{Field::DeltaZ, Field::ViewDepth}},
                           {{Field::DeltaZ, Field::ProjectedDepth}},
+                          {{Field::FirstHitNormal, Field::FirstHitLinearZ}},
                       }));
 
 // Two gbuffers of a graph can each have their own layout.

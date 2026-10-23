@@ -291,6 +291,14 @@ static const float3 CAST_FAIL = float3(1, 1, 0);
         color = float4(float3(params.gbuffer.get_projected_depth(pixel)), 1);
         break;
     }
+    case 30: { // First Hit Normal
+        color = float4(debug_normal_color(params.gbuffer.get_first_hit_normal(pixel)), 1);
+        break;
+    }
+    case 31: { // First Hit Linear Z (plain)
+        color = float4(float3(params.gbuffer.get_first_hit_linear_z(pixel)), 1);
+        break;
+    }
     }
 
     params.output[pixel] = color;

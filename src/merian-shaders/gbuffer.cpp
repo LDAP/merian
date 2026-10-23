@@ -122,12 +122,27 @@ const std::array<FormatCandidate, 3>& format_candidates(const Storage storage) {
     return storage == Storage::Uint32 ? UINT32 : storage == Storage::Float16 ? FLOAT16 : FLOAT32;
 }
 
-vk::DeviceSize texel_bytes(const GBufferLayout::Texture& texture) {
+const FormatCandidate& smallest_format(const GBufferLayout::Texture& texture) {
     const std::array<FormatCandidate, 3>& candidates = format_candidates(texture.storage);
-    const auto it = std::ranges::find_if(candidates, [&](const FormatCandidate& candidate) {
+    return *std::ranges::find_if(candidates, [&](const FormatCandidate& candidate) {
         return candidate.channel_count >= texture.channel_count;
     });
-    return Image::format_size(it->format);
+}
+
+vk::DeviceSize texel_bytes(const GBufferLayout::Texture& texture) {
+    return Image::format_size(smallest_format(texture).format);
+}
+
+// an integer image's shader type has to match the channels of its format
+uint32_t element_channels(const GBufferLayout::Texture& texture) {
+    return texture.storage == Storage::Uint32 ? smallest_format(texture).channel_count
+                                              : TEXTURE_CHANNELS;
+}
+
+std::string element_type(const GBufferLayout::Texture& texture) {
+    const uint32_t count = element_channels(texture);
+    const char* const scalar = texture.storage == Storage::Uint32 ? "uint" : "float";
+    return count == 1 ? scalar : fmt::format("{}{}", scalar, count);
 }
 
 // Largest fields first, each into the first texture appended here that takes it.
@@ -173,8 +188,10 @@ vk::DeviceSize bytes_per_pixel(const std::vector<GBufferField>& fields, const bo
 std::string decode(const GBufferField field, const bool packed, const std::string& channels) {
     switch (field) {
     case GBufferField::Normal:
+    case GBufferField::FirstHitNormal:
         return packed ? fmt::format("decode_normal({})", channels) : channels;
     case GBufferField::LinearZ:
+    case GBufferField::FirstHitLinearZ:
     case GBufferField::DeltaZ:
     case GBufferField::ViewDepth:
     case GBufferField::ProjectedDepth:
@@ -195,8 +212,10 @@ std::string encode(const GBufferField field, const bool packed) {
     const std::string value = fmt::format("sample.{}", traits(field).name);
     switch (field) {
     case GBufferField::Normal:
+    case GBufferField::FirstHitNormal:
         return packed ? fmt::format("encode_normal({})", value) : value;
     case GBufferField::LinearZ:
+    case GBufferField::FirstHitLinearZ:
     case GBufferField::DeltaZ:
     case GBufferField::ViewDepth:
     case GBufferField::ProjectedDepth:
@@ -363,6 +382,7 @@ const GBufferLayoutHandle& GBufferLayout::complete() {
             {{GBufferField::Roughness}},
             {{GBufferField::ViewDepth}},
             {{GBufferField::ProjectedDepth}},
+            {{GBufferField::FirstHitNormal, GBufferField::FirstHitLinearZ}},
         });
     return layout;
 }
@@ -485,7 +505,7 @@ std::string GBufferLayout::generate_module() const {
     std::string store;
     for (uint32_t i = 0; i < textures.size(); i++) {
         const Texture& texture = textures[i];
-        const char* element = texture.storage == Storage::Uint32 ? "uint4" : "float4";
+        const std::string element = element_type(texture);
         read_members += fmt::format("    public RRWWTexture2D<{}, 0> tex{};\n", element, i);
         write_members += fmt::format("    public RRWWTexture2D<{}, 2> tex{};\n", element, i);
         texel_members += fmt::format("    public {} tex{};\n", element, i);
@@ -495,7 +515,8 @@ std::string GBufferLayout::generate_module() const {
         for (const Placement& placement : texture.placements) {
             components.push_back(encode(placement.field, placement.packed));
         }
-        components.resize(components.size() + TEXTURE_CHANNELS - texture.channel_count, "0");
+        components.resize(components.size() + element_channels(texture) - texture.channel_count,
+                          "0");
         store += fmt::format("        tex{}.Store(pixel, {}({}));\n", i, element,
                              fmt::join(components, ", "));
     }

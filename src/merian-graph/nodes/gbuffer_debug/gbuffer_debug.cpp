@@ -51,6 +51,9 @@ const std::vector<DebugField> FIELDS = {
     {"Specular Hit Distance", {GBufferField::SpecularHitDistance}},
     {"View Depth", {GBufferField::ViewDepth}},
     {"Projected Depth", {GBufferField::ProjectedDepth}},
+    // First hit, kept under primary surface replacement
+    {"First Hit Normal", {GBufferField::FirstHitNormal}},
+    {"First Hit Linear Z", {GBufferField::FirstHitLinearZ}},
 };
 
 } // namespace
