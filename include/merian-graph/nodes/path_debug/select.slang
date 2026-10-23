@@ -7,23 +7,47 @@ using merian;
 #include "merian-graph/nodes/path_debug/layout.slangh"
 #include "merian-graph/nodes/path_debug/common.slangh"
 
+// the group's share of the overlay histogram, the match bits and the match count, flushed once
+groupshared uint gs_hist[PATH_DEBUG_HIST_BINS];
+static const uint MATCH_WORDS = PATH_DEBUG_WG / 32;
+
+groupshared uint gs_matches[MATCH_WORDS];
+groupshared uint gs_matched;
+
 void count_overlay_path(const PathRecordPath p) {
-    InterlockedAdd(state[PATH_DEBUG_STATE_MATCHED], 1);
-    if (params.overlay_rank == PATH_DEBUG_RANK_FIREFLIES) {
-        InterlockedAdd(state[PATH_DEBUG_STATE_HIST + path_debug_lum_bin(p.luminance)], 1);
-    } else if (path_debug_keeps_top() && params.overlay_keep_update != 0) {
-        const uint key = path_debug_top_key(p);
-        if (key != 0) {
-            InterlockedAdd(state[PATH_DEBUG_STATE_HIST + path_debug_key_bin(key)], 1);
-        }
+    if (!path_debug_keeps_top() || params.overlay_keep_update == 0) {
+        return;
+    }
+    const uint key = path_debug_top_key(p);
+    if (key != 0) {
+        InterlockedAdd(gs_hist[path_debug_key_bin(key)], 1);
     }
 }
 
-[numthreads(PATH_DEBUG_WG, 1, 1)]
-[shader("compute")]
-void main(uint3 gid: SV_DispatchThreadID) {
+// The first vertex past the specular transmissions at the path's start, what the pixel shows
+// through clear glass; the first one if the path leaves the scene behind them.
+float3 seen_through_glass(const PathRecordPath p, const uint vertex_region, const float3 first) {
+    float3 seen = first;
+    for (uint v = 0; v < p.vertex_count; v++) {
+        const PathRecordVertex vertex =
+            path_record_load_vertex(in_records, vertex_region, p.vertex_offset + v);
+        if (vertex.nee) {
+            continue;
+        }
+        if (distance(vertex.pos, camera.position) >= PATH_DEBUG_ENV_DISTANCE) {
+            return first;
+        }
+        seen = vertex.pos;
+        if (vertex.terminal ||
+            vertex.lobe != (PATH_RECORD_LOBE_DELTA | PATH_RECORD_LOBE_TRANSMISSION)) {
+            return seen;
+        }
+    }
+    return seen;
+}
+
+void select_path(const uint i, const uint local) {
     const uint count = path_record_path_count(in_records);
-    const uint i = gid.x;
     if (i >= count) {
         return;
     }
@@ -38,58 +62,67 @@ void main(uint3 gid: SV_DispatchThreadID) {
     if (params.pick_x != PATH_DEBUG_NO_PIXEL &&
         all(p.pixel == uint2(params.pick_x, params.pick_y))) {
         uint claimed;
-        InterlockedExchange(state[PATH_DEBUG_STATE_PICK], params.pick_seq, claimed);
+        InterlockedExchange(state[PATH_DEBUG_STATE_PICK + PATH_DEBUG_PICK_RECORD_SEQ],
+                            params.pick_seq, claimed);
         if (claimed != params.pick_seq) {
-            const float3 pos =
+            const float3 first =
                 path_record_load_vertex(in_records, vertex_region, p.vertex_offset).pos;
-            state[PATH_DEBUG_STATE_PICK + 1] = asuint(pos.x);
-            state[PATH_DEBUG_STATE_PICK + 2] = asuint(pos.y);
-            state[PATH_DEBUG_STATE_PICK + 3] = asuint(pos.z);
-            state[PATH_DEBUG_STATE_PICK + 4] = asuint(
-                max(path_debug_pixel_footprint(p.pixel, distance(camera.position, pos)), 1e-6f));
+            const float3 seen = seen_through_glass(p, vertex_region, first);
+            path_debug_store_float3(state, PATH_DEBUG_STATE_PICK + PATH_DEBUG_PICK_FIRST, first);
+            path_debug_store_float3(state, PATH_DEBUG_STATE_PICK + PATH_DEBUG_PICK_SEEN, seen);
         }
     }
 
-    if (params.overlay_source == PATH_DEBUG_SOURCE_ALL) {
-        count_overlay_path(p);
+    if (path_debug_selects_point() && path_debug_in_selected_pixel(p)) {
+        const bool at_point = path_debug_starts_at_point(p, vertex_region);
+        InterlockedAdd(state[PATH_DEBUG_STATE_POINT + (at_point ? 0 : 1)], 1);
     }
 
-    const bool finite = !isnan(p.luminance) && !isinf(p.luminance);
-    const uint moments_base = path_debug_moments_base(p.pixel);
-    if (params.pixel_stats_accumulate != 0 && finite) {
-        path_debug_atomic_add_float(moments, moments_f, moments_base + 0, p.luminance);
-        path_debug_atomic_add_float(moments, moments_f, moments_base + 1,
-                                    p.luminance * p.luminance);
-        InterlockedAdd(moments[moments_base + 2], 1);
-    }
-
-    const uint scatter = path_debug_scatter_count(in_records, p, vertex_region);
-    if (!path_debug_selection_matches(p, vertex_region, scatter)) {
+    const uint scatter = path_debug_needs_scatter_count()
+                             ? path_debug_scatter_count(in_records, p, vertex_region)
+                             : 0;
+    const bool matched = path_debug_selection_matches(p, vertex_region, scatter) &&
+                         path_debug_expression_matches(p, vertex_region, scatter);
+    if (!matched) {
         return;
     }
-    const bool in_a = path_debug_expression_matches(0, p, vertex_region, scatter);
-    const bool in_b = path_debug_expression_matches(1, p, vertex_region, scatter);
-    if (in_a) {
-        path_debug_set_match(i, 0);
-    }
-    if (in_b) {
-        path_debug_set_match(i, 1);
-    }
-    if (!in_a && !in_b) {
-        return;
-    }
+    InterlockedOr(gs_matches[local >> 5], 1u << (local & 31u));
+    InterlockedAdd(gs_matched, 1);
 
-    if (params.pixel_stats_accumulate != 0 && finite &&
-        params.pixel_stats_source != PATH_DEBUG_SOURCE_ALL &&
-        (params.pixel_stats_source == PATH_DEBUG_SOURCE_A ? in_a : in_b)) {
-        path_debug_atomic_add_float(moments, moments_f, moments_base + 3, p.luminance);
-        path_debug_atomic_add_float(moments, moments_f, moments_base + 4,
+    if (params.pixel_stats_accumulate != 0 && isfinite(p.luminance)) {
+        const uint base = path_debug_moments_base(p.pixel);
+        path_debug_atomic_add_float(moments, moments_f, base + PATH_DEBUG_MOMENT_SUM, p.luminance);
+        path_debug_atomic_add_float(moments, moments_f, base + PATH_DEBUG_MOMENT_SQUARES,
                                     p.luminance * p.luminance);
-        InterlockedAdd(moments[moments_base + 5], 1);
+        InterlockedAdd(moments[base + PATH_DEBUG_MOMENT_COUNT], 1);
     }
 
-    if (params.overlay_source != PATH_DEBUG_SOURCE_ALL &&
-        path_debug_in_source(i, params.overlay_source)) {
-        count_overlay_path(p);
+    count_overlay_path(p);
+}
+
+[numthreads(PATH_DEBUG_WG, 1, 1)]
+[shader("compute")]
+void main(uint3 gid: SV_DispatchThreadID, uint3 tid: SV_GroupThreadID) {
+    if (tid.x < PATH_DEBUG_HIST_BINS) {
+        gs_hist[tid.x] = 0;
+    }
+    if (tid.x < MATCH_WORDS) {
+        gs_matches[tid.x] = 0;
+    }
+    if (tid.x == 0) {
+        gs_matched = 0;
+    }
+    GroupMemoryBarrierWithGroupSync();
+    select_path(gid.x, tid.x);
+    GroupMemoryBarrierWithGroupSync();
+    if (tid.x < PATH_DEBUG_HIST_BINS && gs_hist[tid.x] != 0) {
+        InterlockedAdd(state[PATH_DEBUG_STATE_HIST + tid.x], gs_hist[tid.x]);
+    }
+    // the group starts at a multiple of PATH_DEBUG_WG, so its bits fill whole words
+    if (tid.x < MATCH_WORDS && gs_matches[tid.x] != 0) {
+        InterlockedOr(matches[(gid.x - tid.x) / 32 + tid.x], gs_matches[tid.x]);
+    }
+    if (tid.x == 0 && gs_matched != 0) {
+        InterlockedAdd(state[PATH_DEBUG_STATE_MATCHED], gs_matched);
     }
 }

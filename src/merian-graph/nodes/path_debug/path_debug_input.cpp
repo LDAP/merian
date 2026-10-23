@@ -17,6 +17,9 @@ int modifier_of(const InputController::Key key) {
     case InputController::Key::LEFT_ALT:
     case InputController::Key::RIGHT_ALT:
         return InputController::ALT;
+    case InputController::Key::LEFT_SUPER:
+    case InputController::Key::RIGHT_SUPER:
+        return InputController::SUPER;
     default:
         return 0;
     }
@@ -51,16 +54,17 @@ bool PathDebugInput::Observer::on_key([[maybe_unused]] InputController& controll
     } else {
         held_mods = mods;
     }
-    escape_pressed |=
-        key == InputController::Key::ESCAPE && action == InputController::KeyStatus::PRESS;
+    if (key == InputController::Key::ESCAPE && action == InputController::KeyStatus::PRESS) {
+        escape_mods = held_mods | mods;
+    }
     return false;
 }
 
 bool PathDebugInput::on_key([[maybe_unused]] InputController& controller,
                             const InputController::Key key,
                             [[maybe_unused]] const InputController::KeyStatus action,
-                            [[maybe_unused]] const int mods) {
-    return key == InputController::Key::ESCAPE && consume_escape;
+                            const int mods) {
+    return key == InputController::Key::ESCAPE && modifier_held(mods);
 }
 
 bool PathDebugInput::on_mouse_button([[maybe_unused]] InputController& controller,
@@ -69,9 +73,9 @@ bool PathDebugInput::on_mouse_button([[maybe_unused]] InputController& controlle
     if (button != InputController::MouseButton::MOUSE1) {
         return false;
     }
-    const bool pick = (observed->held_mods & PICK_MODIFIER) != 0;
-    if (status == InputController::KeyStatus::PRESS && (over_panels() || pick)) {
-        click = Click{observed->cursor_pos, pick};
+    const bool select = modifier_held(0);
+    if (status == InputController::KeyStatus::PRESS && (over_panels() || select)) {
+        events.click = Click{observed->cursor_pos, select};
         swallow_release = true;
         return true;
     }
@@ -86,11 +90,11 @@ bool PathDebugInput::on_scroll([[maybe_unused]] InputController& controller,
                                [[maybe_unused]] const double xoffset,
                                const double yoffset) {
     if (over_panels()) {
-        panel_scroll += yoffset;
+        events.panel_scroll += yoffset;
         return true;
     }
-    if ((observed->held_mods & WIDEN_MODIFIER) != 0) {
-        widen_scroll += yoffset;
+    if (modifier_held(0)) {
+        events.radius_scroll += yoffset;
         return true;
     }
     return false;
@@ -103,6 +107,14 @@ InputListenerHandle PathDebugInput::observer() const {
 void PathDebugInput::set_panel_area(const float2& lower, const float2& upper) {
     panel_lower = lower;
     panel_upper = upper;
+}
+
+void PathDebugInput::set_modifier(const int modifier) {
+    this->modifier = modifier;
+}
+
+bool PathDebugInput::modifier_held(const int mods) const {
+    return ((observed->held_mods | mods) & modifier) != 0;
 }
 
 bool PathDebugInput::over_panels() const {
@@ -118,24 +130,10 @@ std::optional<float2> PathDebugInput::cursor() const {
     return observed->cursor_pos;
 }
 
-std::optional<PathDebugInput::Click> PathDebugInput::take_click() {
-    return std::exchange(click, std::nullopt);
-}
-
-double PathDebugInput::take_panel_scroll() {
-    return std::exchange(panel_scroll, 0.);
-}
-
-double PathDebugInput::take_widen_scroll() {
-    return std::exchange(widen_scroll, 0.);
-}
-
-bool PathDebugInput::take_escape() {
-    return std::exchange(observed->escape_pressed, false);
-}
-
-void PathDebugInput::set_consume_escape(const bool consume) {
-    consume_escape = consume;
+PathDebugInput::Events PathDebugInput::consume_events() {
+    const std::optional<int> mods = std::exchange(observed->escape_mods, std::nullopt);
+    events.clear = mods && (*mods & modifier) != 0;
+    return std::exchange(events, Events{});
 }
 
 } // namespace merian

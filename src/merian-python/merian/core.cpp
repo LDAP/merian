@@ -149,7 +149,8 @@ NB_MODULE(_core, m) {
                                                  nb::is_arithmetic())
         .value("DEFAULT_OPEN", merian::Properties::ChildFlagBits::DEFAULT_OPEN)
         .value("FRAMED", merian::Properties::ChildFlagBits::FRAMED)
-        .value("TABS", merian::Properties::ChildFlagBits::TABS);
+        .value("TABS", merian::Properties::ChildFlagBits::TABS)
+        .value("HEADERLESS", merian::Properties::ChildFlagBits::HEADERLESS);
     nb::enum_<merian::Properties::OptionsStyle>(m, "OptionsStyle")
         .value("DONT_CARE", merian::Properties::OptionsStyle::DONT_CARE)
         .value("RADIO_BUTTON", merian::Properties::OptionsStyle::RADIO_BUTTON)

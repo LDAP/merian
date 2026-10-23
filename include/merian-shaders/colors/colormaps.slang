@@ -13,6 +13,19 @@ float3 colormap_turbo(float x) {
                       dot(v2, float2(-89.90310912f, 27.34824973f)));
 }
 
+// Polynomial fit of matplotlib's plasma (Zucker 2020, "Colormap polynomials", shadertoy WlfXRN).
+float3 colormap_plasma(float x) {
+    x = saturate(x);
+    const float3 c0 = float3(0.05873234392399702f, 0.02333670892565664f, 0.5433401826748754f);
+    const float3 c1 = float3(2.176514634195958f, 0.2383834171260182f, 0.7539604599784036f);
+    const float3 c2 = float3(-2.689460476458034f, -7.455851135738909f, 3.110799939717086f);
+    const float3 c3 = float3(6.130348345893603f, 42.3461881477227f, -28.51885465332158f);
+    const float3 c4 = float3(-11.10743619062271f, -82.66631109428045f, 60.13984767418263f);
+    const float3 c5 = float3(10.02306557647065f, 71.41361770095349f, -54.07218655560067f);
+    const float3 c6 = float3(-3.658713842777788f, -22.93153465461149f, 18.19190778539828f);
+    return saturate(c0 + x * (c1 + x * (c2 + x * (c3 + x * (c4 + x * (c5 + x * c6))))));
+}
+
 // Diverging blue-white-red map for signed quantities; 0.5 = neutral.
 float3 colormap_diverging(float x) {
     x = saturate(x);

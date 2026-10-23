@@ -8,7 +8,8 @@
 
 namespace merian {
 
-// Over the panels, clicks and scrolling belong to the panels whatever the modifiers.
+// Every binding needs the modifier held, so the scene keeps its own; over the panels, clicks and
+// scrolling belong to the panels whatever the modifiers.
 class PathDebugInput : public InputListener {
   public:
     static constexpr int PRIORITY = 5;
@@ -16,13 +17,20 @@ class PathDebugInput : public InputListener {
     static constexpr int UI_PRIORITY = 8;
     // above any UI, which consumes the key events while it has the keyboard
     static constexpr int OBSERVER_PRIORITY = 1000;
-    static constexpr int PICK_MODIFIER = InputController::ALT;
-    static constexpr int WIDEN_MODIFIER = InputController::CONTROL;
 
     struct Click {
         float2 pos;
-        // with the pick modifier held
-        bool pick;
+        // with the modifier held
+        bool select;
+    };
+
+    // What arrived since the last consume_events().
+    struct Events {
+        std::optional<Click> click;
+        double panel_scroll = 0.;
+        double radius_scroll = 0.;
+        // Escape with the modifier held, whoever consumed it
+        bool clear = false;
     };
 
     bool on_cursor(InputController& controller, double xpos, double ypos) override;
@@ -41,14 +49,12 @@ class PathDebugInput : public InputListener {
     // In window coordinates; empty without panels.
     void set_panel_area(const float2& lower, const float2& upper);
 
+    // InputController::ModKey bits.
+    void set_modifier(int modifier);
+
     // Empty while a listener above has the cursor.
     std::optional<float2> cursor() const;
-    std::optional<Click> take_click();
-    double take_panel_scroll();
-    double take_widen_scroll();
-    // Escape pressed, whoever consumed it.
-    bool take_escape();
-    void set_consume_escape(bool consume);
+    Events consume_events();
 
   private:
     class Observer : public InputListener {
@@ -64,20 +70,21 @@ class PathDebugInput : public InputListener {
         float2 cursor_pos{};
         // the last cursor event did not reach PRIORITY
         bool cursor_taken = false;
-        bool escape_pressed = false;
+        // the modifiers held at the last Escape press
+        std::optional<int> escape_mods;
     };
 
     bool over_panels() const;
+    bool modifier_held(int mods) const;
 
     std::shared_ptr<Observer> observed = std::make_shared<Observer>();
 
-    std::optional<Click> click;
+    Events events;
     float2 panel_lower{};
     float2 panel_upper{};
-    double panel_scroll = 0.;
-    double widen_scroll = 0.;
+
+    int modifier = InputController::ALT;
     bool swallow_release = false;
-    bool consume_escape = false;
 };
 
 } // namespace merian

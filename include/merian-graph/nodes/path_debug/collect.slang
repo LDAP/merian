@@ -19,29 +19,15 @@ void collect_kept_top(const uint path_index, const PathRecordPath p) {
     }
     uint at;
     if (bin > band) {
-        InterlockedAdd(state[PATH_DEBUG_STATE_CANDIDATES + 0], 1, at);
+        InterlockedAdd(state[PATH_DEBUG_STATE_CANDIDATES_ABOVE], 1, at);
         if (at < PATH_DEBUG_KEPT_SLOTS) {
-            state[PATH_DEBUG_STATE_DRAW_LIST + at] = path_index;
+            state[PATH_DEBUG_STATE_CANDIDATES + at] = path_index;
         }
         return;
     }
-    InterlockedAdd(state[PATH_DEBUG_STATE_CANDIDATES + 1], 1, at);
-    if (at < PATH_DEBUG_MAX_DRAW - PATH_DEBUG_KEPT_SLOTS) {
-        state[PATH_DEBUG_STATE_DRAW_LIST + PATH_DEBUG_KEPT_SLOTS + at] = path_index;
-    }
-}
-
-void collect_fireflies(const uint path_index, const PathRecordPath p) {
-    const uint bin = path_debug_lum_bin(p.luminance);
-    const uint band = state[PATH_DEBUG_STATE_BAND];
-    if (bin < band ||
-        (bin == band && path_debug_path_hash(p) > state[PATH_DEBUG_STATE_BAND_KEEP])) {
-        return;
-    }
-    uint slot;
-    InterlockedAdd(state[PATH_DEBUG_STATE_DRAW_COUNT], 1, slot);
-    if (slot < params.overlay_max_paths && slot < PATH_DEBUG_MAX_DRAW) {
-        state[PATH_DEBUG_STATE_DRAW_LIST + slot] = path_index;
+    InterlockedAdd(state[PATH_DEBUG_STATE_CANDIDATES_IN_BAND], 1, at);
+    if (at < PATH_DEBUG_BAND_CANDIDATES) {
+        state[PATH_DEBUG_STATE_CANDIDATES + PATH_DEBUG_KEPT_SLOTS + at] = path_index;
     }
 }
 
@@ -55,19 +41,12 @@ void main(uint3 gid: SV_DispatchThreadID) {
     }
 
     const PathRecordPath p = path_record_load_path(in_records, i);
-    if (p.vertex_count == 0 || any(p.pixel >= path_debug_dim()) ||
-        !path_debug_in_source(i, params.overlay_source)) {
+    if (p.vertex_count == 0 || any(p.pixel >= path_debug_dim()) || !path_debug_matched(i)) {
         return;
     }
-    switch (params.overlay_rank) {
-    case PATH_DEBUG_RANK_FIREFLIES:
-        collect_fireflies(i, p);
-        break;
-    case PATH_DEBUG_RANK_RECENT:
-        path_debug_recent_commit(p);
-        break;
-    default:
+    if (path_debug_keeps_top()) {
         collect_kept_top(i, p);
-        break;
+    } else {
+        path_debug_recent_commit(p);
     }
 }

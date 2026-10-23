@@ -7,62 +7,66 @@ using merian;
 #include "merian-graph/nodes/path_debug/layout.slangh"
 #include "merian-graph/nodes/path_debug/common.slangh"
 
-void threshold_fireflies() {
-    const uint wanted = clamp(
-        uint(float(state[PATH_DEBUG_STATE_MATCHED]) * params.overlay_brightest_fraction), 1u,
-        max(params.overlay_max_paths, 1u));
-    uint band = 0;
-    uint band_keep = 0xFFFFFFFFu;
-    uint above = 0;
-    for (int bin = PATH_DEBUG_HIST_BINS - 1; bin >= 1; bin--) {
-        const uint count = state[PATH_DEBUG_STATE_HIST + bin];
-        if (above + count >= wanted) {
-            band = uint(bin);
-            band_keep = path_debug_share_threshold(count > 0 ? float(wanted - above) / float(count)
-                                                             : 1.f);
-            break;
-        }
-        above += count;
-    }
-    state[PATH_DEBUG_STATE_BAND] = band;
-    state[PATH_DEBUG_STATE_BAND_KEEP] = band_keep;
-}
+groupshared uint gs_kept[PATH_DEBUG_HIST_BINS];
+groupshared uint gs_count[PATH_DEBUG_HIST_BINS];
+groupshared uint gs_band_thread;
 
-void threshold_kept_top() {
-    uint kept_count[PATH_DEBUG_HIST_BINS];
-    for (uint bin = 0; bin < PATH_DEBUG_HIST_BINS; bin++) {
-        kept_count[bin] = 0;
-    }
-    for (uint slot = 0; slot < params.overlay_max_paths; slot++) {
-        const uint key = path_debug_kept_key_now(slot);
-        if (key != 0) {
-            kept_count[path_debug_key_bin(key)]++;
-        }
-    }
-    uint band = 0;
-    uint above = 0;
-    for (int bin = PATH_DEBUG_HIST_BINS - 1; bin >= 0; bin--) {
-        above += state[PATH_DEBUG_STATE_HIST + bin] + kept_count[bin];
-        if (above >= params.overlay_max_paths) {
-            band = uint(bin);
-            break;
-        }
-    }
-    state[PATH_DEBUG_STATE_BAND] = band;
-}
+static const uint NO_BAND = 0xFFFFFFFFu;
 
-[numthreads(1, 1, 1)]
+// the band of the key histogram the kept top-k reaches into, over the kept and the new paths
+[numthreads(PATH_DEBUG_HIST_BINS, 1, 1)]
 [shader("compute")]
-void main() {
-    if (params.map_batch_end != 0) {
+void main(uint3 tid: SV_GroupThreadID) {
+    const uint t = tid.x;
+    if (t == 0 && params.map_batch_end != 0) {
         stats[PATH_DEBUG_STATS_BATCHES]++;
         stats[PATH_DEBUG_STATS_BATCH_SAMPLES] = stats[PATH_DEBUG_STATS_SAMPLES];
         stats[PATH_DEBUG_STATS_BATCH_DRAWS] = stats[PATH_DEBUG_STATS_DRAWS];
     }
+    if (!path_debug_keeps_top() || params.overlay_keep_update == 0) {
+        return;
+    }
+    // brightest share starts over every frame
+    const bool share = params.overlay_rank == PATH_DEBUG_RANK_BRIGHTEST_SHARE;
 
-    if (params.overlay_rank == PATH_DEBUG_RANK_FIREFLIES) {
-        threshold_fireflies();
-    } else if (path_debug_keeps_top() && params.overlay_keep_update != 0) {
-        threshold_kept_top();
+    gs_kept[t] = 0;
+    if (t == 0) {
+        gs_band_thread = NO_BAND;
+    }
+    GroupMemoryBarrierWithGroupSync();
+    for (uint slot = t; !share && slot < params.overlay_max_paths; slot += PATH_DEBUG_HIST_BINS) {
+        const uint key = path_debug_kept_key_now(slot);
+        if (key != 0) {
+            InterlockedAdd(gs_kept[path_debug_key_bin(key)], 1);
+        }
+    }
+    GroupMemoryBarrierWithGroupSync();
+
+    // brightest first
+    const uint bin = PATH_DEBUG_HIST_BINS - 1 - t;
+    const uint count = state[PATH_DEBUG_STATE_HIST + bin] + gs_kept[bin];
+    gs_count[t] = count;
+    GroupMemoryBarrierWithGroupSync();
+    uint brighter = 0;
+    for (uint u = 0; u < t; u++) {
+        brighter += gs_count[u];
+    }
+
+    const uint wanted =
+        share ? clamp(uint(float(state[PATH_DEBUG_STATE_MATCHED]) * params.overlay_brightest_share),
+                      1u, params.overlay_max_paths)
+              : params.overlay_max_paths;
+    if (brighter + count >= wanted) {
+        InterlockedMin(gs_band_thread, t);
+    }
+    GroupMemoryBarrierWithGroupSync();
+    if (t == 0) {
+        state[PATH_DEBUG_STATE_KEEP_COUNT] = wanted;
+        if (gs_band_thread == NO_BAND) {
+            state[PATH_DEBUG_STATE_BAND] = 0;
+        }
+    }
+    if (t == gs_band_thread) {
+        state[PATH_DEBUG_STATE_BAND] = bin;
     }
 }

@@ -1,7 +1,6 @@
 #include "merian-graph/objects/path_record_sink.hpp"
 
 #include <algorithm>
-#include <array>
 
 namespace merian {
 
@@ -12,14 +11,11 @@ OutputConnectorDescriptor PathRecordSink::describe_output(const ContextHandle& c
     last_max_range = context->get_physical_device()->get_device_limits().maxStorageBufferRange &
                      ~vk::DeviceSize{3};
     last_extent = extent;
-    vk::DeviceSize size = vk::DeviceSize{PATH_RECORD_HEADER_UINTS} * 4;
-    if (is_connected) {
-        size = stream_size(spp, vertices_per_path);
-    }
-    emitted_size = size;
+    emitted_size = is_connected ? stream_size(spp, vertices_per_path)
+                                : vk::DeviceSize{PATH_RECORD_HEADER_UINTS} * sizeof(uint32_t);
     // the consumer writes the header that the next iteration's renderer reads
     con = ManagedVkBufferOut::create(vk::BufferCreateInfo(
-        {}, size,
+        {}, emitted_size,
         vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst |
             vk::BufferUsageFlagBits::eTransferSrc));
     return {.name = "path_records",
@@ -61,9 +57,8 @@ void PathRecordSink::process(const CommandBufferHandle& cmd,
     }
     // graph memory is uninitialized, and a garbage header would arm recording
     if (iteration == 0) {
-        const std::array<const uint32_t, PATH_RECORD_HEADER_UINTS> zero{};
         const BufferHandle& buffer = io[con];
-        cmd->update(buffer, vk::ArrayProxy<const uint32_t>(zero));
+        cmd->fill(buffer, 0, sizeof(uint32_t) * PATH_RECORD_HEADER_UINTS);
         cmd->barrier(buffer->buffer_barrier2(vk::PipelineStageFlagBits2::eTransfer,
                                              vk::PipelineStageFlagBits2::eRayTracingShaderKHR |
                                                  vk::PipelineStageFlagBits2::eComputeShader,

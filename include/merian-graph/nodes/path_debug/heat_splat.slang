@@ -9,8 +9,7 @@ using merian;
 #include "merian-graph/nodes/path_debug/common.slangh"
 
 void grid_add(const float3 pos, const float weight) {
-    const int3 cell = int3(floor(pos / params.heat_cell_size));
-    const uint slot = path_debug_grid_find(path_debug_cell_key(cell), true);
+    const uint slot = path_debug_grid_find(path_debug_grid_key(pos), true);
     if (slot == PATH_DEBUG_GRID_INVALID) {
         return;
     }
@@ -27,29 +26,23 @@ void main(uint3 gid: SV_DispatchThreadID) {
     }
 
     const PathRecordPath p = path_record_load_path(in_records, i);
-    if (p.vertex_count == 0 || !path_debug_in_source(i, params.heat_source)) {
+    if (p.vertex_count == 0 || !path_debug_matched(i)) {
         return;
     }
 
     const uint vertex_region = path_record_vertex_region_offset(in_records);
-    uint chain = 0;
-    for (uint v = 0; v < p.vertex_count; v++) {
-        chain += path_debug_is_connection(
-                     path_record_load_vertex_meta(in_records, vertex_region, p.vertex_offset + v))
-                     ? 0
-                     : 1;
-    }
+    uint chain = path_debug_chain_length(in_records, p, vertex_region);
     float downstream = 0.f;
     float nee_at_parent = 0.f;
     for (int k = int(p.vertex_count) - 1; k >= 0; k--) {
         const PathRecordVertex v =
             path_record_load_vertex(in_records, vertex_region, p.vertex_offset + k);
-        const float lum = yuv_luminance(v.contrib);
+        const float lum = path_debug_finite_or_zero(yuv_luminance(v.contrib));
         if (v.nee) {
-            nee_at_parent += isfinite(lum) ? lum : 0.f;
+            nee_at_parent += lum;
             continue;
         }
-        downstream += (isfinite(lum) ? lum : 0.f) + nee_at_parent;
+        downstream += lum + nee_at_parent;
         nee_at_parent = 0.f;
         chain--;
         if (chain < params.heat_bounce_min || chain > params.heat_bounce_max) {

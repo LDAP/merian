@@ -12,7 +12,6 @@
 #include <bit>
 #include <cfloat>
 #include <cmath>
-#include <numbers>
 #include <string>
 #include <vector>
 
@@ -39,10 +38,30 @@ float3 check_albedo(const Stats& stats) {
            static_cast<float>(std::max(stats[PATH_DEBUG_CHECK_DRAWS], 1u));
 }
 
+std::string elided(std::string text, const float width) {
+    if (ImGui::CalcTextSize(text.c_str()).x <= width) {
+        return text;
+    }
+    while (!text.empty() && ImGui::CalcTextSize((text + "...").c_str()).x > width) {
+        text.pop_back();
+    }
+    return text + "...";
+}
+
+constexpr ImVec4 GOOD_COLOR{0.35f, 0.85f, 0.4f, 1.f};
+constexpr ImVec4 WARN_COLOR{0.95f, 0.75f, 0.3f, 1.f};
+constexpr ImVec4 BAD_COLOR{0.95f, 0.35f, 0.3f, 1.f};
+constexpr ImU32 LABEL_COLOR = IM_COL32(235, 235, 235, 255);
+constexpr ImU32 RECORDED_COLOR = IM_COL32(203, 166, 247, 255);
+
+ImVec4 to_imvec4(const float3& rgb) {
+    return {rgb.x, rgb.y, rgb.z, 1.f};
+}
+
 void shadowed_text(ImDrawList* const dl,
                    const ImVec2 pos,
                    const char* text,
-                   const ImU32 color = IM_COL32(235, 235, 235, 255)) {
+                   const ImU32 color = LABEL_COLOR) {
     dl->AddText(ImVec2(pos.x + 1.f, pos.y + 1.f), IM_COL32(0, 0, 0, 200), text);
     dl->AddText(pos, color, text);
 }
@@ -52,15 +71,35 @@ float chi2_sigma(const uint32_t dof) {
     return std::sqrt(2.f / static_cast<float>(std::max(dof, 1u)));
 }
 
+bool per_steradian(const uint32_t channel) {
+    return channel != PATH_DEBUG_MAP_COVERAGE && channel != PATH_DEBUG_MAP_RADIANCE_COLOR &&
+           channel != PATH_DEBUG_MAP_MEAN && channel != PATH_DEBUG_MAP_MEAN_COLOR;
+}
+
+bool colored(const uint32_t channel) {
+    return channel == PATH_DEBUG_MAP_INTEGRAND_COLOR || channel == PATH_DEBUG_MAP_RADIANCE_COLOR ||
+           channel == PATH_DEBUG_MAP_MEAN_COLOR;
+}
+
+bool diverging(const uint32_t channel) {
+    return channel == PATH_DEBUG_MAP_RATIO || channel == PATH_DEBUG_MAP_ZSCORE ||
+           channel == PATH_DEBUG_MAP_COVERAGE;
+}
+
+float reduced_chi2(const Stats& stats) {
+    return stat_float(stats, PATH_DEBUG_STATS_CHI2) /
+           static_cast<float>(std::max(stats[PATH_DEBUG_STATS_CHI2_DOF], 1u));
+}
+
 ImVec4 chi2_color(const float reduced, const uint32_t dof) {
     const float deviation = std::abs(reduced - 1.f) / chi2_sigma(dof);
     if (deviation < 3.f) {
-        return {0.35f, 0.85f, 0.4f, 1.f};
+        return GOOD_COLOR;
     }
     if (deviation < 5.f) {
-        return {0.95f, 0.75f, 0.3f, 1.f};
+        return WARN_COLOR;
     }
-    return {0.95f, 0.35f, 0.3f, 1.f};
+    return BAD_COLOR;
 }
 
 std::string si_count(const uint64_t n) {
@@ -97,7 +136,7 @@ bool direction_disc(const char* id, float& theta_deg, float& phi_deg) {
         const float dy = (mouse.y - center.y) / RADIUS;
         const float r = std::sqrt((dx * dx) + (dy * dy));
         if (r > 1e-3f) {
-            phi_deg = std::atan2(-dy, dx) * 180.f / std::numbers::pi_v<float>;
+            phi_deg = degrees(std::atan2(-dy, dx));
             const float polar = std::min(r, 1.f) * 90.f;
             theta_deg = below ? 180.f - polar : polar;
             changed = true;
@@ -118,7 +157,7 @@ bool direction_disc(const char* id, float& theta_deg, float& phi_deg) {
     shadowed_text(dl, ImVec2(center.x + 4.f, center.y - RADIUS - 2.f), "90°");
 
     const float polar = below ? 180.f - theta_deg : theta_deg;
-    const float rad = phi_deg * std::numbers::pi_v<float> / 180.f;
+    const float rad = radians(phi_deg);
     const float handle_r = RADIUS * std::clamp(polar / 90.f, 0.f, 1.f);
     const ImVec2 handle(center.x + (handle_r * std::cos(rad)),
                         center.y - (handle_r * std::sin(rad)));
@@ -132,23 +171,30 @@ bool direction_disc(const char* id, float& theta_deg, float& phi_deg) {
 }
 
 struct BSDFVerdict {
-    enum class Status { ok, fail, no_statement };
+    enum class Status { OK, FAIL, APPROXIMATE, NO_STATEMENT };
     const char* label;
     Status status;
     std::string detail;
 };
 
+BSDFVerdict::Status passed(const bool ok) {
+    return ok ? BSDFVerdict::Status::OK : BSDFVerdict::Status::FAIL;
+}
+
 void check_row(const BSDFVerdict& verdict) {
     ImGui::TextUnformatted(verdict.label);
     ImGui::SameLine(210.f);
     switch (verdict.status) {
-    case BSDFVerdict::Status::ok:
-        ImGui::TextColored(ImVec4(0.35f, 0.85f, 0.4f, 1.f), "OK (%s)", verdict.detail.c_str());
+    case BSDFVerdict::Status::OK:
+        ImGui::TextColored(GOOD_COLOR, "OK (%s)", verdict.detail.c_str());
         break;
-    case BSDFVerdict::Status::fail:
-        ImGui::TextColored(ImVec4(0.95f, 0.35f, 0.3f, 1.f), "FAIL (%s)", verdict.detail.c_str());
+    case BSDFVerdict::Status::FAIL:
+        ImGui::TextColored(BAD_COLOR, "FAIL (%s)", verdict.detail.c_str());
         break;
-    default:
+    case BSDFVerdict::Status::APPROXIMATE:
+        ImGui::TextColored(WARN_COLOR, "APPROX (%s)", verdict.detail.c_str());
+        break;
+    case BSDFVerdict::Status::NO_STATEMENT:
         ImGui::TextDisabled("n/a (%s)", verdict.detail.c_str());
         break;
     }
@@ -156,7 +202,7 @@ void check_row(const BSDFVerdict& verdict) {
 
 std::vector<BSDFVerdict> bsdf_verdicts(const Stats& stats) {
     const uint32_t draws = stats[PATH_DEBUG_CHECK_DRAWS];
-    if (draws == 0) {
+    if (draws == 0 || stats[PATH_DEBUG_CHECK_CELLS] == 0) {
         return {};
     }
 
@@ -173,34 +219,37 @@ std::vector<BSDFVerdict> bsdf_verdicts(const Stats& stats) {
     const auto identity = [&](const char* label, const uint32_t off_slot, const uint32_t count,
                               const float worst) {
         const float share = static_cast<float>(stats[off_slot]) / static_cast<float>(count);
-        return BSDFVerdict{label,
-                           share <= 1e-3f ? BSDFVerdict::Status::ok : BSDFVerdict::Status::fail,
+        return BSDFVerdict{label, passed(share <= 1e-3f),
                            fmt::format("{:.3f}% off, worst {:.0e}", share * 100.f, worst)};
     };
     const auto integral = [&](const char* label, const bool ok, const std::string& detail) {
         if (!resolved && !ok) {
-            return BSDFVerdict{label, BSDFVerdict::Status::no_statement,
+            return BSDFVerdict{label, BSDFVerdict::Status::NO_STATEMENT,
                                fmt::format("{}, {}", unresolved, detail)};
         }
-        return BSDFVerdict{label, ok ? BSDFVerdict::Status::ok : BSDFVerdict::Status::fail, detail};
+        return BSDFVerdict{label, passed(ok), detail};
     };
 
     std::vector<BSDFVerdict> verdicts;
     const float mc_tol = std::max(6.f * albedo_stderr, 1e-3f);
     const bool energy_ok = albedo_max <= 1.f + mc_tol;
-    verdicts.push_back(
-        {"energy conservation", energy_ok ? BSDFVerdict::Status::ok : BSDFVerdict::Status::fail,
-         energy_ok ? fmt::format("albedo {:.4f} ± {:.4f}", albedo_max, albedo_stderr)
-                   : fmt::format("albedo {:.4f}{}", albedo_max,
-                                 transmitted > 0 ? ", refraction scales by eta²" : "")});
+    verdicts.push_back({"energy conservation", passed(energy_ok),
+                        energy_ok
+                            ? fmt::format("albedo {:.4f} ± {:.4f}", albedo_max, albedo_stderr)
+                            : fmt::format("albedo {:.4f}{}", albedo_max,
+                                          transmitted > 0 ? ", refraction scales by eta²" : "")});
 
     verdicts.push_back(identity("reciprocity", PATH_DEBUG_CHECK_OFF_RECIPROCITY,
                                 std::max(stats[PATH_DEBUG_CHECK_RECIPROCITY_CELLS], 1u),
                                 stat_float(stats, PATH_DEBUG_CHECK_ERR_RECIPROCITY)));
 
+    // a draw sample() rejects carries no density, so the pdf integrates to the valid share
     const float pdf_integral = stat_float(stats, PATH_DEBUG_CHECK_PDF_INTEGRAL);
-    verdicts.push_back(integral("pdf normalized", std::abs(pdf_integral - 1.f) <= 1e-2f,
-                                fmt::format("∫pdf dω = {:.4f}", pdf_integral)));
+    const float valid_share =
+        static_cast<float>(stats[PATH_DEBUG_CHECK_VALID]) / static_cast<float>(draws);
+    verdicts.push_back(
+        integral("pdf normalized", std::abs(pdf_integral - valid_share) <= 1e-2f,
+                 fmt::format("∫pdf dω {:.4f} vs valid draws {:.4f}", pdf_integral, valid_share)));
 
     verdicts.push_back(identity("sample weight = eval / pdf", PATH_DEBUG_CHECK_OFF_WEIGHT, draws,
                                 stat_float(stats, PATH_DEBUG_CHECK_ERR_WEIGHT)));
@@ -209,7 +258,7 @@ std::vector<BSDFVerdict> bsdf_verdicts(const Stats& stats) {
 
     const bool finite_ok = bad == 0 && bad_cells == 0;
     verdicts.push_back(
-        {"finite and non-negative", finite_ok ? BSDFVerdict::Status::ok : BSDFVerdict::Status::fail,
+        {"finite and non-negative", passed(finite_ok),
          finite_ok ? fmt::format("{} samples", si_count(draws))
                    : fmt::format("{} samples, {} cells", si_count(bad), si_count(bad_cells))});
 
@@ -220,12 +269,22 @@ std::vector<BSDFVerdict> bsdf_verdicts(const Stats& stats) {
         integral("sampling integrates eval", eval_rel <= 0.02f,
                  fmt::format("∫f·cos dω {:.4f} vs sampled {:.4f}", eval_lum, albedo_lum)));
 
+    // an approximation for demodulation, without the eta^2 radiance scaling of refraction
     const float albedo_fn = yuv_luminance(stat_rgb(stats, PATH_DEBUG_CHECK_ALBEDO));
-    const float albedo_rel =
-        std::abs(albedo_fn - albedo_lum) / std::max({albedo_fn, albedo_lum, 1e-6f});
-    verdicts.push_back({"get_albedo()",
-                        albedo_rel <= 0.15f ? BSDFVerdict::Status::ok : BSDFVerdict::Status::fail,
-                        fmt::format("{:.4f} vs {:.4f}", albedo_fn, albedo_lum)});
+    const float albedo_rel = (albedo_fn - albedo_lum) / std::max({albedo_fn, albedo_lum, 1e-6f});
+    const float refracted =
+        stat_float(stats, PATH_DEBUG_CHECK_TRANSMITTED_WEIGHT) / static_cast<float>(draws);
+    const std::string albedo_detail =
+        fmt::format("{:.4f} vs {:.4f}, {:+.0f}%", albedo_fn, albedo_lum, albedo_rel * 100.f);
+    if (std::abs(albedo_rel) <= 0.15f) {
+        verdicts.push_back({"get_albedo()", BSDFVerdict::Status::OK, albedo_detail});
+    } else if (refracted > 0.f) {
+        verdicts.push_back({"get_albedo()", BSDFVerdict::Status::NO_STATEMENT,
+                            fmt::format("{:.4f} vs {:.4f}, {:.4f} refracted carries eta²",
+                                        albedo_fn, albedo_lum, refracted)});
+    } else {
+        verdicts.push_back({"get_albedo()", BSDFVerdict::Status::APPROXIMATE, albedo_detail});
+    }
     return verdicts;
 }
 
@@ -265,8 +324,7 @@ void vertex_row(const uint32_t index, const uint32_t* const words) {
     if (std::isfinite(contrib_lum)) {
         ImGui::Text("%.3g", contrib_lum);
     } else {
-        ImGui::TextColored(ImVec4(1.f, 0.45f, 0.35f, 1.f), "%.3g, %.3g, %.3g", contrib.x, contrib.y,
-                           contrib.z);
+        ImGui::TextColored(BAD_COLOR, "%.3g, %.3g, %.3g", contrib.x, contrib.y, contrib.z);
     }
     ImGui::TableNextColumn();
     ImGui::TextUnformatted(terminal ? ""
@@ -287,317 +345,460 @@ void vertex_row(const uint32_t index, const uint32_t* const words) {
     }
 }
 
+// one button per option, the chosen one highlighted
+template <std::size_t N>
+bool segmented(const char* id, int32_t& value, const std::array<const char*, N>& names) {
+    ImGui::PushID(id);
+    bool changed = false;
+    for (std::size_t i = 0; i < N; i++) {
+        if (i > 0) {
+            ImGui::SameLine(0.f, 1.f);
+        }
+        const bool chosen = value == static_cast<int32_t>(i);
+        ImGui::PushStyleColor(
+            ImGuiCol_Button,
+            ImGui::GetStyleColorVec4(chosen ? ImGuiCol_TabSelected : ImGuiCol_FrameBg));
+        if (ImGui::SmallButton(names[i]) && !chosen) {
+            value = static_cast<int32_t>(i);
+            changed = true;
+        }
+        ImGui::PopStyleColor();
+    }
+    ImGui::PopID();
+    return changed;
+}
+
+// a label, then a combo over the names
+template <std::size_t N>
+void labeled_combo(const char* label,
+                   int32_t& value,
+                   const std::array<const char*, N>& names,
+                   const float width) {
+    ImGui::PushID(label);
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted(label);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(width);
+    if (ImGui::BeginCombo("##combo", names.at(value))) {
+        for (int32_t i = 0; i < static_cast<int32_t>(N); i++) {
+            if (ImGui::Selectable(names.at(i), i == value)) {
+                value = i;
+            }
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::PopID();
+}
+
 } // namespace
 
 void PathDebugNode::draw_window() {
     const float font = ImGui::GetFontSize();
     const ImVec2 position(440.f, 40.f);
+    const ImVec2 display = ImGui::GetIO().DisplaySize;
     ImGui::SetNextWindowPos(position, ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(
-        ImVec2(std::min(43.f * font, ImGui::GetIO().DisplaySize.x - position.x), 0.f),
+        ImVec2(std::min(43.f * font, display.x - position.x),
+               std::min(38.f * ImGui::GetFrameHeightWithSpacing(), display.y - (2.f * position.y))),
         ImGuiCond_FirstUseEver);
-    escape_clears = false;
     if (!ImGui::Begin("Path Debugger")) {
         ImGui::End();
         return;
     }
-    // Escape cancelling a text edit keeps the pick
-    escape_clears = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
-                    !ImGui::GetIO().WantTextInput;
-    ImGui::PushItemWidth(-10.f * font);
 
-    const std::scoped_lock lock(stats_mutex);
     window_drawn = true;
     draw_header();
 
+    // the header stays, the tab scrolls
+    const auto tab = [this, font](const char* label, void (PathDebugNode::*content)()) {
+        if (!ImGui::BeginTabItem(label)) {
+            return;
+        }
+        if (ImGui::BeginChild("##content")) {
+            ImGui::PushItemWidth(-10.f * font);
+            (this->*content)();
+            ImGui::PopItemWidth();
+        }
+        ImGui::EndChild();
+        ImGui::EndTabItem();
+    };
     if (ImGui::BeginTabBar("tabs")) {
-        if (ImGui::BeginTabItem("Select")) {
-            draw_properties_section(&PathDebugNode::properties_selection);
-            ImGui::EndTabItem();
-        }
-        if (ImGui::BeginTabItem("Draw")) {
-            draw_lines_tab();
-            ImGui::EndTabItem();
-        }
-        if (ImGui::BeginTabItem("Analyze")) {
-            draw_analyze_tab();
-            ImGui::EndTabItem();
-        }
-        if (ImGui::BeginTabItem("Capture")) {
-            draw_capture_tab();
-            ImGui::EndTabItem();
-        }
+        tab("Paths", &PathDebugNode::draw_paths_tab);
+        tab("View", &PathDebugNode::draw_view_tab);
+        tab("Analysis", &PathDebugNode::draw_analysis_tab);
         ImGui::EndTabBar();
     }
-    ImGui::PopItemWidth();
     ImGui::End();
 }
 
-void PathDebugNode::draw_properties_section(void (PathDebugNode::*section)(Properties&)) {
+void PathDebugNode::draw_image_choice() {
+    const float margin = ImGui::GetStyle().WindowPadding.x;
+    ImGui::SetNextWindowPos(ImVec2(margin, ImGui::GetIO().DisplaySize.y - margin), ImGuiCond_Always,
+                            ImVec2(0.f, 1.f));
+    ImGui::SetNextWindowBgAlpha(0.75f);
+    constexpr ImGuiWindowFlags FLAGS =
+        ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
+        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
+        ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove;
+    if (ImGui::Begin("##image choice", nullptr, FLAGS)) {
+        labeled_combo("image", backdrop, BACKDROP_NAMES, 13.f * ImGui::GetFontSize());
+        if (backdrop_missing) {
+            ImGui::SameLine();
+            ImGui::TextColored(WARN_COLOR, "%s",
+                               shows_reference() ? "reference required" : "input required");
+        }
+    }
+    ImGui::End();
+}
+
+void PathDebugNode::draw_properties_section(const char* id,
+                                            void (PathDebugNode::*section)(Properties&)) {
+    ImGui::PushID(id);
     ImGuiProperties config;
     (this->*section)(config);
+    ImGui::PopID();
 }
 
 void PathDebugNode::draw_header() {
-    const bool held = freeze && readback_valid && latest_readback.frame.paths > 0;
-    if (held) {
-        ImGui::TextColored(ImVec4(1.f, 0.76f, 0.25f, 1.f), "FROZEN");
+    const float font = ImGui::GetFontSize();
+    const ImGuiStyle& style = ImGui::GetStyle();
+    const auto right_aligned = [&](const std::initializer_list<const char*> buttons) {
+        float width = 0.f;
+        for (const char* button : buttons) {
+            width +=
+                ImGui::CalcTextSize(button).x + (2.f * style.FramePadding.x) + style.ItemSpacing.x;
+        }
+        ImGui::SameLine(std::max(ImGui::GetCursorPosX(), ImGui::GetWindowContentRegionMax().x -
+                                                             width + style.ItemSpacing.x));
+    };
+
+    // 1. capture state, path counts and the session settings
+    const int32_t state = capture;
+    constexpr std::array<const char*, 3> BADGES = {"LIVE###state", "FROZEN###state", "OFF###state"};
+    constexpr std::array<ImVec4, 3> BADGE_COLORS = {ImVec4(0.42f, 0.85f, 0.45f, 1.f),
+                                                    ImVec4(1.f, 0.76f, 0.25f, 1.f),
+                                                    ImVec4(0.6f, 0.6f, 0.62f, 1.f)};
+    const ImVec4& color = BADGE_COLORS.at(state);
+    ImGui::PushStyleColor(ImGuiCol_Text, color);
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(color.x, color.y, color.z, 0.12f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(color.x, color.y, color.z, 0.28f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(color.x, color.y, color.z, 0.42f));
+    if (ImGui::SmallButton(BADGES.at(state))) {
+        capture = (state + 1) % static_cast<int32_t>(CAPTURE_STATE_NAMES.size());
+    }
+    ImGui::PopStyleColor(4);
+    ImGui::SetItemTooltip("%s", state == CAPTURE_LIVE ? "Click to freeze the recorded paths"
+                                : state == CAPTURE_FROZEN
+                                    ? "Click to turn off recording, analysis and drawing"
+                                    : "Click to record again");
+    ImGui::SameLine();
+    if (capture == CAPTURE_OFF) {
+        ImGui::TextDisabled("not recording");
+    } else if (readback_valid) {
+        ImGui::TextDisabled("%u / %s", latest_readback.frame.draw_count,
+                            si_count(latest_readback.frame.paths).c_str());
+        ImGui::SetItemTooltip(
+            "drawn / recorded paths\n%s of %s record slots · record "
+            "probability %.3g\n%s match the selection%s",
+            si_count(latest_readback.frame.paths).c_str(), si_count(record_path_capacity).c_str(),
+            params.keep_prob, si_count(latest_readback.frame.matched).c_str(),
+            capture == CAPTURE_FROZEN
+                ? fmt::format("\nheld from frame {}", latest_readback.frame.records_frame).c_str()
+                : "");
+    }
+    struct Popup {
+        const char* label;
+        const char* id;
+        void (PathDebugNode::*content)(Properties&);
+    };
+    const std::array<Popup, 3> popups = {
+        Popup{"Capture", "capture", &PathDebugNode::properties_capture},
+        Popup{"Export", "export", &PathDebugNode::properties_export},
+        Popup{"Keys", "keys", &PathDebugNode::properties_keys}};
+    right_aligned({popups[0].label, popups[1].label, popups[2].label});
+    for (const Popup& popup : popups) {
+        if (ImGui::SmallButton(popup.label)) {
+            ImGui::OpenPopup(popup.label);
+        }
         ImGui::SameLine();
-        ImGui::TextDisabled("frame %u", latest_readback.frame.records_frame);
+    }
+    ImGui::NewLine();
+    ImGui::PushItemWidth(-8.f * font);
+    for (const Popup& popup : popups) {
+        if (ImGui::BeginPopup(popup.label)) {
+            draw_properties_section(popup.id, popup.content);
+            ImGui::EndPopup();
+        }
+    }
+    ImGui::PopItemWidth();
+
+    // 2. the selection
+    int32_t kind = select_kind;
+    if (segmented("kind", kind, SELECT_NAMES)) {
+        set_select_kind(kind);
+    }
+    if (select_kind == SELECT_REGION) {
+        ImGui::SameLine();
+        int32_t match = region_match;
+        if (segmented("match", match, MATCH_NAMES)) {
+            set_region_match(match);
+        }
+    }
+    ImGui::SameLine();
+    const std::string status = selection_status();
+    if (has_selection && (selected_offscreen || point_hidden())) {
+        ImGui::TextColored(WARN_COLOR, "%s", status.c_str());
+    } else if (!has_selection || !selected_pos_valid) {
+        ImGui::TextDisabled("%s", status.c_str());
     } else {
-        ImGui::TextColored(ImVec4(0.42f, 0.85f, 0.45f, 1.f), "LIVE");
+        ImGui::TextUnformatted(status.c_str());
     }
-    if (readback_valid) {
-        ImGui::SameLine();
-        ImGui::TextDisabled("%s paths · drawing %s", si_count(latest_readback.frame.paths).c_str(),
-                            overlay_summary().c_str());
+    right_aligned({"Clear"});
+    ImGui::BeginDisabled(!has_selection);
+    if (ImGui::SmallButton("Clear")) {
+        clear_selection();
     }
+    ImGui::EndDisabled();
+    ImGui::SetItemTooltip("%s+Esc", modifier_name());
+
+    // 3. the path color
+    labeled_combo("color", overlay_color, COLOR_NAMES, 13.f * font);
+    ImGui::SameLine();
+    draw_color_legend();
     ImGui::Separator();
 }
 
-std::string PathDebugNode::overlay_summary() const {
-    if (isolate_path >= 0) {
-        return fmt::format("path #{}", isolate_path);
+std::string PathDebugNode::selection_status() const {
+    if (!has_selection) {
+        return fmt::format("no selection · {}+click the image", modifier_name());
     }
-    if (overlay_rank == static_cast<int32_t>(PATH_DEBUG_RANK_RESAMPLED)) {
-        return fmt::format("{} resampled from {}", latest_readback.frame.draw_count,
-                           si_count(kept_from));
+    if (selected_offscreen) {
+        return "off screen";
     }
-    if (overlay_rank == static_cast<int32_t>(PATH_DEBUG_RANK_BRIGHTEST)) {
-        return fmt::format("{} brightest of {}", latest_readback.frame.draw_count,
-                           si_count(kept_from));
+    if (!selected_pos_valid) {
+        return "resolving surface";
     }
-    if (overlay_rank == static_cast<int32_t>(PATH_DEBUG_RANK_RECENT)) {
-        return fmt::format("{} most recent", latest_readback.frame.draw_count);
+    if (point_hidden()) {
+        return "point occluded · no paths";
     }
-    const uint32_t matched = latest_readback.frame.matched;
-    if (matched == 0) {
-        return "none";
+    if (select_kind == SELECT_POINT) {
+        return fmt::format("pixel {}, {}", selected_pixel.x, selected_pixel.y);
     }
-    if (matched <= params.overlay_max_paths) {
-        return fmt::format("all {}", si_count(matched));
-    }
-    return fmt::format("brightest {:.2g}% of {}", overlay_brightest_fraction * 100.f,
-                       si_count(matched));
+    return fmt::format("radius {:.3g}", selected_radius);
 }
 
-void PathDebugNode::draw_lines_tab() {
-    draw_properties_section(&PathDebugNode::properties_overlay);
-    if (overlay_color == static_cast<int32_t>(PATH_DEBUG_COLOR_TECHNIQUE)) {
+void PathDebugNode::draw_color_legend() const {
+    const float scale = std::max(overlay_exposure, 1e-12f);
+    const auto range = [scale](const float log2_value) {
+        return fmt::format("{:.3g}", std::exp2(log2_value) / scale);
+    };
+    const auto bar = [](ImU32 (*colormap)(float), const std::string& low, const std::string& high) {
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextDisabled("%s", low.c_str());
+        ImGui::SameLine();
+        const float line = ImGui::GetFrameHeight();
+        const float width =
+            std::max(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(high.c_str()).x -
+                         ImGui::GetStyle().ItemSpacing.x,
+                     40.f);
+        const ImVec2 origin = ImGui::GetCursorScreenPos();
+        imgui_colorbar(ImGui::GetWindowDrawList(), ImVec2(origin.x, origin.y + (0.3f * line)),
+                       ImVec2(origin.x + width, origin.y + (0.7f * line)), colormap);
+        ImGui::Dummy(ImVec2(width, line));
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s", high.c_str());
+    };
+    switch (overlay_color) {
+    case PATH_DEBUG_COLOR_LUMINANCE:
+        bar(imgui_colormap_turbo, range(-0.5f * PATH_DEBUG_LUMINANCE_STOPS),
+            range(0.5f * PATH_DEBUG_LUMINANCE_STOPS));
+        break;
+    case PATH_DEBUG_COLOR_CONTRIBUTION:
+        bar(imgui_colormap_plasma, range(-0.5f * PATH_DEBUG_CONTRIBUTION_STOPS),
+            range(0.5f * PATH_DEBUG_CONTRIBUTION_STOPS));
+        break;
+    case PATH_DEBUG_COLOR_THROUGHPUT_GAIN:
+        bar(imgui_colormap_diverging,
+            fmt::format("{:.3g}", std::exp2(-0.5f * PATH_DEBUG_GAIN_STOPS)),
+            fmt::format("{:.3g}", std::exp2(0.5f * PATH_DEBUG_GAIN_STOPS)));
+        break;
+    case PATH_DEBUG_COLOR_SCATTER_EVENTS:
+        bar(imgui_colormap_turbo, "0",
+            fmt::format("{} scatter events", PATH_DEBUG_SCATTER_COLOR_EVENTS));
+        break;
+    case PATH_DEBUG_COLOR_TECHNIQUE:
+        ImGui::AlignTextToFramePadding();
         for (const uint32_t method :
              {PATH_RECORD_METHOD_BSDF, PATH_RECORD_METHOD_GUIDING, PATH_RECORD_METHOD_LIGHT,
               PATH_RECORD_METHOD_REPLAYED_BSDF, PATH_RECORD_METHOD_REPLAYED_LIGHT,
               PATH_RECORD_METHOD_RECONNECTION, PATH_RECORD_METHOD_UNKNOWN}) {
-            const uint32_t rgb = PATH_DEBUG_METHOD_COLORS[method];
             ImGui::TextColored(
-                ImVec4(static_cast<float>((rgb >> 16) & 0xFFu) / 255.f,
-                       static_cast<float>((rgb >> 8) & 0xFFu) / 255.f,
-                       static_cast<float>(rgb & 0xFFu) / 255.f, 1.f),
-                "%s",
+                to_imvec4(path_debug_unpack_rgb(PATH_DEBUG_METHOD_COLORS[method])), "%s",
                 method == PATH_RECORD_METHOD_UNKNOWN ? "other" : PATH_RECORD_METHOD_NAMES[method]);
             ImGui::SameLine();
         }
         ImGui::NewLine();
+        break;
+    default:
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextDisabled("one color per path");
+        break;
     }
-    draw_properties_section(&PathDebugNode::properties_backdrop);
 }
 
-void PathDebugNode::draw_capture_tab() {
-    if (readback_valid) {
-        ImGui::Text("%s of %s paths · keep %.3g", si_count(latest_readback.frame.paths).c_str(),
-                    si_count(record_path_capacity).c_str(), params.keep_prob);
+void PathDebugNode::draw_paths_tab() {
+    draw_properties_section("draw", &PathDebugNode::properties_path_choice);
+    if (ImGui::CollapsingHeader("Filter", ImGuiTreeNodeFlags_DefaultOpen)) {
+        draw_properties_section("filter", &PathDebugNode::properties_filter);
     }
-    draw_properties_section(&PathDebugNode::properties_capture);
-    draw_properties_section(&PathDebugNode::properties_export);
+    if (ImGui::CollapsingHeader("Drawing", ImGuiTreeNodeFlags_DefaultOpen)) {
+        draw_properties_section("drawing", &PathDebugNode::properties_line_style);
+        ImGui::TextDisabled("vertices:");
+        ImGui::SameLine();
+        ImGui::TextColored(to_imvec4(path_debug_unpack_rgb(PATH_DEBUG_START_COLOR)), "start");
+        ImGui::SameLine();
+        ImGui::TextColored(to_imvec4(path_debug_unpack_rgb(PATH_DEBUG_END_COLOR)), "end");
+        ImGui::SameLine();
+        ImGui::TextColored(to_imvec4(path_debug_unpack_rgb(PATH_DEBUG_ESCAPED_COLOR)), "escaped");
+    }
+    if (ImGui::CollapsingHeader("Selection")) {
+        draw_properties_section("selection", &PathDebugNode::properties_selection_details);
+    }
+    if (ImGui::CollapsingHeader("Drawn paths")) {
+        draw_drawn_paths();
+    }
 }
 
-void PathDebugNode::draw_analyze_tab() {
-    if (!ImGui::BeginTabBar("analyze")) {
-        return;
+void PathDebugNode::draw_view_tab() {
+    draw_properties_section("view", &PathDebugNode::properties_view);
+}
+
+void PathDebugNode::draw_analysis_tab() {
+    if (ImGui::CollapsingHeader("Sampling")) {
+        path_statistics_shown = true;
+        draw_sampling_section();
     }
-    if (ImGui::BeginTabItem("maps")) {
-        draw_maps_tab();
-        ImGui::EndTabItem();
+    if (ImGui::CollapsingHeader("BSDF check")) {
+        path_statistics_shown = true;
+        draw_bsdf_section();
     }
-    if (ImGui::BeginTabItem("BSDF")) {
-        draw_bsdf_tab();
-        ImGui::EndTabItem();
+    if (ImGui::CollapsingHeader("Pixel")) {
+        draw_pixel_section();
     }
-    if (ImGui::BeginTabItem("paths")) {
-        draw_inspector();
-        ImGui::EndTabItem();
+    if (ImGui::CollapsingHeader("Histograms")) {
+        path_statistics_shown = true;
+        draw_histograms_section();
     }
-    if (ImGui::BeginTabItem("pixels")) {
-        draw_convergence_tab();
-        ImGui::EndTabItem();
-    }
-    if (ImGui::BeginTabItem("distributions")) {
-        draw_distributions_tab();
-        ImGui::EndTabItem();
-    }
-    if (ImGui::BeginTabItem("heat")) {
-        draw_properties_section(&PathDebugNode::properties_heat);
-        if (readback_valid && heat_mode != static_cast<int32_t>(PATH_DEBUG_HEAT_OFF)) {
-            const uint32_t cells = latest_readback.frame.grid_cells;
-            const uint32_t dropped = latest_readback.frame.grid_dropped;
-            ImGui::Text("heat grid %.0f%% full",
-                        100.f * static_cast<float>(cells) /
-                            static_cast<float>(std::max(params.grid_slots, 1u)));
-            if (dropped > 0) {
-                ImGui::SameLine();
-                ImGui::TextColored(ImVec4(0.95f, 0.35f, 0.3f, 1.f), "%s splats dropped",
-                                   si_count(dropped).c_str());
+}
+
+void PathDebugNode::draw_pixel_section() {
+    pixel_section_shown = true;
+    ImGui::TextDisabled("sample statistics, no reference needed");
+    ImGui::SeparatorText(
+        selection_visible()
+            ? fmt::format("pixel {}, {}", selected_pixel.x, selected_pixel.y).c_str()
+        : has_selection ? "pixel · off screen"
+                        : "image centre");
+    if (!selected_offscreen && !pixel_history.empty()) {
+        const PixelSample& last = pixel_history.back();
+        ImGui::Text("mean %.4g · variance %.4g · relative standard error %.3f · %u paths",
+                    last.mean, last.variance, last.rel_error, latest_readback.probe.selected_count);
+        const auto plot = [&](const char* title, float PixelSample::* const value,
+                              const float min) {
+            std::vector<float> values;
+            values.reserve(pixel_history.size());
+            for (const PixelSample& sample : pixel_history) {
+                values.push_back(sample.*value);
             }
-        }
-        ImGui::EndTabItem();
+            ImGui::TextUnformatted(title);
+            ImGui::PlotLines(fmt::format("##{}", title).c_str(), values.data(),
+                             static_cast<int>(values.size()), 0, nullptr, min, FLT_MAX,
+                             ImVec2(-FLT_MIN, 50));
+        };
+        plot("mean", &PixelSample::mean, FLT_MAX);
+        plot("variance", &PixelSample::variance, 0.f);
+        plot("relative standard error", &PixelSample::rel_error, 0.f);
     }
-    ImGui::EndTabBar();
+    if (ImGui::Button("Reset")) {
+        pixel_stats_dirty = true;
+    }
 }
 
-void PathDebugNode::draw_convergence_tab() {
-    convergence_drawn = true;
-    draw_properties_section(&PathDebugNode::properties_pixel_stats);
+void PathDebugNode::draw_histograms_section() const {
     const auto& stats = latest_readback.stats;
-    ImGui::SeparatorText(pick_visible() ? "picked pixel"
-                         : picked       ? "picked pixel (offscreen)"
-                                        : "image centre");
-    if (pick_visible() == picked && !mean_history.empty()) {
-        const std::vector<float> means(mean_history.begin(), mean_history.end());
-        const std::vector<float> errs(rel_error_history.begin(), rel_error_history.end());
-        const std::vector<float> vars(variance_history.begin(), variance_history.end());
-        ImGui::Text("mean %.4g · variance %.4g · rel. error %.3f · %u paths", means.back(),
-                    vars.back(), errs.back(), latest_readback.probe.picked_count);
-        ImGui::PlotLines("mean", means.data(), static_cast<int>(means.size()), 0, nullptr, FLT_MAX,
-                         FLT_MAX, ImVec2(0, 50));
-        ImGui::PlotLines("variance", vars.data(), static_cast<int>(vars.size()), 0, nullptr, 0.f,
-                         FLT_MAX, ImVec2(0, 50));
-        ImGui::PlotLines("rel. error", errs.data(), static_cast<int>(errs.size()), 0, nullptr, 0.f,
-                         FLT_MAX, ImVec2(0, 50));
-    }
-
-    std::array<float, THETA_BANDS> records_curve{};
-    std::array<float, THETA_BANDS> pdf_curve{};
-    double records_norm = 0.;
-    double pdf_norm = 0.;
-    for (uint32_t band = 0; band < THETA_BANDS; band++) {
-        const uint32_t base = PATH_DEBUG_STATS_THETA + (3 * band);
-        const float omega = stat_float(stats, base + 2);
-        if (omega <= 0.f) {
-            continue;
-        }
-        records_curve[band] = static_cast<float>(stats[base + 0]) / omega;
-        pdf_curve[band] = stat_float(stats, base + 1) / omega;
-        records_norm += static_cast<double>(stats[base + 0]);
-        pdf_norm += static_cast<double>(stat_float(stats, base + 1));
-    }
-    ImGui::SeparatorText("density and pdf over the polar angle");
-    ImDrawList* const dl = ImGui::GetWindowDrawList();
-    const ImVec2 origin = ImGui::GetCursorScreenPos();
-    const float plot_w = ImGui::GetContentRegionAvail().x - 10.f;
-    const float plot_h = 110.f;
-    dl->AddRectFilled(origin, ImVec2(origin.x + plot_w, origin.y + plot_h),
-                      ImGui::GetColorU32(ImGuiCol_FrameBg), 4.f);
-    const auto draw_curve = [&](const std::array<float, THETA_BANDS>& curve, const double norm,
-                                const ImU32 color, const float thickness) {
-        if (norm <= 0.) {
-            return;
-        }
-        float vmax = 0.f;
-        for (const float v : curve) {
-            vmax = std::max(vmax, static_cast<float>(v / norm));
-        }
-        if (vmax <= 0.f) {
-            return;
-        }
-        std::array<ImVec2, THETA_BANDS> points;
-        for (uint32_t band = 0; band < THETA_BANDS; band++) {
-            const float x = origin.x + ((static_cast<float>(band) + 0.5f) / THETA_BANDS) * plot_w;
-            const float y = origin.y + plot_h - 6.f -
-                            (static_cast<float>(curve[band] / norm) / vmax) * (plot_h - 12.f);
-            points[band] = ImVec2(x, y);
-        }
-        dl->AddPolyline(points.data(), THETA_BANDS, color, ImDrawFlags_None, thickness);
+    const auto histogram = [](const char* title, const float* values, const uint32_t bins) {
+        ImGui::TextUnformatted(title);
+        ImGui::PlotHistogram(fmt::format("##{}", title).c_str(), values, static_cast<int>(bins), 0,
+                             nullptr, 0.f, FLT_MAX, ImVec2(-FLT_MIN, 60));
     };
-    draw_curve(pdf_curve, pdf_norm, IM_COL32(235, 235, 235, 255), 4.f);
-    draw_curve(records_curve, records_norm, IM_COL32(203, 166, 247, 255), 1.5f);
-    ImGui::Dummy(ImVec2(plot_w, plot_h + 4.f));
-    ImGui::TextColored(ImVec4(0.92f, 0.92f, 0.92f, 1.f), "pdf");
-    ImGui::SameLine();
-    ImGui::TextColored(ImVec4(0.80f, 0.65f, 0.97f, 1.f), "records");
-}
-
-void PathDebugNode::draw_distributions_tab() const {
-    const auto& stats = latest_readback.stats;
-    const auto histogram = [&](const char* label, const uint32_t offset, const uint32_t bins) {
+    const auto counts = [&](const uint32_t offset, const uint32_t bins) {
         std::array<float, PATH_DEBUG_HIST_SMALL_BINS> values{};
-        float vmax = 0.f;
         for (uint32_t i = 0; i < bins; i++) {
             values[i] = static_cast<float>(stats[offset + i]);
-            vmax = std::max(vmax, values[i]);
         }
-        ImGui::PlotHistogram(label, values.data(), static_cast<int>(bins), 0, nullptr, 0.f, vmax,
-                             ImVec2(0, 60));
+        return values;
     };
-    histogram("path luminance (log2)", PATH_DEBUG_STATS_LUM, PATH_DEBUG_HIST_SMALL_BINS);
-    histogram("sample pdf (log2)", PATH_DEBUG_STATS_PDF, PATH_DEBUG_HIST_SMALL_BINS);
-    histogram("paths by scatter events", PATH_DEBUG_STATS_BOUNCE, PATH_DEBUG_LENGTH_BINS);
+    const auto count_histogram = [&](const char* title, const uint32_t offset,
+                                     const uint32_t bins) {
+        histogram(title, counts(offset, bins).data(), bins);
+    };
+    count_histogram("path luminance (log2)", PATH_DEBUG_STATS_LUM, PATH_DEBUG_HIST_SMALL_BINS);
+    count_histogram("pdf (log2)", PATH_DEBUG_STATS_PDF, PATH_DEBUG_HIST_SMALL_BINS);
+    count_histogram("paths by scatter events", PATH_DEBUG_STATS_SCATTER, PATH_DEBUG_SCATTER_BINS);
 
-    std::array<float, PATH_DEBUG_LENGTH_BINS> contrib{};
-    std::array<float, PATH_DEBUG_LENGTH_BINS> mean{};
+    std::array<float, PATH_DEBUG_SCATTER_BINS> contrib{};
+    std::array<float, PATH_DEBUG_SCATTER_BINS> mean{};
     float total = 0.f;
-    for (uint32_t i = 0; i < PATH_DEBUG_LENGTH_BINS; i++) {
-        contrib[i] = stat_float(stats, PATH_DEBUG_STATS_LEN_CONTRIB + i);
-        const uint32_t n = stats[PATH_DEBUG_STATS_BOUNCE + i];
+    for (uint32_t i = 0; i < PATH_DEBUG_SCATTER_BINS; i++) {
+        contrib[i] = stat_float(stats, PATH_DEBUG_STATS_SCATTER_CONTRIB + i);
+        const uint32_t n = stats[PATH_DEBUG_STATS_SCATTER + i];
         mean[i] = n > 0 ? contrib[i] / static_cast<float>(n) : 0.f;
         total += contrib[i];
     }
-    ImGui::PlotHistogram("contribution by scatter events", contrib.data(),
-                         static_cast<int>(contrib.size()), 0, nullptr, 0.f, FLT_MAX, ImVec2(0, 60));
-    ImGui::PlotHistogram("mean contribution per path", mean.data(), static_cast<int>(mean.size()),
-                         0, nullptr, 0.f, FLT_MAX, ImVec2(0, 60));
+    histogram("contribution by scatter events", contrib.data(), PATH_DEBUG_SCATTER_BINS);
+    histogram("mean contribution by scatter events", mean.data(), PATH_DEBUG_SCATTER_BINS);
     if (total > 0.f) {
         std::string shares;
-        for (uint32_t i = 0; i < PATH_DEBUG_LENGTH_BINS; i++) {
+        for (uint32_t i = 0; i < PATH_DEBUG_SCATTER_BINS; i++) {
             if (contrib[i] > 0.02f * total) {
                 shares += fmt::format("{}: {:.0f}%  ", i, 100.f * contrib[i] / total);
             }
         }
-        wrapped_text(fmt::format("energy share: {}", shares));
+        wrapped_text(fmt::format("contribution share by scatter events: {}", shares));
     }
 }
 
-void PathDebugNode::draw_bsdf_tab() {
+void PathDebugNode::draw_bsdf_section() {
     const auto& stats = latest_readback.stats;
     if (!gbuffer_connected) {
-        ImGui::TextDisabled("needs the gbuffer input");
+        ImGui::TextDisabled("gbuffer required");
         return;
     }
-    if (!pick_visible()) {
-        ImGui::TextDisabled(picked ? "the pick is offscreen" : "Select with ALT+Click");
+    if (!selection_visible()) {
+        ImGui::TextDisabled(
+            "%s",
+            has_selection
+                ? "selection off screen"
+                : fmt::format("selection required · {}+click a surface", modifier_name()).c_str());
         return;
     }
 
-    // 1. the incident direction every tool below uses
+    // 1. the incident direction every check uses
     ImGui::SeparatorText("incident direction");
     bool wi_changed = false;
     if (direction_disc("wi", wi_theta_deg, wi_phi_deg)) {
         wi_mode = static_cast<int32_t>(PATH_DEBUG_WI_MANUAL);
         wi_changed = true;
     }
+    ImGui::SetItemTooltip("Drag to set the incident direction.");
     ImGui::SameLine();
     ImGui::BeginGroup();
-    if (wi_mode == static_cast<int32_t>(PATH_DEBUG_WI_CAMERA)) {
-        ImGui::TextUnformatted("the camera ray");
-        ImGui::TextDisabled("drag on the disc to set one");
-    } else {
+    wi_changed |= segmented("incident", wi_mode, WI_NAMES);
+    if (wi_mode == static_cast<int32_t>(PATH_DEBUG_WI_MANUAL)) {
         ImGui::Text("polar %.1f° · azimuth %.1f°", wi_theta_deg, wi_phi_deg);
-        if (ImGui::SmallButton("use the camera ray")) {
-            wi_mode = static_cast<int32_t>(PATH_DEBUG_WI_CAMERA);
-            wi_changed = true;
-        }
     }
     bool below = wi_theta_deg > 90.f;
-    if (ImGui::Checkbox("below the surface", &below)) {
+    if (ImGui::Checkbox("from below", &below)) {
         wi_theta_deg = 180.f - wi_theta_deg;
         wi_changed = true;
     }
@@ -611,6 +812,17 @@ void PathDebugNode::draw_bsdf_tab() {
     if (ImGui::Button("check BSDF")) {
         check_requested = true;
     }
+    ImGui::SameLine();
+    const uint32_t check_draws_done = stats[PATH_DEBUG_CHECK_DRAWS];
+    ImGui::TextDisabled(
+        "%s", check_draws_done < PATH_DEBUG_CHECK_TARGET_DRAWS
+                  ? fmt::format("{} draws, a check tops them up to {} + {}² quadrature",
+                                si_count(check_draws_done), si_count(PATH_DEBUG_CHECK_TARGET_DRAWS),
+                                PATH_DEBUG_CHECK_DIM)
+                        .c_str()
+                  : fmt::format("{} draws + {}² quadrature", si_count(check_draws_done),
+                                PATH_DEBUG_CHECK_DIM)
+                        .c_str());
     const std::vector<BSDFVerdict> verdicts = bsdf_verdicts(stats);
     if (verdicts.empty()) {
         return;
@@ -619,96 +831,109 @@ void PathDebugNode::draw_bsdf_tab() {
         check_row(verdict);
     }
 
-    const float draws = static_cast<float>(stats[PATH_DEBUG_CHECK_DRAWS]);
+    const auto draws = static_cast<float>(check_draws_done);
     const float3 albedo_mc = check_albedo(stats);
-    ImGui::Text("alpha %.3g · %.1f%% valid · %.1f%% transmitted",
+    ImGui::Text("alpha %.3g · %.1f%% valid · %.1f%% transmitted · albedo (%.4f, %.4f, %.4f)",
                 stat_float(stats, PATH_DEBUG_CHECK_ALPHA),
                 100.f * static_cast<float>(stats[PATH_DEBUG_CHECK_VALID]) / draws,
-                100.f * static_cast<float>(stats[PATH_DEBUG_CHECK_TRANSMITTED]) / draws);
-    ImGui::Text("albedo (%.4f, %.4f, %.4f)", albedo_mc.x, albedo_mc.y, albedo_mc.z);
+                100.f * static_cast<float>(stats[PATH_DEBUG_CHECK_TRANSMITTED]) / draws,
+                albedo_mc.x, albedo_mc.y, albedo_mc.z);
 
     // 3. total variation against the pdf
-    ImGui::SeparatorText("total variation vs pdf");
+    ImGui::SeparatorText("total variation to pdf");
     if (stats[PATH_DEBUG_STATS_CHECK_SAMPLES] > 0) {
-        ImGui::Text("sampled %.2f%%", total_variation_percent(stats, PATH_DEBUG_STATS_TV_CHECK));
+        ImGui::Text("BSDF sample() %.2f%%",
+                    total_variation_percent(stats, PATH_DEBUG_STATS_TV_CHECK));
         ImGui::SameLine();
     }
-    ImGui::Text("eval %.2f%%", total_variation_percent(stats, PATH_DEBUG_STATS_TV_EVAL));
-    if (shared_support(true)) {
+    ImGui::Text("BSDF eval() %.2f%%", total_variation_percent(stats, PATH_DEBUG_STATS_TV_EVAL));
+    if (bsdf_comparable()) {
         ImGui::SameLine();
-        ImGui::Text("records %.2f%%", total_variation_percent(stats, PATH_DEBUG_STATS_TV_RECORDS));
+        ImGui::Text("recorded %.2f%%", total_variation_percent(stats, PATH_DEBUG_STATS_TV_RECORDS));
     }
 }
 
-void PathDebugNode::draw_inspector() {
-    inspector_drawn = true;
+void PathDebugNode::draw_drawn_paths() {
+    drawn_paths_shown = true;
 
+    bool any = false;
     if (ImGui::BeginTable("paths", 4,
                           ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_ScrollY,
-                          ImVec2(0.f, 130.f))) {
+                          ImVec2(0.f, 10.f * ImGui::GetTextLineHeightWithSpacing()))) {
         ImGui::TableSetupColumn("path", ImGuiTableColumnFlags_WidthFixed, 74.f);
         ImGui::TableSetupColumn("pixel", ImGuiTableColumnFlags_WidthFixed, 84.f);
         ImGui::TableSetupColumn("luminance", ImGuiTableColumnFlags_WidthFixed, 74.f);
         ImGui::TableSetupColumn("expression", ImGuiTableColumnFlags_WidthStretch);
         ImGui::TableHeadersRow();
-        for (uint32_t t = 0; t < TOP_COUNT; t++) {
+        for (uint32_t t = 0; t < PATH_DEBUG_TOP_COUNT; t++) {
             const TopPath& entry = latest_readback.top[t];
-            if (entry.index == PATH_DEBUG_NO_ISOLATE) {
+            if (entry.slot == PATH_DEBUG_NO_PATH) {
                 break;
             }
+            any = true;
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
-            const bool selected = isolate_path == static_cast<int32_t>(entry.index);
-            if (ImGui::Selectable(fmt::format("#{}##path{}", entry.index, t).c_str(), selected,
+            const bool is_isolated = isolate_path == entry.slot;
+            if (ImGui::Selectable(fmt::format("#{}##path{}", entry.slot, t).c_str(), is_isolated,
                                   ImGuiSelectableFlags_SpanAllColumns)) {
-                isolate_path = selected ? -1 : static_cast<int32_t>(entry.index);
+                isolate_path = is_isolated ? std::nullopt : std::optional<uint32_t>(entry.slot);
             }
             ImGui::TableNextColumn();
-            ImGui::Text("%u, %u", entry.pixel & 0xFFFFu, entry.pixel >> 16);
+            const uint2 pixel = path_record_unpack_pixel(entry.pixel);
+            ImGui::Text("%u, %u", pixel.x, pixel.y);
             ImGui::TableNextColumn();
             ImGui::Text("%.4g", std::bit_cast<float>(entry.luminance));
             ImGui::TableNextColumn();
-            const std::string expression =
-                path_expression_of(entry.classes, entry.sample_and_scatter >> 16);
-            ImGui::TextUnformatted(expression.c_str());
+            const std::string events = path_expression_of(
+                entry.classes, path_debug_unpack_count(entry.sample_and_scatter));
+            ImGui::TextUnformatted(events.c_str());
             ImGui::SameLine();
-            if (ImGui::SmallButton(fmt::format("filter##expr{}", t).c_str())) {
-                set_expression(false, expression);
-                scatter_range = int2(0, 32);
+            if (ImGui::SmallButton(fmt::format("set filter##expr{}", t).c_str())) {
+                set_expression(events);
+                scatter_range = int2(0, SCATTER_UNLIMITED);
                 method_mask = 0;
                 material_id = -1;
             }
+            ImGui::SetItemTooltip("Filter by %s; resets the constraints.", events.c_str());
         }
         ImGui::EndTable();
     }
-
-    if (isolate_path < 0) {
-        return;
-    }
-    if (ImGui::Button("show all")) {
-        isolate_path = -1;
-        return;
+    if (!any) {
+        ImGui::TextDisabled("no paths drawn");
     }
 
+    if (!isolate_path) {
+        return;
+    }
     const IsolatedPath& isolated = latest_readback.isolated;
     if (isolated.valid == 0) {
-        ImGui::TextDisabled("#%d not recorded", isolate_path);
+        ImGui::TextDisabled("path #%u is no longer kept", *isolate_path);
+    } else {
+        const uint2 pixel = path_record_unpack_pixel(isolated.pixel);
+        ImGui::Text("path #%u · pixel %u, %u · sample %u · frame %u · luminance %.4g",
+                    *isolate_path, pixel.x, pixel.y,
+                    path_debug_unpack_sample(isolated.sample_and_count),
+                    latest_readback.frame.records_frame, std::bit_cast<float>(isolated.luminance));
+    }
+    ImGui::SameLine();
+    if (ImGui::SmallButton("show all")) {
+        isolate_path.reset();
         return;
     }
-    const uint32_t vertices = isolated.sample_and_count >> 16;
-    ImGui::Text("pixel (%u, %u) · sample %u · frame %u · luminance %.4g", isolated.pixel & 0xFFFFu,
-                isolated.pixel >> 16, isolated.sample_and_count & 0xFFFFu,
-                latest_readback.frame.records_frame, std::bit_cast<float>(isolated.luminance));
+    if (isolated.valid == 0) {
+        return;
+    }
 
+    const uint32_t vertices = path_debug_unpack_count(isolated.sample_and_count);
     if (ImGui::BeginTable("vertices", 8,
                           ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_ScrollY,
-                          ImVec2(0.f, 200.f))) {
-        ImGui::TableSetupColumn("i", ImGuiTableColumnFlags_WidthFixed, 24.f);
-        ImGui::TableSetupColumn("class", ImGuiTableColumnFlags_WidthFixed, 44.f);
+                          ImVec2(0.f, 12.f * ImGui::GetTextLineHeightWithSpacing()))) {
+        ImGui::TableSetupColumn("#", ImGuiTableColumnFlags_WidthFixed, 24.f);
+        ImGui::TableSetupColumn("event", ImGuiTableColumnFlags_WidthFixed, 44.f);
         ImGui::TableSetupColumn("pdf", ImGuiTableColumnFlags_WidthFixed, 76.f);
         ImGui::TableSetupColumn("throughput", ImGuiTableColumnFlags_WidthFixed, 82.f);
         ImGui::TableSetupColumn("contribution", ImGuiTableColumnFlags_WidthFixed, 86.f);
-        ImGui::TableSetupColumn("sampled by", ImGuiTableColumnFlags_WidthFixed, 74.f);
+        ImGui::TableSetupColumn("technique", ImGuiTableColumnFlags_WidthFixed, 74.f);
         ImGui::TableSetupColumn("material", ImGuiTableColumnFlags_WidthFixed, 60.f);
         ImGui::TableSetupColumn("position", ImGuiTableColumnFlags_WidthStretch);
         ImGui::TableHeadersRow();
@@ -719,11 +944,57 @@ void PathDebugNode::draw_inspector() {
     }
 }
 
-void PathDebugNode::draw_maps_tab() {
-    if (readback_valid) {
-        draw_sampling_fit();
+void PathDebugNode::draw_polar_profile() const {
+    const auto& stats = latest_readback.stats;
+    std::array<float, PATH_DEBUG_THETA_BANDS> records_curve{};
+    std::array<float, PATH_DEBUG_THETA_BANDS> pdf_curve{};
+    for (uint32_t band = 0; band < PATH_DEBUG_THETA_BANDS; band++) {
+        const uint32_t base = PATH_DEBUG_STATS_THETA + (PATH_DEBUG_THETA_UINTS * band);
+        const float solid_angle = stat_float(stats, base + 2);
+        if (solid_angle <= 0.f) {
+            continue;
+        }
+        records_curve[band] = static_cast<float>(stats[base + 0]) / solid_angle;
+        pdf_curve[band] = stat_float(stats, base + 1) / solid_angle;
     }
-    draw_properties_section(&PathDebugNode::properties_maps);
+    ImGui::SeparatorText("polar profile: pdf and recorded density");
+    ImDrawList* const dl = ImGui::GetWindowDrawList();
+    const ImVec2 origin = ImGui::GetCursorScreenPos();
+    const float plot_w = ImGui::GetContentRegionAvail().x - 10.f;
+    const float plot_h = 110.f;
+    dl->AddRectFilled(origin, ImVec2(origin.x + plot_w, origin.y + plot_h),
+                      ImGui::GetColorU32(ImGuiCol_FrameBg), 4.f);
+    const auto draw_curve = [&](const std::array<float, PATH_DEBUG_THETA_BANDS>& curve,
+                                const ImU32 color, const float thickness) {
+        const float vmax = *std::ranges::max_element(curve);
+        if (vmax <= 0.f) {
+            return;
+        }
+        std::array<ImVec2, PATH_DEBUG_THETA_BANDS> points;
+        for (uint32_t band = 0; band < PATH_DEBUG_THETA_BANDS; band++) {
+            const float x =
+                origin.x + ((static_cast<float>(band) + 0.5f) / PATH_DEBUG_THETA_BANDS) * plot_w;
+            const float y = origin.y + plot_h - 6.f - (curve[band] / vmax * (plot_h - 12.f));
+            points[band] = ImVec2(x, y);
+        }
+        dl->AddPolyline(points.data(), PATH_DEBUG_THETA_BANDS, color, ImDrawFlags_None, thickness);
+    };
+    draw_curve(pdf_curve, LABEL_COLOR, 4.f);
+    draw_curve(records_curve, RECORDED_COLOR, 1.5f);
+    ImGui::Dummy(ImVec2(plot_w, plot_h + 4.f));
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(LABEL_COLOR), "pdf");
+    ImGui::SameLine();
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(RECORDED_COLOR), "recorded");
+}
+
+void PathDebugNode::draw_sampling_section() {
+    if (!maps_at_point()) {
+        ImGui::TextDisabled("point selection required");
+    } else if (readback_valid) {
+        draw_sampling_fit();
+        draw_polar_profile();
+    }
+    draw_properties_section("sampling", &PathDebugNode::properties_sampling);
 }
 
 void PathDebugNode::draw_sampling_fit() const {
@@ -734,19 +1005,16 @@ void PathDebugNode::draw_sampling_fit() const {
     const uint32_t dof = stats[PATH_DEBUG_STATS_CHI2_DOF];
     const uint32_t seen = stats[PATH_DEBUG_STATS_SEEN];
     const uint32_t batches = stats[PATH_DEBUG_STATS_BATCHES];
-    if (!shared_support(!recorded)) {
-        ImGui::TextDisabled(shared_support(false)
-                                ? "chi2 needs the camera ray as incident direction"
-                                : "chi2 needs the picked pixel at bounce 0");
+    if (!recorded && !bsdf_comparable()) {
+        ImGui::TextDisabled("chi2 requires incident direction: camera ray");
     } else if ((seen & PATH_DEBUG_SEEN_RESAMPLED) != 0) {
-        ImGui::TextDisabled("chi2: resampled paths have no per-vertex density");
+        ImGui::TextDisabled("chi2 n/a: resampled paths carry no per-vertex pdf");
     } else if (!recorded && (seen & PATH_DEBUG_SEEN_CONNECTION) != 0) {
-        ImGui::TextDisabled("chi2 of light draws needs the recorded pdf reference");
+        ImGui::TextDisabled("chi2 of NEE draws requires test against: recorded pdf");
     } else if ((seen & PATH_DEBUG_SEEN_REUSED) != 0 && batches < PATH_DEBUG_MIN_BATCHES) {
-        ImGui::TextDisabled("chi2 of reused samples: batch %u of %u", batches,
-                            PATH_DEBUG_MIN_BATCHES);
+        ImGui::TextDisabled("chi2 waits for batch %u of %u", batches, PATH_DEBUG_MIN_BATCHES);
     } else if (dof > 0) {
-        const float reduced = stat_float(stats, PATH_DEBUG_STATS_CHI2) / static_cast<float>(dof);
+        const float reduced = reduced_chi2(stats);
         ImGui::TextColored(chi2_color(reduced, dof),
                            "chi2/dof %.2f over %u bins, expected 1 ± %.2f", reduced, dof,
                            chi2_sigma(dof));
@@ -761,39 +1029,29 @@ void PathDebugNode::draw_sampling_fit() const {
             fmt::format("{} batches of {} frames · lag-1 correlation {:.2f}", batches,
                         map_batch_frames, correlation);
         if (correlation > 0.2f) {
-            ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.3f, 1.f), "%s: raise batch frames",
-                               batch_text.c_str());
+            ImGui::TextColored(WARN_COLOR, "%s: raise batch frames", batch_text.c_str());
         } else {
             ImGui::TextDisabled("%s", batch_text.c_str());
         }
     }
     if (!recorded && stats[PATH_DEBUG_STATS_SPIKE_BINS] > 0) {
-        ImGui::TextDisabled("%.1f%% of samples in %u quasi-delta bins, excluded",
+        ImGui::TextDisabled("excluded: %.1f%% of samples in %u quasi-delta bins",
                             stat_float(stats, PATH_DEBUG_STATS_SPIKE_MASS) * 100.f,
                             stats[PATH_DEBUG_STATS_SPIKE_BINS]);
     }
     ImGui::Separator();
 }
 
-void PathDebugNode::draw_overlay() {
-    const std::scoped_lock lock(stats_mutex);
-    draw_panel_labels();
-    draw_probe_tooltip();
-}
-
-std::string PathDebugNode::map_scope() const {
-    const char* const pixels =
-        picked && restrict_mode == static_cast<int32_t>(PATH_DEBUG_RESTRICT_PIXEL)
-            ? (pick_visible() ? "picked pixel" : "offscreen pick")
-        : picked && restrict_mode >= static_cast<int32_t>(PATH_DEBUG_RESTRICT_THROUGH)
-            ? "region"
-            : "all pixels";
-    const char* const frame = params.map_frame == PATH_DEBUG_FRAME_LOCAL ? "local" : "world";
-    if (map_bounce == 0) {
-        return fmt::format("{} · {}", pixels, frame);
-    }
-    return map_bounce < 0 ? fmt::format("{} · {} · all bounces", pixels, frame)
-                          : fmt::format("{} · {} · bounce {}", pixels, frame, map_bounce);
+std::string PathDebugNode::binned_caption() const {
+    const char* const draws = DRAWS_NAMES.at(map_draws);
+    // a renderer that does not report the technique records none of a kind
+    const auto& stats = latest_readback.stats;
+    const char* const none =
+        stats[PATH_DEBUG_STATS_SAMPLES] == 0 && stats[PATH_DEBUG_STATS_COUNT] > 0
+            ? " · none recorded"
+            : "";
+    return params.map_frame == PATH_DEBUG_FRAME_LOCAL ? fmt::format("({}){}", draws, none)
+                                                      : fmt::format("({}) · world{}", draws, none);
 }
 
 void PathDebugNode::draw_panel_labels() const {
@@ -808,17 +1066,14 @@ void PathDebugNode::draw_panel_labels() const {
     const float x0 = static_cast<float>(panel_left()) * to_ui;
     const float close = static_cast<float>(label_px(PATH_DEBUG_PANEL_CLOSE)) * to_ui;
     const float line = ImGui::GetTextLineHeight();
-    const float shared_max = std::max({stat_float(stats, PATH_DEBUG_STATS_MAX_DENSITY),
-                                       stat_float(stats, PATH_DEBUG_STATS_MAX_PDF),
-                                       stat_float(stats, PATH_DEBUG_STATS_MAX_CHECK),
-                                       stat_float(stats, PATH_DEBUG_STATS_MAX_EVAL)});
+    const float shared_max = stat_float(stats, PATH_DEBUG_STATS_MAX_SHARED);
+    const float integrand_max = stat_float(stats, PATH_DEBUG_STATS_MAX_INTEGRAND);
     const uint32_t dof = stats[PATH_DEBUG_STATS_CHI2_DOF];
-    const auto atlas_rows = static_cast<float>(
-        (MAP_CHANNEL_COUNT + PATH_DEBUG_PANEL_ATLAS_COLUMNS - 1) / PATH_DEBUG_PANEL_ATLAS_COLUMNS);
+    const auto atlas_rows = static_cast<float>(PATH_DEBUG_PANEL_ATLAS_ROWS);
     const auto atlas_columns = static_cast<float>(PATH_DEBUG_PANEL_ATLAS_COLUMNS);
 
     uint32_t slot = 0;
-    for (uint32_t channel = 0; channel < MAP_CHANNEL_COUNT; channel++) {
+    for (uint32_t channel = 0; channel < PATH_DEBUG_MAP_CHANNEL_COUNT; channel++) {
         if ((params.map_panel_mask & (1u << channel)) == 0) {
             continue;
         }
@@ -834,36 +1089,43 @@ void PathDebugNode::draw_panel_labels() const {
         const ImVec2 close_min(x0 + panel - close, y0);
         dl->AddRectFilled(close_min, ImVec2(x0 + panel, y0 + close), IM_COL32(38, 38, 38, 255));
         dl->AddLine(ImVec2(close_min.x + 4.f, y0 + 4.f), ImVec2(x0 + panel - 4.f, y0 + close - 4.f),
-                    IM_COL32(235, 235, 235, 255), 1.5f);
+                    LABEL_COLOR, 1.5f);
         dl->AddLine(ImVec2(close_min.x + 4.f, y0 + close - 4.f), ImVec2(x0 + panel - 4.f, y0 + 4.f),
-                    IM_COL32(235, 235, 235, 255), 1.5f);
-        if (channel != PATH_DEBUG_MAP_CONTRIB_COLOR) {
-            const bool diverging =
-                channel == PATH_DEBUG_MAP_RATIO || channel == PATH_DEBUG_MAP_ZSCORE;
+                    LABEL_COLOR, 1.5f);
+        if (!colored(channel)) {
             imgui_colorbar(dl, ImVec2(x0, y0 + panel + 1.f), ImVec2(x0 + panel, y0 + panel + 4.f),
-                           diverging ? imgui_colormap_diverging : imgui_colormap_turbo);
+                           diverging(channel) ? imgui_colormap_diverging : imgui_colormap_turbo);
         }
 
         std::string value;
-        ImU32 value_color = IM_COL32(235, 235, 235, 255);
+        ImU32 value_color = LABEL_COLOR;
         switch (channel) {
+        case PATH_DEBUG_MAP_INTEGRAND_NORMALIZED:
         case PATH_DEBUG_MAP_DENSITY:
+        case PATH_DEBUG_MAP_RECORDED_PDF:
         case PATH_DEBUG_MAP_PDF:
             value = fmt::format("max {:.2g}/sr", shared_max);
             break;
-        case PATH_DEBUG_MAP_CONTRIB:
-            value = fmt::format("max {:.2g}/sr", stat_float(stats, PATH_DEBUG_STATS_MAX_CONTRIB));
+        case PATH_DEBUG_MAP_SECOND_MOMENT:
+            value = fmt::format("max {:.2g}/sr", stat_float(stats, PATH_DEBUG_STATS_MAX_MOMENT));
+            break;
+        case PATH_DEBUG_MAP_RADIANCE_COLOR:
+            value = fmt::format("max {:.2g}", stat_float(stats, PATH_DEBUG_STATS_MAX_RADIANCE));
+            break;
+        case PATH_DEBUG_MAP_INTEGRAND:
+        case PATH_DEBUG_MAP_INTEGRAND_COLOR:
+            value = fmt::format("max {:.2g}/sr", integrand_max);
             break;
         case PATH_DEBUG_MAP_MEAN:
             value = fmt::format("max {:.2g}", stat_float(stats, PATH_DEBUG_STATS_MAX_MEAN));
             break;
         case PATH_DEBUG_MAP_RATIO:
+        case PATH_DEBUG_MAP_COVERAGE:
             value = "0.25x - 4x";
             break;
         case PATH_DEBUG_MAP_ZSCORE:
             if (dof > 0) {
-                const float reduced =
-                    stat_float(stats, PATH_DEBUG_STATS_CHI2) / static_cast<float>(dof);
+                const float reduced = reduced_chi2(stats);
                 value = fmt::format("chi2/dof {:.2f}", reduced);
                 value_color = ImGui::ColorConvertFloat4ToU32(chi2_color(reduced, dof));
             }
@@ -879,23 +1141,33 @@ void PathDebugNode::draw_panel_labels() const {
         default:
             break;
         }
-        const float text_y = y0 + panel + 6.f;
-        shadowed_text(dl, ImVec2(x0, text_y), MAP_CHANNEL_NAMES[channel]);
-        shadowed_text(dl, ImVec2(x0 + panel - ImGui::CalcTextSize(value.c_str()).x, text_y),
-                      value.c_str(), value_color);
-        if (channel == PATH_DEBUG_MAP_DENSITY) {
-            shadowed_text(dl, ImVec2(x0, text_y + line), map_scope().c_str(),
-                          IM_COL32(170, 170, 170, 255));
+        std::string caption;
+        if (channel == PATH_DEBUG_MAP_DENSITY || channel == PATH_DEBUG_MAP_RECORDED_PDF ||
+            channel == PATH_DEBUG_MAP_COVERAGE) {
+            caption = binned_caption();
+        } else if (channel == PATH_DEBUG_MAP_RADIANCE_COLOR && !bsdf_comparable()) {
+            caption = "camera ray required";
         } else if (channel == PATH_DEBUG_MAP_RATIO || channel == PATH_DEBUG_MAP_ZSCORE) {
-            shadowed_text(
-                dl, ImVec2(x0, text_y + line),
-                !shared_support(map_pdf_ref == static_cast<int32_t>(PATH_DEBUG_PDF_REF_BSDF))
-                    ? "needs the picked pixel at bounce 0"
-                : map_pdf_ref == static_cast<int32_t>(PATH_DEBUG_PDF_REF_RECORDED)
-                    ? "vs recorded pdf"
-                    : "vs BSDF pdf",
-                IM_COL32(170, 170, 170, 255));
+            const bool recorded = map_pdf_ref == static_cast<int32_t>(PATH_DEBUG_PDF_REF_RECORDED);
+            caption = !recorded && !bsdf_comparable() ? "camera ray required"
+                      : recorded                      ? "vs recorded pdf"
+                                                      : "vs BSDF pdf()";
         }
+
+        // the value moves below a name that leaves no room for it
+        const float text_y = y0 + panel + 6.f;
+        const float gap = ImGui::GetStyle().ItemSpacing.x;
+        const float value_width = ImGui::CalcTextSize(value.c_str()).x;
+        const bool value_beside_name =
+            ImGui::CalcTextSize(MAP_CHANNEL_NAMES[channel]).x + gap + value_width <= panel;
+        shadowed_text(dl, ImVec2(x0, text_y), MAP_CHANNEL_NAMES[channel]);
+        shadowed_text(dl,
+                      ImVec2(x0 + panel - value_width, text_y + (value_beside_name ? 0.f : line)),
+                      value.c_str(), value_color);
+        const float caption_width =
+            value_beside_name || value.empty() ? panel : panel - value_width - gap;
+        shadowed_text(dl, ImVec2(x0, text_y + line), elided(caption, caption_width).c_str(),
+                      IM_COL32(170, 170, 170, 255));
     }
 
     if (panel_overflow > 0) {
@@ -917,14 +1189,22 @@ void PathDebugNode::draw_probe_tooltip() const {
         return;
     }
     std::string text;
-    if (probe.kind == PATH_DEBUG_PROBE_PANEL && params.probe_channel != PATH_DEBUG_MAP_NONE) {
-        text = fmt::format("density {:.3g}/sr · pdf {:.3g}\nmean {:.3g} · {} samples",
-                           std::bit_cast<float>(probe.a), std::bit_cast<float>(probe.b),
-                           std::bit_cast<float>(probe.c), probe.count);
+    const uint32_t channel = probe.kind == PATH_DEBUG_PROBE_PANEL    ? params.probe_channel
+                             : probe.kind == PATH_DEBUG_PROBE_SPHERE ? params.sphere_channel
+                                                                     : PATH_DEBUG_MAP_NONE;
+    if (channel != PATH_DEBUG_MAP_NONE) {
+        const uint32_t shown = channel == PATH_DEBUG_MAP_RATIO || channel == PATH_DEBUG_MAP_ZSCORE
+                                   ? PATH_DEBUG_MAP_DENSITY
+                                   : channel;
+        text = fmt::format("{} {:.3g}{} · pdf {:.3g}\nmean {:.3g} · {} samples",
+                           MAP_CHANNEL_NAMES[shown], std::bit_cast<float>(probe.values[0]),
+                           per_steradian(shown) ? "/sr" : "", std::bit_cast<float>(probe.values[1]),
+                           std::bit_cast<float>(probe.values[2]), probe.count);
     } else if (probe.kind == PATH_DEBUG_PROBE_PIXEL) {
-        text = fmt::format("mean {:.4g} · rel. error {:.3f}\nvariance {:.3g} · {} paths",
-                           std::bit_cast<float>(probe.a), std::bit_cast<float>(probe.b),
-                           std::bit_cast<float>(probe.c), probe.count);
+        text = fmt::format("mean {:.4g} · rel. std. error {:.3f}\nvariance {:.3g} · {} paths",
+                           std::bit_cast<float>(probe.values[0]),
+                           std::bit_cast<float>(probe.values[1]),
+                           std::bit_cast<float>(probe.values[2]), probe.count);
     }
     if (text.empty()) {
         return;

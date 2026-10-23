@@ -13,7 +13,7 @@ using merian;
 
 RWTexture2D<float4> out_panels;
 
-[numthreads(16, 16, 1)]
+[numthreads(PATH_DEBUG_WG_2D, PATH_DEBUG_WG_2D, 1)]
 [shader("compute")]
 void main(uint3 gid: SV_DispatchThreadID) {
     const uint2 cell = gid.xy;

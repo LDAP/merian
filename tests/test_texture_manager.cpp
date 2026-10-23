@@ -33,6 +33,9 @@ class TextureManagerTest : public ::testing::Test {
     static void SetUpTestSuite() {
         spdlog::set_level(spdlog::level::debug);
         ContextCreateInfo info{
+            // what the texture manager's shaders declare: 16 bit ids, non-uniform indexing
+            .features = VulkanFeatures(std::vector<std::string>{
+                "shaderInt16", "shaderSampledImageArrayNonUniformIndexing"}),
             .context_extensions = {ExtensionVkValidationLayers::name, ExtensionResources::name},
             .application_name = "test-texture-manager",
         };

@@ -94,7 +94,7 @@ class ImGuiProperties : public Properties {
 
   private:
     // what st_end_child has to close, since a child inside a TABS parent is a tab item
-    enum class OpenChild { TREE, TAB_BAR, TAB_ITEM };
+    enum class OpenChild { TREE, TAB_BAR, TAB_ITEM, HEADERLESS };
     std::vector<OpenChild> open_children;
 };
 

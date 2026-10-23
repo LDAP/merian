@@ -62,6 +62,11 @@ bool ImGuiProperties::st_begin_child(const std::string& id,
         open_children.push_back(OpenChild::TAB_BAR);
         return true;
     }
+    if ((flags & ChildFlagBits::HEADERLESS) != 0) {
+        ImGui::PushID(id.c_str());
+        open_children.push_back(OpenChild::HEADERLESS);
+        return true;
+    }
 
     ImGuiTreeNodeFlags imgui_flags{};
     if (flags & ChildFlagBits::DEFAULT_OPEN) {
@@ -89,6 +94,9 @@ void ImGuiProperties::st_end_child() {
         break;
     case OpenChild::TREE:
         ImGui::TreePop();
+        break;
+    case OpenChild::HEADERLESS:
+        ImGui::PopID();
         break;
     }
 }

@@ -23,7 +23,7 @@ struct PathRecordCapacities {
 
 // Must match path_record_path_capacity() / path_record_vertex_capacity() in path-record.slang.
 inline PathRecordCapacities path_record_capacities(const uint64_t buffer_bytes) {
-    const uint64_t payload = (buffer_bytes / 4) - PATH_RECORD_HEADER_UINTS;
+    const uint64_t payload = (buffer_bytes / sizeof(uint32_t)) - PATH_RECORD_HEADER_UINTS;
     const auto path_capacity =
         static_cast<uint32_t>(payload / PATH_RECORD_REGION_RATIO / PATH_RECORD_UINTS);
     const uint64_t path_uints = static_cast<uint64_t>(path_capacity) * PATH_RECORD_UINTS;
@@ -41,7 +41,7 @@ inline uint64_t path_record_buffer_size(const uint64_t paths, const uint32_t ver
     const uint64_t for_paths = paths * PATH_RECORD_REGION_RATIO * PATH_RECORD_UINTS;
     const uint64_t payload = std::max(for_vertices, for_paths) +
                              (static_cast<uint64_t>(PATH_RECORD_REGION_RATIO) * PATH_RECORD_UINTS);
-    return (PATH_RECORD_HEADER_UINTS + payload) * 4;
+    return (PATH_RECORD_HEADER_UINTS + payload) * sizeof(uint32_t);
 }
 
 } // namespace merian

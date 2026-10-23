@@ -1,5 +1,7 @@
 #pragma once
 
+#include "merian-graph/nodes/path_debug/layout.slangh"
+
 #include <array>
 #include <cstdint>
 #include <string>
@@ -7,7 +9,8 @@
 namespace merian {
 
 struct PathExpression {
-    std::array<uint32_t, 4> words{};
+    // two 16 bit tokens per word
+    std::array<uint32_t, PATH_DEBUG_MAX_TOKENS / 2> words{};
     uint32_t token_count = 0;
     bool nee = false;
     bool valid = true;

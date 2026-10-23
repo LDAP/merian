@@ -1,142 +1,214 @@
 // Include after common.slangh; needs merian_shaders.colors.colorspaces, colormaps and
 // utils.dir_map.
+#pragma once
 
 #include "merian-graph/nodes/path_debug/map_test.slangh"
 
+// a bin whose value is zero, one without data, one a test leaves out, and a quasi-delta one
+static const float PATH_DEBUG_MAP_ZERO_GRAY = 0.04f;
+static const float PATH_DEBUG_MAP_EMPTY_GRAY = 0.02f;
+static const float PATH_DEBUG_MAP_UNTESTED_GRAY = 0.12f;
+static const float3 PATH_DEBUG_MAP_SPIKE_COLOR = float3(0.45f, 0.25f, 0.05f);
+
 float3 path_debug_map_heat_color(const float value, const float vmax) {
     if (!(value > 0.f) || !(vmax > 0.f)) {
-        return float3(0.04f);
+        return float3(PATH_DEBUG_MAP_ZERO_GRAY);
     }
-    return merian::colormap_turbo(path_debug_log_decades(value, vmax, params.map_exposure));
+    return colormap_turbo(path_debug_log_decades(value, vmax, params.map_exposure));
+}
+
+// stops clamped to +-range on the diverging map, white at 0
+float3 path_debug_map_diverging(const float stops, const float range) {
+    return colormap_diverging(clamp(stops, -range, range) / (2.f * range) + 0.5f);
+}
+
+// the samples of a stats counter times the bin's solid angle, the denominator of a density
+float path_debug_map_sample_steradians(const uint stat, const float solid_angle) {
+    return float(max(stats[stat], 1u)) * solid_angle;
+}
+
+float path_debug_map_density(const uint bin, const float solid_angle) {
+    return float(maps[path_debug_map_count_at(bin)]) /
+           path_debug_map_sample_steradians(PATH_DEBUG_STATS_SAMPLES, solid_angle);
+}
+
+float path_debug_map_integrand_normalized(const uint bin, const float solid_angle) {
+    const float integral = asfloat(stats[PATH_DEBUG_STATS_INTEGRAND]);
+    return integral > 0.f ? yuv_luminance(path_debug_map_integrand(bin)) / (integral * solid_angle)
+                          : 0.f;
+}
+
+// the light arriving at the point: the integrand over BSDF eval(), where eval() holds
+float3 path_debug_map_radiance(const uint bin, const float solid_angle) {
+    const float eval_norm = asfloat(stats[PATH_DEBUG_STATS_EVAL_NORM]);
+    if (!path_debug_bsdf_comparable() || !(eval_norm > 0.f)) {
+        return float3(0.f);
+    }
+    const float3 integrand = path_debug_map_integrand(bin) /
+                             path_debug_map_sample_steradians(PATH_DEBUG_STATS_COUNT, solid_angle);
+    const float3 eval = path_debug_map_eval(bin);
+    return select(eval > 1e-3f * eval_norm, integrand / eval, float3(0.f));
+}
+
+// what a panel shows at a bin, on the scale of path_debug_map_scale; a color panel gives its
+// luminance, a test nothing
+float path_debug_map_value(const uint view, const uint2 cell, const float solid_angle) {
+    const uint bin = path_debug_map_bin(cell);
+    if (solid_angle <= 0.f) {
+        return 0.f;
+    }
+    switch (view) {
+    case PATH_DEBUG_MAP_INTEGRAND_NORMALIZED:
+        return path_debug_map_integrand_normalized(bin, solid_angle);
+    case PATH_DEBUG_MAP_DENSITY:
+        return path_debug_map_density(bin, solid_angle);
+    case PATH_DEBUG_MAP_RECORDED_PDF: {
+        // the continuous draws over the sum of their 1/pdf: the mean pdf over the bin
+        const float sum_recip = asfloat(maps[path_debug_map_recip_at(bin)]);
+        return sum_recip > 0.f ? float(maps[path_debug_map_continuous_at(bin)]) / sum_recip : 0.f;
+    }
+    case PATH_DEBUG_MAP_PDF:
+        return abs(asfloat(maps[path_debug_map_pdf_at(bin)]));
+    case PATH_DEBUG_MAP_CHECK:
+        return float(maps[path_debug_map_check_at(bin)]) /
+               path_debug_map_sample_steradians(PATH_DEBUG_STATS_CHECK_SAMPLES, solid_angle);
+    case PATH_DEBUG_MAP_EVAL: {
+        const float eval_norm = asfloat(stats[PATH_DEBUG_STATS_EVAL_NORM]);
+        return eval_norm > 0.f ? yuv_luminance(path_debug_map_eval(bin)) / eval_norm : 0.f;
+    }
+    case PATH_DEBUG_MAP_COVERAGE: {
+        const float target = path_debug_map_integrand_normalized(bin, solid_angle);
+        return target > 0.f ? path_debug_map_density(bin, solid_angle) / target : 0.f;
+    }
+    case PATH_DEBUG_MAP_INTEGRAND:
+    case PATH_DEBUG_MAP_INTEGRAND_COLOR:
+        return yuv_luminance(path_debug_map_integrand(bin)) /
+               path_debug_map_sample_steradians(PATH_DEBUG_STATS_COUNT, solid_angle);
+    case PATH_DEBUG_MAP_SECOND_MOMENT:
+        return asfloat(maps[path_debug_map_moment_at(bin)]) /
+               path_debug_map_sample_steradians(PATH_DEBUG_STATS_COUNT, solid_angle);
+    case PATH_DEBUG_MAP_RADIANCE_COLOR:
+        return yuv_luminance(path_debug_map_radiance(bin, solid_angle));
+    case PATH_DEBUG_MAP_MEAN:
+    case PATH_DEBUG_MAP_MEAN_COLOR: {
+        const uint count = maps[path_debug_map_count_at(bin)];
+        return count > 0 ? yuv_luminance(path_debug_map_contrib(bin)) / float(count) : 0.f;
+    }
+    default:
+        return 0.f;
+    }
+}
+
+// the value at the top of a panel's color map
+float path_debug_map_scale(const uint view) {
+    switch (view) {
+    case PATH_DEBUG_MAP_INTEGRAND:
+    case PATH_DEBUG_MAP_INTEGRAND_COLOR:
+        return asfloat(stats[PATH_DEBUG_STATS_MAX_INTEGRAND]);
+    case PATH_DEBUG_MAP_SECOND_MOMENT:
+        return asfloat(stats[PATH_DEBUG_STATS_MAX_MOMENT]);
+    case PATH_DEBUG_MAP_RADIANCE_COLOR:
+        return asfloat(stats[PATH_DEBUG_STATS_MAX_RADIANCE]);
+    case PATH_DEBUG_MAP_MEAN:
+    case PATH_DEBUG_MAP_MEAN_COLOR:
+        return asfloat(stats[PATH_DEBUG_STATS_MAX_MEAN]);
+    default:
+        return asfloat(stats[PATH_DEBUG_STATS_MAX_SHARED]);
+    }
+}
+
+// what a color panel tints its bin with
+float3 path_debug_map_hue(const uint view, const uint bin, const float solid_angle) {
+    switch (view) {
+    case PATH_DEBUG_MAP_INTEGRAND_COLOR:
+        return path_debug_map_integrand(bin);
+    case PATH_DEBUG_MAP_RADIANCE_COLOR:
+        return path_debug_map_radiance(bin, solid_angle);
+    default:
+        return path_debug_map_contrib(bin);
+    }
+}
+
+// its own hue, the brightness of the heat color map
+float3 path_debug_map_hue_color(const float3 rgb, const float value, const float vmax) {
+    const float peak = max(max(rgb.r, rgb.g), rgb.b);
+    if (!(value > 0.f) || !(peak > 0.f)) {
+        return float3(0.f);
+    }
+    return pow(rgb / peak, 1.f / 2.2f) * path_debug_log_decades(value, vmax, params.map_exposure);
 }
 
 float3 path_debug_map_color(const uint view, const uint2 cell) {
-    const uint bin = cell.y * params.map_res + cell.x;
+    const uint bin = path_debug_map_bin(cell);
     const float solid_angle = dir_map_bin_solid_angle(params.map_transform, cell, params.map_res);
     if (solid_angle <= 0.f) {
-        return float3(0.02f);
+        return float3(PATH_DEBUG_MAP_EMPTY_GRAY);
     }
-    const uint total = max(stats[PATH_DEBUG_STATS_SAMPLES], 1u);
-    const uint count = maps[path_debug_map_count_at(bin)];
-    const uint c = path_debug_map_contrib_at(bin);
-    const float3 contrib = float3(asfloat(maps[c + 0]), asfloat(maps[c + 1]), asfloat(maps[c + 2]));
-    const float pdf_raw = asfloat(maps[path_debug_map_pdf_at(bin)]);
-    const float pdf = abs(pdf_raw);
-
-    const float shared_max = max(max(max(asfloat(stats[PATH_DEBUG_STATS_MAX_DENSITY]),
-                                         asfloat(stats[PATH_DEBUG_STATS_MAX_PDF])),
-                                     asfloat(stats[PATH_DEBUG_STATS_MAX_CHECK])),
-                                 asfloat(stats[PATH_DEBUG_STATS_MAX_EVAL]));
-
     switch (view) {
-    case PATH_DEBUG_MAP_DENSITY:
-        return path_debug_map_heat_color(float(count) / (float(total) * solid_angle), shared_max);
-    case PATH_DEBUG_MAP_CONTRIB:
-        return path_debug_map_heat_color(merian::yuv_luminance(contrib) /
-                                             (float(total) * solid_angle),
-                                         asfloat(stats[PATH_DEBUG_STATS_MAX_CONTRIB]));
-    case PATH_DEBUG_MAP_CONTRIB_COLOR: {
-        if (count == 0) {
-            return float3(0.f);
+    case PATH_DEBUG_MAP_INTEGRAND_COLOR:
+    case PATH_DEBUG_MAP_RADIANCE_COLOR:
+    case PATH_DEBUG_MAP_MEAN_COLOR:
+        return path_debug_map_hue_color(path_debug_map_hue(view, bin, solid_angle),
+                                        path_debug_map_value(view, cell, solid_angle),
+                                        path_debug_map_scale(view));
+    case PATH_DEBUG_MAP_COVERAGE: {
+        const float sampled = path_debug_map_density(bin, solid_angle);
+        const float target = path_debug_map_integrand_normalized(bin, solid_angle);
+        if (!(sampled > 0.f) && !(target > 0.f)) {
+            return float3(PATH_DEBUG_MAP_EMPTY_GRAY);
         }
-        const float3 mean = contrib * (params.map_exposure / float(count));
-        return pow(mean / (1.f + mean), 1.f / 2.2f);
+        const float stops = !(target > 0.f)    ? 2.f
+                            : !(sampled > 0.f) ? -2.f
+                                               : log2(sampled / target);
+        return path_debug_map_diverging(stops, 2.f);
     }
-    case PATH_DEBUG_MAP_MEAN:
-        return path_debug_map_heat_color(count > 0 ? merian::yuv_luminance(contrib) / float(count)
-                                                   : 0.f,
-                                         asfloat(stats[PATH_DEBUG_STATS_MAX_MEAN]));
-    case PATH_DEBUG_MAP_PDF:
-        return path_debug_map_heat_color(pdf, shared_max);
-    case PATH_DEBUG_MAP_CHECK: {
-        const uint check_total = max(stats[PATH_DEBUG_STATS_CHECK_SAMPLES], 1u);
-        return path_debug_map_heat_color(float(maps[path_debug_map_check_at(bin)]) /
-                                             (float(check_total) * solid_angle),
-                                         shared_max);
+    case PATH_DEBUG_MAP_RATIO:
+    case PATH_DEBUG_MAP_ZSCORE: {
+        const PathDebugBinTest test = path_debug_bin_test(cell, solid_angle, false);
+        if (test.state == PATH_DEBUG_BIN_UNTESTABLE) {
+            return float3(PATH_DEBUG_MAP_UNTESTED_GRAY);
+        }
+        if (test.state == PATH_DEBUG_BIN_SPIKE) {
+            return PATH_DEBUG_MAP_SPIKE_COLOR;
+        }
+        if (view == PATH_DEBUG_MAP_ZSCORE) {
+            return test.state == PATH_DEBUG_BIN_TESTED ? path_debug_map_diverging(test.z, 4.f)
+                                                       : float3(PATH_DEBUG_MAP_EMPTY_GRAY);
+        }
+        const float observed = params.map_pdf_ref == PATH_DEBUG_PDF_REF_RECORDED
+                                   ? asfloat(maps[path_debug_map_recip_at(bin)])
+                                   : float(maps[path_debug_map_count_at(bin)]);
+        if (!(observed > 0.f) || !(test.expected > 0.f)) {
+            return float3(PATH_DEBUG_MAP_EMPTY_GRAY);
+        }
+        return path_debug_map_diverging(log2(observed / test.expected), 2.f);
     }
-    case PATH_DEBUG_MAP_EVAL: {
-        const float eval_norm = asfloat(stats[PATH_DEBUG_STATS_EVAL_NORM]);
-        return path_debug_map_heat_color(
-            eval_norm > 0.f ? asfloat(maps[path_debug_map_eval_at(bin)]) / eval_norm : 0.f,
-            shared_max);
+    default:
+        return path_debug_map_heat_color(path_debug_map_value(view, cell, solid_angle),
+                                         path_debug_map_scale(view));
     }
-    case PATH_DEBUG_MAP_RATIO: {
-        if (params.map_pdf_ref == PATH_DEBUG_PDF_REF_RECORDED) {
-            if (!path_debug_shared_support(false)) {
-                return float3(0.12f);
-            }
-            const float sum_recip = asfloat(maps[path_debug_map_recip_at(bin)]);
-            const float expected = float(stats[PATH_DEBUG_STATS_DRAWS]) * solid_angle;
-            if (!(sum_recip > 0.f) || !(expected > 0.f)) {
-                return float3(0.02f);
-            }
-            if (!path_debug_support_interior(cell)) {
-                return float3(0.12f);
-            }
-            const float stops = clamp(log2(sum_recip / expected), -2.f, 2.f);
-            return merian::colormap_diverging(stops / 4.f + 0.5f);
-        }
-        if (!path_debug_shared_support(true) ||
-            path_debug_maps_hold(PATH_DEBUG_SEEN_CONNECTION | PATH_DEBUG_SEEN_RESAMPLED)) {
-            return float3(0.12f);
-        }
-        const float norm = max(asfloat(stats[PATH_DEBUG_STATS_PDF_NORM]), 1e-6f);
-        const float density = float(count) / (float(total) * solid_angle);
-        if (!(pdf > 0.f) || !(density > 0.f)) {
-            return float3(0.02f);
-        }
-        const float stops = clamp(log2(density * norm / pdf), -2.f, 2.f);
-        return merian::colormap_diverging(stops / 4.f + 0.5f);
-    }
-    case PATH_DEBUG_MAP_ZSCORE:
-    default: {
-        if (params.map_pdf_ref == PATH_DEBUG_PDF_REF_RECORDED) {
-            if (!path_debug_shared_support(false)) {
-                return float3(0.12f);
-            }
-            const float sum_recip = asfloat(maps[path_debug_map_recip_at(bin)]);
-            const float expected = float(stats[PATH_DEBUG_STATS_DRAWS]) * solid_angle;
-            const float variance = path_debug_residual_variance(
-                bin, true, asfloat(maps[path_debug_map_recip2_at(bin)]), false);
-            if (!(variance > 0.f) || !path_debug_support_interior(cell)) {
-                return float3(0.12f);
-            }
-            const float z = (sum_recip - expected) / sqrt(variance);
-            return merian::colormap_diverging(clamp(z, -4.f, 4.f) / 8.f + 0.5f);
-        }
-        if (!path_debug_shared_support(true) ||
-            path_debug_maps_hold(PATH_DEBUG_SEEN_CONNECTION | PATH_DEBUG_SEEN_RESAMPLED)) {
-            return float3(0.12f);
-        }
-        const float norm = max(asfloat(stats[PATH_DEBUG_STATS_PDF_NORM]), 1e-6f);
-        const float expected = float(total) * pdf * solid_angle / norm;
-        if (path_debug_is_spike(float(count), expected)) {
-            return float3(0.45f, 0.25f, 0.05f);
-        }
-        if (pdf_raw < 0.f) {
-            return float3(0.12f);
-        }
-        if (expected < 1e-3f) {
-            return float3(0.02f);
-        }
-        const float variance = path_debug_residual_variance(bin, false, expected, false);
-        if (!(variance > 0.f)) {
-            return float3(0.12f);
-        }
-        const float z = (float(count) - expected) / sqrt(variance);
-        return merian::colormap_diverging(clamp(z, -4.f, 4.f) / 8.f + 0.5f);
-    }
-    }
-}
-
-float3 path_debug_map_color_uv(const uint view, const float2 uv) {
-    return path_debug_map_color(view, min(uint2(uv * params.map_res), params.map_res - 1));
 }
 
 float3 path_debug_map_color_dir(const uint view, const float3 map_dir) {
     const float3 uvw = dir_map_uv(params.map_transform, map_dir);
     if (uvw.z == 0.f) {
-        return float3(0.05f);
+        return float3(PATH_DEBUG_MAP_EMPTY_GRAY);
     }
-    return path_debug_map_color_uv(view, uvw.xy);
+    return path_debug_map_color(view, path_debug_map_cell(uvw.xy));
+}
+
+// the hovered bin of a panel or the sphere, for the host
+void path_debug_write_map_probe(const uint kind, const uint channel, const uint2 cell) {
+    const uint bin = path_debug_map_bin(cell);
+    const float solid_angle = dir_map_bin_solid_angle(params.map_transform, cell, params.map_res);
+    const bool test = channel == PATH_DEBUG_MAP_RATIO || channel == PATH_DEBUG_MAP_ZSCORE;
+    const uint values_at = PATH_DEBUG_OUT_PROBE + PATH_DEBUG_PROBE_VALUES;
+    out_state[PATH_DEBUG_OUT_PROBE + PATH_DEBUG_PROBE_KIND] = kind;
+    out_state[values_at + 0] =
+        asuint(path_debug_map_value(test ? PATH_DEBUG_MAP_DENSITY : channel, cell, solid_angle));
+    out_state[values_at + 1] = asuint(path_debug_map_value(PATH_DEBUG_MAP_PDF, cell, solid_angle));
+    out_state[values_at + 2] = asuint(path_debug_map_value(PATH_DEBUG_MAP_MEAN, cell, solid_angle));
+    out_state[PATH_DEBUG_OUT_PROBE + PATH_DEBUG_PROBE_COUNT] =
+        maps[channel == PATH_DEBUG_MAP_CHECK ? path_debug_map_check_at(bin)
+                                             : path_debug_map_count_at(bin)];
 }

@@ -2,6 +2,9 @@
 
 #ifdef __cplusplus
 #include "merian-shaders/types.slang.h"
+#define PATH_RECORD_FUNC inline
+#else
+#define PATH_RECORD_FUNC
 #endif
 
 namespace merian {
@@ -71,5 +74,13 @@ static const uint32_t PATH_RECORD_METHOD_REPLAYED_LIGHT = 7;
 // a segment a shift connected to a vertex of the source path
 static const uint32_t PATH_RECORD_METHOD_RECONNECTION = 8;
 static const uint32_t PATH_RECORD_METHOD_COUNT = 9;
+
+PATH_RECORD_FUNC uint32_t path_record_pack_pixel(const uint2 pixel) {
+    return (pixel.y << 16) | (pixel.x & 0xFFFFu);
+}
+
+PATH_RECORD_FUNC uint2 path_record_unpack_pixel(const uint32_t packed) {
+    return uint2(packed & 0xFFFFu, packed >> 16);
+}
 
 } // namespace merian

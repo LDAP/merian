@@ -9,6 +9,9 @@ namespace merian {
 // Polynomial fit of the Turbo colormap (Mikhailov, Google AI Blog 2019).
 ImU32 imgui_colormap_turbo(float x);
 
+// Polynomial fit of matplotlib's plasma (Zucker 2020, "Colormap polynomials", shadertoy WlfXRN).
+ImU32 imgui_colormap_plasma(float x);
+
 // Diverging blue-white-red map for signed quantities; 0.5 = neutral.
 ImU32 imgui_colormap_diverging(float x);
 

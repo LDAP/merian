@@ -36,6 +36,8 @@ class Properties {
         FRAMED = 0b10,
         // lay this child's own children out as tabs; presentation only
         TABS = 0b100,
+        // show the contents without a header; presentation only
+        HEADERLESS = 0b1000,
     };
 
     using ChildFlags = uint32_t;

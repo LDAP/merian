@@ -17,7 +17,7 @@ bool path_debug_support_interior(const uint2 cell) {
                 continue;
             }
             if (dir_map_bin_solid_angle(params.map_transform, uint2(n), params.map_res) > 0.f &&
-                maps[path_debug_map_count_at(n.y * params.map_res + n.x)] == 0) {
+                maps[path_debug_map_count_at(path_debug_map_bin(uint2(n)))] == 0) {
                 return false;
             }
         }
@@ -42,4 +42,82 @@ float path_debug_residual_variance(const uint bin,
         batch_end ? total
                   : stats[recorded ? PATH_DEBUG_STATS_BATCH_DRAWS : PATH_DEBUG_STATS_BATCH_SAMPLES];
     return asfloat(maps[path_debug_map_residual2_at(bin)]) * float(total) / float(max(covered, 1u));
+}
+
+// the draws a bin must expect to be tested
+static const float PATH_DEBUG_MIN_EXPECTED = 5.f;
+// a quasi-delta bin: at least this many draws, and this many times what the pdf expects
+static const float PATH_DEBUG_SPIKE_DRAWS = 16.f;
+static const float PATH_DEBUG_SPIKE_EXCESS = 10.f;
+
+bool path_debug_is_spike(const float count, const float expected) {
+    return count >= PATH_DEBUG_SPIKE_DRAWS && count > PATH_DEBUG_SPIKE_EXCESS * expected;
+}
+
+static const uint PATH_DEBUG_BIN_TESTED = 0;
+// too few draws expected for the test
+static const uint PATH_DEBUG_BIN_EMPTY = 1;
+static const uint PATH_DEBUG_BIN_UNTESTABLE = 2;
+// a quasi-delta lobe, left out
+static const uint PATH_DEBUG_BIN_SPIKE = 3;
+
+struct PathDebugBinTest {
+    uint state;
+    // the deviation in standard deviations, where tested
+    float z;
+    // the draws, or the sum of 1/pdf, the reference expects
+    float expected;
+}
+
+// One bin of the test chi2 sums, against the pdf test_against picks.
+PathDebugBinTest path_debug_bin_test(const uint2 cell,
+                                     const float solid_angle,
+                                     const bool batch_end) {
+    PathDebugBinTest test = { PATH_DEBUG_BIN_UNTESTABLE, 0.f, 0.f };
+    const uint bin = path_debug_map_bin(cell);
+    const float count = float(maps[path_debug_map_count_at(bin)]);
+    if (params.map_pdf_ref == PATH_DEBUG_PDF_REF_RECORDED) {
+        if (!path_debug_maps_at_point() || !path_debug_support_interior(cell)) {
+            return test;
+        }
+        // E[sum 1/pdf] = draws * omega inside the support
+        test.expected = float(stats[PATH_DEBUG_STATS_DRAWS]) * solid_angle;
+        if (count < PATH_DEBUG_MIN_EXPECTED || test.expected < 1.f) {
+            test.state = PATH_DEBUG_BIN_EMPTY;
+            return test;
+        }
+        const float variance = path_debug_residual_variance(
+            bin, true, asfloat(maps[path_debug_map_recip2_at(bin)]), batch_end);
+        if (variance > 0.f) {
+            test.state = PATH_DEBUG_BIN_TESTED;
+            test.z = (asfloat(maps[path_debug_map_recip_at(bin)]) - test.expected) / sqrt(variance);
+        }
+        return test;
+    }
+    // the pdf's normalization is known from the second frame after a reset
+    const float norm = asfloat(stats[PATH_DEBUG_STATS_PDF_NORM]);
+    if (!path_debug_bsdf_comparable() || !(norm > 0.f) ||
+        path_debug_maps_hold(PATH_DEBUG_SEEN_CONNECTION | PATH_DEBUG_SEEN_RESAMPLED)) {
+        return test;
+    }
+    const float pdf = asfloat(maps[path_debug_map_pdf_at(bin)]);
+    test.expected = float(stats[PATH_DEBUG_STATS_SAMPLES]) * abs(pdf) * solid_angle / norm;
+    if (path_debug_is_spike(count, test.expected)) {
+        test.state = PATH_DEBUG_BIN_SPIKE;
+        return test;
+    }
+    // a negative pdf marks a bin too coarse for the lobe
+    if (pdf < 0.f) {
+        return test;
+    }
+    if (test.expected < PATH_DEBUG_MIN_EXPECTED) {
+        test.state = PATH_DEBUG_BIN_EMPTY;
+        return test;
+    }
+    const float variance = path_debug_residual_variance(bin, false, test.expected, batch_end);
+    if (variance > 0.f) {
+        test.state = PATH_DEBUG_BIN_TESTED;
+        test.z = (count - test.expected) / sqrt(variance);
+    }
+    return test;
 }
