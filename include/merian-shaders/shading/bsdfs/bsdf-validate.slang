@@ -27,6 +27,8 @@ struct BSDFSampleCheck {
     float3 weight;
     // wo.z / pdf, whose mean estimates INT cos(theta) dwo over the sampled support
     float cos_over_pdf;
+    // the sample's own pdf
+    float pdf;
     // relative deviation of the sample's own weight and pdf from eval() and pdf(), 0 for a
     // singular draw
     float err_weight;
@@ -49,6 +51,7 @@ bsdf_validate_sample<B : BSDF>(const B bsdf, const float3 wi, inout RandomGenera
     check.wo = float3(0.f);
     check.weight = float3(0.f);
     check.cos_over_pdf = 0.f;
+    check.pdf = 0.f;
     check.err_weight = 0.f;
     check.err_pdf = 0.f;
     check.err_delta = 0.f;
@@ -63,6 +66,7 @@ bsdf_validate_sample<B : BSDF>(const B bsdf, const float3 wi, inout RandomGenera
         check.wo = smp.wo;
         check.weight = smp.weight;
         check.cos_over_pdf = smp.wo.z / smp.pdf;
+        check.pdf = smp.pdf;
         check.lobe = smp.lobe;
         check.delta = bsdf_lobe_is_delta(smp.lobe);
         check.transmitted = smp.wo.z * wi.z < 0.f;
