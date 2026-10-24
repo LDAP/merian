@@ -117,6 +117,10 @@ _RUN_SLICE = timedelta(milliseconds=15)
 
 _PLAYBACK_KEYS = (QtCore.Qt.Key.Key_Space, QtCore.Qt.Key.Key_Right)
 _RELEASE_MOUSE_KEY = QtCore.Qt.Key.Key_Backspace
+_FULL_SCREEN_KEYS = tuple(
+    QtCore.QKeyCombination(QtCore.Qt.KeyboardModifier.AltModifier, key)
+    for key in (QtCore.Qt.Key.Key_Return, QtCore.Qt.Key.Key_Enter)
+)
 _PLAYBACK_KEY_USERS = (
     QtWidgets.QAbstractButton,
     QtWidgets.QAbstractItemView,
@@ -1886,6 +1890,8 @@ class _Window(QtWidgets.QMainWindow):
         self.properties_scheduled = False
         self.loading = ""
         self.held: list[QtGui.QAction] = []
+        # Where the full-screen preview returns to: splitter, index and sizes
+        self.preview_place: tuple[QtWidgets.QSplitter, int, list[int]] | None = None
         self.spin = 0
         self.recordings: dict[str | None, list] = {}
         self.view_shortcuts: set[int] = set()
@@ -2018,6 +2024,20 @@ class _Window(QtWidgets.QMainWindow):
 
         view_menu = self.menuBar().addMenu("&View")
         view_menu.setToolTipsVisible(True)
+        self.full_screen_action = _add_action(
+            view_menu,
+            "F&ull Screen Preview",
+            self.set_preview_full_screen,
+            tip="The preview alone on the screen",
+            checkable=True,
+        )
+        self.full_screen_action.setShortcuts(
+            [QtGui.QKeySequence(key) for key in _FULL_SCREEN_KEYS]
+        )
+        # Also from the preview on its own
+        self.full_screen_action.setShortcutContext(
+            QtCore.Qt.ShortcutContext.ApplicationShortcut
+        )
         _add_action(
             view_menu,
             "&Swap Preview and Graph",
@@ -2077,7 +2097,17 @@ class _Window(QtWidgets.QMainWindow):
     def set_shortcut_modifiers(self, modifiers: QtCore.Qt.KeyboardModifier) -> None:
         release = QtCore.QKeyCombination(modifiers, _RELEASE_MOUSE_KEY)
         self.release_action.setShortcut(QtGui.QKeySequence(release))
-        self.view_shortcuts = {release.toCombined()}
+        # The editor's function keys and full screen work in a graph's view too
+        self.view_shortcuts = {release.toCombined()} | {
+            sequence[0].toCombined()
+            for menu in self.menuBar().findChildren(QtWidgets.QMenu)
+            for action in menu.actions()
+            for sequence in action.shortcuts()
+            if sequence[0] in _FULL_SCREEN_KEYS
+            or QtCore.Qt.Key.Key_F1.value
+            <= sequence[0].key().value
+            <= QtCore.Qt.Key.Key_F35.value
+        }
         for action, key in zip((self.play_action, self.step_action), _PLAYBACK_KEYS):
             combination = QtCore.QKeyCombination(modifiers, key)
             action.setShortcuts(
@@ -2101,6 +2131,25 @@ class _Window(QtWidgets.QMainWindow):
             event.accept()
             return True
         return super().event(event)
+
+    def set_preview_full_screen(self, full_screen: bool) -> None:
+        if full_screen:
+            splitter = self.preview.parentWidget()
+            self.preview_place = (
+                splitter,
+                splitter.indexOf(self.preview),
+                splitter.sizes(),
+            )
+            self.preview.setParent(None)
+            self.preview.showFullScreen()
+            self.preview.activateWindow()
+        elif self.preview_place:
+            splitter, index, sizes = self.preview_place
+            self.preview_place = None
+            splitter.insertWidget(index, self.preview)
+            splitter.setSizes(sizes)
+            self.preview.show()
+            self.activateWindow()
 
     def swap(self) -> None:
         split_sizes, side_sizes = self.split.sizes(), self.side.sizes()
