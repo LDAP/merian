@@ -43,7 +43,7 @@ class PathRecordSink {
 
     ManagedVkBufferOutHandle con;
     bool is_connected = false;
-    int32_t budget_mb = 256;
+    int32_t budget_mb = 1024;
     vk::DeviceSize emitted_size = 0;
     vk::DeviceSize last_max_range = std::numeric_limits<vk::DeviceSize>::max();
     vk::Extent3D last_extent{};
