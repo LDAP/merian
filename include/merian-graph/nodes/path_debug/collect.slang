@@ -40,10 +40,10 @@ void main(uint3 gid: SV_DispatchThreadID) {
         return;
     }
 
-    if (!path_debug_matched(i)) {
+    if (!path_debug_holds(i, path_debug_paths_filtered())) {
         return;
     }
-    const PathRecordPath p = path_debug_load_selected_path(i);
+    const PathRecordPath p = path_debug_load_selected_path(i, path_debug_paths_filtered());
     if (path_debug_keeps_top()) {
         collect_kept_top(i, p);
     } else {

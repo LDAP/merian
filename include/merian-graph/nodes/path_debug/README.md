@@ -12,97 +12,94 @@ python examples/graph_run.py examples/pbrt.json scene.pbrt --mixin debug
 | Input | Action |
 | --- | --- |
 | Alt+click | select the surface under the cursor |
-| Alt+scroll | resize a region |
+| Alt+scroll | resize a sphere |
 | Alt+Backspace | clear the selection |
 | click the LIVE badge | LIVE → FROZEN (hold the paths) → OFF |
 
-Every binding uses one modifier, `keys/modifier`. The header holds what changes most: point or
-region, how a region matches and its target, and the path color. The tabs hold the rest: **Paths**
-(what to draw, filter, line style), **View** (image under the paths, false color, sphere) and
-**Analysis** (sampling, BSDF check, pixel, histograms). The image under the paths and its exposure
-are also at the bottom left.
+Every binding uses one modifier, Preferences › modifier. The header holds the selection; the tabs
+hold the rest: **Paths** (color, what to draw, line style, list), **Filter**, **View** (false
+color, sphere, reference), **Analysis** (BSDF check, panels, sampling, statistics) and
+**Preferences**. The image under the paths, its exposure and its reset are at the bottom left.
 
 ## Selection
 
 A recorded path holds a light path, from the camera to a light, for every light it reaches: each
-NEE connection and each light it hits. The selection and the filter pick light paths; a path is
-drawn up to its last selected light path, and the images add what the selected ones carry.
+NEE connection and each light it hits. A path is drawn up to its last selected light path.
 
 - **point**: the paths of the clicked pixel that start at the clicked surface. The renderer then
-  records every sample of that pixel, which the panels need, and the other pixels only while a
-  per-pixel image is shown.
-- **region**: the light paths that hit, start at or end at a target: a sphere around the clicked
-  surface, or the triangle, part (a mesh at one place), object, mesh or material the click sees,
-  the environment for the sky. It looks through glass. The dropdown next to the target chooses one
-  without a click.
-- `anchor: surface point` follows the surface when the camera moves; a point behind another surface
-  keeps no paths. `anchor: pixel` stays on the pixel.
-- The filter narrows the selection: expression, contribution (finite or NaN/Inf), scatter events,
-  technique.
-- Every view shows the selection. With nothing selected, that is every path passing the filter.
-- The per-pixel images, `image: filtered` and `false color: pixel statistic`, leave a point out:
-  they show the filter and a region over the whole image.
-- `image: filtered` shows what the selected light paths add to each pixel, the pixel statistic
-  their variance and more. FROZEN, both stay on the surfaces while the camera moves.
+  records every sample of that pixel, which the panels need.
+- **sphere, triangle, instance, node, mesh, material**: the light paths that hit, start at or end
+  at a sphere around the click, or at what the click sees (an instance is a mesh placed at a
+  node); the environment for the sky. It looks through glass. The dropdown next to the match picks
+  a target without a click.
+- **selection** below holds the ids, the radius, the anchor (`surface point` follows the surface
+  when the camera moves, `pixel` stays) and the pixel.
 
-Path expressions match the scatter events of a light path: `S G D U` specular, glossy, diffuse,
-unclassified; `R T` reflection, transmission; `.` any; a quoted code for the technique that drew
-the event's outgoing direction: `'b'` BSDF, `'g'` guiding, `'n'` NEE, `'c'` cosine, `'u'` uniform,
-`'rrb'` `'rrn'` replayed BSDF and NEE, `'rec'` reconnection; `<D'g'>` all of; `[SG]` either;
-`* + ? {n} {n,m}`. The last event's technique is how the light was reached. For example `L` is a
-light the camera sees, `.` direct light, `.'n'` direct light by NEE, `.'b'` direct light a BSDF
-sample hit, `.*<T>.*` refracts somewhere, `.*<D'g'>.*` guides a diffuse bounce.
+## Filter
+
+Expression, contribution (finite or NaN/Inf), scatter events and technique. It applies where it is
+asked for: `Paths › filtered` (on by default), the `(filtered)` images and `View › Overlay ›
+filtered`. The analysis never filters.
+
+Path expressions match the scatter events of a light path, camera to light: `S G D U` specular,
+glossy, diffuse, unclassified; `R T` reflection, transmission; `.` any; a quoted code for the
+technique that drew the event's outgoing direction: `'b'` BSDF, `'g'` guiding, `'n'` NEE, `'c'`
+cosine, `'u'` uniform, `'rrb'` `'rrn'` replayed BSDF and NEE, `'rec'` reconnection; `<D'g'>` all
+of; `[SG]` either; `* + ? {n} {n,m}`. The last event's technique is how the light was reached;
+`L` alone is a light the camera sees. Hover the field for examples.
+
+## Images
+
+| Image | Shows |
+| --- | --- |
+| source input | the renderer's output |
+| current frame | this frame's recorded paths, per pixel |
+| accumulated | the recorded paths over the frames, the default |
+| (filtered) | what the region and the filter add |
+| reference, difference, split | against the reference (View › Reference) |
+
+FROZEN, the recorded images stay on the surfaces while the camera moves. When the header's record
+probability drops below 1, raise the renderer's `capture budget`.
 
 ## Recipes
 
 | Goal | How |
 | --- | --- |
 | Typical paths | the defaults: paths resampled by contribution |
-| Fireflies | `draw: brightest share`, then Paths › Drawn paths |
-| Where a firefly's weight explodes | `color: BSDF·cos/pdf`: the weight a segment's direction was drawn with, red above 1 |
+| Fireflies | `draw: brightest share`, then Paths › List |
+| Where a firefly's weight explodes | `color: BSDF·cos/pdf`: red above 1 |
 | How light takes on color | `color: transported color` |
-| NaN or Inf | filter `contribution: NaN or Inf` |
-| Light through or into a spot | region, `hits` or `ends at` |
-| Light of one lamp | region, `ends at`, target `part`, click the lamp |
-| Orbit around paths | FROZEN or `keep on camera move` |
-| Only the image | `color: off` |
-| One kind of light: refracted, NEE, n bounces | the filter, `image: filtered` |
-| Where light through a spot lands | region, `image: filtered` |
-| Noisy pixels, fireflies, pixels nothing lights | `false color: pixel statistic`: relative standard error, max / mean, zero fraction |
-| Where light flows in the scene | `false color: scene heatmap`: contribution, incident radiance |
-| Where NEE is wasted | `scene heatmap: NEE failed` |
+| NaN or Inf | Filter › `contribution: NaN or Inf` |
+| Light of one lamp | `instance`, `ends at`, click the lamp |
+| Where light through a spot lands | `sphere`, `hits`, image `accumulated (filtered)` |
+| Where random replay carries light | Filter `.*['rrb''rrn'].*`, image `accumulated (filtered)` |
+| Noisy pixels, fireflies, black pixels | overlay `screen space`: relative standard error, max / mean, zero fraction |
+| Where light flows in the scene | overlay `world space`: contribution, incident radiance |
+| Where NEE is wasted | overlay `world space: NEE failed` |
+| Is the BSDF valid, does sample() draw pdf() | Analysis › BSDF check |
+| Does the renderer draw what it records | Analysis › Sampling, the z-score panels |
+| Which bounces carry the light | Analysis › Statistics › light paths |
+| Orbit around paths | `keep on camera move`, on by default; FROZEN also holds the images |
 | Bias | the Error Plot node, or `examples/compare_methods.py` |
 
 ## Panels
 
-Shown while a point is selected. Every panel bins the directions sampled at that point, and the
-distributions share one scale. Hover a bin, on a panel or the sphere, for its values; View › sphere
-draws any panel around the point.
+Shown while a point is selected; every panel bins directions at the point. The columns are three
+samplers: the renderer's continuations, its NEE, and the material's own `sample()`. Per column:
+what it should follow, what it drew, the pdf it claims, and the z-score of the two (blue too few
+draws, red too many). Hover a bin for its values; View › Sphere draws any panel around the point,
+with `scale` as a polar plot.
 
-| Panel | Shows |
-| --- | --- |
-| integrand (normalized) | BSDF·L·cos normalized to integrate to 1: what a zero-variance sampler samples |
-| sampled directions | what the renderer sampled; `binned` picks all, scatter, BSDF only, guiding only or NEE only |
-| recorded pdf | the pdf the renderer claims for those draws |
-| BSDF pdf(), sample(), eval() | the material alone |
-| z-score, sampled / pdf | sampled directions against `test against` |
-| sampled / integrand | where sampling misses the integrand: blue undersampled, red wasted |
-| second moment | where the variance comes from |
-| incident radiance (color) | the light arriving at the point, the integrand over eval() |
-| integrand, integrand (color), mean luminance, mean color | absolute values |
-
-- BSDF sampling: `binned: BSDF only`, `test against: BSDF pdf()`.
-- Guiding or any mixture: `binned: scatter`, `test against: recorded pdf`; the renderer records the
-  mixture's pdf.
-- chi2/dof near 1 (green) passes. A bin at the edge of a partly occluded light reads low.
+- chi2/dof near 1 (green) passes. A mixture records the mixture's pdf, resampled NEE its realized
+  pdf.
+- NEE draws lights, not directions: lights behind each other (closed or stacked emitters) read red.
 - Reused samples (ReSTIR) are tested with batch means; raise `batch frames` when asked to.
 
 ## BSDF check
 
-`BSDF sample()` draws while it is shown, up to what a check needs. `check BSDF` tops the draws up
-and verifies the material at the incident direction (camera ray or the picker): energy
-conservation, reciprocity, pdf normalization, weight = eval / pdf, sampled pdf = pdf(),
-finiteness, sampling integrates eval, `get_albedo()`.
+`check BSDF` draws `sample()` and integrates the material at the incident direction (camera ray or
+the disc): is it valid (energy, reciprocity, finite, weight = BSDF·cos/pdf), and does `sample()`
+draw `pdf()`.
 
 - When `sample()` can reject, the pdf integrates to the share of valid draws, not to 1.
 - A lobe too narrow for the integration grid reads n/a.
@@ -111,10 +108,8 @@ finiteness, sampling integrates eval, `get_albedo()`.
 
 ## Notes
 
-- The renderer subsamples the record stream to fit its buffer (`record probability`); counts are a
-  sample.
 - ReSTIR PT: `debugger records: candidates` for the analysis, `shaded paths` to see reconnection and
-  replay (no chi2).
+  replay.
 - Segments behind geometry are tested against the gbuffer; glass counts as an occluder.
 - ReSTIR DI's reservoirs keep no light: its connections end on a sphere or the environment, no
   other target.

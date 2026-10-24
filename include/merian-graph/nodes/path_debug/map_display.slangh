@@ -4,11 +4,10 @@
 
 #include "merian-graph/nodes/path_debug/map_test.slangh"
 
-// a bin whose value is zero, one without data, one a test leaves out, and a quasi-delta one
+// a bin whose value is zero, one without data, and one a test leaves out
 static const float PATH_DEBUG_MAP_ZERO_GRAY = 0.04f;
 static const float PATH_DEBUG_MAP_EMPTY_GRAY = 0.02f;
 static const float PATH_DEBUG_MAP_UNTESTED_GRAY = 0.12f;
-static const float3 PATH_DEBUG_MAP_SPIKE_COLOR = float3(0.45f, 0.25f, 0.05f);
 
 float3 path_debug_map_heat_color(const float value, const float vmax) {
     if (!(value > 0.f) || !(vmax > 0.f)) {
@@ -17,19 +16,47 @@ float3 path_debug_map_heat_color(const float value, const float vmax) {
     return colormap_turbo(path_debug_log_decades(value, vmax, params.map_exposure));
 }
 
-// stops clamped to +-range on the diverging map, white at 0
 float3 path_debug_map_diverging(const float stops, const float range) {
     return colormap_diverging(clamp(stops, -range, range) / (2.f * range) + 0.5f);
 }
 
-// the samples of a stats counter times the bin's solid angle, the denominator of a density
-float path_debug_map_sample_steradians(const uint stat, const float solid_angle) {
-    return float(max(stats[stat], 1u)) * solid_angle;
+// the draws a set binned, NEE with the environment's
+uint path_debug_map_samples(const uint set) {
+    if (set == PATH_DEBUG_SET_GUIDING) {
+        return stats[PATH_DEBUG_STATS_GUIDING_SAMPLES];
+    }
+    const uint own = stats[path_debug_set_stat(set, PATH_DEBUG_SET_SAMPLES)];
+    return set == PATH_DEBUG_SET_NEE
+               ? own + stats[path_debug_set_stat(PATH_DEBUG_SET_NEE_ENV, PATH_DEBUG_SET_SAMPLES)]
+               : own;
 }
 
-float path_debug_map_density(const uint bin, const float solid_angle) {
-    return float(maps[path_debug_map_count_at(bin)]) /
-           path_debug_map_sample_steradians(PATH_DEBUG_STATS_SAMPLES, solid_angle);
+uint path_debug_map_draws_in(const uint set, const uint bin) {
+    const uint own = maps[path_debug_map_count_at(set, bin)];
+    return set == PATH_DEBUG_SET_NEE
+               ? own + maps[path_debug_map_count_at(PATH_DEBUG_SET_NEE_ENV, bin)]
+               : own;
+}
+
+float path_debug_map_sampled(const uint set, const uint bin, const float solid_angle) {
+    return float(path_debug_map_draws_in(set, bin)) /
+           (float(max(path_debug_map_samples(set), 1u)) * solid_angle);
+}
+
+// the continuous draws over the sum of their 1/pdf: the mean recorded pdf over the bin
+float path_debug_map_recorded(const uint set, const uint bin) {
+    const uint last = set == PATH_DEBUG_SET_NEE ? PATH_DEBUG_SET_NEE_ENV : set;
+    float continuous = 0.f;
+    float sum_recip = 0.f;
+    for (uint s = set; s <= last; s++) {
+        continuous += float(maps[path_debug_map_set_at(s, PATH_DEBUG_SET_REGION_CONTINUOUS, bin)]);
+        sum_recip += asfloat(maps[path_debug_map_set_at(s, PATH_DEBUG_SET_REGION_RECIP, bin)]);
+    }
+    return sum_recip > 0.f ? continuous / sum_recip : 0.f;
+}
+
+float path_debug_map_per_path(const float value, const float solid_angle) {
+    return value / (float(max(stats[PATH_DEBUG_STATS_COUNT], 1u)) * solid_angle);
 }
 
 float path_debug_map_integrand_normalized(const uint bin, const float solid_angle) {
@@ -45,9 +72,14 @@ float3 path_debug_map_radiance(const uint bin, const float solid_angle) {
         return float3(0.f);
     }
     const float3 integrand = path_debug_map_integrand(bin) /
-                             path_debug_map_sample_steradians(PATH_DEBUG_STATS_COUNT, solid_angle);
+                             (float(max(stats[PATH_DEBUG_STATS_COUNT], 1u)) * solid_angle);
     const float3 eval = path_debug_map_eval(bin);
     return select(eval > 1e-3f * eval_norm, integrand / eval, float3(0.f));
+}
+
+bool path_debug_map_is_diverging(const uint view) {
+    return view == PATH_DEBUG_MAP_ZSCORE_SCATTER || view == PATH_DEBUG_MAP_ZSCORE_NEE ||
+           view == PATH_DEBUG_MAP_ZSCORE_CHECK || view == PATH_DEBUG_MAP_COVERAGE;
 }
 
 // what a panel shows at a bin, on the scale of path_debug_map_scale; a color panel gives its
@@ -60,76 +92,54 @@ float path_debug_map_value(const uint view, const uint2 cell, const float solid_
     switch (view) {
     case PATH_DEBUG_MAP_INTEGRAND_NORMALIZED:
         return path_debug_map_integrand_normalized(bin, solid_angle);
-    case PATH_DEBUG_MAP_DENSITY:
-        return path_debug_map_density(bin, solid_angle);
-    case PATH_DEBUG_MAP_RECORDED_PDF: {
-        // the continuous draws over the sum of their 1/pdf: the mean pdf over the bin
-        const float sum_recip = asfloat(maps[path_debug_map_recip_at(bin)]);
-        return sum_recip > 0.f ? float(maps[path_debug_map_continuous_at(bin)]) / sum_recip : 0.f;
-    }
-    case PATH_DEBUG_MAP_PDF:
-        return abs(asfloat(maps[path_debug_map_pdf_at(bin)]));
-    case PATH_DEBUG_MAP_CHECK:
-        return float(maps[path_debug_map_check_at(bin)]) /
-               path_debug_map_sample_steradians(PATH_DEBUG_STATS_CHECK_SAMPLES, solid_angle);
+    case PATH_DEBUG_MAP_RADIANCE:
+        return yuv_luminance(path_debug_map_radiance(bin, solid_angle));
     case PATH_DEBUG_MAP_EVAL: {
         const float eval_norm = asfloat(stats[PATH_DEBUG_STATS_EVAL_NORM]);
         return eval_norm > 0.f ? yuv_luminance(path_debug_map_eval(bin)) / eval_norm : 0.f;
     }
+    case PATH_DEBUG_MAP_SAMPLED_SCATTER:
+        return path_debug_map_sampled(PATH_DEBUG_SET_SCATTER, bin, solid_angle);
+    case PATH_DEBUG_MAP_SAMPLED_NEE:
+        return path_debug_map_sampled(PATH_DEBUG_SET_NEE, bin, solid_angle);
+    case PATH_DEBUG_MAP_SAMPLED_GUIDING:
+        return path_debug_map_sampled(PATH_DEBUG_SET_GUIDING, bin, solid_angle);
+    case PATH_DEBUG_MAP_CHECK:
+        return float(maps[path_debug_map_check_at(bin)]) /
+               (float(max(stats[PATH_DEBUG_STATS_CHECK_SAMPLES], 1u)) * solid_angle);
+    case PATH_DEBUG_MAP_RECORDED_SCATTER:
+        return path_debug_map_recorded(PATH_DEBUG_SET_SCATTER, bin);
+    case PATH_DEBUG_MAP_RECORDED_NEE:
+        return path_debug_map_recorded(PATH_DEBUG_SET_NEE, bin);
+    case PATH_DEBUG_MAP_PDF:
+        return abs(asfloat(maps[path_debug_map_pdf_at(bin)]));
+    case PATH_DEBUG_MAP_SECOND_MOMENT:
+        return path_debug_map_per_path(asfloat(maps[path_debug_map_moment_at(bin)]), solid_angle);
     case PATH_DEBUG_MAP_COVERAGE: {
         const float target = path_debug_map_integrand_normalized(bin, solid_angle);
-        return target > 0.f ? path_debug_map_density(bin, solid_angle) / target : 0.f;
-    }
-    case PATH_DEBUG_MAP_INTEGRAND:
-    case PATH_DEBUG_MAP_INTEGRAND_COLOR:
-        return yuv_luminance(path_debug_map_integrand(bin)) /
-               path_debug_map_sample_steradians(PATH_DEBUG_STATS_COUNT, solid_angle);
-    case PATH_DEBUG_MAP_SECOND_MOMENT:
-        return asfloat(maps[path_debug_map_moment_at(bin)]) /
-               path_debug_map_sample_steradians(PATH_DEBUG_STATS_COUNT, solid_angle);
-    case PATH_DEBUG_MAP_RADIANCE_COLOR:
-        return yuv_luminance(path_debug_map_radiance(bin, solid_angle));
-    case PATH_DEBUG_MAP_MEAN:
-    case PATH_DEBUG_MAP_MEAN_COLOR: {
-        const uint count = maps[path_debug_map_count_at(bin)];
-        return count > 0 ? yuv_luminance(path_debug_map_contrib(bin)) / float(count) : 0.f;
+        return target > 0.f
+                   ? path_debug_map_sampled(PATH_DEBUG_SET_SCATTER, bin, solid_angle) / target
+                   : 0.f;
     }
     default:
         return 0.f;
     }
 }
 
-// the value at the top of a panel's color map
 float path_debug_map_scale(const uint view) {
     switch (view) {
-    case PATH_DEBUG_MAP_INTEGRAND:
-    case PATH_DEBUG_MAP_INTEGRAND_COLOR:
-        return asfloat(stats[PATH_DEBUG_STATS_MAX_INTEGRAND]);
     case PATH_DEBUG_MAP_SECOND_MOMENT:
         return asfloat(stats[PATH_DEBUG_STATS_MAX_MOMENT]);
-    case PATH_DEBUG_MAP_RADIANCE_COLOR:
+    case PATH_DEBUG_MAP_RADIANCE:
         return asfloat(stats[PATH_DEBUG_STATS_MAX_RADIANCE]);
-    case PATH_DEBUG_MAP_MEAN:
-    case PATH_DEBUG_MAP_MEAN_COLOR:
-        return asfloat(stats[PATH_DEBUG_STATS_MAX_MEAN]);
+    case PATH_DEBUG_MAP_SAMPLED_NEE:
+    case PATH_DEBUG_MAP_RECORDED_NEE:
+        return asfloat(stats[PATH_DEBUG_STATS_MAX_NEE]);
     default:
         return asfloat(stats[PATH_DEBUG_STATS_MAX_SHARED]);
     }
 }
 
-// what a color panel tints its bin with
-float3 path_debug_map_hue(const uint view, const uint bin, const float solid_angle) {
-    switch (view) {
-    case PATH_DEBUG_MAP_INTEGRAND_COLOR:
-        return path_debug_map_integrand(bin);
-    case PATH_DEBUG_MAP_RADIANCE_COLOR:
-        return path_debug_map_radiance(bin, solid_angle);
-    default:
-        return path_debug_map_contrib(bin);
-    }
-}
-
-// its own hue, the brightness of the heat color map
 float3 path_debug_map_hue_color(const float3 rgb, const float value, const float vmax) {
     const float peak = max(max(rgb.r, rgb.g), rgb.b);
     if (!(value > 0.f) || !(peak > 0.f)) {
@@ -145,14 +155,12 @@ float3 path_debug_map_color(const uint view, const uint2 cell) {
         return float3(PATH_DEBUG_MAP_EMPTY_GRAY);
     }
     switch (view) {
-    case PATH_DEBUG_MAP_INTEGRAND_COLOR:
-    case PATH_DEBUG_MAP_RADIANCE_COLOR:
-    case PATH_DEBUG_MAP_MEAN_COLOR:
-        return path_debug_map_hue_color(path_debug_map_hue(view, bin, solid_angle),
+    case PATH_DEBUG_MAP_RADIANCE:
+        return path_debug_map_hue_color(path_debug_map_radiance(bin, solid_angle),
                                         path_debug_map_value(view, cell, solid_angle),
                                         path_debug_map_scale(view));
     case PATH_DEBUG_MAP_COVERAGE: {
-        const float sampled = path_debug_map_density(bin, solid_angle);
+        const float sampled = path_debug_map_sampled(PATH_DEBUG_SET_SCATTER, bin, solid_angle);
         const float target = path_debug_map_integrand_normalized(bin, solid_angle);
         if (!(sampled > 0.f) && !(target > 0.f)) {
             return float3(PATH_DEBUG_MAP_EMPTY_GRAY);
@@ -162,26 +170,18 @@ float3 path_debug_map_color(const uint view, const uint2 cell) {
                                                : log2(sampled / target);
         return path_debug_map_diverging(stops, 2.f);
     }
-    case PATH_DEBUG_MAP_RATIO:
-    case PATH_DEBUG_MAP_ZSCORE: {
-        const PathDebugBinTest test = path_debug_bin_test(cell, solid_angle, false);
-        if (test.state == PATH_DEBUG_BIN_UNTESTABLE) {
+    case PATH_DEBUG_MAP_ZSCORE_SCATTER:
+    case PATH_DEBUG_MAP_ZSCORE_NEE:
+    case PATH_DEBUG_MAP_ZSCORE_CHECK: {
+        const PathDebugBinTest test = path_debug_bin_test(view, cell, solid_angle);
+        switch (test.state) {
+        case PATH_DEBUG_BIN_TESTED:
+            return path_debug_map_diverging(test.z, 4.f);
+        case PATH_DEBUG_BIN_UNTESTABLE:
             return float3(PATH_DEBUG_MAP_UNTESTED_GRAY);
-        }
-        if (test.state == PATH_DEBUG_BIN_SPIKE) {
-            return PATH_DEBUG_MAP_SPIKE_COLOR;
-        }
-        if (view == PATH_DEBUG_MAP_ZSCORE) {
-            return test.state == PATH_DEBUG_BIN_TESTED ? path_debug_map_diverging(test.z, 4.f)
-                                                       : float3(PATH_DEBUG_MAP_EMPTY_GRAY);
-        }
-        const float observed = params.map_pdf_ref == PATH_DEBUG_PDF_REF_RECORDED
-                                   ? asfloat(maps[path_debug_map_recip_at(bin)])
-                                   : float(maps[path_debug_map_count_at(bin)]);
-        if (!(observed > 0.f) || !(test.expected > 0.f)) {
+        default:
             return float3(PATH_DEBUG_MAP_EMPTY_GRAY);
         }
-        return path_debug_map_diverging(log2(observed / test.expected), 2.f);
     }
     default:
         return path_debug_map_heat_color(path_debug_map_value(view, cell, solid_angle),
@@ -197,18 +197,62 @@ float3 path_debug_map_color_dir(const uint view, const float3 map_dir) {
     return path_debug_map_color(view, path_debug_map_cell(uvw.xy));
 }
 
-// the hovered bin of a panel or the sphere, for the host
+// a direction's sphere value on the panel's color scale, bilinear between the bins; 1 for a test
+float path_debug_map_extent_dir(const uint view, const float3 map_dir) {
+    if (path_debug_map_is_diverging(view)) {
+        return 1.f;
+    }
+    const float3 uvw = dir_map_uv(params.map_transform, map_dir);
+    const float vmax = path_debug_map_scale(view);
+    if (uvw.z == 0.f || !(vmax > 0.f)) {
+        return 0.f;
+    }
+    const float2 at = uvw.xy * float(params.map_res) - 0.5f;
+    const int2 base = int2(floor(at));
+    const float2 f = at - float2(base);
+    const int last = int(params.map_res) - 1;
+    float corners[4];
+    for (uint c = 0; c < 4; c++) {
+        const uint2 cell = uint2(clamp(base + int2(c & 1u, c >> 1), 0, last));
+        corners[c] = asfloat(maps[path_debug_map_sphere_at(path_debug_map_bin(cell))]);
+    }
+    const float value =
+        lerp(lerp(corners[0], corners[1], f.x), lerp(corners[2], corners[3], f.x), f.y);
+    return path_debug_log_decades(value, vmax, params.map_exposure);
+}
+
+// the hovered bin of a panel or the sphere, for the host: the value, BSDF pdf() and the draws
 void path_debug_write_map_probe(const uint kind, const uint channel, const uint2 cell) {
     const uint bin = path_debug_map_bin(cell);
     const float solid_angle = dir_map_bin_solid_angle(params.map_transform, cell, params.map_res);
-    const bool test = channel == PATH_DEBUG_MAP_RATIO || channel == PATH_DEBUG_MAP_ZSCORE;
     const uint values_at = PATH_DEBUG_OUT_PROBE + PATH_DEBUG_PROBE_VALUES;
     out_state[PATH_DEBUG_OUT_PROBE + PATH_DEBUG_PROBE_KIND] = kind;
-    out_state[values_at + 0] =
-        asuint(path_debug_map_value(test ? PATH_DEBUG_MAP_DENSITY : channel, cell, solid_angle));
+    float value = path_debug_map_value(channel, cell, solid_angle);
+    if (channel == PATH_DEBUG_MAP_ZSCORE_SCATTER || channel == PATH_DEBUG_MAP_ZSCORE_NEE ||
+        channel == PATH_DEBUG_MAP_ZSCORE_CHECK) {
+        const PathDebugBinTest test = path_debug_bin_test(channel, cell, solid_angle);
+        value = test.state == PATH_DEBUG_BIN_TESTED ? test.z : 0.f;
+    }
+    uint draws = 0;
+    switch (channel) {
+    case PATH_DEBUG_MAP_SAMPLED_NEE:
+    case PATH_DEBUG_MAP_RECORDED_NEE:
+    case PATH_DEBUG_MAP_ZSCORE_NEE:
+        draws = path_debug_map_draws_in(PATH_DEBUG_SET_NEE, bin);
+        break;
+    case PATH_DEBUG_MAP_SAMPLED_GUIDING:
+        draws = maps[path_debug_map_count_at(PATH_DEBUG_SET_GUIDING, bin)];
+        break;
+    case PATH_DEBUG_MAP_CHECK:
+    case PATH_DEBUG_MAP_ZSCORE_CHECK:
+        draws = maps[path_debug_map_check_at(bin)];
+        break;
+    default:
+        draws = maps[path_debug_map_count_at(PATH_DEBUG_SET_SCATTER, bin)];
+        break;
+    }
+    out_state[values_at + 0] = asuint(value);
     out_state[values_at + 1] = asuint(path_debug_map_value(PATH_DEBUG_MAP_PDF, cell, solid_angle));
-    out_state[values_at + 2] = asuint(path_debug_map_value(PATH_DEBUG_MAP_MEAN, cell, solid_angle));
-    out_state[PATH_DEBUG_OUT_PROBE + PATH_DEBUG_PROBE_COUNT] =
-        maps[channel == PATH_DEBUG_MAP_CHECK ? path_debug_map_check_at(bin)
-                                             : path_debug_map_count_at(bin)];
+    out_state[values_at + 2] = asuint(solid_angle);
+    out_state[PATH_DEBUG_OUT_PROBE + PATH_DEBUG_PROBE_COUNT] = draws;
 }

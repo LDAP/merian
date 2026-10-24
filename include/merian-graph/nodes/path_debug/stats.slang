@@ -12,20 +12,17 @@ using merian;
 
 ParameterBlock<GBuffer> gbuffer;
 
-bool is_binned(const PathRecordVertex v) {
-    switch (params.map_draws) {
-    case PATH_DEBUG_DRAWS_ALL:
-        return true;
-    case PATH_DEBUG_DRAWS_SCATTER:
-        return !v.nee;
-    case PATH_DEBUG_DRAWS_BSDF:
-        return !v.nee && v.method == PATH_RECORD_METHOD_BSDF;
-    case PATH_DEBUG_DRAWS_GUIDING:
-        return !v.nee && v.method == PATH_RECORD_METHOD_GUIDING;
-    case PATH_DEBUG_DRAWS_LIGHT:
-    default:
-        return v.nee;
+uint technique_slot(const uint method) {
+    return PATH_DEBUG_STATS_TECHNIQUE_CONTRIB +
+           (method < PATH_RECORD_METHOD_COUNT ? method : PATH_RECORD_METHOD_UNKNOWN);
+}
+
+uint test_set(const PathRecordVertex v) {
+    if (!v.nee) {
+        return PATH_DEBUG_SET_SCATTER;
     }
+    return v.surface.x == PATH_RECORD_GEOMETRY_ENVIRONMENT ? PATH_DEBUG_SET_NEE_ENV
+                                                            : PATH_DEBUG_SET_NEE;
 }
 
 [numthreads(PATH_DEBUG_WG, 1, 1)]
@@ -35,15 +32,11 @@ void main(uint3 gid: SV_DispatchThreadID) {
     const uint phase =
         params.stats_stride > 1 ? pcg(in_records[PATH_RECORD_HDR_FRAME]) % params.stats_stride : 0;
     const uint i = gid.x * params.stats_stride + phase;
-    if (i >= count) {
+    if (i >= count || !path_debug_holds(i, false)) {
         return;
     }
-
-    if (!path_debug_matched(i)) {
-        return;
-    }
-    const PathRecordPath p = path_debug_load_selected_path(i);
-    const uint2 selected = path_debug_path_events(i);
+    const PathRecordPath p = path_debug_load_selected_path(i, false);
+    const uint2 selected = path_debug_path_events(i, false);
     const uint vertex_region = path_record_vertex_region_offset(in_records);
 
     InterlockedAdd(stats[PATH_DEBUG_STATS_COUNT], 1);
@@ -64,12 +57,15 @@ void main(uint3 gid: SV_DispatchThreadID) {
 
     uint chain = path_debug_chain_length(in_records, p, vertex_region);
 
-    uint samples_acc = 0;
-    uint draws_acc = 0;
-    uint seen = 0;
+    uint samples_acc[PATH_DEBUG_TESTED_SETS] = { 0, 0, 0 };
+    uint draws_acc[PATH_DEBUG_TESTED_SETS] = { 0, 0, 0 };
+    uint seen[PATH_DEBUG_TESTED_SETS] = { 0, 0, 0 };
+    uint guided_acc = 0;
     float integrand_acc = 0.f;
     float3 downstream = float3(0.f);
     float3 nee_at_parent = float3(0.f);
+    // a hit's light, waiting for the chain vertex whose draw reached it
+    float pending_hit = 0.f;
     for (int k = int(p.vertex_count) - 1; k >= 0; k--) {
         const PathRecordVertex v =
             path_record_load_vertex(in_records, vertex_region, p.vertex_offset + k);
@@ -82,14 +78,24 @@ void main(uint3 gid: SV_DispatchThreadID) {
             downstream += contrib + nee_at_parent;
             nee_at_parent = float3(0.f);
             chain--;
+            if (pending_hit > 0.f) {
+                path_debug_atomic_add_float(stats, stats_f, technique_slot(v.method),
+                                            pending_hit);
+            }
+            pending_hit = 0.f;
         }
         // the light path the vertex ends has as many scatter events as chain vertices before it
         if (event) {
+            const float lum = yuv_luminance(contrib);
             const uint scatter_bin = min(chain, PATH_DEBUG_SCATTER_BINS - 1);
             InterlockedAdd(stats[PATH_DEBUG_STATS_SCATTER + scatter_bin], 1);
             path_debug_atomic_add_float(stats, stats_f,
-                                        PATH_DEBUG_STATS_SCATTER_CONTRIB + scatter_bin,
-                                        yuv_luminance(contrib));
+                                        PATH_DEBUG_STATS_SCATTER_CONTRIB + scatter_bin, lum);
+            if (v.nee && lum > 0.f) {
+                path_debug_atomic_add_float(stats, stats_f, technique_slot(v.method), lum);
+            } else if (!v.nee) {
+                pending_hit = lum;
+            }
         }
         const uint index = v.nee ? chain - 1 : chain;
         if (index != 0 || v.terminal) {
@@ -106,52 +112,56 @@ void main(uint3 gid: SV_DispatchThreadID) {
                                         min(integrand * integrand, 1e30f));
             integrand_acc += integrand;
         }
-        if (!is_binned(v)) {
-            continue;
-        }
-        if (v.nee) {
-            seen |= PATH_DEBUG_SEEN_CONNECTION | (v.reused ? PATH_DEBUG_SEEN_REUSED : 0);
-            if (path_debug_is_empty_draw(v)) {
-                draws_acc++;
-                continue;
-            }
-        }
-        if (v.resampled) {
-            seen |= PATH_DEBUG_SEEN_RESAMPLED;
-        }
+
+        const uint set = test_set(v);
+        const uint first = v.nee ? PATH_DEBUG_SET_NEE : set;
+        const uint last = v.nee ? PATH_DEBUG_SET_NEE_ENV : set;
+        const uint flags = (v.reused ? PATH_DEBUG_SEEN_REUSED : 0) |
+                           (v.resampled ? PATH_DEBUG_SEEN_RESAMPLED : 0);
         const bool continuous =
             (v.lobe & PATH_RECORD_LOBE_DELTA) == 0 && v.pdf > 0.f && !v.resampled;
+        for (uint s = first; s <= last; s++) {
+            seen[s] |= flags;
+            draws_acc[s] += v.resampled ? 0 : 1;
+        }
+        if (path_debug_is_empty_draw(v) || !in_map) {
+            continue;
+        }
+        InterlockedAdd(maps[path_debug_map_count_at(set, bin)], 1);
+        samples_acc[set]++;
+        if (!v.nee && v.method == PATH_RECORD_METHOD_GUIDING) {
+            InterlockedAdd(maps[path_debug_map_count_at(PATH_DEBUG_SET_GUIDING, bin)], 1);
+            guided_acc++;
+        }
         if (continuous) {
-            draws_acc++;
+            InterlockedAdd(maps[path_debug_map_set_at(set, PATH_DEBUG_SET_REGION_CONTINUOUS, bin)],
+                           1);
+            const float recip = min(1.f / v.pdf, 1e12f);
+            path_debug_atomic_add_float(
+                maps, maps_f, path_debug_map_set_at(set, PATH_DEBUG_SET_REGION_RECIP, bin), recip);
+            path_debug_atomic_add_float(
+                maps, maps_f, path_debug_map_set_at(set, PATH_DEBUG_SET_REGION_RECIP2, bin),
+                recip * recip);
         }
-
-        if (in_map) {
-            InterlockedAdd(maps[path_debug_map_count_at(bin)], 1);
-            path_debug_atomic_add_float3(maps, maps_f, path_debug_map_contrib_at(bin), transported);
-            samples_acc++;
-            if (continuous) {
-                InterlockedAdd(maps[path_debug_map_continuous_at(bin)], 1);
-                const float recip = min(1.f / v.pdf, 1e12f);
-                path_debug_atomic_add_float(maps, maps_f, path_debug_map_recip_at(bin), recip);
-                path_debug_atomic_add_float(maps, maps_f, path_debug_map_recip2_at(bin),
-                                            recip * recip);
-            }
+    }
+    if (pending_hit > 0.f) {
+        path_debug_atomic_add_float(stats, stats_f, technique_slot(PATH_RECORD_METHOD_UNKNOWN),
+                                    pending_hit);
+    }
+    for (uint set = 0; set < PATH_DEBUG_TESTED_SETS; set++) {
+        if (samples_acc[set] != 0) {
+            InterlockedAdd(stats[path_debug_set_stat(set, PATH_DEBUG_SET_SAMPLES)],
+                           samples_acc[set]);
         }
-
-        InterlockedAdd(
-            stats[PATH_DEBUG_STATS_PDF + path_debug_log_bin(v.pdf, PATH_DEBUG_PDF_MIN_LOG,
-                                                            PATH_DEBUG_PDF_MAX_LOG,
-                                                            PATH_DEBUG_HIST_SMALL_BINS)],
-            1);
+        if (draws_acc[set] != 0) {
+            InterlockedAdd(stats[path_debug_set_stat(set, PATH_DEBUG_SET_DRAWS)], draws_acc[set]);
+        }
+        if (seen[set] != 0) {
+            InterlockedOr(stats[path_debug_set_stat(set, PATH_DEBUG_SET_SEEN)], seen[set]);
+        }
     }
-    if (samples_acc != 0) {
-        InterlockedAdd(stats[PATH_DEBUG_STATS_SAMPLES], samples_acc);
-    }
-    if (draws_acc != 0) {
-        InterlockedAdd(stats[PATH_DEBUG_STATS_DRAWS], draws_acc);
-    }
-    if (seen != 0) {
-        InterlockedOr(stats[PATH_DEBUG_STATS_SEEN], seen);
+    if (guided_acc != 0) {
+        InterlockedAdd(stats[PATH_DEBUG_STATS_GUIDING_SAMPLES], guided_acc);
     }
     if (integrand_acc > 0.f) {
         path_debug_atomic_add_float(stats, stats_f, PATH_DEBUG_STATS_INTEGRAND, integrand_acc);

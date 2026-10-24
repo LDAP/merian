@@ -14,7 +14,6 @@ float2 path_debug_render_coord(const uint2 out_pixel) {
     return (float2(out_pixel) + 0.5f) * float2(path_debug_dim()) / float2(path_debug_out_dim());
 }
 
-// the record pixel a pixel of the displayed image shows
 uint2 path_debug_render_pixel(const uint2 out_pixel) {
     return min(uint2(path_debug_render_coord(out_pixel)), path_debug_dim() - 1);
 }
@@ -50,7 +49,6 @@ float3 path_debug_map_normal(const float3 pixel_normal) {
     return any(n != 0.f) ? n : pixel_normal;
 }
 
-// the maps bin the draws of a visible selected point
 bool path_debug_maps_at_point() {
     return path_debug_selects_point();
 }
@@ -69,7 +67,6 @@ bool path_debug_in_selected_pixel(const PathRecordPath p) {
     return all(p.pixel == uint2(params.sel_record_x, params.sel_record_y));
 }
 
-// false if the path starts at a surface other than the selected point's
 bool path_debug_starts_at_point(const PathRecordPath p, const uint vertex_region) {
     if (params.sel_point_tolerance <= 0.f) {
         return true;
@@ -78,8 +75,10 @@ bool path_debug_starts_at_point(const PathRecordPath p, const uint vertex_region
     return distance(first, path_debug_selected_point()) <= params.sel_point_tolerance;
 }
 
-uint path_debug_filtered_base(const uint2 pixel) {
-    return PATH_DEBUG_FILTERED_UINTS * (pixel.y * params.dim_x + pixel.x);
+uint path_debug_filtered_base(const uint2 pixel, const bool with_filter) {
+    const uint pixels = params.dim_x * params.dim_y;
+    return PATH_DEBUG_FILTERED_UINTS *
+           ((with_filter ? pixels : 0) + pixel.y * params.dim_x + pixel.x);
 }
 
 uint path_debug_moments_base(const uint2 pixel) {
@@ -138,65 +137,45 @@ uint2 path_debug_source_pixel(const uint2 render_pixel) {
                        : uint2((source - 1) % params.dim_x, (source - 1) / params.dim_x);
 }
 
-// maps buffer, regions of N = map_res^2:
-// [0, N)      direction sample count of the binned draws
-// [N, 4N)     their contribution RGB (float)
-// [4N, 5N)    BSDF pdf at the primary hit (float; negative = under-resolved)
-// [5N, 6N)    sum of 1/pdf over continuous-density samples (float)
-// [6N, 7N)    sum of 1/pdf^2 (float)
-// [7N, 8N)    BSDF check sample count
-// [8N, 11N)   BSDF eval f * cos RGB (float)
-// [11N, 12N)  sample count at the batch start
-// [12N, 13N)  sum of 1/pdf at the batch start (float)
-// [13N, 14N)  sum of squared batch residuals (float)
-// [14N, 15N)  the last batch residual (float)
-// [15N, 18N)  contribution RGB of every technique's draws (float)
-// [18N, 19N)  their sum of squared luminance (float)
-// [19N, 20N)  continuous-density sample count
 uint path_debug_map_region(const uint region, const uint index) {
     return region * params.map_res * params.map_res + index;
 }
-uint path_debug_map_count_at(const uint index) {
-    return index;
+uint path_debug_map_set_at(const uint set, const uint field, const uint index) {
+    return path_debug_map_region(set * PATH_DEBUG_SET_REGIONS + field, index);
 }
-uint path_debug_map_contrib_at(const uint index) {
-    return path_debug_map_region(1, 3 * index);
+uint path_debug_map_count_at(const uint set, const uint index) {
+    switch (set) {
+    case PATH_DEBUG_SET_GUIDING:
+        return path_debug_map_region(PATH_DEBUG_MAP_GUIDING_REGION, index);
+    case PATH_DEBUG_SET_CHECK:
+        return path_debug_map_region(PATH_DEBUG_MAP_CHECK_REGION, index);
+    default:
+        return path_debug_map_set_at(set, PATH_DEBUG_SET_REGION_COUNT, index);
+    }
 }
 uint path_debug_map_pdf_at(const uint index) {
-    return path_debug_map_region(4, index);
-}
-uint path_debug_map_recip_at(const uint index) {
-    return path_debug_map_region(5, index);
-}
-uint path_debug_map_recip2_at(const uint index) {
-    return path_debug_map_region(6, index);
+    return path_debug_map_region(PATH_DEBUG_MAP_PDF_REGION, index);
 }
 uint path_debug_map_check_at(const uint index) {
-    return path_debug_map_region(7, index);
+    return path_debug_map_region(PATH_DEBUG_MAP_CHECK_REGION, index);
+}
+uint path_debug_map_check_recip_at(const uint index) {
+    return path_debug_map_region(PATH_DEBUG_MAP_CHECK_RECIP_REGION, index);
+}
+uint path_debug_map_check_recip2_at(const uint index) {
+    return path_debug_map_region(PATH_DEBUG_MAP_CHECK_RECIP2_REGION, index);
 }
 uint path_debug_map_eval_at(const uint index) {
-    return path_debug_map_region(8, 3 * index);
-}
-uint path_debug_map_count_start_at(const uint index) {
-    return path_debug_map_region(11, index);
-}
-uint path_debug_map_recip_start_at(const uint index) {
-    return path_debug_map_region(12, index);
-}
-uint path_debug_map_residual2_at(const uint index) {
-    return path_debug_map_region(13, index);
-}
-uint path_debug_map_residual_prev_at(const uint index) {
-    return path_debug_map_region(14, index);
+    return path_debug_map_region(PATH_DEBUG_MAP_EVAL_REGION, 3 * index);
 }
 uint path_debug_map_integrand_at(const uint index) {
-    return path_debug_map_region(15, 3 * index);
+    return path_debug_map_region(PATH_DEBUG_MAP_INTEGRAND_REGION, 3 * index);
 }
 uint path_debug_map_moment_at(const uint index) {
-    return path_debug_map_region(18, index);
+    return path_debug_map_region(PATH_DEBUG_MAP_MOMENT_REGION, index);
 }
-uint path_debug_map_continuous_at(const uint index) {
-    return path_debug_map_region(19, index);
+uint path_debug_map_sphere_at(const uint index) {
+    return path_debug_map_region(PATH_DEBUG_MAP_SPHERE_REGION, index);
 }
 float3 path_debug_load_float3(RWStructuredBuffer<uint, ScalarDataLayout> buf, const uint at) {
     return float3(asfloat(buf[at + 0]), asfloat(buf[at + 1]), asfloat(buf[at + 2]));
@@ -207,9 +186,6 @@ void path_debug_store_float3(RWStructuredBuffer<uint, ScalarDataLayout> buf,
     for (uint c = 0; c < 3; c++) {
         buf[at + c] = asuint(value[c]);
     }
-}
-float3 path_debug_map_contrib(const uint index) {
-    return path_debug_load_float3(maps, path_debug_map_contrib_at(index));
 }
 float3 path_debug_map_eval(const uint index) {
     return path_debug_load_float3(maps, path_debug_map_eval_at(index));
@@ -277,7 +253,6 @@ uint path_debug_grid_find(const uint key, const bool insert) {
     return PATH_DEBUG_GRID_INVALID;
 }
 
-// a cell's weight and vertices
 float2 path_debug_grid_at(const float3 pos) {
     const uint slot = path_debug_grid_find(path_debug_grid_key(pos), false);
     return slot == PATH_DEBUG_GRID_INVALID
@@ -349,7 +324,6 @@ float3 path_debug_finite_or_zero(const float3 value) {
     return select(isfinite(value), value, float3(0.f));
 }
 
-// the vertices of a path without any of the flags
 uint path_debug_count_vertices(PathRecordStream records,
                                const PathRecordPath p,
                                const uint vertex_region,
@@ -363,7 +337,6 @@ uint path_debug_count_vertices(PathRecordStream records,
     return count;
 }
 
-// the scatter vertices of a path, its NEE connections left out
 uint path_debug_chain_length(PathRecordStream records,
                              const PathRecordPath p,
                              const uint vertex_region) {
@@ -414,7 +387,6 @@ uint path_debug_expression_tokens() {
     return params.expr_count & PATH_DEBUG_EXPR_COUNT_MASK;
 }
 
-// a token whose repeats reach its minimum may hand over to the next
 void path_debug_expression_close(inout PathDebugExpressionState state) {
     for (uint t = 0; t < path_debug_expression_tokens(); t++) {
         if ((state.counts[t] >> path_debug_token_repeat_min(path_debug_token(t))) != 0) {
@@ -444,7 +416,6 @@ uint path_debug_expression_repeat(const uint counts, const uint token) {
     return (counts & ((1u << repeat_max) - 1u)) << 1;
 }
 
-// one more scatter event, drawn by the techniques in labels
 void path_debug_expression_step(inout PathDebugExpressionState state,
                                 const uint meta,
                                 const uint labels) {
@@ -463,12 +434,16 @@ bool path_debug_expression_through(const PathDebugExpressionState state) {
     return (state.counts[path_debug_expression_tokens()] & 1u) != 0;
 }
 
-// The light paths of a recorded path the selection holds, without its point. An NEE connection
-// or a vertex that carries contribution ends one; its scatter events are the chain vertices
-// before it, the last drawn towards the light by the connection or by its own technique.
+// The light paths of a recorded path: every one, those the region holds and those of them the
+// filter passes, the point left out. An NEE connection or a vertex that carries contribution ends
+// one; its scatter events are the chain vertices before it, the last drawn towards the light by
+// the connection or by its own technique.
 struct PathDebugEvents {
+    uint2 mask_filtered;
     uint2 mask;
+    float3 contrib_filtered;
     float3 contrib;
+    float3 contrib_all;
 }
 
 PathDebugEvents path_debug_match_events(const PathRecordPath p, const uint vertex_region) {
@@ -480,7 +455,7 @@ PathDebugEvents path_debug_match_events(const PathRecordPath p, const uint verte
     PathDebugExpressionState before = path_debug_expression_begin();
     PathDebugExpressionState after = before;
 
-    PathDebugEvents events = {uint2(0), float3(0)};
+    PathDebugEvents events = {uint2(0), uint2(0), float3(0), float3(0), float3(0)};
     uint chain = 0;
     uint last_meta = 0;
     bool any_method = false;
@@ -521,44 +496,47 @@ PathDebugEvents path_debug_match_events(const PathRecordPath p, const uint verte
             const uint last_labels = nee ? path_debug_vertex_labels(meta)
                                          : path_debug_vertex_labels(last_meta);
             const bool finite = all(isfinite(contrib));
-            bool matches = (params.sel_finite != PATH_DEBUG_FINITE_ONLY || finite) &&
-                           (params.sel_finite != PATH_DEBUG_FINITE_NONFINITE || !finite) &&
-                           chain >= params.sel_scatters_min && chain <= params.sel_scatters_max;
+            bool passes = (params.sel_finite != PATH_DEBUG_FINITE_ONLY || finite) &&
+                          (params.sel_finite != PATH_DEBUG_FINITE_NONFINITE || !finite) &&
+                          chain >= params.sel_scatters_min && chain <= params.sel_scatters_max;
             if (method_mask != 0) {
                 const bool last_method = chain > 0 && (last_labels & method_mask) != 0;
-                matches = matches && (params.sel_method_mode == PATH_DEBUG_METHOD_EVERY_VERTEX
-                                          ? chain > 0 && every_method && last_method
-                                          : any_method || last_method);
+                passes = passes && (params.sel_method_mode == PATH_DEBUG_METHOD_EVERY_VERTEX
+                                        ? chain > 0 && every_method && last_method
+                                        : any_method || last_method);
             }
-            if (expression && matches) {
+            if (expression && passes) {
                 PathDebugExpressionState through = after;
                 if (nee) {
                     through = before;
                     path_debug_expression_step(through, last_meta, last_labels);
                 }
-                matches = path_debug_expression_through(through);
+                passes = path_debug_expression_through(through);
             }
-            if (region && matches) {
+            bool held = true;
+            if (region) {
                 const bool end_on = path_debug_on_target(pos, surface);
                 switch (params.sel_mode) {
                 case PATH_DEBUG_SELECT_FROM:
-                    matches = chain == 0 ? end_on : starts_on;
+                    held = chain == 0 ? end_on : starts_on;
                     break;
                 case PATH_DEBUG_SELECT_TO:
-                    matches = end_on;
+                    held = end_on;
                     break;
                 default:
-                    matches = hits_on || end_on ||
-                              (sphere && chain > 0 && path_debug_segment_in_sphere(chain_pos, pos));
+                    held = hits_on || end_on ||
+                           (sphere && chain > 0 && path_debug_segment_in_sphere(chain_pos, pos));
                 }
             }
-            if (matches) {
-                if (v < 32) {
-                    events.mask.x |= 1u << v;
-                } else {
-                    events.mask.y |= 1u << (v - 32);
-                }
+            const uint2 bit = v < 32 ? uint2(1u << v, 0) : uint2(0, 1u << (v - 32));
+            events.contrib_all += contrib;
+            if (held) {
+                events.mask |= bit;
                 events.contrib += contrib;
+            }
+            if (held && passes) {
+                events.mask_filtered |= bit;
+                events.contrib_filtered += contrib;
             }
         }
         if (nee) {
@@ -598,20 +576,26 @@ int path_debug_last_event(const uint2 mask) {
                        : (mask.x != 0 ? int(firstbithigh(mask.x)) : -1);
 }
 
+bool path_debug_filters() {
+    return (params.expr_count & PATH_DEBUG_EXPR_ACTIVE) != 0 ||
+           params.sel_finite != PATH_DEBUG_FINITE_ANY || params.sel_scatters_min != 0 ||
+           params.sel_scatters_max != PATH_DEBUG_NO_SCATTER_LIMIT || params.sel_method_mask != 0;
+}
+
 // nothing but a point narrows the selection: every path is held whole, light or not
-bool path_debug_selection_open() {
-    return (params.expr_count & PATH_DEBUG_EXPR_ACTIVE) == 0 && !path_debug_selects_region() &&
-           params.sel_finite == PATH_DEBUG_FINITE_ANY && params.sel_scatters_min == 0 &&
-           params.sel_scatters_max == PATH_DEBUG_NO_SCATTER_LIMIT && params.sel_method_mask == 0;
+bool path_debug_selection_open(const bool with_filter) {
+    return !path_debug_selects_region() && !(with_filter && path_debug_filters());
 }
 
 // the chain up to the deepest event, and the NEE connections that are events
-bool path_debug_event_drawn(const uint2 mask, const uint v, const bool nee) {
+bool path_debug_event_drawn(const uint2 mask,
+                            const uint v,
+                            const bool nee,
+                            const bool with_filter) {
     return nee ? path_debug_is_event_vertex(mask, v)
-               : path_debug_selection_open() || int(v) <= path_debug_last_event(mask);
+               : path_debug_selection_open(with_filter) || int(v) <= path_debug_last_event(mask);
 }
 
-// the scatter events before the deepest event
 uint path_debug_events_depth(PathRecordStream records,
                              const PathRecordPath p,
                              const uint vertex_region,
@@ -625,15 +609,17 @@ uint path_debug_events_depth(PathRecordStream records,
     return chain;
 }
 
-uint2 path_debug_path_events(const uint path_index) {
-    const uint base = path_index * PATH_DEBUG_EVENT_UINTS;
+uint2 path_debug_path_events(const uint path_index, const bool with_filter) {
+    const uint base = path_index * PATH_DEBUG_EVENT_UINTS +
+                      (with_filter ? PATH_DEBUG_EVENT_MASK_FILTERED : PATH_DEBUG_EVENT_MASK);
     return uint2(events[base], events[base + 1]);
 }
 
-// a path of the selection, its luminance that of the selection's events
-PathRecordPath path_debug_load_selected_path(const uint path_index) {
+PathRecordPath path_debug_load_selected_path(const uint path_index, const bool with_filter) {
     PathRecordPath p = path_record_load_path(in_records, path_index);
-    p.luminance = asfloat(events[path_index * PATH_DEBUG_EVENT_UINTS + 2]);
+    p.luminance = asfloat(events[path_index * PATH_DEBUG_EVENT_UINTS +
+                                 (with_filter ? PATH_DEBUG_EVENT_LUMINANCE_FILTERED
+                                           : PATH_DEBUG_EVENT_LUMINANCE)]);
     return p;
 }
 
@@ -644,6 +630,20 @@ uint2 path_debug_kept_events(const uint slot) {
 
 bool path_debug_matched(const uint path_index) {
     return (matches[path_index >> 5] & (1u << (path_index & 31u))) != 0;
+}
+
+bool path_debug_narrows() {
+    return path_debug_selects_region() || path_debug_filters();
+}
+
+bool path_debug_holds(const uint path_index, const bool with_filter) {
+    return path_debug_matched(path_index) &&
+           (any(path_debug_path_events(path_index, with_filter) != 0) ||
+            path_debug_selection_open(with_filter));
+}
+
+bool path_debug_paths_filtered() {
+    return params.paths_filtered != 0;
 }
 
 // 4294967040 is the largest float below 2^32
@@ -687,7 +687,6 @@ uint path_debug_top_key(const PathRecordPath p) {
     return max(asuint(min(key, PATH_DEBUG_MAX_KEY)), 1u);
 }
 
-// a kept key aged by one frame
 uint path_debug_kept_key_now(const uint slot) {
     const uint key = kept[PATH_DEBUG_KEPT_KEYS + slot];
     if (key == 0) {
@@ -714,7 +713,7 @@ void path_debug_keep_path(const uint slot,
         kept[dst_vertices + w] = in_records[src_vertices + w];
     }
     kept[PATH_DEBUG_KEPT_KEYS + slot] = key;
-    const uint2 mask = path_debug_path_events(path_index);
+    const uint2 mask = path_debug_path_events(path_index, path_debug_paths_filtered());
     kept[PATH_DEBUG_KEPT_EVENTS + 2 * slot] = mask.x;
     kept[PATH_DEBUG_KEPT_EVENTS + 2 * slot + 1] = mask.y;
 }

@@ -91,7 +91,6 @@ PathExpression compile_path_expression(const std::string& text) {
     expression.active = text.find_first_not_of(" \t") != std::string::npos;
     std::size_t i = 0;
 
-    // the masks of an event's letters and quoted techniques; L marks the light
     const auto masks = [](const std::string& event, uint32_t& scattering, uint32_t& side,
                           uint32_t& labels, bool& light) {
         for (std::size_t at = 0; at < event.size(); at++) {

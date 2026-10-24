@@ -20,8 +20,10 @@ void main(uint3 tid: SV_GroupThreadID) {
     const uint t = tid.x;
     if (t == 0 && params.map_batch_end != 0) {
         stats[PATH_DEBUG_STATS_BATCHES]++;
-        stats[PATH_DEBUG_STATS_BATCH_SAMPLES] = stats[PATH_DEBUG_STATS_SAMPLES];
-        stats[PATH_DEBUG_STATS_BATCH_DRAWS] = stats[PATH_DEBUG_STATS_DRAWS];
+        for (uint set = 0; set < PATH_DEBUG_TESTED_SETS; set++) {
+            stats[path_debug_set_stat(set, PATH_DEBUG_SET_BATCH_DRAWS)] =
+                stats[path_debug_set_stat(set, PATH_DEBUG_SET_DRAWS)];
+        }
     }
     if (!path_debug_keeps_top() || params.overlay_keep_update == 0) {
         return;
@@ -42,7 +44,6 @@ void main(uint3 tid: SV_GroupThreadID) {
     }
     GroupMemoryBarrierWithGroupSync();
 
-    // brightest first
     const uint bin = PATH_DEBUG_HIST_BINS - 1 - t;
     const uint count = state[PATH_DEBUG_STATE_HIST + bin] + gs_kept[bin];
     gs_count[t] = count;

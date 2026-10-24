@@ -348,7 +348,7 @@ PathDebugNode::describe_outputs(const NodeIOLayout& io_layout) {
         create_uint_buffer(allocator, pixels * PATH_DEBUG_MOMENT_UINTS,
                            vk::BufferUsageFlagBits::eTransferDst, "path_debug moments");
     filtered_buffer =
-        create_uint_buffer(allocator, pixels * PATH_DEBUG_FILTERED_UINTS,
+        create_uint_buffer(allocator, 2 * pixels * PATH_DEBUG_FILTERED_UINTS,
                            vk::BufferUsageFlagBits::eTransferDst, "path_debug filtered");
     voxel_depth_buffer = create_uint_buffer(allocator, pixels * 2, {}, "path_debug voxel depth");
     const auto voxel_image_info = [this](const vk::Format format, const vk::ImageUsageFlags usage) {
@@ -482,7 +482,6 @@ PathDebugNode::NodeStatusFlags PathDebugNode::on_connected(const NodeIOLayout& i
                                           kept_dirty = true;
                                           heat_dirty = true;
                                           image_dirty = true;
-                                          // a selection on its pixel sees what moved there
                                           if (!reproject && capture != CAPTURE_FROZEN) {
                                               repick();
                                           }
@@ -620,9 +619,31 @@ void PathDebugNode::select_at(const int2& pixel) {
 
 void PathDebugNode::set_select_kind(const int32_t kind) {
     select_kind = kind;
-    // a region resolves its pixel through clear glass, a point does not
-    if (has_selection) {
+    if (!has_selection) {
+        return;
+    }
+    // a region resolves its pixel through clear glass, a point does not; a point needs a surface
+    if (selected_pos_valid || pending_pick) {
         select_at(selected_pixel);
+    } else if (select_kind == SELECT_POINT || region_target == TARGET_SPHERE) {
+        clear_selection();
+    }
+}
+
+int32_t PathDebugNode::selection_choice() const {
+    return select_kind == SELECT_POINT ? 0 : region_target + 1;
+}
+
+void PathDebugNode::set_selection_choice(const int32_t choice) {
+    const int32_t kind = choice == 0 ? SELECT_POINT : SELECT_REGION;
+    if (kind != select_kind) {
+        region_target = choice > 0 ? choice - 1 : region_target;
+        set_select_kind(kind);
+        return;
+    }
+    set_region_target(choice - 1);
+    if (region_target == TARGET_SPHERE && has_selection && !selected_pos_valid && !pending_pick) {
+        clear_selection();
     }
 }
 
@@ -676,8 +697,8 @@ void PathDebugNode::pick_target(const uint2 surface, const Placements& at) {
 }
 
 void PathDebugNode::update_target() {
-    const TargetBuild build{records_placements, target,
-                            targets_ids() && !target.environment ? region_target : -1};
+    const int32_t kind = targets_ids() && !target.environment ? region_target : -1;
+    const TargetBuild build{kind >= 0 ? records_placements : nullptr, target, kind};
     const SceneHandle scene = current_scene.lock();
     if (build == target_built || !scene) {
         return;
@@ -702,10 +723,10 @@ void PathDebugNode::update_target() {
                 target_geometry = geometry;
             }
             break;
-        case TARGET_PART:
+        case TARGET_INSTANCE:
             in_target = same_mesh && same_node;
             break;
-        case TARGET_OBJECT:
+        case TARGET_NODE:
             in_target = same_node;
             break;
         case TARGET_MESH:
@@ -774,9 +795,9 @@ std::string PathDebugNode::target_label() const {
         return target.primitive < 0 ? "no triangle"
                                     : fmt::format("triangle {} of {} @ {}", target.primitive,
                                                   mesh_label(target.mesh), node_label(target.node));
-    case TARGET_PART:
+    case TARGET_INSTANCE:
         return fmt::format("{} @ {}", mesh_label(target.mesh), node_label(target.node));
-    case TARGET_OBJECT:
+    case TARGET_NODE:
         return node_label(target.node);
     case TARGET_MESH:
         return mesh_label(target.mesh);
@@ -816,15 +837,13 @@ uint32_t PathDebugNode::apply_readback_feedback(const NodeProcessInfo& info,
                                                 const PathRecordCapacities& capacities) {
     if (info.get_iteration() == 0) {
         readback_valid = false;
-        if (auto_keep_prob) {
-            keep_prob = MIN_KEEP_PROB;
-        }
+        keep_prob = MIN_KEEP_PROB;
     }
     const auto tick = [](bool& drawn, uint32_t& frames) {
         frames = std::exchange(drawn, false) ? 0 : std::min(frames + 1, UI_IDLE_FRAMES);
     };
     tick(window_drawn, frames_since_window);
-    tick(drawn_paths_shown, frames_since_drawn_paths);
+    tick(list_shown, frames_since_list);
     tick(pixel_section_shown, frames_since_pixel_section);
     tick(path_statistics_shown, frames_since_path_statistics);
 
@@ -842,8 +861,7 @@ uint32_t PathDebugNode::apply_readback_feedback(const NodeProcessInfo& info,
 }
 
 void PathDebugNode::adapt_keep_prob(const PathRecordCapacities& capacities) {
-    if (!auto_keep_prob || capture != CAPTURE_LIVE ||
-        traced_pixel_filter != PATH_RECORD_ALL_PIXELS) {
+    if (capture != CAPTURE_LIVE || traced_pixel_filter != PATH_RECORD_ALL_PIXELS) {
         return;
     }
     const float vertex_fill = static_cast<float>(latest_readback.frame.vertices) /
@@ -938,7 +956,6 @@ void PathDebugNode::record_clears(const NodeProcessInfo& info, Submission& submi
         image_dirty = true;
         maps_dirty = true;
         kept_dirty |= !keep_on_camera_move;
-        // a selection on its pixel now sees another surface
         if (!reproject) {
             repick();
         }
@@ -971,11 +988,22 @@ void PathDebugNode::record_clears(const NodeProcessInfo& info, Submission& submi
     }
     if (ImageSignature signature = image_signature(); !(signature == image_held)) {
         image_held = std::move(signature);
+        image_filtered_dirty = true;
+    }
+    const auto shown = static_cast<uint32_t>(backdrop);
+    if (path_debug_backdrop_recorded(shown) && !path_debug_backdrop_accumulated(shown) &&
+        capture != CAPTURE_FROZEN && !was_frozen) {
         image_dirty = true;
     }
     if (image_dirty || first_frame) {
         cmd->fill(filtered_buffer);
         image_dirty = false;
+        image_filtered_dirty = false;
+        image_accumulated = false;
+    } else if (image_filtered_dirty) {
+        const vk::DeviceSize half = filtered_buffer->get_size() / 2;
+        cmd->fill(filtered_buffer, half, half);
+        image_filtered_dirty = false;
         image_accumulated = false;
     }
     if (kept_dirty || first_frame) {
@@ -1036,7 +1064,6 @@ PathDebugNode::FrameActivity PathDebugNode::update_frame(const NodeIO& io, const
     activity.active = ready && capture != CAPTURE_OFF;
     activity.frozen =
         std::exchange(was_frozen, capture == CAPTURE_FROZEN) || capture == CAPTURE_FROZEN;
-    // an isolated path keeps its slot
     activity.keep_update = (!activity.frozen && !isolate_path) || !kept_updated;
     kept_updated |= activity.keep_update && activity.active;
     activity.pixel_stats_accumulate =
@@ -1044,9 +1071,9 @@ PathDebugNode::FrameActivity PathDebugNode::update_frame(const NodeIO& io, const
     pixel_stats_accumulated |= activity.pixel_stats_accumulate && activity.active;
     activity.heat_splat = !activity.frozen || !heat_splatted;
     activity.one_pixel = selects_point() && !shows_pixel_image(io);
-    const bool shows_filtered = backdrop == static_cast<int32_t>(PATH_DEBUG_BACKDROP_FILTERED) ||
+    const bool shows_recorded = path_debug_backdrop_recorded(static_cast<uint32_t>(backdrop)) ||
                                 io.is_connected(con_filtered);
-    activity.image_accumulate = shows_filtered && (!activity.frozen || !image_accumulated);
+    activity.image_accumulate = shows_recorded && (!activity.frozen || !image_accumulated);
     image_accumulated |= activity.image_accumulate && activity.active;
     // a frozen capture keeps the depths of the view its records were traced from
     const CameraHandle camera = ready_camera(io);
@@ -1075,8 +1102,11 @@ PathDebugNode::FrameActivity PathDebugNode::update_frame(const NodeIO& io, const
         activity.maps_accumulate &&
         (map_frames + 1) % static_cast<uint32_t>(std::max(map_batch_frames, 1)) == 0;
     activity.run_check = std::exchange(check_requested, false);
-    activity.check_shown = (activity.panel_mask & (1u << PATH_DEBUG_MAP_CHECK)) != 0 ||
-                           activity.sphere_channel == PATH_DEBUG_MAP_CHECK;
+    const uint32_t check_channels =
+        (1u << PATH_DEBUG_MAP_CHECK) | (1u << PATH_DEBUG_MAP_ZSCORE_CHECK);
+    activity.check_shown = (activity.panel_mask & check_channels) != 0 ||
+                           (activity.sphere_channel != PATH_DEBUG_MAP_NONE &&
+                            ((1u << activity.sphere_channel) & check_channels) != 0);
     return activity;
 }
 
@@ -1184,6 +1214,8 @@ void PathDebugNode::build_selection_params(PathDebugParams& p, const NodeIO& io)
     p.sel_method_mask = method_mask;
     p.sel_method_mode = static_cast<uint32_t>(method_mode);
     p.sel_finite = static_cast<uint32_t>(contribution_filter);
+    p.paths_filtered = paths_filtered ? 1 : 0;
+    p.false_color_filtered = false_color_filtered ? 1 : 0;
     const std::array<uint32_t, PATH_DEBUG_MAX_TOKENS>& tokens = compiled_expression.tokens;
     p.expr_0 = tokens[0];
     p.expr_1 = tokens[1];
@@ -1240,17 +1272,16 @@ void PathDebugNode::build_map_params(PathDebugParams& p,
     p.map_transform = static_cast<uint32_t>(map_transform);
     p.map_frame = gbuffer_connected && selection_visible() ? static_cast<uint32_t>(map_frame)
                                                            : PATH_DEBUG_FRAME_WORLD;
-    p.map_pdf_ref = static_cast<uint32_t>(map_pdf_ref);
-    p.map_draws = static_cast<uint32_t>(map_draws);
     p.map_batch_end = activity.batch_end ? 1 : 0;
     p.map_panel_mask = activity.panel_mask;
     p.map_exposure = map_exposure;
-    p.want_top_list = frames_since_drawn_paths < UI_IDLE_FRAMES ? 1 : 0;
+    p.want_top_list = frames_since_list < UI_IDLE_FRAMES ? 1 : 0;
     p.stats_stride = (analysis_paths <= 0 || selects_point())
                          ? 1
                          : std::max(observed_paths / static_cast<uint32_t>(analysis_paths), 1u);
     p.sphere_channel = activity.sphere_channel;
     p.sphere_radius = sphere_size;
+    p.sphere_scale = sphere_scale ? 1 : 0;
     p.wi_mode = static_cast<uint32_t>(wi_mode);
     p.wi_theta = radians(wi_theta_deg);
     p.wi_phi = radians(wi_phi_deg);
@@ -1282,8 +1313,8 @@ void PathDebugNode::build_pixel_stats_params(PathDebugParams& p,
     p.pixel_stats_scale = pixel_stats_exposure;
     p.filtered_out = io.is_connected(con_filtered) ? 1 : 0;
     p.filtered_active =
-        backdrop == static_cast<int32_t>(PATH_DEBUG_BACKDROP_FILTERED) || p.filtered_out != 0 ? 1
-                                                                                              : 0;
+        path_debug_backdrop_recorded(static_cast<uint32_t>(backdrop)) || p.filtered_out != 0 ? 1
+                                                                                             : 0;
     p.image_exposure = image_exposure;
     p.image_accumulate = activity.image_accumulate ? 1 : 0;
     p.image_depth = activity.image_depth ? 1 : 0;
@@ -1755,9 +1786,19 @@ void PathDebugNode::record_readback(const NodeIO& io,
         if (recorded_pixel_stats != pixel_stats_generation) {
             return;
         }
-        pixel_history.push_back({std::bit_cast<float>(data.probe.selected_mean),
-                                 std::bit_cast<float>(data.probe.selected_rel_error),
-                                 std::bit_cast<float>(data.probe.selected_variance)});
+        const Probe& probe = data.probe;
+        const float mean = std::bit_cast<float>(probe.selected_mean);
+        const uint32_t count = probe.selected_count;
+        pixel_history.push_back({
+            .mean = mean,
+            .rel_error = std::bit_cast<float>(probe.selected_rel_error),
+            .variance = std::bit_cast<float>(probe.selected_variance),
+            .max_ratio = mean > 0.f ? std::bit_cast<float>(probe.selected_max) / mean : 0.f,
+            .zero_fraction =
+                count > 0 ? static_cast<float>(probe.selected_zeros) / static_cast<float>(count)
+                          : 0.f,
+            .count = count,
+        });
         if (pixel_history.size() > PIXEL_HISTORY) {
             pixel_history.pop_front();
         }
@@ -1841,11 +1882,17 @@ PathDebugNode::ImageSignature PathDebugNode::image_signature() const {
     return signature;
 }
 
+void PathDebugNode::invalidate_filter() {
+    kept_dirty |= paths_filtered;
+    heat_dirty |= false_color_filtered;
+    pixel_stats_dirty |= false_color_filtered;
+}
+
 void PathDebugNode::invalidate_selection() {
     maps_dirty = true;
-    pixel_stats_dirty = true;
-    heat_dirty = true;
     kept_dirty = true;
+    pixel_history.clear();
+    invalidate_filter();
 }
 
 void PathDebugNode::repick() {
@@ -1876,10 +1923,15 @@ void PathDebugNode::clear_selection() {
     invalidate_selection();
 }
 
+void PathDebugNode::set_method(const uint32_t method, const bool set) {
+    method_mask = set ? (method_mask | (1u << method)) : (method_mask & ~(1u << method));
+    invalidate_filter();
+}
+
 void PathDebugNode::set_expression(const std::string& text) {
     expression = text;
     compiled_expression = compile_path_expression(text);
-    invalidate_selection();
+    invalidate_filter();
 }
 
 bool PathDebugNode::keeps_top() const {
@@ -1915,8 +1967,8 @@ const char* PathDebugNode::missing_image_input() const {
 }
 
 bool PathDebugNode::shows_pixel_image(const NodeIO& io) const {
-    return backdrop == static_cast<int32_t>(PATH_DEBUG_BACKDROP_FILTERED) ||
-           io.is_connected(con_filtered) || false_color == FALSE_COLOR_PIXEL_STAT;
+    return path_debug_backdrop_recorded(static_cast<uint32_t>(backdrop)) ||
+           io.is_connected(con_filtered) || false_color != FALSE_COLOR_OFF;
 }
 
 bool PathDebugNode::selects_point() const {

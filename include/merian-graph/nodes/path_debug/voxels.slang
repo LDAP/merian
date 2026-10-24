@@ -38,10 +38,9 @@ Varyings vertex_main(const uint vertex: SV_VertexID, const uint instance: SV_Ins
     out.position = CULLED;
     out.source = instance + 1;
 
-    // a pixel some recorded path went through
     const uint2 pixel = uint2(instance % params.dim_x, instance / params.dim_x);
     const bool recorded =
-        filtered[path_debug_filtered_base(pixel) + PATH_DEBUG_FILTERED_COUNT] != 0 ||
+        filtered[path_debug_filtered_base(pixel, false) + PATH_DEBUG_FILTERED_COUNT] != 0 ||
         moments[path_debug_moments_base(pixel) + PATH_DEBUG_MOMENT_COUNT] != 0;
     const float2 depth = voxel_depth[instance];
     if (!recorded || !(depth.x > 0.f)) {

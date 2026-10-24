@@ -29,9 +29,6 @@ constexpr std::array<const char*, 3> DEPTH_NAMES = {"x-ray", "hide", "dash"};
 constexpr std::array<const char*, 3> TRANSFORM_NAMES = {"octahedral", "lat-long",
                                                         "hemisphere (equal-area)"};
 constexpr std::array<const char*, 2> FRAME_NAMES = {"world (y up)", "local shading"};
-constexpr std::array<const char*, 2> PDF_REF_NAMES = {"BSDF pdf()", "recorded pdf"};
-constexpr std::array<const char*, 3> FALSE_COLOR_NAMES = {"off", "scene heatmap",
-                                                          "pixel statistic"};
 // without the off state at 0
 constexpr std::array<const char*, 8> HEAT_NAMES = {
     "vertex count", "contribution", "throughput", "incident radiance",
@@ -60,28 +57,26 @@ constexpr std::array<const char*, 7> PIXEL_STAT_HELP = {
     "max(X) / mean(X): fireflies lie far above 1.",
     "(paths with X = 0) / n."};
 
-constexpr Properties::ChildFlags HEADERLESS_OPEN =
-    Properties::ChildFlagBits::HEADERLESS | Properties::ChildFlagBits::DEFAULT_OPEN;
-
-constexpr std::array<const char*, PATH_DEBUG_MAP_CHANNEL_COUNT> MAP_CHANNEL_DESCRIPTIONS = {
-    "BSDF·L·cos over every technique, normalized to integrate to 1: what a zero-variance sampler "
-    "samples.",
-    "Directions per steradian of the binned draws.",
-    "The pdf the renderer recorded for the binned draws.",
-    "The material's pdf for the incident direction.",
-    "The material's own sample(), without the renderer.",
-    "BSDF·cos, normalized: what an ideal BSDF sampler samples.",
-    "Poisson deviation of each bin from the pdf it is tested against; chi2/dof sums them.",
-    "The sampled directions over the pdf they are tested against: white at 1, blue undersampled, "
-    "red oversampled.",
-    "The sampled directions over the normalized integrand: white at 1, blue undersampled, red "
-    "oversampled.",
-    "BSDF·L·cos over every technique, per steradian.",
-    "The integrand in its own color, on the integrand's brightness scale.",
-    "Squared contributions per steradian: where the variance comes from.",
-    "The integrand over BSDF eval(): the light arriving at the point.",
-    "Mean contribution of a binned draw in each direction.",
-    "Mean color of a binned draw's contribution in each direction."};
+constexpr const char* EXPRESSION_HELP =
+    "Matches the scatter events of a light path, camera to light. Empty matches every path.\n"
+    "\n"
+    "Events\n"
+    "  S G D U: specular, glossy, diffuse, unclassified\n"
+    "  R T: reflection, transmission\n"
+    "  .: any\n"
+    "Techniques: how the event's outgoing direction was drawn\n"
+    "  'b' BSDF, 'g' guiding, 'n' NEE, 'c' cosine, 'u' uniform\n"
+    "  'rrb' replayed BSDF, 'rrn' replayed NEE, 'rec' reconnection\n"
+    "  The last event's technique is how the light was reached.\n"
+    "Combining\n"
+    "  <D'g'>: all of, [SG]: either\n"
+    "  * + ? {n} {n,m} {n,}: repeats\n"
+    "  L alone: a light the camera sees\n"
+    "Examples\n"
+    "  .: direct light\n"
+    "  .'n': direct light by NEE\n"
+    "  .'b': direct light a BSDF sample hit\n"
+    "  .*<T>.*: refracted somewhere";
 
 } // namespace
 
@@ -106,29 +101,48 @@ PathDebugNode::NodeStatusFlags PathDebugNode::properties(Properties& config) {
     section("paths", "paths", OPEN, [&] {
         properties_color(config);
         properties_path_choice(config);
-        section("filter", "filter", OPEN, [&] { properties_filter(config); });
         properties_line_style(config);
     });
-    section("view", "view", OPEN, [&] { properties_view(config); });
+    section("filter", "filter", OPEN, [&] {
+        properties_filter(config);
+        properties_techniques(config);
+    });
+    section("view", "view", OPEN, [&] {
+        properties_image(config);
+        section("overlay", "overlay", OPEN, [&] {
+            config.config_options("type", false_color, options(FALSE_COLOR_NAMES),
+                                  Properties::OptionsStyle::RADIO_BUTTON,
+                                  "World space: per cell of the scene. Screen space: per pixel.");
+            properties_false_color(config);
+        });
+        section("sphere", "sphere", OPEN, [&] { properties_sphere(config); });
+        section("reference", "reference", OPEN, [&] { properties_reference(config); });
+    });
     section("analysis", "analysis", OPEN, [&] {
-        section("sampling", "sampling", {}, [&] { properties_sampling(config); });
         section("bsdf check", "BSDF check", {}, [&] { properties_bsdf_check(config); });
+        section("panels", "panels", {}, [&] {
+            properties_panels(config);
+            properties_bins(config);
+        });
+        section("sampling", "sampling", {}, [&] { properties_sampling(config); });
     });
     section("capture", "capture", OPEN, [&] { properties_capture(config); });
     section("export", "export", OPEN, [&] { properties_export(config); });
-    section("keys", "keys", OPEN, [&] { properties_keys(config); });
+    section("preferences", "preferences", OPEN, [&] { properties_keys(config); });
     return std::exchange(pending_reconnect, false) ? NodeStatusFlags{NEEDS_RECONNECT}
                                                    : NodeStatusFlags{};
 }
 
 void PathDebugNode::properties_selection(Properties& config) {
     config.output_text(selection_status());
-    int32_t kind = select_kind;
-    if (config.config_options("kind", kind, options(SELECT_NAMES),
+    int32_t choice = selection_choice();
+    if (config.config_options("select", choice, options(SELECTION_NAMES),
                               Properties::OptionsStyle::RADIO_BUTTON,
-                              "Point: the pixel's paths that start at the surface. Region: the "
-                              "light paths that hit a target, start or end on it.")) {
-        set_select_kind(kind);
+                              "Point: the pixel's paths that start at the clicked surface. The "
+                              "others: the light paths that hit, start or end on a sphere around "
+                              "the click or on what the click sees; the sky selects the "
+                              "environment.")) {
+        set_selection_choice(choice);
     }
     if (select_kind == SELECT_REGION) {
         int32_t match = region_match;
@@ -137,13 +151,6 @@ void PathDebugNode::properties_selection(Properties& config) {
                                   "Light paths, camera to light, that hit the target, start or end "
                                   "on it.")) {
             set_region_match(match);
-        }
-        int32_t kind = region_target;
-        if (config.config_options("target", kind, options(TARGET_NAMES),
-                                  Properties::OptionsStyle::COMBO,
-                                  "A sphere around the clicked surface, or what the click sees; "
-                                  "the sky selects the environment.")) {
-            set_region_target(kind);
         }
     }
     if (has_selection &&
@@ -158,7 +165,7 @@ void PathDebugNode::properties_selection_details(Properties& config) {
         RegionTarget ids = target;
         bool set = config.config_bool("environment", ids.environment);
         set |= config.config_int("mesh", ids.mesh, "Id; -1 = none.");
-        set |= config.config_int("object", ids.node, "Scene node id; -1 = none.");
+        set |= config.config_int("node", ids.node, "Scene node id; -1 = none.");
         set |= config.config_int("triangle", ids.primitive, "Of the mesh.");
         set |= config.config_int("material", ids.material, "Id; -1 = none.");
         if (set) {
@@ -209,21 +216,11 @@ void PathDebugNode::properties_color(Properties& config) {
 
 void PathDebugNode::properties_filter(Properties& config) {
     std::string text = expression;
-    if (config.config_text("expression", text, false, "Empty matches every path.")) {
+    if (config.config_text("expression", text, false, EXPRESSION_HELP)) {
         set_expression(text);
     }
     if (!compiled_expression.valid) {
         config.output_text("invalid expression");
-    }
-    if (config.is_ui()) {
-        config.output_text("S specular  G glossy  D diffuse  U unclassified  R reflect  T transmit"
-                           "  . any");
-        config.output_text("'b' BSDF  'g' guiding  'n' NEE  'c' cosine  'u' uniform: what drew the "
-                           "event's direction");
-        config.output_text("'rrb' 'rrn' replayed BSDF, NEE  'rec' reconnection  <D'g'> all of  "
-                           "[SG] either");
-        config.output_text("* + ? {n} {n,m}  L alone: a light the camera sees");
-        config.output_text(".'n' direct light by NEE  .'b' direct light a BSDF sample hit");
     }
 
     bool changed =
@@ -233,21 +230,27 @@ void PathDebugNode::properties_filter(Properties& config) {
                                  fmt::format("Min and max; {} = no limit.", SCATTER_UNLIMITED));
     scatter_range.x = std::clamp(scatter_range.x, 0, SCATTER_UNLIMITED);
     scatter_range.y = std::clamp(scatter_range.y, scatter_range.x, SCATTER_UNLIMITED);
-    if (config.st_begin_child("technique", "technique")) {
-        for (uint32_t m = 0; m < PATH_RECORD_METHOD_NAMES.size(); m++) {
-            bool set = (method_mask & (1u << m)) != 0;
-            if (config.config_bool(PATH_RECORD_METHOD_NAMES[m], set)) {
-                method_mask = set ? (method_mask | (1u << m)) : (method_mask & ~(1u << m));
-                changed = true;
-            }
-        }
-        changed |= config.config_options("match", method_mode, options(METHOD_MODE_NAMES),
-                                         Properties::OptionsStyle::COMBO,
-                                         "None ticked matches any technique.");
-        config.st_end_child();
-    }
     if (changed) {
-        invalidate_selection();
+        invalidate_filter();
+    }
+}
+
+void PathDebugNode::properties_techniques(Properties& config) {
+    config.st_separate("technique");
+    for (uint32_t m = 0; m < PATH_RECORD_METHOD_NAMES.size(); m++) {
+        bool set = (method_mask & (1u << m)) != 0;
+        if (config.config_bool(PATH_RECORD_METHOD_NAMES[m], set)) {
+            set_method(m, set);
+        }
+    }
+    properties_technique_match(config);
+}
+
+void PathDebugNode::properties_technique_match(Properties& config) {
+    if (config.config_options("match", method_mode, options(METHOD_MODE_NAMES),
+                              Properties::OptionsStyle::COMBO,
+                              "None ticked matches any technique.")) {
+        invalidate_filter();
     }
 }
 
@@ -275,6 +278,11 @@ void PathDebugNode::properties_path_choice(Properties& config) {
                             1.f);
         resample_history = std::max(resample_history, 0.f);
     }
+    if (config.config_bool("filtered", paths_filtered,
+                           "The drawn paths and the list pass the filter.")) {
+        kept_dirty = true;
+        isolate_path.reset();
+    }
 }
 
 void PathDebugNode::properties_line_style(Properties& config) {
@@ -296,58 +304,28 @@ void PathDebugNode::properties_line_style(Properties& config) {
     }
 }
 
-void PathDebugNode::properties_view(Properties& config) {
+void PathDebugNode::properties_image(Properties& config) {
     config.config_options("image", backdrop, options(BACKDROP_NAMES),
-                          Properties::OptionsStyle::COMBO, "What the paths are drawn on.");
+                          Properties::OptionsStyle::COMBO,
+                          "What the paths are drawn on. Current frame and accumulated: the "
+                          "recorded paths; filtered, what the region and the filter add.");
     if (config.is_ui() && backdrop_missing) {
         config.output_text("{} required · showing source input", missing_image_input());
     }
     config.config_float("exposure", image_exposure,
-                        "Scales the image; the filtered radiance is tone mapped.", 0.01f);
+                        "Scales the image; the recorded radiance is tone mapped.", 0.01f);
     image_exposure = std::max(image_exposure, 0.f);
-    if (backdrop == static_cast<int32_t>(PATH_DEBUG_BACKDROP_FILTERED) &&
+    if (path_debug_backdrop_accumulated(static_cast<uint32_t>(backdrop)) &&
         config.config_bool("reset")) {
         image_dirty = true;
     }
-    if (backdrop == static_cast<int32_t>(PATH_DEBUG_BACKDROP_DIFFERENCE)) {
-        config.config_float("gain", difference_gain, "", 0.1f);
-    }
-    if (backdrop == static_cast<int32_t>(PATH_DEBUG_BACKDROP_SPLIT_REFERENCE)) {
-        config.config_percent("split position", backdrop_split);
-    }
-    if (shows_reference() && backdrop != static_cast<int32_t>(PATH_DEBUG_BACKDROP_DIFFERENCE)) {
-        config.config_bool("alternate", reference_flip,
-                           "Blinks between source input and reference.");
-        if (reference_flip) {
-            config.config_float("rate", reference_flip_hz, "In Hz.", 0.1f);
-        }
-    }
+}
 
-    config.st_separate("reference");
-    if (reference_input_connected) {
-        config.output_text("reference: input");
-    } else if (reference_loaded) {
-        config.output_text("reference: {}", reference_path);
-    } else {
-        config.output_text("no reference · connect the reference input or set a file");
+void PathDebugNode::properties_false_color(Properties& config) {
+    if (false_color == FALSE_COLOR_OFF) {
+        return;
     }
-    if (config.config_path("reference file", reference_path,
-                           "Used while the reference input is not connected.")) {
-        reference_dirty = true;
-    }
-    if (!reference_path.empty() && !reference_loaded) {
-        config.output_text("cannot load {}", reference_path);
-    }
-
-    config.st_separate("false color");
-    config.config_options("false color", false_color, options(FALSE_COLOR_NAMES),
-                          Properties::OptionsStyle::COMBO,
-                          "One quantity tinted over the image; its settings follow.");
-    if (false_color != FALSE_COLOR_OFF) {
-        config.config_percent("opacity", false_color_opacity);
-    }
-    if (false_color == FALSE_COLOR_HEAT &&
-        config.st_begin_child("heatmap", "heatmap", HEADERLESS_OPEN)) {
+    if (false_color == FALSE_COLOR_HEAT) {
         if (!gbuffer_connected) {
             config.output_text("gbuffer required");
         }
@@ -357,6 +335,21 @@ void PathDebugNode::properties_view(Properties& config) {
         if (config.is_ui()) {
             config.output_text(HEAT_HELP.at(heat_quantity));
         }
+    } else {
+        config.config_options("statistic", pixel_statistic, options(PIXEL_STAT_NAMES),
+                              Properties::OptionsStyle::COMBO,
+                              "Over the frames, of every path recorded at a pixel.");
+        if (config.is_ui()) {
+            config.output_text(PIXEL_STAT_HELP.at(pixel_statistic));
+        }
+    }
+    if (config.config_bool("filtered", false_color_filtered,
+                           "Only what the region and the filter pass.")) {
+        heat_dirty = true;
+        pixel_stats_dirty = true;
+    }
+    config.config_percent("opacity", false_color_opacity);
+    if (false_color == FALSE_COLOR_HEAT) {
         heat_dirty |= config.config_vec("scatter events", heat_bounce_range,
                                         "The vertices this far from the camera, min and max.");
         heat_bounce_range.x = std::clamp(heat_bounce_range.x, 0, HEAT_BOUNCE_MAX);
@@ -383,49 +376,75 @@ void PathDebugNode::properties_view(Properties& config) {
                                    static_cast<float>(std::max(params.grid_slots, 1u)),
                                dropped > 0 ? fmt::format(" · {} splats dropped", dropped) : "");
         }
-        config.st_end_child();
+        return;
     }
-    if (false_color == FALSE_COLOR_PIXEL_STAT &&
-        config.st_begin_child("pixel statistic", "pixel statistic", HEADERLESS_OPEN)) {
-        config.config_options("statistic", pixel_statistic, options(PIXEL_STAT_NAMES),
-                              Properties::OptionsStyle::COMBO,
-                              "Over the frames, of every path recorded at a pixel and what the "
-                              "selection's light paths add to it. No reference needed.");
-        if (config.is_ui()) {
-            config.output_text(PIXEL_STAT_HELP.at(pixel_statistic));
-        }
-        config.config_float("exposure", pixel_stats_exposure,
-                            "The value at the top of the color map is 1 / exposure.", 0.1f);
-        if (config.config_bool("reset")) {
-            pixel_stats_dirty = true;
-        }
-        config.st_end_child();
-    }
-
-    config.st_separate("sphere");
-    std::vector<std::string> sphere_options{"off"};
-    sphere_options.insert(sphere_options.end(), MAP_CHANNEL_NAMES.begin(), MAP_CHANNEL_NAMES.end());
-    int32_t sphere_option = sphere_channel + 1;
-    config.config_options("sphere", sphere_option, sphere_options, Properties::OptionsStyle::COMBO,
-                          "A directional map drawn on a sphere at the selected point.");
-    sphere_channel = sphere_option - 1;
-    if (sphere_channel >= 0 && !maps_at_point()) {
-        config.output_text("point selection required");
-    }
-    if (sphere_channel >= 0) {
-        config.config_percent("sphere size", sphere_size, "Of the distance.");
+    config.config_float("exposure", pixel_stats_exposure,
+                        "The value at the top of the color map is 1 / exposure.", 0.1f);
+    if (config.config_bool("reset")) {
+        pixel_stats_dirty = true;
     }
 }
 
-void PathDebugNode::properties_sampling(Properties& config) {
-    if (!gbuffer_connected) {
-        config.output_text("gbuffer required");
+void PathDebugNode::properties_sphere(Properties& config) {
+    std::vector<std::string> sphere_options{"off"};
+    sphere_options.insert(sphere_options.end(), MAP_CHANNEL_NAMES.begin(), MAP_CHANNEL_NAMES.end());
+    int32_t sphere_option = sphere_channel + 1;
+    config.config_options("panel", sphere_option, sphere_options, Properties::OptionsStyle::COMBO,
+                          "A panel drawn on a sphere at the selected point.");
+    sphere_channel = sphere_option - 1;
+    if (sphere_channel < 0) {
+        return;
     }
-    config.st_separate("binning");
-    maps_dirty |= config.config_options("binned", map_draws, options(DRAWS_NAMES),
-                                        Properties::OptionsStyle::COMBO,
-                                        "Scatter: every continuation, recorded with the mixture's "
-                                        "pdf. NEE: the light connections.");
+    if (!maps_at_point()) {
+        config.output_text("point selection required");
+    }
+    config.config_percent("size", sphere_size, "Of the distance.");
+    config.config_bool("scale", sphere_scale,
+                       "The radius follows the value, as a polar plot; tests keep the sphere.");
+}
+
+void PathDebugNode::properties_reference(Properties& config) {
+    if (reference_input_connected) {
+        config.output_text("reference: input");
+    } else if (reference_loaded) {
+        config.output_text("reference: {}", reference_path);
+    } else {
+        config.output_text("no reference · connect the reference input or set a file");
+    }
+    if (config.config_path("file", reference_path,
+                           "Used while the reference input is not connected.")) {
+        reference_dirty = true;
+    }
+    if (!reference_path.empty() && !reference_loaded) {
+        config.output_text("cannot load {}", reference_path);
+    }
+    if (backdrop == static_cast<int32_t>(PATH_DEBUG_BACKDROP_DIFFERENCE)) {
+        config.config_float("gain", difference_gain, "Of the difference image.", 0.1f);
+    }
+    if (backdrop == static_cast<int32_t>(PATH_DEBUG_BACKDROP_SPLIT_REFERENCE)) {
+        config.config_percent("split position", backdrop_split);
+    }
+    if (shows_reference() && backdrop != static_cast<int32_t>(PATH_DEBUG_BACKDROP_DIFFERENCE)) {
+        config.config_bool("alternate", reference_flip,
+                           "Blinks between source input and reference.");
+        if (reference_flip) {
+            config.config_float("rate", reference_flip_hz, "In Hz.", 0.1f);
+        }
+    }
+}
+
+void PathDebugNode::properties_panels(Properties& config) {
+    config.config_bool("show", panels_enabled,
+                       "While a point is selected; scroll over them to page.");
+    for (uint32_t channel = 0; channel < PATH_DEBUG_MAP_CHANNEL_COUNT; channel++) {
+        config.config_bool(MAP_CHANNEL_NAMES[channel], panel_enabled[channel],
+                           MAP_CHANNEL_DESCRIPTIONS[channel]);
+    }
+    config.config_int("size", panel_size, "Pixels at a display scale of 1.", 64, 1024);
+    config.config_float("exposure", map_exposure, "", 0.01f);
+}
+
+void PathDebugNode::properties_bins(Properties& config) {
     maps_dirty |= config.config_options("frame", map_frame, options(FRAME_NAMES),
                                         Properties::OptionsStyle::COMBO);
     maps_dirty |= config.config_options("projection", map_transform, options(TRANSFORM_NAMES),
@@ -435,32 +454,17 @@ void PathDebugNode::properties_sampling(Properties& config) {
         maps_dirty = true;
         pending_reconnect = true;
     }
+}
 
-    config.st_separate("test");
-    maps_dirty |= config.config_options("test against", map_pdf_ref, options(PDF_REF_NAMES),
-                                        Properties::OptionsStyle::COMBO,
-                                        "BSDF pdf(): the material's pdf. Recorded pdf: the pdf "
-                                        "each sampler recorded with its sample.");
+void PathDebugNode::properties_sampling(Properties& config) {
+    config.config_bool("accumulate", map_accumulate, "Over the frames, else this frame's draws.");
+    config.config_int("paths per frame", analysis_paths, "Without a point; 0 = all.", 0, 1 << 22);
     maps_dirty |=
         config.config_int("batch frames", map_batch_frames,
-                          "Frames per batch for the variance of reused samples.", 1, 4096);
-
-    config.st_separate("accumulation");
-    config.config_bool("accumulate", map_accumulate);
-    config.config_int("paths per frame", analysis_paths, "0 = all", 0, 1 << 22);
+                          "Frames per batch for the variance of reused draws (ReSTIR).", 1, 4096);
     if (config.config_bool("reset")) {
         maps_dirty = true;
     }
-
-    config.st_separate("panels");
-    config.config_bool("show", panels_enabled,
-                       "While a point is selected; scroll over them to page.");
-    for (uint32_t channel = 0; channel < PATH_DEBUG_MAP_CHANNEL_COUNT; channel++) {
-        config.config_bool(MAP_CHANNEL_NAMES[channel], panel_enabled[channel],
-                           MAP_CHANNEL_DESCRIPTIONS[channel]);
-    }
-    config.config_int("size", panel_size, "Pixels at a display scale of 1.", 64, 1024);
-    config.config_float("exposure", map_exposure, "", 0.01f);
 }
 
 void PathDebugNode::properties_bsdf_check(Properties& config) {
@@ -482,12 +486,6 @@ void PathDebugNode::properties_capture(Properties& config) {
                           Properties::OptionsStyle::COMBO,
                           "Frozen holds the recorded paths; off records, analyzes and draws "
                           "nothing.");
-    config.config_bool("auto record probability", auto_keep_prob,
-                       "Fits the record probability to the record buffer.");
-    if (!auto_keep_prob) {
-        config.config_percent("record probability", keep_prob);
-        keep_prob = std::clamp(keep_prob, MIN_KEEP_PROB, 1.f);
-    }
 }
 
 void PathDebugNode::properties_export(Properties& config) {

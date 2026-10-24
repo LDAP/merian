@@ -49,10 +49,22 @@ PathRecordVertex seen_through_glass(const PathRecordPath p, const uint vertex_re
     return seen;
 }
 
-// every path at its pixel: the moments of what the selection adds, and the filtered image
+void add_to_image(const uint2 pixel, const bool with_filter, const float3 contrib) {
+    const uint base = path_debug_filtered_base(pixel, with_filter);
+    InterlockedAdd(filtered[base + PATH_DEBUG_FILTERED_COUNT], 1);
+    const float3 finite = path_debug_finite_or_zero(contrib);
+    if (any(finite > 0.f)) {
+        path_debug_atomic_add_float3(filtered, filtered_f, base, finite);
+    }
+}
+
+// every path at its pixel: the moments of what it adds, or what the region and the filter add, and
+// the recorded images
 void accumulate_pixel(const PathRecordPath p, const PathDebugEvents selected) {
-    const float luminance = max(yuv_luminance(selected.contrib), 0.f);
-    const bool held = any(selected.mask != 0);
+    const float luminance = max(yuv_luminance(params.false_color_filtered != 0
+                                                  ? selected.contrib_filtered
+                                                  : selected.contrib_all),
+                                0.f);
     if (params.pixel_stats_accumulate != 0 && isfinite(luminance)) {
         const uint base = path_debug_moments_base(p.pixel);
         InterlockedAdd(moments[base + PATH_DEBUG_MOMENT_COUNT], 1);
@@ -66,14 +78,11 @@ void accumulate_pixel(const PathRecordPath p, const PathDebugEvents selected) {
             InterlockedAdd(moments[base + PATH_DEBUG_MOMENT_ZEROS], 1);
         }
     }
-    if (params.image_accumulate == 0) {
-        return;
-    }
-    const uint base = path_debug_filtered_base(p.pixel);
-    InterlockedAdd(filtered[base + PATH_DEBUG_FILTERED_COUNT], 1);
-    const float3 contrib = path_debug_finite_or_zero(selected.contrib);
-    if (held && any(contrib > 0.f)) {
-        path_debug_atomic_add_float3(filtered, filtered_f, base, contrib);
+    if (params.image_accumulate != 0) {
+        add_to_image(p.pixel, false, selected.contrib_all);
+        if (path_debug_narrows()) {
+            add_to_image(p.pixel, true, selected.contrib_filtered);
+        }
     }
 }
 
@@ -112,18 +121,36 @@ void select_path(const uint i, const uint local) {
     }
 
     const PathDebugEvents selected = path_debug_match_events(p, vertex_region);
-    // the per-pixel images leave a point out
+    // the per-pixel images and the filtered world overlay leave a point out
     accumulate_pixel(p, selected);
-    if ((all(selected.mask == 0) && !path_debug_selection_open()) ||
-        !path_debug_point_matches(p, vertex_region)) {
+    const bool holds = (any(selected.mask != 0) || path_debug_selection_open(false)) &&
+                       path_debug_point_matches(p, vertex_region);
+    const bool heat_filtered =
+        params.heat_mode != PATH_DEBUG_HEAT_OFF && params.false_color_filtered != 0;
+    if (!holds && !heat_filtered) {
+        return;
+    }
+    const uint base = i * PATH_DEBUG_EVENT_UINTS;
+    events[base + PATH_DEBUG_EVENT_MASK_FILTERED] = selected.mask_filtered.x;
+    events[base + PATH_DEBUG_EVENT_MASK_FILTERED + 1] = selected.mask_filtered.y;
+    events[base + PATH_DEBUG_EVENT_MASK] = selected.mask.x;
+    events[base + PATH_DEBUG_EVENT_MASK + 1] = selected.mask.y;
+    events[base + PATH_DEBUG_EVENT_LUMINANCE_FILTERED] =
+        asuint(yuv_luminance(selected.contrib_filtered));
+    events[base + PATH_DEBUG_EVENT_LUMINANCE] = asuint(yuv_luminance(selected.contrib));
+    if (!holds) {
+        return;
+    }
+    InterlockedOr(gs_matches[local >> 5], 1u << (local & 31u));
+
+    // the drawn paths
+    const bool with_filter = path_debug_paths_filtered();
+    if (all((with_filter ? selected.mask_filtered : selected.mask) == 0) &&
+        !path_debug_selection_open(with_filter)) {
         return;
     }
     PathRecordPath held = p;
-    held.luminance = yuv_luminance(selected.contrib);
-    events[i * PATH_DEBUG_EVENT_UINTS] = selected.mask.x;
-    events[i * PATH_DEBUG_EVENT_UINTS + 1] = selected.mask.y;
-    events[i * PATH_DEBUG_EVENT_UINTS + 2] = asuint(held.luminance);
-    InterlockedOr(gs_matches[local >> 5], 1u << (local & 31u));
+    held.luminance = yuv_luminance(with_filter ? selected.contrib_filtered : selected.contrib);
     InterlockedAdd(gs_matched, 1);
     count_overlay_path(held);
 }

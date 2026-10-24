@@ -125,7 +125,6 @@ uint chain_parent(PathRecordStream records,
     return parent;
 }
 
-// a 0xRRGGBB sRGB color, linear
 float3 packed_color(const uint rgb) {
     return srgb_to_rgb(path_debug_unpack_rgb(rgb));
 }
@@ -188,7 +187,6 @@ float sample_weight(PathRecordStream records,
     return before > 0.f ? drawn / before : 0.f;
 }
 
-// a log2 range of `stops` around 1
 float stops_coordinate(const float value, const float stops) {
     return saturate(log2(max(value, 1e-12f)) / stops + 0.5f);
 }
@@ -197,18 +195,15 @@ float color_coordinate(const float value, const float stops) {
     return stops_coordinate(value * params.overlay_color_scale, stops);
 }
 
-// the view depth of the near plane
 float near_depth() {
     return camera.near / length(camera.W);
 }
 
-// the corner of a two-triangle quad a vertex id lands on
 uint2 quad_corner(const uint vertex_id) {
     return uint2(vertex_id == 1 || vertex_id == 3 || vertex_id == 4,
                  vertex_id == 2 || vertex_id == 4 || vertex_id == 5);
 }
 
-// Expands the segment p0 -> p1 into a screen-space quad; a vertex marker caps both ends.
 Varyings emit_quad(float3 p0, float3 p1, const uint kind, const uint vertex_id, Varyings o) {
     const float w_eps = near_depth();
     float w0 = view_depth(p0);
@@ -269,7 +264,7 @@ Varyings segment(PathRecordStream records,
     const PathRecordVertex end_vertex =
         path_record_load_vertex(records, vertex_region, p.vertex_offset + end);
     if (path_debug_is_empty_draw(end_vertex) ||
-        !path_debug_event_drawn(selected, end, end_vertex.nee)) {
+        !path_debug_event_drawn(selected, end, end_vertex.nee, path_debug_paths_filtered())) {
         return o;
     }
     const uint parent = end > 0 ? chain_parent(records, p, vertex_region, end) : 0;
@@ -335,7 +330,6 @@ Varyings segment(PathRecordStream records,
     return emit_quad(p0, p1, kind, vertex_id, o);
 }
 
-// the i-th of PATH_DEBUG_RING_SEGMENTS points on a circle of radius r in the frame's xy plane
 float3 ring_point(const float3 center, const float3x3 frame, const float r, const uint i) {
     const float a = 2.f * MERIAN_M_PI * float(i) / float(PATH_DEBUG_RING_SEGMENTS);
     return center + r * (cos(a) * frame[0] + sin(a) * frame[1]);
@@ -413,7 +407,6 @@ Varyings vertex_main(uint vertex_id: SV_VertexID, uint instance_id: SV_InstanceI
     return segment(kept, PATH_DEBUG_KEPT_VERTICES, slot, kind, item, vertex_id, o);
 }
 
-// where along a -> b the point closest to pixel lies, in [0, 1]
 float closest_on_segment(const float2 pixel, const float2 a, const float2 b) {
     const float2 ab = b - a;
     const float len2 = dot(ab, ab);

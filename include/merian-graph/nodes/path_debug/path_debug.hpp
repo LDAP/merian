@@ -81,16 +81,16 @@ class PathDebugNode : public Node {
     static constexpr std::array<const char*, 3> CAPTURE_STATE_NAMES = {"live", "frozen", "off"};
     static constexpr int32_t SELECT_POINT = 0;
     static constexpr int32_t SELECT_REGION = 1;
-    static constexpr std::array<const char*, 2> SELECT_NAMES = {"point", "region"};
     static constexpr std::array<const char*, 3> MATCH_NAMES = {"hits", "starts at", "ends at"};
+    static constexpr int32_t MATCH_STARTS = 1;
     static constexpr int32_t TARGET_SPHERE = 0;
     static constexpr int32_t TARGET_TRIANGLE = 1;
-    static constexpr int32_t TARGET_PART = 2;
-    static constexpr int32_t TARGET_OBJECT = 3;
+    static constexpr int32_t TARGET_INSTANCE = 2;
+    static constexpr int32_t TARGET_NODE = 3;
     static constexpr int32_t TARGET_MESH = 4;
     static constexpr int32_t TARGET_MATERIAL = 5;
-    static constexpr std::array<const char*, 6> TARGET_NAMES = {"sphere", "triangle", "part",
-                                                                "object", "mesh",     "material"};
+    static constexpr std::array<const char*, 7> SELECTION_NAMES = {
+        "point", "sphere", "triangle", "instance", "node", "mesh", "material"};
     static constexpr std::array<const char*, 4> MODIFIER_NAMES = {"Alt", "Ctrl", "Shift", "Super"};
     static constexpr std::array<int, 4> MODIFIER_KEYS = {
         InputController::ALT, InputController::CONTROL, InputController::SHIFT,
@@ -98,31 +98,61 @@ class PathDebugNode : public Node {
     static constexpr std::array<const char*, 8> COLOR_NAMES = {
         "path luminance", "transported radiance", "scatter events",    "random",
         "technique",      "BSDF·cos/pdf",         "transported color", "off"};
-    static constexpr std::array<const char*, 6> BACKDROP_NAMES = {
-        "source input",  "filtered", "reference", "difference", "split source input | reference",
-        "backdrop input"};
-    static constexpr std::array<const char*, 5> DRAWS_NAMES = {"all", "scatter", "BSDF only",
-                                                               "guiding only", "NEE only"};
+    static constexpr std::array<const char*, 9> BACKDROP_NAMES = {"source input",
+                                                                  "current frame",
+                                                                  "current frame (filtered)",
+                                                                  "accumulated",
+                                                                  "accumulated (filtered)",
+                                                                  "reference",
+                                                                  "difference",
+                                                                  "split source input | reference",
+                                                                  "backdrop input"};
     static constexpr std::array<const char*, 2> WI_NAMES = {"camera ray", "manual"};
     static constexpr int32_t FALSE_COLOR_OFF = 0;
     static constexpr int32_t FALSE_COLOR_HEAT = 1;
     static constexpr int32_t FALSE_COLOR_PIXEL_STAT = 2;
+    static constexpr std::array<const char*, 3> FALSE_COLOR_NAMES = {"off", "world space",
+                                                                     "screen space"};
+    static constexpr int32_t STATISTICS_PIXEL = 0;
+    static constexpr int32_t STATISTICS_LIGHT = 1;
+    static constexpr std::array<const char*, 2> STATISTICS_NAMES = {"pixel", "light paths"};
     static constexpr std::array<const char*, PATH_DEBUG_MAP_CHANNEL_COUNT> MAP_CHANNEL_NAMES = {
         "integrand (normalized)",
-        "sampled directions",
-        "recorded pdf",
-        "BSDF pdf()",
+        "incident radiance",
+        "BSDF·cos (normalized)",
+        "recorded directions",
+        "recorded NEE directions",
         "BSDF sample()",
-        "BSDF eval()",
+        "recorded pdfs",
+        "recorded NEE pdfs",
+        "BSDF pdf()",
         "z-score",
-        "sampled / pdf",
-        "sampled / integrand",
-        "integrand",
-        "integrand (color)",
+        "NEE z-score",
+        "sample() z-score",
+        "recorded / integrand",
         "second moment",
-        "incident radiance (color)",
-        "mean luminance",
-        "mean color"};
+        "recorded guided directions"};
+    static constexpr std::array<const char*, PATH_DEBUG_MAP_CHANNEL_COUNT>
+        MAP_CHANNEL_DESCRIPTIONS = {
+            "BSDF·L·cos of every technique's draws, normalized to integrate to 1: what a "
+            "zero-variance continuation draws.",
+            "The light arriving at the point: the integrand over BSDF eval().",
+            "BSDF eval()·cos, normalized to integrate to 1: what an ideal BSDF sample() draws.",
+            "Where the renderer's continuations went, per steradian.",
+            "Where the renderer's NEE connections went, per steradian.",
+            "Where the material's own sample() draws, per steradian.",
+            "The pdfs the renderer recorded with its continuations, per bin.",
+            "The pdfs the renderer recorded with its NEE connections, per bin.",
+            "The material's pdf().",
+            "The continuations against their recorded pdfs, in standard deviations: blue too few, "
+            "red too many draws.",
+            "The NEE connections against their recorded pdfs, the environment's and the geometry's "
+            "apart, in "
+            "standard deviations; lights behind each other read red.",
+            "BSDF sample()'s draws against their pdfs, in standard deviations.",
+            "The continuations over the normalized integrand: blue undersampled, red oversampled.",
+            "Squared contributions per steradian: where the variance comes from.",
+            "Where the guided continuations went, per steradian."};
 
     struct IsolatedPath {
         uint32_t valid;
@@ -152,7 +182,6 @@ class PathDebugNode : public Node {
         uint2 hit;
     };
 
-    // what a region names: a mesh placed at a node, a triangle of it and its material
     struct RegionTarget {
         bool environment = false;
         int32_t mesh = -1;
@@ -166,7 +195,6 @@ class PathDebugNode : public Node {
     // GeometryIDs belong to the frame they were looked up in
     using Placements = std::shared_ptr<const std::vector<Scene::GeometryPlacement>>;
 
-    // what target_bits was built from
     struct TargetBuild {
         Placements placements;
         RegionTarget target;
@@ -175,7 +203,6 @@ class PathDebugNode : public Node {
         bool operator==(const TargetBuild&) const = default;
     };
 
-    // what the filtered image depends on besides the records
     struct ImageSignature {
         std::string expression;
         int32_t contribution = 0;
@@ -211,13 +238,16 @@ class PathDebugNode : public Node {
 
     struct Probe {
         uint32_t kind;
-        // pixel: mean, relative error, variance; panel or sphere: its value, pdf, mean contribution
+        // pixel: mean, relative error, variance; panel or sphere: its value, BSDF pdf(), solid
+        // angle
         std::array<uint32_t, 3> values;
         uint32_t count;
         uint32_t selected_mean;
         uint32_t selected_rel_error;
         uint32_t selected_count;
         uint32_t selected_variance;
+        uint32_t selected_max;
+        uint32_t selected_zeros;
     };
 
     struct Readback {
@@ -248,14 +278,12 @@ class PathDebugNode : public Node {
     static_assert(offsetof(Readback, stats) == sizeof(uint32_t) * PATH_DEBUG_OUT_UINTS);
 
     struct FrameActivity {
-        // a ready scene and capture not off
         bool active;
         // the frame after a freeze still sees the held records
         bool frozen;
         bool keep_update;
         bool pixel_stats_accumulate;
         bool heat_splat;
-        // a point records only its pixel
         bool one_pixel;
         bool image_accumulate;
         bool image_depth;
@@ -293,17 +321,20 @@ class PathDebugNode : public Node {
         float mean;
         float rel_error;
         float variance;
+        float max_ratio;
+        float zero_fraction;
+        uint32_t count;
     };
     static constexpr std::size_t PIXEL_HISTORY = 512;
 
     void handle_input(const NodeIO& io);
     void select_at(const int2& pixel);
     void set_select_kind(int32_t kind);
+    int32_t selection_choice() const;
+    void set_selection_choice(int32_t choice);
     void set_region_match(int32_t match);
     void set_region_target(int32_t kind);
-    // the region's target where a pick sees the surface, the environment where it sees the sky
     void pick_target(uint2 surface, const Placements& placements);
-    // the GeometryIDs of the region's target in the frame of the matched records
     void update_target();
     void upload_target(const ResourceAllocatorHandle& allocator, Submission& submission);
     bool targets_ids() const;
@@ -313,18 +344,14 @@ class PathDebugNode : public Node {
     // where the point lies on screen, in record pixels
     std::optional<float2> project_point(Camera& camera) const;
     void reproject_pick(const NodeIO& io);
-    // the paths the last readback saw, at most the capacity
     uint32_t apply_readback_feedback(const NodeProcessInfo& info,
                                      const PathRecordCapacities& capacities);
     void adapt_keep_prob(const PathRecordCapacities& capacities);
     void resolve_pick(Camera& camera);
-    // the angle one pixel spans
     float pixel_angle(const Camera& camera) const;
-    // the active camera once the scene is ready, else null
     CameraHandle ready_camera(const NodeIO& io) const;
     void record_clears(const NodeProcessInfo& info, Submission& submission);
     FrameActivity update_frame(const NodeIO& io, bool ready);
-    // the panels' size and place in the window, and where they take the input
     void update_panel_layout(const NodeIO& io, uint32_t panel_mask);
     PathDebugParams build_params(const NodeIO& io,
                                  const NodeProcessInfo& info,
@@ -349,7 +376,6 @@ class PathDebugNode : public Node {
                          Submission& submission,
                          const PathRecordCapacities& capacities,
                          const FrameActivity& activity);
-    // returns the pipeline so the caller can push constants and dispatch
     PipelineHandle bind_scene_pipeline(ScenePipeline& kernel,
                                        const NodeIO& io,
                                        const NodeProcessInfo& info,
@@ -359,7 +385,6 @@ class PathDebugNode : public Node {
                         const NodeProcessInfo& info,
                         Submission& submission,
                         bool onto_canvas);
-    // the filtered image seen from the camera, a box per record pixel
     void record_voxels(const NodeIO& io, const NodeProcessInfo& info, Submission& submission);
     void record_map_panels(const NodeIO& io, const NodeProcessInfo& info, Submission& submission);
     void record_labels(const NodeIO& io,
@@ -384,21 +409,19 @@ class PathDebugNode : public Node {
     void ensure_reference(const ResourceAllocatorHandle& allocator, Submission& submission);
 
     void invalidate_selection();
+    void invalidate_filter();
     ImageSignature image_signature() const;
     void clear_selection();
     // re-resolves the surface at the selected pixel, keeping the current one until it is read back
     void repick();
     void request_pick(const int2& pixel);
-    // forgets the surface, normal and radius of the selection
     void reset_selected_point();
     void set_expression(const std::string& text);
-    // the maps bin the draws of a visible selected point
+    void set_method(uint32_t method, bool set);
     bool maps_at_point() const;
     // the maps bin the draws the BSDF's pdf() is evaluated for
     bool bsdf_comparable() const;
-    // the image shows the reference
     bool shows_reference() const;
-    // the false color, the hover probe or the pixel section reads the per-pixel moments
     bool pixel_stats_read() const;
     bool keeps_top() const;
     bool has_reference() const;
@@ -406,15 +429,11 @@ class PathDebugNode : public Node {
     uint32_t selection_mode() const;
     bool selection_visible() const;
     bool selects_point() const;
-    // the filtered image or the pixel statistic, which need every pixel's paths
     bool shows_pixel_image(const NodeIO& io) const;
-    // what the chosen image lacks while backdrop_missing
     const char* missing_image_input() const;
     bool point_hidden() const;
     const char* modifier_name() const;
-    // the material's id and name
     std::string material_label(uint32_t id) const;
-    // the name of a mesh or a scene node, its id without one
     std::string mesh_label(int32_t mesh) const;
     std::string node_label(int32_t node) const;
     uint32_t shown_panel_mask() const;
@@ -422,27 +441,27 @@ class PathDebugNode : public Node {
     int32_t panel_top(uint32_t slot) const;
     int32_t panel_left() const;
     std::optional<PanelHit> panel_at(const float2& at) const;
-    std::string binned_caption() const;
 
     std::optional<int2> to_image(const float2& window_pos) const;
 
     void draw_window();
-    // the image under the paths, at the bottom left of the canvas
     void draw_image_choice();
     void draw_header();
     void draw_paths_tab();
     void draw_view_tab();
     void draw_analysis_tab();
+    void draw_filter_tab();
+    void draw_preferences_tab();
+    void draw_selection_choice();
+    void draw_panel_choice();
     void draw_sampling_section();
     void draw_bsdf_section();
-    void draw_pixel_section();
-    void draw_histograms_section() const;
-    void draw_drawn_paths();
+    void draw_statistics_section();
+    void draw_pixel_statistics();
+    void draw_light_statistics() const;
+    void draw_list();
     void draw_color_legend() const;
-    void draw_sampling_fit() const;
-    void draw_polar_profile() const;
     std::string selection_status() const;
-    // the names of what a region's target can be, to choose without a click
     void draw_target_choice(const std::string& status);
     void draw_properties_section(const char* id, void (PathDebugNode::*section)(Properties&));
 
@@ -453,9 +472,16 @@ class PathDebugNode : public Node {
     void properties_selection_details(Properties& config);
     void properties_color(Properties& config);
     void properties_filter(Properties& config);
+    void properties_techniques(Properties& config);
+    void properties_technique_match(Properties& config);
     void properties_path_choice(Properties& config);
     void properties_line_style(Properties& config);
-    void properties_view(Properties& config);
+    void properties_false_color(Properties& config);
+    void properties_sphere(Properties& config);
+    void properties_reference(Properties& config);
+    void properties_image(Properties& config);
+    void properties_panels(Properties& config);
+    void properties_bins(Properties& config);
     void properties_sampling(Properties& config);
     void properties_bsdf_check(Properties& config);
     void properties_capture(Properties& config);
@@ -545,7 +571,6 @@ class PathDebugNode : public Node {
     bool presenting = false;
     // the canvas while presenting, else the output
     int2 label_area = int2(0);
-    // the display scale the panels, labels and lines are laid out at
     float label_scale = 1.f;
     std::optional<float2> probe_at;
     std::optional<int2> cursor_pixel;
@@ -555,17 +580,15 @@ class PathDebugNode : public Node {
     Readback latest_readback{};
     bool readback_valid = false;
     bool window_drawn = false;
-    bool drawn_paths_shown = false;
+    bool list_shown = false;
     bool pixel_section_shown = false;
-    // a section that reads the stats pass: sampling, BSDF check, histograms
     bool path_statistics_shown = false;
     uint32_t frames_since_window = UI_IDLE_FRAMES;
-    uint32_t frames_since_drawn_paths = UI_IDLE_FRAMES;
+    uint32_t frames_since_list = UI_IDLE_FRAMES;
     uint32_t frames_since_pixel_section = UI_IDLE_FRAMES;
     uint32_t frames_since_path_statistics = UI_IDLE_FRAMES;
     bool pending_reconnect = false;
 
-    // built once per frame
     PathDebugParams params{};
     // the pixel filter the current records were traced with
     uint32_t traced_pixel_filter = PATH_RECORD_ALL_PIXELS;
@@ -574,7 +597,6 @@ class PathDebugNode : public Node {
     int32_t region_match = 0;
     int32_t region_target = TARGET_SPHERE;
     RegionTarget target;
-    // the pending pick comes from a click, which names the target
     bool target_from_click = false;
     // in the frame of the matched records: the triangle's GeometryID, a bit per GeometryID of the
     // other targets
@@ -599,7 +621,6 @@ class PathDebugNode : public Node {
     // 0 while unknown
     float3 selected_normal = float3(0.f);
     float selected_radius = 0.f;
-    // from the last frame that recorded paths of the point's pixel
     bool point_behind_surface = false;
     bool pending_pick = false;
     int2 pending_pick_pixel = int2(0);
@@ -609,16 +630,16 @@ class PathDebugNode : public Node {
     int2 scatter_range = int2(0, SCATTER_UNLIMITED);
     uint32_t method_mask = 0;
     int32_t method_mode = static_cast<int32_t>(PATH_DEBUG_METHOD_ANY_VERTEX);
-    // the scene's, for the region's targets and their names
     std::weak_ptr<Scene> current_scene;
     std::weak_ptr<MaterialSystem> material_system;
     int32_t contribution_filter = static_cast<int32_t>(PATH_DEBUG_FINITE_ANY);
 
     int32_t overlay_rank = PATH_DEBUG_RANK_RESAMPLED;
+    bool paths_filtered = true;
     int32_t overlay_max_paths = 16;
     float overlay_brightest_share = 1e-4f;
     float resample_history = 60.f;
-    bool keep_on_camera_move = false;
+    bool keep_on_camera_move = true;
     int32_t overlay_depth_mode = static_cast<int32_t>(PATH_DEBUG_DEPTH_DASH);
     int32_t overlay_color = static_cast<int32_t>(PATH_DEBUG_COLOR_LUMINANCE);
     std::optional<uint32_t> isolate_path;
@@ -626,12 +647,12 @@ class PathDebugNode : public Node {
     float overlay_thickness = 2.f;
     float overlay_exposure = 1.f;
 
-    int32_t backdrop = static_cast<int32_t>(PATH_DEBUG_BACKDROP_FILTERED);
+    int32_t backdrop = static_cast<int32_t>(PATH_DEBUG_BACKDROP_ACCUMULATED);
     int32_t false_color = FALSE_COLOR_OFF;
+    bool false_color_filtered = false;
     std::string reference_path;
     bool reference_loaded = false;
     bool reference_input_connected = false;
-    // the image asks for a reference or backdrop input that is not there
     bool backdrop_missing = false;
     bool reference_dirty = false;
     bool reference_flip = false;
@@ -640,23 +661,19 @@ class PathDebugNode : public Node {
     float difference_gain = 10.f;
     float image_exposure = 1.f;
     bool image_dirty = true;
+    bool image_filtered_dirty = true;
     bool image_accumulated = false;
-    // of the filter and region the filtered image holds
     ImageSignature image_held;
-    // the camera of the voxel depths
     CameraHandle image_camera;
     float false_color_opacity = 0.6f;
 
     int32_t map_res_log2 = 5;
     int32_t map_transform = 0;
     int32_t map_frame = static_cast<int32_t>(PATH_DEBUG_FRAME_LOCAL);
-    int32_t map_pdf_ref = static_cast<int32_t>(PATH_DEBUG_PDF_REF_BSDF);
     bool map_accumulate = true;
-    int32_t map_draws = static_cast<int32_t>(PATH_DEBUG_DRAWS_BSDF);
     int32_t map_batch_frames = 64;
     bool check_requested = false;
     uint32_t check_seq = 0;
-    // BSDF check draws recorded since the maps were cleared
     uint32_t check_draws = 0;
     int32_t wi_mode = static_cast<int32_t>(PATH_DEBUG_WI_CAMERA);
     float wi_theta_deg = 45.f;
@@ -664,8 +681,8 @@ class PathDebugNode : public Node {
     bool maps_dirty = true;
     bool pdf_stale = true;
     uint32_t map_frames = 0;
-    std::array<bool, PATH_DEBUG_MAP_CHANNEL_COUNT> panel_enabled{true,  true,  false, true,  false,
-                                                                 false, true,  false, false, false,
+    std::array<bool, PATH_DEBUG_MAP_CHANNEL_COUNT> panel_enabled{true,  false, false, true,  false,
+                                                                 true,  true,  false, true,  true,
                                                                  false, false, false, false, false};
     bool panels_enabled = true;
     int32_t panel_size = 192;
@@ -677,6 +694,8 @@ class PathDebugNode : public Node {
     int32_t sphere_channel = -1;
     // of the distance
     float sphere_size = 0.05f;
+    bool sphere_scale = false;
+    int32_t statistics_kind = STATISTICS_PIXEL;
 
     // PATH_DEBUG_HEAT_* - PATH_DEBUG_HEAT_VERTICES
     int32_t heat_quantity = 0;
@@ -699,14 +718,11 @@ class PathDebugNode : public Node {
     uint32_t pixel_stats_generation = 0;
     bool kept_dirty = true;
     bool kept_updated = false;
-    // the selected pixel's statistics over the last frames
     std::deque<PixelSample> pixel_history;
 
-    // CAPTURE_OFF records, analyzes and draws nothing
     int32_t capture = CAPTURE_LIVE;
     bool was_frozen = false;
     bool camera_moved = false;
-    bool auto_keep_prob = true;
     float keep_prob = 1.f;
     bool export_next = false;
     bool export_metadata = true;

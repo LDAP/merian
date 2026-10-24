@@ -1,65 +1,59 @@
 // Include after common.slangh; needs merian_shaders.utils.dir_map.
 #pragma once
 
-bool path_debug_maps_hold(const uint seen) {
-    return (stats[PATH_DEBUG_STATS_SEEN] & seen) != 0;
+bool path_debug_set_holds(const uint set, const uint seen) {
+    return (stats[path_debug_set_stat(set, PATH_DEBUG_SET_SEEN)] & seen) != 0;
 }
 
-// light draws cover only the light, so a bin next to an empty one straddles the support's edge
-bool path_debug_support_interior(const uint2 cell) {
-    if (!path_debug_maps_hold(PATH_DEBUG_SEEN_CONNECTION)) {
-        return true;
-    }
+static const uint PATH_DEBUG_SUPPORT_OUTSIDE = 0;
+// a bin next to an empty one straddles the edge of the set's support
+static const uint PATH_DEBUG_SUPPORT_EDGE = 1;
+static const uint PATH_DEBUG_SUPPORT_INSIDE = 2;
+
+uint path_debug_support(const uint set, const uint2 cell) {
+    bool any_drawn = false;
+    bool all_drawn = true;
     for (int dy = -1; dy <= 1; dy++) {
         for (int dx = -1; dx <= 1; dx++) {
             const int2 n = int2(cell) + int2(dx, dy);
-            if (any(n < 0) || any(n >= int(params.map_res))) {
+            if (any(n < 0) || any(n >= int(params.map_res)) ||
+                !(dir_map_bin_solid_angle(params.map_transform, uint2(n), params.map_res) > 0.f)) {
                 continue;
             }
-            if (dir_map_bin_solid_angle(params.map_transform, uint2(n), params.map_res) > 0.f &&
-                maps[path_debug_map_count_at(path_debug_map_bin(uint2(n)))] == 0) {
-                return false;
-            }
+            const uint count = maps[path_debug_map_count_at(set, path_debug_map_bin(uint2(n)))];
+            const bool drawn = count != 0;
+            any_drawn = any_drawn || drawn;
+            all_drawn = all_drawn && drawn;
         }
     }
-    return true;
+    return all_drawn ? PATH_DEBUG_SUPPORT_INSIDE
+                     : (any_drawn ? PATH_DEBUG_SUPPORT_EDGE : PATH_DEBUG_SUPPORT_OUTSIDE);
 }
 
-// Variance of a bin's residual against its reference: `independent` for independent draws, batch
-// means once reused draws are correlated; negative while too few batches completed.
-float path_debug_residual_variance(const uint bin,
-                                   const bool recorded,
+// Variance of a bin's sum of 1/pdf: the independent draws', batch means once reused draws are
+// correlated; negative while too few batches completed.
+float path_debug_residual_variance(const uint set,
+                                   const uint bin,
                                    const float independent,
                                    const bool batch_end) {
-    if (!path_debug_maps_hold(PATH_DEBUG_SEEN_REUSED)) {
+    if (!path_debug_set_holds(set, PATH_DEBUG_SEEN_REUSED)) {
         return independent;
     }
     if (stats[PATH_DEBUG_STATS_BATCHES] + (batch_end ? 1 : 0) < PATH_DEBUG_MIN_BATCHES) {
         return -1.f;
     }
-    const uint total = stats[recorded ? PATH_DEBUG_STATS_DRAWS : PATH_DEBUG_STATS_SAMPLES];
+    const uint total = stats[path_debug_set_stat(set, PATH_DEBUG_SET_DRAWS)];
     const uint covered =
-        batch_end ? total
-                  : stats[recorded ? PATH_DEBUG_STATS_BATCH_DRAWS : PATH_DEBUG_STATS_BATCH_SAMPLES];
-    return asfloat(maps[path_debug_map_residual2_at(bin)]) * float(total) / float(max(covered, 1u));
+        batch_end ? total : stats[path_debug_set_stat(set, PATH_DEBUG_SET_BATCH_DRAWS)];
+    return asfloat(maps[path_debug_map_set_at(set, PATH_DEBUG_SET_REGION_RESIDUAL2, bin)]) *
+           float(total) / float(max(covered, 1u));
 }
 
-// the draws a bin must expect to be tested
 static const float PATH_DEBUG_MIN_EXPECTED = 5.f;
-// a quasi-delta bin: at least this many draws, and this many times what the pdf expects
-static const float PATH_DEBUG_SPIKE_DRAWS = 16.f;
-static const float PATH_DEBUG_SPIKE_EXCESS = 10.f;
-
-bool path_debug_is_spike(const float count, const float expected) {
-    return count >= PATH_DEBUG_SPIKE_DRAWS && count > PATH_DEBUG_SPIKE_EXCESS * expected;
-}
 
 static const uint PATH_DEBUG_BIN_TESTED = 0;
-// too few draws expected for the test
 static const uint PATH_DEBUG_BIN_EMPTY = 1;
 static const uint PATH_DEBUG_BIN_UNTESTABLE = 2;
-// a quasi-delta lobe, left out
-static const uint PATH_DEBUG_BIN_SPIKE = 3;
 
 struct PathDebugBinTest {
     uint state;
@@ -69,55 +63,112 @@ struct PathDebugBinTest {
     float expected;
 }
 
-// One bin of the test chi2 sums, against the pdf test_against picks.
-PathDebugBinTest path_debug_bin_test(const uint2 cell,
-                                     const float solid_angle,
-                                     const bool batch_end) {
+// One bin of a set's draws against the pdf it recorded: E[sum 1/pdf] = draws * omega inside the
+// support.
+PathDebugBinTest path_debug_recorded_test(const uint set,
+                                          const uint2 cell,
+                                          const float solid_angle,
+                                          const bool batch_end) {
     PathDebugBinTest test = { PATH_DEBUG_BIN_UNTESTABLE, 0.f, 0.f };
+    if (!path_debug_maps_at_point() || path_debug_set_holds(set, PATH_DEBUG_SEEN_RESAMPLED) ||
+        path_debug_support(set, cell) != PATH_DEBUG_SUPPORT_INSIDE) {
+        return test;
+    }
     const uint bin = path_debug_map_bin(cell);
-    const float count = float(maps[path_debug_map_count_at(bin)]);
-    if (params.map_pdf_ref == PATH_DEBUG_PDF_REF_RECORDED) {
-        if (!path_debug_maps_at_point() || !path_debug_support_interior(cell)) {
-            return test;
-        }
-        // E[sum 1/pdf] = draws * omega inside the support
-        test.expected = float(stats[PATH_DEBUG_STATS_DRAWS]) * solid_angle;
-        if (count < PATH_DEBUG_MIN_EXPECTED || test.expected < 1.f) {
-            test.state = PATH_DEBUG_BIN_EMPTY;
-            return test;
-        }
-        const float variance = path_debug_residual_variance(
-            bin, true, asfloat(maps[path_debug_map_recip2_at(bin)]), batch_end);
-        if (variance > 0.f) {
-            test.state = PATH_DEBUG_BIN_TESTED;
-            test.z = (asfloat(maps[path_debug_map_recip_at(bin)]) - test.expected) / sqrt(variance);
-        }
-        return test;
-    }
-    // the pdf's normalization is known from the second frame after a reset
-    const float norm = asfloat(stats[PATH_DEBUG_STATS_PDF_NORM]);
-    if (!path_debug_bsdf_comparable() || !(norm > 0.f) ||
-        path_debug_maps_hold(PATH_DEBUG_SEEN_CONNECTION | PATH_DEBUG_SEEN_RESAMPLED)) {
-        return test;
-    }
-    const float pdf = asfloat(maps[path_debug_map_pdf_at(bin)]);
-    test.expected = float(stats[PATH_DEBUG_STATS_SAMPLES]) * abs(pdf) * solid_angle / norm;
-    if (path_debug_is_spike(count, test.expected)) {
-        test.state = PATH_DEBUG_BIN_SPIKE;
-        return test;
-    }
-    // a negative pdf marks a bin too coarse for the lobe
-    if (pdf < 0.f) {
-        return test;
-    }
-    if (test.expected < PATH_DEBUG_MIN_EXPECTED) {
+    test.expected = float(stats[path_debug_set_stat(set, PATH_DEBUG_SET_DRAWS)]) * solid_angle;
+    if (float(maps[path_debug_map_count_at(set, bin)]) < PATH_DEBUG_MIN_EXPECTED ||
+        test.expected < 1.f) {
         test.state = PATH_DEBUG_BIN_EMPTY;
         return test;
     }
-    const float variance = path_debug_residual_variance(bin, false, test.expected, batch_end);
+    const float variance = path_debug_residual_variance(
+        set, bin, asfloat(maps[path_debug_map_set_at(set, PATH_DEBUG_SET_REGION_RECIP2, bin)]),
+        batch_end);
     if (variance > 0.f) {
         test.state = PATH_DEBUG_BIN_TESTED;
-        test.z = (count - test.expected) / sqrt(variance);
+        test.z = (asfloat(maps[path_debug_map_set_at(set, PATH_DEBUG_SET_REGION_RECIP, bin)]) -
+                  test.expected) /
+                 sqrt(variance);
     }
     return test;
+}
+
+// One bin of BSDF sample()'s continuous draws against their pdfs, as the recorded ones.
+PathDebugBinTest path_debug_check_test(const uint2 cell, const float solid_angle) {
+    PathDebugBinTest test = { PATH_DEBUG_BIN_UNTESTABLE, 0.f, 0.f };
+    const uint draws = stats[PATH_DEBUG_CHECK_DRAWS];
+    if (draws == 0 ||
+        path_debug_support(PATH_DEBUG_SET_CHECK, cell) != PATH_DEBUG_SUPPORT_INSIDE) {
+        return test;
+    }
+    const uint bin = path_debug_map_bin(cell);
+    test.expected = float(draws) * solid_angle;
+    if (float(maps[path_debug_map_check_at(bin)]) < PATH_DEBUG_MIN_EXPECTED ||
+        test.expected < 1.f) {
+        test.state = PATH_DEBUG_BIN_EMPTY;
+        return test;
+    }
+    const float variance = asfloat(maps[path_debug_map_check_recip2_at(bin)]);
+    if (variance > 0.f) {
+        test.state = PATH_DEBUG_BIN_TESTED;
+        test.z = (asfloat(maps[path_debug_map_check_recip_at(bin)]) - test.expected) /
+                 sqrt(variance);
+    }
+    return test;
+}
+
+// One bin of the NEE connections against their recorded pdfs: every light set whose support holds
+// the bin expects draws * omega.
+PathDebugBinTest path_debug_nee_test(const uint2 cell,
+                                     const float solid_angle,
+                                     const bool batch_end) {
+    PathDebugBinTest test = { PATH_DEBUG_BIN_UNTESTABLE, 0.f, 0.f };
+    if (!path_debug_maps_at_point()) {
+        return test;
+    }
+    const uint bin = path_debug_map_bin(cell);
+    float observed = 0.f;
+    float variance = 0.f;
+    float drawn = 0.f;
+    uint covering = 0;
+    for (uint set = PATH_DEBUG_SET_NEE; set <= PATH_DEBUG_SET_NEE_ENV; set++) {
+        const uint support = path_debug_support(set, cell);
+        if (support == PATH_DEBUG_SUPPORT_OUTSIDE) {
+            continue;
+        }
+        if (support == PATH_DEBUG_SUPPORT_EDGE ||
+            path_debug_set_holds(set, PATH_DEBUG_SEEN_RESAMPLED)) {
+            return test;
+        }
+        const float set_variance = path_debug_residual_variance(
+            set, bin, asfloat(maps[path_debug_map_set_at(set, PATH_DEBUG_SET_REGION_RECIP2, bin)]),
+            batch_end);
+        if (!(set_variance > 0.f)) {
+            return test;
+        }
+        covering++;
+        observed += asfloat(maps[path_debug_map_set_at(set, PATH_DEBUG_SET_REGION_RECIP, bin)]);
+        variance += set_variance;
+        drawn += float(maps[path_debug_map_count_at(set, bin)]);
+    }
+    test.expected = float(stats[path_debug_set_stat(PATH_DEBUG_SET_NEE, PATH_DEBUG_SET_DRAWS)]) *
+                    solid_angle * float(covering);
+    if (covering == 0 || drawn < PATH_DEBUG_MIN_EXPECTED || test.expected < 1.f) {
+        test.state = PATH_DEBUG_BIN_EMPTY;
+        return test;
+    }
+    test.state = PATH_DEBUG_BIN_TESTED;
+    test.z = (observed - test.expected) / sqrt(variance);
+    return test;
+}
+
+PathDebugBinTest path_debug_bin_test(const uint view, const uint2 cell, const float solid_angle) {
+    switch (view) {
+    case PATH_DEBUG_MAP_ZSCORE_SCATTER:
+        return path_debug_recorded_test(PATH_DEBUG_SET_SCATTER, cell, solid_angle, false);
+    case PATH_DEBUG_MAP_ZSCORE_NEE:
+        return path_debug_nee_test(cell, solid_angle, false);
+    default:
+        return path_debug_check_test(cell, solid_angle);
+    }
 }

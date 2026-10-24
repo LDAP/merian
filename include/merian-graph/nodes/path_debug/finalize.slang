@@ -60,7 +60,6 @@ void write_top_list() {
         out_state[dst + PATH_DEBUG_TOP_SLOT] = slot;
         out_state[dst + PATH_DEBUG_TOP_PIXEL] = path_record_pack_pixel(p.pixel);
         out_state[dst + PATH_DEBUG_TOP_LUMINANCE] = asuint(p.luminance);
-        // the deepest of the selection's light paths
         const uint2 selected = path_debug_kept_events(slot);
         out_state[dst + PATH_DEBUG_TOP_SAMPLE_SCATTER] = path_debug_pack_sample_count(
             p.sample_idx, path_debug_events_depth(kept, p, PATH_DEBUG_KEPT_VERTICES, selected));
@@ -98,23 +97,20 @@ void main() {
     out_state[PATH_DEBUG_OUT_KEEP] = in_records[PATH_RECORD_HDR_KEEP_PROB];
 
     stats[PATH_DEBUG_STATS_MAX_SHARED] = 0;
-    stats[PATH_DEBUG_STATS_MAX_INTEGRAND] = 0;
-    stats[PATH_DEBUG_STATS_MAX_MEAN] = 0;
+    stats[PATH_DEBUG_STATS_MAX_NEE] = 0;
     stats[PATH_DEBUG_STATS_MAX_MOMENT] = 0;
     stats[PATH_DEBUG_STATS_MAX_RADIANCE] = 0;
     stats[PATH_DEBUG_STATS_EVAL_NORM] = stats[PATH_DEBUG_STATS_EVAL_INTEGRAL];
     stats[PATH_DEBUG_STATS_EVAL_INTEGRAL] = 0;
-    stats[PATH_DEBUG_STATS_TV_EVAL] = 0;
     stats[PATH_DEBUG_STATS_TV_CHECK] = 0;
-    stats[PATH_DEBUG_STATS_TV_RECORDS] = 0;
+    stats[PATH_DEBUG_STATS_TV_INTEGRAND] = 0;
     stats[PATH_DEBUG_STATS_PDF_NORM] = stats[PATH_DEBUG_STATS_PDF_INTEGRAL];
     stats[PATH_DEBUG_STATS_PDF_INTEGRAL] = 0;
-    stats[PATH_DEBUG_STATS_CHI2] = 0;
-    stats[PATH_DEBUG_STATS_CHI2_DOF] = 0;
-    stats[PATH_DEBUG_STATS_SPIKE_MASS] = 0;
-    stats[PATH_DEBUG_STATS_SPIKE_BINS] = 0;
-    for (uint i = 0; i < PATH_DEBUG_THETA_UINTS * PATH_DEBUG_THETA_BANDS; i++) {
-        stats[PATH_DEBUG_STATS_THETA + i] = 0;
+    stats[PATH_DEBUG_STATS_CHECK_CHI2] = 0;
+    stats[PATH_DEBUG_STATS_CHECK_DOF] = 0;
+    for (uint set = 0; set < PATH_DEBUG_TESTED_SETS; set++) {
+        stats[path_debug_set_stat(set, PATH_DEBUG_SET_CHI2)] = 0;
+        stats[path_debug_set_stat(set, PATH_DEBUG_SET_DOF)] = 0;
     }
 
     out_state[PATH_DEBUG_OUT_ISOLATE + PATH_DEBUG_ISOLATE_VALID] = 0;
@@ -139,6 +135,8 @@ void main() {
     out_state[selected_at + 1] = asuint(selected.rel_error);
     out_state[selected_at + 2] = selected.count;
     out_state[selected_at + 3] = asuint(selected.variance);
+    out_state[selected_at + 4] = asuint(selected.max);
+    out_state[selected_at + 5] = selected.zeros;
 
     // out_state persists, so an empty probe has to be written
     out_state[PATH_DEBUG_OUT_PROBE + PATH_DEBUG_PROBE_KIND] = PATH_DEBUG_PROBE_NONE;

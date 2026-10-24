@@ -18,7 +18,7 @@ Sampler2D<float4> in_backdrop;
 
 static const float3 SPLIT_COLOR = float3(1.f, 1.f, 0.1f);
 
-float3 filtered_tonemapped(const float3 radiance) {
+float3 recorded_tonemapped(const float3 radiance) {
     return 1.f - exp(-radiance * params.image_exposure);
 }
 
@@ -40,8 +40,12 @@ float3 sample_reference(const uint2 pixel) {
 
 float3 backdrop_color(const uint2 pixel, const float3 render, const uint2 render_pixel) {
     switch (params.backdrop) {
-    case PATH_DEBUG_BACKDROP_FILTERED:
-        return filtered_tonemapped(filtered_radiance(render_pixel));
+    case PATH_DEBUG_BACKDROP_FRAME:
+    case PATH_DEBUG_BACKDROP_ACCUMULATED:
+    case PATH_DEBUG_BACKDROP_FRAME_FILTERED:
+    case PATH_DEBUG_BACKDROP_ACCUMULATED_FILTERED:
+        return recorded_tonemapped(
+            recorded_radiance(render_pixel, path_debug_backdrop_filtered(params.backdrop)));
     case PATH_DEBUG_BACKDROP_REFERENCE:
         return params.image_exposure * sample_reference(pixel);
     case PATH_DEBUG_BACKDROP_DIFFERENCE:
@@ -61,7 +65,6 @@ float heat_lookup(const float3 pos) {
     if (params.heat_smooth == 0) {
         return path_debug_heat_value(cell);
     }
-    // the cell and its six face neighbors
     for (int axis = 0; axis < 3; axis++) {
         for (int side = -1; side <= 1; side += 2) {
             float3 offset = float3(0);
@@ -72,8 +75,7 @@ float heat_lookup(const float3 pos) {
     return path_debug_heat_value(cell / 7.f);
 }
 
-// the mean contribution of the filtered paths at a record pixel
-float3 filtered_radiance(const uint2 render_pixel) {
+float3 recorded_radiance(const uint2 render_pixel, const bool with_filter) {
     if (params.filtered_active == 0) {
         return float3(0.f);
     }
@@ -81,7 +83,7 @@ float3 filtered_radiance(const uint2 render_pixel) {
     if (source.x == PATH_DEBUG_NO_PIXEL) {
         return float3(0.f);
     }
-    const uint base = path_debug_filtered_base(source);
+    const uint base = path_debug_filtered_base(source, with_filter && path_debug_narrows());
     const uint count = filtered[base + PATH_DEBUG_FILTERED_COUNT];
     return count > 0 ? path_debug_load_float3(filtered, base) / float(count) : float3(0.f);
 }
@@ -99,13 +101,104 @@ float scene_distance(const uint2 pixel) {
     return lerp(lerp(z00, z10, f.x), lerp(z01, z11, f.x), f.y);
 }
 
-// the displayed pixel at the center of the cursor's record pixel
 uint2 cursor_display_pixel() {
     if (params.cursor_x == PATH_DEBUG_NO_PIXEL) {
         return uint2(PATH_DEBUG_NO_PIXEL);
     }
     return uint2((float2(params.cursor_x, params.cursor_y) + 0.5f) * float2(path_debug_out_dim()) /
                  float2(path_debug_dim()));
+}
+
+struct SphereHit {
+    bool valid;
+    float t;
+    // from the center to the hit, and the surface normal there
+    float3 dir;
+    float3 normal;
+}
+
+static const uint SPHERE_STEPS = 96;
+static const uint SPHERE_REFINES = 8;
+// the radius of a direction without value, over the full one
+static const float SPHERE_MIN_EXTENT = 0.02f;
+
+float sphere_extent(const float3 dir, const float3x3 to_map) {
+    if (params.sphere_scale == 0) {
+        return 1.f;
+    }
+    return max(path_debug_map_extent_dir(params.sphere_channel, mul(to_map, dir)),
+               SPHERE_MIN_EXTENT);
+}
+
+// The sphere at the selected point; scaled, its radius per direction is the value on the panel's
+// color scale, marched inside the full sphere and refined by bisection.
+SphereHit trace_sphere(const float3 rd, out float3x3 to_map) {
+    SphereHit hit = { false, 0.f, float3(0), float3(0) };
+    to_map = float3x3(0.f);
+    const float3 center = path_debug_selected_point();
+    const float radius = params.sphere_radius * distance(camera.position, center);
+    const float3 oc = camera.position - center;
+    const float b = dot(oc, rd);
+    const float h2 = b * b - (dot(oc, oc) - radius * radius);
+    if (h2 < 0.f) {
+        return hit;
+    }
+    const float t_in = max(-b - sqrt(h2), 0.f);
+    const float t_out = -b + sqrt(h2);
+    if (t_out <= 0.f) {
+        return hit;
+    }
+    to_map = dir_map_frame(
+        path_debug_map_normal(gbuffer.get_first_hit_normal(path_debug_selected_pixel())),
+        params.map_frame == PATH_DEBUG_FRAME_LOCAL);
+    const float3 enter = normalize(camera.position + rd * t_in - center);
+    if (params.sphere_scale == 0) {
+        hit.valid = true;
+        hit.t = t_in;
+        hit.dir = enter;
+        hit.normal = enter;
+        return hit;
+    }
+
+    const float step = (t_out - t_in) / float(SPHERE_STEPS);
+    float t_prev = t_in;
+    for (uint i = 1; i <= SPHERE_STEPS; i++) {
+        const float t = t_in + step * float(i);
+        const float3 q = camera.position + rd * t - center;
+        const float d = length(q);
+        if (d > 0.f && d > radius * sphere_extent(q / d, to_map)) {
+            t_prev = t;
+            continue;
+        }
+        float lo = t_prev;
+        float hi = t;
+        for (uint r = 0; r < SPHERE_REFINES; r++) {
+            const float mid = 0.5f * (lo + hi);
+            const float3 m = camera.position + rd * mid - center;
+            const float dm = length(m);
+            if (dm > 0.f && dm > radius * sphere_extent(m / dm, to_map)) {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+        hit.valid = true;
+        hit.t = hi;
+        hit.dir = normalize(camera.position + rd * hi - center);
+        // the surface r(dir) * dir from two neighbor directions
+        const float3 t1 = normalize(abs(hit.dir.z) < 0.9f ? cross(hit.dir, float3(0, 0, 1))
+                                                          : cross(hit.dir, float3(1, 0, 0)));
+        const float3 t2 = cross(hit.dir, t1);
+        const float eps = 0.02f;
+        const float3 d1 = normalize(hit.dir + eps * t1);
+        const float3 d2 = normalize(hit.dir + eps * t2);
+        const float3 p0 = sphere_extent(hit.dir, to_map) * hit.dir;
+        const float3 n = cross(sphere_extent(d1, to_map) * d1 - p0,
+                               sphere_extent(d2, to_map) * d2 - p0);
+        hit.normal = length(n) > 0.f ? normalize(n) * sign(dot(n, hit.dir) + 1e-12f) : hit.dir;
+        return hit;
+    }
+    return hit;
 }
 
 float3 compose(const uint2 pixel, const float3 src) {
@@ -145,29 +238,19 @@ float3 compose(const uint2 pixel, const float3 src) {
 
     if (merian_path_debug_gbuffer && params.sphere_channel != PATH_DEBUG_MAP_NONE &&
         params.sel_point_valid != 0) {
-        const float3 center = path_debug_selected_point();
-        const float radius = params.sphere_radius * distance(camera.position, center);
         const float3 rd =
             camera.get_pinhole_direction_unjittered(float2(pixel), path_debug_out_dim());
-        const float3 oc = camera.position - center;
-        const float b = dot(oc, rd);
-        const float h2 = b * b - (dot(oc, oc) - radius * radius);
-        const float t = -b - sqrt(max(h2, 0.f));
-        // the scene in front of it hides it
-        if (h2 >= 0.f && t >= 0.f && t < scene_distance(pixel)) {
-            const float3 dir = normalize(camera.position + rd * t - center);
-            const float3 selected_normal =
-                gbuffer.get_first_hit_normal(path_debug_selected_pixel());
-            const float3x3 to_map = dir_map_frame(path_debug_map_normal(selected_normal),
-                                                  params.map_frame == PATH_DEBUG_FRAME_LOCAL);
-            const float3 map_dir = mul(to_map, dir);
+        float3x3 to_map;
+        const SphereHit hit = trace_sphere(rd, to_map);
+        if (hit.valid && hit.t < scene_distance(pixel)) {
+            const float3 map_dir = mul(to_map, hit.dir);
             const float3 uvw = dir_map_uv(params.map_transform, map_dir);
             if (uvw.z != 0.f && all(pixel == cursor_display_pixel())) {
                 state[PATH_DEBUG_STATE_SPHERE_PROBE] =
                     path_debug_map_bin(path_debug_map_cell(uvw.xy)) + 1;
             }
             const float3 sphere_color = path_debug_map_color_dir(params.sphere_channel, map_dir) *
-                                        (0.35f + 0.65f * saturate(-dot(dir, rd)));
+                                        (0.35f + 0.65f * saturate(-dot(hit.normal, rd)));
             color = lerp(color, sphere_color, params.overlay_alpha);
         }
     }
@@ -182,7 +265,7 @@ void main(uint3 gid: SV_DispatchThreadID) {
 
     if (all(pixel < path_debug_dim())) {
         if (params.filtered_out != 0) {
-            const float3 filtered = filtered_radiance(pixel);
+            const float3 filtered = recorded_radiance(pixel, true);
             const float lum = yuv_luminance(filtered);
             out_filtered[pixel] = float4(filtered, lum * lum);
         }

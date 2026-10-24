@@ -12,6 +12,40 @@ using merian;
 #include "merian-graph/nodes/path_debug/map_display.slangh"
 #include "merian-shaders/utils/math-constants.slangh"
 
+struct SetReduction {
+    float chi2;
+    uint dof;
+    float lag_product;
+    float lag_square;
+}
+
+// a tested set's bin at a batch end: its residual, and with the previous one where the bin lies
+// inside the set's support
+SetReduction record_batch(const uint set,
+                          const uint bin,
+                          const uint2 cell,
+                          const float solid_angle) {
+    SetReduction r = { 0.f, 0, 0.f, 0.f };
+    const float sum_recip =
+        asfloat(maps[path_debug_map_set_at(set, PATH_DEBUG_SET_REGION_RECIP, bin)]);
+    const float batch_draws = float(stats[path_debug_set_stat(set, PATH_DEBUG_SET_DRAWS)] -
+                                    stats[path_debug_set_stat(set, PATH_DEBUG_SET_BATCH_DRAWS)]);
+    const uint start_at = path_debug_map_set_at(set, PATH_DEBUG_SET_REGION_RECIP_START, bin);
+    const uint residual2_at = path_debug_map_set_at(set, PATH_DEBUG_SET_REGION_RESIDUAL2, bin);
+    const uint prev_at = path_debug_map_set_at(set, PATH_DEBUG_SET_REGION_RESIDUAL_PREV, bin);
+    const float residual = (sum_recip - asfloat(maps[start_at])) - batch_draws * solid_angle;
+    if (stats[PATH_DEBUG_STATS_BATCHES] > 0 &&
+        path_debug_support(set, cell) == PATH_DEBUG_SUPPORT_INSIDE) {
+        const float prev = asfloat(maps[prev_at]);
+        r.lag_product = residual * prev;
+        r.lag_square = prev * prev;
+    }
+    maps[residual2_at] = asuint(asfloat(maps[residual2_at]) + residual * residual);
+    maps[prev_at] = asuint(residual);
+    maps[start_at] = asuint(sum_recip);
+    return r;
+}
+
 [numthreads(PATH_DEBUG_WG, 1, 1)]
 [shader("compute")]
 void main(uint3 gid: SV_DispatchThreadID) {
@@ -22,127 +56,114 @@ void main(uint3 gid: SV_DispatchThreadID) {
         in_map ? dir_map_bin_solid_angle(params.map_transform, cell, params.map_res) : 0.f;
 
     float shared = 0.f;
-    float integrand = 0.f;
+    float nee_max = 0.f;
     float moment = 0.f;
     float radiance = 0.f;
-    float mean = 0.f;
     float pdf_part = 0.f;
     float eval_part = 0.f;
-    float tv_eval = 0.f;
     float tv_check = 0.f;
-    float tv_records = 0.f;
-    float chi2 = 0.f;
-    uint dof = 0;
-    float lag_product = 0.f;
-    float lag_square = 0.f;
+    float tv_integrand = 0.f;
+    float check_chi2 = 0.f;
+    uint check_dof = 0;
+    SetReduction sets[PATH_DEBUG_TESTED_SETS];
+    const bool batch_end = params.map_batch_end != 0;
+    const SetReduction untested = { 0.f, 0, 0.f, 0.f };
+    for (uint set = 0; set < PATH_DEBUG_TESTED_SETS; set++) {
+        sets[set] = in_map && batch_end ? record_batch(set, bin, cell, solid_angle) : untested;
+    }
     if (in_map) {
-        const float density = path_debug_map_value(PATH_DEBUG_MAP_DENSITY, cell, solid_angle);
+        const PathDebugBinTest scatter_test =
+            path_debug_recorded_test(PATH_DEBUG_SET_SCATTER, cell, solid_angle, batch_end);
+        const PathDebugBinTest nee_test = path_debug_nee_test(cell, solid_angle, batch_end);
+        if (scatter_test.state == PATH_DEBUG_BIN_TESTED) {
+            sets[PATH_DEBUG_SET_SCATTER].chi2 = scatter_test.z * scatter_test.z;
+            sets[PATH_DEBUG_SET_SCATTER].dof = 1;
+        }
+        if (nee_test.state == PATH_DEBUG_BIN_TESTED) {
+            sets[PATH_DEBUG_SET_NEE].chi2 = nee_test.z * nee_test.z;
+            sets[PATH_DEBUG_SET_NEE].dof = 1;
+        }
+        if (params.sphere_channel != PATH_DEBUG_MAP_NONE && params.sphere_scale != 0) {
+            maps[path_debug_map_sphere_at(bin)] =
+                asuint(path_debug_map_value(params.sphere_channel, cell, solid_angle));
+        }
+
+        const float sampled =
+            path_debug_map_value(PATH_DEBUG_MAP_SAMPLED_SCATTER, cell, solid_angle);
         const float pdf = path_debug_map_value(PATH_DEBUG_MAP_PDF, cell, solid_angle);
         const float check = path_debug_map_value(PATH_DEBUG_MAP_CHECK, cell, solid_angle);
         const float eval_density = path_debug_map_value(PATH_DEBUG_MAP_EVAL, cell, solid_angle);
-        shared = max(max(max(density, pdf), max(check, eval_density)),
-                     max(path_debug_map_value(PATH_DEBUG_MAP_INTEGRAND_NORMALIZED, cell,
-                                              solid_angle),
-                         path_debug_map_value(PATH_DEBUG_MAP_RECORDED_PDF, cell, solid_angle)));
-        integrand = path_debug_map_value(PATH_DEBUG_MAP_INTEGRAND, cell, solid_angle);
+        const float target =
+            path_debug_map_value(PATH_DEBUG_MAP_INTEGRAND_NORMALIZED, cell, solid_angle);
+        shared = max(max(max(sampled, pdf), max(check, eval_density)),
+                     max(max(target, path_debug_map_value(PATH_DEBUG_MAP_SAMPLED_GUIDING, cell,
+                                                          solid_angle)),
+                         path_debug_map_value(PATH_DEBUG_MAP_RECORDED_SCATTER, cell,
+                                              solid_angle)));
+        nee_max = max(path_debug_map_value(PATH_DEBUG_MAP_SAMPLED_NEE, cell, solid_angle),
+                  path_debug_map_value(PATH_DEBUG_MAP_RECORDED_NEE, cell, solid_angle));
         moment = path_debug_map_value(PATH_DEBUG_MAP_SECOND_MOMENT, cell, solid_angle);
-        radiance = path_debug_map_value(PATH_DEBUG_MAP_RADIANCE_COLOR, cell, solid_angle);
-        mean = path_debug_map_value(PATH_DEBUG_MAP_MEAN, cell, solid_angle);
+        radiance = path_debug_map_value(PATH_DEBUG_MAP_RADIANCE, cell, solid_angle);
         pdf_part = pdf * solid_angle;
         eval_part = yuv_luminance(path_debug_map_eval(bin)) * solid_angle;
         // the pdf's normalization is known from the second frame after a reset
         const float pdf_norm = asfloat(stats[PATH_DEBUG_STATS_PDF_NORM]);
-        const float pdf_mass = pdf_norm > 0.f ? pdf_part / pdf_norm : 0.f;
-        if (solid_angle > 0.f && pdf_norm > 0.f) {
-            tv_eval = abs(pdf_mass - eval_density * solid_angle);
+        if (pdf_norm > 0.f) {
+            const float pdf_mass = pdf_part / pdf_norm;
             if (stats[PATH_DEBUG_STATS_CHECK_SAMPLES] > 0) {
                 tv_check = abs(pdf_mass - check * solid_angle);
             }
-            if (path_debug_bsdf_comparable()) {
-                tv_records = abs(pdf_mass - density * solid_angle);
-            }
         }
+        tv_integrand = abs(sampled - target) * solid_angle;
 
-        const uint count_raw = maps[path_debug_map_count_at(bin)];
-        const float count = float(count_raw);
-        const float sum_recip = asfloat(maps[path_debug_map_recip_at(bin)]);
-        const bool batch_end = params.map_batch_end != 0;
-        if (batch_end) {
-            const float batch_draws =
-                float(stats[PATH_DEBUG_STATS_DRAWS] - stats[PATH_DEBUG_STATS_BATCH_DRAWS]);
-            const float batch_samples =
-                float(stats[PATH_DEBUG_STATS_SAMPLES] - stats[PATH_DEBUG_STATS_BATCH_SAMPLES]);
-            const float residual =
-                params.map_pdf_ref == PATH_DEBUG_PDF_REF_RECORDED
-                    ? (sum_recip - asfloat(maps[path_debug_map_recip_start_at(bin)])) -
-                          batch_draws * solid_angle
-                    : (count - float(maps[path_debug_map_count_start_at(bin)])) -
-                          batch_samples * pdf_mass;
-            if (stats[PATH_DEBUG_STATS_BATCHES] > 0) {
-                const float prev = asfloat(maps[path_debug_map_residual_prev_at(bin)]);
-                lag_product = residual * prev;
-                lag_square = prev * prev;
-            }
-            maps[path_debug_map_residual2_at(bin)] =
-                asuint(asfloat(maps[path_debug_map_residual2_at(bin)]) + residual * residual);
-            maps[path_debug_map_residual_prev_at(bin)] = asuint(residual);
-            maps[path_debug_map_count_start_at(bin)] = count_raw;
-            maps[path_debug_map_recip_start_at(bin)] = asuint(sum_recip);
-        }
-
-        const PathDebugBinTest test = path_debug_bin_test(cell, solid_angle, batch_end);
+        const PathDebugBinTest test = path_debug_check_test(cell, solid_angle);
         if (test.state == PATH_DEBUG_BIN_TESTED) {
-            chi2 = test.z * test.z;
-            dof = 1;
-        } else if (test.state == PATH_DEBUG_BIN_SPIKE) {
-            path_debug_atomic_add_float(stats, stats_f, PATH_DEBUG_STATS_SPIKE_MASS,
-                                        (count - test.expected) /
-                                            max(float(stats[PATH_DEBUG_STATS_SAMPLES]), 1.f));
-            InterlockedAdd(stats[PATH_DEBUG_STATS_SPIKE_BINS], 1);
-        }
-
-        // the polar profile
-        const float4 center =
-            dir_map_dir(params.map_transform, (float2(cell) + 0.5f) / float(params.map_res));
-        if (solid_angle > 0.f && center.w != 0.f) {
-            const float theta = acos(clamp(center.z, -1.f, 1.f));
-            const uint band = min(uint(theta / MERIAN_M_PI * PATH_DEBUG_THETA_BANDS),
-                                  PATH_DEBUG_THETA_BANDS - 1);
-            const uint base = PATH_DEBUG_STATS_THETA + PATH_DEBUG_THETA_UINTS * band;
-            InterlockedAdd(stats[base + 0], count_raw);
-            path_debug_atomic_add_float(stats, stats_f, base + 1, pdf_part);
-            path_debug_atomic_add_float(stats, stats_f, base + 2, solid_angle);
+            check_chi2 = test.z * test.z;
+            check_dof = 1;
         }
     }
 
     const float wave_eval_part = WaveActiveSum(eval_part);
-    const float wave_tv_eval = WaveActiveSum(tv_eval);
     const float wave_tv_check = WaveActiveSum(tv_check);
-    const float wave_tv_records = WaveActiveSum(tv_records);
+    const float wave_tv_integrand = WaveActiveSum(tv_integrand);
     const float wave_shared = WaveActiveMax(shared);
-    const float wave_integrand = WaveActiveMax(integrand);
+    const float wave_nee_max = WaveActiveMax(nee_max);
     const float wave_moment = WaveActiveMax(moment);
     const float wave_radiance = WaveActiveMax(radiance);
-    const float wave_mean = WaveActiveMax(mean);
     const float wave_integral = WaveActiveSum(pdf_part);
-    const float wave_chi2 = WaveActiveSum(chi2);
-    const uint wave_dof = WaveActiveSum(dof);
-    const float wave_lag_product = WaveActiveSum(lag_product);
-    const float wave_lag_square = WaveActiveSum(lag_square);
+    const float wave_check_chi2 = WaveActiveSum(check_chi2);
+    const uint wave_check_dof = WaveActiveSum(check_dof);
     if (WaveIsFirstLane()) {
         path_debug_atomic_max_float(stats, PATH_DEBUG_STATS_MAX_SHARED, wave_shared);
-        path_debug_atomic_add_float(stats, stats_f, PATH_DEBUG_STATS_EVAL_INTEGRAL, wave_eval_part);
-        path_debug_atomic_add_float(stats, stats_f, PATH_DEBUG_STATS_TV_EVAL, wave_tv_eval);
-        path_debug_atomic_add_float(stats, stats_f, PATH_DEBUG_STATS_TV_CHECK, wave_tv_check);
-        path_debug_atomic_add_float(stats, stats_f, PATH_DEBUG_STATS_TV_RECORDS, wave_tv_records);
-        path_debug_atomic_max_float(stats, PATH_DEBUG_STATS_MAX_INTEGRAND, wave_integrand);
+        path_debug_atomic_max_float(stats, PATH_DEBUG_STATS_MAX_NEE, wave_nee_max);
         path_debug_atomic_max_float(stats, PATH_DEBUG_STATS_MAX_MOMENT, wave_moment);
         path_debug_atomic_max_float(stats, PATH_DEBUG_STATS_MAX_RADIANCE, wave_radiance);
-        path_debug_atomic_max_float(stats, PATH_DEBUG_STATS_MAX_MEAN, wave_mean);
+        path_debug_atomic_add_float(stats, stats_f, PATH_DEBUG_STATS_EVAL_INTEGRAL, wave_eval_part);
+        path_debug_atomic_add_float(stats, stats_f, PATH_DEBUG_STATS_TV_CHECK, wave_tv_check);
+        path_debug_atomic_add_float(stats, stats_f, PATH_DEBUG_STATS_TV_INTEGRAND,
+                                    wave_tv_integrand);
         path_debug_atomic_add_float(stats, stats_f, PATH_DEBUG_STATS_PDF_INTEGRAL, wave_integral);
-        path_debug_atomic_add_float(stats, stats_f, PATH_DEBUG_STATS_CHI2, wave_chi2);
-        InterlockedAdd(stats[PATH_DEBUG_STATS_CHI2_DOF], wave_dof);
-        path_debug_atomic_add_float(stats, stats_f, PATH_DEBUG_STATS_LAG_PRODUCT, wave_lag_product);
-        path_debug_atomic_add_float(stats, stats_f, PATH_DEBUG_STATS_LAG_SQUARE, wave_lag_square);
+        path_debug_atomic_add_float(stats, stats_f, PATH_DEBUG_STATS_CHECK_CHI2, wave_check_chi2);
+        InterlockedAdd(stats[PATH_DEBUG_STATS_CHECK_DOF], wave_check_dof);
+    }
+    for (uint set = 0; set < PATH_DEBUG_TESTED_SETS; set++) {
+        const float wave_chi2 = WaveActiveSum(sets[set].chi2);
+        const uint wave_dof = WaveActiveSum(sets[set].dof);
+        const float wave_lag_product = WaveActiveSum(sets[set].lag_product);
+        const float wave_lag_square = WaveActiveSum(sets[set].lag_square);
+        // the NEE test reports for both of its sets
+        const uint reported = set == PATH_DEBUG_SET_NEE_ENV ? PATH_DEBUG_SET_NEE : set;
+        if (WaveIsFirstLane()) {
+            path_debug_atomic_add_float(stats, stats_f,
+                                        path_debug_set_stat(reported, PATH_DEBUG_SET_CHI2),
+                                        wave_chi2);
+            InterlockedAdd(stats[path_debug_set_stat(reported, PATH_DEBUG_SET_DOF)], wave_dof);
+            path_debug_atomic_add_float(stats, stats_f,
+                                        path_debug_set_stat(reported, PATH_DEBUG_SET_LAG_PRODUCT),
+                                        wave_lag_product);
+            path_debug_atomic_add_float(stats, stats_f,
+                                        path_debug_set_stat(reported, PATH_DEBUG_SET_LAG_SQUARE),
+                                        wave_lag_square);
+        }
     }
 }

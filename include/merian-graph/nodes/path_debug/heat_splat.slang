@@ -30,7 +30,6 @@ float throughput_before(const PathRecordPath p, const uint vertex_region, const 
     return 1.f;
 }
 
-// the selection's paths at their chain vertices
 [numthreads(PATH_DEBUG_WG, 1, 1)]
 [shader("compute")]
 void main(uint3 gid: SV_DispatchThreadID) {
@@ -40,11 +39,16 @@ void main(uint3 gid: SV_DispatchThreadID) {
         return;
     }
 
-    if (!path_debug_matched(i)) {
-        return;
+    // every path, or what the region and the filter hold of it
+    const bool with_filter = params.false_color_filtered != 0;
+    uint2 selected = uint2(0xFFFFFFFFu);
+    if (with_filter) {
+        selected = path_debug_path_events(i, true);
+        if (all(selected == 0) && !path_debug_selection_open(true)) {
+            return;
+        }
     }
     const PathRecordPath p = path_record_load_path(in_records, i);
-    const uint2 selected = path_debug_path_events(i);
 
     const uint vertex_region = path_record_vertex_region_offset(in_records);
     uint chain = path_debug_chain_length(in_records, p, vertex_region);
@@ -55,7 +59,8 @@ void main(uint3 gid: SV_DispatchThreadID) {
     for (int k = int(p.vertex_count) - 1; k >= 0; k--) {
         const PathRecordVertex v =
             path_record_load_vertex(in_records, vertex_region, p.vertex_offset + k);
-        const bool event = path_debug_is_event_vertex(selected, uint(k));
+        const bool event = with_filter ? path_debug_is_event_vertex(selected, uint(k))
+                                       : !path_debug_is_empty_draw(v);
         const float lum = event ? path_debug_finite_or_zero(yuv_luminance(v.contrib)) : 0.f;
         if (v.nee) {
             nee_at_parent += lum;
@@ -72,7 +77,7 @@ void main(uint3 gid: SV_DispatchThreadID) {
         failed = 0;
         chain--;
         // path ends count the terminal vertex, an event or not
-        const bool counted = path_debug_event_drawn(selected, uint(k), false) ||
+        const bool counted = path_debug_event_drawn(selected, uint(k), false, with_filter) ||
                              (params.heat_mode == PATH_DEBUG_HEAT_PATH_ENDS && v.terminal);
         if (!counted || chain < params.heat_bounce_min || chain > params.heat_bounce_max) {
             continue;

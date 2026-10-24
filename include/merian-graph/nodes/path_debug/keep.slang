@@ -42,7 +42,8 @@ void main(uint3 tid: SV_GroupThreadID) {
             gs_keys[item] = per_frame ? 0 : path_debug_kept_key_now(item);
         } else {
             const uint path_index = candidate_path(item - slots, above);
-            gs_keys[item] = path_debug_top_key(path_debug_load_selected_path(path_index));
+            gs_keys[item] = path_debug_top_key(
+                path_debug_load_selected_path(path_index, path_debug_paths_filtered()));
         }
     }
     GroupMemoryBarrierWithGroupSync();
@@ -72,7 +73,8 @@ void main(uint3 tid: SV_GroupThreadID) {
     for (uint n = tid.x; n < gs_new_count; n += KEEP_THREADS) {
         const uint item = gs_new[n];
         const uint path_index = candidate_path(item - slots, above);
-        path_debug_keep_path(gs_free[n], path_index, path_debug_load_selected_path(path_index),
+        path_debug_keep_path(gs_free[n], path_index,
+                             path_debug_load_selected_path(path_index, path_debug_paths_filtered()),
                              gs_keys[item]);
     }
 }

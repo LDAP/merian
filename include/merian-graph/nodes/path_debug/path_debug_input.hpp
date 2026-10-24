@@ -20,11 +20,9 @@ class PathDebugInput : public InputListener {
 
     struct Click {
         float2 pos;
-        // with the modifier held
         bool select;
     };
 
-    // What arrived since the last consume_events().
     struct Events {
         std::optional<Click> click;
         double panel_scroll = 0.;

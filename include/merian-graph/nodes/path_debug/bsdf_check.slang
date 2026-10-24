@@ -72,8 +72,15 @@ void main(uint3 gid: SV_DispatchThreadID, ParameterBlock<Scene> scene) {
 
         const float3 uvw = dir_map_uv(params.map_transform, mul(to_map, frame.to_world(check.wo)));
         if (uvw.z != 0.f) {
-            InterlockedAdd(
-                maps[path_debug_map_check_at(path_debug_map_bin(path_debug_map_cell(uvw.xy)))], 1);
+            const uint bin = path_debug_map_bin(path_debug_map_cell(uvw.xy));
+            InterlockedAdd(maps[path_debug_map_check_at(bin)], 1);
+            if (!check.delta) {
+                const float recip = min(1.f / check.pdf, 1e12f);
+                path_debug_atomic_add_float(maps, maps_f, path_debug_map_check_recip_at(bin),
+                                            recip);
+                path_debug_atomic_add_float(maps, maps_f, path_debug_map_check_recip2_at(bin),
+                                            recip * recip);
+            }
             landed++;
         }
         const float weight_lum = yuv_luminance(check.weight);
