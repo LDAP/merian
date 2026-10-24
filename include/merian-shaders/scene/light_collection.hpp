@@ -138,6 +138,7 @@ class LightCollection {
         bool has_sky_portals = false;
         uint32_t debug_view = 0;
         BufferHandle env_cdf;
+        BufferHandle env_guide;
         uint32_t env_size = 0;
     };
 
@@ -239,6 +240,7 @@ class LightCollection {
     int32_t flux_samples = 32;
     // log2 side length of the equal-area octahedral importance map over the environment
     int32_t env_importance_log2 = 8;
+    int32_t env_importance_samples = 2;
     bool env_importance_resized = false;
     bool env_importance_built = false;
     uint64_t env_version = std::numeric_limits<uint64_t>::max();
@@ -257,6 +259,7 @@ class LightCollection {
     BufferHandle prev_offsets_buffer;
 
     BufferHandle env_cdf_buffer[2];
+    BufferHandle env_guide_buffer[2];
     uint32_t env_cdf_slot = 0;
     BufferHandle env_cdf_state_buffer;
     BufferHandle env_cones_buffer;
@@ -346,6 +349,7 @@ class LightCollection {
     Versioned<SlangProgramEntryPoint> guide_entry_point;
     Versioned<Pipeline> guide_pipeline;
     Versioned<ShaderObject> guide_params;
+    Versioned<ShaderObject> env_guide_params;
 };
 
 } // namespace merian

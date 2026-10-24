@@ -11,9 +11,10 @@ struct EnvImportanceBinding {
     // zeroed, see LightCdfBinding
     RWStructuredBuffer<uint> state;
     uint size;
+    uint samples;
 };
 
-// The mean environment luminance over a stratified 2x2 within every texel, scanned in Morton order.
+// The mean environment luminance over a stratified grid in every texel, scanned in Morton order.
 [shader("compute")][numthreads(CDF_GROUP_SIZE, 1, 1)] void
 build(uint thread_id : SV_GroupIndex,
       ParameterBlock<Scene> scene,
@@ -26,17 +27,19 @@ build(uint thread_id : SV_GroupIndex,
     if (i < texels) {
         const uint2 texel = morton_decode2d(i);
         const float inv_size = 1.f / float(params.size);
+        const float inv_samples = 1.f / float(params.samples);
         float sum = 0.f;
-        for (uint s = 0; s < 4; s++) {
-            const float2 offset =
-                float2(0.25f + 0.5f * float(s & 1), 0.25f + 0.5f * float(s >> 1));
-            const float3 dir = equal_area_square_to_sphere((float2(texel) + offset) * inv_size);
-            // the environment is looked up along -wi, and emitters may only light later bounces
-            const ShadingData sd = make_env_shading_data(dir, float3(0), scene.time);
-            sum += yuv_luminance(scene.eval_env_map(sd, DefaultLODSampler()));
+        for (uint y = 0; y < params.samples; y++) {
+            for (uint x = 0; x < params.samples; x++) {
+                const float2 offset = (float2(x, y) + 0.5f) * inv_samples;
+                const float3 dir = equal_area_square_to_sphere((float2(texel) + offset) * inv_size);
+                // the environment is looked up along -wi, and emitters may only light later bounces
+                const ShadingData sd = make_env_shading_data(dir, float3(0), scene.time);
+                const float luminance = yuv_luminance(scene.eval_env_map(sd, DefaultLODSampler()));
+                sum += isfinite(luminance) ? max(luminance, 0.f) : 0.f;
+            }
         }
-        value = 0.25f * sum;
-        value = isfinite(value) ? max(value, 0.f) : 0.f;
+        value = sum * inv_samples * inv_samples;
     }
 
     float2 total;

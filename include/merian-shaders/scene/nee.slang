@@ -612,8 +612,9 @@ struct NEE {
         if (range.x >= count) {
             if (!lists_env())
                 return LIGHT_INVALID_INDEX;
-            texel = search_range(env.importance.cdf, range.x - count, range.y - count,
-                                 rng.next_float2());
+            texel = search_range_guided(env.importance.cdf, env.importance.guide,
+                                        env.importance.texel_count(), range.x - count,
+                                        range.y - count, rng.next_float2());
             return LIGHT_ENV_INDEX;
         }
         const uint position =

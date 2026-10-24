@@ -212,6 +212,11 @@ void LightCollection::ensure_pipelines(const SlangCompositionHandle& scene_compo
                                                                          allocator);
         });
         guide_params.depends_on(guide_entry_point);
+        env_guide_params = Versioned<ShaderObject>([this] {
+            return guide_entry_point->create_shader_object_for_parameter(context, "params",
+                                                                         allocator);
+        });
+        env_guide_params.depends_on(guide_entry_point);
     }
 }
 
@@ -225,18 +230,23 @@ void LightCollection::prepare_buffers(const CommandBufferHandle& cmd) {
         return;
     grid_cascades = std::clamp(grid_cascades, 1, static_cast<int32_t>(LIGHT_GRID_MAX_CASCADES));
     grid_cells_kept = std::clamp(grid_cells_kept, 64, 65536);
+    env_importance_samples = std::clamp(env_importance_samples, 1, 16);
 
     if (env_emissive) {
         if (env_importance_resized || !env_importance_built) {
             env_cdf_slot ^= 1u;
             env_importance_built = false;
-            if (env_importance_resized)
+            if (env_importance_resized) {
                 retire(env_cdf_buffer[env_cdf_slot], cmd);
+                retire(env_guide_buffer[env_cdf_slot], cmd);
+            }
         }
         env_importance_resized = false;
         const uint32_t texels = env_importance_size() * env_importance_size();
         ensure_buffer(env_cdf_buffer[env_cdf_slot], texels * sizeof(float2),
                       "LightCollection::env_cdf", cmd);
+        ensure_buffer(env_guide_buffer[env_cdf_slot], guide_size(texels),
+                      "LightCollection::env_guide", cmd);
         ensure_buffer(env_cdf_state_buffer, cdf_state_size(texels),
                       "LightCollection::env_cdf_state", cmd);
         if (lists_env()) {
@@ -472,6 +482,15 @@ void LightCollection::update(const CommandBufferHandle& cmd,
         ep->bind("params", params, cmd, pipe, obj_allocator);
         cmd->dispatch(groups_x, groups_y, 1);
     };
+    const auto run_guide = [&](const ShaderObjectHandle& params, const BufferHandle& cdf,
+                               const BufferHandle& guide, const uint32_t count) {
+        auto c = params->get_cursor();
+        c["cdf"] = cdf;
+        c["guide"] = guide;
+        c["count"] = count;
+        c["buckets"] = count;
+        run(guide_entry_point, guide_pipeline, params, cdf_block_count(count + 1));
+    };
     const BufferHandle& dummy = allocator->get_dummy_buffer();
     const auto or_dummy = [&](const BufferHandle& buffer) -> const BufferHandle& {
         return buffer ? buffer : dummy;
@@ -534,8 +553,12 @@ void LightCollection::update(const CommandBufferHandle& cmd,
             c["cdf"] = env_cdf_buffer[env_cdf_slot];
             c["state"] = env_cdf_state_buffer;
             c["size"] = env_size;
+            c["samples"] = static_cast<uint32_t>(env_importance_samples);
             run(env_build_entry_point, env_build_pipeline, params,
                 cdf_block_count(env_size * env_size), 1, scene_object);
+            barrier();
+            run_guide(env_guide_params.get(), env_cdf_buffer[env_cdf_slot],
+                      env_guide_buffer[env_cdf_slot], env_size * env_size);
             env_importance_built = true;
         }
         if (triangle_count > 0) {
@@ -614,13 +637,8 @@ void LightCollection::update(const CommandBufferHandle& cmd,
 
     if (triangle_count > 0) {
         MERIAN_PROFILE_SCOPE_GPU(cmd, "guide");
-        const auto params = guide_params.get();
-        auto c = params->get_cursor();
-        c["cdf"] = tree_cdf_buffer[grid_slot];
-        c["guide"] = tree_guide_buffer[grid_slot];
-        c["count"] = triangle_count;
-        c["buckets"] = triangle_count;
-        run(guide_entry_point, guide_pipeline, params, cdf_block_count(triangle_count + 1));
+        run_guide(guide_params.get(), tree_cdf_buffer[grid_slot], tree_guide_buffer[grid_slot],
+                  triangle_count);
         barrier();
     }
 
@@ -705,6 +723,7 @@ LightCollection::Binding LightCollection::make_binding() const {
     frame_binding.has_sky_portals = has_sky_portals;
     frame_binding.debug_view = static_cast<uint32_t>(debug_view);
     frame_binding.env_cdf = env_active ? env_cdf_buffer[env_cdf_slot] : dummy;
+    frame_binding.env_guide = env_active ? env_guide_buffer[env_cdf_slot] : dummy;
     frame_binding.env_size = env_active ? env_importance_size() : 0u;
     return frame_binding;
 }
@@ -746,6 +765,7 @@ void LightCollection::write(ShaderCursor cursor, const Binding& binding) {
 
     auto importance = cursor["env"]["importance"];
     importance["cdf"] = binding.env_cdf;
+    importance["guide"] = binding.env_guide;
     importance["size"] = binding.env_size;
 }
 
@@ -862,12 +882,17 @@ void LightCollection::properties(Properties& props) {
 
     if (props.st_begin_child("environment", "Environment")) {
         int32_t env_size_option = env_importance_log2 - 6;
-        if (props.config_options("importance map", env_size_option, {"64", "128", "256", "512"},
+        if (props.config_options("importance map", env_size_option,
+                                 {"64", "128", "256", "512", "1024"},
                                  Properties::OptionsStyle::COMBO,
                                  "Side length of the importance map over the environment.")) {
             env_importance_log2 = env_size_option + 6;
             env_importance_resized = true;
             grid_reset = true;
+        }
+        if (props.config_int("importance samples", env_importance_samples,
+                             "Stratified samples per texel side of the importance map.", 1, 16)) {
+            env_importance_built = false;
         }
         props.st_end_child();
     }

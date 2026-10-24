@@ -13,6 +13,7 @@ namespace merian {
 // sum in Morton order. Every texel covers the same solid angle, so the density needs no jacobian.
 struct EnvImportance {
     StructuredBuffer<float2> cdf;
+    StructuredBuffer<uint> guide;
     // texels per side, 0 disables environment sampling
     uint size;
 
@@ -41,7 +42,8 @@ struct EnvImportance {
         u = rng.next_float2();
         if (!is_valid())
             return false;
-        texel = morton_decode2d(search_range(cdf, 0, texel_count(), rng.next_float2()));
+        texel = morton_decode2d(
+            search_range_guided(cdf, guide, texel_count(), 0, texel_count(), rng.next_float2()));
         return true;
     }
 
