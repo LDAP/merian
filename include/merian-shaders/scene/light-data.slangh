@@ -241,15 +241,17 @@ bool ff_greater(const float2 a, const float2 b) {
     return a.x > b.x || (a.x == b.x && a.y > b.y);
 }
 
-// Where the entries of [first, end) are drawn by their share of the range's sum: u is uniform to 48
-// bits as two uniform numbers, so even entries far below the range's sum keep their share.
+// Where the entries between the sums base and top are drawn by their share: u is uniform to 48 bits
+// as two uniform numbers, so even entries far below the range's sum keep their share.
+float2 range_threshold(const float2 base, const float2 top, const float2 u) {
+    return ff_add(base, ff_mul(ff_add(top, -base), float2(u.x, u.y * (1.f / 16777216.f))));
+}
+
 float2 range_threshold(const StructuredBuffer<float2> cdf,
                        const uint first,
                        const uint end,
                        const float2 u) {
-    const float2 base = first > 0 ? cdf[first - 1] : float2(0);
-    const float2 total = ff_add(cdf[end - 1], -base);
-    return ff_add(base, ff_mul(total, float2(u.x, u.y * (1.f / 16777216.f))));
+    return range_threshold(first > 0 ? cdf[first - 1] : float2(0), cdf[end - 1], u);
 }
 
 uint cdf_bucket(const float value, const float scale, const uint buckets) {
@@ -257,13 +259,12 @@ uint cdf_bucket(const float value, const float scale, const uint buckets) {
 }
 
 // binary search from the guide's bucket on (Chen and Asau 1974)
-uint search_range_guided(const StructuredBuffer<float2> cdf,
-                         const StructuredBuffer<uint> guide,
-                         const uint buckets,
-                         const uint first,
-                         const uint end,
-                         const float2 u) {
-    const float2 threshold = range_threshold(cdf, first, end, u);
+uint search_guided(const StructuredBuffer<float2> cdf,
+                   const StructuredBuffer<uint> guide,
+                   const uint buckets,
+                   const uint first,
+                   const uint end,
+                   const float2 threshold) {
     const uint bucket = cdf_bucket(threshold.x, asfloat(guide[buckets + 1]), buckets);
     uint lo = clamp(guide[bucket], first, end - 1);
     uint hi = clamp(guide[bucket + 1], lo, end - 1);
@@ -275,6 +276,15 @@ uint search_range_guided(const StructuredBuffer<float2> cdf,
             lo = mid + 1;
     }
     return lo;
+}
+
+uint search_range_guided(const StructuredBuffer<float2> cdf,
+                         const StructuredBuffer<uint> guide,
+                         const uint buckets,
+                         const uint first,
+                         const uint end,
+                         const float2 u) {
+    return search_guided(cdf, guide, buckets, first, end, range_threshold(cdf, first, end, u));
 }
 #endif
 

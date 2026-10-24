@@ -47,6 +47,10 @@ static const uint32_t LIGHT_DEBUG_COVERAGE_RAYS = 32;
 static const uint32_t LIGHT_TREE_SIDE_BITS = 10;
 static const uint32_t LIGHT_TREE_ENV_KEY = 1u << 30;
 static const uint32_t LIGHT_TREE_NO_KEY = 0xFFFFFFFFu;
+// grids over the environment's importance map, as log2 of their side
+static const uint32_t ENV_IMPORTANCE_BASE_LOG2 = 6;
+static const uint32_t ENV_LOOKUP_LOG2 = 8;
+static const uint32_t ENV_CONE_LOG2 = 8;
 static const uint32_t LIGHT_SORT_RADIX_BITS = 8;
 static const uint32_t LIGHT_SORT_PASSES = 4;
 static const uint32_t LIGHT_SORT_GROUP = 256;

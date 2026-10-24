@@ -21,24 +21,32 @@ struct LightGuideBinding {
     uint buckets;
 };
 
-[shader("compute")][numthreads(CDF_GROUP_SIZE, 1, 1)] void
-guide(uint bucket : SV_DispatchThreadID, ParameterBlock<LightGuideBinding> params) {
-    if (bucket > params.buckets)
+void write_guide(const StructuredBuffer<float2> cdf,
+                 const RWStructuredBuffer<uint> guide,
+                 const uint count,
+                 const uint buckets,
+                 const uint bucket) {
+    if (bucket > buckets)
         return;
-    const float total = params.cdf[params.count - 1].x;
-    const float scale = total > 0.f ? float(params.buckets) / total : 0.f;
+    const float total = count > 0 ? cdf[count - 1].x : 0.f;
+    const float scale = total > 0.f ? float(buckets) / total : 0.f;
     if (bucket == 0)
-        params.guide[params.buckets + 1] = asuint(scale);
+        guide[buckets + 1] = asuint(scale);
     uint lo = 0;
-    uint hi = params.count;
+    uint hi = count;
     while (lo < hi) {
         const uint mid = (lo + hi) >> 1;
-        if (cdf_bucket(params.cdf[mid].x, scale, params.buckets) >= bucket)
+        if (cdf_bucket(cdf[mid].x, scale, buckets) >= bucket)
             hi = mid;
         else
             lo = mid + 1;
     }
-    params.guide[bucket] = lo;
+    guide[bucket] = lo;
+}
+
+[shader("compute")][numthreads(CDF_GROUP_SIZE, 1, 1)] void
+guide(uint bucket : SV_DispatchThreadID, ParameterBlock<LightGuideBinding> params) {
+    write_guide(params.cdf, params.guide, params.count, params.buckets, bucket);
 }
 
 // One entry per wave; a wave size of one would mean one per thread.

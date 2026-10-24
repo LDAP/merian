@@ -1,5 +1,6 @@
 #include "merian-shaders/utils/math-constants.slangh"
 
+import merian_shaders.scene.env_importance;
 import merian_shaders.scene.light_data;
 import merian_shaders.utils.envmap;
 import merian_shaders.utils.morton;
@@ -18,11 +19,10 @@ struct LightPreprocessBinding {
     StructuredBuffer<EmissiveLightProxy, ScalarDataLayout> proxies;
     StructuredBuffer<uint> tree_keys;
     StructuredBuffer<float2> tree_cdf;
-    StructuredBuffer<float2> env_cdf;
-    // 0 where the cells do not list the environment
-    uint env_size;
-    // per node of the environment's texels, heap-indexed: the cone around them as (center, cosine
-    // of the radius)
+    // size 0 where the cells do not list the environment
+    EnvImportance env;
+    // per node of the environment's texels down to ENV_CONE_LOG2, heap-indexed: the cone around
+    // them as (center, cosine of the radius)
     RWStructuredBuffer<float4> env_cones;
     RWStructuredBuffer<LightTreeInfo, ScalarDataLayout> tree_info;
     StructuredBuffer<LightTreeInfo, ScalarDataLayout> tree_info_prev;
@@ -34,6 +34,7 @@ struct LightPreprocessBinding {
     RWStructuredBuffer<uint> grid_feedback;
     StructuredBuffer<uint> grid_feedback_prev;
     RWStructuredBuffer<uint> grid_starts;
+    RWStructuredBuffer<float2> grid_env_prefix;
     RWStructuredBuffer<float> grid_probability;
     RWStructuredBuffer<LightBound, ScalarDataLayout> grid_slot_bounds;
     RWStructuredBuffer<LightGridInfo, ScalarDataLayout> grid_info;
@@ -545,7 +546,7 @@ grid_assign(uint3 group_id : SV_GroupID,
 }
 
 uint env_texels(const LightPreprocessBinding params) {
-    return params.env_size * params.env_size;
+    return params.env.texel_count();
 }
 
 uint light_count(const LightPreprocessBinding params) {
@@ -598,24 +599,26 @@ struct TreeNode {
     }
 };
 
+// nodes below the cones' grid take their ancestor's
 uint env_cone_index(const uint side, const uint first_texel, const uint free_bits) {
-    const uint level_bits = 2u * firstbithigh(side) - free_bits;
-    return (1u << level_bits) + (first_texel >> free_bits);
+    const uint bits = max(free_bits, env_grid_shift(side, ENV_CONE_LOG2));
+    return (1u << (2u * firstbithigh(side) - bits)) + (first_texel >> bits);
 }
 
 [shader("compute")][numthreads(64, 1, 1)] void
 env_cones(uint3 thread_id : SV_DispatchThreadID, ParameterBlock<LightPreprocessBinding> params) {
     const uint index = thread_id.x + 1u;
-    if (index >= 2u * env_texels(params))
+    const uint side_bits = 2u * firstbithigh(params.env.size);
+    if (index >= 2u << (side_bits - env_grid_shift(params.env.size, ENV_CONE_LOG2)))
         return;
     const uint level_bits = firstbithigh(index);
-    const uint free_bits = 2u * firstbithigh(params.env_size) - level_bits;
+    const uint free_bits = side_bits - level_bits;
     const uint first_texel = (index - (1u << level_bits)) << free_bits;
 
     const uint2 axis_free = uint2((free_bits + 1u) / 2u, free_bits / 2u);
     const uint2 lo = (morton_decode2d(first_texel) >> axis_free) << axis_free;
     const float2 size = float2(uint2(1u) << axis_free);
-    const float inv_side = 1.f / float(params.env_size);
+    const float inv_side = 1.f / float(params.env.size);
     const float3 center = equal_area_square_to_sphere((float2(lo) + 0.5f * size) * inv_side);
     float cos_radius = 1.f;
     for (uint corner = 0; corner < 9; corner++) {
@@ -658,16 +661,15 @@ TreeNode tree_node(const LightPreprocessBinding params, const uint first, const 
     const uint first_texel = first - count;
     const uint last_texel = end - 1u - count;
     const float texels = float(env_texels(params));
-    node.flux = max(ff_diff(params.env_cdf[last_texel],
-                            first_texel > 0 ? params.env_cdf[first_texel - 1] : float2(0)),
-                    0.f) *
-                (MERIAN_PI * MERIAN_FOUR_PI / texels);
+    node.flux =
+        max(ff_diff(params.env.prefix(last_texel + 1u), params.env.prefix(first_texel)), 0.f) *
+        (MERIAN_PI * MERIAN_FOUR_PI / texels);
     const uint free_bits = shared_prefix_free_bits(first_texel, last_texel);
     node.splittable = free_bits > 0;
     if (node.splittable)
         node.split_key =
             LIGHT_TREE_ENV_KEY + ((last_texel >> (free_bits - 1u)) << (free_bits - 1u));
-    const float4 cone = params.env_cones[env_cone_index(params.env_size, first_texel, free_bits)];
+    const float4 cone = params.env_cones[env_cone_index(params.env.size, first_texel, free_bits)];
     node.distant = true;
     node.center = cone.xyz;
     const float cos_radius = cone.w;
@@ -935,6 +937,8 @@ void store_cut<S : ISlotGroup>(const S slots,
     params.grid_keys[entry] = key;
     params.grid_contribution[entry] = contribution;
     params.grid_starts[entry] = listed ? first : lights;
+    if (listed && first >= params.triangle_count && env_texels(params) > 0)
+        params.grid_env_prefix[entry] = params.env.prefix(first - params.triangle_count);
     params.grid_estimate[entry] = s.geometry.x > 0.f ? scale / s.geometry.x : 1.f;
     if (touched) {
         for (uint i = 0; i < LIGHT_GRID_FEEDBACK_STRIDE; i++)

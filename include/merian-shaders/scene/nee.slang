@@ -99,6 +99,8 @@ struct LightTree {
 
 struct LightGrid {
     StructuredBuffer<uint> starts;
+    // per environment slot, env.importance.prefix() of its first texel
+    StructuredBuffer<float2> env_prefix;
     StructuredBuffer<LightGridInfo, ScalarDataLayout> cascades;
     RWStructuredBuffer<uint> index;
     StructuredBuffer<LightGridBlock, ScalarDataLayout> blocks;
@@ -483,7 +485,7 @@ struct NEE {
 
     Optional<EnvSample> draw_env(const uint texel, inout RandomGenerator rng) {
         if (has_cuts())
-            return env.importance.texel_sample(morton_decode2d(texel), rng.next_float2());
+            return env.importance.texel_sample(texel, rng.next_float2());
         if (!has_env())
             return none;
         return env.importance.sample_direction(rng);
@@ -527,9 +529,8 @@ struct NEE {
 
     uint tree_position(const uint index, const float3 dir) {
         if (index == LIGHT_ENV_INDEX)
-            return lists_env()
-                       ? table.triangle_count + morton_encode2d(env.importance.texel_of(dir))
-                       : LIGHT_INVALID_INDEX;
+            return lists_env() ? table.triangle_count + env.importance.texel_of(dir)
+                               : LIGHT_INVALID_INDEX;
         return index < table.triangle_count ? tree.rank[index] : LIGHT_INVALID_INDEX;
     }
 
@@ -612,9 +613,9 @@ struct NEE {
         if (range.x >= count) {
             if (!lists_env())
                 return LIGHT_INVALID_INDEX;
-            texel = search_range_guided(env.importance.cdf, env.importance.guide,
-                                        env.importance.texel_count(), range.x - count,
-                                        range.y - count, rng.next_float2());
+            texel =
+                env.importance.draw_texel(range.x - count, range.y - count, grid.env_prefix[entry],
+                                          env_prefix_end(entry, range), rng.next_float2());
             return LIGHT_ENV_INDEX;
         }
         const uint position =
@@ -643,14 +644,20 @@ struct NEE {
         if (!lists_env() || !grid.draws_from(vertex, weights))
             return 0.f;
         const uint count = table.triangle_count;
-        const uint texel = morton_encode2d(env.importance.texel_of(dir));
+        const uint texel = env.importance.texel_of(dir);
         const uint entry = grid.slot_of(vertex.cell, count + texel);
         const uint2 range = grid.slot_range(entry);
         if (range.x < count)
             return 0.f;
         return grid.slot_share(vertex, entry, weights) *
-               range_share(env.importance.cdf, range.x - count, range.y - count, texel) *
+               env.importance.range_share(grid.env_prefix[entry], env_prefix_end(entry, range),
+                                          texel) *
                float(tree.env_texels) / MERIAN_FOUR_PI;
+    }
+
+    float2 env_prefix_end(const uint entry, const uint2 range) {
+        return range.y < grid.light_count ? grid.env_prefix[entry + 1u]
+                                          : env.importance.prefix(env.importance.texel_count());
     }
 
     Optional<LightCandidate> draw_triangle(const uint index,

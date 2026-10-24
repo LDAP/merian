@@ -91,7 +91,12 @@ class LightCollection {
         if (version != env_version || !is_static) {
             env_importance_built = false;
         }
+        if (is_static != env_static && env_importance_log2 != env_dynamic_importance_log2) {
+            env_importance_resized = true;
+            grid_reset = true;
+        }
         env_version = version;
+        env_static = is_static;
     }
 
     void set_env_emissive(const bool value) {
@@ -123,6 +128,7 @@ class LightCollection {
         BufferHandle rank;
         uint32_t env_texels = 0;
         BufferHandle starts;
+        BufferHandle env_prefix;
         BufferHandle cascades;
         BufferHandle index;
         BufferHandle blocks;
@@ -137,18 +143,24 @@ class LightCollection {
         uint32_t light_count = 0;
         bool has_sky_portals = false;
         uint32_t debug_view = 0;
+        BufferHandle env_keys;
         BufferHandle env_cdf;
         BufferHandle env_guide;
+        BufferHandle env_lookup;
         uint32_t env_size = 0;
+        uint32_t env_buckets = 0;
     };
 
     void prepare_buffers(const CommandBufferHandle& cmd);
     Binding make_binding() const;
     static void write(ShaderCursor cursor, const Binding& binding);
     void ensure_pipelines(const SlangCompositionHandle& scene_composition);
+    uint32_t env_importance_side_log2() const;
     uint32_t env_importance_size() const {
-        return 1u << static_cast<uint32_t>(env_importance_log2);
+        return 1u << env_importance_side_log2();
     }
+    uint32_t env_grid_cells(uint32_t grid_log2) const;
+    uint32_t env_leaf_capacity() const;
     bool uses_grid() const {
         return source == LightSource::LightSourceGrid;
     }
@@ -239,10 +251,13 @@ class LightCollection {
     bool has_sky_portals = false;
     int32_t flux_samples = 32;
     // log2 side length of the equal-area octahedral importance map over the environment
-    int32_t env_importance_log2 = 8;
+    int32_t env_importance_log2 = 11;
+    int32_t env_dynamic_importance_log2 = 9;
     int32_t env_importance_samples = 2;
+    int32_t env_importance_leaves = 16384;
     bool env_importance_resized = false;
     bool env_importance_built = false;
+    bool env_static = true;
     uint64_t env_version = std::numeric_limits<uint64_t>::max();
 
     std::vector<LightGeometry> light_geometries;
@@ -258,10 +273,14 @@ class LightCollection {
     std::optional<Binding> prev_binding;
     BufferHandle prev_offsets_buffer;
 
+    BufferHandle env_texel_cdf_buffer;
+    BufferHandle env_keys_buffer[2];
     BufferHandle env_cdf_buffer[2];
     BufferHandle env_guide_buffer[2];
+    BufferHandle env_lookup_buffer[2];
     uint32_t env_cdf_slot = 0;
     BufferHandle env_cdf_state_buffer;
+    BufferHandle env_leaves_state_buffer;
     BufferHandle env_cones_buffer;
     // side length of the environment the cones were computed for
     uint32_t env_cones_size = 0;
@@ -284,6 +303,7 @@ class LightCollection {
     // zeroed in the next update
     bool grid_feedback_fresh = false;
     BufferHandle grid_starts_buffer[2];
+    BufferHandle grid_env_prefix_buffer[2];
     BufferHandle grid_estimate_buffer[2];
     BufferHandle grid_slot_bounds_buffer[2];
     BufferHandle grid_probability_buffer[2];
@@ -340,6 +360,12 @@ class LightCollection {
     Versioned<SlangProgramEntryPoint> env_build_entry_point;
     Versioned<Pipeline> env_build_pipeline;
     Versioned<ShaderObject> env_build_params;
+    Versioned<SlangProgramEntryPoint> env_leaves_entry_point;
+    Versioned<Pipeline> env_leaves_pipeline;
+    Versioned<ShaderObject> env_leaves_params;
+    Versioned<SlangProgramEntryPoint> env_guide_entry_point;
+    Versioned<Pipeline> env_guide_pipeline;
+    Versioned<ShaderObject> env_guide_params;
 
     SlangCompositionHandle cdf_composition;
     Versioned<SlangProgram> cdf_program;
@@ -349,7 +375,6 @@ class LightCollection {
     Versioned<SlangProgramEntryPoint> guide_entry_point;
     Versioned<Pipeline> guide_pipeline;
     Versioned<ShaderObject> guide_params;
-    Versioned<ShaderObject> env_guide_params;
 };
 
 } // namespace merian

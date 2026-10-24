@@ -94,6 +94,23 @@ void LightCollection::retire(BufferHandle& buffer, const CommandBufferHandle& cm
     buffer.reset();
 }
 
+uint32_t LightCollection::env_importance_side_log2() const {
+    return static_cast<uint32_t>(env_static ? env_importance_log2 : env_dynamic_importance_log2);
+}
+
+uint32_t LightCollection::env_grid_cells(const uint32_t grid_log2) const {
+    return 1u << (2 * std::min(env_importance_side_log2(), grid_log2));
+}
+
+// below the base grid every level splits fewer than budget nodes, each into four leaves
+uint32_t LightCollection::env_leaf_capacity() const {
+    const uint32_t levels =
+        env_importance_side_log2() - std::min(env_importance_side_log2(), ENV_IMPORTANCE_BASE_LOG2);
+    return std::min(env_importance_size() * env_importance_size(),
+                    env_grid_cells(ENV_IMPORTANCE_BASE_LOG2) +
+                        3 * levels * static_cast<uint32_t>(env_importance_leaves));
+}
+
 void LightCollection::ensure_pipelines(const SlangCompositionHandle& scene_composition) {
     if (!update_composition) {
         update_composition = SlangComposition::create();
@@ -173,17 +190,22 @@ void LightCollection::ensure_pipelines(const SlangCompositionHandle& scene_compo
         env_composition->add_module_from_path("merian-shaders/scene/env-importance-build.slang",
                                               true);
         env_program = SlangProgram::create(compile_context, env_composition);
-        env_build_entry_point = SlangProgramEntryPoint::create(env_program, "build");
-        env_build_pipeline = Versioned<Pipeline>([this] {
-            const auto ep = env_build_entry_point.get();
-            return ComputePipeline::create(ep->get_pipeline_layout(context), ep->specialize());
-        });
-        env_build_pipeline.depends_on(env_build_entry_point);
-        env_build_params = Versioned<ShaderObject>([this] {
-            return env_build_entry_point->create_shader_object_for_parameter(context, "params",
-                                                                             allocator);
-        });
-        env_build_params.depends_on(env_build_entry_point);
+        const auto make = [&](const std::string& name, Versioned<SlangProgramEntryPoint>& ep,
+                              Versioned<Pipeline>& pipe, Versioned<ShaderObject>& params) {
+            ep = SlangProgramEntryPoint::create(env_program, name);
+            pipe = Versioned<Pipeline>([this, &ep] {
+                const auto e = ep.get();
+                return ComputePipeline::create(e->get_pipeline_layout(context), e->specialize());
+            });
+            pipe.depends_on(ep);
+            params = Versioned<ShaderObject>([this, &ep] {
+                return ep->create_shader_object_for_parameter(context, "params", allocator);
+            });
+            params.depends_on(ep);
+        };
+        make("build", env_build_entry_point, env_build_pipeline, env_build_params);
+        make("leaves", env_leaves_entry_point, env_leaves_pipeline, env_leaves_params);
+        make("leaf_guide", env_guide_entry_point, env_guide_pipeline, env_guide_params);
     }
 
     if (!cdf_composition) {
@@ -212,11 +234,6 @@ void LightCollection::ensure_pipelines(const SlangCompositionHandle& scene_compo
                                                                          allocator);
         });
         guide_params.depends_on(guide_entry_point);
-        env_guide_params = Versioned<ShaderObject>([this] {
-            return guide_entry_point->create_shader_object_for_parameter(context, "params",
-                                                                         allocator);
-        });
-        env_guide_params.depends_on(guide_entry_point);
     }
 }
 
@@ -230,28 +247,46 @@ void LightCollection::prepare_buffers(const CommandBufferHandle& cmd) {
         return;
     grid_cascades = std::clamp(grid_cascades, 1, static_cast<int32_t>(LIGHT_GRID_MAX_CASCADES));
     grid_cells_kept = std::clamp(grid_cells_kept, 64, 65536);
-    env_importance_samples = std::clamp(env_importance_samples, 1, 16);
+    env_importance_samples = std::clamp(env_importance_samples, 1, 8);
+    env_importance_leaves = std::clamp(env_importance_leaves, 256, 1 << 18);
 
     if (env_emissive) {
         if (env_importance_resized || !env_importance_built) {
             env_cdf_slot ^= 1u;
             env_importance_built = false;
             if (env_importance_resized) {
+                retire(env_keys_buffer[env_cdf_slot], cmd);
                 retire(env_cdf_buffer[env_cdf_slot], cmd);
                 retire(env_guide_buffer[env_cdf_slot], cmd);
+                retire(env_lookup_buffer[env_cdf_slot], cmd);
             }
         }
         env_importance_resized = false;
         const uint32_t texels = env_importance_size() * env_importance_size();
-        ensure_buffer(env_cdf_buffer[env_cdf_slot], texels * sizeof(float2),
+        const uint32_t leaves = env_leaf_capacity();
+        if (env_importance_built && env_static)
+            retire(env_texel_cdf_buffer, cmd);
+        if (!env_importance_built) {
+            ensure_buffer(env_texel_cdf_buffer, texels * sizeof(float2),
+                          "LightCollection::env_texel_cdf", cmd);
+            ensure_buffer(env_cdf_state_buffer, cdf_state_size(texels),
+                          "LightCollection::env_cdf_state", cmd);
+            ensure_buffer(env_leaves_state_buffer, cdf_state_size(texels),
+                          "LightCollection::env_leaves_state", cmd);
+        }
+        ensure_buffer(env_keys_buffer[env_cdf_slot], (leaves + 1) * sizeof(uint32_t),
+                      "LightCollection::env_keys", cmd);
+        ensure_buffer(env_cdf_buffer[env_cdf_slot], leaves * sizeof(float2),
                       "LightCollection::env_cdf", cmd);
-        ensure_buffer(env_guide_buffer[env_cdf_slot], guide_size(texels),
+        ensure_buffer(env_guide_buffer[env_cdf_slot],
+                      guide_size(static_cast<uint32_t>(env_importance_leaves)),
                       "LightCollection::env_guide", cmd);
-        ensure_buffer(env_cdf_state_buffer, cdf_state_size(texels),
-                      "LightCollection::env_cdf_state", cmd);
+        ensure_buffer(env_lookup_buffer[env_cdf_slot],
+                      (env_grid_cells(ENV_LOOKUP_LOG2) + 1) * sizeof(uint32_t),
+                      "LightCollection::env_lookup", cmd);
         if (lists_env()) {
             const BufferHandle previous = env_cones_buffer;
-            ensure_buffer(env_cones_buffer, 2 * texels * sizeof(float4),
+            ensure_buffer(env_cones_buffer, 2 * env_grid_cells(ENV_CONE_LOG2) * sizeof(float4),
                           "LightCollection::env_cones", cmd);
             if (env_cones_buffer != previous)
                 env_cones_size = 0;
@@ -351,6 +386,8 @@ void LightCollection::prepare_buffers(const CommandBufferHandle& cmd) {
         }
         ensure_buffer(grid_starts_buffer[grid_slot], slot_count * sizeof(uint32_t),
                       "LightCollection::grid_starts", cmd);
+        ensure_buffer(grid_env_prefix_buffer[grid_slot], slot_count * sizeof(float2),
+                      "LightCollection::grid_env_prefix", cmd);
         ensure_buffer(grid_estimate_buffer[grid_slot], slot_count * sizeof(float),
                       "LightCollection::grid_estimate", cmd);
         if (slot_weighing == LightSlotWeighing::LightSlotWeighingShadingPoint) {
@@ -446,9 +483,12 @@ void LightCollection::update(const CommandBufferHandle& cmd,
             cmd->fill(grid_offsets_buffer);
         }
     }
-    if (env_emissive && !env_importance_built)
-        cmd->fill(env_cdf_state_buffer, 0,
-                  cdf_state_size(env_importance_size() * env_importance_size()));
+    if (env_emissive && !env_importance_built) {
+        const vk::DeviceSize state_size =
+            cdf_state_size(env_importance_size() * env_importance_size());
+        cmd->fill(env_cdf_state_buffer, 0, state_size);
+        cmd->fill(env_leaves_state_buffer, 0, state_size);
+    }
     if (grid_feedback_fresh) {
         for (uint32_t i = 0; i < 2; i++) {
             cmd->fill(grid_feedback_buffer[i]);
@@ -482,15 +522,6 @@ void LightCollection::update(const CommandBufferHandle& cmd,
         ep->bind("params", params, cmd, pipe, obj_allocator);
         cmd->dispatch(groups_x, groups_y, 1);
     };
-    const auto run_guide = [&](const ShaderObjectHandle& params, const BufferHandle& cdf,
-                               const BufferHandle& guide, const uint32_t count) {
-        auto c = params->get_cursor();
-        c["cdf"] = cdf;
-        c["guide"] = guide;
-        c["count"] = count;
-        c["buckets"] = count;
-        run(guide_entry_point, guide_pipeline, params, cdf_block_count(count + 1));
-    };
     const BufferHandle& dummy = allocator->get_dummy_buffer();
     const auto or_dummy = [&](const BufferHandle& buffer) -> const BufferHandle& {
         return buffer ? buffer : dummy;
@@ -502,8 +533,13 @@ void LightCollection::update(const CommandBufferHandle& cmd,
         c["proxies"] = proxies_buffer;
         c["tree_keys"] = tree_keys_buffer[0];
         c["tree_cdf"] = tree_cdf_buffer[grid_slot];
-        c["env_cdf"] = env_listed ? env_cdf_buffer[env_cdf_slot] : dummy;
-        c["env_size"] = env_listed ? env_size : 0u;
+        auto env = c["env"];
+        env["keys"] = env_listed ? env_keys_buffer[env_cdf_slot] : dummy;
+        env["cdf"] = env_listed ? env_cdf_buffer[env_cdf_slot] : dummy;
+        env["guide"] = env_listed ? env_guide_buffer[env_cdf_slot] : dummy;
+        env["lookup"] = env_listed ? env_lookup_buffer[env_cdf_slot] : dummy;
+        env["size"] = env_listed ? env_size : 0u;
+        env["buckets"] = static_cast<uint32_t>(env_importance_leaves);
         c["env_cones"] = env_listed ? env_cones_buffer : dummy;
         c["tree_info"] = tree_info_buffer[grid_slot];
         c["tree_info_prev"] = tree_info_buffer[grid_slot ^ 1];
@@ -514,6 +550,7 @@ void LightCollection::update(const CommandBufferHandle& cmd,
         c["grid_feedback"] = or_dummy(grid_feedback_buffer[grid_slot]);
         c["grid_feedback_prev"] = or_dummy(grid_feedback_buffer[grid_slot ^ 1]);
         c["grid_starts"] = or_dummy(grid_starts_buffer[grid_slot]);
+        c["grid_env_prefix"] = or_dummy(grid_env_prefix_buffer[grid_slot]);
         c["grid_estimate"] = or_dummy(grid_estimate_buffer[grid_slot]);
         c["grid_probability"] = or_dummy(grid_probability_buffer[grid_slot]);
         c["grid_slot_bounds"] = or_dummy(grid_slot_bounds_buffer[grid_slot]);
@@ -550,15 +587,34 @@ void LightCollection::update(const CommandBufferHandle& cmd,
         if (env_emissive && !env_importance_built) {
             const auto params = env_build_params.get();
             auto c = params->get_cursor();
-            c["cdf"] = env_cdf_buffer[env_cdf_slot];
+            c["cdf"] = env_texel_cdf_buffer;
             c["state"] = env_cdf_state_buffer;
             c["size"] = env_size;
             c["samples"] = static_cast<uint32_t>(env_importance_samples);
             run(env_build_entry_point, env_build_pipeline, params,
                 cdf_block_count(env_size * env_size), 1, scene_object);
             barrier();
-            run_guide(env_guide_params.get(), env_cdf_buffer[env_cdf_slot],
-                      env_guide_buffer[env_cdf_slot], env_size * env_size);
+            const auto leaves = env_leaves_params.get();
+            auto leaves_cursor = leaves->get_cursor();
+            leaves_cursor["texel_cdf"] = env_texel_cdf_buffer;
+            leaves_cursor["keys"] = env_keys_buffer[env_cdf_slot];
+            leaves_cursor["cdf"] = env_cdf_buffer[env_cdf_slot];
+            leaves_cursor["lookup"] = env_lookup_buffer[env_cdf_slot];
+            leaves_cursor["state"] = env_leaves_state_buffer;
+            leaves_cursor["size"] = env_size;
+            leaves_cursor["budget"] = static_cast<uint32_t>(env_importance_leaves);
+            run(env_leaves_entry_point, env_leaves_pipeline, leaves,
+                cdf_block_count(env_size * env_size));
+            barrier();
+            const auto guide = env_guide_params.get();
+            auto guide_cursor = guide->get_cursor();
+            guide_cursor["cdf"] = env_cdf_buffer[env_cdf_slot];
+            guide_cursor["lookup"] = env_lookup_buffer[env_cdf_slot];
+            guide_cursor["guide"] = env_guide_buffer[env_cdf_slot];
+            guide_cursor["lookup_cells"] = env_grid_cells(ENV_LOOKUP_LOG2);
+            guide_cursor["buckets"] = static_cast<uint32_t>(env_importance_leaves);
+            run(env_guide_entry_point, env_guide_pipeline, guide,
+                cdf_block_count(static_cast<uint32_t>(env_importance_leaves) + 1));
             env_importance_built = true;
         }
         if (triangle_count > 0) {
@@ -589,7 +645,7 @@ void LightCollection::update(const CommandBufferHandle& cmd,
         }
         if (env_listed && env_cones_size != env_size) {
             run(env_cones_entry_point, env_cones_pipeline, write_preprocess(env_cones_params.get()),
-                (2 * env_size * env_size + 63) / 64);
+                (2 * env_grid_cells(ENV_CONE_LOG2) + 63) / 64);
             env_cones_size = env_size;
         }
         barrier();
@@ -637,8 +693,13 @@ void LightCollection::update(const CommandBufferHandle& cmd,
 
     if (triangle_count > 0) {
         MERIAN_PROFILE_SCOPE_GPU(cmd, "guide");
-        run_guide(guide_params.get(), tree_cdf_buffer[grid_slot], tree_guide_buffer[grid_slot],
-                  triangle_count);
+        const auto params = guide_params.get();
+        auto c = params->get_cursor();
+        c["cdf"] = tree_cdf_buffer[grid_slot];
+        c["guide"] = tree_guide_buffer[grid_slot];
+        c["count"] = triangle_count;
+        c["buckets"] = triangle_count;
+        run(guide_entry_point, guide_pipeline, params, cdf_block_count(triangle_count + 1));
         barrier();
     }
 
@@ -708,6 +769,7 @@ LightCollection::Binding LightCollection::make_binding() const {
     frame_binding.rank = or_dummy(tree_rank_buffer[grid_slot]);
     frame_binding.env_texels = env_texels;
     frame_binding.starts = or_dummy(grid_starts_buffer[grid_slot]);
+    frame_binding.env_prefix = or_dummy(grid_env_prefix_buffer[grid_slot]);
     frame_binding.cascades = or_dummy(grid_info_buffer[grid_slot]);
     frame_binding.index = or_dummy(grid_index_buffer[grid_slot]);
     frame_binding.blocks = or_dummy(grid_blocks_buffer);
@@ -722,9 +784,12 @@ LightCollection::Binding LightCollection::make_binding() const {
     frame_binding.light_count = triangle_count + env_texels;
     frame_binding.has_sky_portals = has_sky_portals;
     frame_binding.debug_view = static_cast<uint32_t>(debug_view);
+    frame_binding.env_keys = env_active ? env_keys_buffer[env_cdf_slot] : dummy;
     frame_binding.env_cdf = env_active ? env_cdf_buffer[env_cdf_slot] : dummy;
     frame_binding.env_guide = env_active ? env_guide_buffer[env_cdf_slot] : dummy;
+    frame_binding.env_lookup = env_active ? env_lookup_buffer[env_cdf_slot] : dummy;
     frame_binding.env_size = env_active ? env_importance_size() : 0u;
+    frame_binding.env_buckets = static_cast<uint32_t>(env_importance_leaves);
     return frame_binding;
 }
 
@@ -747,6 +812,7 @@ void LightCollection::write(ShaderCursor cursor, const Binding& binding) {
 
     auto grid = cursor["grid"];
     grid["starts"] = binding.starts;
+    grid["env_prefix"] = binding.env_prefix;
     grid["cascades"] = binding.cascades;
     grid["index"] = binding.index;
     grid["blocks"] = binding.blocks;
@@ -764,9 +830,12 @@ void LightCollection::write(ShaderCursor cursor, const Binding& binding) {
     cursor["debug_view"] = binding.debug_view;
 
     auto importance = cursor["env"]["importance"];
+    importance["keys"] = binding.env_keys;
     importance["cdf"] = binding.env_cdf;
     importance["guide"] = binding.env_guide;
+    importance["lookup"] = binding.env_lookup;
     importance["size"] = binding.env_size;
+    importance["buckets"] = binding.env_buckets;
 }
 
 void LightCollection::write_to(ShaderCursor cursor) const {
@@ -881,17 +950,31 @@ void LightCollection::properties(Properties& props) {
     }
 
     if (props.st_begin_child("environment", "Environment")) {
-        int32_t env_size_option = env_importance_log2 - 6;
-        if (props.config_options("importance map", env_size_option,
-                                 {"64", "128", "256", "512", "1024"},
+        const std::vector<std::string> sizes = {"64", "128", "256", "512", "1024", "2048"};
+        int32_t static_option = env_importance_log2 - 6;
+        if (props.config_options("importance map", static_option, sizes,
                                  Properties::OptionsStyle::COMBO,
-                                 "Side length of the importance map over the environment.")) {
-            env_importance_log2 = env_size_option + 6;
-            env_importance_resized = true;
-            grid_reset = true;
+                                 "Side length of the importance map over a static environment.")) {
+            env_importance_log2 = static_option + 6;
+            env_importance_resized |= env_static;
+            grid_reset |= env_static;
+        }
+        int32_t dynamic_option = env_dynamic_importance_log2 - 6;
+        if (props.config_options("dynamic importance map", dynamic_option, sizes,
+                                 Properties::OptionsStyle::COMBO,
+                                 "Side length of the importance map over an environment that "
+                                 "changes every frame.")) {
+            env_dynamic_importance_log2 = dynamic_option + 6;
+            env_importance_resized |= !env_static;
+            grid_reset |= !env_static;
         }
         if (props.config_int("importance samples", env_importance_samples,
-                             "Stratified samples per texel side of the importance map.", 1, 16)) {
+                             "Stratified samples per texel side of the importance map.", 1, 8)) {
+            env_importance_built = false;
+        }
+        if (props.config_int("importance leaves", env_importance_leaves,
+                             "Leaves of about equal energy the importance map aims for.", 256,
+                             1 << 18)) {
             env_importance_built = false;
         }
         props.st_end_child();
