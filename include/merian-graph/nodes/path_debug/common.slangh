@@ -43,10 +43,15 @@ bool path_debug_selects_point() {
            params.sel_record_x != PATH_DEBUG_NO_PIXEL;
 }
 
-// the local map frame's normal: the selected surface's, the pixel's until it is read back
+// the local map frame's normal: the selected surface's, the captured pixel's until it is read back
 float3 path_debug_map_normal(const float3 pixel_normal) {
     const float3 n = path_debug_selected_normal();
-    return any(n != 0.f) ? n : pixel_normal;
+    if (any(n != 0.f)) {
+        return n;
+    }
+    return params.surface_capture == 0
+               ? path_debug_load_float3(stats, PATH_DEBUG_STATS_SURFACE + PATH_DEBUG_SURFACE_NORMAL)
+               : pixel_normal;
 }
 
 bool path_debug_maps_at_point() {
@@ -147,8 +152,6 @@ uint path_debug_map_count_at(const uint set, const uint index) {
     switch (set) {
     case PATH_DEBUG_SET_GUIDING:
         return path_debug_map_region(PATH_DEBUG_MAP_GUIDING_REGION, index);
-    case PATH_DEBUG_SET_CHECK:
-        return path_debug_map_region(PATH_DEBUG_MAP_CHECK_REGION, index);
     default:
         return path_debug_map_set_at(set, PATH_DEBUG_SET_REGION_COUNT, index);
     }
@@ -156,14 +159,32 @@ uint path_debug_map_count_at(const uint set, const uint index) {
 uint path_debug_map_pdf_at(const uint index) {
     return path_debug_map_region(PATH_DEBUG_MAP_PDF_REGION, index);
 }
+uint path_debug_map_pdf_support_at(const uint index) {
+    return path_debug_map_region(PATH_DEBUG_MAP_PDF_SUPPORT_REGION, index);
+}
 uint path_debug_map_check_at(const uint index) {
     return path_debug_map_region(PATH_DEBUG_MAP_CHECK_REGION, index);
 }
 uint path_debug_map_check_recip_at(const uint index) {
     return path_debug_map_region(PATH_DEBUG_MAP_CHECK_RECIP_REGION, index);
 }
+uint path_debug_map_check_recip_error_at(const uint index) {
+    return path_debug_map_region(PATH_DEBUG_MAP_CHECK_RECIP_ERROR_REGION, index);
+}
 uint path_debug_map_check_recip2_at(const uint index) {
     return path_debug_map_region(PATH_DEBUG_MAP_CHECK_RECIP2_REGION, index);
+}
+uint path_debug_map_check_recip2_error_at(const uint index) {
+    return path_debug_map_region(PATH_DEBUG_MAP_CHECK_RECIP2_ERROR_REGION, index);
+}
+uint path_debug_map_check_recip_total_at(const uint index) {
+    return path_debug_map_region(PATH_DEBUG_MAP_CHECK_RECIP_TOTAL_REGION, 2 * index);
+}
+uint path_debug_map_check_recip2_total_at(const uint index) {
+    return path_debug_map_region(PATH_DEBUG_MAP_CHECK_RECIP2_TOTAL_REGION, 2 * index);
+}
+float path_debug_map_float_float(const uint index) {
+    return asfloat(maps[index]) + asfloat(maps[index + 1]);
 }
 uint path_debug_map_eval_at(const uint index) {
     return path_debug_map_region(PATH_DEBUG_MAP_EVAL_REGION, 3 * index);
@@ -615,8 +636,19 @@ uint2 path_debug_path_events(const uint path_index, const bool with_filter) {
     return uint2(events[base], events[base + 1]);
 }
 
-PathRecordPath path_debug_load_selected_path(const uint path_index, const bool with_filter) {
+// a path whose vertices lie outside the stream reads as empty
+PathRecordPath path_debug_load_record(const uint path_index) {
     PathRecordPath p = path_record_load_path(in_records, path_index);
+    const uint capacity = path_record_vertex_capacity(in_records);
+    if (p.vertex_offset > capacity || p.vertex_count > capacity - p.vertex_offset) {
+        p.vertex_offset = 0;
+        p.vertex_count = 0;
+    }
+    return p;
+}
+
+PathRecordPath path_debug_load_selected_path(const uint path_index, const bool with_filter) {
+    PathRecordPath p = path_debug_load_record(path_index);
     p.luminance = asfloat(events[path_index * PATH_DEBUG_EVENT_UINTS +
                                  (with_filter ? PATH_DEBUG_EVENT_LUMINANCE_FILTERED
                                            : PATH_DEBUG_EVENT_LUMINANCE)]);
@@ -759,23 +791,25 @@ uint path_debug_key_bin(const uint key) {
 }
 
 #if defined(MERIAN_SPIRV_CAP_SUPPORTED_AtomicFloat32AddEXT)
-void path_debug_atomic_add_float(RWStructuredBuffer<uint, ScalarDataLayout> buf,
-                                 RWStructuredBuffer<float, ScalarDataLayout> buf_f,
-                                 const uint index,
-                                 const float value) {
-    InterlockedAdd(buf_f[index], value);
+float path_debug_atomic_add_float(RWStructuredBuffer<uint, ScalarDataLayout> buf,
+                                  RWStructuredBuffer<float, ScalarDataLayout> buf_f,
+                                  const uint index,
+                                  const float value) {
+    float before;
+    InterlockedAdd(buf_f[index], value, before);
+    return before;
 }
 #else
-void path_debug_atomic_add_float(RWStructuredBuffer<uint, ScalarDataLayout> buf,
-                                 RWStructuredBuffer<float, ScalarDataLayout> buf_f,
-                                 const uint index,
-                                 const float value) {
+float path_debug_atomic_add_float(RWStructuredBuffer<uint, ScalarDataLayout> buf,
+                                  RWStructuredBuffer<float, ScalarDataLayout> buf_f,
+                                  const uint index,
+                                  const float value) {
     uint expected = buf[index];
     for (;;) {
         uint orig;
         InterlockedCompareExchange(buf[index], expected, asuint(asfloat(expected) + value), orig);
         if (orig == expected) {
-            break;
+            return asfloat(expected);
         }
         expected = orig;
     }

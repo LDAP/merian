@@ -10,14 +10,18 @@ static const uint PATH_DEBUG_SUPPORT_OUTSIDE = 0;
 static const uint PATH_DEBUG_SUPPORT_EDGE = 1;
 static const uint PATH_DEBUG_SUPPORT_INSIDE = 2;
 
+bool path_debug_bin_in_map(const int2 cell) {
+    return all(cell >= 0) && all(cell < int(params.map_res)) &&
+           dir_map_bin_solid_angle(params.map_transform, uint2(cell), params.map_res) > 0.f;
+}
+
 uint path_debug_support(const uint set, const uint2 cell) {
     bool any_drawn = false;
     bool all_drawn = true;
     for (int dy = -1; dy <= 1; dy++) {
         for (int dx = -1; dx <= 1; dx++) {
             const int2 n = int2(cell) + int2(dx, dy);
-            if (any(n < 0) || any(n >= int(params.map_res)) ||
-                !(dir_map_bin_solid_angle(params.map_transform, uint2(n), params.map_res) > 0.f)) {
+            if (!path_debug_bin_in_map(n)) {
                 continue;
             }
             const uint count = maps[path_debug_map_count_at(set, path_debug_map_bin(uint2(n)))];
@@ -63,6 +67,22 @@ struct PathDebugBinTest {
     float expected;
 }
 
+// the bin and its neighbours lie where pdf() is positive in every probed direction
+bool path_debug_pdf_supports(const uint2 cell) {
+    for (int dy = -1; dy <= 1; dy++) {
+        for (int dx = -1; dx <= 1; dx++) {
+            const int2 n = int2(cell) + int2(dx, dy);
+            if (!path_debug_bin_in_map(n)) {
+                continue;
+            }
+            if (maps[path_debug_map_pdf_support_at(path_debug_map_bin(uint2(n)))] == 0) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 // One bin of a set's draws against the pdf it recorded: E[sum 1/pdf] = draws * omega inside the
 // support.
 PathDebugBinTest path_debug_recorded_test(const uint set,
@@ -97,8 +117,7 @@ PathDebugBinTest path_debug_recorded_test(const uint set,
 PathDebugBinTest path_debug_check_test(const uint2 cell, const float solid_angle) {
     PathDebugBinTest test = { PATH_DEBUG_BIN_UNTESTABLE, 0.f, 0.f };
     const uint draws = stats[PATH_DEBUG_CHECK_DRAWS];
-    if (draws == 0 ||
-        path_debug_support(PATH_DEBUG_SET_CHECK, cell) != PATH_DEBUG_SUPPORT_INSIDE) {
+    if (draws == 0 || !path_debug_pdf_supports(cell)) {
         return test;
     }
     const uint bin = path_debug_map_bin(cell);
@@ -108,10 +127,11 @@ PathDebugBinTest path_debug_check_test(const uint2 cell, const float solid_angle
         test.state = PATH_DEBUG_BIN_EMPTY;
         return test;
     }
-    const float variance = asfloat(maps[path_debug_map_check_recip2_at(bin)]);
+    const float variance = path_debug_map_float_float(path_debug_map_check_recip2_total_at(bin));
     if (variance > 0.f) {
         test.state = PATH_DEBUG_BIN_TESTED;
-        test.z = (asfloat(maps[path_debug_map_check_recip_at(bin)]) - test.expected) /
+        test.z = (path_debug_map_float_float(path_debug_map_check_recip_total_at(bin)) -
+                  test.expected) /
                  sqrt(variance);
     }
     return test;

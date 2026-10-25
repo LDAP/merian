@@ -127,4 +127,28 @@ struct PCG : RandomGenerator {
     }
 }
 
+// Steele, Lea and Flood 2014, "Fast splittable pseudorandom number generators"
+struct SplitMix64 : RandomGenerator {
+    typealias CloneType = SplitMix64;
+
+    uint64_t state;
+
+    __init(uint64_t seed) {
+        this.state = seed;
+    }
+
+    CloneType clone() {
+        return SplitMix64(this.state);
+    }
+
+    [mutating]
+    uint next() {
+        state += 0x9E3779B97F4A7C15ull;
+        uint64_t z = state;
+        z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
+        z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
+        return uint((z ^ (z >> 31)) >> 32);
+    }
+}
+
 }

@@ -1,0 +1,41 @@
+// Include after common.slangh; needs merian_shaders.scene.hit.
+#pragma once
+
+struct PathDebugSurface {
+    RayDesc ray;
+    Hit hit;
+}
+
+// The selected point's camera ray and hit: this frame's in a capture frame, which store_thread
+// keeps with the pixel normal, else the kept ones.
+PathDebugSurface path_debug_surface(const RayDesc ray,
+                                    const Hit hit,
+                                    const float3 normal,
+                                    const bool store_thread) {
+    const uint at = PATH_DEBUG_STATS_SURFACE;
+    const uint hit_at = at + PATH_DEBUG_SURFACE_HIT;
+    PathDebugSurface surface = { ray, hit };
+    if (params.surface_capture != 0) {
+        if (store_thread) {
+            path_debug_store_float3(stats, at + PATH_DEBUG_SURFACE_ORIGIN, ray.Origin);
+            stats[at + PATH_DEBUG_SURFACE_T_MIN] = asuint(ray.TMin);
+            path_debug_store_float3(stats, at + PATH_DEBUG_SURFACE_DIRECTION, ray.Direction);
+            stats[at + PATH_DEBUG_SURFACE_T_MAX] = asuint(ray.TMax);
+            stats[hit_at + 0] = hit.instance_id;
+            stats[hit_at + 1] = hit.instance_index;
+            stats[hit_at + 2] = hit.primitive_id;
+            stats[hit_at + 3] = hit.geometry_index;
+            stats[hit_at + 4] = asuint(hit.barycentrics.x);
+            stats[hit_at + 5] = asuint(hit.barycentrics.y);
+            path_debug_store_float3(stats, at + PATH_DEBUG_SURFACE_NORMAL, normal);
+        }
+        return surface;
+    }
+    surface.ray.Origin = path_debug_load_float3(stats, at + PATH_DEBUG_SURFACE_ORIGIN);
+    surface.ray.TMin = asfloat(stats[at + PATH_DEBUG_SURFACE_T_MIN]);
+    surface.ray.Direction = path_debug_load_float3(stats, at + PATH_DEBUG_SURFACE_DIRECTION);
+    surface.ray.TMax = asfloat(stats[at + PATH_DEBUG_SURFACE_T_MAX]);
+    surface.hit = Hit(stats[hit_at + 0], stats[hit_at + 1], stats[hit_at + 2], stats[hit_at + 3],
+                      float2(asfloat(stats[hit_at + 4]), asfloat(stats[hit_at + 5])));
+    return surface;
+}

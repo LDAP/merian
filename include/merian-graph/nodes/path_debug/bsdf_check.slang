@@ -8,14 +8,28 @@ import merian_shaders.utils.frame;
 import merian_shaders.shading.bsdfs.bsdf_validate;
 import merian_shaders.colors.colorspaces;
 import merian_shaders.gbuffer;
+import merian_shaders.utils.math;
 
 using merian;
 
 #include "merian-graph/nodes/path_debug/layout.slangh"
 #include "merian-graph/nodes/path_debug/common.slangh"
+#include "merian-graph/nodes/path_debug/surface.slangh"
 
 ParameterBlock<GBuffer> gbuffer;
 [vk::push_constant] ConstantBuffer<PathDebugCheckPass> pass;
+
+static const uint64_t RANDOMS_PER_THREAD = 1024;
+
+// exact as long as the atomic rounds to nearest like the ALU
+void atomic_add_compensated(const uint index, const uint error_index, const float value) {
+    const float before = path_debug_atomic_add_float(maps, maps_f, index, value);
+    float error;
+    two_sum(before, value, error);
+    if (error != 0.f) {
+        path_debug_atomic_add_float(maps, maps_f, error_index, error);
+    }
+}
 
 [numthreads(PATH_DEBUG_WG_2D, PATH_DEBUG_WG_2D, 1)]
 [shader("compute")]
@@ -25,14 +39,17 @@ void main(uint3 gid: SV_DispatchThreadID, ParameterBlock<Scene> scene) {
     if (gid.x >= PATH_DEBUG_CHECK_DIM || (!sampling && !quadrature)) {
         return;
     }
-    const Hit hit = gbuffer.get_hit(path_debug_selected_pixel());
-    const RayDesc ray = scene.generate_camera_ray(path_debug_selected_pixel(), path_debug_dim());
-    const ShadingPoint sp = scene.get_shading_point(ray, hit);
+    const float3 selected_normal = gbuffer.get_first_hit_normal(path_debug_selected_pixel());
+    const PathDebugSurface surface =
+        path_debug_surface(scene.generate_camera_ray(path_debug_selected_pixel(), path_debug_dim()),
+                           gbuffer.get_hit(path_debug_selected_pixel()), selected_normal,
+                           all(gid.xy == 0));
+    const RayDesc ray = surface.ray;
+    const ShadingPoint sp = scene.get_shading_point(ray, surface.hit);
     if (!sp.has_surface_material) {
         return;
     }
 
-    const float3 selected_normal = gbuffer.get_first_hit_normal(path_debug_selected_pixel());
     const float3x3 to_map = dir_map_frame(path_debug_map_normal(selected_normal),
                                           params.map_frame == PATH_DEBUG_FRAME_LOCAL);
     const OrthonormalFrame frame = sp.shading_frame;
@@ -41,7 +58,9 @@ void main(uint3 gid: SV_DispatchThreadID, ParameterBlock<Scene> scene) {
 
     // 1. sampled half
     const uint draws = sampling ? PATH_DEBUG_CHECK_SAMPLES_PER_CELL : 0;
-    RandomGenerator rng = PCG(xxhash32(uint4(gid.xy, pass.seq, 0xB5D5u)));
+    const uint64_t stream =
+        (uint64_t(pass.seq) * PATH_DEBUG_CHECK_DIM + gid.y) * PATH_DEBUG_CHECK_DIM + gid.x;
+    RandomGenerator rng = SplitMix64(stream * RANDOMS_PER_THREAD * 0x9E3779B97F4A7C15ull);
     uint landed = 0;
     uint valid = 0;
     uint bad = 0;
@@ -76,10 +95,10 @@ void main(uint3 gid: SV_DispatchThreadID, ParameterBlock<Scene> scene) {
             InterlockedAdd(maps[path_debug_map_check_at(bin)], 1);
             if (!check.delta) {
                 const float recip = min(1.f / check.pdf, 1e12f);
-                path_debug_atomic_add_float(maps, maps_f, path_debug_map_check_recip_at(bin),
-                                            recip);
-                path_debug_atomic_add_float(maps, maps_f, path_debug_map_check_recip2_at(bin),
-                                            recip * recip);
+                atomic_add_compensated(path_debug_map_check_recip_at(bin),
+                                       path_debug_map_check_recip_error_at(bin), recip);
+                atomic_add_compensated(path_debug_map_check_recip2_at(bin),
+                                       path_debug_map_check_recip2_error_at(bin), recip * recip);
             }
             landed++;
         }

@@ -20,12 +20,12 @@ HostWindow::HostWindow(const WindowCreateInfo& create_info) : title(create_info.
 
 vk::Extent2D HostWindow::framebuffer_extent() {
     const std::lock_guard lock(mutex);
-    return extent;
+    return dispatched_extent;
 }
 
 vk::Extent2D HostWindow::window_extent() {
     const std::lock_guard lock(mutex);
-    return logical_extent(extent, display_scale);
+    return logical_extent(dispatched_extent, dispatched_display_scale);
 }
 
 SwapchainHandle HostWindow::create_swapchain(const ContextHandle& context) {
@@ -44,14 +44,14 @@ void HostWindow::poll_events() {
     input_ends_with_cursor = false;
     const vk::Extent2D current_extent = extent;
     const float current_display_scale = display_scale;
+    const bool rescaled = std::exchange(dispatched_display_scale, display_scale) != display_scale;
+    const bool resized = std::exchange(dispatched_extent, extent) != extent;
     lock.unlock();
 
-    if (current_display_scale != dispatched_display_scale) {
-        dispatched_display_scale = current_display_scale;
+    if (rescaled) {
         dispatch_display_scale_changed(current_display_scale);
     }
-    if (current_extent != dispatched_extent) {
-        dispatched_extent = current_extent;
+    if (resized) {
         dispatch_resize(current_extent, logical_extent(current_extent, current_display_scale));
     }
     for (const auto& dispatch : dispatches) {
@@ -79,7 +79,7 @@ InputControllerHandle HostWindow::get_input_controller() {
 
 float HostWindow::get_display_scale() {
     const std::lock_guard lock(mutex);
-    return display_scale;
+    return dispatched_display_scale;
 }
 
 void HostWindow::set_cursor(const WindowCursorShape shape) {

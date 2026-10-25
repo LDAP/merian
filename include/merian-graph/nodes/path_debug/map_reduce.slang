@@ -4,6 +4,7 @@ import merian_shaders.utils.hash;
 import merian_shaders.utils.dir_map;
 import merian_shaders.colors.colorspaces;
 import merian_shaders.colors.colormaps;
+import merian_shaders.utils.math;
 
 using merian;
 
@@ -46,11 +47,63 @@ SetReduction record_batch(const uint set,
     return r;
 }
 
+void add_float_float(RWStructuredBuffer<uint, ScalarDataLayout> buf,
+                     const uint total_at,
+                     const float2 value) {
+    float error;
+    const float sum = two_sum(asfloat(buf[total_at]), value.x, error);
+    const float lo = exact_add(exact_add(error, asfloat(buf[total_at + 1])), value.y);
+    const float hi = exact_add(sum, lo);
+    buf[total_at] = asuint(hi);
+    buf[total_at + 1] = asuint(exact_sub(lo, exact_sub(hi, sum)));
+}
+
+void fold_check_sums(const uint bin) {
+    const uint recip_at = path_debug_map_check_recip_at(bin);
+    if (maps[recip_at] == 0) {
+        return;
+    }
+    const uint recip_error_at = path_debug_map_check_recip_error_at(bin);
+    const uint recip2_at = path_debug_map_check_recip2_at(bin);
+    const uint recip2_error_at = path_debug_map_check_recip2_error_at(bin);
+    add_float_float(maps, path_debug_map_check_recip_total_at(bin),
+                    float2(asfloat(maps[recip_at]), asfloat(maps[recip_error_at])));
+    add_float_float(maps, path_debug_map_check_recip2_total_at(bin),
+                    float2(asfloat(maps[recip2_at]), asfloat(maps[recip2_error_at])));
+    maps[recip_at] = 0;
+    maps[recip_error_at] = 0;
+    maps[recip2_at] = 0;
+    maps[recip2_error_at] = 0;
+}
+
+void fold_check_weight(const uint sum_at, const uint total_at) {
+    add_float_float(stats, total_at, float2(asfloat(stats[sum_at]), 0.f));
+    stats[sum_at] = 0;
+}
+
+void fold_check_weights() {
+    for (uint c = 0; c < 3; c++) {
+        fold_check_weight(PATH_DEBUG_CHECK_WEIGHT + c, PATH_DEBUG_CHECK_WEIGHT_TOTAL + 2 * c);
+    }
+    fold_check_weight(PATH_DEBUG_CHECK_WEIGHT_M2, PATH_DEBUG_CHECK_WEIGHT_M2_TOTAL);
+    fold_check_weight(PATH_DEBUG_CHECK_TRANSMITTED_WEIGHT,
+                      PATH_DEBUG_CHECK_TRANSMITTED_WEIGHT_TOTAL);
+}
+
 [numthreads(PATH_DEBUG_WG, 1, 1)]
 [shader("compute")]
 void main(uint3 gid: SV_DispatchThreadID) {
     const uint bin = gid.x;
     const bool in_map = bin < params.map_res * params.map_res;
+    if (in_map) {
+        fold_check_sums(bin);
+    }
+    if (bin == 0) {
+        fold_check_weights();
+    }
+    if (params.map_fold_only != 0) {
+        return;
+    }
     const uint2 cell = path_debug_map_cell_of(bin);
     const float solid_angle =
         in_map ? dir_map_bin_solid_angle(params.map_transform, cell, params.map_res) : 0.f;

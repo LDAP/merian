@@ -675,6 +675,8 @@ class PathDebugNode : public Node {
     bool check_requested = false;
     uint32_t check_seq = 0;
     uint32_t check_draws = 0;
+    bool check_topping_up = false;
+    bool surface_captured = false;
     int32_t wi_mode = static_cast<int32_t>(PATH_DEBUG_WI_CAMERA);
     float wi_theta_deg = 45.f;
     float wi_phi_deg = 0.f;

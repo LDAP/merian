@@ -320,7 +320,7 @@ RenderPT::process(const NodeIO& io, const NodeProcessInfo& info, Submission& sub
     if (io.is_connected(con_irradiance_cache)) {
         cursor["irradiance_cache"] = io[con_irradiance_cache].r();
     }
-    path_records.process(cmd, io, info.get_iteration(), cursor.find("path_records"));
+    path_records.process(cmd, io, cursor.find("path_records"));
 
     cmd->bind(pipe);
     ep->bind("scene", scene->get_shader_object(), cmd, pipe, obj_allocator);

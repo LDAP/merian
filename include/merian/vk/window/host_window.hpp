@@ -12,8 +12,8 @@
 
 namespace merian {
 
-// A window a host application shows. The host functions are thread-safe; the input is dispatched
-// in poll_events().
+// A window a host application shows. The host functions are thread-safe; the input, the extent
+// and the display scale apply in poll_events().
 class HostWindow : public Window, public InputController {
   public:
     explicit HostWindow(const WindowCreateInfo& create_info = {});
@@ -35,8 +35,7 @@ class HostWindow : public Window, public InputController {
     void set_clipboard_text(const char* text) override;
     const char* get_clipboard_text() override;
 
-    // In pixels, at a display scale (pixels per logical pixel, > 0). The swapchain follows at its
-    // next acquire.
+    // In pixels, at a display scale (pixels per logical pixel, > 0).
     void set_extent(const vk::Extent2D framebuffer_extent, const float display_scale = 1.f);
 
     void request_close();

@@ -430,6 +430,7 @@ PathDebugNode::NodeStatusFlags PathDebugNode::on_connected(const NodeIOLayout& i
     build_gbuffer_kernels(io.get_context(), allocator);
     bsdf_map = {};
     bsdf_check = {};
+    image_camera.reset();
     maps_dirty = true;
     heat_dirty = true;
     image_dirty = true;
@@ -733,8 +734,10 @@ void PathDebugNode::update_target() {
             in_target = same_mesh;
             break;
         default: {
-            const Scene::MeshHandle& mesh = scene->get_mesh_infos()[placement.mesh_id].mesh;
-            in_target = mesh && static_cast<int32_t>(mesh->material_id) == target.material;
+            const auto& meshes = scene->get_mesh_infos();
+            in_target = placement.mesh_id < meshes.size() && meshes[placement.mesh_id].mesh &&
+                        static_cast<int32_t>(meshes[placement.mesh_id].mesh->material_id) ==
+                            target.material;
             break;
         }
         }
@@ -971,6 +974,8 @@ void PathDebugNode::record_clears(const NodeProcessInfo& info, Submission& submi
         maps_dirty = false;
         map_frames = 0;
         check_draws = 0;
+        check_topping_up = false;
+        surface_captured = false;
         pdf_stale = true;
     }
     if (heat_dirty || first_frame) {
@@ -1028,6 +1033,8 @@ PathDebugNode::FrameActivity PathDebugNode::update_frame(const NodeIO& io, const
         if (!placements || *placements != scene->get_geometry_placements()) {
             placements = std::make_shared<const std::vector<Scene::GeometryPlacement>>(
                 scene->get_geometry_placements());
+            surface_captured = false;
+            pdf_stale = true;
         }
     }
     // held records keep the GeometryIDs of the frame they were traced in
@@ -1101,7 +1108,8 @@ PathDebugNode::FrameActivity PathDebugNode::update_frame(const NodeIO& io, const
     activity.batch_end =
         activity.maps_accumulate &&
         (map_frames + 1) % static_cast<uint32_t>(std::max(map_batch_frames, 1)) == 0;
-    activity.run_check = std::exchange(check_requested, false);
+    activity.run_check = check_requested && gbuffer_connected && selection_visible();
+    check_requested &= !activity.run_check;
     const uint32_t check_channels =
         (1u << PATH_DEBUG_MAP_CHECK) | (1u << PATH_DEBUG_MAP_ZSCORE_CHECK);
     activity.check_shown = (activity.panel_mask & check_channels) != 0 ||
@@ -1285,6 +1293,8 @@ void PathDebugNode::build_map_params(PathDebugParams& p,
     p.wi_mode = static_cast<uint32_t>(wi_mode);
     p.wi_theta = radians(wi_theta_deg);
     p.wi_phi = radians(wi_phi_deg);
+    p.map_fold_only = activity.maps_active ? 0 : 1;
+    p.surface_capture = surface_captured ? 0 : 1;
 }
 
 void PathDebugNode::build_heat_params(PathDebugParams& p, const FrameActivity& activity) const {
@@ -1433,6 +1443,20 @@ void PathDebugNode::record_analysis(const NodeIO& io,
         cmd->dispatch(path_groups, 1, 1);
     }
     cmd->barrier({compute_to_compute(matches_buffer), compute_to_compute(events_buffer)});
+    // a requested check and a shown sample() panel top the draws up to the target over the frames
+    const bool surface_visible = gbuffer_connected && selection_visible();
+    const uint32_t check_missing =
+        PATH_DEBUG_CHECK_TARGET_DRAWS - std::min(check_draws, PATH_DEBUG_CHECK_TARGET_DRAWS);
+    check_topping_up =
+        (check_topping_up || activity.run_check) && check_missing > 0 && gbuffer_connected;
+    const uint32_t check_frame_draws = activity.run_check     ? PATH_DEBUG_CHECK_FIRST_DRAWS
+                                       : check_topping_up     ? PATH_DEBUG_CHECK_TOP_UP_DRAWS
+                                       : activity.check_shown ? PATH_DEBUG_CHECK_FRAME_DRAWS
+                                                              : 0u;
+    const uint32_t check_new_draws = std::min(check_frame_draws, check_missing);
+    const bool check_runs = (activity.run_check || check_new_draws > 0) && surface_visible;
+    // the check's test needs the pdf() support
+    const bool map_runs = pdf_stale && (activity.maps_active || check_runs) && surface_visible;
     if (activity.maps_accumulate) {
         MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "stats");
         const uint32_t stats_threads = ceil_div(capacities.path_capacity, params.stats_stride);
@@ -1440,7 +1464,7 @@ void PathDebugNode::record_analysis(const NodeIO& io,
         cmd->dispatch(groups(stats_threads), 1, 1);
         map_frames++;
     }
-    if (pdf_stale && activity.maps_active && gbuffer_connected) {
+    if (map_runs) {
         MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "bsdf map");
         ensure_scene_pipeline(io.get_context(), io.get_allocator(), bsdf_map, scene,
                               BSDF_MAP_MODULE);
@@ -1449,14 +1473,7 @@ void PathDebugNode::record_analysis(const NodeIO& io,
                       PATH_DEBUG_WG_2D);
         pdf_stale = false;
     }
-    // a check tops the draws up and integrates anew, a shown BSDF sample() draws up to that
-    const uint32_t check_missing =
-        PATH_DEBUG_CHECK_TARGET_DRAWS - std::min(check_draws, PATH_DEBUG_CHECK_TARGET_DRAWS);
-    const uint32_t check_new_draws = activity.run_check ? check_missing
-                                     : activity.check_shown
-                                         ? std::min(PATH_DEBUG_CHECK_FRAME_DRAWS, check_missing)
-                                         : 0;
-    if ((activity.run_check || check_new_draws > 0) && gbuffer_connected) {
+    if (check_runs) {
         MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "bsdf check");
         const PathDebugCheckPass pass{
             ++check_seq,
@@ -1482,11 +1499,13 @@ void PathDebugNode::record_analysis(const NodeIO& io,
                       PATH_DEBUG_WG_2D);
         check_draws += pass.sample_threads * PATH_DEBUG_CHECK_SAMPLES_PER_CELL;
     }
+    surface_captured |= map_runs || check_runs;
     cmd->barrier({compute_to_compute(state_buffer), compute_to_compute(stats_buffer),
                   compute_to_compute(maps_buffer)});
     {
         MERIAN_PROFILE_SCOPE_GPU(info.get_profiler(), cmd, "reduce+threshold");
-        if (activity.maps_active) {
+        // folds the check's frame sums as well
+        if (activity.maps_active || check_runs) {
             map_reduce_kernel->bind(io, info, submission);
             cmd->dispatch(groups(params.map_res * params.map_res), 1, 1);
             cmd->barrier(compute_to_compute(stats_buffer));
@@ -2046,9 +2065,9 @@ std::optional<PathDebugNode::PanelHit> PathDebugNode::panel_at(const float2& at)
         }
         const auto close = static_cast<float>(label_px(PATH_DEBUG_PANEL_CLOSE));
         const uint2 bin =
-            min(uint2((at - float2(left, top)) / size * static_cast<float>(params.map_res)),
-                uint2(params.map_res - 1));
-        return PanelHit{channel, (bin.y * params.map_res) + bin.x,
+            min(uint2((at - float2(left, top)) / size * static_cast<float>(allocated_map_res)),
+                uint2(allocated_map_res - 1));
+        return PanelHit{channel, (bin.y * allocated_map_res) + bin.x,
                         at.y < top + close && at.x >= left + size - close};
     }
     return std::nullopt;

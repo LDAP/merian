@@ -48,7 +48,7 @@ void main(uint3 gid: SV_DispatchThreadID) {
             return;
         }
     }
-    const PathRecordPath p = path_record_load_path(in_records, i);
+    const PathRecordPath p = path_debug_load_record(i);
 
     const uint vertex_region = path_record_vertex_region_offset(in_records);
     uint chain = path_debug_chain_length(in_records, p, vertex_region);

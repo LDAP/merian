@@ -478,7 +478,8 @@ void PathDebugNode::properties_bsdf_check(Properties& config) {
         wi_phi_deg = std::clamp(wi_phi_deg, -180.f, 180.f);
     }
     check_requested |= config.config_bool(
-        "check", "Tops the draws of BSDF sample() up and integrates the BSDF over the sphere.");
+        "check", "Integrates the BSDF over the sphere and tops the draws of BSDF sample() up over "
+                 "the next frames.");
 }
 
 void PathDebugNode::properties_capture(Properties& config) {

@@ -48,6 +48,8 @@ class ImGuiContext : public std::enable_shared_from_this<ImGuiContext> {
     static void set_current(::ImGuiContext* ctx) {
         ImGui::SetCurrentContext(ctx);
         imgui_set_core_context(ctx);
+        // the word-wrap classifier is a static per binary that only a font atlas build fills
+        ImTextInitClassifiers();
     }
 
     operator ::ImGuiContext*() const {

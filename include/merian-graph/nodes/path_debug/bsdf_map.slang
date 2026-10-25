@@ -11,6 +11,7 @@ using merian;
 
 #include "merian-graph/nodes/path_debug/layout.slangh"
 #include "merian-graph/nodes/path_debug/common.slangh"
+#include "merian-graph/nodes/path_debug/surface.slangh"
 
 ParameterBlock<GBuffer> gbuffer;
 
@@ -26,16 +27,20 @@ void main(uint3 gid: SV_DispatchThreadID, ParameterBlock<Scene> scene) {
     }
     const uint bin = path_debug_map_bin(cell);
 
-    const Hit hit = gbuffer.get_hit(path_debug_selected_pixel());
-    const RayDesc ray = scene.generate_camera_ray(path_debug_selected_pixel(), path_debug_dim());
-    const ShadingPoint sp = scene.get_shading_point(ray, hit);
+    const float3 selected_normal = gbuffer.get_first_hit_normal(path_debug_selected_pixel());
+    const PathDebugSurface surface =
+        path_debug_surface(scene.generate_camera_ray(path_debug_selected_pixel(), path_debug_dim()),
+                           gbuffer.get_hit(path_debug_selected_pixel()), selected_normal,
+                           all(cell == 0));
+    const RayDesc ray = surface.ray;
+    const ShadingPoint sp = scene.get_shading_point(ray, surface.hit);
     if (!sp.has_surface_material) {
         maps[path_debug_map_pdf_at(bin)] = asuint(0.f);
+        maps[path_debug_map_pdf_support_at(bin)] = 0;
         path_debug_store_float3(maps, path_debug_map_eval_at(bin), float3(0.f));
         return;
     }
 
-    const float3 selected_normal = gbuffer.get_first_hit_normal(path_debug_selected_pixel());
     const float3x3 to_map = dir_map_frame(path_debug_map_normal(selected_normal),
                                           params.map_frame == PATH_DEBUG_FRAME_LOCAL);
 
@@ -70,6 +75,7 @@ void main(uint3 gid: SV_DispatchThreadID, ParameterBlock<Scene> scene) {
     const float mean_pdf = valid > 0 ? pdf_sum / float(valid) : 0.f;
     const bool resolved = valid == SUB_BINS * SUB_BINS && pdf_max <= 8.f * pdf_min + 1e-3f;
     maps[path_debug_map_pdf_at(bin)] = asuint(resolved ? mean_pdf : -mean_pdf);
+    maps[path_debug_map_pdf_support_at(bin)] = valid > 0 && pdf_min > 0.f ? 1 : 0;
     path_debug_store_float3(maps, path_debug_map_eval_at(bin),
                             valid > 0 ? eval_sum / float(valid) : float3(0.f));
 }

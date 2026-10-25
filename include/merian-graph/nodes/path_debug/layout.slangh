@@ -171,13 +171,12 @@ static const uint32_t PATH_DEBUG_OFFSCREEN = 0xFFFFFFFEu;
 static const uint32_t PATH_DEBUG_RECORD_NO_PIXEL = 0xFFFEFFFEu;
 
 // the draws at the point, each set binned on its own: every continuation, the NEE connections to
-// geometry and to the environment, the guided continuations and BSDF sample()'s
+// geometry and to the environment and the guided continuations
 static const uint32_t PATH_DEBUG_SET_SCATTER = 0;
 static const uint32_t PATH_DEBUG_SET_NEE = 1;
 static const uint32_t PATH_DEBUG_SET_NEE_ENV = 2;
 static const uint32_t PATH_DEBUG_TESTED_SETS = 3;
 static const uint32_t PATH_DEBUG_SET_GUIDING = 3;
-static const uint32_t PATH_DEBUG_SET_CHECK = 4;
 
 static const uint32_t PATH_DEBUG_STATS_COUNT = 0;
 static const uint32_t PATH_DEBUG_STATS_MAX_SHARED = 1;
@@ -239,13 +238,23 @@ static const uint32_t PATH_DEBUG_CHECK_BAD_CELLS = PATH_DEBUG_CHECK_QUADRATURE +
 static const uint32_t PATH_DEBUG_CHECK_ALBEDO = PATH_DEBUG_CHECK_QUADRATURE + 9;
 static const uint32_t PATH_DEBUG_CHECK_ALPHA = PATH_DEBUG_CHECK_QUADRATURE + 12;
 static const uint32_t PATH_DEBUG_CHECK_QUADRATURE_UINTS = 13;
-static const uint32_t PATH_DEBUG_CHECK_UINTS =
-    PATH_DEBUG_CHECK_QUADRATURE + PATH_DEBUG_CHECK_QUADRATURE_UINTS - PATH_DEBUG_CHECK;
+// the frame's sums of the weights (rgb), their squared deviations and the transmitted weight join
+// these float-float totals
+static const uint32_t PATH_DEBUG_CHECK_TOTALS =
+    PATH_DEBUG_CHECK_QUADRATURE + PATH_DEBUG_CHECK_QUADRATURE_UINTS;
+static const uint32_t PATH_DEBUG_CHECK_WEIGHT_TOTAL = PATH_DEBUG_CHECK_TOTALS + 0;
+static const uint32_t PATH_DEBUG_CHECK_WEIGHT_M2_TOTAL = PATH_DEBUG_CHECK_TOTALS + 6;
+static const uint32_t PATH_DEBUG_CHECK_TRANSMITTED_WEIGHT_TOTAL = PATH_DEBUG_CHECK_TOTALS + 8;
+static const uint32_t PATH_DEBUG_CHECK_UINTS = PATH_DEBUG_CHECK_TOTALS + 10 - PATH_DEBUG_CHECK;
 static const uint32_t PATH_DEBUG_CHECK_DIM = 1024;
 static const uint32_t PATH_DEBUG_CHECK_SAMPLES_PER_CELL = 16;
-static const uint32_t PATH_DEBUG_CHECK_TARGET_DRAWS =
+// the draws BSDF sample() is topped up to; drawn in a check's first frame, its later frames and
+// per frame of a shown panel
+static const uint32_t PATH_DEBUG_CHECK_TARGET_DRAWS = 1000000000;
+static const uint32_t PATH_DEBUG_CHECK_FIRST_DRAWS =
     PATH_DEBUG_CHECK_DIM * PATH_DEBUG_CHECK_DIM * PATH_DEBUG_CHECK_SAMPLES_PER_CELL;
-static const uint32_t PATH_DEBUG_CHECK_FRAME_DRAWS = 512 * 512;
+static const uint32_t PATH_DEBUG_CHECK_TOP_UP_DRAWS = 1u << 21;
+static const uint32_t PATH_DEBUG_CHECK_FRAME_DRAWS = 1u << 18;
 
 static const uint32_t PATH_DEBUG_HIST_SMALL_BINS = 64;
 static const uint32_t PATH_DEBUG_SCATTER_BINS = 32;
@@ -257,8 +266,18 @@ static const uint32_t PATH_DEBUG_STATS_SCATTER_CONTRIB =
     PATH_DEBUG_STATS_SCATTER + PATH_DEBUG_SCATTER_BINS;
 static const uint32_t PATH_DEBUG_STATS_TECHNIQUE_CONTRIB =
     PATH_DEBUG_STATS_SCATTER_CONTRIB + PATH_DEBUG_SCATTER_BINS;
-static const uint32_t PATH_DEBUG_STATS_UINTS =
+// the selected point's camera ray, hit and pixel normal, captured once per reset
+static const uint32_t PATH_DEBUG_STATS_SURFACE =
     PATH_DEBUG_STATS_TECHNIQUE_CONTRIB + PATH_RECORD_METHOD_COUNT;
+static const uint32_t PATH_DEBUG_SURFACE_ORIGIN = 0;
+static const uint32_t PATH_DEBUG_SURFACE_T_MIN = 3;
+static const uint32_t PATH_DEBUG_SURFACE_DIRECTION = 4;
+static const uint32_t PATH_DEBUG_SURFACE_T_MAX = 7;
+// instance id, instance index, primitive id, geometry index, barycentrics
+static const uint32_t PATH_DEBUG_SURFACE_HIT = 8;
+static const uint32_t PATH_DEBUG_SURFACE_NORMAL = 14;
+static const uint32_t PATH_DEBUG_SURFACE_UINTS = 17;
+static const uint32_t PATH_DEBUG_STATS_UINTS = PATH_DEBUG_STATS_SURFACE + PATH_DEBUG_SURFACE_UINTS;
 
 static const uint32_t PATH_DEBUG_SEEN_REUSED = 1;
 static const uint32_t PATH_DEBUG_SEEN_RESAMPLED = 2;
@@ -267,9 +286,10 @@ static const uint32_t PATH_DEBUG_MIN_BATCHES = 8;
 // maps buffer, regions of map_res^2 bins: per tested set PATH_DEBUG_SET_REGIONS of draw count,
 // continuous draw count, sum of 1/pdf (float), of 1/pdf^2 (float), the sum of 1/pdf at the batch
 // start, the sum of squared batch residuals and the last batch residual (float); then the guided
-// draw count, BSDF pdf() (float; negative = under-resolved), BSDF sample()'s count, sum of 1/pdf
-// and of 1/pdf^2 (float), BSDF eval() cos RGB, the integrand RGB of every technique's draws, the
-// sum of its squared luminance and the sphere's panel value (float)
+// draw count, BSDF pdf() (float; negative = under-resolved), 1 where pdf() is positive in every
+// probed direction, BSDF sample()'s count, the frame's sums of 1/pdf and 1/pdf^2 each with its
+// rounding errors (float), their totals (float-float), BSDF eval() cos RGB, the integrand RGB of
+// every technique's draws, the sum of its squared luminance and the sphere's panel value (float)
 static const uint32_t PATH_DEBUG_SET_REGIONS = 7;
 static const uint32_t PATH_DEBUG_SET_REGION_COUNT = 0;
 static const uint32_t PATH_DEBUG_SET_REGION_CONTINUOUS = 1;
@@ -281,10 +301,15 @@ static const uint32_t PATH_DEBUG_SET_REGION_RESIDUAL_PREV = 6;
 static const uint32_t PATH_DEBUG_MAP_GUIDING_REGION =
     PATH_DEBUG_TESTED_SETS * PATH_DEBUG_SET_REGIONS;
 static const uint32_t PATH_DEBUG_MAP_PDF_REGION = PATH_DEBUG_MAP_GUIDING_REGION + 1;
-static const uint32_t PATH_DEBUG_MAP_CHECK_REGION = PATH_DEBUG_MAP_PDF_REGION + 1;
+static const uint32_t PATH_DEBUG_MAP_PDF_SUPPORT_REGION = PATH_DEBUG_MAP_PDF_REGION + 1;
+static const uint32_t PATH_DEBUG_MAP_CHECK_REGION = PATH_DEBUG_MAP_PDF_SUPPORT_REGION + 1;
 static const uint32_t PATH_DEBUG_MAP_CHECK_RECIP_REGION = PATH_DEBUG_MAP_CHECK_REGION + 1;
-static const uint32_t PATH_DEBUG_MAP_CHECK_RECIP2_REGION = PATH_DEBUG_MAP_CHECK_REGION + 2;
-static const uint32_t PATH_DEBUG_MAP_EVAL_REGION = PATH_DEBUG_MAP_CHECK_REGION + 3;
+static const uint32_t PATH_DEBUG_MAP_CHECK_RECIP_ERROR_REGION = PATH_DEBUG_MAP_CHECK_REGION + 2;
+static const uint32_t PATH_DEBUG_MAP_CHECK_RECIP2_REGION = PATH_DEBUG_MAP_CHECK_REGION + 3;
+static const uint32_t PATH_DEBUG_MAP_CHECK_RECIP2_ERROR_REGION = PATH_DEBUG_MAP_CHECK_REGION + 4;
+static const uint32_t PATH_DEBUG_MAP_CHECK_RECIP_TOTAL_REGION = PATH_DEBUG_MAP_CHECK_REGION + 5;
+static const uint32_t PATH_DEBUG_MAP_CHECK_RECIP2_TOTAL_REGION = PATH_DEBUG_MAP_CHECK_REGION + 7;
+static const uint32_t PATH_DEBUG_MAP_EVAL_REGION = PATH_DEBUG_MAP_CHECK_REGION + 9;
 static const uint32_t PATH_DEBUG_MAP_INTEGRAND_REGION = PATH_DEBUG_MAP_EVAL_REGION + 3;
 static const uint32_t PATH_DEBUG_MAP_MOMENT_REGION = PATH_DEBUG_MAP_INTEGRAND_REGION + 3;
 static const uint32_t PATH_DEBUG_MAP_SPHERE_REGION = PATH_DEBUG_MAP_MOMENT_REGION + 1;
@@ -505,6 +530,9 @@ struct PathDebugParams {
     uint32_t wi_mode;
     float wi_theta;
     float wi_phi;
+    uint32_t map_fold_only;
+    // the BSDF kernels capture the selected pixel's camera ray, hit and normal, else reuse them
+    uint32_t surface_capture;
 
     uint32_t heat_mode;
     uint32_t heat_bounce_min;

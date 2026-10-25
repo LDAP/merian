@@ -113,11 +113,13 @@ void bind_window(nb::module_& m) {
         .def_prop_ro("mouse_grabbed", &HostWindow::is_mouse_grabbed,
                      "Whether the graph asks for raw mouse input: a hidden cursor whose "
                      "positions move without bounds.")
-        .def_prop_ro("extent",
-                     [](HostWindow& window) {
-                         const vk::Extent2D extent = window.framebuffer_extent();
-                         return nb::make_tuple(extent.width, extent.height);
-                     })
+        .def_prop_ro(
+            "extent",
+            [](HostWindow& window) {
+                const vk::Extent2D extent = window.framebuffer_extent();
+                return nb::make_tuple(extent.width, extent.height);
+            },
+            "In pixels, the extent the graph renders at; set_extent applies at its next iteration.")
         .def(
             "set_extent",
             [](HostWindow& window, const uint32_t width, const uint32_t height,

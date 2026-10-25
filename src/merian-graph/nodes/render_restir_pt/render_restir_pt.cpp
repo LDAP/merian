@@ -430,7 +430,7 @@ RenderRestirPT::process(const NodeIO& io, const NodeProcessInfo& info, Submissio
     }
 
     ensure_pipeline(io.get_context(), io.get_allocator(), scene);
-    path_records.process(cmd, io, info.get_iteration(), {});
+    path_records.process(cmd, io, {});
     if (pairing_dirty) {
         upload_pairing(io.get_allocator(), submission);
     }

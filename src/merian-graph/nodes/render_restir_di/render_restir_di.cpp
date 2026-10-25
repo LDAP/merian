@@ -212,7 +212,7 @@ RenderRestirDI::process(const NodeIO& io, const NodeProcessInfo& info, Submissio
         cursor["gbuffer"] = gbuf.r();
         cursor["prev_gbuffer"] = prev_gbuf.r();
         cursor["irradiance"] = io[con_irradiance].get_texture();
-        path_records.process(cmd, io, info.get_iteration(), cursor.find("path_records"));
+        path_records.process(cmd, io, cursor.find("path_records"));
         return obj;
     };
 

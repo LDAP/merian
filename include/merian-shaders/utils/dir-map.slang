@@ -69,31 +69,80 @@ float3 dir_map_uv(const uint transform, const float3 dir) {
     }
 }
 
-// Solid angle covered by one bin: finite-difference Jacobians at 2x2 sub-bin points. A sub-point
-// whose stencil leaves the domain is skipped — differencing against the out-of-domain sentinel
-// would explode the Jacobian.
+// Solid angle of the spherical triangle abc (Van Oosterom and Strackee 1983).
+float dir_map_triangle_solid_angle(const float3 a, const float3 b, const float3 c) {
+    const float triple = abs(dot(a, cross(b - a, c - a)));
+    return 2.f * atan2(triple, 1.f + dot(a, b) + dot(b, c) + dot(c, a));
+}
+
+float dir_map_unit_circle(const float x) {
+    return sqrt(max((1.f - x) * (1.f + x), 0.f));
+}
+
+// Integral of sqrt(1 - t^2) over [a, b] for 0 <= a <= b <= 1, without cancellation for b - a small.
+float dir_map_unit_circle_integral(const float a, const float b) {
+    const float ga = dir_map_unit_circle(a);
+    const float gb = dir_map_unit_circle(b);
+    const float q = ga + gb > 0.f ? a * (a + b) / (ga + gb) : 0.f;
+    // b g(b) - a g(a) and asin(b) - asin(a) = asin(b g(a) - a g(b))
+    return 0.5f * ((b - a) * (gb - q) + asin(min((b - a) * (ga + q), 1.f)));
+}
+
+// Area of the unit disk in a bin its circle crosses, the bin within one quadrant.
+float dir_map_disk_bin_area(const float2 lo, const float2 hi) {
+    // folded to x <= y, where the circle's slope stays below 1
+    float2 inner = min(abs(lo), abs(hi));
+    float2 outer = max(abs(lo), abs(hi));
+    if (inner.x + outer.x > inner.y + outer.y) {
+        inner = inner.yx;
+        outer = outer.yx;
+    }
+    const float full_until = clamp(dir_map_unit_circle(outer.y), inner.x, outer.x);
+    const float empty_from = clamp(dir_map_unit_circle(inner.y), inner.x, outer.x);
+    return (outer.y - inner.y) * (full_until - inner.x) +
+           dir_map_unit_circle_integral(full_until, empty_from) -
+           inner.y * (empty_from - full_until);
+}
+
+// Solid angle covered by one bin, exact for an even res.
 float dir_map_bin_solid_angle(const uint transform, const uint2 bin, const uint res) {
     const float inv_res = 1.f / float(res);
-    const float h = 0.1f * inv_res;
-    float sum = 0.f;
-    [unroll]
-    for (uint qy = 0; qy < 2; qy++) {
-        [unroll]
-        for (uint qx = 0; qx < 2; qx++) {
-            const float2 uv = (float2(bin) + float2(0.25f + 0.5f * qx, 0.25f + 0.5f * qy)) *
-                              inv_res;
-            const float4 xp = dir_map_dir(transform, uv + float2(h, 0));
-            const float4 xn = dir_map_dir(transform, uv - float2(h, 0));
-            const float4 yp = dir_map_dir(transform, uv + float2(0, h));
-            const float4 yn = dir_map_dir(transform, uv - float2(0, h));
-            if (dir_map_dir(transform, uv).w == 0.f || xp.w == 0.f || xn.w == 0.f ||
-                yp.w == 0.f || yn.w == 0.f) {
-                continue;
-            }
-            sum += length(cross(xp.xyz - xn.xyz, yp.xyz - yn.xyz)) / (4.f * h * h);
-        }
+    switch (transform) {
+    case DIR_MAP_LATLONG: {
+        // azimuth step times cos(theta_0) - cos(theta_1)
+        const float theta_step = 3.14159265f * inv_res;
+        const float theta_mid = (float(bin.y) + 0.5f) * theta_step;
+        return 2.f * 3.14159265f * inv_res * 2.f * sin(theta_mid) * sin(0.5f * theta_step);
     }
-    return sum * 0.25f * inv_res * inv_res;
+    case DIR_MAP_HEMI: {
+        // equal-area: 2 sr per unit of disk area
+        const float2 lo = float2(bin) * (2.f * inv_res) - 1.f;
+        const float2 hi = lo + 2.f * inv_res;
+        // a bin belongs to the disk if one of its quarter centres does
+        const float2 nearest = min(abs(0.75f * lo + 0.25f * hi), abs(0.25f * lo + 0.75f * hi));
+        const float2 farthest = max(abs(lo), abs(hi));
+        if (dot(nearest, nearest) >= 1.f) {
+            return 0.f;
+        }
+        if (dot(farthest, farthest) <= 1.f) {
+            return 8.f * inv_res * inv_res;
+        }
+        return 2.f * max(dir_map_disk_bin_area(lo, hi), 0.f);
+    }
+    default: {
+        // the edges and the diagonal along the octahedron's folds are great circles
+        const float3 c00 = dir_map_dir(DIR_MAP_OCT, float2(bin) * inv_res).xyz;
+        const float3 c10 = dir_map_dir(DIR_MAP_OCT, float2(bin + uint2(1, 0)) * inv_res).xyz;
+        const float3 c11 = dir_map_dir(DIR_MAP_OCT, float2(bin + uint2(1, 1)) * inv_res).xyz;
+        const float3 c01 = dir_map_dir(DIR_MAP_OCT, float2(bin + uint2(0, 1)) * inv_res).xyz;
+        if ((2 * bin.x + 1 < res) == (2 * bin.y + 1 < res)) {
+            return dir_map_triangle_solid_angle(c00, c10, c01) +
+                   dir_map_triangle_solid_angle(c10, c11, c01);
+        }
+        return dir_map_triangle_solid_angle(c00, c10, c11) +
+               dir_map_triangle_solid_angle(c00, c11, c01);
+    }
+    }
 }
 
 } // namespace merian

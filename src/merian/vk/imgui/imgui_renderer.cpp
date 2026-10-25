@@ -238,9 +238,13 @@ void ImGuiRenderer::render(const CommandBufferHandle& cmd, const ImageViewHandle
     // DisplaySize is in logical pixels; scale to physical pixels for the render target.
     const float fb_width = draw_data->DisplaySize.x * draw_data->FramebufferScale.x;
     const float fb_height = draw_data->DisplaySize.y * draw_data->FramebufferScale.y;
-    const vk::Extent2D fb_extent{static_cast<uint32_t>(fb_width), static_cast<uint32_t>(fb_height)};
+    // rendering stays within the image, also for a frame laid out for another extent
+    const vk::Extent3D image_extent = image->get_extent();
+    const vk::Extent2D render_extent{
+        std::min(static_cast<uint32_t>(fb_width), image_extent.width),
+        std::min(static_cast<uint32_t>(fb_height), image_extent.height)};
     cmd->begin_rendering(
-        vk::RenderingInfo{{}, vk::Rect2D{{0, 0}, fb_extent}, 1, 0, color_attachment});
+        vk::RenderingInfo{{}, vk::Rect2D{{0, 0}, render_extent}, 1, 0, color_attachment});
 
     cmd->bind(pipeline);
     cmd->set_viewport(vk::Viewport{0, 0, fb_width, fb_height, 0.0f, 1.0f});
@@ -276,10 +280,12 @@ void ImGuiRenderer::render(const CommandBufferHandle& cmd, const ImageViewHandle
                 last_tex_id = tex_id;
             }
 
-            const float cx0 = (draw_cmd.ClipRect.x - clip_off.x) * clip_scale.x;
-            const float cy0 = (draw_cmd.ClipRect.y - clip_off.y) * clip_scale.y;
-            const float cx1 = (draw_cmd.ClipRect.z - clip_off.x) * clip_scale.x;
-            const float cy1 = (draw_cmd.ClipRect.w - clip_off.y) * clip_scale.y;
+            const float cx0 = std::max((draw_cmd.ClipRect.x - clip_off.x) * clip_scale.x, 0.f);
+            const float cy0 = std::max((draw_cmd.ClipRect.y - clip_off.y) * clip_scale.y, 0.f);
+            const float cx1 = std::min((draw_cmd.ClipRect.z - clip_off.x) * clip_scale.x,
+                                       static_cast<float>(render_extent.width));
+            const float cy1 = std::min((draw_cmd.ClipRect.w - clip_off.y) * clip_scale.y,
+                                       static_cast<float>(render_extent.height));
 
             if (cx1 <= cx0 || cy1 <= cy0)
                 continue;

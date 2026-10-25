@@ -24,10 +24,7 @@ class PathRecordSink {
     void add_constants(const SlangCompositionHandle& composition) const;
 
     // call once per process()
-    void process(const CommandBufferHandle& cmd,
-                 const NodeIO& io,
-                 uint64_t iteration,
-                 ShaderCursor cursor) const;
+    void process(const CommandBufferHandle& cmd, const NodeIO& io, ShaderCursor cursor);
 
     // binds the stream for further dispatches of the same process()
     void bind(const NodeIO& io, ShaderCursor cursor) const;
@@ -45,6 +42,7 @@ class PathRecordSink {
     bool is_connected = false;
     int32_t budget_mb = 1024;
     vk::DeviceSize emitted_size = 0;
+    bool header_cleared = false;
     vk::DeviceSize last_max_range = std::numeric_limits<vk::DeviceSize>::max();
     vk::Extent3D last_extent{};
 };

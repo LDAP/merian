@@ -1,6 +1,7 @@
 #include "merian-graph/objects/path_record_sink.hpp"
 
 #include <algorithm>
+#include <utility>
 
 namespace merian {
 
@@ -11,6 +12,7 @@ OutputConnectorDescriptor PathRecordSink::describe_output(const ContextHandle& c
     last_max_range = context->get_physical_device()->get_device_limits().maxStorageBufferRange &
                      ~vk::DeviceSize{3};
     last_extent = extent;
+    header_cleared = false;
     emitted_size = is_connected ? stream_size(spp, vertices_per_path)
                                 : vk::DeviceSize{PATH_RECORD_HEADER_UINTS} * sizeof(uint32_t);
     // the consumer writes the header that the next iteration's renderer reads
@@ -50,14 +52,13 @@ void PathRecordSink::add_constants(const SlangCompositionHandle& composition) co
 
 void PathRecordSink::process(const CommandBufferHandle& cmd,
                              const NodeIO& io,
-                             const uint64_t iteration,
-                             ShaderCursor cursor) const {
+                             ShaderCursor cursor) {
     if (!is_connected) {
         return;
     }
-    // graph memory is uninitialized, and a garbage header would arm recording; a node with several
-    // passes clears it once per pass
-    if (iteration == 0) {
+    // graph memory is uninitialized, and a garbage header would arm recording and hand the consumer
+    // unwritten paths
+    if (!std::exchange(header_cleared, true)) {
         const BufferHandle& buffer = io[con];
         cmd->fill(buffer, 0, sizeof(uint32_t) * PATH_RECORD_HEADER_UINTS);
         cmd->barrier(buffer->buffer_barrier2(

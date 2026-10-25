@@ -101,6 +101,10 @@ with `scale` as a polar plot.
 the disc): is it valid (energy, reciprocity, finite, weight = BSDF·cos/pdf), and does `sample()`
 draw `pdf()`.
 
+- The check tops the draws up to 1G over the next frames while the point is on screen; the
+  verdicts update with them.
+- `sample()`, `pdf()` and the check see one hit of the jittered camera until the next reset, so a
+  textured material is checked at one texel of the pixel.
 - When `sample()` can reject, the pdf integrates to the share of valid draws, not to 1.
 - A lobe too narrow for the integration grid reads n/a.
 - `get_albedo()` is an approximation for denoiser demodulation: APPROX when far off, n/a with

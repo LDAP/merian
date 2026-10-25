@@ -92,7 +92,7 @@ void select_path(const uint i, const uint local) {
         return;
     }
 
-    const PathRecordPath p = path_record_load_path(in_records, i);
+    const PathRecordPath p = path_debug_load_record(i);
     if (p.vertex_count == 0 || any(p.pixel >= path_debug_dim())) {
         return;
     }
