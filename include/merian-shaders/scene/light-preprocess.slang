@@ -7,10 +7,13 @@ import merian_shaders.utils.morton;
 
 using merian;
 
-// a block whose cell a lookup found within these frames gives way only to finer cells
+// a block whose cell a lookup found within these frames gives way only to finer cells of its class
+// and to the classes before it
 static const uint LIGHT_GRID_RECENT_FRAMES = 8;
 static const uint LIGHT_GRID_IDLE_RANKS = 64;
-static const uint LIGHT_GRID_EVICTION_RANKS = LIGHT_GRID_MAX_CASCADES + LIGHT_GRID_IDLE_RANKS;
+static const uint LIGHT_GRID_RECENT_RANKS =
+    uint(LightGridClass::LightGridClassCount) * LIGHT_GRID_MAX_CASCADES;
+static const uint LIGHT_GRID_EVICTION_RANKS = LIGHT_GRID_RECENT_RANKS + LIGHT_GRID_IDLE_RANKS;
 
 // Per-frame preprocess for next event estimation: cuts through the light tree for the cells of a
 // world-space grid that rays look up, and one over the whole scene.
@@ -43,8 +46,8 @@ struct LightPreprocessBinding {
     StructuredBuffer<uint> grid_index_prev;
     RWStructuredBuffer<LightGridBlock, ScalarDataLayout> grid_blocks;
     RWStructuredBuffer<uint> grid_free;
-    // per allocate group its missed cells, then their first free block; then the free block count,
-    // then per cascade its missed cells
+    // per class and allocate group its missed cells, then their first free block; then the free
+    // block count, then per class and cascade the missed cells
     RWStructuredBuffer<uint> grid_offsets;
     // zeroed, see LIGHT_GRID_SETUP_STATE
     RWStructuredBuffer<uint> setup_state;
@@ -346,6 +349,7 @@ LightGridBlock prev_cell_block(const LightPreprocessBinding params, const uint p
     b.orientation = light_cell_orientation(prev_cell);
     b.idle = 0;
     b.kept = 0;
+    b.unseen = 0;
     return b;
 }
 
@@ -364,7 +368,32 @@ uint prev_index_entry(const LightPreprocessBinding params, const uint prev_cell)
                                                                : 0u;
 }
 
-// Carries each held block to its cell in this frame's index and counts visited cells without one.
+LightGridClass light_grid_class(const bool seen) {
+    return seen ? LightGridClass::LightGridClassSeen : LightGridClass::LightGridClassOther;
+}
+
+uint light_grid_bucket(const bool seen, const uint cascade) {
+    return uint(light_grid_class(seen)) * LIGHT_GRID_MAX_CASCADES + cascade;
+}
+
+uint missed_group_slot(const LightPreprocessBinding params, const bool seen, const uint group) {
+    return uint(light_grid_class(seen)) * params.allocate_groups + group;
+}
+
+uint free_count_slot(const LightPreprocessBinding params) {
+    return uint(LightGridClass::LightGridClassCount) * params.allocate_groups;
+}
+
+uint missed_bucket_slot(const LightPreprocessBinding params, const uint bucket) {
+    return free_count_slot(params) + 1u + bucket;
+}
+
+uint missed_counts(const bool missed, const bool seen) {
+    return missed ? (seen ? 1u : 0x10000u) : 0u;
+}
+
+// Carries each held block to its cell in this frame's index and counts per class the visited cells
+// without one.
 [shader("compute")][numthreads(LIGHT_GRID_ALLOCATE_GROUP, 1, 1)] void
 grid_keep(uint3 group_id : SV_GroupID,
           uint local_id : SV_GroupIndex,
@@ -373,6 +402,7 @@ grid_keep(uint3 group_id : SV_GroupID,
     const uint entry = prev_index_entry(params, prev_cell);
     const uint block = light_cell_block(entry);
     const bool visited = (entry & LIGHT_GRID_VISITED) != 0;
+    const bool seen = (entry & LIGHT_GRID_SEEN) != 0;
     uint cell = 0;
     const bool moved = entry != 0 && moved_cell(params, prev_cell_block(params, prev_cell), cell);
     if (block != LIGHT_GRID_FALLBACK_BLOCK) {
@@ -383,19 +413,24 @@ grid_keep(uint3 group_id : SV_GroupID,
                         : min(params.grid_blocks[block].idle + 1u,
                               LIGHT_GRID_RECENT_FRAMES + LIGHT_GRID_IDLE_RANKS - 1u);
             params.grid_blocks[block].kept = 1;
+            params.grid_blocks[block].unseen =
+                seen ? 0u : min(params.grid_blocks[block].unseen + 1u, LIGHT_GRID_RECENT_FRAMES);
         } else {
             params.grid_blocks[block].idle = LIGHT_GRID_IDLE_FREE;
         }
     }
-    const bool missed = entry == LIGHT_GRID_VISITED && moved;
-    if (missed)
-        InterlockedAdd(params.grid_offsets[params.allocate_groups + 1u +
-                                           light_cell_cascade(cell, params.grid_dimension)],
-                       1u);
-    uint total;
-    group_prefix_sum(local_id, uint(missed), total);
-    if (local_id == 0)
-        params.grid_offsets[group_id.x] = total;
+    const bool missed = visited && block == LIGHT_GRID_FALLBACK_BLOCK && moved;
+    if (missed) {
+        const uint cascade = light_cell_cascade(cell, params.grid_dimension);
+        const uint bucket = light_grid_bucket(seen, cascade);
+        InterlockedAdd(params.grid_offsets[missed_bucket_slot(params, bucket)], 1u);
+    }
+    uint totals;
+    group_prefix_sum(local_id, missed_counts(missed, seen), totals);
+    if (local_id == 0) {
+        params.grid_offsets[missed_group_slot(params, true, group_id.x)] = totals & 0xFFFFu;
+        params.grid_offsets[missed_group_slot(params, false, group_id.x)] = totals >> 16;
+    }
 }
 
 bool held_block(const LightPreprocessBinding params, const uint block) {
@@ -403,22 +438,28 @@ bool held_block(const LightPreprocessBinding params, const uint block) {
            params.grid_blocks[block].idle != LIGHT_GRID_IDLE_FREE;
 }
 
-// Higher goes first: the longest unvisited, then the coarsest recently visited.
+// Higher goes first: the longest unvisited, then the recently visited by class, the coarsest first.
 uint eviction_rank(const LightPreprocessBinding params, const uint block, out uint cell) {
     const LightGridBlock b = params.grid_blocks[block];
     uint cascade;
     uint3 coord;
     block_cell(params, b, cascade, coord);
     cell = light_cell_index(cascade, coord, b.orientation, params.grid_dimension);
-    return b.idle < LIGHT_GRID_RECENT_FRAMES
-               ? cascade
-               : LIGHT_GRID_MAX_CASCADES + b.idle - LIGHT_GRID_RECENT_FRAMES;
+    if (b.idle >= LIGHT_GRID_RECENT_FRAMES)
+        return LIGHT_GRID_RECENT_RANKS + b.idle - LIGHT_GRID_RECENT_FRAMES;
+    return light_grid_bucket(b.unseen < LIGHT_GRID_RECENT_FRAMES, cascade);
 }
 
 groupshared uint s_rank_blocks[LIGHT_GRID_EVICTION_RANKS];
 
 [shader("compute")][numthreads(LIGHT_GRID_ALLOCATE_GROUP, 1, 1)] void
 grid_allocate(uint local_id : SV_GroupIndex, ParameterBlock<LightPreprocessBinding> params) {
+    // a reset frees every block, even without missed cells
+    uint missed_cells = 0;
+    for (uint bucket = 0; bucket < LIGHT_GRID_RECENT_RANKS; bucket++)
+        missed_cells += params.grid_offsets[missed_bucket_slot(params, bucket)];
+    if (missed_cells == 0 && !params.grid_reset)
+        return;
     for (uint rank = local_id; rank < LIGHT_GRID_EVICTION_RANKS; rank += LIGHT_GRID_ALLOCATE_GROUP)
         s_rank_blocks[rank] = 0;
     GroupMemoryBarrierWithGroupSync();
@@ -429,21 +470,21 @@ grid_allocate(uint local_id : SV_GroupIndex, ParameterBlock<LightPreprocessBindi
     }
     GroupMemoryBarrierWithGroupSync();
 
-    // the missed cells take free blocks, then held ones of a higher rank than their cascade's,
-    // the nearest first
+    // the missed cells take free blocks, then held ones ranked after their class and cascade, class
+    // by class and the nearest first
     uint held = 0;
     uint idle_held = 0;
     for (uint rank = 0; rank < LIGHT_GRID_EVICTION_RANKS; rank++) {
         held += s_rank_blocks[rank];
-        idle_held += rank >= LIGHT_GRID_MAX_CASCADES ? s_rank_blocks[rank] : 0u;
+        idle_held += rank >= LIGHT_GRID_RECENT_RANKS ? s_rank_blocks[rank] : 0u;
     }
     const uint unheld = params.block_count - 1u - held;
-    uint coarser = held - idle_held;
+    uint outranked = held - idle_held;
     uint taken = 0;
-    for (uint cascade = 0; cascade < params.grid_cascades; cascade++) {
-        coarser -= s_rank_blocks[cascade];
-        const uint takeable = unheld + idle_held + coarser;
-        taken += min(params.grid_offsets[params.allocate_groups + 1u + cascade],
+    for (uint bucket = 0; bucket < LIGHT_GRID_RECENT_RANKS; bucket++) {
+        outranked -= s_rank_blocks[bucket];
+        const uint takeable = unheld + idle_held + outranked;
+        taken += min(params.grid_offsets[missed_bucket_slot(params, bucket)],
                      takeable > taken ? takeable - taken : 0u);
     }
     const uint evicted = taken > unheld ? taken - unheld : 0u;
@@ -500,30 +541,34 @@ grid_allocate(uint local_id : SV_GroupIndex, ParameterBlock<LightPreprocessBindi
     }
 
     uint missed_count = 0;
-    for (uint base = 0; base < params.allocate_groups; base += LIGHT_GRID_ALLOCATE_GROUP) {
-        const uint group = base + local_id;
-        const bool listed = group < params.allocate_groups;
+    for (uint base = 0; base < free_count_slot(params); base += LIGHT_GRID_ALLOCATE_GROUP) {
+        const uint slot = base + local_id;
+        const bool listed = slot < free_count_slot(params);
         uint total;
         const uint offset =
             missed_count +
-            group_prefix_sum(local_id, listed ? params.grid_offsets[group] : 0u, total);
+            group_prefix_sum(local_id, listed ? params.grid_offsets[slot] : 0u, total);
         if (listed)
-            params.grid_offsets[group] = offset;
+            params.grid_offsets[slot] = offset;
         missed_count += total;
     }
     if (local_id == 0)
-        params.grid_offsets[params.allocate_groups] = free_count;
+        params.grid_offsets[free_count_slot(params)] = free_count;
 }
 
 bool missed_cell(const LightPreprocessBinding params,
                  const uint prev_cell,
                  out LightGridBlock b,
-                 out uint cell) {
+                 out uint cell,
+                 out bool seen) {
     cell = 0;
     b = {};
-    if (prev_index_entry(params, prev_cell) != LIGHT_GRID_VISITED)
+    const uint entry = prev_index_entry(params, prev_cell);
+    seen = (entry & LIGHT_GRID_SEEN) != 0;
+    if ((entry & LIGHT_GRID_VISITED) == 0 || light_cell_block(entry) != LIGHT_GRID_FALLBACK_BLOCK)
         return false;
     b = prev_cell_block(params, prev_cell);
+    b.unseen = seen ? 0u : LIGHT_GRID_RECENT_FRAMES;
     return moved_cell(params, b, cell);
 }
 
@@ -533,12 +578,14 @@ grid_assign(uint3 group_id : SV_GroupID,
             ParameterBlock<LightPreprocessBinding> params) {
     LightGridBlock b;
     uint cell;
+    bool seen;
     const bool missed =
-        missed_cell(params, group_id.x * LIGHT_GRID_ALLOCATE_GROUP + local_id, b, cell);
-    uint total;
-    const uint at =
-        params.grid_offsets[group_id.x] + group_prefix_sum(local_id, uint(missed), total);
-    if (missed && at < params.grid_offsets[params.allocate_groups]) {
+        missed_cell(params, group_id.x * LIGHT_GRID_ALLOCATE_GROUP + local_id, b, cell, seen);
+    uint totals;
+    const uint before = group_prefix_sum(local_id, missed_counts(missed, seen), totals);
+    const uint at = params.grid_offsets[missed_group_slot(params, seen, group_id.x)] +
+                    (seen ? before & 0xFFFFu : before >> 16);
+    if (missed && at < params.grid_offsets[free_count_slot(params)]) {
         const uint block = params.grid_free[at];
         params.grid_index[cell] = block;
         params.grid_blocks[block] = b;

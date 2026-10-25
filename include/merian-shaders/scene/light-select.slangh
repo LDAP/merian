@@ -17,6 +17,13 @@ enum LightSlotWeighing : uint32_t {
     LightSlotWeighingShadingPoint = 1,
 };
 
+// cells first hits found keep their cuts ahead of the others
+enum LightGridClass : uint32_t {
+    LightGridClassSeen = 0,
+    LightGridClassOther = 1,
+    LightGridClassCount = 2,
+};
+
 enum LightDebugView : uint32_t {
     LightDebugDrawOutcome = 0,
     LightDebugCell = 1,
@@ -73,8 +80,9 @@ static const uint LIGHT_GRID_FRESH_SPLITS = 8;
 static const uint LIGHT_GRID_NO_ORIENTATION = LIGHT_GRID_ORIENTATIONS - 1u;
 // holds the cut over the whole scene
 static const uint LIGHT_GRID_FALLBACK_BLOCK = 0;
-// set in a cell's index entry once a lookup found it
+// set in a cell's index entry once a lookup found it, and once a first hit did
 static const uint LIGHT_GRID_VISITED = 0x80000000u;
+static const uint LIGHT_GRID_SEEN = 0x40000000u;
 static const uint LIGHT_GRID_IDLE_FREE = 0xFFFFFFFFu;
 static const float LIGHT_GRID_MAX_CONTRIBUTION = 64.f;
 static const float LIGHT_GRID_CONTRIBUTION_SCALE = 256.f;
@@ -114,7 +122,7 @@ uint light_cell_orientation(const uint cell) {
 }
 
 uint light_cell_block(const uint entry) {
-    return entry & ~LIGHT_GRID_VISITED;
+    return entry & ~(LIGHT_GRID_VISITED | LIGHT_GRID_SEEN);
 }
 
 uint light_orientation(const float3 normal) {
@@ -154,12 +162,14 @@ struct LightGridBlock {
     uint32_t idle;
     // held the same cell last frame
     uint32_t kept;
+    // frames since a first hit last found its cell, up to LIGHT_GRID_RECENT_FRAMES
+    uint32_t unseen;
 };
 
 #ifdef __cplusplus
 static_assert(sizeof(LightGridInfo) == 24, "LightGridInfo layout mismatch");
 static_assert(sizeof(LightTreeInfo) == 16, "LightTreeInfo layout mismatch");
-static_assert(sizeof(LightGridBlock) == 28, "LightGridBlock layout mismatch");
+static_assert(sizeof(LightGridBlock) == 32, "LightGridBlock layout mismatch");
 #endif
 
 } // namespace merian

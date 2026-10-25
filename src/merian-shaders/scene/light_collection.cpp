@@ -364,7 +364,10 @@ void LightCollection::prepare_buffers(const CommandBufferHandle& cmd) {
         ensure_buffer(grid_free_buffer, blocks * sizeof(uint32_t), "LightCollection::grid_free",
                       cmd);
         ensure_buffer(grid_offsets_buffer,
-                      (allocate_group_count() + 1 + LIGHT_GRID_MAX_CASCADES) * sizeof(uint32_t),
+                      (LightGridClass::LightGridClassCount *
+                           (allocate_group_count() + LIGHT_GRID_MAX_CASCADES) +
+                       1) *
+                          sizeof(uint32_t),
                       "LightCollection::grid_offsets", cmd);
         const vk::DeviceSize slot_count = static_cast<vk::DeviceSize>(blocks) * LIGHT_GRID_SLOTS;
         for (uint32_t i = 0; i < 2; i++) {
@@ -707,17 +710,27 @@ void LightCollection::update(const CommandBufferHandle& cmd,
         MERIAN_PROFILE_SCOPE_GPU(cmd, "grid");
         if (triangle_count > 0) {
             if (uses_grid()) {
-                run(keep_entry_point, keep_pipeline, write_preprocess(keep_params.get()),
-                    allocate_group_count());
+                {
+                    MERIAN_PROFILE_SCOPE_GPU(cmd, "keep");
+                    run(keep_entry_point, keep_pipeline, write_preprocess(keep_params.get()),
+                        allocate_group_count());
+                }
                 barrier();
-                run(allocate_entry_point, allocate_pipeline,
-                    write_preprocess(allocate_params.get()), 1);
+                {
+                    MERIAN_PROFILE_SCOPE_GPU(cmd, "allocate");
+                    run(allocate_entry_point, allocate_pipeline,
+                        write_preprocess(allocate_params.get()), 1);
+                }
                 barrier();
-                run(assign_entry_point, assign_pipeline, write_preprocess(assign_params.get()),
-                    allocate_group_count());
+                {
+                    MERIAN_PROFILE_SCOPE_GPU(cmd, "assign");
+                    run(assign_entry_point, assign_pipeline, write_preprocess(assign_params.get()),
+                        allocate_group_count());
+                }
                 barrier();
             }
             // one group per block
+            MERIAN_PROFILE_SCOPE_GPU(cmd, "cuts");
             const uint32_t blocks = block_count();
             run(grid_entry_point, grid_pipeline, write_preprocess(grid_params.get()),
                 std::min(blocks, LIGHT_DISPATCH_ROW),

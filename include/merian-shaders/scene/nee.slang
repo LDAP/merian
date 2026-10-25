@@ -120,11 +120,13 @@ struct LightGrid {
         return int3(floor((pos - info.origin) * info.inv_cell_size + offset));
     }
 
-    // record: the cell counts as visited, so it keeps a cut of its own
+    // record: the cell counts as visited, so it keeps a cut of its own; with first_hit ahead of the
+    // cells only later bounces find
     uint lookup(const float3 pos,
                 const float3 face_normal,
                 inout RandomGenerator rng,
-                const bool record = true) {
+                const bool record = true,
+                const bool first_hit = false) {
         if (!in_use)
             return LIGHT_INVALID_INDEX;
         if (merian_nee_source == int(LightSource::LightSourceScene))
@@ -149,8 +151,9 @@ struct LightGrid {
         const uint cell = light_cell_index(cascade, uint3(clamp(coord, 0, int(base.dimension) - 1)),
                                            light_orientation(face_normal), base.dimension);
         const uint entry = index[cell];
-        if (record && (entry & LIGHT_GRID_VISITED) == 0)
-            index[cell] = entry | LIGHT_GRID_VISITED;
+        const uint mark = record ? LIGHT_GRID_VISITED | (first_hit ? LIGHT_GRID_SEEN : 0u) : 0u;
+        if ((entry & mark) != mark)
+            InterlockedOr(index[cell], mark);
         return light_cell_block(entry);
     }
 
@@ -361,13 +364,14 @@ struct NEE {
                                    const float spawn_offset,
                                    const float3 normal,
                                    inout RandomGenerator rng,
-                                   const bool record = true) {
+                                   const bool record = true,
+                                   const bool first_hit = false) {
         DirectLightVertex vertex;
         vertex.pos = pos;
         vertex.normal = normal;
         vertex.face_normal = face_normal;
         vertex.spawn_offset = spawn_offset;
-        vertex.cell = grid.lookup(pos, face_normal, rng, record);
+        vertex.cell = grid.lookup(pos, face_normal, rng, record, first_hit);
         return vertex;
     }
 

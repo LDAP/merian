@@ -231,7 +231,7 @@ float3 trace_path<Reorder : IThreadReorder>(const ParameterBlock<Scene> scene,
             sp.pos, ng, spawn_offset,
             Scene::get_receiver_normal(ray.Direction, ng,
                                        bsdf_is_transmissive(bsdf.get_lobe_types())),
-            rng);
+            rng, true, bounce == uint16_t(1) && nee_surface);
         if (roulette && roulette_first && !survives_roulette(throughput, rng)) {
             break;
         }
