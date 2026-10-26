@@ -17,8 +17,8 @@ python examples/graph_run.py examples/pbrt.json scene.pbrt --mixin debug
 | click the LIVE badge | LIVE → FROZEN (hold the paths) → OFF |
 
 Every binding uses one modifier, Preferences › modifier. The header holds the selection; the tabs
-hold the rest: **Paths** (color, what to draw, line style, list), **Filter**, **View** (false
-color, sphere, reference), **Analysis** (BSDF check, panels, sampling, statistics) and
+hold the rest: **Paths** (color, what to draw, line style, list), **Filter**, **View** (background,
+false color, sphere, reference), **Analysis** (BSDF check, panels, sampling, statistics) and
 **Preferences**. The image under the paths, its exposure and its reset are at the bottom left.
 
 ## Selection
@@ -58,8 +58,9 @@ of; `[SG]` either; `* + ? {n} {n,m}`. The last event's technique is how the ligh
 | (filtered) | what the region and the filter add |
 | reference, difference, split | against the reference (View › Reference) |
 
-FROZEN, the recorded images stay on the surfaces while the camera moves. When the header's record
-probability drops below 1, raise the renderer's `capture budget`.
+FROZEN, the recorded images stay on the surfaces while the camera moves. Where a recorded image holds
+no path, View › Background draws the scene's triangle edges (the default) or its albedo. When the
+header's record probability drops below 1, raise the renderer's `capture budget`.
 
 ## Recipes
 

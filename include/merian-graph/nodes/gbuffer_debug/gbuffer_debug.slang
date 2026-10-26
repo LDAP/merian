@@ -1,6 +1,5 @@
 import merian_shaders.gbuffer;
 import merian_shaders.scene.scene;
-import merian_shaders.shading.materials.gltf_material;
 import merian_shaders.utils.textures;
 import merian_shaders.colors.debug;
 
@@ -18,7 +17,6 @@ struct PushConstant {
 [vk::push_constant] ConstantBuffer<PushConstant> pc;
 
 static const float3 MISS = float3(1, 0, 1);
-static const float3 CAST_FAIL = float3(1, 1, 0);
 
 [shader("compute")][numthreads(16, 16, 1)] void main(uint3 tid : SV_DispatchThreadID,
                                                      ParameterBlock<Scene> scene,
@@ -156,74 +154,44 @@ static const float3 CAST_FAIL = float3(1, 1, 0);
         }
         break;
     }
-    case 11: { // Metallic (GltfMaterial only)
-        // https://github.com/shader-slang/slang/issues/11266
-        const Hit hit = params.gbuffer.get_hit(pixel);
-        if (let gd = scene.get_geometry_data(hit)) {
-            const TriangleHit tri = scene.get_triangle_hit(hit, gd);
-            const MaterialModel m = scene.material_system.get_material(gd.material_id);
-            if (let g = m as GltfMaterial) {
-                color = float4(
-                    float3(g.get_metallic(scene.material_system.texture_manager.get_textures(),
-                                          tri.get_uv(hit))),
-                    1);
-            } else {
-                color = float4(CAST_FAIL, 1);
-            }
-        } else {
-            color = float4(MISS, 1);
-        }
-        break;
-    }
-    case 12: { // Roughness (GltfMaterial only)
-        // https://github.com/shader-slang/slang/issues/11266
-        const Hit hit = params.gbuffer.get_hit(pixel);
-        if (let gd = scene.get_geometry_data(hit)) {
-            const TriangleHit tri = scene.get_triangle_hit(hit, gd);
-            const MaterialModel m = scene.material_system.get_material(gd.material_id);
-            if (let g = m as GltfMaterial) {
-                color = float4(
-                    float3(g.get_roughness(scene.material_system.texture_manager.get_textures(),
-                                           tri.get_uv(hit))),
-                    1);
-            } else {
-                color = float4(CAST_FAIL, 1);
-            }
-        } else {
-            color = float4(MISS, 1);
-        }
+    case 11: { // Effective Alpha
+        const RayDesc ray = scene.generate_camera_ray(pixel, dim);
+        const ShadingPoint sp = scene.get_shading_point(ray, params.gbuffer.get_hit(pixel));
+        color = sp.has_surface_material
+                    ? float4(float3(sp.surface_material.get_bsdf().effective_alpha), 1)
+                    : float4(MISS, 1);
         break;
     }
 
         // --- IDs & barycentrics ---
 
-    case 13: { // Instance ID
+    case 12: { // Instance ID
         const uint id = params.gbuffer.get_hit(pixel).instance_id;
         color = (id == uint(-1)) ? float4(MISS, 1) : float4(random_color(id), 1);
         break;
     }
-    case 14: { // Geometry Index
+    case 13: { // Geometry Index
         const Hit hit = params.gbuffer.get_hit(pixel);
         color = hit.is_valid() ? float4(random_color(hit.geometry_index), 1) : float4(MISS, 1);
         break;
     }
-    case 15: { // Geometry ID
+    case 14: { // Geometry ID
         const Hit hit = params.gbuffer.get_hit(pixel);
         color = hit.is_valid() ? float4(random_color(hit.get_geometry_id()), 1) : float4(MISS, 1);
         break;
     }
-    case 16: { // Primitive ID
+    case 15: { // Primitive ID
         const Hit hit = params.gbuffer.get_hit(pixel);
         color = hit.is_valid() ? float4(random_color(hit.primitive_id), 1) : float4(MISS, 1);
         break;
     }
-    case 17: { // Material ID
+    case 16: { // Material ID
         const Hit hit = params.gbuffer.get_hit(pixel);
         color = hit.is_valid() ? float4(random_color(uint(scene.get_material_id(hit))), 1)
                                : float4(MISS, 1);
         break;
     }
-    case 18: { // Barycentrics
+    case 17: { // Barycentrics
         const Hit hit = params.gbuffer.get_hit(pixel);
         color = hit.is_valid() ? float4(hit.get_barycentrics3(), 1) : float4(MISS, 1);
         break;
@@ -231,21 +199,21 @@ static const float3 CAST_FAIL = float3(1, 1, 0);
 
         // --- Depth & motion ---
 
-    case 19: { // Linear Z (plain)
+    case 18: { // Linear Z (plain)
         color = float4(float3(params.gbuffer.get_linear_z(pixel)), 1);
         break;
     }
-    case 20: { // Grad Z (plain, per-axis magnitude)
+    case 19: { // Grad Z (plain, per-axis magnitude)
         const float2 g = params.gbuffer.get_grad_z(pixel);
         color = float4(abs(g), 0, 1);
         break;
     }
-    case 21: { // Delta Z (red = negative, blue = positive)
+    case 20: { // Delta Z (red = negative, blue = positive)
         const float dz = params.gbuffer.get_delta_z(pixel);
         color = float4(max(-dz, 0.f), 0, max(dz, 0.f), 1);
         break;
     }
-    case 22: { // Motion Vectors (normalized to fraction of max output dim)
+    case 21: { // Motion Vectors (normalized to fraction of max output dim)
         const float2 m = params.gbuffer.get_motion_vectors(pixel);
         const float s = float(max(dim.x, dim.y));
         color = float4(abs(m) / s, 0, 1);
@@ -254,7 +222,7 @@ static const float3 CAST_FAIL = float3(1, 1, 0);
 
         // --- Flags ---
 
-    case 23: { // Flat Shading Flag (1 = flat, 0 = smooth)
+    case 22: { // Flat Shading Flag (1 = flat, 0 = smooth)
         const Hit hit = params.gbuffer.get_hit(pixel);
         if (let gd = scene.get_geometry_data(hit)) {
             const float flag = (gd.flags & GeometryDataFlags::FlatShading) ? 1.f : 0.f;
@@ -267,35 +235,35 @@ static const float3 CAST_FAIL = float3(1, 1, 0);
 
         // --- Lobes & depths ---
 
-    case 24: { // Diffuse Albedo
+    case 23: { // Diffuse Albedo
         color = float4(params.gbuffer.get_diffuse_albedo(pixel), 1);
         break;
     }
-    case 25: { // Specular Albedo
+    case 24: { // Specular Albedo
         color = float4(params.gbuffer.get_specular_albedo(pixel), 1);
         break;
     }
-    case 26: { // Specular Roughness (linear)
+    case 25: { // Specular Roughness (linear)
         color = float4(float3(params.gbuffer.get_roughness(pixel)), 1);
         break;
     }
-    case 27: { // Specular Hit Distance
+    case 26: { // Specular Hit Distance
         color = float4(float3(params.gbuffer.get_specular_hit_distance(pixel)), 1);
         break;
     }
-    case 28: { // View Depth (plain)
+    case 27: { // View Depth (plain)
         color = float4(float3(params.gbuffer.get_view_depth(pixel)), 1);
         break;
     }
-    case 29: { // Projected Depth
+    case 28: { // Projected Depth
         color = float4(float3(params.gbuffer.get_projected_depth(pixel)), 1);
         break;
     }
-    case 30: { // First Hit Normal
+    case 29: { // First Hit Normal
         color = float4(debug_normal_color(params.gbuffer.get_first_hit_normal(pixel)), 1);
         break;
     }
-    case 31: { // First Hit Linear Z (plain)
+    case 30: { // First Hit Linear Z (plain)
         color = float4(float3(params.gbuffer.get_first_hit_linear_z(pixel)), 1);
         break;
     }

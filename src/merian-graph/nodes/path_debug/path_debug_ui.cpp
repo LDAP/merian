@@ -879,6 +879,13 @@ void PathDebugNode::draw_filter_tab() {
 }
 
 void PathDebugNode::draw_view_tab() {
+    if (ImGui::CollapsingHeader("Background", ImGuiTreeNodeFlags_DefaultOpen)) {
+        segmented("background", background, BACKGROUND_NAMES);
+        if (!gbuffer_connected && background != static_cast<int32_t>(PATH_DEBUG_BACKGROUND_OFF) &&
+            path_debug_backdrop_recorded(static_cast<uint32_t>(backdrop))) {
+            ImGui::TextDisabled("gbuffer required");
+        }
+    }
     if (ImGui::CollapsingHeader("Overlay", ImGuiTreeNodeFlags_DefaultOpen)) {
         if (segmented("type", false_color, FALSE_COLOR_NAMES)) {
             heat_dirty = true;

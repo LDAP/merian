@@ -291,7 +291,8 @@ std::vector<InputConnectorDescriptor> PathDebugNode::describe_inputs() {
     con_gbuffer = GBufferIn::create({{{GBufferField::Hit}},
                                      {{GBufferField::FirstHitNormal}},
                                      {{GBufferField::FirstHitLinearZ}},
-                                     {{GBufferField::GradZ}}});
+                                     {{GBufferField::GradZ}},
+                                     {{GBufferField::Albedo}}});
     return {
         {"scene", con_scene},
         {"records", con_records,
@@ -1334,6 +1335,7 @@ void PathDebugNode::build_pixel_stats_params(PathDebugParams& p,
 void PathDebugNode::build_backdrop_params(PathDebugParams& p, const NodeProcessInfo& info) const {
     p.backdrop_split = backdrop_split;
     p.difference_gain = difference_gain;
+    p.background = static_cast<uint32_t>(background);
     p.backdrop = backdrop_missing ? PATH_DEBUG_BACKDROP_SOURCE : static_cast<uint32_t>(backdrop);
     if (reference_flip && (p.backdrop == PATH_DEBUG_BACKDROP_REFERENCE ||
                            p.backdrop == PATH_DEBUG_BACKDROP_SPLIT_REFERENCE)) {

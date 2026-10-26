@@ -107,6 +107,8 @@ class PathDebugNode : public Node {
                                                                   "difference",
                                                                   "split source input | reference",
                                                                   "backdrop input"};
+    static constexpr std::array<const char*, 3> BACKGROUND_NAMES = {"off", "wireframe",
+                                                                    "shaded albedo"};
     static constexpr std::array<const char*, 2> WI_NAMES = {"camera ray", "manual"};
     static constexpr int32_t FALSE_COLOR_OFF = 0;
     static constexpr int32_t FALSE_COLOR_HEAT = 1;
@@ -648,6 +650,7 @@ class PathDebugNode : public Node {
     float overlay_exposure = 1.f;
 
     int32_t backdrop = static_cast<int32_t>(PATH_DEBUG_BACKDROP_ACCUMULATED);
+    int32_t background = static_cast<int32_t>(PATH_DEBUG_BACKGROUND_WIREFRAME);
     int32_t false_color = FALSE_COLOR_OFF;
     bool false_color_filtered = false;
     std::string reference_path;

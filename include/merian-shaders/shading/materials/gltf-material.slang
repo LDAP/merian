@@ -120,26 +120,6 @@ struct GltfMaterial<let TRANSMISSION : bool = false,
         }
     }
 
-    float get_metallic(const Textures textures,
-                       const float2 uv,
-                       const LODSampler2D lod = DefaultLODSampler()) {
-        float metallic = metallic_factor;
-        if (metallic_roughness_texture != TextureID(-1)) {
-            metallic *= textures.sample(lod, metallic_roughness_texture, uv).b;
-        }
-        return metallic;
-    }
-
-    float get_roughness(const Textures textures,
-                        const float2 uv,
-                        const LODSampler2D lod = DefaultLODSampler()) {
-        float roughness = roughness_factor;
-        if (metallic_roughness_texture != TextureID(-1)) {
-            roughness *= textures.sample(lod, metallic_roughness_texture, uv).g;
-        }
-        return roughness;
-    }
-
     override float3 get_emission(const ShadingData sd,
                                  const Textures textures,
                                  const LODSampler2D lod) {

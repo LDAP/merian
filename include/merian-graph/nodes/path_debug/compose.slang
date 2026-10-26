@@ -17,6 +17,9 @@ Sampler2D<float4> in_reference;
 Sampler2D<float4> in_backdrop;
 
 static const float3 SPLIT_COLOR = float3(1.f, 1.f, 0.1f);
+static const float3 WIREFRAME_COLOR = float3(0.35f);
+static const float WIREFRAME_HALF_WIDTH = 0.5f;
+static const float SHADED_AMBIENT = 0.2f;
 
 float3 recorded_tonemapped(const float3 radiance) {
     return 1.f - exp(-radiance * params.image_exposure);
@@ -38,14 +41,81 @@ float3 sample_reference(const uint2 pixel) {
     return in_reference.SampleLevel(out_uv(pixel), 0.f).rgb;
 }
 
+bool same_triangle(const Hit a, const Hit b) {
+    return a.get_geometry_id() == b.get_geometry_id() && a.primitive_id == b.primitive_id;
+}
+
+bool barycentric_step(const uint2 render_pixel, const Hit hit, const int2 axis, out float3 step) {
+    step = float3(0.f);
+    const int2 forward = int2(render_pixel) + axis;
+    if (all(forward < int2(path_debug_dim()))) {
+        const Hit next = gbuffer.get_hit(uint2(forward));
+        if (same_triangle(hit, next)) {
+            step = next.get_barycentrics3() - hit.get_barycentrics3();
+            return true;
+        }
+    }
+    const int2 backward = int2(render_pixel) - axis;
+    if (all(backward >= 0)) {
+        const Hit prev = gbuffer.get_hit(uint2(backward));
+        if (same_triangle(hit, prev)) {
+            step = hit.get_barycentrics3() - prev.get_barycentrics3();
+            return true;
+        }
+    }
+    return false;
+}
+
+// solid wireframe [Bærentzen et al. 2006]
+float wireframe_coverage(const uint2 pixel, const uint2 render_pixel, const Hit hit) {
+    float3 dx;
+    float3 dy;
+    if (!barycentric_step(render_pixel, hit, int2(1, 0), dx) ||
+        !barycentric_step(render_pixel, hit, int2(0, 1), dy)) {
+        return 1.f;
+    }
+    if (all(dx == 0.f) && all(dy == 0.f)) {
+        return 0.f;
+    }
+    const float2 offset =
+        path_debug_render_coord(pixel) - (float2(render_pixel) + 0.5f + camera.jitter);
+    const float3 b = hit.get_barycentrics3() + offset.x * dx + offset.y * dy;
+    const float2 render_per_out = float2(path_debug_dim()) / float2(path_debug_out_dim());
+    const float3 gx = dx * render_per_out.x;
+    const float3 gy = dy * render_per_out.y;
+    const float3 distance = abs(b) / max(sqrt(gx * gx + gy * gy), 1e-12f);
+    return saturate(WIREFRAME_HALF_WIDTH + 0.5f - min(distance.x, min(distance.y, distance.z)));
+}
+
+float3 background_color(const uint2 pixel, const uint2 render_pixel) {
+    if (!merian_path_debug_gbuffer || params.background == PATH_DEBUG_BACKGROUND_OFF) {
+        return float3(0.f);
+    }
+    const Hit hit = gbuffer.get_hit(render_pixel);
+    if (!hit.is_valid()) {
+        return float3(0.f);
+    }
+    if (params.background == PATH_DEBUG_BACKGROUND_WIREFRAME) {
+        return wireframe_coverage(pixel, render_pixel, hit) * WIREFRAME_COLOR;
+    }
+    const float3 view =
+        camera.get_pinhole_direction_unjittered(float2(render_pixel), path_debug_dim());
+    const float facing = abs(dot(gbuffer.get_first_hit_normal(render_pixel), view));
+    return saturate(gbuffer.get_albedo(render_pixel)) *
+           (SHADED_AMBIENT + (1.f - SHADED_AMBIENT) * facing);
+}
+
 float3 backdrop_color(const uint2 pixel, const float3 render, const uint2 render_pixel) {
     switch (params.backdrop) {
     case PATH_DEBUG_BACKDROP_FRAME:
     case PATH_DEBUG_BACKDROP_ACCUMULATED:
     case PATH_DEBUG_BACKDROP_FRAME_FILTERED:
-    case PATH_DEBUG_BACKDROP_ACCUMULATED_FILTERED:
-        return recorded_tonemapped(
-            recorded_radiance(render_pixel, path_debug_backdrop_filtered(params.backdrop)));
+    case PATH_DEBUG_BACKDROP_ACCUMULATED_FILTERED: {
+        const float4 recorded =
+            recorded_radiance(render_pixel, path_debug_backdrop_filtered(params.backdrop));
+        return recorded.w > 0.f ? recorded_tonemapped(recorded.rgb)
+                                : background_color(pixel, render_pixel);
+    }
     case PATH_DEBUG_BACKDROP_REFERENCE:
         return params.image_exposure * sample_reference(pixel);
     case PATH_DEBUG_BACKDROP_DIFFERENCE:
@@ -75,17 +145,18 @@ float heat_lookup(const float3 pos) {
     return path_debug_heat_value(cell / 7.f);
 }
 
-float3 recorded_radiance(const uint2 render_pixel, const bool with_filter) {
+float4 recorded_radiance(const uint2 render_pixel, const bool with_filter) {
     if (params.filtered_active == 0) {
-        return float3(0.f);
+        return float4(0.f);
     }
     const uint2 source = path_debug_source_pixel(render_pixel);
     if (source.x == PATH_DEBUG_NO_PIXEL) {
-        return float3(0.f);
+        return float4(0.f);
     }
     const uint base = path_debug_filtered_base(source, with_filter && path_debug_narrows());
     const uint count = filtered[base + PATH_DEBUG_FILTERED_COUNT];
-    return count > 0 ? path_debug_load_float3(filtered, base) / float(count) : float3(0.f);
+    return count > 0 ? float4(path_debug_load_float3(filtered, base) / float(count), float(count))
+                     : float4(0.f);
 }
 
 // the scene's distance at a displayed pixel, bilinear between the record pixels
@@ -265,7 +336,7 @@ void main(uint3 gid: SV_DispatchThreadID) {
 
     if (all(pixel < path_debug_dim())) {
         if (params.filtered_out != 0) {
-            const float3 filtered = recorded_radiance(pixel, true);
+            const float3 filtered = recorded_radiance(pixel, true).rgb;
             const float lum = yuv_luminance(filtered);
             out_filtered[pixel] = float4(filtered, lum * lum);
         }

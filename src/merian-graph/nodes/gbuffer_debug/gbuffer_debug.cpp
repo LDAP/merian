@@ -28,8 +28,7 @@ const std::vector<DebugField> FIELDS = {
     // Material
     {"Alpha", {GBufferField::Hit}},
     {"Emissive", {GBufferField::Hit}},
-    {"Metallic", {GBufferField::Hit}},
-    {"Roughness", {GBufferField::Hit}},
+    {"Effective Alpha", {GBufferField::Hit}},
     // IDs & barycentrics
     {"Instance ID", {GBufferField::Hit}},
     {"Geometry Index", {GBufferField::Hit}},

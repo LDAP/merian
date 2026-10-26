@@ -433,6 +433,10 @@ static const uint32_t PATH_DEBUG_BACKDROP_DIFFERENCE = 6;
 static const uint32_t PATH_DEBUG_BACKDROP_SPLIT_REFERENCE = 7;
 static const uint32_t PATH_DEBUG_BACKDROP_INPUT = 8;
 
+static const uint32_t PATH_DEBUG_BACKGROUND_OFF = 0;
+static const uint32_t PATH_DEBUG_BACKGROUND_WIREFRAME = 1;
+static const uint32_t PATH_DEBUG_BACKGROUND_SHADED_ALBEDO = 2;
+
 PATH_DEBUG_FUNC bool path_debug_backdrop_recorded(const uint32_t backdrop) {
     return backdrop >= PATH_DEBUG_BACKDROP_FRAME &&
            backdrop <= PATH_DEBUG_BACKDROP_ACCUMULATED_FILTERED;
@@ -517,6 +521,7 @@ struct PathDebugParams {
     float backdrop_split;
     float difference_gain;
     float image_exposure;
+    uint32_t background;
 
     uint32_t map_res;
     uint32_t map_transform;

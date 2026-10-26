@@ -315,6 +315,14 @@ void PathDebugNode::properties_image(Properties& config) {
     config.config_float("exposure", image_exposure,
                         "Scales the image; the recorded radiance is tone mapped.", 0.01f);
     image_exposure = std::max(image_exposure, 0.f);
+    config.config_options("background", background, options(BACKGROUND_NAMES),
+                          Properties::OptionsStyle::COMBO,
+                          "Where the current frame or accumulated image holds no path.");
+    if (config.is_ui() && !gbuffer_connected &&
+        background != static_cast<int32_t>(PATH_DEBUG_BACKGROUND_OFF) &&
+        path_debug_backdrop_recorded(static_cast<uint32_t>(backdrop))) {
+        config.output_text("gbuffer required");
+    }
     if (path_debug_backdrop_accumulated(static_cast<uint32_t>(backdrop)) &&
         config.config_bool("reset")) {
         image_dirty = true;
