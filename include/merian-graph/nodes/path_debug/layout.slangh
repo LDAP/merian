@@ -227,7 +227,9 @@ static const uint32_t PATH_DEBUG_CHECK_ERR_PDF = PATH_DEBUG_CHECK + 9;
 static const uint32_t PATH_DEBUG_CHECK_OFF_WEIGHT = PATH_DEBUG_CHECK + 10;
 static const uint32_t PATH_DEBUG_CHECK_OFF_PDF = PATH_DEBUG_CHECK + 11;
 static const uint32_t PATH_DEBUG_CHECK_TRANSMITTED_WEIGHT = PATH_DEBUG_CHECK + 12;
-static const uint32_t PATH_DEBUG_CHECK_QUADRATURE = PATH_DEBUG_CHECK + 13;
+static const uint32_t PATH_DEBUG_CHECK_SINGULAR = PATH_DEBUG_CHECK + 13;
+static const uint32_t PATH_DEBUG_CHECK_CONTINUOUS_WEIGHT = PATH_DEBUG_CHECK + 14;
+static const uint32_t PATH_DEBUG_CHECK_QUADRATURE = PATH_DEBUG_CHECK + 15;
 static const uint32_t PATH_DEBUG_CHECK_CELLS = PATH_DEBUG_CHECK_QUADRATURE + 0;
 static const uint32_t PATH_DEBUG_CHECK_PDF_INTEGRAL = PATH_DEBUG_CHECK_QUADRATURE + 1;
 static const uint32_t PATH_DEBUG_CHECK_EVAL_INTEGRAL = PATH_DEBUG_CHECK_QUADRATURE + 2;
@@ -238,14 +240,14 @@ static const uint32_t PATH_DEBUG_CHECK_BAD_CELLS = PATH_DEBUG_CHECK_QUADRATURE +
 static const uint32_t PATH_DEBUG_CHECK_ALBEDO = PATH_DEBUG_CHECK_QUADRATURE + 9;
 static const uint32_t PATH_DEBUG_CHECK_ALPHA = PATH_DEBUG_CHECK_QUADRATURE + 12;
 static const uint32_t PATH_DEBUG_CHECK_QUADRATURE_UINTS = 13;
-// the frame's sums of the weights (rgb), their squared deviations and the transmitted weight join
-// these float-float totals
+// the frame's float sums join these float-float totals
 static const uint32_t PATH_DEBUG_CHECK_TOTALS =
     PATH_DEBUG_CHECK_QUADRATURE + PATH_DEBUG_CHECK_QUADRATURE_UINTS;
 static const uint32_t PATH_DEBUG_CHECK_WEIGHT_TOTAL = PATH_DEBUG_CHECK_TOTALS + 0;
 static const uint32_t PATH_DEBUG_CHECK_WEIGHT_M2_TOTAL = PATH_DEBUG_CHECK_TOTALS + 6;
 static const uint32_t PATH_DEBUG_CHECK_TRANSMITTED_WEIGHT_TOTAL = PATH_DEBUG_CHECK_TOTALS + 8;
-static const uint32_t PATH_DEBUG_CHECK_UINTS = PATH_DEBUG_CHECK_TOTALS + 10 - PATH_DEBUG_CHECK;
+static const uint32_t PATH_DEBUG_CHECK_CONTINUOUS_WEIGHT_TOTAL = PATH_DEBUG_CHECK_TOTALS + 10;
+static const uint32_t PATH_DEBUG_CHECK_UINTS = PATH_DEBUG_CHECK_TOTALS + 12 - PATH_DEBUG_CHECK;
 static const uint32_t PATH_DEBUG_CHECK_DIM = 1024;
 static const uint32_t PATH_DEBUG_CHECK_SAMPLES_PER_CELL = 16;
 // the draws BSDF sample() is topped up to; drawn in a check's first frame, its later frames and

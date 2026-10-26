@@ -105,7 +105,8 @@ draw `pdf()`.
   verdicts update with them.
 - `sample()`, `pdf()` and the check see one hit of the jittered camera until the next reset, so a
   textured material is checked at one texel of the pixel.
-- When `sample()` can reject, the pdf integrates to the share of valid draws, not to 1.
+- The pdf integrates to the share of continuous draws, not to 1, when `sample()` can reject or
+  draws a singular lobe (a smooth pane, a pass-through).
 - A lobe too narrow for the integration grid reads n/a.
 - `get_albedo()` is an approximation for denoiser demodulation: APPROX when far off, n/a with
   refraction, whose sample weights carry eta².

@@ -65,10 +65,12 @@ void main(uint3 gid: SV_DispatchThreadID, ParameterBlock<Scene> scene) {
     uint valid = 0;
     uint bad = 0;
     uint transmitted = 0;
+    uint singular = 0;
     uint off_weight = 0;
     uint off_pdf = 0;
     float3 weight_sum = float3(0.f);
     float transmitted_weight = 0.f;
+    float continuous_weight = 0.f;
     float weight_lum_sq = 0.f;
     float err_weight = 0.f;
     float err_pdf = 0.f;
@@ -79,6 +81,7 @@ void main(uint3 gid: SV_DispatchThreadID, ParameterBlock<Scene> scene) {
         }
         valid++;
         transmitted += check.transmitted ? 1 : 0;
+        singular += check.delta ? 1 : 0;
         // reported on its own, it would poison every sum below
         if (!check.sane) {
             bad++;
@@ -104,6 +107,7 @@ void main(uint3 gid: SV_DispatchThreadID, ParameterBlock<Scene> scene) {
         }
         const float weight_lum = yuv_luminance(check.weight);
         transmitted_weight += check.transmitted ? weight_lum : 0.f;
+        continuous_weight += check.delta ? 0.f : weight_lum;
         weight_sum += check.weight;
         weight_lum_sq += weight_lum * weight_lum;
     }
@@ -137,6 +141,7 @@ void main(uint3 gid: SV_DispatchThreadID, ParameterBlock<Scene> scene) {
     const uint wave_valid = WaveActiveSum(valid);
     const uint wave_bad = WaveActiveSum(bad);
     const uint wave_transmitted = WaveActiveSum(transmitted);
+    const uint wave_singular = WaveActiveSum(singular);
     const uint wave_off_weight = WaveActiveSum(off_weight);
     const uint wave_off_pdf = WaveActiveSum(off_pdf);
     const uint wave_off_reciprocity = WaveActiveSum(off_reciprocity);
@@ -149,6 +154,7 @@ void main(uint3 gid: SV_DispatchThreadID, ParameterBlock<Scene> scene) {
     const float wave_weight_m2 =
         max(WaveActiveSum(weight_lum_sq) - wave_weight_lum * wave_mean_lum, 0.f);
     const float wave_transmitted_weight = WaveActiveSum(transmitted_weight);
+    const float wave_continuous_weight = WaveActiveSum(continuous_weight);
     const float wave_pdf = WaveActiveSum(pdf_part);
     const float3 wave_eval = WaveActiveSum(eval_part);
     const float wave_err_weight = WaveActiveMax(err_weight);
@@ -162,12 +168,17 @@ void main(uint3 gid: SV_DispatchThreadID, ParameterBlock<Scene> scene) {
         InterlockedAdd(stats[PATH_DEBUG_CHECK_VALID], wave_valid);
         InterlockedAdd(stats[PATH_DEBUG_CHECK_BAD], wave_bad);
         InterlockedAdd(stats[PATH_DEBUG_CHECK_TRANSMITTED], wave_transmitted);
+        if (wave_singular != 0) {
+            InterlockedAdd(stats[PATH_DEBUG_CHECK_SINGULAR], wave_singular);
+        }
         InterlockedAdd(stats[PATH_DEBUG_CHECK_OFF_WEIGHT], wave_off_weight);
         InterlockedAdd(stats[PATH_DEBUG_CHECK_OFF_PDF], wave_off_pdf);
         path_debug_atomic_add_float3(stats, stats_f, PATH_DEBUG_CHECK_WEIGHT, wave_weight);
         path_debug_atomic_add_float(stats, stats_f, PATH_DEBUG_CHECK_WEIGHT_M2, wave_weight_m2);
         path_debug_atomic_add_float(stats, stats_f, PATH_DEBUG_CHECK_TRANSMITTED_WEIGHT,
                                     wave_transmitted_weight);
+        path_debug_atomic_add_float(stats, stats_f, PATH_DEBUG_CHECK_CONTINUOUS_WEIGHT,
+                                    wave_continuous_weight);
         path_debug_atomic_max_float(stats, PATH_DEBUG_CHECK_ERR_WEIGHT, wave_err_weight);
         path_debug_atomic_max_float(stats, PATH_DEBUG_CHECK_ERR_PDF, wave_err_pdf);
     }

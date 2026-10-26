@@ -288,6 +288,8 @@ BSDFVerdicts bsdf_verdicts(const Stats& stats) {
         std::sqrt(stat_float_float(stats, PATH_DEBUG_CHECK_WEIGHT_M2_TOTAL)) /
         static_cast<float>(draws);
     const uint32_t transmitted = stats[PATH_DEBUG_CHECK_TRANSMITTED];
+    const uint32_t continuous =
+        std::max(stats[PATH_DEBUG_CHECK_VALID] - stats[PATH_DEBUG_CHECK_SINGULAR], 1u);
     const uint32_t bad = stats[PATH_DEBUG_CHECK_BAD];
     const uint32_t bad_cells = stats[PATH_DEBUG_CHECK_BAD_CELLS];
     const bool resolved = stat_float(stats, PATH_DEBUG_CHECK_ALPHA) >= 0.0225f;
@@ -323,8 +325,8 @@ BSDFVerdicts bsdf_verdicts(const Stats& stats) {
         {"finite and non-negative", passed(finite_ok),
          finite_ok ? fmt::format("{} samples", si_count(draws))
                    : fmt::format("{} samples, {} cells", si_count(bad), si_count(bad_cells))});
-    verdicts.valid.push_back(identity("weight = BSDF·cos/pdf", PATH_DEBUG_CHECK_OFF_WEIGHT, draws,
-                                      stat_float(stats, PATH_DEBUG_CHECK_ERR_WEIGHT)));
+    verdicts.valid.push_back(identity("weight = BSDF·cos/pdf", PATH_DEBUG_CHECK_OFF_WEIGHT,
+                                      continuous, stat_float(stats, PATH_DEBUG_CHECK_ERR_WEIGHT)));
     // an approximation for demodulation, without the eta^2 radiance scaling of refraction
     const float albedo_fn = yuv_luminance(stat_rgb(stats, PATH_DEBUG_CHECK_ALBEDO));
     const float albedo_rel = (albedo_fn - albedo_lum) / std::max({albedo_fn, albedo_lum, 1e-6f});
@@ -353,21 +355,27 @@ BSDFVerdicts bsdf_verdicts(const Stats& stats) {
              fmt::format("chi2/dof {:.2f} over {} bins, expected 1 ± {:.2f}", reduced, dof,
                          chi2_sigma(dof))});
     }
-    verdicts.sampling.push_back(identity("sampled pdf = pdf()", PATH_DEBUG_CHECK_OFF_PDF, draws,
-                                         stat_float(stats, PATH_DEBUG_CHECK_ERR_PDF)));
-    // a draw sample() rejects has no pdf, so the pdf integrates to the valid share
+    verdicts.sampling.push_back(identity("sampled pdf = pdf()", PATH_DEBUG_CHECK_OFF_PDF,
+                                         continuous, stat_float(stats, PATH_DEBUG_CHECK_ERR_PDF)));
     const float pdf_integral = stat_float(stats, PATH_DEBUG_CHECK_PDF_INTEGRAL);
-    const float valid_share =
-        static_cast<float>(stats[PATH_DEBUG_CHECK_VALID]) / static_cast<float>(draws);
-    verdicts.sampling.push_back(
-        integral("pdf integrates to 1", std::abs(pdf_integral - valid_share) <= 1e-2f,
-                 fmt::format("∫pdf dω {:.4f} vs valid draws {:.4f}", pdf_integral, valid_share)));
+    const float continuous_share =
+        static_cast<float>(stats[PATH_DEBUG_CHECK_VALID] - stats[PATH_DEBUG_CHECK_SINGULAR]) /
+        static_cast<float>(draws);
+    const float pdf_rel = std::abs(pdf_integral - continuous_share) /
+                          std::max({pdf_integral, continuous_share, 1e-6f});
+    verdicts.sampling.push_back(integral(
+        "pdf integrates to 1", pdf_rel <= 1e-2f,
+        fmt::format("∫pdf dω {:.4f} vs continuous draws {:.4f}", pdf_integral, continuous_share)));
     const float eval_lum = yuv_luminance(stat_rgb(stats, PATH_DEBUG_CHECK_EVAL_INTEGRAL));
+    const float continuous_albedo =
+        stat_float_float(stats, PATH_DEBUG_CHECK_CONTINUOUS_WEIGHT_TOTAL) /
+        static_cast<float>(draws);
     const float eval_rel =
-        std::abs(eval_lum - albedo_lum) / std::max({eval_lum, albedo_lum, 1e-6f});
+        std::abs(eval_lum - continuous_albedo) / std::max({eval_lum, continuous_albedo, 1e-6f});
     verdicts.sampling.push_back(
         integral("draws integrate BSDF·cos", eval_rel <= 0.02f,
-                 fmt::format("∫BSDF·cos dω {:.4f} vs sampled {:.4f}", eval_lum, albedo_lum)));
+                 fmt::format("∫BSDF·cos dω {:.4f} vs continuous draws {:.4f}", eval_lum,
+                             continuous_albedo)));
     if (stats[PATH_DEBUG_STATS_CHECK_SAMPLES] > 0) {
         verdicts.sampling.push_back(
             {"total variation", BSDFVerdict::Status::VALUE,
@@ -1257,12 +1265,14 @@ void PathDebugNode::draw_bsdf_section() {
     }
     const auto draws = static_cast<float>(check_draws_done);
     const float3 albedo_mc = check_albedo(stats);
-    wrapped_disabled(fmt::format(
-        "alpha {:.3g} · {:.1f}% valid · {:.1f}% transmitted · albedo ({:.4f}, {:.4f}, {:.4f})",
-        stat_float(stats, PATH_DEBUG_CHECK_ALPHA),
-        100.f * static_cast<float>(stats[PATH_DEBUG_CHECK_VALID]) / draws,
-        100.f * static_cast<float>(stats[PATH_DEBUG_CHECK_TRANSMITTED]) / draws, albedo_mc.x,
-        albedo_mc.y, albedo_mc.z));
+    wrapped_disabled(
+        fmt::format("alpha {:.3g} · {:.1f}% valid · {:.1f}% transmitted · {:.1f}% "
+                    "singular · albedo ({:.4f}, {:.4f}, {:.4f})",
+                    stat_float(stats, PATH_DEBUG_CHECK_ALPHA),
+                    100.f * static_cast<float>(stats[PATH_DEBUG_CHECK_VALID]) / draws,
+                    100.f * static_cast<float>(stats[PATH_DEBUG_CHECK_TRANSMITTED]) / draws,
+                    100.f * static_cast<float>(stats[PATH_DEBUG_CHECK_SINGULAR]) / draws,
+                    albedo_mc.x, albedo_mc.y, albedo_mc.z));
 }
 
 void PathDebugNode::draw_sampling_section() {

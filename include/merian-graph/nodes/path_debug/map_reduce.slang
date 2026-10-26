@@ -88,6 +88,8 @@ void fold_check_weights() {
     fold_check_weight(PATH_DEBUG_CHECK_WEIGHT_M2, PATH_DEBUG_CHECK_WEIGHT_M2_TOTAL);
     fold_check_weight(PATH_DEBUG_CHECK_TRANSMITTED_WEIGHT,
                       PATH_DEBUG_CHECK_TRANSMITTED_WEIGHT_TOTAL);
+    fold_check_weight(PATH_DEBUG_CHECK_CONTINUOUS_WEIGHT,
+                      PATH_DEBUG_CHECK_CONTINUOUS_WEIGHT_TOTAL);
 }
 
 [numthreads(PATH_DEBUG_WG, 1, 1)]
