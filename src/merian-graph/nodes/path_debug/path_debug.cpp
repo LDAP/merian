@@ -1637,7 +1637,7 @@ void PathDebugNode::record_voxels(const NodeIO& io,
     const ImageHandle& image = voxel_texture->get_image();
     const ImageHandle& depth = voxel_depth_view->get_image();
     cmd->barrier({compute_to_vertex(filtered_buffer), compute_to_vertex(moments_buffer),
-                  compute_to_vertex(voxel_depth_buffer)});
+                  compute_to_vertex(voxel_depth_buffer), compute_to_compute(voxel_depth_buffer)});
     cmd->barrier(
         {image->barrier2(vk::ImageLayout::eColorAttachmentOptimal, vk::AccessFlagBits2::eShaderRead,
                          vk::AccessFlagBits2::eColorAttachmentWrite,

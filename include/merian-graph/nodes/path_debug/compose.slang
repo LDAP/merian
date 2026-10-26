@@ -11,14 +11,20 @@ using merian;
 #include "merian-graph/nodes/path_debug/layout.slangh"
 #include "merian-graph/nodes/path_debug/common.slangh"
 #include "merian-graph/nodes/path_debug/map_display.slangh"
+#include "merian-graph/nodes/path_debug/voxel.slangh"
 
 ParameterBlock<GBuffer> gbuffer;
+
+#include "merian-graph/nodes/path_debug/depth_test.slangh"
 Sampler2D<float4> in_reference;
 Sampler2D<float4> in_backdrop;
 
 static const float3 SPLIT_COLOR = float3(1.f, 1.f, 0.1f);
-static const float3 WIREFRAME_COLOR = float3(0.35f);
+// Blender's active object, #FFAA40
+static const float3 WIREFRAME_COLOR = float3(1.f, 0.402f, 0.051f);
+// in displayed pixels
 static const float WIREFRAME_HALF_WIDTH = 0.5f;
+static const float WIREFRAME_FALLOFF = 0.5f;
 static const float SHADED_AMBIENT = 0.2f;
 
 float3 recorded_tonemapped(const float3 radiance) {
@@ -84,7 +90,8 @@ float wireframe_coverage(const uint2 pixel, const uint2 render_pixel, const Hit 
     const float3 gx = dx * render_per_out.x;
     const float3 gy = dy * render_per_out.y;
     const float3 distance = abs(b) / max(sqrt(gx * gx + gy * gy), 1e-12f);
-    return saturate(WIREFRAME_HALF_WIDTH + 0.5f - min(distance.x, min(distance.y, distance.z)));
+    const float nearest = min(distance.x, min(distance.y, distance.z));
+    return saturate((WIREFRAME_HALF_WIDTH - nearest) / WIREFRAME_FALLOFF + 0.5f);
 }
 
 float3 background_color(const uint2 pixel, const uint2 render_pixel) {
@@ -111,10 +118,26 @@ float3 backdrop_color(const uint2 pixel, const float3 render, const uint2 render
     case PATH_DEBUG_BACKDROP_ACCUMULATED:
     case PATH_DEBUG_BACKDROP_FRAME_FILTERED:
     case PATH_DEBUG_BACKDROP_ACCUMULATED_FILTERED: {
-        const float4 recorded =
-            recorded_radiance(render_pixel, path_debug_backdrop_filtered(params.backdrop));
-        return recorded.w > 0.f ? recorded_tonemapped(recorded.rgb)
-                                : background_color(pixel, render_pixel);
+        const uint2 source = path_debug_source_pixel(render_pixel);
+        if (params.image_voxels != 0 && source.x == PATH_DEBUG_NO_PIXEL) {
+            return background_color(pixel, render_pixel);
+        }
+        const float3 recorded = recorded_tonemapped(
+            recorded_radiance(source, path_debug_backdrop_filtered(params.backdrop)));
+        if (params.image_voxels == 0 || params.background == PATH_DEBUG_BACKGROUND_OFF) {
+            return recorded;
+        }
+        const PathDebugVoxel voxel =
+            path_debug_voxel(source, voxel_depth[source.y * params.dim_x + source.x]);
+        if (!path_debug_pixel_behind_geometry(
+                render_pixel, distance(voxel.center, camera.position) - voxel.half_depth)) {
+            return recorded;
+        }
+        if (params.background == PATH_DEBUG_BACKGROUND_SHADED_ALBEDO) {
+            return background_color(pixel, render_pixel);
+        }
+        return lerp(recorded, WIREFRAME_COLOR,
+                    wireframe_coverage(pixel, render_pixel, gbuffer.get_hit(render_pixel)));
     }
     case PATH_DEBUG_BACKDROP_REFERENCE:
         return params.image_exposure * sample_reference(pixel);
@@ -145,18 +168,16 @@ float heat_lookup(const float3 pos) {
     return path_debug_heat_value(cell / 7.f);
 }
 
-float4 recorded_radiance(const uint2 render_pixel, const bool with_filter) {
+float3 recorded_radiance(const uint2 source, const bool with_filter) {
     if (params.filtered_active == 0) {
-        return float4(0.f);
+        return float3(0.f);
     }
-    const uint2 source = path_debug_source_pixel(render_pixel);
     if (source.x == PATH_DEBUG_NO_PIXEL) {
-        return float4(0.f);
+        return float3(0.f);
     }
     const uint base = path_debug_filtered_base(source, with_filter && path_debug_narrows());
     const uint count = filtered[base + PATH_DEBUG_FILTERED_COUNT];
-    return count > 0 ? float4(path_debug_load_float3(filtered, base) / float(count), float(count))
-                     : float4(0.f);
+    return count > 0 ? path_debug_load_float3(filtered, base) / float(count) : float3(0.f);
 }
 
 // the scene's distance at a displayed pixel, bilinear between the record pixels
@@ -336,7 +357,7 @@ void main(uint3 gid: SV_DispatchThreadID) {
 
     if (all(pixel < path_debug_dim())) {
         if (params.filtered_out != 0) {
-            const float3 filtered = recorded_radiance(pixel, true).rgb;
+            const float3 filtered = recorded_radiance(path_debug_source_pixel(pixel), true);
             const float lum = yuv_luminance(filtered);
             out_filtered[pixel] = float4(filtered, lum * lum);
         }

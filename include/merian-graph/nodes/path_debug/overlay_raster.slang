@@ -16,8 +16,9 @@ using merian;
 ParameterBlock<GBuffer> gbuffer;
 [vk::push_constant] ConstantBuffer<PathDebugOverlayView> view;
 
+#include "merian-graph/nodes/path_debug/depth_test.slangh"
+
 // in pixels at a display scale of 1
-static const float DEPTH_TEST_PIXELS = 2.f;
 static const float DASH_PIXELS = 5.f;
 static const float MAX_HALF_WIDTH = 6.f;
 static const float QUAD_MARGIN = 2.f;
@@ -80,28 +81,10 @@ float half_width_at(const uint kind, const float z_ref, const float line_z) {
     return view.scale * half_width;
 }
 
-// A surface lies in front of the distance at every record pixel around the target pixel, so the
-// test does not follow the jitter of the gbuffer. Depths clamped to MAX_LINEAR_Z are the sky.
 bool behind_geometry(const float2 target_pixel, const float distance_to_camera) {
-    if (!merian_path_debug_gbuffer) {
-        return false;
-    }
-    const int2 dim = int2(path_debug_dim());
-    const float2 at = (target_pixel - view_origin()) / view_size() * float2(dim) - 0.5f;
-    const int2 base = int2(floor(at));
-    for (int i = 0; i < 4; i++) {
-        const uint2 p = uint2(clamp(base + int2(i & 1, i >> 1), int2(0), dim - 1));
-        const float gz = gbuffer.get_first_hit_linear_z(p);
-        if (!(gz > 0.f && gz < MAX_LINEAR_Z)) {
-            return false;
-        }
-        const float2 grad = float2(gbuffer.get_grad_z(p));
-        const float tolerance = DEPTH_TEST_PIXELS * (abs(grad.x) + abs(grad.y)) + 0.01f * gz;
-        if (distance_to_camera <= gz + tolerance) {
-            return false;
-        }
-    }
-    return true;
+    const float2 record_coord =
+        (target_pixel - view_origin()) / view_size() * float2(path_debug_dim());
+    return path_debug_behind_geometry(record_coord, distance_to_camera);
 }
 
 float3 unescape(const float3 from, const float3 to) {

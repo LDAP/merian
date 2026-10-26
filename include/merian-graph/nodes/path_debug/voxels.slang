@@ -6,15 +6,10 @@ using merian;
 
 #include "merian-graph/nodes/path_debug/layout.slangh"
 #include "merian-graph/nodes/path_debug/common.slangh"
-
-// the camera the voxel depths were captured with
-uniform merian::Camera voxel_camera;
+#include "merian-graph/nodes/path_debug/voxel.slangh"
 
 // reversed z, a point at view depth w gets VOXEL_NEAR / w
 static const float VOXEL_NEAR = 1e-4f;
-// in pixel footprints
-static const float MIN_DEPTH_SPAN = 1.f;
-static const float MAX_DEPTH_SPAN = 32.f;
 static const float4 CULLED = float4(2.f, 2.f, 2.f, 1.f);
 
 struct Varyings {
@@ -30,8 +25,7 @@ float4 to_clip(const float3 pos) {
                   dot(d, camera.W) / dot(camera.W, camera.W));
 }
 
-// The slice of a record pixel's frustum around its first hit, deep enough to cover the surface
-// the pixel sees. A 14 vertex strip draws a box.
+// A 14 vertex strip draws a voxel's box.
 [shader("vertex")]
 Varyings vertex_main(const uint vertex: SV_VertexID, const uint instance: SV_InstanceID) {
     Varyings out;
@@ -47,21 +41,13 @@ Varyings vertex_main(const uint vertex: SV_VertexID, const uint instance: SV_Ins
         return out;
     }
 
-    const uint2 dim = path_debug_dim();
-    const float2 center = float2(pixel);
-    const float footprint =
-        depth.x *
-        distance(voxel_camera.get_pinhole_direction_unjittered(center, dim),
-                 voxel_camera.get_pinhole_direction_unjittered(center + float2(1.f, 0.f), dim));
-    const float span = isfinite(depth.y) ? depth.y : 0.f;
-    const float half_depth =
-        0.5f * clamp(span, MIN_DEPTH_SPAN * footprint, MAX_DEPTH_SPAN * footprint);
-
+    const float half_depth = path_debug_voxel(pixel, depth).half_depth;
     const uint bit = 1u << vertex;
     const float2 corner =
         float2((0x287au & bit) != 0 ? 0.5f : -0.5f, (0x02afu & bit) != 0 ? 0.5f : -0.5f);
     const float distance_along = depth.x + ((0x31e3u & bit) != 0 ? half_depth : -half_depth);
-    const float3 dir = voxel_camera.get_pinhole_direction_unjittered(center + corner, dim);
+    const float3 dir =
+        voxel_camera.get_pinhole_direction_unjittered(float2(pixel) + corner, path_debug_dim());
     out.position = to_clip(voxel_camera.position + dir * max(distance_along, 0.f));
     return out;
 }

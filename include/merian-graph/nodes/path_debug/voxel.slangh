@@ -1,0 +1,29 @@
+// Include after common.slangh.
+#pragma once
+
+// the camera the voxel depths were captured with
+uniform merian::Camera voxel_camera;
+
+// in pixel footprints
+static const float MIN_DEPTH_SPAN = 1.f;
+static const float MAX_DEPTH_SPAN = 32.f;
+
+struct PathDebugVoxel {
+    float3 center;
+    float half_depth;
+}
+
+// The slice of a record pixel's frustum around its first hit, deep enough to cover the surface
+// the pixel sees.
+PathDebugVoxel path_debug_voxel(const uint2 pixel, const float2 depth) {
+    const uint2 dim = path_debug_dim();
+    const float3 dir = voxel_camera.get_pinhole_direction_unjittered(float2(pixel), dim);
+    const float3 next =
+        voxel_camera.get_pinhole_direction_unjittered(float2(pixel) + float2(1.f, 0.f), dim);
+    const float footprint = depth.x * distance(dir, next);
+    const float span = isfinite(depth.y) ? depth.y : 0.f;
+    PathDebugVoxel voxel;
+    voxel.center = voxel_camera.position + dir * depth.x;
+    voxel.half_depth = 0.5f * clamp(span, MIN_DEPTH_SPAN * footprint, MAX_DEPTH_SPAN * footprint);
+    return voxel;
+}

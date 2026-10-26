@@ -317,7 +317,8 @@ void PathDebugNode::properties_image(Properties& config) {
     image_exposure = std::max(image_exposure, 0.f);
     config.config_options("background", background, options(BACKGROUND_NAMES),
                           Properties::OptionsStyle::COMBO,
-                          "Where the current frame or accumulated image holds no path.");
+                          "Once a frozen camera moves: wireframe in the gaps and over nearer "
+                          "geometry, shaded albedo in the gaps and over hidden images.");
     if (config.is_ui() && !gbuffer_connected &&
         background != static_cast<int32_t>(PATH_DEBUG_BACKGROUND_OFF) &&
         path_debug_backdrop_recorded(static_cast<uint32_t>(backdrop))) {

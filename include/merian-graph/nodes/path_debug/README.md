@@ -58,9 +58,10 @@ of; `[SG]` either; `* + ? {n} {n,m}`. The last event's technique is how the ligh
 | (filtered) | what the region and the filter add |
 | reference, difference, split | against the reference (View › Reference) |
 
-FROZEN, the recorded images stay on the surfaces while the camera moves. Where a recorded image holds
-no path, View › Background draws the scene's triangle edges (the default) or its albedo. When the
-header's record probability drops below 1, raise the renderer's `capture budget`.
+FROZEN, the recorded images stay on the surfaces while the camera moves. View › Background draws the
+scene's triangle edges (the default) where they leave gaps and over them where the scene is closer,
+or its albedo, which hides the images behind it. When the header's record probability drops below
+1, raise the renderer's `capture budget`.
 
 ## Recipes
 

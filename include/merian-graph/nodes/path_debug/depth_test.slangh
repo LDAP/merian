@@ -1,0 +1,45 @@
+// Include after common.slangh and the gbuffer's declaration.
+#pragma once
+
+// in record pixels
+static const float DEPTH_TEST_PIXELS = 2.f;
+
+// Depths clamped to MAX_LINEAR_Z are the sky.
+bool path_debug_behind_first_hit(const int2 pixel, const float distance_to_camera) {
+    const uint2 p = uint2(clamp(pixel, int2(0), int2(path_debug_dim()) - 1));
+    const float gz = gbuffer.get_first_hit_linear_z(p);
+    if (!(gz > 0.f && gz < MAX_LINEAR_Z)) {
+        return false;
+    }
+    const float2 grad = float2(gbuffer.get_grad_z(p));
+    const float tolerance = DEPTH_TEST_PIXELS * (abs(grad.x) + abs(grad.y)) + 0.01f * gz;
+    return distance_to_camera > gz + tolerance;
+}
+
+// A surface lies in front of the distance at every record pixel around the coordinate, so the
+// test does not follow the jitter of the gbuffer.
+bool path_debug_behind_geometry(const float2 record_coord, const float distance_to_camera) {
+    if (!merian_path_debug_gbuffer) {
+        return false;
+    }
+    const int2 base = int2(floor(record_coord - 0.5f));
+    for (int i = 0; i < 4; i++) {
+        if (!path_debug_behind_first_hit(base + int2(i & 1, i >> 1), distance_to_camera)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool path_debug_pixel_behind_geometry(const uint2 pixel, const float distance_to_camera) {
+    if (!merian_path_debug_gbuffer) {
+        return false;
+    }
+    for (int i = 0; i < 5; i++) {
+        const int2 offset = int2(i == 1 ? 1 : i == 2 ? -1 : 0, i == 3 ? 1 : i == 4 ? -1 : 0);
+        if (!path_debug_behind_first_hit(int2(pixel) + offset, distance_to_camera)) {
+            return false;
+        }
+    }
+    return true;
+}
