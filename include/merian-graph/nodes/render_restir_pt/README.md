@@ -83,7 +83,9 @@ previous frame, reservoir splatting projects the previous primary hits forward.
   splats only: which of the two a pixel took would depend on where other samples landed.
 
 `history cap` bounds the confidence of the history; `duplication cap` lowers it where the previous
-frame's path repeats around the pixel (Lin et al. 2026, 6). `specular motion vectors` backproject
+frame's path repeats around the pixel (Lin et al. 2026, 6). `geometry rejection` lowers it to
+`mismatch cap` where the previous pixel's normal or depth diverges from the pixel's, as on
+disocclusions; 0 drops the history. With area reservoirs it applies to `backprojection` only. `specular motion vectors` backproject
 the specular share of a smooth surface by the virtual image it reflects, `disocclusion motion
 vectors` follow the occluder out of a disocclusion (Zeng et al. 2021).
 

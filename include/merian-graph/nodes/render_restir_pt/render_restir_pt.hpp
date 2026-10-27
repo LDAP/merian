@@ -78,6 +78,7 @@ class RenderRestirPT : public Node {
     uint32_t recorded_paths_per_pixel() const;
     uint32_t recorded_vertices_per_path() const;
     bool use_raygen() const;
+    bool temporal_rejection_applies() const;
 
     ShaderCompileContextHandle compile_context;
 
@@ -124,6 +125,10 @@ class RenderRestirPT : public Node {
     int32_t temporal_mode = RestirPTTemporalBackprojection;
     bool duplication_cap = false;
     float duplication_exponent = 0.1f;
+    bool temporal_geometry_rejection = true;
+    float temporal_reject_normal = 0.5f;
+    float temporal_reject_depth = 0.1f;
+    float mismatch_cap = 1.f;
 
     // spatial reuse
     int32_t spatial_rounds = 1;

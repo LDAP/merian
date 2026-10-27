@@ -42,14 +42,25 @@ restir_pt_surface(const GBuffer gbuffer, const uint2 pixel) {
     return s;
 }
 
+RestirPTSurface restir_pt_surface_in_prev_frame(const GBuffer gbuffer, const uint2 pixel) {
+    RestirPTSurface s = restir_pt_surface(gbuffer, pixel);
+    if (s.is_surface())
+        s.dist += gbuffer.get_delta_z(pixel);
+    return s;
+}
+
 // Symmetric, so that a reciprocal pair agrees about whether it is one.
-bool restir_pt_compatible(const RestirPTSurface a, const RestirPTSurface b) {
+bool restir_pt_compatible(const RestirPTSurface a,
+                          const RestirPTSurface b,
+                          const bool rejection,
+                          const float reject_normal,
+                          const float reject_depth) {
     if (!a.is_surface() || !b.is_surface())
         return false;
-    if (!merian_restir_pt_geometry_rejection)
+    if (!rejection)
         return true;
-    return dot(a.normal, b.normal) >= merian_restir_pt_reject_normal &&
-           abs(a.dist - b.dist) < merian_restir_pt_reject_depth * max(a.dist, b.dist);
+    return dot(a.normal, b.normal) >= reject_normal &&
+           abs(a.dist - b.dist) < reject_depth * max(a.dist, b.dist);
 }
 
 uint restir_pt_pack_pixel(const int2 pixel) {

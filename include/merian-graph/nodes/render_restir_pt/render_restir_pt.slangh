@@ -246,6 +246,7 @@ struct RestirPTPushConstant {
     float early_stop_cutoff;
     float history_cap;
     float duplication_exponent;
+    float mismatch_cap;
 };
 
 } // namespace merian

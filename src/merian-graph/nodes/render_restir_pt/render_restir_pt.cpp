@@ -178,6 +178,9 @@ void RenderRestirPT::update_render_constants() {
                     "export static const bool merian_restir_pt_independent_feedback = {};\n"
                     "export static const bool merian_restir_pt_retrace_suffix = {};\n"
                     "export static const uint merian_restir_pt_temporal_mode = {}u;\n"
+                    "export static const bool merian_restir_pt_temporal_geometry_rejection = {};\n"
+                    "export static const float merian_restir_pt_temporal_reject_normal = {:f};\n"
+                    "export static const float merian_restir_pt_temporal_reject_depth = {:f};\n"
                     "export static const bool merian_restir_pt_specular_motion = {};\n"
                     "export static const float merian_restir_pt_specular_motion_roughness = {:f};\n"
                     "export static const uint merian_restir_pt_debug_view = {}u;\n"
@@ -190,9 +193,15 @@ void RenderRestirPT::update_render_constants() {
                     b(geometry_rejection && neighbor_selection != RestirPTNeighborsCGNS),
                     reject_normal, reject_depth, b(demodulate_albedo), b(stochastic_backprojection),
                     b(disocclusion_motion), b(duplication_cap), b(decoupled_shading),
-                    b(independent_feedback), b(retrace_suffix), temporal_mode, b(specular_motion),
+                    b(independent_feedback), b(retrace_suffix), temporal_mode,
+                    b(temporal_geometry_rejection && temporal_rejection_applies()),
+                    temporal_reject_normal, temporal_reject_depth, b(specular_motion),
                     specular_motion_roughness, debug_view, record_mode));
     path_records.add_constants(composition);
+}
+
+bool RenderRestirPT::temporal_rejection_applies() const {
+    return !area || temporal_mode == RestirPTTemporalBackprojection;
 }
 
 uint32_t RenderRestirPT::recorded_paths_per_pixel() const {
@@ -212,7 +221,9 @@ uint32_t RenderRestirPT::recorded_vertices_per_path() const {
 std::vector<InputConnectorDescriptor> RenderRestirPT::describe_inputs() {
     const GBufferGroup surface = {{GBufferField::Normal, GBufferField::LinearZ}};
     std::vector<GBufferGroup> gbuffer_groups = {
-        {{GBufferField::Hit}}, surface, {{GBufferField::MotionVectors}}};
+        {{GBufferField::Hit}},
+        {{GBufferField::Normal, GBufferField::LinearZ, GBufferField::DeltaZ}},
+        {{GBufferField::MotionVectors}}};
     if (demodulate_albedo) {
         gbuffer_groups.push_back({{GBufferField::Albedo}});
     }
@@ -475,6 +486,7 @@ RenderRestirPT::process(const NodeIO& io, const NodeProcessInfo& info, Submissio
     pc.early_stop_cutoff = early_stop_cutoff;
     pc.history_cap = history_cap;
     pc.duplication_exponent = duplication_exponent;
+    pc.mismatch_cap = mismatch_cap;
 
     const vk::PipelineStageFlags stages =
         vk::PipelineStageFlagBits::eComputeShader |
@@ -716,7 +728,7 @@ RenderRestirPT::NodeStatusFlags RenderRestirPT::properties(Properties& config) {
         if (specular_motion) {
             constants_changed |= config.config_float(
                 "specular max roughness", specular_motion_roughness,
-                "Linear roughness up to which a surface counts as smooth.", 0.f, 1.f);
+                "Linear roughness up to which a surface counts as smooth.", 0.01f, 0.f, 1.f);
         }
         constants_changed |= config.config_bool(
             "disocclusion motion vectors", disocclusion_motion,
@@ -728,7 +740,26 @@ RenderRestirPT::NodeStatusFlags RenderRestirPT::properties(Properties& config) {
             "et al. 2026, 6).");
         if (duplication_cap) {
             config.config_float("duplication exponent", duplication_exponent,
-                                "Exponent on the duplication rate that lowers the cap.", 0.f, 10.f);
+                                "Exponent on the duplication rate that lowers the cap.", 0.01f, 0.f,
+                                10.f);
+        }
+        const bool show_rejection = temporal_rejection_applies() || !config.is_ui();
+        if (show_rejection)
+            constants_changed |= config.config_bool(
+                "geometry rejection", temporal_geometry_rejection,
+                "Lower the history cap where the previous pixel's normal or depth diverges too far "
+                "from the pixel's, as on disocclusions.");
+        if (show_rejection && temporal_geometry_rejection) {
+            float angle = std::acos(temporal_reject_normal);
+            constants_changed |= config.config_angle(
+                "max normal angle", angle, "Reject histories with normals farther apart.", 0, 180);
+            temporal_reject_normal = std::cos(angle);
+            constants_changed |= config.config_percent(
+                "max depth difference", temporal_reject_depth,
+                "Reject histories whose camera distance differs by more than this fraction, after "
+                "the motion of the pixel's surface.");
+            config.config_float("mismatch cap", mismatch_cap,
+                                "History cap of a rejected history. 0 drops it.", 0.1f, 0.f);
         }
         config.st_end_child();
     }
@@ -774,9 +805,9 @@ RenderRestirPT::NodeStatusFlags RenderRestirPT::properties(Properties& config) {
             config.config_float("solid angle", scale_solid_angle,
                                 "Solid angle of the characteristic search disk, in steradian. "
                                 "Sets the world-space falloff of the position term.",
-                                0.f);
+                                0.01f, 0.f);
             config.config_float("normal exponent", normal_beta,
-                                "Exponent on the normal compatibility term.", 0.f);
+                                "Exponent on the normal compatibility term.", 0.1f, 0.f);
             constants_changed |= config.config_bool(
                 "early stopping", early_stopping,
                 "Stop scoring candidates once enough of them are compatible enough.");
@@ -784,7 +815,7 @@ RenderRestirPT::NodeStatusFlags RenderRestirPT::properties(Properties& config) {
                 config.config_float("early stop score", early_stop_cutoff,
                                     "Compatibility score a candidate must reach to count towards "
                                     "stopping the search.",
-                                    0.f, 1.f);
+                                    0.01f, 0.f, 1.f);
             }
             config.st_end_child();
         }
