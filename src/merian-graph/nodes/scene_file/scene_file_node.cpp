@@ -72,14 +72,18 @@ SceneFileNode::process(const NodeIO& io, const NodeProcessInfo& info, Submission
     return {};
 }
 
+void SceneFileNode::reload() {
+    // Load synchronously so the stored camera is restored onto a populated scene.
+    if (scene && !file_path.empty()) {
+        context->get_queue(vk::QueueFlagBits::eGraphics)
+            ->submit_wait(
+                [&](const CommandBufferHandle& cmd) { load_file(*scene, cmd, file_path); });
+    }
+}
+
 SceneFileNode::NodeStatusFlags SceneFileNode::properties(Properties& config) {
     if (config.config_path("file", file_path, file_description)) {
-        // Load synchronously so the stored camera is restored onto a populated scene.
-        if (scene && !file_path.empty()) {
-            context->get_queue(vk::QueueFlagBits::eGraphics)
-                ->submit_wait(
-                    [&](const CommandBufferHandle& cmd) { load_file(*scene, cmd, file_path); });
-        }
+        reload();
     }
 
     if (scene) {

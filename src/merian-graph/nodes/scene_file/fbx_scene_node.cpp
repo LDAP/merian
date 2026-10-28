@@ -17,6 +17,15 @@ FBXSceneNode::query_device_support([[maybe_unused]] const DeviceSupportQueryInfo
 #endif
 }
 
+FBXSceneNode::NodeStatusFlags FBXSceneNode::properties(Properties& config) {
+    if (config.config_bool("orm specular textures", orm_specular_textures,
+                           "Read the specular texture of Phong materials as occlusion, roughness "
+                           "and metalness (R, G, B), the convention of the ORCA scenes.")) {
+        reload();
+    }
+    return SceneFileNode::properties(config);
+}
+
 SceneHandle
 FBXSceneNode::create_scene([[maybe_unused]] const ShaderCompileContextHandle& compile_context,
                            [[maybe_unused]] const ContextHandle& context,
@@ -33,7 +42,7 @@ void FBXSceneNode::load_file([[maybe_unused]] Scene& scene,
                              [[maybe_unused]] const CommandBufferHandle& cmd,
                              [[maybe_unused]] const std::filesystem::path& path) {
 #ifdef MERIAN_UFBX_ENABLED
-    static_cast<FBXScene&>(scene).load(cmd, path);
+    static_cast<FBXScene&>(scene).load(cmd, path, orm_specular_textures);
 #endif
 }
 

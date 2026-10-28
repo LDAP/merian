@@ -331,6 +331,9 @@ struct Scene {
             const float4 t = bary.x * t0 + bary.y * t1 + bary.z * t2;
             tangent = to_world_vector(tri.gd, instance, normalize(t.xyz), prev_frame);
             handedness = sign(t.w);
+            if ((tri.gd.flags & GeometryDataFlags::Pretransformed) == 0 &&
+                determinant((float3x3)get_instance_transform(instance, prev_frame)) < 0.f)
+                handedness = -handedness;
             tangent_valid = true;
         } else {
             const float2 duv1 = float2(tri.v1.uv) - float2(tri.v0.uv);

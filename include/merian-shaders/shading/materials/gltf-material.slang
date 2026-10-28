@@ -160,7 +160,8 @@ struct GltfMaterial<let TRANSMISSION : bool = false,
             if (merian_hint_clamp_normals) {
                 const float3 clamped_n =
                     keller_clamp_normal(mapped.get_normal(), sd.face_normal, sd.wi);
-                shading_frame = OrthonormalFrame(clamped_n, mapped.get_tangent());
+                shading_frame =
+                    OrthonormalFrame(clamped_n, mapped.get_tangent(), mapped.get_handedness());
             } else {
                 shading_frame = mapped;
             }

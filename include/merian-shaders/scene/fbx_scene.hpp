@@ -21,7 +21,9 @@ class FBXScene : public Scene {
     ~FBXScene() override;
 
     // Load an FBX file (.fbx)
-    void load(const CommandBufferHandle& cmd, const std::filesystem::path& path);
+    void load(const CommandBufferHandle& cmd,
+              const std::filesystem::path& path,
+              bool orm_specular_textures);
 
     float3 get_up() override {
         return float3(0, 1, 0);
@@ -32,7 +34,7 @@ class FBXScene : public Scene {
     }
 
   private:
-    void load_materials(const CommandBufferHandle& cmd);
+    void load_materials(const CommandBufferHandle& cmd, bool orm_specular_textures);
 
     void load_meshes();
 

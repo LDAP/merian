@@ -18,6 +18,7 @@
 #include <cmath>
 #include <fstream>
 #include <functional>
+#include <utility>
 
 namespace merian {
 
@@ -31,12 +32,6 @@ constexpr int MAX_RESOLVE_DEPTH = 8;
 
 float3 transform_point(const float4x4& m, const float3& p) {
     return float3(mul(m, float4(p, 1.f)));
-}
-
-float det3(const float4x4& m) {
-    return m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) -
-           m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +
-           m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
 }
 
 std::optional<float3> param_rgb(const ParsedParameter& param, const std::filesystem::path& base) {
@@ -519,6 +514,18 @@ MaterialID PBRTScene::material_for_shape(const CommandBufferHandle& cmd,
 
 namespace {
 
+void wind_to_normals(std::vector<uint3>& triangles,
+                     const std::vector<float3>& positions,
+                     const std::vector<float3>& normals) {
+    for (uint3& tri : triangles) {
+        const float3 face_normal =
+            cross(positions[tri.y] - positions[tri.x], positions[tri.z] - positions[tri.x]);
+        if (dot(face_normal, normals[tri.x] + normals[tri.y] + normals[tri.z]) < 0.f) {
+            std::swap(tri.y, tri.z);
+        }
+    }
+}
+
 // Without normals pbrt shades a mesh with its geometric normal.
 bool fill_trianglemesh(const ParamDict& p, Scene::SimpleMesh& sm, bool& flat_shading) {
     const std::vector<float3> positions = p.get_vec3_list("P");
@@ -553,6 +560,7 @@ bool fill_trianglemesh(const ParamDict& p, Scene::SimpleMesh& sm, bool& flat_sha
         for (float3& n : normals) {
             n = length(n) > 1e-20f ? normalize(n) : float3(0, 1, 0);
         }
+        wind_to_normals(triangles, positions, normals);
     }
     std::vector<float2> uvs = p.get_vec2_list("uv");
     if (uvs.empty()) {
@@ -658,6 +666,7 @@ bool fill_plymesh(const std::filesystem::path& path, Scene::SimpleMesh& sm, bool
                     const float3 n(nrm[i * 3], nrm[i * 3 + 1], nrm[i * 3 + 2]);
                     normals[i] = length(n) > 1e-20f ? normalize(n) : float3(0, 1, 0);
                 }
+                wind_to_normals(triangles, positions, normals);
             } else {
                 normals = compute_vertex_normals(positions, triangles);
             }
@@ -816,8 +825,11 @@ std::optional<Scene::MeshID> PBRTScene::build_shape_mesh(const CommandBufferHand
         flags = flags | MeshFlags::TwoSided;
     }
 
-    if (shape.reverse_orientation != (det3(shape.ctm) < 0.f)) {
+    if (shape.reverse_orientation) {
         flags = flags | MeshFlags::FlipFacing;
+        for (PackedVertexData& v : sm->vertices) {
+            v.encoded_normal = encode_normal(-decode_normal(v.encoded_normal));
+        }
     }
     if (shape.params.find("S") != nullptr) {
         flags = flags | MeshFlags::HasTangents;

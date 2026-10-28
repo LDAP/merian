@@ -28,7 +28,8 @@ void main(uint thread_id: SV_GroupThreadID, uint2 wg_id: SV_GroupID) {
         encode_normal(normalize(mul(job.inverse_transposed, float4(normal, 0.0)).xyz));
     v_out.uv = v_in.uv;
     const float3 t_world = normalize(mul((float3x3)job.transform, tangent.xyz));
-    v_out.encoded_tangent = encode_tangent(float4(t_world, tangent.w));
+    const float handedness = determinant((float3x3)job.transform) < 0.f ? -tangent.w : tangent.w;
+    v_out.encoded_tangent = encode_tangent(float4(t_world, handedness));
 
     job.dst[i] = v_out;
 }

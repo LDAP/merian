@@ -52,8 +52,9 @@ struct OpenPBRMaterial<let TRANSMISSION : bool = false,
                        let CLEARCOAT : bool = false,
                        let SHEEN : bool = false,
                        let VOLUME : bool = false,
-                       let ROUGHNESS_ENCODING : RoughnessEncoding = RoughnessEncoding::Roughness>
-    : MaterialModel {
+                       let ROUGHNESS_ENCODING : RoughnessEncoding = RoughnessEncoding::Roughness,
+                       let METALNESS_CHANNEL : uint = 0,
+                       let ROUGHNESS_CHANNEL : uint = 0> : MaterialModel {
     typealias MaterialSampleImpl = OpenPBRMaterialSample;
 
     MaterialHeader header; // alpha_texture_id = base color texture
@@ -116,11 +117,11 @@ struct OpenPBRMaterial<let TRANSMISSION : bool = false,
 
         float metal = metalness;
         if (metalness_texture != TextureID(-1)) {
-            metal *= textures.sample(lod0, metalness_texture, sd.uv).r;
+            metal *= textures.sample(lod0, metalness_texture, sd.uv)[METALNESS_CHANNEL];
         }
         float2 alpha = specular_alpha;
         if (roughness_texture != TextureID(-1)) {
-            const float texel = textures.sample(lod0, roughness_texture, sd.uv).r;
+            const float texel = textures.sample(lod0, roughness_texture, sd.uv)[ROUGHNESS_CHANNEL];
             // The texel scales the lobe width, so it enters in alpha space.
             if (ROUGHNESS_ENCODING == RoughnessEncoding::AlphaSquared) {
                 alpha *= sqrt(texel);
@@ -140,7 +141,8 @@ struct OpenPBRMaterial<let TRANSMISSION : bool = false,
             if (merian_hint_clamp_normals) {
                 const float3 clamped_n =
                     keller_clamp_normal(mapped.get_normal(), sd.face_normal, sd.wi);
-                shading_frame = OrthonormalFrame(clamped_n, mapped.get_tangent());
+                shading_frame =
+                    OrthonormalFrame(clamped_n, mapped.get_tangent(), mapped.get_handedness());
             } else {
                 shading_frame = mapped;
             }

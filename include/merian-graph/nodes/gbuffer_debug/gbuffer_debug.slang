@@ -119,9 +119,7 @@ static const float3 MISS = float3(1, 0, 1);
         if (let gd = scene.get_geometry_data(hit)) {
             const TriangleHit tri = scene.get_triangle_hit(hit, gd);
             const Surface surface = scene.get_surface(hit, tri);
-            const float h =
-                sign(dot(surface.frame.get_bitangent(),
-                         cross(surface.frame.get_normal(), surface.frame.get_tangent())));
+            const float h = surface.frame.get_handedness();
             color = float4(float3(0.5f + 0.5f * h), 1);
         } else {
             color = float4(MISS, 1);

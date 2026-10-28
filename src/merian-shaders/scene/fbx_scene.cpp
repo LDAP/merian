@@ -94,7 +94,7 @@ void FBXScene::free_scene() {
 // Material loading
 // ---------------------------------------------------------------------------
 
-void FBXScene::load_materials(const CommandBufferHandle& cmd) {
+void FBXScene::load_materials(const CommandBufferHandle& cmd, const bool orm_specular_textures) {
     // Textures upload lazily on first material access.
     texture_slots.assign(scene->textures.count, TextureSlot{});
 
@@ -138,15 +138,25 @@ void FBXScene::load_materials(const CommandBufferHandle& cmd) {
                             (two_sided ? MeshFlags::TwoSided : MeshFlags::None);
 
         // metalness / roughness (linear scalar maps; the texture replaces the constant)
-        mat.metalness_texture = load(pbr.metalness, true);
+        const TextureID orm_texture =
+            orm_specular_textures && !pbr_shader ? load(pbr.specular_color, true) : TextureID(-1);
+        const bool orm = orm_texture != TextureID(-1);
+        if (orm) {
+            mat.metalness_texture = orm_texture;
+            mat.metalness_channel = 2;
+            mat.roughness_texture = orm_texture;
+            mat.roughness_channel = 1;
+        } else {
+            mat.metalness_texture = load(pbr.metalness, true);
+            mat.roughness_texture = load(pbr.roughness, true);
+        }
         mat.metalness = mat.metalness_texture != TextureID(-1) ? 1.f : map_real(pbr.metalness, 0.f);
-        mat.roughness_texture = load(pbr.roughness, true);
         const float roughness =
             mat.roughness_texture != TextureID(-1) ? 1.f : map_real(pbr.roughness, 1.f);
         mat.specular_alpha = float2(ggx_roughness_to_alpha(roughness));
 
         // specular
-        mat.specular_weight = map_real(pbr.specular_factor, 1.f);
+        mat.specular_weight = orm ? 1.f : map_real(pbr.specular_factor, 1.f);
         mat.specular_ior = map_real(pbr.specular_ior, 1.5f);
 
         // emission (sRGB texture × linear factor)
@@ -465,7 +475,9 @@ void FBXScene::compute_aabb() {
     }
 }
 
-void FBXScene::load(const CommandBufferHandle& cmd, const std::filesystem::path& path) {
+void FBXScene::load(const CommandBufferHandle& cmd,
+                    const std::filesystem::path& path,
+                    const bool orm_specular_textures) {
     for (const TextureSlot& slot : texture_slots) {
         for (const TextureID id : {slot.id_srgb, slot.id_linear}) {
             if (id != TextureID(-1)) {
@@ -507,7 +519,7 @@ void FBXScene::load(const CommandBufferHandle& cmd, const std::filesystem::path&
 
     // ----------------
 
-    load_materials(cmd);
+    load_materials(cmd, orm_specular_textures);
 
     load_meshes();
 

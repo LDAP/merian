@@ -48,7 +48,7 @@ class Scene : public std::enable_shared_from_this<Scene> {
         HasVariableTopology = 0x2,
         // default: treat all as non-opaque (allow alpha mask)
         IsOpaque = 0x4,
-        // front winding is clockwise; maps to VK_GEOMETRY_INSTANCE_TRIANGLE_FLIP_FACING_BIT_KHR
+        // front winding is clockwise in object space
         FlipFacing = 0x8,
         // default: cull backfaces
         TwoSided = 0x10,
@@ -354,7 +354,7 @@ class Scene : public std::enable_shared_from_this<Scene> {
     struct MeshGroup {
         SmallSet<MeshID, 1> meshes;
 
-        // only the TLAS-instance-level flags shared by all meshes (GROUP_SPLIT_MASK)
+        // TLAS instance flags (GROUP_SPLIT_MASK); FlipFacing refers to the BLAS vertices
         MeshFlags flags;
         uint8_t instance_mask = 0xFF;
         bool has_animated_node = false;

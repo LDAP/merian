@@ -258,6 +258,14 @@ void Scene::invalidate_node(Node& node) {
     }
 }
 
+namespace {
+
+bool is_mirrored(const float4x4& transform) {
+    return determinant(float3x3(transform)) < 0.f;
+}
+
+} // namespace
+
 void Scene::update_node(NodeID node_id, const float4x4& local_transform) {
     assert(node_ids.is_used(node_id));
     assert(node_id < scene_graph.size());
@@ -267,6 +275,8 @@ void Scene::update_node(NodeID node_id, const float4x4& local_transform) {
     assert(node.is_animated);
 
     if (node.local_transform != local_transform) {
+        needs_regroup |= pretransform_animated &&
+                         is_mirrored(node.local_transform) != is_mirrored(local_transform);
         node.local_transform = local_transform;
 
         invalidate_node(node);
@@ -1087,7 +1097,7 @@ void Scene::compute_mesh_groups() {
             continue;
         }
 
-        const uint32_t key = split_key(mesh.flags, mesh.instance_mask);
+        uint32_t key = split_key(mesh.flags, mesh.instance_mask);
         MeshGroupID group_id;
 
         if (info.instances.size() > 1) {
@@ -1096,6 +1106,10 @@ void Scene::compute_mesh_groups() {
             assert(info.instances.size() == 1);
             const NodeID node_id = *info.instances.begin();
             const bool is_dynamic = scene_graph[node_id]->is_animated || mesh.is_morphed();
+            const bool pretransformed = !is_dynamic || pretransform_animated;
+            if (pretransformed && is_mirrored(get_global_transform(node_id))) {
+                key ^= static_cast<uint32_t>(MeshFlags::FlipFacing);
+            }
 
             if (!is_dynamic) {
                 group_id = get_or_create(groups_static, key);
@@ -1250,6 +1264,7 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
             // an animated node passing through identity still has a previous transform
             const bool transform_is_identity =
                 !node.is_animated && global_transform == identity_transform;
+            const bool node_mirrored = !pretransform && is_mirrored(global_transform);
 
             for (const MeshID mesh_id : group.meshes) {
                 MeshInfo& info = mesh_infos[mesh_id];
@@ -1289,7 +1304,9 @@ void Scene::upload_geometry_data(const CommandBufferHandle& cmd) {
                 if (pretransform || transform_is_identity) {
                     gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::Pretransformed);
                 }
-                if (mesh.is_flip_facing()) {
+                const bool flip_facing = pretransform ? group.flags & MeshFlags::FlipFacing
+                                                      : mesh.is_flip_facing() != node_mirrored;
+                if (flip_facing) {
                     gd.flags = GeometryDataFlags(gd.flags | GeometryDataFlags::FlipFacing);
                 }
                 if (mesh.flags & MeshFlags::HasTangents) {

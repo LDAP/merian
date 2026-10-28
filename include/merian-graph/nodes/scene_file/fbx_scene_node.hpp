@@ -10,6 +10,8 @@ class FBXSceneNode : public SceneFileNode {
 
     DeviceSupportInfo query_device_support(const DeviceSupportQueryInfo& query_info) override;
 
+    NodeStatusFlags properties(Properties& config) override;
+
   protected:
     SceneHandle create_scene(const ShaderCompileContextHandle& compile_context,
                              const ContextHandle& context,
@@ -19,6 +21,9 @@ class FBXSceneNode : public SceneFileNode {
     void load_file(Scene& scene,
                    const CommandBufferHandle& cmd,
                    const std::filesystem::path& path) override;
+
+  private:
+    bool orm_specular_textures = true;
 };
 
 } // namespace merian

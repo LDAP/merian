@@ -47,6 +47,8 @@ class SceneFileNode : public Node {
     virtual void
     load_file(Scene& scene, const CommandBufferHandle& cmd, const std::filesystem::path& path) = 0;
 
+    void reload();
+
   private:
     const std::string file_description;
 

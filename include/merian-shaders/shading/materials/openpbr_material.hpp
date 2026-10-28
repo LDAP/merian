@@ -65,6 +65,8 @@ struct OpenPBRMaterial : Material {
     TextureID emission_texture{TextureID(-1)};
     TextureID normal_texture{TextureID(-1)};
     RoughnessEncoding roughness_encoding{RoughnessEncoding::Roughness};
+    uint32_t metalness_channel{0};
+    uint32_t roughness_channel{0};
 
     std::optional<OpenPBRTransmissionData> transmission;
     std::optional<OpenPBRClearcoatData> clearcoat;
@@ -85,10 +87,10 @@ struct OpenPBRMaterial : Material {
 
     std::string variant_type_name() const {
         const auto b = [](bool v) { return v ? "true" : "false"; };
-        return fmt::format("merian::OpenPBRMaterial<{}, {}, {}, {}, {}>",
+        return fmt::format("merian::OpenPBRMaterial<{}, {}, {}, {}, {}, {}, {}>",
                            b(transmission.has_value()), b(clearcoat.has_value()),
                            b(sheen.has_value()), b(volume.has_value()),
-                           slang_name(roughness_encoding));
+                           slang_name(roughness_encoding), metalness_channel, roughness_channel);
     }
 
     bool has_interior_volume() const override {

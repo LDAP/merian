@@ -13,7 +13,7 @@ namespace merian {
 enum GeometryDataFlags : uint16_t {
     // Data already in world space; skip the instance transform multiply.
     Pretransformed = 0x1,
-    // Set when -cross(edge01, edge02) is the front-facing (outward) normal.
+    // Set when -cross(edge01, edge02) of the world-space edges is the front-facing normal.
     FlipFacing = 0x8,
 
     // None: sequential indices, triangle i has vertices 3i, 3i+1, 3i+2
