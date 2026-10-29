@@ -5,6 +5,7 @@ import math
 from collections.abc import Callable
 from pathlib import Path
 
+import numpy as np
 from PySide6 import QtCore, QtGui, QtWidgets
 
 import merian
@@ -429,15 +430,52 @@ class _Tabs(QtWidgets.QWidget):
         self.cursor = 0
 
 
+def _number_text(value: object) -> str:
+    if isinstance(value, float) and math.isfinite(value):
+        with np.errstate(over="ignore"):
+            single = np.float32(value)
+        if float(single) == value:
+            return str(single)
+    return json.dumps(value)
+
+
 def _set_text(value: object) -> str:
     """Returns value as --set takes it."""
     if isinstance(value, str):
         return value
-    return json.dumps(list(value) if isinstance(value, tuple) else value)
+    if isinstance(value, tuple):
+        return f"[{', '.join(map(_number_text, value))}]"
+    return _number_text(value)
+
+
+@functools.cache
+def _copy_icon() -> QtGui.QIcon:
+    pixmap = QtGui.QPixmap(64, 64)
+    pixmap.fill(QtCore.Qt.GlobalColor.transparent)
+    painter = QtGui.QPainter(pixmap)
+    painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+    painter.setPen(QtGui.QPen(QtGui.QColor(THEME["text_dim"]), 5))
+    front = QtCore.QRectF(8, 20, 34, 38)
+    visible = QtGui.QPainterPath()
+    visible.addRect(QtCore.QRectF(pixmap.rect()))
+    covered = QtGui.QPainterPath()
+    covered.addRoundedRect(front.adjusted(-6, -6, 6, 6), 10, 10)
+    painter.setClipPath(visible.subtracted(covered))
+    painter.drawRoundedRect(front.translated(14, -14), 6, 6)
+    painter.setClipping(False)
+    painter.drawRoundedRect(front, 6, 6)
+    painter.end()
+    return QtGui.QIcon(pixmap)
 
 
 class _LabeledRow(QtWidgets.QWidget):
-    def __init__(self, label: str, field: QtWidgets.QWidget, pointer: str | None):
+    def __init__(
+        self,
+        label: str,
+        field: QtWidgets.QWidget,
+        pointer: str | None,
+        copyable: bool = False,
+    ):
         super().__init__()
         self.setObjectName("propertyRow")
         self.setAttribute(QtCore.Qt.WidgetAttribute.WA_StyledBackground)
@@ -450,6 +488,18 @@ class _LabeledRow(QtWidgets.QWidget):
         layout.addWidget(self.label, 2)
         if isinstance(field, _Switch):
             layout.addWidget(field, 3, QtCore.Qt.AlignmentFlag.AlignLeft)
+        elif copyable:
+            field_layout = QtWidgets.QHBoxLayout()
+            field_layout.setSpacing(2)
+            field_layout.addWidget(field, 1)
+            self.copy_button = QtWidgets.QToolButton(
+                icon=_copy_icon(), toolTip="Copy the value", autoRaise=True
+            )
+            self.copy_button.clicked.connect(self.copy_value)
+            field_layout.addWidget(
+                self.copy_button, 0, QtCore.Qt.AlignmentFlag.AlignTop
+            )
+            layout.addLayout(field_layout, 3)
         else:
             layout.addWidget(field, 3)
         self.field = field
@@ -489,6 +539,10 @@ class _LabeledRow(QtWidgets.QWidget):
             self.scrub = None
             return True
         return False
+
+    def copy_value(self) -> None:
+        QtWidgets.QApplication.clipboard().setText(_set_text(self.value))
+        QtWidgets.QToolTip.showText(QtGui.QCursor.pos(), "Copied", self.copy_button)
 
     def contextMenuEvent(self, event: QtGui.QContextMenuEvent) -> None:
         if self.pointer is None:
@@ -1259,7 +1313,10 @@ class QtProperties:
             else:
                 field.textEdited.connect(commit)
         pointer = None if kind == "plot" else self.pointer_of(item.key)
-        return _LabeledRow(_display(item.label), field, pointer)
+        copyable = kind in ("color", "path", "text", "multiline") or (
+            kind in ("float", "int") and isinstance(item.value, tuple)
+        )
+        return _LabeledRow(_display(item.label), field, pointer, copyable)
 
     def update_row(self, item: _Item, field: QtWidgets.QWidget) -> None:
         kind, value = item.kind, item.value
