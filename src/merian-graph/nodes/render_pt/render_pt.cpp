@@ -68,7 +68,7 @@ std::vector<InputConnectorDescriptor> RenderPT::describe_inputs() {
         gbuffer_groups.push_back({{GBufferField::Albedo}});
     }
     if (volume_available) {
-        gbuffer_groups.push_back({{GBufferField::LinearZ}});
+        gbuffer_groups.push_back({{GBufferField::FirstHitLinearZ}});
         gbuffer_groups.push_back({{GBufferField::MotionVectors}});
     }
     con_gbuffer = GBufferIn::create(gbuffer_groups);

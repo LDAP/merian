@@ -83,7 +83,7 @@ void render_pixel(const uint2 pixel,
     RandomGenerator rng = PCG(xxhash32(uint4(pixel, scene.frame, 0x564Fu)) ^ merian_render_seed);
 
     const RayDesc primary_ray = scene.generate_camera_ray(pixel, dim);
-    const float linear_z = params.gbuffer.get_linear_z(pixel);
+    const float linear_z = params.gbuffer.get_first_hit_linear_z(pixel);
     const float max_t = min(linear_z, medium.get_max_distance());
     const float xi_max = transmittance_xi_max(max_t, mu_t);
 
