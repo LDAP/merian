@@ -45,12 +45,13 @@ NB_MODULE(_graph, m) {
                 registry.load_from_plugins();
             }
             nlohmann::json types = nlohmann::json::object();
-            for (const auto& name : registry.node_type_names()) {
-                types[name] = registry.node_type_info(name).description;
+            for (const auto& name : registry.node_names()) {
+                types[name] = registry.node_info(name).description;
             }
             return types;
         },
-        "{name: description} of every registered node type, including plugins.");
+        "{name: description} of what add_node takes: the node types and their variants, "
+        "including plugins'.");
     m.def("default_search_dirs", &GraphDescription::default_search_dirs);
     m.def(
         "merge",
