@@ -4,6 +4,7 @@
 #include "log_sink.hpp"
 #include "merian/io/image_io.hpp"
 #include "merian/plugin/plugins.hpp"
+#include "merian/shader/shader_compile_context.hpp"
 #include "merian/utils/properties.hpp"
 #include "merian/vk/context.hpp"
 #include "merian/vk/extension/extension_device_fault.hpp"
@@ -112,6 +113,34 @@ NB_MODULE(_core, m) {
                 return context.get_shader_compile_context()->is_compiling();
             },
             "Whether shaders are loaded or compiled right now, on any thread.")
+        .def_ro_static("DEFAULT_SHADER_OPTIMIZATION_LEVEL",
+                       &merian::Context::BUILD_OPTIMIZATION_LEVEL,
+                       "The optimization level shaders are compiled with unless set otherwise.")
+        .def_ro_static("DEFAULT_SHADER_DEBUG_INFO", &merian::Context::IS_DEBUG_BUILD,
+                       "Whether shaders carry debug information unless set otherwise.")
+        .def_prop_rw(
+            "shader_optimization_level",
+            [](const merian::Context& context) {
+                return context.get_shader_compile_context()->get_optimization_level();
+            },
+            [](const merian::Context& context, const uint32_t level) {
+                if (level > 3) {
+                    throw nb::value_error("the optimization level is 0 (none) to 3 (maximal)");
+                }
+                context.get_shader_compile_context()->set_optimization_level(level);
+            },
+            "Optimization level of the shaders compiled from now on, 0 (none) to 3 (maximal). "
+            "Set it while no graph runs.")
+        .def_prop_rw(
+            "shader_debug_info",
+            [](const merian::Context& context) {
+                return context.get_shader_compile_context()->should_generate_debug_info();
+            },
+            [](const merian::Context& context, const bool enable) {
+                context.get_shader_compile_context()->set_generate_debug_info(enable);
+            },
+            "Whether the shaders compiled from now on carry debug information. Set it while no "
+            "graph runs.")
         .def(
             "dump_device_fault",
             [](merian::Context& context) {

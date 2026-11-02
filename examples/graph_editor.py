@@ -24,9 +24,9 @@ adds to the selection.
 
 Space plays and pauses, Right steps. A graph's view sends the keys to the graph; there,
 Shift+Alt+Space plays and pauses, Shift+Alt+Right steps and Shift+Alt+Backspace gives the
-mouse back, in the editor too; the Preferences tab sets their modifier, and the log
-level. The Log tab shows merian's log. The preferences are stored for the user, not in
-the config.
+mouse back, in the editor too; the Preferences tab sets their modifier, the log level,
+and the optimization level and debug information of the shaders. The Log tab shows
+merian's log. The preferences are stored for the user, not in the config.
 """
 
 import argparse
@@ -361,6 +361,7 @@ class _GraphWorker(QtCore.QObject):
         self.open_context, self.description = open_context, description
         self.context: merian.Context | None = None
         self.graph: mg.Graph | None = None
+        self.shader_options: tuple[int | None, bool | None] = (None, None)
         self.commands: queue.SimpleQueue[Callable[[], None]] = queue.SimpleQueue()
         self.runner = threading.Thread(target=self.loop, name="graph", daemon=True)
         self.playing = True
@@ -398,6 +399,7 @@ class _GraphWorker(QtCore.QObject):
     def open_graph(self) -> None:
         self.loading.emit("Loading merian")
         self.context = self.open_context()
+        self.apply_shader_options()
         self.loading.emit("Loading graph")
         try:
             self.graph = mg.Graph(self.context, self.description, strict=False)
@@ -623,6 +625,28 @@ class _GraphWorker(QtCore.QObject):
 
     def reload_shaders(self) -> None:
         self.graph.reload_shaders()
+
+    def apply_shader_options(self) -> bool:
+        level, debug_info = self.shader_options
+        if level is None:
+            level = merian.Context.DEFAULT_SHADER_OPTIMIZATION_LEVEL
+        if debug_info is None:
+            debug_info = merian.Context.DEFAULT_SHADER_DEBUG_INFO
+        context = self.context
+        if (context.shader_optimization_level, context.shader_debug_info) == (
+            level,
+            debug_info,
+        ):
+            return False
+        context.shader_optimization_level = level
+        context.shader_debug_info = debug_info
+        return True
+
+    def set_shader_options(self, options: tuple[int | None, bool | None]) -> None:
+        self.shader_options = options
+        if self.apply_shader_options():
+            self.graph.reload_shaders(force=True)
+            self.graph.restart_run()
 
     def set_reports(self, times: bool, memory: bool) -> None:
         self.times_shown, self.memory_shown = times, memory
@@ -1953,6 +1977,9 @@ class _Window(QtWidgets.QMainWindow):
         self.log_view = LogView(log_sink)
         self.preferences = preferences
         preferences.shortcut_modifiers_changed.connect(self.set_shortcut_modifiers)
+        preferences.shader_options_changed.connect(
+            lambda options: self.worker.post(self.worker.set_shader_options, options)
+        )
         self.tabs = QtWidgets.QTabWidget()
         for page, name in (
             (self.properties.widget, "Node"),
@@ -2876,6 +2903,7 @@ def main(argv: list[str] | None = None) -> int:
         worker = _GraphWorker(
             lambda: scene.context((mg.HOST_WINDOWS_EXTENSION,)), description
         )
+        worker.shader_options = preferences.shader_options()
         window = _Window(worker, path, new_positions, log_sink, preferences)
         window.showMaximized()
         worker.start()

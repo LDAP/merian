@@ -73,13 +73,15 @@ class ShaderCompileContext : public std::enable_shared_from_this<ShaderCompileCo
         return preprocessor_macros.erase(key) > 0;
     }
 
-    void set_geneate_debug_info(const bool enable) {
+    void set_generate_debug_info(const bool enable) {
         debug_info = enable;
+        retire_session();
     }
 
     void set_optimization_level(const uint32_t level) {
         assert(level <= 3);
         optimization_level = level;
+        retire_session();
     }
 
     void set_target(const SpirvVersion target) {
