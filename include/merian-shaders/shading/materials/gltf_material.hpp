@@ -18,6 +18,12 @@ struct GltfTransmissionData {
 struct GltfVolumeData {
     float3 absorption{0, 0, 0};
 };
+struct GltfDiffuseTransmissionData {
+    float factor{0.0f};
+    float3 color{1, 1, 1};
+    TextureID texture{TextureID(-1)};
+    TextureID color_texture{TextureID(-1)};
+};
 struct GltfClearcoatData {
     float weight{0.0f};
     float roughness{0.0f};
@@ -62,6 +68,7 @@ struct GltfMaterial : Material {
 
     std::optional<GltfTransmissionData> transmission;
     std::optional<GltfVolumeData> volume;
+    std::optional<GltfDiffuseTransmissionData> diffuse_transmission;
     std::optional<GltfClearcoatData> clearcoat;
     std::optional<GltfSheenData> sheen;
     std::optional<GltfIridescenceData> iridescence;
@@ -82,10 +89,10 @@ struct GltfMaterial : Material {
     // Specialized Slang type for this feature combination; order matches the bool generic params.
     std::string variant_type_name() const {
         const auto b = [](bool v) { return v ? "true" : "false"; };
-        return fmt::format("merian::GltfMaterial<{}, {}, {}, {}, {}, {}>",
-                           b(transmission.has_value()), b(volume.has_value()),
-                           b(clearcoat.has_value()), b(sheen.has_value()),
-                           b(iridescence.has_value()), b(anisotropy.has_value()));
+        return fmt::format(
+            "merian::GltfMaterial<{}, {}, {}, {}, {}, {}, {}>", b(transmission.has_value()),
+            b(volume.has_value()), b(diffuse_transmission.has_value()), b(clearcoat.has_value()),
+            b(sheen.has_value()), b(iridescence.has_value()), b(anisotropy.has_value()));
     }
 
     bool has_interior_volume() const override {
@@ -128,6 +135,12 @@ struct GltfMaterial : Material {
         }
         if (volume) {
             put(volume->absorption);
+        }
+        if (diffuse_transmission) {
+            put(diffuse_transmission->factor);
+            put(diffuse_transmission->color);
+            put(diffuse_transmission->texture);
+            put(diffuse_transmission->color_texture);
         }
         if (clearcoat) {
             put(clearcoat->weight);

@@ -258,6 +258,14 @@ vk::SamplerAddressMode gltf_wrap_to_vk(int wrap) {
     }
 }
 
+float diffuse_transmission_factor(const tinygltf::Material& gmat) {
+    const auto it = gmat.extensions.find("KHR_materials_diffuse_transmission");
+    if (it == gmat.extensions.end() || !it->second.Has("diffuseTransmissionFactor")) {
+        return 0.0f;
+    }
+    return static_cast<float>(it->second.Get("diffuseTransmissionFactor").GetNumberAsDouble());
+}
+
 } // namespace
 
 void GLTFScene::load_materials(const CommandBufferHandle& cmd) {
@@ -418,6 +426,27 @@ void GLTFScene::load_materials(const CommandBufferHandle& cmd) {
             }
             return -1;
         };
+
+        if (const float factor = diffuse_transmission_factor(gmat); factor > 0.0f) {
+            const tinygltf::Value& ext = gmat.extensions.at("KHR_materials_diffuse_transmission");
+            GltfDiffuseTransmissionData diffuse_trans;
+            diffuse_trans.factor = factor;
+            if (const int idx = ext_texture(ext, "diffuseTransmissionTexture"); idx >= 0) {
+                diffuse_trans.texture = get_or_load_texture(cmd, idx, /*linear=*/true);
+            }
+            if (ext.Has("diffuseTransmissionColorFactor")) {
+                const tinygltf::Value& c = ext.Get("diffuseTransmissionColorFactor");
+                if (c.ArrayLen() >= 3) {
+                    diffuse_trans.color = float3(static_cast<float>(c.Get(0).GetNumberAsDouble()),
+                                                 static_cast<float>(c.Get(1).GetNumberAsDouble()),
+                                                 static_cast<float>(c.Get(2).GetNumberAsDouble()));
+                }
+            }
+            if (const int idx = ext_texture(ext, "diffuseTransmissionColorTexture"); idx >= 0) {
+                diffuse_trans.color_texture = get_or_load_texture(cmd, idx, /*linear=*/false);
+            }
+            mat.diffuse_transmission = diffuse_trans;
+        }
 
         // KHR_materials_clearcoat — thin glossy dielectric coat (textures store R = factor, G =
         // roughness).
@@ -670,7 +699,8 @@ void GLTFScene::load_meshes() {
                 }
                 // Two-sided, or transmissive: refraction must hit the back/exit interface.
                 if (gmat.doubleSided ||
-                    gmat.extensions.find("KHR_materials_transmission") != gmat.extensions.end()) {
+                    gmat.extensions.find("KHR_materials_transmission") != gmat.extensions.end() ||
+                    diffuse_transmission_factor(gmat) > 0.0f) {
                     flags = flags | MeshFlags::TwoSided;
                 }
             } else {

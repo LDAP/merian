@@ -1,9 +1,9 @@
 
 import merian_shaders.shading.materials.material;
 import merian_shaders.shading.bsdfs.brdf_ggx;
-import merian_shaders.shading.bsdfs.brdf_lambert_diffuse;
 import merian_shaders.shading.bsdfs.brdf_sheen;
 import merian_shaders.shading.bsdfs.bsdf_conductor_fresnel;
+import merian_shaders.shading.bsdfs.bsdf_diffuse_transmission;
 import merian_shaders.shading.bsdfs.bsdf_fresnel_mix;
 import merian_shaders.shading.bsdfs.bsdf_iridescence;
 import merian_shaders.shading.bsdfs.bsdf_mix;
@@ -14,10 +14,9 @@ namespace merian {
 
 // https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#complete-model
 
-// Opaque dielectric: specular over diffuse, Fresnel modulated by KHR_materials_iridescence.
-typealias GltfOpaqueDielectric = IridescentFresnelMixBSDF<SpecularBRDF, LambertDiffuseBRDF>;
+typealias GltfDiffuseDielectric = IridescentFresnelMixBSDF<SpecularBRDF, DiffuseTransmissionBSDF>;
 // KHR_materials_transmission: coupled iridescent rough dielectric, mixed by the weight.
-typealias GltfDielectric = MixBSDF<GltfOpaqueDielectric, IridescentRoughDielectricBSDF>;
+typealias GltfDielectric = MixBSDF<GltfDiffuseDielectric, IridescentRoughDielectricBSDF>;
 typealias GltfConductor = IridescentConductorBSDF<SpecularBRDF>;
 typealias GltfReflective = MixBSDF<GltfDielectric, GltfConductor>;
 // KHR_materials_sheen: sheen lobe over the reflective base.
@@ -34,6 +33,12 @@ struct GltfTransmission {
 };
 struct GltfVolume {
     float3 absorption; // precomputed sigma_a (Beer-Lambert)
+};
+struct GltfDiffuseTransmission {
+    float factor;
+    float3 color;
+    TextureID texture;
+    TextureID color_texture;
 };
 struct GltfClearcoat {
     float weight;
@@ -63,6 +68,7 @@ struct GltfAnisotropy {
 
 struct GltfMaterial<let TRANSMISSION : bool = false,
                     let VOLUME : bool = false,
+                    let DIFFUSE_TRANSMISSION : bool = false,
                     let CLEARCOAT : bool = false,
                     let SHEEN : bool = false,
                     let IRIDESCENCE : bool = false,
@@ -84,6 +90,7 @@ struct GltfMaterial<let TRANSMISSION : bool = false,
 
     Conditional<GltfTransmission, TRANSMISSION> transmission;
     Conditional<GltfVolume, VOLUME> volume;
+    Conditional<GltfDiffuseTransmission, DIFFUSE_TRANSMISSION> diffuse_transmission;
     Conditional<GltfClearcoat, CLEARCOAT> clearcoat;
     Conditional<GltfSheen, SHEEN> sheen;
     Conditional<GltfIridescence, IRIDESCENCE> iridescence;
@@ -97,6 +104,11 @@ struct GltfMaterial<let TRANSMISSION : bool = false,
     property Optional<GltfVolume> volume_opt {
         get {
             return volume;
+        }
+    }
+    property Optional<GltfDiffuseTransmission> diffuse_transmission_opt {
+        get {
+            return diffuse_transmission;
         }
     }
     property Optional<GltfClearcoat> clearcoat_opt {
@@ -206,6 +218,21 @@ struct GltfMaterial<let TRANSMISSION : bool = false,
             tw = trans.weight;
         }
 
+        float diffuse_transmission_weight = 0.0f;
+        float3 diffuse_transmission_color = float3(1.0f);
+        if (let diffuse_trans = diffuse_transmission_opt) {
+            diffuse_transmission_weight = diffuse_trans.factor;
+            if (diffuse_trans.texture != TextureID(-1)) {
+                diffuse_transmission_weight *=
+                    textures.sample(lod0, diffuse_trans.texture, sd.uv).a;
+            }
+            diffuse_transmission_color = diffuse_trans.color;
+            if (diffuse_trans.color_texture != TextureID(-1)) {
+                diffuse_transmission_color *=
+                    textures.sample(lod, diffuse_trans.color_texture, sd.uv).rgb;
+            }
+        }
+
         float iridescence_factor = 0.0f;
         float iri_ior = 1.0f;
         float iri_thickness = 0.0f;
@@ -223,12 +250,13 @@ struct GltfMaterial<let TRANSMISSION : bool = false,
             iri_thickness = lerp(iri.thickness_min, iri.thickness_max, t);
         }
 
-        // opaque: iridescent specular over diffuse; transmission: rough dielectric with iridescence
-        const GltfOpaqueDielectric opaque_dielectric =
-            GltfOpaqueDielectric(SpecularBRDF(specular_alpha), LambertDiffuseBRDF(base.rgb),
-                                 dielectric_f0, eta, iri_ior, iri_thickness, iridescence_factor);
+        const GltfDiffuseDielectric diffuse_dielectric = GltfDiffuseDielectric(
+            SpecularBRDF(specular_alpha),
+            DiffuseTransmissionBSDF(base.rgb * (1.0f - diffuse_transmission_weight),
+                                    diffuse_transmission_color * diffuse_transmission_weight),
+            dielectric_f0, eta, iri_ior, iri_thickness, iridescence_factor);
         const GltfDielectric dielectric = GltfDielectric(
-            opaque_dielectric,
+            diffuse_dielectric,
             IridescentRoughDielectricBSDF(alpha, eta, base.rgb, float3(dielectric_f0), iri_ior,
                                           iri_thickness, iridescence_factor),
             tw);

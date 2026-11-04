@@ -157,6 +157,11 @@ struct IridescentFresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
                                           inout RandomGenerator rng,
                                           out float pdf,
                                           out BSDFLobe lobe) {
+        if (wi.z < BSDF_MIN_COS_THETA) {
+            pdf = 0.0f;
+            lobe = BSDFLobe::None;
+            return float3(0.0f);
+        }
         float base_pdf;
         float layer_pdf;
         BSDFLobe base_lobe;
@@ -194,6 +199,9 @@ struct IridescentFresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
     }
 
     Optional<float3> sample(const float3 wi, inout RandomGenerator rng) {
+        if (wi.z < BSDF_MIN_COS_THETA) {
+            return none;
+        }
         // Macro-normal Fresnel as the lobe-selection probability (no half vector exists yet);
         // pdf() mirrors it, the sample weight corrects the difference to eval.
         const float f = fresnel_dielectric(wi.z, eta);
@@ -204,12 +212,18 @@ struct IridescentFresnelMixBSDF<Layer : BSDF, Base : BSDF> : BSDF {
     }
 
     float pdf(const float3 wi, const float3 wo) {
+        if (wi.z < BSDF_MIN_COS_THETA) {
+            return 0.0f;
+        }
         const float f = fresnel_dielectric(wi.z, eta);
         return lerp(base.pdf(wi, wo), layer.pdf(wi, wo), f);
     }
 
     override Optional<ShadingFunctionSample> sample_eval(const float3 wi,
                                                          inout RandomGenerator rng) {
+        if (wi.z < BSDF_MIN_COS_THETA) {
+            return none;
+        }
         // Sample layer or base by Fresnel, evaluate the combined pdf/weight, propagate the
         // chosen sub-BSDF's lobe.
         const float f = fresnel_dielectric(wi.z, eta);
