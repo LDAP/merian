@@ -96,7 +96,8 @@ struct GltfMaterial : Material {
     }
 
     bool has_interior_volume() const override {
-        return volume.has_value();
+        return volume.has_value() && (volume->absorption.x > 0.f || volume->absorption.y > 0.f ||
+                                      volume->absorption.z > 0.f);
     }
 
     uint32_t get_payload_size() const override {

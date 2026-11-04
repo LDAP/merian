@@ -212,7 +212,7 @@ struct GltfMaterial<let TRANSMISSION : bool = false,
         // Relative IOR (incident / transmitted); drives the Fresnel split and the refraction. A
         // transmissive material is always traced two-sided, and a one-sided mesh has its back
         // faces culled, so the face alone says which side of the interface the ray is on.
-        const float eta = sd.front_facing ? 1.0f / ior : ior;
+        const float eta = sd.front_facing || !(TRANSMISSION || VOLUME) ? 1.0f / ior : ior;
         float tw = 0.0f;
         if (let trans = transmission_opt) {
             tw = trans.weight;

@@ -411,12 +411,16 @@ void GLTFScene::load_materials(const CommandBufferHandle& cmd) {
             const double att_dist = ext.Has("attenuationDistance")
                                         ? ext.Get("attenuationDistance").GetNumberAsDouble()
                                         : std::numeric_limits<double>::infinity();
-            if (thickness_factor > 0.0 && std::isfinite(att_dist) && att_dist > 0.0) {
-                const auto sigma = [att_dist](float c) {
-                    return static_cast<float>(-std::log(std::clamp(c, 1e-4f, 1.0f)) / att_dist);
-                };
-                mat.volume = GltfVolumeData{
-                    float3(sigma(att_color.x), sigma(att_color.y), sigma(att_color.z))};
+            if (thickness_factor > 0.0) {
+                GltfVolumeData vol;
+                if (std::isfinite(att_dist) && att_dist > 0.0) {
+                    const auto sigma = [att_dist](float c) {
+                        return static_cast<float>(-std::log(std::clamp(c, 1e-4f, 1.0f)) / att_dist);
+                    };
+                    vol.absorption =
+                        float3(sigma(att_color.x), sigma(att_color.y), sigma(att_color.z));
+                }
+                mat.volume = vol;
             }
         }
 
