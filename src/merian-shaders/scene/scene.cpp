@@ -868,6 +868,7 @@ void Scene::properties_env(Properties& props) {
     if (selection_changed) {
         const float old_yaw = env_map ? env_map->get_yaw_rad() : 0.f;
         const float old_pitch = env_map ? env_map->get_pitch_rad() : 0.f;
+        const bool old_mirror = env_map && env_map->get_mirror();
 
         const TextureHandle dummy = allocator->get_dummy_texture();
         EnvMapHandle next;
@@ -883,6 +884,7 @@ void Scene::properties_env(Properties& props) {
         }
         next->set_base_transform(rotation_from_to(get_up(), float3(0, 1, 0)));
         next->set_yaw_pitch(old_yaw, old_pitch);
+        next->set_mirror(old_mirror);
         set_env(next);
     }
 

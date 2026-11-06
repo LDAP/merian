@@ -47,6 +47,7 @@ class EnvMap {
         bool changed = false;
         changed |= props.config_angle("yaw", yaw_rad);
         changed |= props.config_angle("pitch", pitch_rad, "", -90, 90);
+        changed |= props.config_bool("mirror horizontally", mirror);
         if (changed) {
             rebuild_transform();
         }
@@ -74,6 +75,15 @@ class EnvMap {
         return pitch_rad;
     }
 
+    void set_mirror(const bool m) {
+        mirror = m;
+        rebuild_transform();
+    }
+
+    bool get_mirror() const {
+        return mirror;
+    }
+
     void set_intensity(const float i) {
         intensity = i;
     }
@@ -94,7 +104,8 @@ class EnvMap {
     void rebuild_transform() {
         const float4x4 yaw = rotation(float3(0, 1, 0), yaw_rad);
         const float4x4 pitch = rotation(float3(1, 0, 0), pitch_rad);
-        to_local = mul(pitch, mul(yaw, base_to_local));
+        const float4x4 oriented = mul(pitch, mul(yaw, base_to_local));
+        to_local = mirror ? mul(scale(float3(-1, 1, 1)), oriented) : oriented;
         ++version;
     }
 
@@ -102,6 +113,7 @@ class EnvMap {
     float4x4 base_to_local = identity<float4x4>();
     float yaw_rad = 0.f;
     float pitch_rad = 0.f;
+    bool mirror = false;
     float intensity = 1.f;
     uint64_t version = 0;
 };
