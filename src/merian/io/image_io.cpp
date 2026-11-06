@@ -6,12 +6,19 @@
 #include <spdlog/spdlog.h>
 #include <stb_image.h>
 #include <stb_image_write.h>
+#ifdef MERIAN_EXR_ENABLED
+#include <tinyexr.h>
+#endif
 
 #include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace merian {
@@ -40,6 +47,124 @@ class StbiBlob : public Blob {
     void* data_;
     std::size_t size_;
 };
+
+#ifdef MERIAN_EXR_ENABLED
+class MallocBlob : public Blob {
+  public:
+    MallocBlob(void* data, const std::size_t size_bytes) : data_(data), size_(size_bytes) {}
+    MallocBlob(const MallocBlob&) = delete;
+    MallocBlob& operator=(const MallocBlob&) = delete;
+    MallocBlob(MallocBlob&&) = delete;
+    MallocBlob& operator=(MallocBlob&&) = delete;
+    ~MallocBlob() override {
+        std::free(data_);
+    }
+
+    void* get_data() override {
+        return data_;
+    }
+    std::size_t get_size() override {
+        return size_;
+    }
+
+  private:
+    void* data_;
+    std::size_t size_;
+};
+
+int exr_channel_count(const std::filesystem::path& path) {
+    if (!std::filesystem::exists(path)) {
+        throw std::runtime_error{"image_io: cannot open " + path.string()};
+    }
+    EXRVersion version;
+    if (ParseEXRVersionFromFile(&version, path.string().c_str()) != TINYEXR_SUCCESS) {
+        throw std::runtime_error{"image_io: not an EXR file: " + path.string()};
+    }
+    EXRHeader header;
+    InitEXRHeader(&header);
+    const char* error = nullptr;
+    if (ParseEXRHeaderFromFile(&header, &version, path.string().c_str(), &error) !=
+        TINYEXR_SUCCESS) {
+        const std::string reason = error != nullptr ? error : "unknown error";
+        FreeEXRErrorMessage(error);
+        FreeEXRHeader(&header);
+        throw std::runtime_error{"image_io: cannot read EXR header of " + path.string() + ": " +
+                                 reason};
+    }
+    int count = 0;
+    for (int i = 0; i < header.num_channels; ++i) {
+        const std::string_view name = header.channels[i].name;
+        count += static_cast<int>(name == "R" || name == "G" || name == "B" || name == "A");
+    }
+    if (header.num_channels == 1) {
+        count = 1;
+    }
+    FreeEXRHeader(&header);
+    return count;
+}
+#endif
+
+BlobHandle
+load_exr(const std::filesystem::path& path, ImageInfo& info, const int desired_channels) {
+#ifdef MERIAN_EXR_ENABLED
+    const int source_channels = exr_channel_count(path);
+    float* loaded = nullptr;
+    int width = 0;
+    int height = 0;
+    const char* error = nullptr;
+    if (LoadEXR(&loaded, &width, &height, path.string().c_str(), &error) != TINYEXR_SUCCESS) {
+        const std::string reason = error != nullptr ? error : "unknown error";
+        FreeEXRErrorMessage(error);
+        throw std::runtime_error{"image_io: LoadEXR failed for " + path.string() + ": " + reason};
+    }
+    const std::size_t texel_count = static_cast<std::size_t>(width) * height;
+    const BlobHandle rgba = std::make_shared<MallocBlob>(loaded, texel_count * 4 * sizeof(float));
+    if (source_channels == 1) {
+        for (std::size_t i = 0; i < texel_count; ++i) {
+            loaded[(i * 4) + 3] = 1.f;
+        }
+    }
+
+    const int out_channels =
+        desired_channels == 0 ? std::min(source_channels, 4) : desired_channels;
+    info = {.width = width,
+            .height = height,
+            .channels = out_channels,
+            .source_channels = source_channels};
+    if (out_channels == 4) {
+        return rgba;
+    }
+    std::vector<float> out(texel_count * out_channels);
+    constexpr std::array<int, 4> SOURCE_RGBA = {0, 1, 2, 3};
+    constexpr std::array<int, 2> SOURCE_RA = {0, 3};
+    const int* source = out_channels == 2 ? SOURCE_RA.data() : SOURCE_RGBA.data();
+    for (std::size_t i = 0; i < texel_count; ++i) {
+        for (int c = 0; c < out_channels; ++c) {
+            out[(i * out_channels) + c] = loaded[(i * 4) + source[c]];
+        }
+    }
+    return std::make_shared<VectorBlob<float>>(std::move(out));
+#else
+    (void)info;
+    (void)desired_channels;
+    throw std::runtime_error{"image_io: built without EXR support (-Dexr), cannot load " +
+                             path.string()};
+#endif
+}
+
+BlobHandle float_to_u8(const BlobHandle& texels, const ImageInfo& info) {
+    const float* src = texels->get_data<float>();
+    const std::size_t texel_count = static_cast<std::size_t>(info.width) * info.height;
+    const int color_channels =
+        info.channels == 2 || info.channels == 4 ? info.channels - 1 : info.channels;
+    std::vector<uint8_t> out(texel_count * info.channels);
+    for (std::size_t i = 0; i < out.size(); ++i) {
+        const bool is_alpha = static_cast<int>(i % info.channels) >= color_channels;
+        const float v = is_alpha ? src[i] : std::pow(std::max(src[i], 0.f), 1.f / 2.2f);
+        out[i] = static_cast<uint8_t>(std::clamp(v * 255.f + 0.5f, 0.f, 255.f));
+    }
+    return std::make_shared<VectorBlob<uint8_t>>(std::move(out));
+}
 
 ImageFormat resolve_format(const std::filesystem::path& path, const ImageFormat requested) {
     if (requested != ImageFormat::AUTO) {
@@ -338,6 +463,8 @@ const char* image_format_extension(const ImageFormat format) noexcept {
         return ".hdr";
     case ImageFormat::PFM:
         return ".pfm";
+    case ImageFormat::EXR:
+        return ".exr";
     case ImageFormat::AUTO:
         break;
     }
@@ -359,7 +486,13 @@ ImageFormat image_format_from_extension(const std::filesystem::path& path) noexc
         return ImageFormat::HDR;
     if (ext == ".pfm")
         return ImageFormat::PFM;
+    if (ext == ".exr")
+        return ImageFormat::EXR;
     return ImageFormat::AUTO;
+}
+
+bool image_format_is_float(const ImageFormat format) noexcept {
+    return format == ImageFormat::HDR || format == ImageFormat::PFM || format == ImageFormat::EXR;
 }
 
 bool rgba8_is_opaque(const uint8_t* data, const size_t texel_count) {
@@ -377,6 +510,9 @@ image_load_u8(const std::filesystem::path& path, ImageInfo& info, const int desi
     if (is_dds(path)) {
         return dds_decode_rgba8(dds_load(path, false), info);
     }
+    if (image_format_from_extension(path) == ImageFormat::EXR) {
+        return float_to_u8(load_exr(path, info, desired_channels), info);
+    }
 
     int w = 0;
     int h = 0;
@@ -393,8 +529,13 @@ image_load_u8(const std::filesystem::path& path, ImageInfo& info, const int desi
 
 BlobHandle
 image_load_f32(const std::filesystem::path& path, ImageInfo& info, const int desired_channels) {
-    if (image_format_from_extension(path) == ImageFormat::PFM) {
+    switch (image_format_from_extension(path)) {
+    case ImageFormat::PFM:
         return load_pfm(path, info, desired_channels);
+    case ImageFormat::EXR:
+        return load_exr(path, info, desired_channels);
+    default:
+        break;
     }
     int w = 0;
     int h = 0;
@@ -436,7 +577,8 @@ void image_save_u8(const std::filesystem::path& path,
         break;
     case ImageFormat::HDR:
     case ImageFormat::PFM:
-        throw std::runtime_error{"image_io: image_save_u8 cannot write HDR/PFM"};
+    case ImageFormat::EXR:
+        throw std::runtime_error{"image_io: image_save_u8 cannot write HDR/PFM/EXR"};
     case ImageFormat::AUTO:
         break;
     }

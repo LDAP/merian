@@ -119,6 +119,10 @@ imgui = dependency('imgui', version: ['>=1.92.6'], fallback: ['imgui', 'imgui_de
 nlohmann_json = dependency('nlohmann_json', version: ['>=3.11.3'], fallback: ['nlohmann_json', 'nlohmann_json_dep'])
 vma = dependency('VulkanMemoryAllocator', version: ['>=3.3.0'], fallback: ['VulkanMemoryAllocator', 'VulkanMemoryAllocator_dep'], default_options : ['static_functions=false', 'dynamic_functions=true'])
 stb = dependency('stb', fallback: ['stb', 'stb_dep'], default_options : ['stb_libraries=[\'stb_image\', \'stb_image_write\']'])
+tinyexr = dependency('tinyexr', required: get_option('exr'), fallback: ['tinyexr', 'tinyexr_dep'])
+if get_option('exr').enable_auto_if(tinyexr.found()).enabled()
+    global_args += ['-DMERIAN_EXR_ENABLED']
+endif
 tinybvh = dependency('tinybvh', required: false)
 if not tinybvh.found() and get_option('tinybvh').enabled()
     tinybvh = dependency('tinybvh', fallback: ['tinybvh', 'tinybvh_dep'])

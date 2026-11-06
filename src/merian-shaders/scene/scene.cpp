@@ -805,9 +805,7 @@ void Scene::process_pending_env_load(const CommandBufferHandle& cmd) {
     const auto load_texture = [&](const std::filesystem::path& path,
                                   const std::string& name) -> TextureHandle {
         ImageInfo info;
-        const ImageFormat fmt = image_format_from_extension(path);
-        const bool is_hdr = fmt == ImageFormat::HDR || fmt == ImageFormat::PFM;
-        if (is_hdr) {
+        if (image_format_is_float(image_format_from_extension(path))) {
             const BlobHandle blob = image_load_f32(path, info);
             return allocator->create_texture_from_rgba32f(
                 cmd, blob->get_data<float>(), info.width, info.height,

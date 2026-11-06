@@ -1,0 +1,11 @@
+[wrap-git]
+directory = tinyexr
+
+url = https://github.com/syoyo/tinyexr
+revision = v3.2.0
+depth = 1
+
+patch_directory = tinyexr
+
+[provide]
+tinyexr = tinyexr_dep

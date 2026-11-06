@@ -122,6 +122,9 @@ TextureID PBRTScene::load_image_texture(const CommandBufferHandle& cmd,
         }
         return cached;
     }
+    if (slot.failed) {
+        return TextureID(-1);
+    }
 
     const std::filesystem::path path = std::filesystem::path(filename).is_absolute()
                                            ? std::filesystem::path(filename)
@@ -131,18 +134,10 @@ TextureID PBRTScene::load_image_texture(const CommandBufferHandle& cmd,
         return TextureID(-1);
     }
 
-    std::string ext = path.extension().string();
-    std::transform(ext.begin(), ext.end(), ext.begin(),
-                   [](const unsigned char c) { return std::tolower(c); });
-    if (ext == ".exr") {
-        warn_once("exr", "EXR images are unsupported, skipping " + filename);
-        return TextureID(-1);
-    }
-
     // Mipmap color textures only; box-filtering scalar/normal maps degrades them.
     TextureHandle texture;
     try {
-        if (ext == ".pfm" || ext == ".hdr") {
+        if (image_format_is_float(image_format_from_extension(path))) {
             ImageInfo info;
             const BlobHandle blob = image_load_f32(path, info, 4);
             texture = get_allocator()->create_texture_from_rgba32f(
@@ -159,6 +154,7 @@ TextureID PBRTScene::load_image_texture(const CommandBufferHandle& cmd,
         }
     } catch (const std::exception& e) {
         SPDLOG_WARN("PBRTScene: failed to load texture '{}': {}", path.string(), e.what());
+        slot.failed = true;
         return TextureID(-1);
     }
 
@@ -944,10 +940,6 @@ void PBRTScene::load_env(const CommandBufferHandle& cmd) {
     TextureHandle texture;
     if (!light.filename.empty()) {
         const std::filesystem::path path = base_dir / light.filename;
-        if (path.extension() == ".exr") {
-            warn_once("exr", "EXR images are unsupported, skipping " + light.filename);
-            return;
-        }
         try {
             ImageInfo info;
             const BlobHandle blob = image_load_f32(path, info, 4);

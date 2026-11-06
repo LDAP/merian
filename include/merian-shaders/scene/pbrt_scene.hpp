@@ -49,6 +49,7 @@ class PBRTScene : public Scene {
         TextureID id_srgb = TextureID(-1);
         TextureID id_linear = TextureID(-1);
         bool has_alpha = false;
+        bool failed = false;
     };
 
     struct MaterialBuild;

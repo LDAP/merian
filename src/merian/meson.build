@@ -138,6 +138,7 @@ merian_deps = [
     stb,
     subprocess,
     tgltf,
+    tinyexr,
     tol,
     vma,
     vulkan,

@@ -36,7 +36,7 @@ _TITLE_HEIGHT = 26
 
 def _load(path: str, exposure: float) -> Image.Image:
     suffix = Path(path).suffix.lower()
-    if suffix in (".hdr", ".pfm"):
+    if suffix in (".exr", ".hdr", ".pfm"):
         linear = merian.io.load_image(path)
         linear = (
             np.repeat(linear, 3, axis=2) if linear.shape[2] == 1 else linear[..., :3]

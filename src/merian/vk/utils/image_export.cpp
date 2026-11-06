@@ -34,8 +34,8 @@ void image_export(const ResourceAllocatorHandle& allocator,
     if (format == ImageFormat::AUTO) {
         format = image_format_from_extension(path);
     }
-    if (format == ImageFormat::AUTO) {
-        throw std::runtime_error{"image_export: cannot infer a format from " + path.string()};
+    if (format == ImageFormat::AUTO || format == ImageFormat::EXR) {
+        throw std::runtime_error{"image_export: cannot write " + path.string()};
     }
     std::error_code error;
     std::filesystem::create_directories(path.parent_path(), error);
@@ -43,7 +43,7 @@ void image_export(const ResourceAllocatorHandle& allocator,
         throw std::runtime_error{"image_export: cannot create " + path.parent_path().string() +
                                  ": " + error.message()};
     }
-    const bool as_float = format == ImageFormat::HDR || format == ImageFormat::PFM;
+    const bool as_float = image_format_is_float(format);
     const vk::Format capture_format =
         as_float ? vk::Format::eR32G32B32A32Sfloat : vk::Format::eR8G8B8A8Srgb;
     const vk::Extent3D capture_extent{extent.width, extent.height, 1};

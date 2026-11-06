@@ -53,6 +53,12 @@ option(
     description: 'Build with pbrt-v4 scene support (needs miniply and zlib).'
 )
 option(
+    'exr',
+    type: 'feature',
+    value: 'auto',
+    description: 'Build with OpenEXR image loading (tinyexr).'
+)
+option(
     'tinybvh',
     type: 'feature',
     value: 'auto',
