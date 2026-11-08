@@ -16,7 +16,7 @@ void main(int local_index: SV_GroupIndex) {
     float max_luminance;
     if (params.automatic == 0) {
         const float ev = ev_100(params.aperture, params.shutter_time, params.iso);
-        max_luminance = ev_100_to_max_luminance(ev, params.iso, params.q);
+        max_luminance = ev_100_to_max_luminance(ev, params.q);
     } else {
         const uint local_bin = out_histogram[local_index];
         local_hist[local_index] = local_bin * local_index;
@@ -40,8 +40,8 @@ void main(int local_index: SV_GroupIndex) {
                 exp2(((average_bin / float(hist_size - 2.)) * params.max_log_histogram) +
                      params.min_log_histogram);
 
-            const float ev = ev_100_from_average(average_l, 100, params.K);
-            max_luminance = ev_100_to_max_luminance(ev, 100, params.q);
+            const float ev = ev_100_from_average(average_l, params.K);
+            max_luminance = ev_100_to_max_luminance(ev, params.q);
 
             if (params.reset != 1) {
                 float last_max_luminance = out_avg_luminance[0];

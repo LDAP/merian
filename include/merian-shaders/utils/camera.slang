@@ -45,12 +45,12 @@ float ev_100(float aperture, float shutter_time, float iso) {
     return log2(((aperture * aperture) * 100.0f) / (shutter_time * iso));
 }
 
-float ev_100_from_average(float avg_luminance, float iso, float K) {
-    return log2((avg_luminance * iso) / K);
+float ev_100_from_average(float avg_luminance, float K) {
+    return log2((avg_luminance * 100.0f) / K);
 }
 
-float ev_100_to_max_luminance(float ev100, float iso, float q) {
-    return (78.0f / (iso * q)) * pow(2.0f, ev100);
+float ev_100_to_max_luminance(float ev100, float q) {
+    return (78.0f / (100.0f * q)) * pow(2.0f, ev100);
 }
 
 float max_luminance_to_exposure(float max_luminance) {
