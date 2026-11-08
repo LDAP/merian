@@ -6,15 +6,35 @@ const int workgroup_size_y = 1;
 [vk::constant_id(2)]
 const int MODE = 0;
 
-Sampler2D<float4> in_src;
-RWTexture2D<float4> out_out;
-[format("rgba16f")]
-RWTexture2D<float4> out_interm;
+static const int MAX_LEVELS = 12;
 
 struct PushConstant {
-    float threshold;
-    float strength;
+    int level;
+    int coarse_is_down;
+    int karis;
+    float fine_weight;
+    float coarse_weight;
+    float intensity;
+    float radius;
 };
 
 [vk::push_constant]
 ConstantBuffer<PushConstant> pc;
+
+float2 pixel_uv(const int2 ipos, const uint width, const uint height) {
+    return (float2(ipos) + 0.5) / float2(width, height);
+}
+
+float3 tent(Sampler2D<float4> tex, const float2 uv, const float radius) {
+    uint width, height;
+    tex.GetDimensions(width, height);
+    const float2 d = radius / float2(width, height);
+    float3 sum = tex.SampleLevel(uv, 0).rgb * 4.0;
+    sum += (tex.SampleLevel(uv + float2(-d.x, 0), 0).rgb + tex.SampleLevel(uv + float2(d.x, 0), 0).rgb +
+            tex.SampleLevel(uv + float2(0, -d.y), 0).rgb + tex.SampleLevel(uv + float2(0, d.y), 0).rgb) *
+           2.0;
+    sum += tex.SampleLevel(uv + float2(-d.x, -d.y), 0).rgb +
+           tex.SampleLevel(uv + float2(d.x, -d.y), 0).rgb +
+           tex.SampleLevel(uv + float2(-d.x, d.y), 0).rgb + tex.SampleLevel(uv + float2(d.x, d.y), 0).rgb;
+    return sum / 16.0;
+}

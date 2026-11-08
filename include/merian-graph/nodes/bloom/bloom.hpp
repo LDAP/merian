@@ -19,10 +19,16 @@ class Bloom : public Node {
 
     static constexpr uint32_t local_size_x = 16;
     static constexpr uint32_t local_size_y = 16;
+    static constexpr uint32_t max_levels = 12;
 
     struct PushConstant {
-        float threshold = 10.0;
-        float strength = 0.001;
+        int32_t level = 0;
+        int32_t coarse_is_down = 0;
+        int32_t karis = 0;
+        float fine_weight = 1.0;
+        float coarse_weight = 1.0;
+        float intensity = 0.04;
+        float radius = 1.0;
     };
 
   public:
@@ -50,18 +56,35 @@ class Bloom : public Node {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
+    std::vector<float> level_weights(uint32_t level_count) const;
+
+    void bind_mip_chain();
+
+    void barrier_written(const CommandBufferHandle& cmd, const ImageHandle& image);
+
     ShaderCompileContextHandle compile_context;
 
-    VkSampledImageInHandle con_src = VkSampledImageIn::create();
+    VkSampledImageInHandle con_src;
     ManagedVkImageOutHandle con_out;
-    ManagedVkImageOutHandle con_interm;
 
     PushConstant pc;
     Versioned<SpecializationInfo> spec_info;
 
-    std::optional<ComputeKernel> separate_kernel;
+    std::optional<ComputeKernel> downsample_kernel;
+    std::optional<ComputeKernel> upsample_kernel;
     std::optional<ComputeKernel> composite_kernel;
 
+    ImageHandle down_image;
+    ImageHandle up_image;
+    std::vector<TextureHandle> down_levels;
+    std::vector<TextureHandle> up_levels;
+    uint32_t chain_level_count = 0;
+    uint32_t image_height = 0;
+
+    float size = 0.2;
+    float core = 0.001;
+    float falloff = 2.5;
+    bool karis_average = false;
     int32_t mode = 0;
 };
 

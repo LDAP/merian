@@ -72,7 +72,7 @@ NodeRegistry::NodeRegistry() {
     register_node_type<ABSideBySide>("AB Side By Side",
                                      "Compare two inputs in a side by side view.");
     register_node_type<Accumulate>("Accumulate", "Accumulate values across multiple iterations.");
-    register_node_type<Bloom>("Bloom", "Selectively blurs pixels that surpass a threshold.");
+    register_node_type<Bloom>("Bloom", "Glare around bright light sources, energy conserving.");
     register_node_type<ColorImage>("Color",
                                    "Outputs a image filled cleared with the selected color.");
     register_node_type<DLSSNode>(
