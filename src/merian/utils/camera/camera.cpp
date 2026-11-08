@@ -574,7 +574,7 @@ void Camera::properties(Properties& props) {
         projection_change_id++;
     }
     if (props.config_float("focus distance", focus_distance,
-                           "distance to the plane of perfect focus", 0.001f, 0.01f, 20.0f)) {
+                           "distance to the plane of perfect focus", 0.001f, 0.01f, far_plane)) {
         focus_distance_on_target = false;
         projection_change_id++;
     }
