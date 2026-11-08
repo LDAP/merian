@@ -205,7 +205,10 @@ BlobHandle load_pfm(const std::filesystem::path& path, ImageInfo& info, int desi
     }
     const bool little_endian = scale < 0;
     const int out_channels = desired_channels == 0 ? src_channels : desired_channels;
-    info = {.width = width, .height = height, .channels = out_channels};
+    info = {.width = width,
+            .height = height,
+            .channels = out_channels,
+            .source_channels = src_channels};
 
     const std::size_t pixel_count = static_cast<std::size_t>(width) * height;
     const std::size_t src_row_floats = static_cast<std::size_t>(width) * src_channels;
@@ -510,8 +513,13 @@ image_load_u8(const std::filesystem::path& path, ImageInfo& info, const int desi
     if (is_dds(path)) {
         return dds_decode_rgba8(dds_load(path, false), info);
     }
-    if (image_format_from_extension(path) == ImageFormat::EXR) {
+    switch (image_format_from_extension(path)) {
+    case ImageFormat::PFM:
+        return float_to_u8(load_pfm(path, info, desired_channels), info);
+    case ImageFormat::EXR:
         return float_to_u8(load_exr(path, info, desired_channels), info);
+    default:
+        break;
     }
 
     int w = 0;
