@@ -554,7 +554,7 @@ image_load_f32(const std::filesystem::path& path, ImageInfo& info, const int des
                                  stbi_failure_reason()};
     }
     const int out_channels = desired_channels == 0 ? native : desired_channels;
-    info = {.width = w, .height = h, .channels = out_channels};
+    info = {.width = w, .height = h, .channels = out_channels, .source_channels = native};
     return std::make_shared<StbiBlob>(pixels, static_cast<std::size_t>(w) * h * out_channels *
                                                   sizeof(float));
 }
