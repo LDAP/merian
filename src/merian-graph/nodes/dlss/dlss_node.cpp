@@ -238,7 +238,7 @@ DLSSNode::pre_process(const NodeIO& io, [[maybe_unused]] const NodeProcessInfo& 
         return {};
     }
     // the camera's resolution is known once the scene is ready
-    camera_extent = scene->get_resolution().value_or(vk::Extent3D{});
+    camera_extent = scene->get_resolution();
     if (const vk::Extent3D automatic = camera_extent.width != 0 ? camera_extent : render_extent;
         (out_width == 0 && target_extent.width != automatic.width) ||
         (out_height == 0 && target_extent.height != automatic.height)) {

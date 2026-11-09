@@ -125,12 +125,8 @@ void GBufferRTNode::ensure_pipeline(const ContextHandle& context,
 [[nodiscard]] GBufferRTNode::NodeStatusFlags
 GBufferRTNode::pre_process(const NodeIO& io, [[maybe_unused]] const NodeProcessInfo& info) {
     const SceneHandle& scene = io[con_scene];
-    const std::optional<vk::Extent3D> resolution = scene ? scene->get_resolution() : std::nullopt;
-    resolution_from_scene = resolution.has_value();
-    if (resolution) {
-        native_extent = *resolution;
-    }
-    if (const vk::Extent3D traced = scaled(native_extent, RESOLUTION_SCALES[resolution_scale]);
+    if (const vk::Extent3D traced =
+            scaled(scene->get_resolution(), RESOLUTION_SCALES[resolution_scale]);
         traced != extent) {
         extent = traced;
         return NodeStatusFlagBits::NEEDS_RECONNECT;
@@ -196,13 +192,6 @@ void GBufferRTNode::update_gbuffer_constants() {
 
 GBufferRTNode::NodeStatusFlags GBufferRTNode::properties(Properties& config) {
     bool needs_reconnect = false;
-    if (resolution_from_scene) {
-        config.output_text("resolution from scene camera: {}x{}", native_extent.width,
-                           native_extent.height);
-    } else {
-        needs_reconnect |= config.config_uint("width", &native_extent.width);
-        needs_reconnect |= config.config_uint("height", &native_extent.height);
-    }
     if (config.config_float("texture lod bias", texture_lod_bias,
                             "in mip levels; an upscaler asks for -1 on top of the scale", 0.05f)) {
         if (composition) {

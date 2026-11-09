@@ -773,18 +773,21 @@ void GLTFScene::load_cameras() {
 
         if (gcam.type == "perspective") {
             float yfov = radians(60.f);
-            float aspect = 1.f;
+            const vk::Extent3D resolution =
+                gcam.perspective.aspectRatio > 0
+                    ? Camera::resolution_for_aspect_ratio(
+                          static_cast<float>(gcam.perspective.aspectRatio))
+                    : Camera::DEFAULT_RESOLUTION;
             float znear = 0.01f;
             float zfar = 1000.f;
 
-            if (gcam.perspective.aspectRatio > 0)
-                aspect = static_cast<float>(gcam.perspective.aspectRatio);
             yfov = static_cast<float>(gcam.perspective.yfov);
             znear = static_cast<float>(gcam.perspective.znear);
             if (gcam.perspective.zfar > 0)
                 zfar = static_cast<float>(gcam.perspective.zfar);
 
-            add_camera(std::make_shared<Camera>(eye, center, up_vec, yfov, aspect, znear, zfar));
+            add_camera(
+                std::make_shared<Camera>(eye, center, up_vec, yfov, resolution, znear, zfar));
             SPDLOG_DEBUG("GLTFScene: loaded {} camera '{}' at ({},{},{})", gcam.type, gcam.name,
                          eye.x, eye.y, eye.z);
         } else {
@@ -798,7 +801,8 @@ void GLTFScene::load_cameras() {
         SPDLOG_INFO("GLTFScene: no cameras in file, adding default camera");
 
         add_camera(std::make_shared<Camera>(float3(3, 3, 3), float3(0, 0, 0), get_up(),
-                                            radians(60.f), 1920.f / 1080.f, 0.01f, 1000.f));
+                                            radians(60.f), Camera::DEFAULT_RESOLUTION, 0.01f,
+                                            1000.f));
         AABB& aabb = get_aabb();
         if (aabb.is_valid()) {
             get_active_camera()->look_at(float3(1.3) * aabb.get_max().y, aabb.get_center(),

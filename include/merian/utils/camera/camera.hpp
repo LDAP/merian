@@ -5,7 +5,6 @@
 #include "merian/utils/vector_matrix.hpp"
 
 #include <memory>
-#include <optional>
 
 namespace merian {
 
@@ -22,12 +21,16 @@ class Camera {
     }
 
   public:
+    static constexpr vk::Extent3D DEFAULT_RESOLUTION{1920, 1080, 1};
+
+    static vk::Extent3D resolution_for_aspect_ratio(float aspect_ratio) noexcept;
+
     // field_of_view is vertical, in radians
     Camera(const float3& position = float3(0),
            const float3& target = float3(1, 0, 0),
            const float3& up = float3(0, 0, 1),
            const float field_of_view = radians(60.f),
-           const float aspect_ratio = 1.f,
+           const vk::Extent3D& resolution = DEFAULT_RESOLUTION,
            const float near_plane = 0.1f,
            const float far_plane = 1000.f);
 
@@ -77,7 +80,7 @@ class Camera {
 
     // field_of_view is vertical, in radians
     void set_perspective(const float field_of_view = radians(60.f),
-                         const float aspect_ratio = 1.f,
+                         const vk::Extent3D& resolution = DEFAULT_RESOLUTION,
                          const float near_plane = 0.1f,
                          const float far_plane = 1000.f) noexcept;
 
@@ -87,15 +90,10 @@ class Camera {
     // in radians, converted to vertical using the current aspect ratio
     void set_field_of_view_horizontal(const float field_of_view) noexcept;
 
-    // aspect_ratio = width / height; resets the resolution (a directly authored aspect has no
-    // resolution opinion).
-    void set_aspect_ratio(const float aspect_ratio) noexcept;
-
     // Native render resolution; the aspect ratio follows from it.
     void set_resolution(const vk::Extent3D& resolution) noexcept;
 
-    // nullopt if the camera has no resolution opinion (aspect ratio stands alone).
-    const std::optional<vk::Extent3D>& get_resolution() const noexcept;
+    const vk::Extent3D& get_resolution() const noexcept;
 
     void set_near_plane(const float near_plane) noexcept;
 
@@ -227,8 +225,7 @@ class Camera {
     //-------------------------------------------------
 
     float field_of_view; // vertical FOV, in radians
-    float aspect_ratio;  // aspect_ratio = width / height
-    std::optional<vk::Extent3D> resolution;
+    vk::Extent3D resolution;
     float near_plane;
     float far_plane;
     float f_number = 0.f;                 // f-number of the lens; 0 = pinhole
@@ -236,7 +233,6 @@ class Camera {
     bool focus_distance_on_target = true; // lock focus_distance to the distance to the target
     float sensor_height = 24.f;           // image height in mm (vertical); full-frame default
 
-    // Increase whenever fov, aspect_ratio, near_plane or far_plane changes
     uint32_t projection_change_id = 0;
 
     // Cache

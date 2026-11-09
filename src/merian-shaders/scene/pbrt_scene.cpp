@@ -971,6 +971,8 @@ void PBRTScene::load_env(const CommandBufferHandle& cmd) {
 }
 
 void PBRTScene::load_camera() {
+    const vk::Extent3D film{static_cast<uint32_t>(desc->film_width),
+                            static_cast<uint32_t>(desc->film_height), 1};
     if (desc->camera) {
         const float4x4 camera_to_world = inverse(desc->camera->world_to_camera);
         const float3 eye(camera_to_world[0][3], camera_to_world[1][3], camera_to_world[2][3]);
@@ -988,17 +990,13 @@ void PBRTScene::load_camera() {
                                 ? fov
                                 : 2.f * std::atan(std::tan(0.5f * fov) / aspect);
 
-        const auto camera =
-            std::make_shared<Camera>(eye, eye + forward, up, fov_y, aspect, 0.01f, 1000.f);
-        camera->set_resolution(vk::Extent3D{static_cast<uint32_t>(desc->film_width),
-                                            static_cast<uint32_t>(desc->film_height), 1});
-        add_camera(camera);
+        add_camera(std::make_shared<Camera>(eye, eye + forward, up, fov_y, film, 0.01f, 1000.f));
     }
 
     if (get_cameras().empty()) {
         SPDLOG_INFO("PBRTScene: no camera in file, adding default camera");
         add_camera(std::make_shared<Camera>(float3(3, 3, 3), float3(0, 0, 0), get_up(),
-                                            radians(60.f), 1920.f / 1080.f, 0.01f, 1000.f));
+                                            radians(60.f), film, 0.01f, 1000.f));
         AABB& aabb = get_aabb();
         if (aabb.is_valid()) {
             get_active_camera()->look_at_bounding_box(aabb);

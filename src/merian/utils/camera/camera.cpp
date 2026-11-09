@@ -5,6 +5,7 @@
 #include "merian/utils/xorshift.hpp"
 #include "merian/vk/utils/math.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cassert>
 #include <cmath>
@@ -12,16 +13,25 @@
 
 namespace merian {
 
+vk::Extent3D Camera::resolution_for_aspect_ratio(const float aspect_ratio) noexcept {
+    assert(aspect_ratio > 0);
+    const uint32_t height = DEFAULT_RESOLUTION.height;
+    const auto width =
+        static_cast<uint32_t>(std::lround(static_cast<float>(height) * aspect_ratio));
+    return {std::max(width, 1u), height, 1};
+}
+
 Camera::Camera(const float3& position,
                const float3& target,
                const float3& up,
                const float field_of_view,
-               const float aspect_ratio,
+               const vk::Extent3D& resolution,
                const float near_plane,
                const float far_plane)
     : position(position), target(target), up(normalize(up)), field_of_view(field_of_view),
-      aspect_ratio(aspect_ratio), near_plane(near_plane), far_plane(far_plane) {
+      resolution(resolution), near_plane(near_plane), far_plane(far_plane) {
 
+    assert(resolution.width > 0 && resolution.height > 0);
     assert(field_of_view < radians(179.99f));
     assert(field_of_view > radians(0.01f));
     assert(near_plane > 0 && near_plane < far_plane);
@@ -42,7 +52,8 @@ const float4x4& Camera::get_view_matrix() noexcept {
 
 const float4x4& Camera::get_projection_matrix() noexcept {
     if (has_changed(projection_change_id, projection_change_id_cache)) {
-        projection_cache = merian::perspective(field_of_view, aspect_ratio, near_plane, far_plane);
+        projection_cache =
+            merian::perspective(field_of_view, get_aspect_ratio(), near_plane, far_plane);
     }
     return projection_cache;
 }
@@ -62,7 +73,7 @@ uint64_t Camera::get_change_id() const noexcept {
 }
 bool Camera::operator==(const Camera& other) const noexcept {
     return position == other.position && target == other.target && up == other.up &&
-           field_of_view == other.field_of_view && aspect_ratio == other.aspect_ratio &&
+           field_of_view == other.field_of_view && resolution == other.resolution &&
            near_plane == other.near_plane && far_plane == other.far_plane &&
            f_number == other.f_number && focus_distance == other.focus_distance &&
            sensor_height == other.sensor_height;
@@ -119,17 +130,17 @@ const float3& Camera::get_up() const noexcept {
 // -----------------------------------------------------------------------------
 
 void Camera::set_perspective(const float field_of_view,
-                             const float aspect_ratio,
+                             const vk::Extent3D& resolution,
                              const float near_plane,
                              const float far_plane) noexcept {
+    assert(resolution.width > 0 && resolution.height > 0);
     assert(field_of_view < radians(179.99f));
     assert(field_of_view > radians(0.01f));
     assert(near_plane > 0 && near_plane < far_plane);
     assert(far_plane > 0 && far_plane > near_plane);
 
     this->field_of_view = field_of_view;
-    this->aspect_ratio = aspect_ratio;
-    resolution.reset();
+    this->resolution = resolution;
     this->near_plane = near_plane;
     this->far_plane = far_plane;
 
@@ -148,25 +159,20 @@ void Camera::set_field_of_view_horizontal(const float field_of_view) noexcept {
     assert(field_of_view < radians(179.99f));
     assert(field_of_view > radians(0.01f));
 
-    this->field_of_view = 2.f * std::atan(std::tan(field_of_view * 0.5f) / aspect_ratio);
-    projection_change_id++;
-}
-
-// aspect_ratio = width / height
-void Camera::set_aspect_ratio(const float aspect_ratio) noexcept {
-    assert(aspect_ratio > 0);
-
-    this->aspect_ratio = aspect_ratio;
-    resolution.reset();
+    this->field_of_view = 2.f * std::atan(std::tan(field_of_view * 0.5f) / get_aspect_ratio());
     projection_change_id++;
 }
 
 void Camera::set_resolution(const vk::Extent3D& resolution) noexcept {
-    set_aspect_ratio(static_cast<float>(resolution.width) / static_cast<float>(resolution.height));
+    assert(resolution.width > 0 && resolution.height > 0);
+    if (resolution == this->resolution) {
+        return;
+    }
     this->resolution = resolution;
+    projection_change_id++;
 }
 
-const std::optional<vk::Extent3D>& Camera::get_resolution() const noexcept {
+const vk::Extent3D& Camera::get_resolution() const noexcept {
     return resolution;
 }
 
@@ -217,11 +223,11 @@ float Camera::get_field_of_view_vertical() const noexcept {
 }
 
 float Camera::get_field_of_view_horizontal() const noexcept {
-    return 2.f * std::atan(std::tan(field_of_view * 0.5f) * aspect_ratio);
+    return 2.f * std::atan(std::tan(field_of_view * 0.5f) * get_aspect_ratio());
 }
 
 float Camera::get_aspect_ratio() const noexcept {
-    return aspect_ratio;
+    return static_cast<float>(resolution.width) / static_cast<float>(resolution.height);
 }
 
 float Camera::get_near_plane() const noexcept {
@@ -388,12 +394,12 @@ void Camera::write_to(ShaderCursor cursor) {
     cursor["up"] = up;
     // basis scaled so position + ndc.x * U + ndc.y * V + W lies on the plane of perfect focus;
     // normalized directions and projections are invariant to the scale.
-    cursor["U"] = rgt * (half_vfov_tan * aspect_ratio * focus);
+    cursor["U"] = rgt * (half_vfov_tan * get_aspect_ratio() * focus);
     cursor["V"] = cross(rgt, fwd) * (half_vfov_tan * focus);
     cursor["W"] = fwd * focus;
     cursor["near"] = near_plane;
     cursor["far"] = far_plane;
-    cursor["aspect_ratio"] = aspect_ratio;
+    cursor["aspect_ratio"] = get_aspect_ratio();
     cursor["aperture_radius"] = get_aperture_radius();
     cursor["jitter"] = jitter;
 }
@@ -408,7 +414,7 @@ void Camera::look_at_bounding_box(const AABB& aabb) {
     const float vfov = this->field_of_view * 0.85f;
 
     const float tan_hy = std::tan(vfov * 0.5f);
-    const float tan_hx = tan_hy * aspect_ratio;
+    const float tan_hx = tan_hy * get_aspect_ratio();
 
     // Establish an initial view direction
     look_at(float3(1.3) * (aabb.get_max().y + 1e-3f), aabb.get_center(), get_up());
@@ -527,6 +533,12 @@ void Camera::properties(Properties& props) {
 
     props.st_separate();
 
+    vk::Extent3D configured = resolution;
+    bool resolution_changed = props.config_uint("width", configured.width, "", 1u);
+    resolution_changed |= props.config_uint("height", configured.height, "", 1u);
+    if (resolution_changed && configured.width > 0 && configured.height > 0) {
+        set_resolution(configured);
+    }
     float fov_hdeg = degrees(get_field_of_view_horizontal());
     if (props.config_float("fov", fov_hdeg, "horizontal, in degrees", 0.1f, 0.01f, 179.9f)) {
         set_field_of_view_horizontal(radians(fov_hdeg));
@@ -541,9 +553,6 @@ void Camera::properties(Properties& props) {
         projection_change_id++;
     }
     if (props.config_float("far", far_plane, "", 0.1f, near_plane + 0.1f, 10000.0f)) {
-        projection_change_id++;
-    }
-    if (props.config_float("aspect", aspect_ratio)) {
         projection_change_id++;
     }
 

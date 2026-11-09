@@ -505,8 +505,7 @@ class Scene : public std::enable_shared_from_this<Scene> {
         return false;
     }
 
-    // nullopt if there is no active camera or it has no resolution opinion
-    std::optional<vk::Extent3D> get_resolution() const;
+    vk::Extent3D get_resolution() const;
 
     void set_active_camera(uint32_t index);
 

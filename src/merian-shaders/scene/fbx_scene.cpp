@@ -415,11 +415,14 @@ void FBXScene::load_cameras() {
         const float3 center = eye - forward;
 
         const float yfov = radians(static_cast<float>(cam->field_of_view_deg.y));
-        const float aspect = cam->aspect_ratio > 0 ? static_cast<float>(cam->aspect_ratio) : 1.f;
+        const vk::Extent3D resolution =
+            cam->aspect_ratio > 0
+                ? Camera::resolution_for_aspect_ratio(static_cast<float>(cam->aspect_ratio))
+                : Camera::DEFAULT_RESOLUTION;
         const float znear = cam->near_plane > 0 ? static_cast<float>(cam->near_plane) : 0.01f;
         const float zfar = cam->far_plane > 0 ? static_cast<float>(cam->far_plane) : 1000.f;
 
-        add_camera(std::make_shared<Camera>(eye, center, up_vec, yfov, aspect, znear, zfar));
+        add_camera(std::make_shared<Camera>(eye, center, up_vec, yfov, resolution, znear, zfar));
         SPDLOG_DEBUG("FBXScene: loaded camera '{}' at ({},{},{})", cam->name.data, eye.x, eye.y,
                      eye.z);
     }
@@ -428,7 +431,8 @@ void FBXScene::load_cameras() {
     if (get_cameras().empty()) {
         SPDLOG_INFO("FBXScene: no cameras in file, adding default camera");
         add_camera(std::make_shared<Camera>(float3(3, 3, 3), float3(0, 0, 0), get_up(),
-                                            radians(60.f), 1920.f / 1080.f, 0.01f, 1000.f));
+                                            radians(60.f), Camera::DEFAULT_RESOLUTION, 0.01f,
+                                            1000.f));
         AABB& aabb = get_aabb();
         if (aabb.is_valid()) {
             get_active_camera()->look_at_bounding_box(aabb);
