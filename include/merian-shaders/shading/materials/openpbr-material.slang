@@ -162,14 +162,6 @@ struct OpenPBRMaterial<let TRANSMISSION : bool = false,
             transmission_color = trans.color;
         }
 
-        // The coupled rough dielectric is isotropic; sqrt(ax * ay) preserves the NDF peak.
-        const float alpha_iso = TRANSMISSION ? sqrt(alpha.x * alpha.y) : alpha.x;
-        const OpenPBRDielectric dielectric = OpenPBRDielectric(
-            OpenPBROpaqueDielectric(SpecularBRDF(alpha), LambertDiffuseBRDF(base), dielectric_f0),
-            RoughDielectricBSDF(alpha_iso, eta, transmission_color), tw);
-        const OpenPBRSubstrate substrate =
-            OpenPBRSubstrate(dielectric, OpenPBRMetal(SpecularBRDF(alpha), base), metal);
-
         float cw = 0.0f;
         float coat_alpha = 0.0f;
         float coat_f0 = 0.0f;
@@ -179,8 +171,6 @@ struct OpenPBRMaterial<let TRANSMISSION : bool = false,
             const float coat_t = (coat.ior - 1.0f) / (coat.ior + 1.0f);
             coat_f0 = coat_t * coat_t;
         }
-        const OpenPBRCoated coated =
-            OpenPBRCoated(SpecularBRDF(coat_alpha), substrate, coat_f0, cw);
 
         float sw = 0.0f;
         float3 sheen_col = float3(0.0f);
@@ -200,11 +190,22 @@ struct OpenPBRMaterial<let TRANSMISSION : bool = false,
         }
 
         OpenPBRMaterialSample s;
-        s.brdf = OpenPBRBSDF(coated, SheenBRDF(sheen_col, sheen_alpha), sw);
-        out_shading_frame = shading_frame;
-        out_emission = get_emission(sd, textures, lod);
+        s.base_color = base;
+        s.metalness = metal;
+        s.specular_alpha = alpha;
+        s.dielectric_f0 = dielectric_f0;
+        s.transmission_weight = tw;
+        s.transmission_color = transmission_color;
+        s.coat_weight = cw;
+        s.coat_alpha = coat_alpha;
+        s.coat_f0 = coat_f0;
+        s.sheen_weight = sw;
+        s.sheen_color = sheen_col;
+        s.sheen_alpha = sheen_alpha;
         s.eta = eta;
         s.absorption = absorb;
+        out_shading_frame = shading_frame;
+        out_emission = get_emission(sd, textures, lod);
         return s;
     }
 }
@@ -212,12 +213,32 @@ struct OpenPBRMaterial<let TRANSMISSION : bool = false,
 struct OpenPBRMaterialSample : MaterialSample {
     typealias BSDFImpl = OpenPBRBSDF;
 
-    OpenPBRBSDF brdf;
+    float3 base_color;
+    float metalness;
+    float2 specular_alpha;
+    float dielectric_f0;
+    float transmission_weight;
+    float3 transmission_color;
+    float coat_weight;
+    float coat_alpha;
+    float coat_f0;
+    float sheen_weight;
+    float3 sheen_color;
+    float sheen_alpha;
     float eta;
     float3 absorption;
 
     BSDFImpl get_bsdf() {
-        return brdf;
+        const float alpha_iso = sqrt(specular_alpha.x * specular_alpha.y);
+        const OpenPBRDielectric dielectric = OpenPBRDielectric(
+            OpenPBROpaqueDielectric(SpecularBRDF(specular_alpha), LambertDiffuseBRDF(base_color),
+                                    dielectric_f0),
+            RoughDielectricBSDF(alpha_iso, eta, transmission_color), transmission_weight);
+        const OpenPBRSubstrate substrate = OpenPBRSubstrate(
+            dielectric, OpenPBRMetal(SpecularBRDF(specular_alpha), base_color), metalness);
+        const OpenPBRCoated coated =
+            OpenPBRCoated(SpecularBRDF(coat_alpha), substrate, coat_f0, coat_weight);
+        return OpenPBRBSDF(coated, SheenBRDF(sheen_color, sheen_alpha), sheen_weight);
     }
 
     override IsotropicVolume get_interior_volume() {

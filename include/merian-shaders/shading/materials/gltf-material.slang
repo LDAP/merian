@@ -249,22 +249,6 @@ struct GltfMaterial<let TRANSMISSION : bool = false,
             iri_thickness = lerp(iri.thickness_min, iri.thickness_max, t);
         }
 
-        const GltfDiffuseDielectric diffuse_dielectric = GltfDiffuseDielectric(
-            SpecularBRDF(specular_alpha),
-            DiffuseTransmissionBSDF(base.rgb * (1.0f - diffuse_transmission_weight),
-                                    diffuse_transmission_color * diffuse_transmission_weight),
-            dielectric_f0, eta, iri_ior, iri_thickness, iridescence_factor);
-        const GltfDielectric dielectric = GltfDielectric(
-            diffuse_dielectric,
-            IridescentRoughDielectricBSDF(alpha, eta, base.rgb, float3(dielectric_f0), iri_ior,
-                                          iri_thickness, iridescence_factor),
-            tw);
-        const GltfReflective reflective =
-            GltfReflective(dielectric,
-                           GltfConductor(SpecularBRDF(specular_alpha), base.rgb, iri_ior,
-                                         iri_thickness, iridescence_factor),
-                           metallic);
-
         float coat_weight = 0.0f;
         float coat_alpha = 0.0f;
         if (let coat = clearcoat_opt) {
@@ -300,17 +284,26 @@ struct GltfMaterial<let TRANSMISSION : bool = false,
                 sheen_rough *= textures.sample(lod0, sh.roughness_texture, sd.uv).a;
             }
         }
-        const float sheen_alpha = ggx_roughness_to_alpha(sheen_rough);
-        const float max_sheen = max(sheen_col.r, max(sheen_col.g, sheen_col.b));
-        const GltfSheened sheened =
-            GltfSheened(SheenBRDF(sheen_col, sheen_alpha), reflective, sheen_alpha, max_sheen);
-
         GltfMaterialSample s;
-        s.brdf = GltfBSDF(SpecularBRDF(coat_alpha), sheened, GLTF_DIELECTRIC_IOR_F0, coat_weight);
+        s.base_color = base.rgb;
+        s.metalness = metallic;
+        s.alpha = alpha;
+        s.tangent_alpha = specular_alpha.x;
+        s.dielectric_f0 = dielectric_f0;
+        s.eta = eta;
+        s.transmission_weight = tw;
+        s.diffuse_transmission_weight = diffuse_transmission_weight;
+        s.diffuse_transmission_color = diffuse_transmission_color;
+        s.iridescence_factor = iridescence_factor;
+        s.iridescence_ior = iri_ior;
+        s.iridescence_thickness = iri_thickness;
+        s.coat_weight = coat_weight;
+        s.coat_alpha = coat_alpha;
+        s.sheen_color = sheen_col;
+        s.sheen_alpha = ggx_roughness_to_alpha(sheen_rough);
+        s.absorption = absorb;
         out_shading_frame = shading_frame;
         out_emission = emission;
-        s.eta = eta;
-        s.absorption = absorb;
         return s;
     }
 }
@@ -318,12 +311,46 @@ struct GltfMaterial<let TRANSMISSION : bool = false,
 struct GltfMaterialSample : MaterialSample {
     typealias BSDFImpl = GltfBSDF;
 
-    GltfBSDF brdf;
+    float3 base_color;
+    float metalness;
+    float alpha;
+    float tangent_alpha;
+    float dielectric_f0;
     float eta;
+    float transmission_weight;
+    float diffuse_transmission_weight;
+    float3 diffuse_transmission_color;
+    float iridescence_factor;
+    float iridescence_ior;
+    float iridescence_thickness;
+    float coat_weight;
+    float coat_alpha;
+    float3 sheen_color;
+    float sheen_alpha;
     float3 absorption;
 
     BSDFImpl get_bsdf() {
-        return brdf;
+        const float2 specular_alpha = float2(tangent_alpha, alpha);
+        const GltfDiffuseDielectric diffuse_dielectric = GltfDiffuseDielectric(
+            SpecularBRDF(specular_alpha),
+            DiffuseTransmissionBSDF(base_color * (1.0f - diffuse_transmission_weight),
+                                    diffuse_transmission_color * diffuse_transmission_weight),
+            dielectric_f0, eta, iridescence_ior, iridescence_thickness, iridescence_factor);
+        const GltfDielectric dielectric =
+            GltfDielectric(diffuse_dielectric,
+                           IridescentRoughDielectricBSDF(alpha, eta, base_color,
+                                                         float3(dielectric_f0), iridescence_ior,
+                                                         iridescence_thickness, iridescence_factor),
+                           transmission_weight);
+        const GltfReflective reflective =
+            GltfReflective(dielectric,
+                           GltfConductor(SpecularBRDF(specular_alpha), base_color, iridescence_ior,
+                                         iridescence_thickness, iridescence_factor),
+                           metalness);
+        const float max_sheen = max(sheen_color.r, max(sheen_color.g, sheen_color.b));
+        const GltfSheened sheened =
+            GltfSheened(SheenBRDF(sheen_color, sheen_alpha), reflective, sheen_alpha, max_sheen);
+        return GltfBSDF(SpecularBRDF(coat_alpha), sheened, GLTF_DIELECTRIC_IOR_F0, coat_weight);
     }
 
     override IsotropicVolume get_interior_volume() {
