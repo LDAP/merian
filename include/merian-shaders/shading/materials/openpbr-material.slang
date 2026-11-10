@@ -20,9 +20,8 @@ typealias OpenPBROpaqueDielectric = FresnelMixBSDF<SpecularBRDF, LambertDiffuseB
 typealias OpenPBRDielectric = MixBSDF<OpenPBROpaqueDielectric, RoughDielectricBSDF>;
 typealias OpenPBRMetal = ConductorFresnelBSDF<SpecularBRDF>;
 typealias OpenPBRSubstrate = MixBSDF<OpenPBRDielectric, OpenPBRMetal>; // by metalness
-typealias OpenPBRCoated = FresnelMixBSDF<SpecularBRDF, OpenPBRSubstrate>;
-typealias OpenPBRWithCoat = MixBSDF<OpenPBRSubstrate, OpenPBRCoated>; // by coat weight
-typealias OpenPBRBSDF = MixBSDF<OpenPBRWithCoat, SheenBRDF>; // by sheen weight
+typealias OpenPBRCoated = FresnelMixBSDF<SpecularBRDF, OpenPBRSubstrate>; // by coat weight
+typealias OpenPBRBSDF = MixBSDF<OpenPBRCoated, SheenBRDF>; // by sheen weight
 
 enum RoughnessEncoding {
     Roughness,
@@ -180,8 +179,8 @@ struct OpenPBRMaterial<let TRANSMISSION : bool = false,
             const float coat_t = (coat.ior - 1.0f) / (coat.ior + 1.0f);
             coat_f0 = coat_t * coat_t;
         }
-        const OpenPBRWithCoat with_coat = OpenPBRWithCoat(
-            substrate, OpenPBRCoated(SpecularBRDF(coat_alpha), substrate, coat_f0), cw);
+        const OpenPBRCoated coated =
+            OpenPBRCoated(SpecularBRDF(coat_alpha), substrate, coat_f0, cw);
 
         float sw = 0.0f;
         float3 sheen_col = float3(0.0f);
@@ -201,7 +200,7 @@ struct OpenPBRMaterial<let TRANSMISSION : bool = false,
         }
 
         OpenPBRMaterialSample s;
-        s.brdf = OpenPBRBSDF(with_coat, SheenBRDF(sheen_col, sheen_alpha), sw);
+        s.brdf = OpenPBRBSDF(coated, SheenBRDF(sheen_col, sheen_alpha), sw);
         out_shading_frame = shading_frame;
         out_emission = get_emission(sd, textures, lod);
         s.eta = eta;

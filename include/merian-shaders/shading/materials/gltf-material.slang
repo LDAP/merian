@@ -21,9 +21,8 @@ typealias GltfConductor = IridescentConductorBSDF<SpecularBRDF>;
 typealias GltfReflective = MixBSDF<GltfDielectric, GltfConductor>;
 // KHR_materials_sheen: sheen lobe over the reflective base.
 typealias GltfSheened = SheenLayerBSDF<GltfReflective>;
-// KHR_materials_clearcoat: a GGX coat over the sheened surface, mixed by the clearcoat weight.
-typealias GltfCoated = FresnelMixBSDF<SpecularBRDF, GltfSheened>;
-typealias GltfBSDF = MixBSDF<GltfSheened, GltfCoated>;
+// KHR_materials_clearcoat: a GGX coat over the sheened surface, by the clearcoat weight.
+typealias GltfBSDF = FresnelMixBSDF<SpecularBRDF, GltfSheened>;
 
 static const float GLTF_DIELECTRIC_IOR_F0 = 0.04f; // equals ior = 1.5
 
@@ -307,9 +306,7 @@ struct GltfMaterial<let TRANSMISSION : bool = false,
             GltfSheened(SheenBRDF(sheen_col, sheen_alpha), reflective, sheen_alpha, max_sheen);
 
         GltfMaterialSample s;
-        s.brdf =
-            GltfBSDF(sheened, GltfCoated(SpecularBRDF(coat_alpha), sheened, GLTF_DIELECTRIC_IOR_F0),
-                     coat_weight);
+        s.brdf = GltfBSDF(SpecularBRDF(coat_alpha), sheened, GLTF_DIELECTRIC_IOR_F0, coat_weight);
         out_shading_frame = shading_frame;
         out_emission = emission;
         s.eta = eta;
