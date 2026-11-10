@@ -3,6 +3,7 @@ __exported import merian_shaders.shading.materials.material;
 namespace merian {
 
 extern static const int merian_material_system_payload_max_size;
+extern static const int merian_material_system_model_count;
 // alpha values less than the threshold are considered transparent.
 extern static const float merian_alpha_test_threshold = 0.5;
 // False where no material can have anything but vacuum behind a transmission event.
@@ -46,9 +47,12 @@ struct MaterialSystem {
         return 1.f;
     }
 
+    MaterialBufferEntry get_entry(const MaterialID material_id, const bool prev_frame = false) {
+        return prev_frame ? prev_materials[material_id] : materials[material_id];
+    }
+
     MaterialModel get_material(const MaterialID material_id, const bool prev_frame = false) {
-        const MaterialBufferEntry entry =
-            prev_frame ? prev_materials[material_id] : materials[material_id];
+        const MaterialBufferEntry entry = get_entry(material_id, prev_frame);
         return createDynamicObject<MaterialModel>(entry.header.material_model_type_id, entry);
     }
 
@@ -56,8 +60,17 @@ struct MaterialSystem {
                         const ShadingData sd,
                         const LODSampler2D lod_sampler = DefaultLODSampler(),
                         const bool prev_frame = false) {
-        return get_material(material_id, prev_frame)
-            .get_emission(sd, texture_manager.get_textures(prev_frame), lod_sampler);
+        const MaterialBufferEntry entry = get_entry(material_id, prev_frame);
+        const Textures textures = texture_manager.get_textures(prev_frame);
+        const int last = merian_material_system_model_count - 1;
+        [ForceUnroll] for (int model = 0; model < last; model++) {
+            if (entry.header.material_model_type_id == model) {
+                return createDynamicObject<MaterialModel>(model, entry)
+                    .get_emission(sd, textures, lod_sampler);
+            }
+        }
+        return createDynamicObject<MaterialModel>(last, entry)
+            .get_emission(sd, textures, lod_sampler);
     }
 
     MaterialSample get_material_sample(const MaterialID material_id,
@@ -66,9 +79,17 @@ struct MaterialSystem {
                                        out OrthonormalFrame out_shading_frame,
                                        const LODSampler2D lod_sampler = DefaultLODSampler(),
                                        const bool prev_frame = false) {
-        const MaterialModel material_model = get_material(material_id, prev_frame);
-        return material_model.get_sample(sd, texture_manager.get_textures(prev_frame), lod_sampler,
-                                         out_emission, out_shading_frame);
+        const MaterialBufferEntry entry = get_entry(material_id, prev_frame);
+        const Textures textures = texture_manager.get_textures(prev_frame);
+        const int last = merian_material_system_model_count - 1;
+        [ForceUnroll] for (int model = 0; model < last; model++) {
+            if (entry.header.material_model_type_id == model) {
+                return createDynamicObject<MaterialModel>(model, entry)
+                    .get_sample(sd, textures, lod_sampler, out_emission, out_shading_frame);
+            }
+        }
+        return createDynamicObject<MaterialModel>(last, entry)
+            .get_sample(sd, textures, lod_sampler, out_emission, out_shading_frame);
     }
 }
 

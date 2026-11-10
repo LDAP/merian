@@ -39,6 +39,7 @@ SlangCompositionHandle MaterialSystem::query_device_support_composition() {
     composition->add_module_from_string(
         "material_system_constants",
         "namespace merian { export static const int merian_material_system_payload_max_size = 1;\n"
+        "export static const int merian_material_system_model_count = 1;\n"
         "export static const bool merian_material_system_any_interior_volume = false; }");
     composition->add_module_from_path("merian-shaders/shading/materials/diffuse-material.slang");
     composition->add_type_conformance("merian::MaterialModel", "merian::DiffuseMaterial", 0);
@@ -51,8 +52,10 @@ void MaterialSystem::update_composition_constants() {
         "material_system_constants",
         fmt::format("namespace merian {{ export static const int "
                     "merian_material_system_payload_max_size = {};\n"
+                    "export static const int merian_material_system_model_count = {};\n"
                     "export static const bool merian_material_system_any_interior_volume = {}; }}",
-                    payload_uints, any_interior_volume ? "true" : "false"));
+                    payload_uints, std::max<std::size_t>(material_types.size(), 1),
+                    any_interior_volume ? "true" : "false"));
 }
 
 void MaterialSystem::set_alpha_test_threshold(const float threshold) {
@@ -115,8 +118,7 @@ MaterialModelID MaterialSystem::register_material_type(const std::string& slang_
 
     const auto dispatch_id = static_cast<MaterialModelID>(material_types.size());
     material_types.emplace(slang_type_name, MaterialTypeInfo{slang_module_path, dispatch_id});
-
-    // triggers program rebuild via listener
+    update_composition_constants();
     composition->add_module_from_path(slang_module_path);
     composition->add_type_conformance("merian::MaterialModel", slang_type_name, dispatch_id);
     return dispatch_id;
