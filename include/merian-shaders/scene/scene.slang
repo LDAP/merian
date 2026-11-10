@@ -13,6 +13,7 @@ import merian_shaders.utils.hash;
 import merian_shaders.utils.pseudorandom;
 import merian_shaders.utils.random;
 import merian_shaders.utils.sampling;
+import merian_shaders.utils.unset;
 
 // Workaround for https://github.com/shader-slang/slang/pull/10769; scene.cpp injects replacements.
 __exported import scene_as_workaround;
@@ -440,7 +441,7 @@ struct Scene {
             ShadingData(-ray.Direction, surface.pos, surface.uv, get_time(prev_frame),
                         frame, face_normal, ctx.bounce, front_facing);
 
-        ShadingPoint sp;
+        ShadingPoint sp = unset<ShadingPoint>();
         sp.pos = surface.pos;
         sp.prev_pos = prev_pos;
         sp.enc_face_normal = encode_normal(surface.face_normal);
@@ -766,7 +767,7 @@ struct Scene {
             ShadingData(-ray.Direction, pos, float2(0), get_time(prev_frame),
                         OrthonormalFrame(-ray.Direction), -ray.Direction, ctx.bounce, true);
 
-        ShadingPoint sp;
+        ShadingPoint sp = unset<ShadingPoint>();
         sp.pos = pos;
         sp.prev_pos = pos;
         sp.enc_face_normal = encode_normal(-ray.Direction);
