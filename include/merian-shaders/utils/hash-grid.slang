@@ -217,9 +217,11 @@ struct HashGrid<typename T,
     // occupies, or is invalid if the grid does not hold it.
     HashGridPos find(const HashGridPos pos) {
         uint slot = pos.slot;
+        uint found = MERIAN_HASH_GRID_INVALID_SLOT;
         for (uint i = 0; i < PROBE_COUNT; i++) {
             if (keys_match(load_hash(slot), pos.key)) {
-                return HashGridPos(slot, pos.key);
+                found = slot;
+                break;
             }
 
             slot++;
@@ -227,7 +229,7 @@ struct HashGrid<typename T,
                 slot -= BUFFER_SIZE;
         }
 
-        return HashGridPos();
+        return HashGridPos(found, pos.key);
     }
 
     Optional<T> load(const HashGridPos pos) {
